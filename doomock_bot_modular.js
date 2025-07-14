@@ -33,13 +33,22 @@ bot.on('message', (msg) => {
     case text === '/help':
       utils(bot, msg);
       break;
-    case text === '/worktime':
+    case text.startsWith('/worktime'):
       worktime(bot, msg);
       break;
-    case text === '/fortune':
+    case text.startsWith('/fortune'):
       fortune(bot, msg);
       break;
+    case text.startsWith('/timer'):
+      timer(bot, msg);
+      break;
     case text.startsWith('/add '):
+    case text === '/todo':
+    case text === '/list':
+    case text.startsWith('/done '):
+    case text.startsWith('/delete '):
+    case text === '/clear':
+    case text.startsWith('/todo'):
       todo(bot, msg);
       break;
     default:
