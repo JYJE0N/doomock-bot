@@ -1,0 +1,12 @@
+{
+  "name": "doomock-bot",
+  "version": "1.0.0",
+  "main": "doomock_bot_modular.js",
+  "scripts": {
+    "start": "node doomock_bot_modular.js"
+  },
+  "dependencies": {
+    "dotenv": "^16.0.0",
+    "node-telegram-bot-api": "^0.61.0"
+  }
+}
