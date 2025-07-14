@@ -1,34 +1,57 @@
-class TodoManager {
-  constructor() {
-    this.todos = new Map(); // chatId -> []
-  }
+require('dotenv').config();
+const TelegramBot = require('node-telegram-bot-api');
 
-  get(chatId) {
-    return this.todos.get(chatId) || [];
-  }
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
-  add(chatId, text) {
-    const list = this.get(chatId);
-    list.push({ text, completed: false, createdAt: new Date() });
-    this.todos.set(chatId, list);
-  }
+console.log("BOT_TOKEN:", process.env.BOT_TOKEN);
 
-  complete(chatId, index) {
-    const list = this.get(chatId);
-    if (list[index]) {
-      list[index].completed = true;
-      return true;
-    }
-    return false;
-  }
+bot.on("polling_error", (err) => {
+  console.error("polling error:", err);
+  console.error("Error details:", err.message);
+  console.error("Error stack:", err.stack);
+  console.error("Error code:", err.code);
+});
 
-  delete(chatId, index) {
-    const list = this.get(chatId);
-    if (list[index]) {
-      list.splice(index, 1);
-      return true;
-    }
-    return false;
+console.log('doomock modular bot started!');
+
+// 모듈 불러오기
+const fortune = require('./fortune');
+const timer = require('./timer');
+const todo = require('./todo');
+const utils = require('./utils');
+const worktime = require('./worktime');
+
+// 메인 메시지 핸들러
+bot.on('message', (msg) => {
+  const text = msg.text;
+  const chatId = msg.chat.id;
+
+  switch (true) {
+    case text === '/start':
+      bot.sendMessage(chatId, '반가워요! /help로 사용법을 확인하세요.');
+      break;
+    case text === '/help':
+      utils(bot, msg);
+      break;
+    case text === '/worktime':
+      worktime(bot, msg);
+      break;
+    case text.startsWith('/fortune'):
+      fortune(bot, msg);
+      break;
+    case text.startsWith('/timer'):
+      timer(bot, msg);
+      break;
+    case text.startsWith('/add '):
+    case text === '/todo':
+    case text === '/list':
+    case text.startsWith('/done '):
+    case text.startsWith('/delete '):
+    case text === '/clear':
+    case text.startsWith('/todo'):
+      todo(bot, msg);
+      break;
+    default:
+      bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /help 를 입력해보세요.');
   }
-}
-module.exports = new TodoManager();
+});
