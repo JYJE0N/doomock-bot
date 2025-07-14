@@ -1,6 +1,11 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
+
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+
+console.log("BOT_TOKEN:", process.env.BOT_TOKEN);
+
+bot.on("polling_error", (err) => console.error("polling error:", JSON.stringify(err, null, 2)));
 
 console.log('doomock modular bot started!');
 
