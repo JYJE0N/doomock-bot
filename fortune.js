@@ -22,4 +22,6 @@ class FortuneManager {
     return `${card.emoji} *${card.name}* - ${card.meaning}`;
   }
 }
-module.exports = new FortuneManager();
+module.exports = function(bot, msg) {
+  // 기능 구현
+};
