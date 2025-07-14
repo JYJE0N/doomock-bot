@@ -53,3 +53,4 @@ bot.onText(/\/tarot/, (msg) => {
 });
 
 console.log("✅ doomock modular bot started!");
+bot.launch();
