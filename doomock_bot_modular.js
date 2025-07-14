@@ -13,32 +13,26 @@ const worktime = require('./worktime');
 
 // 메인 메시지 핸들러
 bot.on('message', (msg) => {
-    const text = msg.text;
-    const chatId = msg.chat.id;
+  const text = msg.text;
+  const chatId = msg.chat.id;
 
-    console.log(`Received from ${chatId}: ${text}`);
-
-    // fortune 모듈 예시
-    if (text === '/fortune') {
-        fortune(bot, msg);
-    }
-    // timer 모듈 예시
-    else if (text === '/timer') {
-        timer(bot, msg);
-    }
-    // 할일 추가 예시
-    else if (text.startsWith('/add ')) {
-        todo(bot, msg);
-    }
-    // 근무시간 확인
-    else if (text === '/worktime') {
-        worktime(bot, msg);
-    }
-    // 유틸 예시
-    else if (text === '/help') {
-        utils(bot, msg);
-    }
-    else {
-        bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /help 를 입력해보세요.');
-    }
+  switch (true) {
+    case text === '/start':
+      bot.sendMessage(chatId, '반가워요! /help로 사용법을 확인하세요.');
+      break;
+    case text === '/help':
+      utils(bot, msg);
+      break;
+    case text === '/worktime':
+      worktime(bot, msg);
+      break;
+    case text === '/fortune':
+      fortune(bot, msg);
+      break;
+    case text.startsWith('/add '):
+      todo(bot, msg);
+      break;
+    default:
+      bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /help 를 입력해보세요.');
+  }
 });
