@@ -5,7 +5,12 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
 console.log("BOT_TOKEN:", process.env.BOT_TOKEN);
 
-bot.on("polling_error", (err) => console.error("polling error:", JSON.stringify(err, null, 2)));
+bot.on("polling_error", (err) => {
+  console.error("polling error:", err);
+  console.error("Error details:", err.message);
+  console.error("Error stack:", err.stack);
+  console.error("Error code:", err.code);
+});
 
 console.log('doomock modular bot started!');
 
