@@ -1,5 +1,8 @@
 require("dotenv").config();
 const TelegramBot = require("node-telegram-bot-api");
+
+// 여기에서 process.env.BOT_TOKEN 사용
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 const Utils = require("./utils");
 const Todo = require("./todo");
 const WorkTime = require("./worktime");
