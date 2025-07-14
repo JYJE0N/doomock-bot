@@ -9,8 +9,6 @@ const WorkTime = require("./worktime");
 const Timer = require("./timer");
 const Fortune = require("./fortune");
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
-
 // 할일
 bot.onText(/\/add (.+)/, (msg, match) => {
   Todo.add(msg.chat.id, match[1]);
