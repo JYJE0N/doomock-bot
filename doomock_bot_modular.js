@@ -26,32 +26,38 @@ bot.on('message', (msg) => {
   const text = msg.text;
   const chatId = msg.chat.id;
 
-  switch (true) {
-    case text === '/start':
-      bot.sendMessage(chatId, '반가워요! /help로 사용법을 확인하세요.');
-      break;
-    case text === '/help':
-      utils(bot, msg);
-      break;
-    case text.startsWith('/worktime'):
-      worktime(bot, msg);
-      break;
-    case text.startsWith('/fortune'):
-      fortune(bot, msg);
-      break;
-    case text.startsWith('/timer'):
-      timer(bot, msg);
-      break;
-    case text.startsWith('/add '):
-    case text === '/todo':
-    case text === '/list':
-    case text.startsWith('/done '):
-    case text.startsWith('/delete '):
-    case text === '/clear':
-    case text.startsWith('/todo'):
-      todo(bot, msg);
-      break;
-    default:
-      bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /help 를 입력해보세요.');
+  // 명령어가 없으면 무시
+  if (!text || !text.startsWith('/')) {
+    return;
+  }
+
+  console.log(`받은 명령어: ${text} (사용자: ${msg.from.first_name})`);
+
+  // if-else 구조로 변경하여 중복 실행 방지
+  if (text === '/start') {
+    bot.sendMessage(chatId, '반가워요! /help로 사용법을 확인하세요.');
+  
+  } else if (text === '/help') {
+    utils(bot, msg);
+  
+  } else if (text.startsWith('/worktime')) {
+    worktime(bot, msg);
+  
+  } else if (text.startsWith('/fortune')) {
+    fortune(bot, msg);
+  
+  } else if (text.startsWith('/timer')) {
+    timer(bot, msg);
+  
+  } else if (text.startsWith('/add ') || 
+             text === '/todo' || 
+             text === '/list' || 
+             text.startsWith('/done ') || 
+             text.startsWith('/delete ') || 
+             text === '/clear') {
+    todo(bot, msg);
+  
+  } else {
+    bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /help 를 입력해보세요.');
   }
 });
