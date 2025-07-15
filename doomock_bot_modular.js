@@ -82,7 +82,7 @@ bot.onText(/\/clear_completed/, async (msg) => {
 bot.onText(/\/stats/, async (msg) => {
   const s = await todo.getTodoStats(msg.from.id);
   bot.sendMessage(msg.chat.id, 
-    `📊 *할 일 통계*\n\n총: ${s.total}, ✅ 완료: ${s.completed}, 🔲 미완료: ${s.pending}, 📈 완료율: ${s.completionRate}%`, 
+    `📊 **할 일 통계**\n\n총: ${s.total}, ✅ 완료: ${s.completed}, 🔲 미완료: ${s.pending}, 📈 완료율: ${s.completionRate}%`, 
     { parse_mode: "Markdown" }
   );
 });
@@ -114,11 +114,43 @@ bot.on('callback_query', async (query) => {
         break;
         
       case 'fortune_menu':
+        sendFortuneMenu(chatId);
+        break;
+        
+      case 'fortune_general':
         fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune' });
+        break;
+        
+      case 'fortune_work':
+        fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune work' });
+        break;
+        
+      case 'fortune_love':
+        fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune love' });
+        break;
+        
+      case 'fortune_money':
+        fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune money' });
+        break;
+        
+      case 'fortune_health':
+        fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune health' });
+        break;
+        
+      case 'fortune_meeting':
+        fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune meeting' });
         break;
         
       case 'fortune_tarot':
         fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune tarot' });
+        break;
+        
+      case 'fortune_lucky':
+        fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune lucky' });
+        break;
+        
+      case 'fortune_all':
+        fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune all' });
         break;
         
       case 'remind_menu':
@@ -154,16 +186,14 @@ bot.on('callback_query', async (query) => {
 
 // 메인 메뉴 함수
 function sendMainMenu(chatId) {
-  bot.sendMessage(chatId, '🏠 *두목봇 메인 메뉴*\n\n원하는 기능을 선택하세요 👇', {
+  bot.sendMessage(chatId, '🏠 **두목봇 메인 메뉴**\n\n원하는 기능을 선택하세요 👇', {
     parse_mode: "Markdown",
     reply_markup: {
       inline_keyboard: [
-        [{ text: '📝 할 일 관리', callback_data: 'todo_menu' }],
+        [{ text: '📝 할 일', callback_data: 'todo_menu' }, { text: '🔔 리마인드', callback_data: 'remind_menu' }],
         [{ text: '🔮 운세', callback_data: 'fortune_menu' }, { text: '🎴 타로', callback_data: 'fortune_tarot' }],
-        [{ text: '🔔 리마인드', callback_data: 'remind_menu' }],
         [{ text: '⏰ 타이머', callback_data: 'timer' }, { text: '⏱️ 근무시간', callback_data: 'worktime' }],
-        [{ text: '🗣️ TTS 테스트', callback_data: 'say_test' }],
-        [{ text: '❓ 도움말', callback_data: 'help' }]
+        [{ text: '🗣️ TTS', callback_data: 'say_test' }, { text: '❓ 도움말', callback_data: 'help' }]
       ]
     }
   });
@@ -171,7 +201,7 @@ function sendMainMenu(chatId) {
 
 // 할 일 관리 메뉴
 function sendTodoMenu(chatId) {
-  bot.sendMessage(chatId, '📝 *할 일 관리*\n\n원하는 작업을 선택하세요:', {
+  bot.sendMessage(chatId, '📝 **할 일 관리**\n\n원하는 작업을 선택하세요:', {
     parse_mode: "Markdown",
     reply_markup: {
       inline_keyboard: [
@@ -191,7 +221,7 @@ async function handleListTodos(chatId, userId) {
     return bot.sendMessage(chatId, "📭 아직 등록된 할 일이 없습니다.");
   }
   
-  let text = "📝 *할 일 목록:*\n\n";
+  let text = "📝 **할 일 목록:**\n\n";
   todosList.forEach((t, i) => {
     text += `${i + 1}. ${t.done ? "✅" : "🔲"} ${t.task}\n`;
   });
@@ -209,7 +239,7 @@ async function handleClearCompleted(chatId, userId) {
 async function handleStats(chatId, userId) {
   const s = await todo.getTodoStats(userId);
   bot.sendMessage(chatId, 
-    `📊 *할 일 통계*\n\n` +
+    `📊 **할 일 통계**\n\n` +
     `총 할 일: ${s.total}개\n` +
     `✅ 완료: ${s.completed}개\n` +
     `🔲 미완료: ${s.pending}개\n` +
@@ -234,20 +264,31 @@ function handleSayTest(chatId) {
   });
 }
 
-// 도움말
-function sendHelp(chatId) {
-  const helpText = `❓ *두목봇 도움말*\n\n` +
-    `*할 일 관리:*\n` +
-    `/add [할 일] - 할 일 추가\n` +
-    `/list - 할 일 목록 보기\n` +
-    `/done [번호] - 할 일 완료/미완료 토글\n` +
-    `/delete [번호] - 할 일 삭제\n` +
-    `/clear_completed - 완료된 할 일 모두 삭제\n` +
-    `/stats - 할 일 통계 보기\n\n` +
-    `*기타:*\n` +
-    `/say [문장] - TTS로 문장 읽기\n` +
-    `/start - 메인 메뉴 보기\n\n` +
-    `또는 메뉴 버튼을 이용하세요! 🎯`;
+// 운세 메뉴
+function sendFortuneMenu(chatId) {
+  bot.sendMessage(chatId, '🔮 **운세 메뉴**\n\n원하는 운세를 선택하세요:', {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🌟 오늘의 운세', callback_data: 'fortune_general' }, { text: '💼 업무운', callback_data: 'fortune_work' }],
+        [{ text: '💕 연애운', callback_data: 'fortune_love' }, { text: '💰 재물운', callback_data: 'fortune_money' }],
+        [{ text: '🌿 건강운', callback_data: 'fortune_health' }, { text: '🍻 회식운', callback_data: 'fortune_meeting' }],
+        [{ text: '🃏 타로카드', callback_data: 'fortune_tarot' }, { text: '🍀 행운정보', callback_data: 'fortune_lucky' }],
+        [{ text: '📊 종합운세', callback_data: 'fortune_all' }],
+        [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
+  });
+}
+  const helpText = `❓ **두목봇 도움말**\n\n` +
+    `**할 일 관리:**\n` +
+    `• 할 일 추가: "할일 [내용]"\n` +
+    `• 할 일 완료: "완료 [번호]"\n` +
+    `• 할 일 삭제: "삭제 [번호]"\n\n` +
+    `**기타 기능:**\n` +
+    `• TTS: "말해줘 [문장]"\n` +
+    `• 메뉴 보기: "메뉴"\n\n` +
+    `또는 아래 버튼을 이용하세요! 🎯`;
     
   bot.sendMessage(chatId, helpText, { parse_mode: "Markdown" });
 }
