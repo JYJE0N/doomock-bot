@@ -509,6 +509,151 @@ class WorkTimeManager {
     }
 }
 
+// TTS 메뉴 키보드
+const ttsMenuKeyboard = {
+    inline_keyboard: [
+        [
+            { text: '🎤 한국어 TTS', callback_data: 'tts_korean' },
+            { text: '🗣️ 영어 TTS', callback_data: 'tts_english' }
+        ],
+        [
+            { text: '🇯🇵 일본어 TTS', callback_data: 'tts_japanese' },
+            { text: '🇨🇳 중국어 TTS', callback_data: 'tts_chinese' }
+        ],
+        [
+            { text: '⚙️ TTS 설정', callback_data: 'tts_settings' },
+            { text: '📋 사용법', callback_data: 'tts_help' }
+        ],
+        [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+        ]
+    ]
+};
+
+// TTS 설정 키보드
+const ttsSettingsKeyboard = {
+    inline_keyboard: [
+        [
+            { text: '👨 남성 음성', callback_data: 'tts_voice_male' },
+            { text: '👩 여성 음성', callback_data: 'tts_voice_female' }
+        ],
+        [
+            { text: '🐌 느린 속도', callback_data: 'tts_speed_slow' },
+            { text: '⚡ 빠른 속도', callback_data: 'tts_speed_fast' }
+        ],
+        [
+            { text: '🔙 TTS 메뉴', callback_data: 'tts_menu' }
+        ]
+    ]
+};
+
+// TTS 관리자
+class TTSManager {
+    constructor() {
+        this.userSettings = new Map(); // userId -> { language, voice, speed }
+        this.defaultSettings = {
+            language: 'ko-KR',
+            voice: 'ko-KR-Standard-A',
+            speed: 1.0
+        };
+    }
+    
+    getUserSettings(userId) {
+        return this.userSettings.get(userId) || { ...this.defaultSettings };
+    }
+    
+    setUserSettings(userId, settings) {
+        const currentSettings = this.getUserSettings(userId);
+        this.userSettings.set(userId, { ...currentSettings, ...settings });
+    }
+    
+    getLanguageSettings() {
+        return {
+            'ko-KR': {
+                name: '한국어',
+                voices: {
+                    male: 'ko-KR-Standard-C',
+                    female: 'ko-KR-Standard-A'
+                }
+            },
+            'en-US': {
+                name: '영어',
+                voices: {
+                    male: 'en-US-Standard-B',
+                    female: 'en-US-Standard-C'
+                }
+            },
+            'ja-JP': {
+                name: '일본어',
+                voices: {
+                    male: 'ja-JP-Standard-C',
+                    female: 'ja-JP-Standard-A'
+                }
+            },
+            'zh-CN': {
+                name: '중국어',
+                voices: {
+                    male: 'zh-CN-Standard-B',
+                    female: 'zh-CN-Standard-A'
+                }
+            }
+        };
+    }
+    
+    async generateTTS(text, settings) {
+        try {
+            // Google Cloud Text-to-Speech API 설정
+            const textToSpeech = require('@google-cloud/text-to-speech');
+            const client = new textToSpeech.TextToSpeechClient({
+                keyFilename: process.env.GOOGLE_SERVICE_ACCOUNT_PATH, // 서비스 계정 키 파일 경로
+                projectId: process.env.GOOGLE_PROJECT_ID
+            });
+
+            const request = {
+                input: { text: text },
+                voice: { 
+                    languageCode: settings.language,
+                    name: settings.voice 
+                },
+                audioConfig: { 
+                    audioEncoding: 'MP3',
+                    speakingRate: settings.speed
+                },
+            };
+
+            const [response] = await client.synthesizeSpeech(request);
+            return response.audioContent;
+        } catch (error) {
+            console.error('TTS 생성 오류:', error);
+            
+            // Fallback: 간단한 TTS 응답 (실제 음성 없이)
+            return null;
+        }
+    }
+    
+    getUsageInfo() {
+        return `🎤 **TTS 사용법**\n\n` +
+               `**📱 메뉴 방식:**\n` +
+               `/start → 🎤 TTS → 언어 선택 → 텍스트 입력\n\n` +
+               `**⌨️ 명령어 방식:**\n` +
+               `/say 안녕하세요 - 한국어 TTS\n` +
+               `/say en Hello - 영어 TTS\n` +
+               `/say ja こんにちは - 일본어 TTS\n` +
+               `/say zh 你好 - 중국어 TTS\n\n` +
+               `**⚙️ 기능:**\n` +
+               `• 4개 언어 지원 (한/영/일/중)\n` +
+               `• 남성/여성 음성 선택\n` +
+               `• 속도 조절 (느림/보통/빠름)\n` +
+               `• 개인 설정 저장\n\n` +
+               `**💡 팁:**\n` +
+               `• 짧은 문장이 더 자연스럽습니다\n` +
+               `• 문장부호를 사용하면 더 자연스러워요\n` +
+               `• 설정에서 음성과 속도를 변경할 수 있어요`;
+    }
+}
+
+const ttsManager = new TTSManager();
+
 const workTimeManager = new WorkTimeManager();
 
 const reminderManager = new ReminderManager();
@@ -531,6 +676,7 @@ const mainMenuKeyboard = {
             { text: '🔔 리마인더', callback_data: 'reminder_menu' }
         ],
         [
+            { text: '🎤 TTS', callback_data: 'tts_menu' },
             { text: '❓ 도움말', callback_data: 'help_menu' }
         ]
     ]
@@ -579,6 +725,70 @@ bot.on('message', async (msg) => {
             userStates.delete(userId);
             bot.sendMessage(chatId, '❌ 작업이 취소되었습니다.');
             return;
+        }
+
+        // TTS 상태 처리
+        if (userState) {
+            if (userState.action === 'tts_input') {
+                const settings = ttsManager.getUserSettings(userId);
+                const language = userState.language || settings.language;
+                
+                try {
+                    bot.sendMessage(chatId, '🎤 음성을 생성하고 있습니다... 잠시만 기다려주세요.');
+                    
+                    // 언어별 설정 업데이트
+                    const languageSettings = ttsManager.getLanguageSettings();
+                    const langConfig = languageSettings[language];
+                    const voiceType = settings.voice.includes('Standard-A') || settings.voice.includes('Standard-C') ? 
+                                     (settings.voice.includes('A') ? 'female' : 'male') : 'female';
+                    
+                    const ttsSettings = {
+                        language: language,
+                        voice: langConfig.voices[voiceType],
+                        speed: settings.speed
+                    };
+                    
+                    const audioContent = await ttsManager.generateTTS(text, ttsSettings);
+                    
+                    if (audioContent) {
+                        // 음성 파일을 임시로 저장하고 전송
+                        const fs = require('fs');
+                        const path = require('path');
+                        const tempFileName = `tts_${Date.now()}.mp3`;
+                        const tempFilePath = path.join(__dirname, tempFileName);
+                        
+                        fs.writeFileSync(tempFilePath, audioContent, 'binary');
+                        
+                        await bot.sendVoice(chatId, tempFilePath, {
+                            caption: `🎤 "${text}" (${langConfig.name})`,
+                            reply_markup: { 
+                                inline_keyboard: [
+                                    [{ text: '🔄 다시 생성', callback_data: userState.language ? `tts_${userState.language.split('-')[0]}` : 'tts_korean' }],
+                                    [{ text: '🔙 TTS 메뉴', callback_data: 'tts_menu' }]
+                                ]
+                            }
+                        });
+                        
+                        // 임시 파일 삭제
+                        fs.unlinkSync(tempFilePath);
+                    } else {
+                        bot.sendMessage(chatId, `❌ 음성 생성에 실패했습니다.\n\n📝 입력하신 텍스트: "${text}"\n🌐 언어: ${langConfig.name}`, {
+                            reply_markup: { 
+                                inline_keyboard: [
+                                    [{ text: '🔄 다시 시도', callback_data: userState.language ? `tts_${userState.language.split('-')[0]}` : 'tts_korean' }],
+                                    [{ text: '🔙 TTS 메뉴', callback_data: 'tts_menu' }]
+                                ]
+                            }
+                        });
+                    }
+                } catch (error) {
+                    console.error('TTS 처리 오류:', error);
+                    bot.sendMessage(chatId, '❌ 음성 생성 중 오류가 발생했습니다.');
+                }
+                
+                userStates.delete(userId);
+                return;
+            }
         }
 
         // 타이머 상태 처리
@@ -753,6 +963,104 @@ bot.on('message', async (msg) => {
                 bot.sendMessage(chatId, '🤖 두목봇 메인 메뉴\n\n원하는 기능을 선택해주세요:', {
                     reply_markup: mainMenuKeyboard
                 });
+            case 'tts_menu':
+                bot.editMessageText('🎤 TTS (음성 변환) 메뉴\n\n원하는 언어를 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: ttsMenuKeyboard
+                });
+                break;
+
+            case 'tts_korean':
+                userStates.set(userId, { action: 'tts_input', language: 'ko-KR' });
+                bot.sendMessage(chatId, '🎤 **한국어 TTS**\n\n음성으로 변환할 한국어 텍스트를 입력해주세요.\n\n예: 안녕하세요, 반갑습니다!\n\n취소하려면 /cancel 을 입력하세요.');
+                break;
+
+            case 'tts_english':
+                userStates.set(userId, { action: 'tts_input', language: 'en-US' });
+                bot.sendMessage(chatId, '🗣️ **English TTS**\n\nPlease enter the English text to convert to speech.\n\nExample: Hello, nice to meet you!\n\nType /cancel to cancel.');
+                break;
+
+            case 'tts_japanese':
+                userStates.set(userId, { action: 'tts_input', language: 'ja-JP' });
+                bot.sendMessage(chatId, '🇯🇵 **日本語 TTS**\n\n音声に変換する日本語テキストを入力してください。\n\n例: こんにちは、はじめまして！\n\nキャンセルするには /cancel を入力してください。');
+                break;
+
+            case 'tts_chinese':
+                userStates.set(userId, { action: 'tts_input', language: 'zh-CN' });
+                bot.sendMessage(chatId, '🇨🇳 **中文 TTS**\n\n请输入要转换为语音的中文文本。\n\n例如: 你好，很高兴见到你！\n\n要取消请输入 /cancel');
+                break;
+
+            case 'tts_settings':
+                const currentSettings = ttsManager.getUserSettings(userId);
+                const languageSettings = ttsManager.getLanguageSettings();
+                const currentLang = languageSettings[currentSettings.language];
+                const isVoiceFemale = currentSettings.voice.includes('A');
+                const speedText = currentSettings.speed === 0.8 ? '느린' : 
+                                currentSettings.speed === 1.2 ? '빠른' : '보통';
+                
+                bot.sendMessage(chatId, 
+                    `⚙️ **TTS 설정**\n\n` +
+                    `🌐 현재 언어: ${currentLang.name}\n` +
+                    `🎭 현재 음성: ${isVoiceFemale ? '👩 여성' : '👨 남성'}\n` +
+                    `⚡ 현재 속도: ${speedText}\n\n` +
+                    `아래 버튼으로 설정을 변경하세요:`, {
+                    parse_mode: 'Markdown',
+                    reply_markup: ttsSettingsKeyboard
+                });
+                break;
+
+            case 'tts_voice_male':
+                const currentLangMale = ttsManager.getUserSettings(userId).language;
+                const langConfigMale = ttsManager.getLanguageSettings()[currentLangMale];
+                ttsManager.setUserSettings(userId, { voice: langConfigMale.voices.male });
+                bot.sendMessage(chatId, '👨 남성 음성으로 설정되었습니다!', {
+                    reply_markup: { 
+                        inline_keyboard: [[{ text: '🔙 TTS 설정', callback_data: 'tts_settings' }]] 
+                    }
+                });
+                break;
+
+            case 'tts_voice_female':
+                const currentLangFemale = ttsManager.getUserSettings(userId).language;
+                const langConfigFemale = ttsManager.getLanguageSettings()[currentLangFemale];
+                ttsManager.setUserSettings(userId, { voice: langConfigFemale.voices.female });
+                bot.sendMessage(chatId, '👩 여성 음성으로 설정되었습니다!', {
+                    reply_markup: { 
+                        inline_keyboard: [[{ text: '🔙 TTS 설정', callback_data: 'tts_settings' }]] 
+                    }
+                });
+                break;
+
+            case 'tts_speed_slow':
+                ttsManager.setUserSettings(userId, { speed: 0.8 });
+                bot.sendMessage(chatId, '🐌 느린 속도로 설정되었습니다!', {
+                    reply_markup: { 
+                        inline_keyboard: [[{ text: '🔙 TTS 설정', callback_data: 'tts_settings' }]] 
+                    }
+                });
+                break;
+
+            case 'tts_speed_fast':
+                ttsManager.setUserSettings(userId, { speed: 1.2 });
+                bot.sendMessage(chatId, '⚡ 빠른 속도로 설정되었습니다!', {
+                    reply_markup: { 
+                        inline_keyboard: [[{ text: '🔙 TTS 설정', callback_data: 'tts_settings' }]] 
+                    }
+                });
+                break;
+
+            case 'tts_help':
+                const helpText = ttsManager.getUsageInfo();
+                bot.sendMessage(chatId, helpText, {
+                    parse_mode: 'Markdown',
+                    reply_markup: { 
+                        inline_keyboard: [
+                            [{ text: '🎤 TTS 시작하기', callback_data: 'tts_korean' }],
+                            [{ text: '🔙 TTS 메뉴', callback_data: 'tts_menu' }]
+                        ]
+                    }
+                });
                 break;
             case text === '/help':
                 utils(bot, msg);
@@ -858,81 +1166,70 @@ bot.on('callback_query', async (callbackQuery) => {
                 bot.editMessageText('🔮 운세 메뉴\n\n원하는 운세를 선택해주세요:', {
                     chat_id: chatId,
                     message_id: message.message_id,
-                    reply_markup: fortuneMenuKeyboard
+                    reply_markup: {
+                        inline_keyboard: [
+                            [
+                                { text: '🌟 일반운세', callback_data: 'fortune_general' },
+                                { text: '💼 업무운', callback_data: 'fortune_work' }
+                            ],
+                            [
+                                { text: '💕 연애운', callback_data: 'fortune_love' },
+                                { text: '💰 재물운', callback_data: 'fortune_money' }
+                            ],
+                            [
+                                { text: '🌿 건강운', callback_data: 'fortune_health' },
+                                { text: '🍻 회식운', callback_data: 'fortune_meeting' }
+                            ],
+                            [
+                                { text: '🃏 타로카드', callback_data: 'fortune_tarot' },
+                                { text: '🍀 행운정보', callback_data: 'fortune_lucky' }
+                            ],
+                            [
+                                { text: '📋 종합운세', callback_data: 'fortune_all' }
+                            ],
+                            [
+                                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                            ]
+                        ]
+                    }
                 });
                 break;
 
             case 'fortune_general':
-                const generalFortune = fortuneManager.getGeneral(userId);
-                bot.sendMessage(chatId, `🌟 **오늘의 일반운세**\n\n${generalFortune}`, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                // 기존 fortune 모듈 사용
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune' });
                 break;
 
             case 'fortune_work':
-                const workFortune = fortuneManager.getWork(userId);
-                bot.sendMessage(chatId, `💼 **오늘의 업무운**\n\n${workFortune}`, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune work' });
                 break;
 
             case 'fortune_love':
-                const loveFortune = fortuneManager.getLove(userId);
-                bot.sendMessage(chatId, `💕 **오늘의 연애운**\n\n${loveFortune}`, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune love' });
                 break;
 
             case 'fortune_money':
-                const moneyFortune = fortuneManager.getMoney(userId);
-                bot.sendMessage(chatId, `💰 **오늘의 재물운**\n\n${moneyFortune}`, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune money' });
                 break;
 
             case 'fortune_health':
-                const healthFortune = fortuneManager.getHealth(userId);
-                bot.sendMessage(chatId, `🌿 **오늘의 건강운**\n\n${healthFortune}`, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune health' });
                 break;
 
             case 'fortune_meeting':
-                const meetingFortune = fortuneManager.getMeeting(userId);
-                bot.sendMessage(chatId, `🍻 **오늘의 회식운**\n\n${meetingFortune}`, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune meeting' });
                 break;
 
             case 'fortune_tarot':
-                const tarotFortune = fortuneManager.getTarot(userId);
-                bot.sendMessage(chatId, `🃏 **오늘의 타로카드**\n\n${tarotFortune}`, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune tarot' });
                 break;
 
             case 'fortune_lucky':
-                const luckyInfo = fortuneManager.getLucky(userId);
-                bot.sendMessage(chatId, luckyInfo, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune lucky' });
                 break;
 
             case 'fortune_all':
-                const userName = callbackQuery.from.first_name || "익명의 사용자";
-                const allFortune = fortuneManager.getAll(userId, userName);
-                bot.sendMessage(chatId, allFortune, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 운세 메뉴', callback_data: 'fortune_menu' }]] }
-                });
+                fortune(bot, { chat: { id: chatId }, from: { id: userId, first_name: callbackQuery.from.first_name }, text: '/fortune all' });
                 break;
 
             case 'todo_menu':
