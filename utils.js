@@ -19,10 +19,12 @@ class Utils {
   }
   
   static getCurrentTime() {
+    // 한국 시간대로 현재 시간 가져오기
     const now = new Date();
+    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
     return {
-      hours: now.getHours(),
-      minutes: now.getMinutes()
+      hours: koreaTime.getHours(),
+      minutes: koreaTime.getMinutes()
     };
   }
   
@@ -34,7 +36,11 @@ class Utils {
   }
   
   static getGreeting() {
-    const hour = new Date().getHours();
+    // 한국 시간대로 현재 시간 가져오기
+    const now = new Date();
+    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+    const hour = koreaTime.getHours();
+    
     if (hour < 6) return "새벽";
     if (hour < 12) return "아침";
     if (hour < 18) return "오후";
