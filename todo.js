@@ -6,7 +6,7 @@ let todos;
 (async () => {
   await client.connect();
   console.log("✅ MongoDB Connected");
-  const db = client.db("doomock");
+  const db = client.db("doomock"); 
   todos = db.collection("todos");
 })();
 
