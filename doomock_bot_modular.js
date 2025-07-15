@@ -58,7 +58,7 @@ bot.on('message', async (msg) => {
     if (tasks.length === 0) {
       bot.sendMessage(chatId, `📂 등록된 할 일이 없어요.`);
     } else {
-      const list = tasks.map((t, i) => `${i+1}. ${t.task} ${t.done ? '✅' : '⏳'}`).join('\n');
+      const list = tasks.map((t, i) => `${i + 1}. ${t.task} ${t.done ? '✅' : '⏳'}`).join('\n');
       bot.sendMessage(chatId, `📋 할 일 목록:\n${list}\n\n💡 완료: /done 번호\n💡 삭제: /del 번호`);
     }
 
@@ -70,8 +70,8 @@ bot.on('message', async (msg) => {
     const index = parseInt(text.substring(6)) - 1;
     const result = await todoDB.toggleTodo(msg.from.id, index);
     if (result !== null) {
-      bot.sendMessage(chatId, result ? 
-        `✅ ${index + 1}번 할 일을 완료했어요!` : 
+      bot.sendMessage(chatId, result ?
+        `✅ ${index + 1}번 할 일을 완료했어요!` :
         `📝 ${index + 1}번 할 일을 미완료로 변경했어요!`);
     } else {
       bot.sendMessage(chatId, '❌ 잘못된 번호입니다.');
@@ -99,11 +99,11 @@ bot.on('message', async (msg) => {
     remind(bot, msg);
 
   } else if (text.startsWith('/say ')) {
-  const content = text.substring(5);
-  const ttsUrl = utils.Utils.getTTSUrl(content);
-  bot.sendAudio(chatId, ttsUrl, {
-    caption: `🗣 "${content}" 를 읽어드릴게요.`
-  });
+    const content = text.substring(5);
+    const ttsUrl = utils.Utils.getTTSUrl(content);
+    bot.sendAudio(chatId, ttsUrl, {
+      caption: `🗣 "${content}" 를 읽어드릴게요.`
+    });
 
   } else if (text === '/utils' || text === '/help') {
     utils(bot, msg);
@@ -125,8 +125,8 @@ bot.on('callback_query', async (callbackQuery) => {
     bot.editMessageText('📝 **할 일 관리 메뉴**\n\n' +
       '**✏️ 추가:** /add 장보기\n' +
       '**📋 목록:** /list\n' +
-      '**✅ 완료:** /done 1 (1번 완료)\n' +
-      '**🗑️ 삭제:** /del 1 (1번 삭제)\n' +
+      '**✅ 완료:** /done 1\n' +
+      '**🗑️ 삭제:** /del 1\n' +
       '**🗑️ 전체삭제:** /clear', {
       chat_id: chatId,
       message_id: message.message_id,
@@ -137,9 +137,7 @@ bot.on('callback_query', async (callbackQuery) => {
             { text: '📋 할 일 보기', callback_data: 'show_todos' },
             { text: '🗑️ 전체 삭제', callback_data: 'clear_todos' }
           ],
-          [
-            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-          ]
+          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
         ]
       }
     });
@@ -157,10 +155,9 @@ bot.on('callback_query', async (callbackQuery) => {
         }
       });
     } else {
-      const list = tasks.map((t, i) => 
-        `${i+1}. ${t.task} ${t.done ? '✅' : '⏳'}`
+      const list = tasks.map((t, i) =>
+        `${i + 1}. ${t.task} ${t.done ? '✅' : '⏳'}`
       ).join('\n');
-      
       bot.editMessageText(`📋 **할 일 목록**\n\n${list}\n\n💡 완료: /done 번호\n💡 삭제: /del 번호`, {
         chat_id: chatId,
         message_id: message.message_id,
@@ -189,7 +186,7 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data === 'remind_menu') {
-    bot.editMessageText('🔔 리마인드 사용법:\n\n/remind 30 공부하기\n/remind 14:30 미팅\n\n시간 뒤 또는 특정 시각에 알림을 드려요.', {
+    bot.editMessageText('🔔 리마인드 사용법:\n\n/remind 30 공부하기\n/remind 14:30 미팅', {
       chat_id: chatId,
       message_id: message.message_id,
       reply_markup: {
@@ -200,7 +197,6 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data === 'fortune') {
-    // 포춘 메뉴 표시
     bot.editMessageText('🔮 **운세 메뉴**\n\n원하는 운세를 선택해주세요:', {
       chat_id: chatId,
       message_id: message.message_id,
@@ -234,18 +230,13 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data.startsWith('fortune_')) {
-    // 포춘 기능 처리
     const fortuneType = data.replace('fortune_', '');
     const fakeMsg = {
       text: `/fortune ${fortuneType === 'general' ? '' : fortuneType}`,
       chat: { id: chatId },
       from: { id: userId, first_name: callbackQuery.from.first_name }
     };
-    
-    // 포춘 함수 호출
     fortune(bot, fakeMsg);
-    
-    // 메뉴 하단에 버튼 추가
     setTimeout(() => {
       bot.sendMessage(chatId, '🎯 **다른 운세도 확인해보세요!**', {
         parse_mode: 'Markdown',
@@ -261,7 +252,7 @@ bot.on('callback_query', async (callbackQuery) => {
     }, 1000);
 
   } else if (data === 'timer') {
-    bot.editMessageText('⏰ 타이머 사용법:\n\n/timer 5 - 5분 타이머\n/timer 30 - 30분 타이머\n/timer 60 - 1시간 타이머\n\n아래 버튼을 눌러서 바로 설정할 수도 있어요!', {
+    bot.editMessageText('⏰ 타이머 사용법:\n\n/timer 5\n/timer 30\n/timer 60', {
       chat_id: chatId,
       message_id: message.message_id,
       reply_markup: {
@@ -283,17 +274,13 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data.startsWith('timer_')) {
-    // 타이머 기능 처리
     const minutes = data.replace('timer_', '');
     const fakeMsg = {
       text: `/timer ${minutes}`,
       chat: { id: chatId },
       from: { id: userId }
     };
-    
     timer(bot, fakeMsg);
-    
-    // 메뉴로 돌아가기 버튼
     setTimeout(() => {
       bot.sendMessage(chatId, '⏰ 타이머가 설정되었습니다!', {
         reply_markup: {
@@ -308,88 +295,44 @@ bot.on('callback_query', async (callbackQuery) => {
     }, 1000);
 
   } else if (data === 'worktime') {
-    // 근무시간 정보 표시
-    const now = new Date();
-    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-    
-    // 근무시간 설정 (08:30 - 17:30)
-    const startTime = new Date(koreaTime);
-    startTime.setHours(8, 30, 0, 0);
-    
-    const endTime = new Date(koreaTime);
-    endTime.setHours(17, 30, 0, 0);
-    
-    const currentTime = koreaTime.toLocaleTimeString('ko-KR', { 
-      hour: '2-digit', 
-      minute: '2-digit' 
+    worktime(bot, {
+      chat: { id: chatId },
+      from: { id: userId }
     });
-    
-    let workMessage = `⏱️ **근무시간 체크**\n\n🕐 현재 시간: ${currentTime}\n📋 근무시간: 08:30 - 17:30\n\n`;
-    
-    if (koreaTime < startTime) {
-      const timeDiff = startTime - koreaTime;
-      const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-      workMessage += `🌅 출근까지 ${hours}시간 ${minutes}분 남았어요!`;
-    } else if (koreaTime > endTime) {
-      workMessage += `🎉 퇴근시간이 지났어요! 수고하셨습니다!`;
-    } else {
-      const timeDiff = endTime - koreaTime;
-      const hours = Math.floor(timeDiff / (1000 * 60 * 60));
-      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
-      workMessage += `⏰ 퇴근까지 ${hours}시간 ${minutes}분 남았어요!`;
-    }
 
-    bot.editMessageText(workMessage, {
+  } else if (data === 'utils') {
+    bot.editMessageText('🎲 **유틸리티 메뉴**\n\n필요한 기능을 선택하세요:', {
       chat_id: chatId,
       message_id: message.message_id,
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [
-            { text: '🔄 새로고침', callback_data: 'worktime' },
-            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-          ]
+          [{ text: '🗣️ 말하기 테스트', callback_data: 'say_test' }],
+          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
         ]
       }
     });
-
-  } else if (data === 'utils') {
-  bot.editMessageText('🎲 **유틸리티 메뉴**\n\n필요한 기능을 선택하세요:', {
-    chat_id: chatId,
-    message_id: message.message_id,
-    parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '🗣️ 말하기 테스트', callback_data: 'say_test' }],
-        [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
-      ]
-    }
-  });
 
   } else if (data === 'say_test') {
-  const content = "안녕하세요! 두목봇 테스트 음성입니다.";
-  const ttsUrl = utils.Utils.getTTSUrl(content);
-
-  bot.sendAudio(chatId, ttsUrl, {
-    caption: `🗣 "${content}" 를 읽어드릴게요.`
-  });
-
-  setTimeout(() => {
-    bot.sendMessage(chatId, '🎲 **유틸리티 메뉴로 돌아갑니다**', {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🎲 유틸리티', callback_data: 'utils' }],
-          [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
-        ]
-      }
+    const content = "안녕하세요! 두목봇 테스트 음성입니다.";
+    const ttsUrl = utils.Utils.getTTSUrl(content);
+    bot.sendAudio(chatId, ttsUrl, {
+      caption: `🗣 "${content}" 를 읽어드릴게요.`
     });
-  }, 1000);
-}
+    setTimeout(() => {
+      bot.sendMessage(chatId, '🎲 **유틸리티 메뉴로 돌아갑니다**', {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🎲 유틸리티', callback_data: 'utils' }],
+            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+          ]
+        }
+      });
+    }, 1000);
 
   } else if (data === 'help') {
-    bot.editMessageText('❓ **두목봇 사용법**\n\n📝 **할 일 관리:** /add, /list, /clear, /done, /del\n🔮 **운세:** 오늘의 운세 확인\n⏰ **타이머:** 시간 알림 설정\n⏱️ **근무시간:** 출퇴근 기록\n🎲 **유틸리티:** 재미있는 기능들\n\n모든 기능은 /start 메뉴에서 사용할 수 있어요!', {
+    bot.editMessageText('❓ **두목봇 사용법**\n\n📝 할 일 / 🔮 운세 / ⏰ 타이머 / ⏱️ 근무시간 등은 /start 메뉴에서 사용할 수 있어요!', {
       chat_id: chatId,
       message_id: message.message_id,
       parse_mode: 'Markdown',
