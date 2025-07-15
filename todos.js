@@ -8,6 +8,11 @@ const mongoUrl = process.env.MONGO_URL ||
 console.log("DEBUG MONGO_URL:", mongoUrl);
 console.log("🔍 All MONGO env vars:", Object.keys(process.env).filter(k => k.includes('MONGO')));
 
+if (!mongoUrl.startsWith("mongodb://") && !mongoUrl.startsWith("mongodb+srv://")) {
+  console.error("🚨 Invalid MONGO_URL detected:", mongoUrl);
+  process.exit(1);  // 잘못된 URL일 때 강제 종료
+}
+
 const client = new MongoClient(mongoUrl);
 let todos;
 let isConnected = false;
@@ -156,7 +161,7 @@ exports.editTodo = async function(userId, todoIndex, newTask) {
   }
 };
 
-// 완료된 할 일들만 삭제
+// 완료된 할 일만 삭제
 exports.clearCompletedTodos = async function(userId) {
   try {
     await ensureConnection();
@@ -194,7 +199,7 @@ exports.getTodoStats = async function(userId) {
   }
 };
 
-// 데이터베이스 연결 종료 (앱 종료 시 사용)
+// 데이터베이스 연결 종료
 exports.closeConnection = async function() {
   try {
     await client.close();
@@ -205,5 +210,5 @@ exports.closeConnection = async function() {
   }
 };
 
-// 초기 연결 시도
+// 초기 연결
 connectDB().catch(console.error);
