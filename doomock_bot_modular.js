@@ -50,11 +50,8 @@ bot.onText(/\/list/, async (msg) => {
     return bot.sendMessage(msg.chat.id, "📭 아직 등록된 할 일이 없습니다.");
   }
   
-  let text = "📝 *할 일 목록:*\n";
-  todosList.forEach((t, i) => {
-    text += `${i + 1}. ${t.done ? "✅" : "🔲"} ${t.task}\n`;
-  });
-  
+  let text = "📝 **할 일 목록:**\n";
+  todosList.forEach((t, i) => text += `${i + 1}. ${t.done ? "✅" : "🔲"} ${t.task}\n`);
   bot.sendMessage(msg.chat.id, text, { parse_mode: "Markdown" });
 });
 
@@ -214,6 +211,23 @@ function sendTodoMenu(chatId) {
   });
 }
 
+// 운세 메뉴
+function sendFortuneMenu(chatId) {
+  bot.sendMessage(chatId, '🔮 **운세 메뉴**\n\n원하는 운세를 선택하세요:', {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🌟 오늘의 운세', callback_data: 'fortune_general' }, { text: '💼 업무운', callback_data: 'fortune_work' }],
+        [{ text: '💕 연애운', callback_data: 'fortune_love' }, { text: '💰 재물운', callback_data: 'fortune_money' }],
+        [{ text: '🌿 건강운', callback_data: 'fortune_health' }, { text: '🍻 회식운', callback_data: 'fortune_meeting' }],
+        [{ text: '🃏 타로카드', callback_data: 'fortune_tarot' }, { text: '🍀 행운정보', callback_data: 'fortune_lucky' }],
+        [{ text: '📊 종합운세', callback_data: 'fortune_all' }],
+        [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
+  });
+}
+
 // 할 일 목록 처리
 async function handleListTodos(chatId, userId) {
   const todosList = await todo.getTodos(userId) || [];
@@ -264,22 +278,8 @@ function handleSayTest(chatId) {
   });
 }
 
-// 운세 메뉴
-function sendFortuneMenu(chatId) {
-  bot.sendMessage(chatId, '🔮 **운세 메뉴**\n\n원하는 운세를 선택하세요:', {
-    parse_mode: "Markdown",
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '🌟 오늘의 운세', callback_data: 'fortune_general' }, { text: '💼 업무운', callback_data: 'fortune_work' }],
-        [{ text: '💕 연애운', callback_data: 'fortune_love' }, { text: '💰 재물운', callback_data: 'fortune_money' }],
-        [{ text: '🌿 건강운', callback_data: 'fortune_health' }, { text: '🍻 회식운', callback_data: 'fortune_meeting' }],
-        [{ text: '🃏 타로카드', callback_data: 'fortune_tarot' }, { text: '🍀 행운정보', callback_data: 'fortune_lucky' }],
-        [{ text: '📊 종합운세', callback_data: 'fortune_all' }],
-        [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
-      ]
-    }
-  });
-}
+// 도움말
+function sendHelp(chatId) {
   const helpText = `❓ **두목봇 도움말**\n\n` +
     `**할 일 관리:**\n` +
     `• 할 일 추가: "할일 [내용]"\n` +
