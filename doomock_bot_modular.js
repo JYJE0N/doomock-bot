@@ -141,15 +141,16 @@ bot.on('callback_query', async (callbackQuery) => {
     }
   });
 }
-  } else if (data === 'utils') {
-    // utils 모듈 호출
-    const fakeMsg = { chat: { id: chatId }, from: { id: chatId } };
-    utils(bot, fakeMsg);
-    bot.editMessageReplyMarkup({
-      inline_keyboard: [
-        [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
-      ]
-    }, { chat_id: chatId, message_id: message.message_id });
+  // 올바른 형태
+} else if (data === 'utils') {
+  bot.editMessageText('🎲 유틸리티 메뉴...', {
+    chat_id: chatId,
+    message_id: message.message_id,
+    reply_markup: {
+      inline_keyboard: [...]
+    }
+  });  // <- 이렇게 }); 로 끝나야 함
+}
   } else if (data === 'help') {
     bot.editMessageText('❓ 두목봇 사용법:\n\n📝 할 일 관리: /add, /list, /clear\n🔮 운세: 오늘의 운세 확인\n⏰ 타이머: 시간 알림 설정\n⏱️ 근무시간: 출퇴근 기록\n🎲 유틸리티: 재미있는 기능들\n\n모든 기능은 /start 메뉴에서 사용할 수 있어요!', {
       chat_id: chatId,
