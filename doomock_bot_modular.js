@@ -126,14 +126,21 @@ bot.on('callback_query', async (callbackQuery) => {
       }
     });
   } else if (data === 'worktime') {
-    // worktime 모듈 호출
-    const fakeMsg = { chat: { id: chatId }, from: { id: chatId } };
-    worktime(bot, fakeMsg);
-    bot.editMessageReplyMarkup({
+  // worktime 기능을 직접 구현
+  const now = new Date();
+  const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+  const timeString = koreaTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  
+  bot.editMessageText(`⏱️ 근무시간 체크\n\n🕐 현재 시간: ${timeString}\n\n📋 회사 근무시간: 08:30 - 17:30`, {
+    chat_id: chatId,
+    message_id: message.message_id,
+    reply_markup: {
       inline_keyboard: [
         [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
       ]
-    }, { chat_id: chatId, message_id: message.message_id });
+    }
+  });
+}
   } else if (data === 'utils') {
     // utils 모듈 호출
     const fakeMsg = { chat: { id: chatId }, from: { id: chatId } };
