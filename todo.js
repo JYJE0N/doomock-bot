@@ -37,7 +37,7 @@ function handleTodo(bot, msg) {
      } else {
        let message = '📋 **할일 목록**\n\n';
        userTodos.forEach((todo, index) => {
-         const status = todo.completed ? '✅' : '⭕';
+         const status = todo.completed ? '✅' : '📌';
          message += `${index + 1}. ${status} ${todo.text}\n`;
        });
        message += `\n총 ${userTodos.length}개의 할일`;
