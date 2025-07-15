@@ -1,68 +1,67 @@
-// monthly_leave.js - 월차 관리 (todos.js 스타일)
-const { MongoClient } = require('mongodb');
-// 여러 환경 변수 시도
+const { MongoClient } = require("mongodb");
+
+// 여러 환경 변수 시도 (todos.js와 동일)
 const mongoUrl = process.env.MONGO_URL || 
                  process.env.MONGO_PUBLIC_URL || 
                  process.env.MONGODB_URI ||
                  process.env.MONGO_URI ||
                  `mongodb://${process.env.MONGOUSER}:${process.env.MONGOPASSWORD}@${process.env.MONGOHOST}:${process.env.MONGOPORT}`;
 
+console.log("📅 MonthlyLeaveManager: MongoDB URL 확인");
+console.log("🔍 All MONGO env vars:", Object.keys(process.env).filter(k => k.includes('MONGO')));
+
+if (!mongoUrl.startsWith("mongodb://") && !mongoUrl.startsWith("mongodb+srv://")) {
+  console.error("🚨 Invalid MONGO_URL detected:", mongoUrl);
+  process.exit(1);
+}
+
+const client = new MongoClient(mongoUrl);
+let monthlyLeaves;
+let isConnected = false;
+
+// MongoDB 연결 함수
+async function connectDB() {
+  if (!isConnected) {
+    try {
+      await client.connect();
+      console.log("✅ MonthlyLeaveManager: MongoDB Connected");
+      const db = client.db("test"); // todos.js와 동일한 DB 사용
+      monthlyLeaves = db.collection("monthly_leaves");
+      isConnected = true;
+    } catch (error) {
+      console.error("❌ MonthlyLeaveManager MongoDB Connection Error:", error.message);
+      throw error;
+    }
+  }
+}
+
+// 연결 확인 함수
+async function ensureConnection() {
+  if (!isConnected) {
+    await connectDB();
+  }
+}
+
+// 한국 시간 가져오기
+function getKoreaTime() {
+  return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+}
+
+// 현재 년도 가져오기
+function getCurrentYear() {
+  return getKoreaTime().getFullYear();
+}
+
 class MonthlyLeaveManager {
-    constructor() {
-        this.client = null;
-        this.db = null;
-        this.collection = null;
-        this.isConnected = false;
-    }
-
-    async connect() {
-        if (this.isConnected && this.client) {
-            return;
-        }
-
-        try {
-            console.log('📅 MonthlyLeaveManager: MongoDB 연결 시도...');
-            
-            this.client = new MongoClient(process.env.MONGODB_URI, {
-                serverSelectionTimeoutMS: 5000,
-                connectTimeoutMS: 5000,
-            });
-            
-            await this.client.connect();
-            this.db = this.client.db('telegram_bot');
-            this.collection = this.db.collection('monthly_leaves');
-            this.isConnected = true;
-            
-            console.log('✅ MonthlyLeaveManager: MongoDB 연결 성공');
-        } catch (error) {
-            console.error('❌ MonthlyLeaveManager MongoDB 연결 실패:', error.message);
-            throw error;
-        }
-    }
-
-    getKoreaTime() {
-        return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-    }
-
-    getCurrentYear() {
-        return this.getKoreaTime().getFullYear();
-    }
-
-    async ensureConnection() {
-        if (!this.isConnected) {
-            await this.connect();
-        }
-    }
-
     async initializeUser(userId) {
         try {
-            await this.ensureConnection();
+            await ensureConnection();
             
-            const currentYear = this.getCurrentYear();
+            const currentYear = getCurrentYear();
             const userKey = `${userId}_${currentYear}`;
             
             // 이미 존재하는지 확인
-            const existingUser = await this.collection.findOne({ 
+            const existingUser = await monthlyLeaves.findOne({ 
                 userKey: userKey,
                 year: currentYear 
             });
@@ -76,11 +75,11 @@ class MonthlyLeaveManager {
                     usedLeaves: 0,
                     remainingLeaves: 15,
                     leaveHistory: [],
-                    createdAt: this.getKoreaTime(),
-                    updatedAt: this.getKoreaTime()
+                    createdAt: getKoreaTime(),
+                    updatedAt: getKoreaTime()
                 };
                 
-                await this.collection.insertOne(newUser);
+                await monthlyLeaves.insertOne(newUser);
                 console.log(`✅ 사용자 ${userId} 연차 정보 초기화 완료`);
             }
         } catch (error) {
@@ -91,19 +90,19 @@ class MonthlyLeaveManager {
 
     async getUserLeaves(userId) {
         try {
-            await this.ensureConnection();
+            await ensureConnection();
             
-            const currentYear = this.getCurrentYear();
+            const currentYear = getCurrentYear();
             const userKey = `${userId}_${currentYear}`;
             
-            let user = await this.collection.findOne({ 
+            let user = await monthlyLeaves.findOne({ 
                 userKey: userKey,
                 year: currentYear 
             });
 
             if (!user) {
                 await this.initializeUser(userId);
-                user = await this.collection.findOne({ 
+                user = await monthlyLeaves.findOne({ 
                     userKey: userKey,
                     year: currentYear 
                 });
@@ -118,9 +117,9 @@ class MonthlyLeaveManager {
 
     async setTotalLeaves(userId, totalLeaves) {
         try {
-            await this.ensureConnection();
+            await ensureConnection();
             
-            const currentYear = this.getCurrentYear();
+            const currentYear = getCurrentYear();
             const userKey = `${userId}_${currentYear}`;
             
             await this.initializeUser(userId);
@@ -128,13 +127,13 @@ class MonthlyLeaveManager {
             const user = await this.getUserLeaves(userId);
             const newRemaining = totalLeaves - user.usedLeaves;
             
-            await this.collection.updateOne(
+            await monthlyLeaves.updateOne(
                 { userKey: userKey, year: currentYear },
                 { 
                     $set: { 
                         totalLeaves: totalLeaves,
                         remainingLeaves: newRemaining,
-                        updatedAt: this.getKoreaTime()
+                        updatedAt: getKoreaTime()
                     }
                 }
             );
@@ -149,9 +148,9 @@ class MonthlyLeaveManager {
 
     async useLeave(userId, days, reason = '') {
         try {
-            await this.ensureConnection();
+            await ensureConnection();
             
-            const currentYear = this.getCurrentYear();
+            const currentYear = getCurrentYear();
             const userKey = `${userId}_${currentYear}`;
             
             const user = await this.getUserLeaves(userId);
@@ -164,19 +163,19 @@ class MonthlyLeaveManager {
             const newRemaining = user.remainingLeaves - days;
             
             const leaveRecord = {
-                date: this.getKoreaTime(),
+                date: getKoreaTime(),
                 days: days,
                 reason: reason,
                 type: days === 0.5 ? '반차' : '연차'
             };
 
-            await this.collection.updateOne(
+            await monthlyLeaves.updateOne(
                 { userKey: userKey, year: currentYear },
                 { 
                     $set: { 
                         usedLeaves: newUsed,
                         remainingLeaves: newRemaining,
-                        updatedAt: this.getKoreaTime()
+                        updatedAt: getKoreaTime()
                     },
                     $push: { leaveHistory: leaveRecord }
                 }
@@ -242,12 +241,17 @@ class MonthlyLeaveManager {
     }
 
     async close() {
-        if (this.client) {
-            await this.client.close();
-            this.isConnected = false;
+        try {
+            await client.close();
             console.log('📅 MonthlyLeaveManager: MongoDB 연결 종료');
+            isConnected = false;
+        } catch (error) {
+            console.error("❌ Close Connection Error:", error.message);
         }
     }
 }
+
+// 초기 연결
+connectDB().catch(console.error);
 
 module.exports = MonthlyLeaveManager;
