@@ -47,7 +47,41 @@ bot.on('callback_query', async (callbackQuery) => {
 
   bot.answerCallbackQuery(callbackQuery.id);
 
-  if (data === 'utils') {
+  if (data === 'fortune') {
+    fortune(bot, { 
+      chat: { id: chatId }, 
+      from: { id: userId }, 
+      message_id: message.message_id,
+      text: '/fortune' 
+    });
+
+  } else if (data === 'tarot') {
+    fortune(bot, { 
+      chat: { id: chatId }, 
+      from: { id: userId }, 
+      message_id: message.message_id,
+      text: '/fortune_tarot'
+    });
+
+  } else if (data === 'remind_menu') {
+    remind(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id });
+
+  } else if (data === 'timer') {
+    timer(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id });
+
+  } else if (data === 'worktime') {
+    worktime(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id });
+
+  } else if (data === 'todo_menu') {
+    bot.sendMessage(chatId, '📝 할 일 메뉴입니다.\n\n- /add 로 할 일 추가\n- /list 로 목록 보기\n- /done 으로 완료 표시', {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
+        ]
+      }
+    });
+
+  } else if (data === 'utils') {
     bot.editMessageText('🎲 **유틸리티 메뉴**\n\n필요한 기능을 선택하세요:', {
       chat_id: chatId,
       message_id: message.message_id,
@@ -72,42 +106,6 @@ bot.on('callback_query', async (callbackQuery) => {
       caption: `🗣 "${content}" 를 읽어드릴게요.`
     }).then(sentMsg => {
       lastAudio[chatId] = sentMsg.message_id;
-    });
-
-    setTimeout(() => {
-      bot.sendMessage(chatId, '🎲 **유틸리티 메뉴로 돌아갑니다**', {
-        parse_mode: 'Markdown',
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: '🎲 유틸리티', callback_data: 'utils' }],
-            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
-          ]
-        }
-      });
-    }, 1000);
-
-  } else if (data === 'fortune') {
-    fortune(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id });
-
-  } else if (data === 'tarot') {
-    fortune(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id, type: 'tarot' });
-
-  } else if (data === 'remind_menu') {
-    remind(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id });
-
-  } else if (data === 'timer') {
-    timer(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id });
-
-  } else if (data === 'worktime') {
-    worktime(bot, { chat: { id: chatId }, from: { id: userId }, message_id: message.message_id });
-
-  } else if (data === 'todo_menu') {
-    bot.sendMessage(chatId, '📝 할 일 메뉴입니다.\n\n- /add 로 할 일 추가\n- /list 로 목록 보기\n- /done 으로 완료 표시', {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
-        ]
-      }
     });
 
   } else if (data === 'help') {
