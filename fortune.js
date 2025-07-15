@@ -274,16 +274,29 @@ module.exports = function(bot, msg) {
     // 도움말
     bot.sendMessage(chatId, 
       '🔮 **운세 사용법**\n\n' +
+      '**📱 메뉴 방식:**\n' +
+      '/start → 🔮 운세 → 원하는 운세 선택\n\n' +
+      '**⌨️ 명령어 방식:**\n' +
       '/fortune - 오늘의 일반 운세\n' +
       '/fortune work - 오늘의 업무운\n' +
       '/fortune love - 오늘의 연애운\n' +
       '/fortune money - 오늘의 재물운\n' +
       '/fortune health - 오늘의 건강운\n' +
-      '/fortune meeting - 오늘의 회식운 🆕\n' +
-      '/fortune tarot - 오늘의 타로카드 (메이저 아르카나)\n' +
-      '/fortune lucky - 오늘의 행운 정보\n' +
-      '/fortune all - 종합 운세 🆕\n\n' +
-      '✨ 당신만의 특별한 운세를 확인해보세요!', 
+      '/fortune meeting - 오늘의 회식운\n' +
+      '/fortune tarot - 오늘의 타로카드 (메이저 아르카나 22장)\n' +
+      '/fortune lucky - 오늘의 행운 정보 (로또 번호 포함)\n' +
+      '/fortune all - 종합 운세 (모든 운세 한 번에)\n\n' +
+      '✨ **특징:**\n' +
+      '• 개인별 맞춤 운세 (같은 날 같은 결과)\n' +
+      '• 실제 이름으로 개인화\n' +
+      '• 한국 시간 기준\n' +
+      '• 매일 새로운 운세\n\n' +
+      '🎯 **사용 예시:**\n' +
+      '• 빠른 확인: /fortune\n' +
+      '• 상세 확인: /fortune all\n' +
+      '• 재미: /fortune tarot\n' +
+      '• 로또: /fortune lucky\n\n' +
+      '당신만의 특별한 운세를 확인해보세요! 🌟', 
       { parse_mode: 'Markdown' }
     );
   }
