@@ -1,6 +1,8 @@
 const { MongoClient } = require("mongodb");
 
-const client = new MongoClient(process.env.mongodb://mongo:qchZyqLIOOYbZRuSxkzccTqXTkTuxBdJ@mongodb.railway.internal:27017);  // 여기!! 환경변수 이름 MONGO_URL
+console.log("DEBUG MONGO_URL:", process.env.MONGO_URL);
+
+const client = new MongoClient(process.env.MONGO_URL); // ✅ 이렇게 고쳐야 해
 let todos;
 
 (async () => {
