@@ -2,7 +2,7 @@
   "name": "doomock-bot",
   "version": "1.0.0",
   "description": "Telegram todo bot with MongoDB",
-  "main": "index.js",
+  "main": "doomock_bot_modular.js",
   "scripts": {
     "start": "node index.js"
   },
