@@ -148,7 +148,7 @@ class FortuneManager {
   }
   
   // 종합 운세 메소드
-  getAll(userId) {
+  getAll(userId, userName) {
     const general = this.getGeneral(userId);
     const work = this.getWork(userId);
     const love = this.getLove(userId);
@@ -156,7 +156,7 @@ class FortuneManager {
     const health = this.getHealth(userId);
     const meeting = this.getMeeting(userId);
     
-    return `🔮 **${this.getUserName(userId)}님의 오늘 종합운세**\n\n` +
+    return `🔮 **${userName}님의 오늘 종합운세**\n\n` +
            `**🌟 전체운:** ${general}\n\n` +
            `**💼 업무운:** ${work}\n\n` +
            `**💕 연애운:** ${love}\n\n` +
@@ -210,6 +210,7 @@ class FortuneManager {
   }
   
   getUserName(userId) {
+    // 이 메소드는 더 이상 사용하지 않음 (실제 사용자 이름 사용)
     const names = ["용감한", "지혜로운", "따뜻한", "밝은", "성실한", "창의적인", "친절한", "멋진"];
     return names[userId % names.length];
   }
@@ -265,7 +266,8 @@ module.exports = function(bot, msg) {
     
   } else if (text === '/fortune all') {
     // 종합 운세
-    const allFortune = fortuneManager.getAll(userId);
+    const userName = msg.from.first_name || "익명의 사용자";
+    const allFortune = fortuneManager.getAll(userId, userName);
     bot.sendMessage(chatId, allFortune, { parse_mode: 'Markdown' });
     
   } else if (text.startsWith('/fortune')) {
