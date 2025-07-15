@@ -1,4 +1,17 @@
-const { Utils } = require('./utils');
+// Utils 함수들을 직접 정의
+const timeToMinutes = (time) => {
+  return time.hours * 60 + time.minutes;
+};
+
+const formatTimeString = (time) => {
+  const hours = time.hours.toString().padStart(2, '0');
+  const minutes = time.minutes.toString().padStart(2, '0');
+  return `${hours}:${minutes}`;
+};
+
+const getUserName = (msg) => {
+  return msg.from.first_name || msg.from.username || '사용자';
+};
 
 // 고정된 근무시간 상수
 const WORK_SCHEDULE = {
@@ -8,8 +21,8 @@ const WORK_SCHEDULE = {
 
 class WorkTimeManager {
   calculateWorkHours() {
-    const startMinutes = Utils.timeToMinutes(WORK_SCHEDULE.start);
-    const endMinutes = Utils.timeToMinutes(WORK_SCHEDULE.end);
+    const startMinutes = timeToMinutes(WORK_SCHEDULE.start);
+    const endMinutes = timeToMinutes(WORK_SCHEDULE.end);
     const totalMinutes = endMinutes - startMinutes;
     
     const hours = Math.floor(totalMinutes / 60);
@@ -67,8 +80,8 @@ class WorkTimeManager {
   }
   
   formatSchedule() {
-    const startTime = Utils.formatTimeString(WORK_SCHEDULE.start);
-    const endTime = Utils.formatTimeString(WORK_SCHEDULE.end);
+    const startTime = formatTimeString(WORK_SCHEDULE.start);
+    const endTime = formatTimeString(WORK_SCHEDULE.end);
     const workHours = this.calculateWorkHours();
     
     return `⏰ 회사 근무시간\n시작: ${startTime}\n종료: ${endTime}\n총 근무시간: ${workHours.hours}시간 ${workHours.minutes}분`;
@@ -81,7 +94,7 @@ const workTimeManager = new WorkTimeManager();
 module.exports = function(bot, msg) {
   const text = msg.text;
   const chatId = msg.chat.id;
-  const userName = Utils.getUserName(msg);
+  const userName = getUserName(msg);
   
   if (text === '/worktime') {
     // 현재 업무시간 및 상태 보기
@@ -90,11 +103,11 @@ module.exports = function(bot, msg) {
     
     bot.sendMessage(chatId, `${scheduleText}\n\n${status.message}`);
     
-  } else if (text.startsWith('/worktime')) {
+  } else if (text && text.startsWith('/worktime')) {
     // 도움말
     bot.sendMessage(chatId, 
       '💼 근무시간 정보:\n\n' +
-      '⏰ 회사 근무시간은 고정되어 있습니다.\n' +
+      '⏰ 돈을 벌면 좋읍니다.\n' +
       '• 시작: 08:30\n' +
       '• 종료: 17:30\n' +
       '• 총 근무시간: 9시간\n\n' +
