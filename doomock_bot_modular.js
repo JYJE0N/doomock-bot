@@ -39,6 +39,21 @@ bot.onText(/\/say$/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, "😅 읽을 문장을 입력해주세요.\n예: `/say 안녕하세요`", { parse_mode: "Markdown" });
 });
+//할일 추가
+// /add 명령어 : 할 일 추가
+bot.onText(/\/add (.+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const task = match[1];
+
+  if (!task) {
+    bot.sendMessage(chatId, "😅 추가할 할 일을 입력해주세요.\n예: `/add 설거지`", { parse_mode: "Markdown" });
+    return;
+  }
+
+  await todo.addTodo(userId, task);
+  bot.sendMessage(chatId, `✅ 할 일을 추가했습니다: ${task}`);
+});
 
 // 메인 메뉴 인라인 버튼
 function sendMainMenu(chatId) {
