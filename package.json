@@ -2,10 +2,10 @@
   "name": "doomock-telegram-bot",
   "version": "1.0.0",
   "description": "Modular Telegram Bot with Monthly Leave Management",
-  "main": "doomock_bot_with_leave.js",
+  "main": "doomock_bot_modular.js",
   "scripts": {
-    "start": "node doomock_bot_with_leave.js",
-    "dev": "nodemon doomock_bot_with_leave.js",
+    "start": "node doomock_bot_modular.js",
+    "dev": "nodemon doomock_bot_modular.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
