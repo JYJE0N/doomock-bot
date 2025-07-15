@@ -1,6 +1,6 @@
 const { MongoClient } = require("mongodb");
 
-console.log("DEBUG MONGO_URL:", process.env.MONGO_URL);
+console.log("DEBUG MONGO_URL:", process.env.MONGO_PUBLIC_URL);
 
 const client = new MongoClient(process.env.MONGO_PUBLIC_URL); // ✅ 이렇게 고쳐야 해
 let todos;
