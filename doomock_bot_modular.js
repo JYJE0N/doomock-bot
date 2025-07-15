@@ -24,7 +24,11 @@ bot.setMyCommands([
   { command: 'timer', description: '⏰ 타이머' },
   { command: 'worktime', description: '⏱️ 근무시간' },
   { command: 'remind', description: '🔔 리마인드' }
-]);
+]).then(() => {
+  console.log("✅ 봇 명령어 메뉴가 설정되었습니다!");
+}).catch(err => {
+  console.error("❌ 봇 명령어 설정 실패:", err);
+});
 
 const lastAudio = {};
 
