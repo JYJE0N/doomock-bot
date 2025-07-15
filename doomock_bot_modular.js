@@ -2,16 +2,9 @@ require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
 
 // polling 방식
-const bot = new TelegramBot(process.env.BOT_TOKEN, {
-  polling: true
-});
+const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
 console.log("BOT_TOKEN:", process.env.BOT_TOKEN);
-
-bot.on('polling_error', (err) => {
-  console.log('Polling error:', err);
-});
-
 console.log('doomock modular bot started!');
 
 // 모듈 불러오기
@@ -20,6 +13,12 @@ const timer = require('./timer');
 const todo = require('./todo');
 const utils = require('./utils');
 const worktime = require('./worktime');
+const remind = require('./remind');  // 추가
+
+// polling error 로그
+bot.on('polling_error', (err) => {
+  console.log('Polling error:', err);
+});
 
 // 메인 메시지 핸들러
 bot.on('message', (msg) => {
@@ -52,6 +51,7 @@ bot.on('message', (msg) => {
           { text: '💼 근무시간', callback_data: 'worktime' }
         ],
         [
+          { text: '🔔 리마인드', callback_data: 'remind_menu' },
           { text: '❓ 도움말', callback_data: 'help' }
         ]
       ]
@@ -78,6 +78,9 @@ bot.on('message', (msg) => {
              text === '/clear') {
     todo(bot, modifiedMsg);
 
+  } else if (text.startsWith('/remind ')) {
+    remind(bot, modifiedMsg);
+
   } else {
     bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /help 를 입력해보세요.');
   }
@@ -96,6 +99,12 @@ bot.on('callback_query', (callbackQuery) => {
 
   } else if (data === 'worktime') {
     worktime(bot, { ...callbackQuery.message, from: callbackQuery.from, text: '/worktime' });
+
+  } else if (data === 'remind_menu') {
+    bot.editMessageText('🔔 리마인드 사용법:\n\n/remind [분] 내용\n예: /remind 30 독서하기\n\n/remind HH:MM 내용\n예: /remind 14:30 미팅', {
+      chat_id: chatId,
+      message_id: message.message_id
+    });
 
   } else if (data === 'todo_menu') {
     const todoKeyboard = {
@@ -177,6 +186,7 @@ bot.on('callback_query', (callbackQuery) => {
           { text: '💼 근무시간', callback_data: 'worktime' }
         ],
         [
+          { text: '🔔 리마인드', callback_data: 'remind_menu' },
           { text: '❓ 도움말', callback_data: 'help' }
         ]
       ]
