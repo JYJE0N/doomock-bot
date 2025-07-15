@@ -10,6 +10,22 @@ const utils = require('./utils');
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 console.log("✅ 두목봇 started!");
 
+// 봇 명령어 메뉴 설정 (그룹채팅 왼쪽 삼선메뉴)
+bot.setMyCommands([
+  { command: 'start', description: '🏠 메인 메뉴' },
+  { command: 'add', description: '📝 할 일 추가' },
+  { command: 'list', description: '📋 할 일 목록' },
+  { command: 'done', description: '✅ 할 일 완료' },
+  { command: 'delete', description: '🗑️ 할 일 삭제' },
+  { command: 'stats', description: '📊 할 일 통계' },
+  { command: 'say', description: '🗣️ TTS 음성읽기' },
+  { command: 'fortune', description: '🔮 오늘의 운세' },
+  { command: 'tarot', description: '🃏 타로카드' },
+  { command: 'timer', description: '⏰ 타이머' },
+  { command: 'worktime', description: '⏱️ 근무시간' },
+  { command: 'remind', description: '🔔 리마인드' }
+]);
+
 const lastAudio = {};
 
 // /start 명령어
@@ -76,12 +92,25 @@ bot.onText(/\/clear_completed/, async (msg) => {
   bot.sendMessage(msg.chat.id, "🧹 완료된 할 일을 모두 삭제했습니다.");
 });
 
-bot.onText(/\/stats/, async (msg) => {
-  const s = await todo.getTodoStats(msg.from.id);
-  bot.sendMessage(msg.chat.id, 
-    `📊 **할 일 통계**\n\n총: ${s.total}, ✅ 완료: ${s.completed}, 🔲 미완료: ${s.pending}, 📈 완료율: ${s.completionRate}%`, 
-    { parse_mode: "Markdown" }
-  );
+// 추가 명령어들
+bot.onText(/\/fortune$/, (msg) => {
+  fortune(bot, { chat: { id: msg.chat.id }, from: msg.from, text: '/fortune' });
+});
+
+bot.onText(/\/tarot$/, (msg) => {
+  fortune(bot, { chat: { id: msg.chat.id }, from: msg.from, text: '/fortune tarot' });
+});
+
+bot.onText(/\/timer$/, (msg) => {
+  timer(bot, { chat: { id: msg.chat.id }, from: msg.from, text: '/timer' });
+});
+
+bot.onText(/\/worktime$/, (msg) => {
+  worktime(bot, { chat: { id: msg.chat.id }, from: msg.from, text: '/worktime' });
+});
+
+bot.onText(/\/remind$/, (msg) => {
+  remind(bot, { chat: { id: msg.chat.id }, from: msg.from, text: '/remind' });
 });
 
 // 콜백 쿼리 처리
