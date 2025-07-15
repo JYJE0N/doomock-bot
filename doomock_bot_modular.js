@@ -241,3 +241,9 @@ bot.on('callback_query', (callbackQuery) => {
     fortune(bot, { ...callbackQuery.message, from: callbackQuery.from, text: commandText });
   }
 });
+
+bot.on('message', (msg) => {
+  console.log("메시지 수신:", msg.text);
+  bot.sendMessage(msg.chat.id, "✅ 메시지 받았습니다: " + msg.text);
+});
+
