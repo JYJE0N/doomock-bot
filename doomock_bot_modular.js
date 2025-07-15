@@ -151,7 +151,7 @@ bot.on('callback_query', async (query) => {
       remind(bot, { chat: { id: chatId }, from: query.from });
       break;
     case 'timer':
-      timer(bot, { chat: { id: chatId }, from: query.from });
+    timer(bot, { chat: { id: chatId }, from: query.from, text: '' });
       break;
     case 'worktime':
       worktime(bot, { chat: { id: chatId }, from: query.from });
