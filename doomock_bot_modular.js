@@ -98,6 +98,13 @@ bot.on('message', async (msg) => {
   } else if (text.startsWith('/remind ')) {
     remind(bot, msg);
 
+  } else if (text.startsWith('/say ')) {
+  const content = text.substring(5);
+  const ttsUrl = utils.Utils.getTTSUrl(content);
+  bot.sendAudio(chatId, ttsUrl, {
+    caption: `🗣 "${content}" 를 읽어드릴게요.`
+  });
+
   } else if (text === '/utils' || text === '/help') {
     utils(bot, msg);
 
