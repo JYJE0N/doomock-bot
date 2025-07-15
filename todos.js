@@ -22,14 +22,154 @@ let todos;
   }
 })();
 
+// 할 일 추가
 exports.addTodo = async function(userId, task) {
-  await todos.insertOne({ userId, task, done: false, createdAt: new Date() });
+  try {
+    await todos.insertOne({ 
+      userId, 
+      task, 
+      done: false, 
+      createdAt: new Date() 
+    });
+    return true;
+  } catch (error) {
+    console.error("❌ Add Todo Error:", error.message);
+    return false;
+  }
 };
 
+// 할 일 목록 가져오기
 exports.getTodos = async function(userId) {
-  return await todos.find({ userId }).toArray();
+  try {
+    return await todos.find({ userId }).sort({ createdAt: 1 }).toArray();
+  } catch (error) {
+    console.error("❌ Get Todos Error:", error.message);
+    return [];
+  }
 };
 
+// 모든 할 일 삭제
 exports.clearTodos = async function(userId) {
-  await todos.deleteMany({ userId });
+  try {
+    await todos.deleteMany({ userId });
+    return true;
+  } catch (error) {
+    console.error("❌ Clear Todos Error:", error.message);
+    return false;
+  }
+};
+
+// 할 일 완료/미완료 토글
+exports.toggleTodo = async function(userId, todoIndex) {
+  try {
+    const userTodos = await todos.find({ userId }).sort({ createdAt: 1 }).toArray();
+    
+    if (todoIndex >= 0 && todoIndex < userTodos.length) {
+      const todo = userTodos[todoIndex];
+      const newDoneStatus = !todo.done;
+      
+      await todos.updateOne(
+        { _id: todo._id },
+        { 
+          $set: { 
+            done: newDoneStatus,
+            updatedAt: new Date()
+          } 
+        }
+      );
+      
+      return newDoneStatus;
+    }
+    return null;
+  } catch (error) {
+    console.error("❌ Toggle Todo Error:", error.message);
+    return null;
+  }
+};
+
+// 특정 할 일 삭제
+exports.deleteTodo = async function(userId, todoIndex) {
+  try {
+    const userTodos = await todos.find({ userId }).sort({ createdAt: 1 }).toArray();
+    
+    if (todoIndex >= 0 && todoIndex < userTodos.length) {
+      const todo = userTodos[todoIndex];
+      await todos.deleteOne({ _id: todo._id });
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("❌ Delete Todo Error:", error.message);
+    return false;
+  }
+};
+
+// 할 일 수정
+exports.editTodo = async function(userId, todoIndex, newTask) {
+  try {
+    const userTodos = await todos.find({ userId }).sort({ createdAt: 1 }).toArray();
+    
+    if (todoIndex >= 0 && todoIndex < userTodos.length) {
+      const todo = userTodos[todoIndex];
+      await todos.updateOne(
+        { _id: todo._id },
+        { 
+          $set: { 
+            task: newTask,
+            updatedAt: new Date()
+          } 
+        }
+      );
+      return true;
+    }
+    return false;
+  } catch (error) {
+    console.error("❌ Edit Todo Error:", error.message);
+    return false;
+  }
+};
+
+// 완료된 할 일들만 삭제
+exports.clearCompletedTodos = async function(userId) {
+  try {
+    await todos.deleteMany({ userId, done: true });
+    return true;
+  } catch (error) {
+    console.error("❌ Clear Completed Todos Error:", error.message);
+    return false;
+  }
+};
+
+// 할 일 통계
+exports.getTodoStats = async function(userId) {
+  try {
+    const allTodos = await todos.find({ userId }).toArray();
+    const completed = allTodos.filter(todo => todo.done).length;
+    const pending = allTodos.length - completed;
+    
+    return {
+      total: allTodos.length,
+      completed: completed,
+      pending: pending,
+      completionRate: allTodos.length > 0 ? Math.round((completed / allTodos.length) * 100) : 0
+    };
+  } catch (error) {
+    console.error("❌ Get Todo Stats Error:", error.message);
+    return {
+      total: 0,
+      completed: 0,
+      pending: 0,
+      completionRate: 0
+    };
+  }
+};
+
+// 데이터베이스 연결 종료 (앱 종료 시 사용)
+exports.closeConnection = async function() {
+  try {
+    await client.close();
+    console.log("✅ MongoDB Connection Closed");
+  } catch (error) {
+    console.error("❌ Close Connection Error:", error.message);
+  }
 };
