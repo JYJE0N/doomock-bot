@@ -100,11 +100,10 @@ bot.on('message', async (msg) => {
   } else if (text.startsWith('/remind ')) {
     remind(bot, msg);
 
-  } else if (text.startsWith('/say ')) {
-  const content = text.substring(5);
+  } else if (text.startsWith('/say')) {
+  const content = text.length > 4 ? text.substring(5).trim() : "읽을 내용이 없습니다.";
   const ttsUrl = utils.Utils.getTTSUrl(content);
 
-  // 직전에 보낸 음성이 있으면 삭제
   if (lastAudio[chatId]) {
     bot.deleteMessage(chatId, lastAudio[chatId]).catch(console.error);
   }
@@ -117,14 +116,6 @@ bot.on('message', async (msg) => {
     console.error("TTS sendAudio error:", err);
     bot.sendMessage(chatId, '❌ 음성파일을 전송하는데 실패했어요.');
   });
-
-  } else if (text === '/utils' || text === '/help') {
-    utils(bot, msg);
-
-  } else {
-    bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /start 로 메뉴를 열어보세요.');
-  }
-});
 
 bot.on('callback_query', async (callbackQuery) => {
   const message = callbackQuery.message;
