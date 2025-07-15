@@ -5,6 +5,7 @@ const mongoUrl = process.env.MONGO_URL ||
                  process.env.MONGO_PUBLIC_URL || 
                  `mongodb://${process.env.MONGOUSER}:${process.env.MONGOPASSWORD}@${process.env.MONGOHOST}:${process.env.MONGOPORT}`;
 
+
 console.log("DEBUG MONGO_URL:", mongoUrl);
 console.log("🔍 All MONGO env vars:", Object.keys(process.env).filter(k => k.includes('MONGO')));
 
