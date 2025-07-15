@@ -73,22 +73,19 @@ bot.onText(/\/list/, async (msg) => {
   bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
 });
 
-// /done 명령어 : 할 일 완료 표시
+// /done 명령어 : 할 일 완료 토글
 bot.onText(/\/done (\d+)/, async (msg, match) => {
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   const index = parseInt(match[1], 10) - 1;
 
-  const todosList = await todo.getTodos(userId);
-  if (index < 0 || index >= todosList.length) {
+  const newStatus = await todo.toggleTodo(userId, index);
+  if (newStatus === null) {
     bot.sendMessage(chatId, "😅 올바른 번호를 입력해주세요.\n예: `/done 2`");
     return;
   }
 
-  const todoItem = todosList[index];
-  await todo.markDone(userId, todoItem._id);
-
-  bot.sendMessage(chatId, `✅ '${todoItem.task}' 를 완료 처리했습니다.`);
+  bot.sendMessage(chatId, `✅ ${index + 1}번 할 일의 상태를 ${newStatus ? "완료" : "미완료"}로 변경했습니다.`);
 });
 
 // 메인 메뉴 인라인 버튼
