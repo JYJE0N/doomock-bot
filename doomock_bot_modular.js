@@ -166,6 +166,14 @@ bot.on('callback_query', async (query) => {
         handleSayTest(chatId);
         break;
         
+      case 'say_help':
+        handleSayHelp(chatId);
+        break;
+        
+      case 'say_usage':
+        handleSayUsage(chatId);
+        break;
+        
       case 'help':
         sendHelp(chatId);
         break;
@@ -190,7 +198,7 @@ function sendMainMenu(chatId) {
         [{ text: '📝 할 일', callback_data: 'todo_menu' }, { text: '🔔 리마인드', callback_data: 'remind_menu' }],
         [{ text: '🔮 운세', callback_data: 'fortune_menu' }, { text: '🎴 타로', callback_data: 'fortune_tarot' }],
         [{ text: '⏰ 타이머', callback_data: 'timer' }, { text: '⏱️ 근무시간', callback_data: 'worktime' }],
-        [{ text: '🗣️ TTS', callback_data: 'say_test' }, { text: '❓ 도움말', callback_data: 'help' }]
+        [{ text: '🗣️ TTS', callback_data: 'say_help' }, { text: '❓ 도움말', callback_data: 'help' }]
       ]
     }
   });
@@ -275,6 +283,49 @@ function handleSayTest(chatId) {
     caption: `🗣 "${content}"` 
   }).then(sentMsg => {
     lastAudio[chatId] = sentMsg.message_id;
+  });
+}
+
+// TTS 사용법 안내
+function handleSayHelp(chatId) {
+  bot.sendMessage(chatId, '🗣️ **TTS (음성 읽기) 사용법**\n\n원하는 기능을 선택하세요:', {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🎤 테스트 음성 듣기', callback_data: 'say_test' }],
+        [{ text: '📝 사용법 보기', callback_data: 'say_usage' }],
+        [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
+  });
+}
+
+// TTS 상세 사용법
+function handleSayUsage(chatId) {
+  const usageText = `🗣️ **TTS 사용법 가이드**\n\n` +
+    `**기본 사용법:**\n` +
+    `\`/say 읽을 문장\`\n\n` +
+    `**사용 예시:**\n` +
+    `• \`/say 안녕하세요\`\n` +
+    `• \`/say 오늘 날씨가 좋네요\`\n` +
+    `• \`/say 두목봇 최고야\`\n\n` +
+    `**주의사항:**\n` +
+    `• 한글, 영어 모두 지원\n` +
+    `• 너무 긴 문장은 잘릴 수 있어요\n` +
+    `• 이전 음성은 자동으로 삭제됩니다\n\n` +
+    `**팁:**\n` +
+    `• 띄어쓰기를 정확히 하면 더 자연스러워요\n` +
+    `• 문장부호(. , ! ?)를 사용하면 억양이 살아요\n\n` +
+    `지금 바로 시도해보세요! 🎯`;
+    
+  bot.sendMessage(chatId, usageText, { 
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🎤 테스트 해보기', callback_data: 'say_test' }],
+        [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
   });
 }
 
