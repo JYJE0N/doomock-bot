@@ -1,19 +1,25 @@
+const googleTTS = require('google-tts-api');
+
 class Utils {
   static getUserName(msg) {
     return msg.from.first_name || "사용자";
   }
+
   static parseTime(timeStr) {
     if (!timeStr.includes(":")) return null;
     const [hours, minutes] = timeStr.split(":").map(Number);
     if (hours > 23 || minutes > 59) return null;
     return { hours, minutes };
   }
+
   static timeToMinutes({ hours, minutes }) {
     return hours * 60 + minutes;
   }
+
   static formatTimeString({ hours, minutes }) {
     return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
   }
+
   static getCurrentTime() {
     const now = new Date();
     const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
@@ -22,12 +28,14 @@ class Utils {
       minutes: koreaTime.getMinutes()
     };
   }
+
   static formatDate(date) {
     const year = date.getFullYear();
     const month = (date.getMonth() + 1).toString().padStart(2, "0");
     const day = date.getDate().toString().padStart(2, "0");
     return `${year}-${month}-${day}`;
   }
+
   static getGreeting() {
     const now = new Date();
     const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
@@ -37,6 +45,15 @@ class Utils {
     if (hour < 18) return "오후";
     if (hour < 22) return "저녁";
     return "밤";
+  }
+
+  // ✅ 추가된 TTS 기능
+  static getTTSUrl(text, lang = 'ko', speed = 1) {
+    return googleTTS.getAudioUrl(text, {
+      lang,
+      slow: speed < 1,
+      host: 'https://translate.google.com',
+    });
   }
 }
 
