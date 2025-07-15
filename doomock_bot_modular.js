@@ -355,15 +355,38 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data === 'utils') {
-    bot.editMessageText('🎲 유틸리티 메뉴입니다. (추가 예정)', {
-      chat_id: chatId,
-      message_id: message.message_id,
+  bot.editMessageText('🎲 **유틸리티 메뉴**\n\n필요한 기능을 선택하세요:', {
+    chat_id: chatId,
+    message_id: message.message_id,
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🗣️ 말하기 테스트', callback_data: 'say_test' }],
+        [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
+  });
+
+  } else if (data === 'say_test') {
+  const content = "안녕하세요! 두목봇 테스트 음성입니다.";
+  const ttsUrl = utils.Utils.getTTSUrl(content);
+
+  bot.sendAudio(chatId, ttsUrl, {
+    caption: `🗣 "${content}" 를 읽어드릴게요.`
+  });
+
+  setTimeout(() => {
+    bot.sendMessage(chatId, '🎲 **유틸리티 메뉴로 돌아갑니다**', {
+      parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
+          [{ text: '🎲 유틸리티', callback_data: 'utils' }],
+          [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
         ]
       }
     });
+  }, 1000);
+}
 
   } else if (data === 'help') {
     bot.editMessageText('❓ **두목봇 사용법**\n\n📝 **할 일 관리:** /add, /list, /clear, /done, /del\n🔮 **운세:** 오늘의 운세 확인\n⏰ **타이머:** 시간 알림 설정\n⏱️ **근무시간:** 출퇴근 기록\n🎲 **유틸리티:** 재미있는 기능들\n\n모든 기능은 /start 메뉴에서 사용할 수 있어요!', {
