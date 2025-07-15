@@ -3,7 +3,7 @@ const TelegramBot = require('node-telegram-bot-api');
 const MonthlyLeaveManager = require('./monthly_leave');
 
 // 봇 초기화
-const token = process.env.TELEGRAM_BOT_TOKEN;
+const token = process.env.BOT_TOKEN;
 const bot = new TelegramBot(token, { polling: true });
 
 // 월차 매니저 초기화
