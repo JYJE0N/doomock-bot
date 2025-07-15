@@ -1,6 +1,6 @@
 const { MongoClient } = require("mongodb");
 
-const client = new MongoClient(process.env.MONGO_URL);  // 여기!! 환경변수 이름 MONGO_URL
+const client = new MongoClient(process.env.mongodb://mongo:qchZyqLIOOYbZRuSxkzccTqXTkTuxBdJ@mongodb.railway.internal:27017);  // 여기!! 환경변수 이름 MONGO_URL
 let todos;
 
 (async () => {
