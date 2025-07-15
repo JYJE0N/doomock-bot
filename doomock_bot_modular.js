@@ -58,13 +58,33 @@ bot.on('message', async (msg) => {
     if (tasks.length === 0) {
       bot.sendMessage(chatId, `📂 등록된 할 일이 없어요.`);
     } else {
-      const list = tasks.map((t, i) => `${i+1}. ${t.task} ${t.done ? '✅' : ''}`).join('\n');
-      bot.sendMessage(chatId, `📋 할 일 목록:\n${list}`);
+      const list = tasks.map((t, i) => `${i+1}. ${t.task} ${t.done ? '✅' : '⏳'}`).join('\n');
+      bot.sendMessage(chatId, `📋 할 일 목록:\n${list}\n\n💡 완료: /done 번호\n💡 삭제: /del 번호`);
     }
 
   } else if (text === '/clear') {
     await todoDB.clearTodos(msg.from.id);
     bot.sendMessage(chatId, `🗑️ 모든 할 일을 삭제했어요.`);
+
+  } else if (text.startsWith('/done ')) {
+    const index = parseInt(text.substring(6)) - 1;
+    const result = await todoDB.toggleTodo(msg.from.id, index);
+    if (result !== null) {
+      bot.sendMessage(chatId, result ? 
+        `✅ ${index + 1}번 할 일을 완료했어요!` : 
+        `📝 ${index + 1}번 할 일을 미완료로 변경했어요!`);
+    } else {
+      bot.sendMessage(chatId, '❌ 잘못된 번호입니다.');
+    }
+
+  } else if (text.startsWith('/del ')) {
+    const index = parseInt(text.substring(5)) - 1;
+    const result = await todoDB.deleteTodo(msg.from.id, index);
+    if (result) {
+      bot.sendMessage(chatId, `🗑️ ${index + 1}번 할 일을 삭제했어요!`);
+    } else {
+      bot.sendMessage(chatId, '❌ 잘못된 번호입니다.');
+    }
 
   } else if (text === '/fortune' || text.startsWith('/fortune ')) {
     fortune(bot, msg);
@@ -95,12 +115,68 @@ bot.on('callback_query', async (callbackQuery) => {
   bot.answerCallbackQuery(callbackQuery.id);
 
   if (data === 'todo_menu') {
-    bot.editMessageText('📝 할 일 관리 메뉴입니다:\n\n/add 장보기 - 할 일 추가\n/list - 할 일 목록 보기\n/clear - 모든 할 일 삭제', {
+    bot.editMessageText('📝 **할 일 관리 메뉴**\n\n' +
+      '**✏️ 추가:** /add 장보기\n' +
+      '**📋 목록:** /list\n' +
+      '**✅ 완료:** /done 1 (1번 완료)\n' +
+      '**🗑️ 삭제:** /del 1 (1번 삭제)\n' +
+      '**🗑️ 전체삭제:** /clear', {
+      chat_id: chatId,
+      message_id: message.message_id,
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '📋 할 일 보기', callback_data: 'show_todos' },
+            { text: '🗑️ 전체 삭제', callback_data: 'clear_todos' }
+          ],
+          [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+          ]
+        ]
+      }
+    });
+
+  } else if (data === 'show_todos') {
+    const tasks = await todoDB.getTodos(userId);
+    if (tasks.length === 0) {
+      bot.editMessageText('📂 등록된 할 일이 없어요.', {
+        chat_id: chatId,
+        message_id: message.message_id,
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: '🔙 할 일 메뉴', callback_data: 'todo_menu' }]
+          ]
+        }
+      });
+    } else {
+      const list = tasks.map((t, i) => 
+        `${i+1}. ${t.task} ${t.done ? '✅' : '⏳'}`
+      ).join('\n');
+      
+      bot.editMessageText(`📋 **할 일 목록**\n\n${list}\n\n💡 완료: /done 번호\n💡 삭제: /del 번호`, {
+        chat_id: chatId,
+        message_id: message.message_id,
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🔄 새로고침', callback_data: 'show_todos' },
+              { text: '🔙 할 일 메뉴', callback_data: 'todo_menu' }
+            ]
+          ]
+        }
+      });
+    }
+
+  } else if (data === 'clear_todos') {
+    await todoDB.clearTodos(userId);
+    bot.editMessageText('🗑️ 모든 할 일을 삭제했어요!', {
       chat_id: chatId,
       message_id: message.message_id,
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
+          [{ text: '🔙 할 일 메뉴', callback_data: 'todo_menu' }]
         ]
       }
     });
@@ -283,7 +359,7 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data === 'help') {
-    bot.editMessageText('❓ **두목봇 사용법**\n\n📝 **할 일 관리:** /add, /list, /clear\n🔮 **운세:** 오늘의 운세 확인\n⏰ **타이머:** 시간 알림 설정\n⏱️ **근무시간:** 출퇴근 기록\n🎲 **유틸리티:** 재미있는 기능들\n\n모든 기능은 /start 메뉴에서 사용할 수 있어요!', {
+    bot.editMessageText('❓ **두목봇 사용법**\n\n📝 **할 일 관리:** /add, /list, /clear, /done, /del\n🔮 **운세:** 오늘의 운세 확인\n⏰ **타이머:** 시간 알림 설정\n⏱️ **근무시간:** 출퇴근 기록\n🎲 **유틸리티:** 재미있는 기능들\n\n모든 기능은 /start 메뉴에서 사용할 수 있어요!', {
       chat_id: chatId,
       message_id: message.message_id,
       parse_mode: 'Markdown',
