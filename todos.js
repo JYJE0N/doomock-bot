@@ -1,12 +1,12 @@
 const { MongoClient } = require("mongodb");
 
-const client = new MongoClient(process.env.MONGO_URL);
+const client = new MongoClient(process.env.MONGO_URL);  // 여기!! 환경변수 이름 MONGO_URL
 let todos;
 
 (async () => {
   await client.connect();
   console.log("✅ MongoDB Connected");
-  const db = client.db("doomock"); 
+  const db = client.db("doomock");
   todos = db.collection("todos");
 })();
 
