@@ -1,169 +1,158 @@
 require('dotenv').config();
 const TelegramBot = require('node-telegram-bot-api');
-const fortune = require('./fortune');
-const remind = require('./remind');
-const timer = require('./timer');
-const worktime = require('./worktime');
+const todo = require('./todos');
 const utils = require('./utils');
-const todo = require('./todo');
 
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
-
 console.log("✅ 두목봇 started!");
 
 const lastAudio = {};
 
-// /start 명령어
+// /start
 bot.onText(/\/start/, (msg) => {
-  const chatId = msg.chat.id;
-  sendMainMenu(chatId);
+  sendMainMenu(msg.chat.id);
 });
 
-// /say 명령어
+// /say
 bot.onText(/\/say (.+)/, (msg, match) => {
   const chatId = msg.chat.id;
   const text = match[1];
-
-  if (!text) {
-    bot.sendMessage(chatId, "😅 읽을 문장을 입력해주세요.\n예: `/say 안녕하세요`", { parse_mode: "Markdown" });
-    return;
-  }
-
   const ttsUrl = utils.Utils.getTTSUrl(text);
+
   bot.sendAudio(chatId, ttsUrl, {
     caption: `🗣 "${text}" 를 읽어드릴게요.`
   });
 });
 
 bot.onText(/\/say$/, (msg) => {
-  const chatId = msg.chat.id;
-  bot.sendMessage(chatId, "😅 읽을 문장을 입력해주세요.\n예: `/say 안녕하세요`", { parse_mode: "Markdown" });
+  bot.sendMessage(msg.chat.id, "😅 읽을 문장을 입력해주세요.\n예: `/say 안녕하세요`", { parse_mode: "Markdown" });
 });
-// /add 명령어 : 할 일 추가
+
+// /add
 bot.onText(/\/add (.+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
   const userId = msg.from.id;
-  const task = match[1];
-
-  if (!task) {
-    bot.sendMessage(chatId, "😅 추가할 할 일을 입력해주세요.\n예: `/add 설거지`", { parse_mode: "Markdown" });
-    return;
-  }
-
-  await todo.addTodo(userId, task);
-  bot.sendMessage(chatId, `✅ 할 일을 추가했습니다: ${task}`);
+  await todo.addTodo(userId, match[1]);
+  bot.sendMessage(msg.chat.id, `✅ 할 일을 추가했습니다: ${match[1]}`);
 });
 
-// /list 명령어 : 할 일 목록
+// /list
 bot.onText(/\/list/, async (msg) => {
-  const chatId = msg.chat.id;
   const userId = msg.from.id;
-
-  const todosList = await todo.getTodos(userId);
-  if (todosList.length === 0) {
-    bot.sendMessage(chatId, "📭 아직 등록된 할 일이 없습니다.");
+  const todosList = await todo.getTodos(userId) || [];
+  if (!todosList.length) {
+    bot.sendMessage(msg.chat.id, "📭 아직 등록된 할 일이 없습니다.");
     return;
   }
-
   let text = "📝 *당신의 할 일 목록:*\n";
   todosList.forEach((t, i) => {
     text += `${i + 1}. ${t.done ? "✅" : "🔲"} ${t.task}\n`;
   });
-
-  bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
+  bot.sendMessage(msg.chat.id, text, { parse_mode: "Markdown" });
 });
 
-// /done 명령어 : 할 일 완료 토글
+// /done
 bot.onText(/\/done (\d+)/, async (msg, match) => {
-  const chatId = msg.chat.id;
   const userId = msg.from.id;
   const index = parseInt(match[1], 10) - 1;
-
-  const newStatus = await todo.toggleTodo(userId, index);
-  if (newStatus === null) {
-    bot.sendMessage(chatId, "😅 올바른 번호를 입력해주세요.\n예: `/done 2`");
+  const status = await todo.toggleTodo(userId, index);
+  if (status === null) {
+    bot.sendMessage(msg.chat.id, "😅 올바른 번호를 입력해주세요.");
     return;
   }
-
-  bot.sendMessage(chatId, `✅ ${index + 1}번 할 일의 상태를 ${newStatus ? "완료" : "미완료"}로 변경했습니다.`);
+  bot.sendMessage(msg.chat.id, `✅ ${index + 1}번 할 일 상태를 ${status ? "완료" : "미완료"}로 변경했습니다.`);
 });
 
-// 메인 메뉴 인라인 버튼
+// /delete
+bot.onText(/\/delete (\d+)/, async (msg, match) => {
+  const userId = msg.from.id;
+  const index = parseInt(match[1], 10) - 1;
+  const result = await todo.deleteTodo(userId, index);
+  if (!result) {
+    bot.sendMessage(msg.chat.id, "😅 올바른 번호를 입력해주세요.");
+    return;
+  }
+  bot.sendMessage(msg.chat.id, `🗑️ ${index + 1}번 할 일을 삭제했습니다.`);
+});
+
+// /clear_completed
+bot.onText(/\/clear_completed/, async (msg) => {
+  await todo.clearCompletedTodos(msg.from.id);
+  bot.sendMessage(msg.chat.id, "🧹 완료된 할 일을 모두 삭제했습니다.");
+});
+
+// /stats
+bot.onText(/\/stats/, async (msg) => {
+  const stats = await todo.getTodoStats(msg.from.id);
+  const text = `📊 *할 일 통계*\n\n`
+    + `총 할 일: ${stats.total}\n`
+    + `✅ 완료: ${stats.completed}\n`
+    + `🔲 미완료: ${stats.pending}\n`
+    + `📈 완료율: ${stats.completionRate}%`;
+  bot.sendMessage(msg.chat.id, text, { parse_mode: "Markdown" });
+});
+
+// 메인 메뉴
 function sendMainMenu(chatId) {
   bot.sendMessage(chatId, '🏠 메인 메뉴입니다. 원하는 기능을 선택하세요 👇', {
     reply_markup: {
       inline_keyboard: [
-        [{ text: '📝 할 일 관리', callback_data: 'todo_menu' }, { text: '🔔 리마인드', callback_data: 'remind_menu' }],
-        [{ text: '🔮 운세', callback_data: 'fortune_menu' }, { text: '🎴 타로카드', callback_data: 'fortune_tarot' }],
-        [{ text: '⏰ 타이머', callback_data: 'timer' }, { text: '⏱️ 근무시간', callback_data: 'worktime' }],
-        [{ text: '🎲 유틸리티', callback_data: 'utils' }],
+        [{ text: '📝 할 일 관리', callback_data: 'todo_menu' }],
+        [{ text: '🎲 유틸리티', callback_data: 'utils_menu' }],
         [{ text: '❓ 도움말', callback_data: 'help' }]
       ]
     }
   });
 }
 
-// callback_query 핸들러
-bot.on('callback_query', (query) => {
+// callback_query
+bot.on('callback_query', async (query) => {
   const data = query.data;
   const chatId = query.message.chat.id;
-  const messageId = query.message.message_id;
-
-  console.log(`🔥 callback_query: data=${data} from user=${query.from.id}`);
+  const userId = query.from.id;
 
   bot.answerCallbackQuery(query.id);
 
   switch (data) {
     case 'todo_menu':
-      bot.sendMessage(chatId, '📝 할 일 메뉴입니다.\n\n- /add 로 할 일 추가\n- /list 로 목록 보기\n- /done 으로 완료 표시', {
-        reply_markup: { inline_keyboard: [[{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]] }
-      });
-      break;
-
-    case 'remind_menu':
-      remind(bot, { chat: { id: chatId }, from: query.from, message_id: messageId });
-      break;
-
-    case 'fortune_menu':
-      bot.sendMessage(chatId, '🔮 원하는 운세를 선택하세요:', {
+      bot.sendMessage(chatId, '📝 할 일 관리 메뉴입니다.', {
         reply_markup: {
           inline_keyboard: [
-            [{ text: '🔮 일반 운세', callback_data: 'fortune_general' }],
-            [{ text: '💼 업무 운세', callback_data: 'fortune_work' }],
-            [{ text: '❤️ 연애 운세', callback_data: 'fortune_love' }],
-            [{ text: '🌈 종합 운세', callback_data: 'fortune_all' }],
+            [{ text: '📋 할 일 목록', callback_data: 'list_todos' }],
+            [{ text: '🧹 완료된 할 일 삭제', callback_data: 'clear_completed' }],
+            [{ text: '📊 통계 보기', callback_data: 'stats' }],
             [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
           ]
         }
       });
       break;
-
-    case 'fortune_general':
-      fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune' });
+    case 'list_todos': {
+      const todosList = await todo.getTodos(userId) || [];
+      if (!todosList.length) {
+        bot.sendMessage(chatId, "📭 아직 등록된 할 일이 없습니다.");
+        return;
+      }
+      let text = "📝 *당신의 할 일 목록:*\n";
+      todosList.forEach((t, i) => {
+        text += `${i + 1}. ${t.done ? "✅" : "🔲"} ${t.task}\n`;
+      });
+      bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
       break;
-    case 'fortune_work':
-      fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune work' });
+    }
+    case 'clear_completed':
+      await todo.clearCompletedTodos(userId);
+      bot.sendMessage(chatId, "🧹 완료된 할 일을 모두 삭제했습니다.");
       break;
-    case 'fortune_love':
-      fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune love' });
+    case 'stats': {
+      const stats = await todo.getTodoStats(userId);
+      const text = `📊 *할 일 통계*\n\n`
+        + `총 할 일: ${stats.total}\n`
+        + `✅ 완료: ${stats.completed}\n`
+        + `🔲 미완료: ${stats.pending}\n`
+        + `📈 완료율: ${stats.completionRate}%`;
+      bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
       break;
-    case 'fortune_all':
-      fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune all' });
-      break;
-
-    case 'fortune_tarot':
-      fortune(bot, { chat: { id: chatId }, from: query.from, text: '/fortune tarot' });
-      break;
-
-    case 'timer':
-      timer(bot, { chat: { id: chatId }, from: query.from, message_id: messageId });
-      break;
-
-    case 'worktime':
-      worktime(bot, { chat: { id: chatId }, from: query.from, message_id: messageId });
-      break;
-
-    case 'utils':
+    }
+    case 'utils_menu':
       bot.sendMessage(chatId, '🎲 유틸리티 메뉴입니다.', {
         reply_markup: {
           inline_keyboard: [
@@ -173,8 +162,7 @@ bot.on('callback_query', (query) => {
         }
       });
       break;
-
-    case 'say_test':
+    case 'say_test': {
       const content = "안녕하세요! 두목봇 테스트 음성입니다.";
       const ttsUrl = utils.Utils.getTTSUrl(content);
 
@@ -188,21 +176,12 @@ bot.on('callback_query', (query) => {
         lastAudio[chatId] = sentMsg.message_id;
       });
       break;
-
+    }
     case 'help':
-      bot.sendMessage(chatId, '❓ 도움말입니다.\n\n'
-        + '/add, /list, /done 등으로 할 일 관리\n'
-        + '/fortune 으로 운세 보기\n'
-        + '/fortune_tarot 으로 타로 뽑기\n'
-        + '/timer 로 타이머 시작\n'
-        + '/say 로 TTS 테스트\n\n'
-        + '필요시 언제든 물어보세요!', {
-        reply_markup: {
-          inline_keyboard: [[{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]]
-        }
-      });
+      bot.sendMessage(chatId, "❓ 도움말\n\n"
+        + "/add, /list, /done, /delete, /clear_completed, /stats\n"
+        + "또는 메뉴 버튼을 눌러주세요.");
       break;
-
     case 'main_menu':
     default:
       sendMainMenu(chatId);
