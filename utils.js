@@ -1,94 +1,113 @@
-const googleTTS = require('google-tts-api');
+// utils.js - 기본 유틸리티 함수들
 
-class Utils {
-  static getUserName(msg) {
-    return msg.from.first_name || "사용자";
-  }
-
-  static parseTime(timeStr) {
-    if (!timeStr.includes(":")) return null;
-    const [hours, minutes] = timeStr.split(":").map(Number);
-    if (hours > 23 || minutes > 59) return null;
-    return { hours, minutes };
-  }
-
-  static timeToMinutes({ hours, minutes }) {
-    return hours * 60 + minutes;
-  }
-
-  static formatTimeString({ hours, minutes }) {
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
-  }
-
-  static getCurrentTime() {
-    const now = new Date();
-    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-    return {
-      hours: koreaTime.getHours(),
-      minutes: koreaTime.getMinutes()
-    };
-  }
-
-  static formatDate(date) {
-    const year = date.getFullYear();
-    const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    const day = date.getDate().toString().padStart(2, "0");
-    return `${year}-${month}-${day}`;
-  }
-
-  static getGreeting() {
-    const now = new Date();
-    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-    const hour = koreaTime.getHours();
-    if (hour < 6) return "새벽";
-    if (hour < 12) return "아침";
-    if (hour < 18) return "오후";
-    if (hour < 22) return "저녁";
-    return "밤";
-  }
-
-  // ✅ 추가된 TTS 기능
-  static getTTSUrl(text, lang = 'ko', speed = 1) {
-    return googleTTS.getAudioUrl(text, {
-      lang,
-      slow: speed < 1,
-      host: 'https://translate.google.com',
-    });
-  }
+// 한국 시간 가져오기
+function getKoreaTime() {
+    return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
 }
 
-module.exports = function(bot, msg) {
-  const chatId = msg.chat.id;
-  const userName = Utils.getUserName(msg);
-  const greeting = Utils.getGreeting();
-  const helpMessage =
-    `👋 안녕하세요, ${userName}님! ${greeting}에도 열심히 활동하시는군요!\n\n` +
-    '🤖 두목봇 사용법:\n\n' +
-    '📝 **할 일 관리**\n' +
-    '/add [할 일] - 할 일 추가\n' +
-    '/todo - 할 일 목록 보기\n' +
-    '/done [번호] - 할 일 완료\n' +
-    '/delete [번호] - 할 일 삭제\n' +
-    '/clear - 모든 할 일 삭제\n\n' +
-    '⏰ **타이머**\n' +
-    '/timer start [작업명] - 타이머 시작\n' +
-    '/timer stop - 타이머 종료\n' +
-    '/timer status - 현재 상태 확인\n\n' +
-    '🔮 **운세**\n' +
-    '/fortune - 오늘의 일반 운세\n' +
-    '/fortune work - 오늘의 업무운\n' +
-    '/fortune tarot - 오늘의 타로카드\n\n' +
-    '💼 **업무시간**\n' +
-    '/worktime - 업무시간 관리\n\n' +
-    '❓ **기타**\n' +
-    '/help - 이 도움말 보기\n' +
-    '/start - 봇 시작하기\n\n' +
-    '💡 **사용 예시:**\n' +
-    '• `/add 프로젝트 마무리하기`\n' +
-    '• `/timer start 독서`\n' +
-    '• `/fortune work`\n\n' +
-    '궁금한 점이 있으시면 언제든 명령어를 입력해보세요! 😊';
-  bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
-};
+// 현재 년도 가져오기
+function getCurrentYear() {
+    return getKoreaTime().getFullYear();
+}
 
-module.exports.Utils = Utils;
+// 날짜 포맷팅 (YYYY-MM-DD)
+function formatDate(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleDateString('ko-KR');
+}
+
+// 시간 포맷팅 (HH:MM)
+function formatTime(date) {
+    if (!date) return '';
+    const d = new Date(date);
+    return d.toLocaleTimeString('ko-KR', { 
+        hour: '2-digit', 
+        minute: '2-digit',
+        hour12: false 
+    });
+}
+
+// 날짜와 시간 포맷팅
+function formatDateTime(date) {
+    if (!date) return '';
+    return `${formatDate(date)} ${formatTime(date)}`;
+}
+
+// 숫자를 소수점 1자리까지 표시
+function formatNumber(num, decimals = 1) {
+    return parseFloat(num).toFixed(decimals);
+}
+
+// 퍼센트 계산
+function calculatePercentage(used, total) {
+    if (total === 0) return 0;
+    return ((used / total) * 100).toFixed(1);
+}
+
+// 텍스트 자르기
+function truncateText(text, maxLength = 100) {
+    if (!text) return '';
+    if (text.length <= maxLength) return text;
+    return text.substring(0, maxLength) + '...';
+}
+
+// 랜덤 선택
+function randomChoice(array) {
+    if (!Array.isArray(array) || array.length === 0) return null;
+    return array[Math.floor(Math.random() * array.length)];
+}
+
+// 배열 섞기
+function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+// 지연 함수
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 에러 로깅
+function logError(error, context = '') {
+    console.error(`[${getKoreaTime().toISOString()}] ${context}:`, error);
+}
+
+// 성공 로깅
+function logSuccess(message, context = '') {
+    console.log(`[${getKoreaTime().toISOString()}] ${context}: ${message}`);
+}
+
+// 유효한 숫자인지 확인
+function isValidNumber(value) {
+    return !isNaN(value) && isFinite(value) && value >= 0;
+}
+
+// 유효한 날짜인지 확인
+function isValidDate(date) {
+    return date instanceof Date && !isNaN(date);
+}
+
+// 모듈 내보내기
+module.exports = {
+    getKoreaTime,
+    getCurrentYear,
+    formatDate,
+    formatTime,
+    formatDateTime,
+    formatNumber,
+    calculatePercentage,
+    truncateText,
+    randomChoice,
+    shuffleArray,
+    delay,
+    logError,
+    logSuccess,
+    isValidNumber,
+    isValidDate
+};
