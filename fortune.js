@@ -284,8 +284,8 @@ class FortuneManager {
 const fortuneManager = new FortuneManager();
 
 // 포춘 기능을 처리하는 함수
-module.exports = function(bot, msg) {
-  const text = msg.text;
+module.exports = (bot, msg) => {
+  const text = msg.text || '';
   const chatId = msg.chat.id;
   const userId = msg.from.id;
   
