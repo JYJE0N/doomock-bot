@@ -184,8 +184,73 @@ bot.on('callback_query', async (query) => {
         break;
         
       case 'timer':
-        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer' });
+        sendTimerMenu(chatId);
         break;
+        
+      case 'timer_help':
+        sendTimerHelp(chatId);
+        break;
+        
+      case 'timer_start_menu':
+        sendTimerStartMenu(chatId);
+        break;
+        
+      case 'timer_stop':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer stop' });
+        break;
+        
+      case 'timer_status':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer status' });
+        break;
+        
+      case 'start_timer_공부하기':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 공부하기' });
+        break;
+      case 'start_timer_작업하기':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 작업하기' });
+        break;
+      case 'start_timer_운동하기':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 운동하기' });
+        break;
+      case 'start_timer_독서하기':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 독서하기' });
+        break;
+      case 'start_timer_요리하기':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 요리하기' });
+        break;
+      case 'start_timer_청소하기':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 청소하기' });
+        break;
+      case 'start_timer_취미활동':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 취미활동' });
+        break;
+      case 'start_timer_회의시간':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer start 회의시간' });
+        break;
+        
+      case 'set_timer_3m':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer 3m' });
+        break;
+      case 'set_timer_5m':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer 5m' });
+        break;
+      case 'set_timer_10m':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer 10m' });
+        break;
+      case 'set_timer_20m':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer 20m' });
+        break;
+      case 'set_timer_25m':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer 25m' });
+        break;
+      case 'set_timer_30m':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer 30m' });
+        break;
+      case 'set_timer_1h':
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer 1h' });
+        break;
+        
+      case 'remind_menu':
         
       case 'worktime':
         worktime(bot, { chat: { id: chatId }, from: query.from, text: '/worktime' });
@@ -358,17 +423,145 @@ function handleSayUsage(chatId) {
   });
 }
 
+// 타이머 메뉴
+function sendTimerMenu(chatId) {
+  bot.sendMessage(chatId, '⏰ **타이머 메뉴**\n\n원하는 기능을 선택하세요:', {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '▶️ 타이머 시작', callback_data: 'timer_start_menu' }],
+        [{ text: '⏹️ 타이머 정지', callback_data: 'timer_stop' }, { text: '📊 상태 확인', callback_data: 'timer_status' }],
+        [{ text: '📚 사용법 보기', callback_data: 'timer_help' }],
+        [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
+  });
+}
+
+// 타이머 시작 메뉴 (빠른 선택)
+function sendTimerStartMenu(chatId) {
+  bot.sendMessage(chatId, '▶️ **타이머 시작**\n\n작업을 선택하거나 직접 입력하세요:', {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '📚 공부하기', callback_data: 'start_timer_공부하기' }, { text: '💻 작업하기', callback_data: 'start_timer_작업하기' }],
+        [{ text: '🏃 운동하기', callback_data: 'start_timer_운동하기' }, { text: '📖 독서하기', callback_data: 'start_timer_독서하기' }],
+        [{ text: '🍳 요리하기', callback_data: 'start_timer_요리하기' }, { text: '🧹 청소하기', callback_data: 'start_timer_청소하기' }],
+        [{ text: '🎨 취미활동', callback_data: 'start_timer_취미활동' }, { text: '💼 회의시간', callback_data: 'start_timer_회의시간' }],
+        [{ text: '🔙 타이머 메뉴', callback_data: 'timer' }]
+      ]
+    }
+  });
+}
+
+// 타이머 사용법
+function sendTimerHelp(chatId) {
+  const helpText = `⏰ **타이머 사용법 가이드**\n\n` +
+    `**이 타이머는 스톱워치 방식입니다** ⏱️\n` +
+    `작업을 시작할 때 켜고, 끝날 때 꺼서 소요시간을 측정해요!\n\n` +
+    
+    `**사용 방법:**\n` +
+    `1️⃣ **시작**: 버튼 또는 \`/timer start 작업명\`\n` +
+    `2️⃣ **확인**: \`/timer status\`로 경과시간 체크\n` +
+    `3️⃣ **종료**: \`/timer stop\`으로 완료 및 결과 확인\n\n` +
+    
+    `**명령어 예시:**\n` +
+    `• \`/timer start 영어공부\` - 영어공부 타이머 시작\n` +
+    `• \`/timer status\` - 현재 진행상황 확인\n` +
+    `• \`/timer stop\` - 타이머 종료 및 결과보기\n\n` +
+    
+    `**활용 팁:**\n` +
+    `• 📚 공부시간 측정으로 학습량 파악\n` +
+    `• 💻 업무시간 기록으로 생산성 관리\n` +
+    `• 🏃 운동시간 체크로 건강관리\n` +
+    `• 🎯 집중력 향상을 위한 시간 의식\n\n` +
+    
+    `**주의사항:**\n` +
+    `• 한 번에 하나의 타이머만 실행 가능\n` +
+    `• 봇을 재시작하면 타이머가 초기화됩니다\n` +
+    `• 그룹채팅에서도 개인별로 독립 작동\n\n` +
+    
+    `지금 바로 시작해보세요! 시간을 의식하면 더 집중할 수 있어요 🎯`;
+    
+  bot.sendMessage(chatId, helpText, { 
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '▶️ 타이머 시작', callback_data: 'timer_start_menu' }],
+        [{ text: '🔙 타이머 메뉴', callback_data: 'timer' }]
+      ]
+    }
+  });
+}
+
+// 빠른 타이머 메뉴 (기존 함수 이름 변경)
+function handleQuickTimer(chatId, userId) {
+  bot.sendMessage(chatId, '⚡ **빠른 타이머 설정**\n\n자주 사용하는 시간을 선택하세요:', {
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🍝 3분 (라면)', callback_data: 'set_timer_3m' }, { text: '☕ 5분 (커피)', callback_data: 'set_timer_5m' }],
+        [{ text: '🏃 10분 (운동)', callback_data: 'set_timer_10m' }, { text: '💤 20분 (낮잠)', callback_data: 'set_timer_20m' }],
+        [{ text: '📚 25분 (집중)', callback_data: 'set_timer_25m' }, { text: '🍲 30분 (요리)', callback_data: 'set_timer_30m' }],
+        [{ text: '⏰ 1시간', callback_data: 'set_timer_1h' }],
+        [{ text: '🔙 타이머 메뉴', callback_data: 'timer' }, { text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
+  });
+}
+
 // 도움말
 function sendHelp(chatId) {
-  const helpText = `❓ **두목봇 도움말**\n\n` +
-    `**할 일 관리:**\n` +
-    `• 할 일 추가: "할일 [내용]"\n` +
-    `• 할 일 완료: "완료 [번호]"\n` +
-    `• 할 일 삭제: "삭제 [번호]"\n\n` +
-    `**기타 기능:**\n` +
-    `• TTS: "말해줘 [문장]"\n` +
-    `• 메뉴 보기: "메뉴"\n\n` +
-    `또는 아래 버튼을 이용하세요! 🎯`;
+  const helpText = `❓ **두목봇 완전 가이드**\n\n` +
+    `안녕하세요! 두목봇의 모든 기능을 소개해드릴게요 🤖\n\n` +
     
-  bot.sendMessage(chatId, helpText, { parse_mode: "Markdown" });
+    `**📱 사용 방법 2가지**\n` +
+    `1️⃣ **버튼 메뉴**: /start → 원하는 기능 클릭\n` +
+    `2️⃣ **명령어**: 채팅창 왼쪽 메뉴(≡) 또는 직접 입력\n\n` +
+    
+    `**📝 할 일 관리**\n` +
+    `• \`/add 할일내용\` - 새로운 할 일 추가\n` +
+    `• \`/list\` - 내 할 일 목록 보기\n` +
+    `• \`/done 번호\` - 할 일 완료/취소\n` +
+    `• \`/delete 번호\` - 할 일 삭제\n` +
+    `• \`/stats\` - 완료율 통계\n\n` +
+    
+    `**🔮 운세 & 점술**\n` +
+    `• \`/fortune\` - 오늘의 종합 운세\n` +
+    `• \`/tarot\` - 타로카드 뽑기 (78장)\n` +
+    `• 세부 운세: 연애/재물/건강/업무/회식/행운\n\n` +
+    
+    `**🗣️ 음성 기능**\n` +
+    `• \`/say 문장\` - TTS로 음성 읽어주기\n` +
+    `• 예시: \`/say 안녕하세요\`\n\n` +
+    
+    `**⏰ 시간 관리**\n` +
+    `• \`/timer\` - 타이머 설정\n` +
+    `• \`/worktime\` - 근무시간 기록\n` +
+    `• \`/remind\` - 리마인더 설정\n\n` +
+    
+    `**💡 사용 팁**\n` +
+    `• 그룹채팅에서도 모든 기능 사용 가능\n` +
+    `• 개인별 데이터는 안전하게 분리 저장\n` +
+    `• 매일 새로운 운세로 업데이트\n` +
+    `• 버튼이 편하면 /start, 빠른 실행은 명령어 추천\n\n` +
+    
+    `**🎯 빠른 시작 추천**\n` +
+    `1. \`/add 두목봇 사용해보기\` - 할 일 추가\n` +
+    `2. \`/fortune\` - 오늘 운세 확인\n` +
+    `3. \`/say 두목봇 최고야\` - 음성 테스트\n\n` +
+    
+    `문제가 있거나 제안사항이 있으시면 언제든 말씀해주세요! 😊\n\n` +
+    `**🏠 메인 메뉴로**: /start`;
+    
+  bot.sendMessage(chatId, helpText, { 
+    parse_mode: "Markdown",
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }],
+        [{ text: '📝 할 일 시작', callback_data: 'todo_menu' }, { text: '🔮 운세 보기', callback_data: 'fortune_menu' }],
+        [{ text: '🗣️ TTS 사용', callback_data: 'say_help' }]
+      ]
+    }
+  });
 }
