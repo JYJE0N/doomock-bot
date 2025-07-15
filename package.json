@@ -4,7 +4,7 @@
   "description": "Telegram todo bot with MongoDB",
   "main": "doomock_bot_modular.js",
   "scripts": {
-    "start": "node index.js"
+    "start": "node doomock_bot_modular.js"
   },
   "dependencies": {
     "dotenv": "^16.3.1",
