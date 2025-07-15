@@ -1,4 +1,4 @@
-// monthly_leave.js - 월차 관리 (todos.js 스타일로 수정)
+// monthly_leave.js - 월차 관리 (todos.js 스타일)
 const { MongoClient } = require('mongodb');
 
 class MonthlyLeaveManager {
