@@ -11,25 +11,30 @@ const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 console.log("✅ 두목봇 started!");
 
 // 봇 시작할 때 명령어 등록
-bot.telegram.setMyCommands([
-  { command: 'start', description: '🏠 메인 메뉴' },
-  { command: 'add', description: '📝 할 일 추가' },
-  { command: 'list', description: '📋 할 일 목록' },
-  { command: 'done', description: '✅ 할 일 완료' },
-  { command: 'delete', description: '🗑️ 할 일 삭제' },
-  { command: 'stats', description: '📊 할 일 통계' },
-  { command: 'say', description: '🗣️ TTS 음성읽기' },
-  { command: 'fortune', description: '🔮 오늘의 운세' },
-  { command: 'tarot', description: '🃏 타로카드' },
-  { command: 'timer', description: '⏰ 타이머' },
-  { command: 'worktime', description: '⏱️ 근무시간' },
-  { command: 'remind', description: '🔔 리마인드' }
-]).then(() => {
-  console.log('✅ 명령어가 등록되었습니다!');
-}).catch(err => {
-  console.error('❌ 명령어 등록 실패:', err);
-});
-// 봇 시작
+async function setupBot() {
+  try {
+    await bot.telegram.setMyCommands([
+      { command: 'start', description: '🏠 메인 메뉴' },
+      { command: 'add', description: '📝 할 일 추가' },
+      { command: 'list', description: '📋 할 일 목록' },
+      { command: 'done', description: '✅ 할 일 완료' },
+      { command: 'delete', description: '🗑️ 할 일 삭제' },
+      { command: 'stats', description: '📊 할 일 통계' },
+      { command: 'say', description: '🔊 TTS 음성읽기' },
+      { command: 'fortune', description: '🔮 오늘의 운세' },
+      { command: 'tarot', description: '🃏 타로카드' },
+      { command: 'timer', description: '⏱️ 타이머' },
+      { command: 'worktime', description: '⏰ 근무시간' },
+      { command: 'remind', description: '🔔 리마인드' }
+    ]);
+    console.log('✅ 명령어가 등록되었습니다!');
+  } catch (err) {
+    console.error('❌ 명령어 등록 실패:', err);
+  }
+}
+
+// bot.launch() 전에 호출
+setupBot();
 bot.launch();
 
 const lastAudio = {};
