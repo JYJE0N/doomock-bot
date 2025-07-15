@@ -6,8 +6,8 @@ let todos;
 (async () => {
   await client.connect();
   console.log("✅ MongoDB Connected");
-  const db = client.db("doomock"); // DB 이름
-  todos = db.collection("todos");   // 컬렉션
+  const db = client.db("doomock");
+  todos = db.collection("todos");
 })();
 
 exports.addTodo = async function(userId, task) {
