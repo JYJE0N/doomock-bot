@@ -39,7 +39,6 @@ bot.onText(/\/say$/, (msg) => {
   const chatId = msg.chat.id;
   bot.sendMessage(chatId, "😅 읽을 문장을 입력해주세요.\n예: `/say 안녕하세요`", { parse_mode: "Markdown" });
 });
-//할일 추가
 // /add 명령어 : 할 일 추가
 bot.onText(/\/add (.+)/, async (msg, match) => {
   const chatId = msg.chat.id;
@@ -53,6 +52,43 @@ bot.onText(/\/add (.+)/, async (msg, match) => {
 
   await todo.addTodo(userId, task);
   bot.sendMessage(chatId, `✅ 할 일을 추가했습니다: ${task}`);
+});
+
+// /list 명령어 : 할 일 목록
+bot.onText(/\/list/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+
+  const todosList = await todo.getTodos(userId);
+  if (todosList.length === 0) {
+    bot.sendMessage(chatId, "📭 아직 등록된 할 일이 없습니다.");
+    return;
+  }
+
+  let text = "📝 *당신의 할 일 목록:*\n";
+  todosList.forEach((t, i) => {
+    text += `${i + 1}. ${t.done ? "✅" : "🔲"} ${t.task}\n`;
+  });
+
+  bot.sendMessage(chatId, text, { parse_mode: "Markdown" });
+});
+
+// /done 명령어 : 할 일 완료 표시
+bot.onText(/\/done (\d+)/, async (msg, match) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  const index = parseInt(match[1], 10) - 1;
+
+  const todosList = await todo.getTodos(userId);
+  if (index < 0 || index >= todosList.length) {
+    bot.sendMessage(chatId, "😅 올바른 번호를 입력해주세요.\n예: `/done 2`");
+    return;
+  }
+
+  const todoItem = todosList[index];
+  await todo.markDone(userId, todoItem._id);
+
+  bot.sendMessage(chatId, `✅ '${todoItem.task}' 를 완료 처리했습니다.`);
 });
 
 // 메인 메뉴 인라인 버튼
