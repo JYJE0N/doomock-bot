@@ -218,8 +218,24 @@ bot.on('callback_query', (callbackQuery) => {
     const fortuneType = data.replace('fortune_', '');
     let commandText = '/fortune';
     
-    if (fortuneType !== 'general') {
-      commandText = `/fortune ${fortuneType}`;
+    if (fortuneType === 'general') {
+      commandText = '/fortune';
+    } else if (fortuneType === 'work') {
+      commandText = '/fortune work';
+    } else if (fortuneType === 'love') {
+      commandText = '/fortune love';
+    } else if (fortuneType === 'money') {
+      commandText = '/fortune money';
+    } else if (fortuneType === 'health') {
+      commandText = '/fortune health';
+    } else if (fortuneType === 'meeting') {
+      commandText = '/fortune meeting';
+    } else if (fortuneType === 'tarot') {
+      commandText = '/fortune tarot';
+    } else if (fortuneType === 'lucky') {
+      commandText = '/fortune lucky';
+    } else if (fortuneType === 'all') {
+      commandText = '/fortune all';
     }
     
     fortune(bot, { ...callbackQuery.message, from: callbackQuery.from, text: commandText });
