@@ -13,7 +13,7 @@ console.log("✅ 두목봇 started!");
 // 봇 시작할 때 명령어 등록
 async function setupBot() {
   try {
-    await bot.telegram.setMyCommands([
+    await bot.setMyCommands([
       { command: 'start', description: '🏠 메인 메뉴' },
       { command: 'add', description: '📝 할 일 추가' },
       { command: 'list', description: '📋 할 일 목록' },
@@ -33,9 +33,8 @@ async function setupBot() {
   }
 }
 
-// bot.launch() 전에 호출
+// 봇 시작 전에 호출
 setupBot();
-bot.launch();
 
 const lastAudio = {};
 
