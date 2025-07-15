@@ -1,5 +1,11 @@
 // monthly_leave.js - 월차 관리 (todos.js 스타일)
 const { MongoClient } = require('mongodb');
+// 여러 환경 변수 시도
+const mongoUrl = process.env.MONGO_URL || 
+                 process.env.MONGO_PUBLIC_URL || 
+                 process.env.MONGODB_URI ||
+                 process.env.MONGO_URI ||
+                 `mongodb://${process.env.MONGOUSER}:${process.env.MONGOPASSWORD}@${process.env.MONGOHOST}:${process.env.MONGOPORT}`;
 
 class MonthlyLeaveManager {
     constructor() {
