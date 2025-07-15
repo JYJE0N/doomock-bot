@@ -131,7 +131,7 @@ bot.on('callback_query', async (callbackQuery) => {
   const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
   const timeString = koreaTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
   
-  bot.editMessageText(`⏱️ 근무시간 체크\n\n🕐 현재 시간: ${timeString}\n\n📋 회사 근무시간: 08:30 - 17:30`, {
+  bot.editMessageText(`⏱️ 근무시간 체크\n\n🕐 현재 시간: ${timeString}\n\n📋 회사 근무시간: 08:30 - 17:30\n\n${statusMessage}`, {
     chat_id: chatId,
     message_id: message.message_id,
     reply_markup: {
