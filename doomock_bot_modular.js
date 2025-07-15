@@ -66,7 +66,7 @@ bot.on('message', async (msg) => {
     await todoDB.clearTodos(msg.from.id);
     bot.sendMessage(chatId, `🗑️ 모든 할 일을 삭제했어요.`);
 
-  } else if (text === '/fortune') {
+  } else if (text === '/fortune' || text.startsWith('/fortune ')) {
     fortune(bot, msg);
 
   } else if (text === '/worktime') {
@@ -90,6 +90,7 @@ bot.on('callback_query', async (callbackQuery) => {
   const message = callbackQuery.message;
   const chatId = message.chat.id;
   const data = callbackQuery.data;
+  const userId = callbackQuery.from.id;
 
   bot.answerCallbackQuery(callbackQuery.id);
 
@@ -116,39 +117,156 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data === 'fortune') {
-    const fakeMsg = { chat: { id: chatId }, from: { id: chatId } };
-    fortune(bot, fakeMsg);
-    bot.editMessageReplyMarkup({
-      inline_keyboard: [
-        [
-          { text: '🎲 다시 뽑기', callback_data: 'fortune' },
-          { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-        ]
-      ]
-    }, { chat_id: chatId, message_id: message.message_id });
-
-  } else if (data === 'timer') {
-    bot.editMessageText('⏰ 타이머 사용법:\n\n/timer 5 - 5분 타이머\n/timer 30 - 30분 타이머\n/timer 60 - 1시간 타이머\n\n직접 명령어를 입력해주세요!', {
+    // 포춘 메뉴 표시
+    bot.editMessageText('🔮 **운세 메뉴**\n\n원하는 운세를 선택해주세요:', {
       chat_id: chatId,
       message_id: message.message_id,
+      parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
+          [
+            { text: '🌟 일반운세', callback_data: 'fortune_general' },
+            { text: '💼 업무운', callback_data: 'fortune_work' }
+          ],
+          [
+            { text: '💕 연애운', callback_data: 'fortune_love' },
+            { text: '💰 재물운', callback_data: 'fortune_money' }
+          ],
+          [
+            { text: '🌿 건강운', callback_data: 'fortune_health' },
+            { text: '🍻 회식운', callback_data: 'fortune_meeting' }
+          ],
+          [
+            { text: '🃏 타로카드', callback_data: 'fortune_tarot' },
+            { text: '🍀 행운정보', callback_data: 'fortune_lucky' }
+          ],
+          [
+            { text: '📊 종합운세', callback_data: 'fortune_all' }
+          ],
+          [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+          ]
         ]
       }
     });
 
-  } else if (data === 'worktime') {
-    const now = new Date();
-    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
-    const timeString = koreaTime.toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit' });
+  } else if (data.startsWith('fortune_')) {
+    // 포춘 기능 처리
+    const fortuneType = data.replace('fortune_', '');
+    const fakeMsg = {
+      text: `/fortune ${fortuneType === 'general' ? '' : fortuneType}`,
+      chat: { id: chatId },
+      from: { id: userId, first_name: callbackQuery.from.first_name }
+    };
+    
+    // 포춘 함수 호출
+    fortune(bot, fakeMsg);
+    
+    // 메뉴 하단에 버튼 추가
+    setTimeout(() => {
+      bot.sendMessage(chatId, '🎯 **다른 운세도 확인해보세요!**', {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '🔮 운세 메뉴', callback_data: 'fortune' },
+              { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
+          ]
+        }
+      });
+    }, 1000);
 
-    bot.editMessageText(`⏱️ 근무시간 체크\n\n🕐 현재 시간: ${timeString}\n\n📋 회사 근무시간: 08:30 - 17:30`, {
+  } else if (data === 'timer') {
+    bot.editMessageText('⏰ 타이머 사용법:\n\n/timer 5 - 5분 타이머\n/timer 30 - 30분 타이머\n/timer 60 - 1시간 타이머\n\n아래 버튼을 눌러서 바로 설정할 수도 있어요!', {
       chat_id: chatId,
       message_id: message.message_id,
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
+          [
+            { text: '⏰ 5분', callback_data: 'timer_5' },
+            { text: '⏰ 15분', callback_data: 'timer_15' },
+            { text: '⏰ 30분', callback_data: 'timer_30' }
+          ],
+          [
+            { text: '⏰ 1시간', callback_data: 'timer_60' },
+            { text: '⏰ 2시간', callback_data: 'timer_120' }
+          ],
+          [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+          ]
+        ]
+      }
+    });
+
+  } else if (data.startsWith('timer_')) {
+    // 타이머 기능 처리
+    const minutes = data.replace('timer_', '');
+    const fakeMsg = {
+      text: `/timer ${minutes}`,
+      chat: { id: chatId },
+      from: { id: userId }
+    };
+    
+    timer(bot, fakeMsg);
+    
+    // 메뉴로 돌아가기 버튼
+    setTimeout(() => {
+      bot.sendMessage(chatId, '⏰ 타이머가 설정되었습니다!', {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: '⏰ 타이머 메뉴', callback_data: 'timer' },
+              { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
+          ]
+        }
+      });
+    }, 1000);
+
+  } else if (data === 'worktime') {
+    // 근무시간 정보 표시
+    const now = new Date();
+    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+    
+    // 근무시간 설정 (08:30 - 17:30)
+    const startTime = new Date(koreaTime);
+    startTime.setHours(8, 30, 0, 0);
+    
+    const endTime = new Date(koreaTime);
+    endTime.setHours(17, 30, 0, 0);
+    
+    const currentTime = koreaTime.toLocaleTimeString('ko-KR', { 
+      hour: '2-digit', 
+      minute: '2-digit' 
+    });
+    
+    let workMessage = `⏱️ **근무시간 체크**\n\n🕐 현재 시간: ${currentTime}\n📋 근무시간: 08:30 - 17:30\n\n`;
+    
+    if (koreaTime < startTime) {
+      const timeDiff = startTime - koreaTime;
+      const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+      workMessage += `🌅 출근까지 ${hours}시간 ${minutes}분 남았어요!`;
+    } else if (koreaTime > endTime) {
+      workMessage += `🎉 퇴근시간이 지났어요! 수고하셨습니다!`;
+    } else {
+      const timeDiff = endTime - koreaTime;
+      const hours = Math.floor(timeDiff / (1000 * 60 * 60));
+      const minutes = Math.floor((timeDiff % (1000 * 60 * 60)) / (1000 * 60));
+      workMessage += `⏰ 퇴근까지 ${hours}시간 ${minutes}분 남았어요!`;
+    }
+
+    bot.editMessageText(workMessage, {
+      chat_id: chatId,
+      message_id: message.message_id,
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: '🔄 새로고침', callback_data: 'worktime' },
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+          ]
         ]
       }
     });
@@ -165,9 +283,10 @@ bot.on('callback_query', async (callbackQuery) => {
     });
 
   } else if (data === 'help') {
-    bot.editMessageText('❓ 두목봇 사용법:\n\n📝 할 일 관리: /add, /list, /clear\n🔮 운세: 오늘의 운세 확인\n⏰ 타이머: 시간 알림 설정\n⏱️ 근무시간: 출퇴근 기록\n🎲 유틸리티: 재미있는 기능들\n\n모든 기능은 /start 메뉴에서 사용할 수 있어요!', {
+    bot.editMessageText('❓ **두목봇 사용법**\n\n📝 **할 일 관리:** /add, /list, /clear\n🔮 **운세:** 오늘의 운세 확인\n⏰ **타이머:** 시간 알림 설정\n⏱️ **근무시간:** 출퇴근 기록\n🎲 **유틸리티:** 재미있는 기능들\n\n모든 기능은 /start 메뉴에서 사용할 수 있어요!', {
       chat_id: chatId,
       message_id: message.message_id,
+      parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
           [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
