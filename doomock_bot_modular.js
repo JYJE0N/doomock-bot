@@ -10,8 +10,8 @@ const utils = require('./utils');
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 console.log("✅ 두목봇 started!");
 
-// 봇 명령어 메뉴 설정 (그룹채팅 왼쪽 삼선메뉴)
-bot.setMyCommands([
+// 봇 시작할 때 명령어 등록
+bot.telegram.setMyCommands([
   { command: 'start', description: '🏠 메인 메뉴' },
   { command: 'add', description: '📝 할 일 추가' },
   { command: 'list', description: '📋 할 일 목록' },
@@ -25,10 +25,12 @@ bot.setMyCommands([
   { command: 'worktime', description: '⏱️ 근무시간' },
   { command: 'remind', description: '🔔 리마인드' }
 ]).then(() => {
-  console.log("✅ 봇 명령어 메뉴가 설정되었습니다!");
+  console.log('✅ 명령어가 등록되었습니다!');
 }).catch(err => {
-  console.error("❌ 봇 명령어 설정 실패:", err);
+  console.error('❌ 명령어 등록 실패:', err);
 });
+// 봇 시작
+bot.launch();
 
 const lastAudio = {};
 
