@@ -151,15 +151,15 @@ bot.on('callback_query', async (query) => {
         break;
         
       case 'remind_menu':
-        remind(bot, { chat: { id: chatId }, from: query.from, text: '' });
+        remind(bot, { chat: { id: chatId }, from: query.from, text: '/remind' });
         break;
         
       case 'timer':
-        timer(bot, { chat: { id: chatId }, from: query.from, text: '' });
+        timer(bot, { chat: { id: chatId }, from: query.from, text: '/timer' });
         break;
         
       case 'worktime':
-        worktime(bot, { chat: { id: chatId }, from: query.from, text: '' });
+        worktime(bot, { chat: { id: chatId }, from: query.from, text: '/worktime' });
         break;
         
       case 'say_test':
