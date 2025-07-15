@@ -19,6 +19,27 @@ bot.onText(/\/start/, (msg) => {
   sendMainMenu(chatId);
 });
 
+// /say 명령어
+bot.onText(/\/say (.+)/, (msg, match) => {
+  const chatId = msg.chat.id;
+  const text = match[1];
+
+  if (!text) {
+    bot.sendMessage(chatId, "😅 읽을 문장을 입력해주세요.\n예: `/say 안녕하세요`", { parse_mode: "Markdown" });
+    return;
+  }
+
+  const ttsUrl = utils.Utils.getTTSUrl(text);
+  bot.sendAudio(chatId, ttsUrl, {
+    caption: `🗣 "${text}" 를 읽어드릴게요.`
+  });
+});
+
+bot.onText(/\/say$/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, "😅 읽을 문장을 입력해주세요.\n예: `/say 안녕하세요`", { parse_mode: "Markdown" });
+});
+
 // 메인 메뉴 인라인 버튼
 function sendMainMenu(chatId) {
   bot.sendMessage(chatId, '🏠 메인 메뉴입니다. 원하는 기능을 선택하세요 👇', {
@@ -40,7 +61,7 @@ bot.on('callback_query', (query) => {
   const chatId = query.message.chat.id;
   const messageId = query.message.message_id;
 
-  console.log(`🔥 callback_query: data=${data}`);
+  console.log(`🔥 callback_query: data=${data} from user=${query.from.id}`);
 
   bot.answerCallbackQuery(query.id);
 
