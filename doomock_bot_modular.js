@@ -7,6 +7,8 @@ const worktime = require('./worktime');
 const utils = require('./utils');
 const remind = require('./remind');
 
+const lastAudio = {};  // 🔥 추가
+
 const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
 
 console.log("BOT_TOKEN:", process.env.BOT_TOKEN);
@@ -99,11 +101,22 @@ bot.on('message', async (msg) => {
     remind(bot, msg);
 
   } else if (text.startsWith('/say ')) {
-    const content = text.substring(5);
-    const ttsUrl = utils.Utils.getTTSUrl(content);
-    bot.sendAudio(chatId, ttsUrl, {
-      caption: `🗣 "${content}" 를 읽어드릴게요.`
-    });
+  const content = text.substring(5);
+  const ttsUrl = utils.Utils.getTTSUrl(content);
+
+  // 직전에 보낸 음성이 있으면 삭제
+  if (lastAudio[chatId]) {
+    bot.deleteMessage(chatId, lastAudio[chatId]).catch(console.error);
+  }
+
+  bot.sendAudio(chatId, ttsUrl, {
+    caption: `🗣 "${content}" 를 읽어드릴게요.`
+  }).then(sentMsg => {
+    lastAudio[chatId] = sentMsg.message_id;
+  }).catch(err => {
+    console.error("TTS sendAudio error:", err);
+    bot.sendMessage(chatId, '❌ 음성파일을 전송하는데 실패했어요.');
+  });
 
   } else if (text === '/utils' || text === '/help') {
     utils(bot, msg);
