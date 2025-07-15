@@ -1,13 +1,14 @@
 {
   "name": "doomock-bot",
   "version": "1.0.0",
-  "main": "doomock_bot_modular.js",
+  "description": "Telegram todo bot with MongoDB",
+  "main": "index.js",
   "scripts": {
-    "start": "node doomock_bot_modular.js"
+    "start": "node index.js"
   },
   "dependencies": {
-    "dotenv": "^16.0.0",
-    "node-telegram-bot-api": "^0.61.0",
-    "mongodb": "^5.7.0"
+    "dotenv": "^16.3.1",
+    "mongodb": "^5.7.0",
+    "node-telegram-bot-api": "^0.61.0"
   }
 }
