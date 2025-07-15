@@ -247,3 +247,10 @@ bot.on('message', (msg) => {
   bot.sendMessage(msg.chat.id, "✅ 메시지 받았습니다: " + msg.text);
 });
 
+process.on('SIGINT', () => {
+  console.log("Interrupt signal received");
+  process.exit();
+});
+
+setInterval(() => {}, 1000); // 1초마다 빈 작업을 돌려 keep-alive
+
