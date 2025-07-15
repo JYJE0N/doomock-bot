@@ -20,13 +20,20 @@ class WorkTimeManager {
   
   getWorkStatus() {
     const now = new Date();
-    const currentMinutes = Utils.timeToMinutes(Utils.getCurrentTime());
-    const startMinutes = Utils.timeToMinutes(WORK_SCHEDULE.start);
-    const endMinutes = Utils.timeToMinutes(WORK_SCHEDULE.end);
+    const currentHours = now.getHours();
+    const currentMinutes = now.getMinutes();
+    const currentTotalMinutes = currentHours * 60 + currentMinutes;
     
-    if (currentMinutes < startMinutes) {
+    const startTotalMinutes = WORK_SCHEDULE.start.hours * 60 + WORK_SCHEDULE.start.minutes;
+    const endTotalMinutes = WORK_SCHEDULE.end.hours * 60 + WORK_SCHEDULE.end.minutes;
+    
+    console.log(`현재시간: ${currentHours}:${currentMinutes} (${currentTotalMinutes}분)`);
+    console.log(`업무시작: ${WORK_SCHEDULE.start.hours}:${WORK_SCHEDULE.start.minutes} (${startTotalMinutes}분)`);
+    console.log(`업무종료: ${WORK_SCHEDULE.end.hours}:${WORK_SCHEDULE.end.minutes} (${endTotalMinutes}분)`);
+    
+    if (currentTotalMinutes < startTotalMinutes) {
       // 아직 업무 시작 전
-      const remainingMinutes = startMinutes - currentMinutes;
+      const remainingMinutes = startTotalMinutes - currentTotalMinutes;
       const hours = Math.floor(remainingMinutes / 60);
       const minutes = remainingMinutes % 60;
       return { 
@@ -35,9 +42,9 @@ class WorkTimeManager {
         minutes,
         message: `⏳ 업무 시작까지: ${hours}시간 ${minutes}분 남음`
       };
-    } else if (currentMinutes < endMinutes) {
+    } else if (currentTotalMinutes < endTotalMinutes) {
       // 업무 시간 중
-      const remainingMinutes = endMinutes - currentMinutes;
+      const remainingMinutes = endTotalMinutes - currentTotalMinutes;
       const hours = Math.floor(remainingMinutes / 60);
       const minutes = remainingMinutes % 60;
       return { 
