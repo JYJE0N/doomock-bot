@@ -19,15 +19,19 @@ class WorkTimeManager {
   }
   
   getWorkStatus() {
+    // 한국 시간대로 현재 시간 가져오기
     const now = new Date();
-    const currentHours = now.getHours();
-    const currentMinutes = now.getMinutes();
+    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+    
+    const currentHours = koreaTime.getHours();
+    const currentMinutes = koreaTime.getMinutes();
     const currentTotalMinutes = currentHours * 60 + currentMinutes;
     
     const startTotalMinutes = WORK_SCHEDULE.start.hours * 60 + WORK_SCHEDULE.start.minutes;
     const endTotalMinutes = WORK_SCHEDULE.end.hours * 60 + WORK_SCHEDULE.end.minutes;
     
-    console.log(`현재시간: ${currentHours}:${currentMinutes} (${currentTotalMinutes}분)`);
+    console.log(`서버시간: ${now.getHours()}:${now.getMinutes()}`);
+    console.log(`한국시간: ${currentHours}:${currentMinutes} (${currentTotalMinutes}분)`);
     console.log(`업무시작: ${WORK_SCHEDULE.start.hours}:${WORK_SCHEDULE.start.minutes} (${startTotalMinutes}분)`);
     console.log(`업무종료: ${WORK_SCHEDULE.end.hours}:${WORK_SCHEDULE.end.minutes} (${endTotalMinutes}분)`);
     
