@@ -509,15 +509,39 @@ bot.on('callback_query', async (callbackQuery) => {
             case 'insight_quick':
                 dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight quick' });
                 break;
-
+            //인사이트 케이스
             case 'insight_dashboard':
             case 'insight_inventory':
             case 'insight_marketing':
             case 'insight_content':
             case 'insight_risk':
             case 'insight_refresh':
-                dustInsights.handleCallback(bot, callbackQuery);
-                break;
+                console.log(`📊 인사이트 콜백 처리: ${data}`);
+    // 🆕 수정: 각각 개별 처리
+    if (data === 'insight_dashboard') {
+        // 대시보드 처리
+        if (dustInsights.showRealtimeDashboard) {
+            dustInsights.showRealtimeDashboard(bot, chatId, getUserName(callbackQuery.from));
+        } else {
+            bot.sendMessage(chatId, '📱 실시간 대시보드 기능을 준비 중입니다...');
+        }
+    } else if (data === 'insight_inventory') {
+        // 재고 전략 처리
+        dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+    } else if (data === 'insight_marketing') {
+        // 마케팅 전략 처리
+        dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+    } else if (data === 'insight_content') {
+        // 콘텐츠 전략 처리
+        bot.sendMessage(chatId, '📝 콘텐츠 마케팅 전략 기능을 준비 중입니다...');
+    } else if (data === 'insight_risk') {
+        // 리스크 분석 처리
+        bot.sendMessage(chatId, '⚠️ 리스크 분석 기능을 준비 중입니다...');
+    } else if (data === 'insight_refresh') {
+        // 새로고침 처리
+        dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+    }
+    break;
 
             // ===== 휴가 관리 관련 =====
             case 'leave_menu':
