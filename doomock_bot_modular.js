@@ -51,14 +51,24 @@ bot.setMyCommands([
     console.log('✅ 명령어가 Telegram에 등록되었습니다.');
 }).catch(console.error);
 
-// Bot Menu (햄버거 메뉴) 설정
-bot.setMyMenuButton({
-    menu_button: {
-        type: 'commands'
+// Bot Menu 설정 (안전한 방법으로 시도)
+try {
+    if (typeof bot.setMyMenuButton === 'function') {
+        bot.setMyMenuButton({
+            menu_button: {
+                type: 'commands'
+            }
+        }).then(() => {
+            console.log('✅ Bot Menu가 활성화되었습니다.');
+        }).catch((err) => {
+            console.log('⚠️ Bot Menu 설정 실패 (버전 미지원):', err.message);
+        });
+    } else {
+        console.log('⚠️ setMyMenuButton 메서드가 지원되지 않습니다. 명령어 목록만 사용됩니다.');
     }
-}).then(() => {
-    console.log('✅ Bot Menu가 활성화되었습니다.');
-}).catch(console.error);
+} catch (error) {
+    console.log('⚠️ Bot Menu 설정을 건너뜁니다:', error.message);
+}
 
 // 메인 메뉴 키보드
 const mainMenuKeyboard = {
