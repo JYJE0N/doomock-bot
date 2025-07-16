@@ -1,34 +1,48 @@
 {
-  "name": "doomock-telegram-bot",
+  "name": "doomock-bot",
   "version": "1.0.0",
-  "description": "Modular Telegram Bot with Monthly Leave Management",
+  "description": "직장인을 위한 퇴근계산기 텔레그램 봇",
   "main": "doomock_bot_modular.js",
   "scripts": {
     "start": "node doomock_bot_modular.js",
     "dev": "nodemon doomock_bot_modular.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-  "dependencies": {
-    "node-telegram-bot-api": "^0.64.0",
-    "mongodb": "^6.3.0",
-    "dotenv": "^16.3.1",
-    "moment-timezone": "^0.5.43",
-    "node-cron": "^3.0.3"
-  },
-  "devDependencies": {
-    "nodemon": "^3.0.2"
-  },
-  "engines": {
-    "node": ">=18.0.0"
-  },
   "keywords": [
     "telegram",
     "bot",
-    "mongodb",
-    "modular",
-    "leave-management",
-    "monthly-leave"
+    "productivity",
+    "work",
+    "timer",
+    "todo",
+    "fortune",
+    "reminder"
   ],
-  "author":"doomock",
-  "license": "MIT"
+  "author": "JYJE0N",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.0.3",
+    "node-telegram-bot-api": "^0.64.0",
+    "mongodb": "^5.1.0",
+    "google-tts-api": "^2.0.2",
+    "gtts": "^0.2.1",
+    "axios": "^1.4.0",
+    "form-data": "^4.0.0",
+    "fs": "^0.0.1-security",
+    "path": "^0.12.7"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.22"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JYJE0N/doomock-bot.git"
+  },
+  "bugs": {
+    "url": "https://github.com/JYJE0N/doomock-bot/issues"
+  },
+  "homepage": "https://github.com/JYJE0N/doomock-bot#readme"
 }
