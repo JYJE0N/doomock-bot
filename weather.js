@@ -1,4 +1,4 @@
-// weather.js - 날씨 정보 모듈
+// weather.js - 날씨 정보 모듈 (화성 기본 설정)
 
 const axios = require('axios');
 const { getUserName } = require('./username_helper');
@@ -7,8 +7,9 @@ const { getUserName } = require('./username_helper');
 const WEATHER_API_KEY = process.env.WEATHER_API_KEY || 'YOUR_API_KEY_HERE';
 const WEATHER_BASE_URL = 'https://api.openweathermap.org/data/2.5';
 
-// 한국 주요 도시 좌표
+// 한국 주요 도시 좌표 (화성이 맨 위!)
 const CITIES = {
+  '화성': { lat: 37.2061, lon: 126.8306 }, // 🆕 화성/동탄을 맨 위로!
   '서울': { lat: 37.5665, lon: 126.9780 },
   '부산': { lat: 35.1796, lon: 129.0756 },
   '대구': { lat: 35.8714, lon: 128.6014 },
@@ -18,7 +19,6 @@ const CITIES = {
   '울산': { lat: 35.5384, lon: 129.3114 },
   '세종': { lat: 36.4800, lon: 127.2890 },
   '경기': { lat: 37.4138, lon: 127.5183 },
-  '화성': { lat: 37.2061, lon: 126.8306 }, // 🆕 화성/동탄 좌표 추가
   '강원': { lat: 37.8228, lon: 128.1555 },
   '충북': { lat: 36.6356, lon: 127.4917 },
   '충남': { lat: 36.5184, lon: 126.8000 },
@@ -81,8 +81,8 @@ class WeatherManager {
     }
   }
 
-  // 현재 날씨 가져오기
-  async getCurrentWeather(city = '서울') {
+  // 현재 날씨 가져오기 (🆕 기본값을 화성으로 변경!)
+  async getCurrentWeather(city = '화성') {  // 서울 → 화성으로 변경!
     try {
       const cityInfo = CITIES[city];
       if (!cityInfo) {
@@ -137,8 +137,8 @@ class WeatherManager {
     }
   }
 
-  // 5일 날씨 예보
-  async getWeatherForecast(city = '서울') {
+  // 5일 날씨 예보 (🆕 기본값을 화성으로 변경!)
+  async getWeatherForecast(city = '화성') {  // 서울 → 화성으로 변경!
     try {
       const cityInfo = CITIES[city];
       if (!cityInfo) {
@@ -174,7 +174,7 @@ class WeatherManager {
     }
   }
 
-  // 🔧 수정: 출근용 날씨 정보 포맷 (한국 시간 적용)
+  // 🔧 수정: 출근용 날씨 정보 포맷 (화성 특화!)
   formatMorningWeather(weatherData) {
     // 한국 시간으로 수정
     const now = new Date();
@@ -182,6 +182,12 @@ class WeatherManager {
     const timeStr = `${koreaTime.getHours().toString().padStart(2, '0')}:${koreaTime.getMinutes().toString().padStart(2, '0')}`;
     
     let message = `🌤️ **${weatherData.city} 날씨** (${timeStr})\n\n`;
+    
+    // 🏡 화성일 때 특별 메시지!
+    if (weatherData.city === '화성') {
+      message += `🏡 동탄/화성 지역 현재 날씨입니다!\n\n`;
+    }
+    
     message += `${weatherData.weatherEmoji} ${weatherData.weatherDesc}\n`;
     message += `🌡️ 기온: ${weatherData.temp}°C (체감 ${weatherData.feelsLike}°C)\n`;
     message += `💧 습도: ${weatherData.humidity}%\n`;
@@ -206,12 +212,24 @@ class WeatherManager {
       message += `🧴 **자외선 차단제를 바르세요!**\n`;
     }
     
+    // 🏡 화성 지역 특별 정보
+    if (weatherData.city === '화성') {
+      message += `\n🚌 **동탄 통근 TIP:**\n`;
+      if (weatherData.temp <= 0) {
+        message += `• 버스 대기 시간이 길 수 있으니 따뜻하게!\n`;
+      }
+      if (weatherData.weatherDesc.includes('비')) {
+        message += `• 동탄역 지하보도를 이용하세요!\n`;
+      }
+    }
+    
     return message;
   }
 
   // 간단한 날씨 정보 (메뉴용)
   formatSimpleWeather(weatherData) {
-    return `${weatherData.weatherEmoji} ${weatherData.temp}°C ${weatherData.weatherDesc}\n${weatherData.clothing.emoji} ${weatherData.clothing.text}`;
+    const locationEmoji = weatherData.city === '화성' ? '🏡' : '🌤️';
+    return `${locationEmoji} ${weatherData.weatherEmoji} ${weatherData.temp}°C ${weatherData.weatherDesc}\n${weatherData.clothing.emoji} ${weatherData.clothing.text}`;
   }
 
   // 24시간 예보 포맷
@@ -235,7 +253,7 @@ module.exports = function(bot, msg) {
   const userName = getUserName(msg);
 
   // 도시 추출 (예: /weather 서울, /날씨 부산)
-  let city = '서울'; // 기본값
+  let city = '화성'; // 🆕 기본값을 화성으로 변경!
   if (text) {
     const cityMatch = text.match(/(?:weather|날씨)\s*(.+)/i);
     if (cityMatch && cityMatch[1]) {
@@ -247,7 +265,7 @@ module.exports = function(bot, msg) {
   }
 
   if (text === '/weather' || text === '/날씨' || !text) {
-    // 현재 날씨 정보
+    // 현재 날씨 정보 (화성 기본!)
     weatherManager.getCurrentWeather(city)
       .then(weatherData => {
         const weatherMessage = weatherManager.formatMorningWeather(weatherData);
@@ -290,12 +308,10 @@ module.exports = function(bot, msg) {
     const cityList = Object.keys(CITIES).slice(0, 10).join(', ');
     bot.sendMessage(chatId, 
       `🌤️ **날씨 정보 도움말**\n\n` +
-      `**사용법:**\n` +
-      `• /weather 또는 /날씨 - 서울 날씨\n` +
-      `• /weather 부산 - 부산 날씨\n` +
-      `• /날씨 예보 - 시간별 예보\n\n` +
-      `**지원 도시:**\n${cityList} 등\n\n` +
-      `날씨에 맞는 옷차림과 대기질 정보도 함께 제공합니다! 🌈`,
+      `**사용법:**\n• /weather 또는 /날씨 - 화성 날씨 (기본!) 🏡\n• /weather 서울 - 서울 날씨\n• /날씨 예보 - 시간별 예보\n\n` +
+      `**지원 도시:**\n🏡 화성(동탄), ${cityList.replace('화성, ', '')} 등\n\n` +
+      `날씨에 맞는 옷차림과 대기질 정보도 함께 제공합니다! 🌈\n\n` +
+      `🏡 **화성/동탄 지역이 기본으로 설정되어 있어요!**`,
       { parse_mode: 'Markdown' }
     );
   }
