@@ -470,32 +470,27 @@ userStates.clear();
 // 콜백 쿼리 핸들러 수정 - 함수명 오타 수정
 
 // 완전한 콜백 쿼리 핸들러 - 모든 케이스 포함
-
+// 1. 콜백 쿼리 핸들러 수정 (기존 코드의 문제점 해결)
 bot.on('callback_query', async (callbackQuery) => {
     const message = callbackQuery.message;
     const data = callbackQuery.data;
     const chatId = message.chat.id;
     const userId = callbackQuery.from.id;
 
-    // 디버깅 로그 추가
     console.log(`📞 콜백 쿼리 받음: "${data}" (사용자: ${userId})`);
 
-    // 콜백 쿼리 응답 (올바른 함수명 사용)
-    bot.answerCallbackQuery(callbackQuery.id);
+    // 콜백 쿼리 응답 (중요: 먼저 응답)
+    try {
+        await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (error) {
+        console.error('콜백 쿼리 응답 실패:', error);
+    }
 
     try {
         switch (data) {
-            case 'main_menu':
-                bot.editMessageText(`🤖 안녕하세요 ${getUserName(callbackQuery.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`, {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: mainMenuKeyboard
-                });
-                break;
-
-             // ===== 인사이트 메뉴 케이스들 =====
+            // ===== 인사이트 관련 콜백 =====
             case 'insight_menu':
-                bot.editMessageText(`📊 ${getUserName(callbackQuery.from)}님의 마케팅 인사이트\n\n미세먼지 기반 마케팅 전략을 확인해보세요:`, {
+                await bot.editMessageText(`📊 ${getUserName(callbackQuery.from)}님의 마케팅 인사이트\n\n미세먼지 기반 마케팅 전략을 확인해보세요:`, {
                     chat_id: chatId,
                     message_id: message.message_id,
                     reply_markup: insightMenuKeyboard
@@ -503,45 +498,147 @@ bot.on('callback_query', async (callbackQuery) => {
                 break;
 
             case 'insight_full':
-                dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+                // 로딩 메시지 표시
+                await bot.editMessageText('🔍 종합 인사이트를 생성하고 있습니다...', {
+                    chat_id: chatId,
+                    message_id: message.message_id
+                });
+                
+                // 인사이트 모듈 호출
+                dustInsights(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from, 
+                    text: '/insight' 
+                });
                 break;
 
             case 'insight_quick':
-                dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight quick' });
+                await bot.editMessageText('⚡ 빠른 인사이트를 생성하고 있습니다...', {
+                    chat_id: chatId,
+                    message_id: message.message_id
+                });
+                
+                dustInsights(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from, 
+                    text: '/insight quick' 
+                });
                 break;
-            //인사이트 케이스
+
             case 'insight_dashboard':
+                await bot.editMessageText('📱 실시간 대시보드를 불러오고 있습니다...', {
+                    chat_id: chatId,
+                    message_id: message.message_id
+                });
+                
+                // 대시보드 함수 안전하게 호출
+                if (dustInsights.showRealtimeDashboard) {
+                    await dustInsights.showRealtimeDashboard(bot, chatId, getUserName(callbackQuery.from));
+                } else {
+                    await bot.sendMessage(chatId, '📱 실시간 대시보드를 준비하고 있습니다...');
+                }
+                break;
+
             case 'insight_inventory':
+                await bot.editMessageText('📦 재고 전략을 분석하고 있습니다...', {
+                    chat_id: chatId,
+                    message_id: message.message_id
+                });
+                
+                dustInsights(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from, 
+                    text: '/insight inventory' 
+                });
+                break;
+
             case 'insight_marketing':
+                await bot.editMessageText('🎯 마케팅 전략을 분석하고 있습니다...', {
+                    chat_id: chatId,
+                    message_id: message.message_id
+                });
+                
+                dustInsights(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from, 
+                    text: '/insight marketing' 
+                });
+                break;
+
             case 'insight_content':
+                await bot.sendMessage(chatId, '📝 콘텐츠 마케팅 전략 기능을 준비 중입니다...', {
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                        ]]
+                    }
+                });
+                break;
+
             case 'insight_risk':
+                await bot.sendMessage(chatId, '⚠️ 리스크 분석 기능을 준비 중입니다...', {
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                        ]]
+                    }
+                });
+                break;
+
             case 'insight_refresh':
-                console.log(`📊 인사이트 콜백 처리: ${data}`);
-    // 🆕 수정: 각각 개별 처리
-    if (data === 'insight_dashboard') {
-        // 대시보드 처리
-        if (dustInsights.showRealtimeDashboard) {
-            dustInsights.showRealtimeDashboard(bot, chatId, getUserName(callbackQuery.from));
-        } else {
-            bot.sendMessage(chatId, '📱 실시간 대시보드 기능을 준비 중입니다...');
+                await bot.editMessageText('🔄 최신 데이터로 인사이트를 새로고침합니다...', {
+                    chat_id: chatId,
+                    message_id: message.message_id
+                });
+                
+                setTimeout(() => {
+                    dustInsights(bot, { 
+                        chat: { id: chatId }, 
+                        from: callbackQuery.from, 
+                        text: '/insight' 
+                    });
+                }, 1000);
+                break;
+
+            // ===== 기타 콜백들 =====
+            case 'main_menu':
+                await bot.editMessageText(`🤖 안녕하세요 ${getUserName(callbackQuery.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`, {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: mainMenuKeyboard
+                });
+                break;
+
+            // ... 다른 케이스들 ...
+
+            default:
+                console.log(`❓ 알 수 없는 콜백 데이터: ${data}`);
+                await bot.sendMessage(chatId, '❌ 알 수 없는 명령입니다. 메인 메뉴로 돌아갑니다.', {
+                    reply_markup: {
+                        inline_keyboard: [[
+                            { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+                        ]]
+                    }
+                });
+                break;
         }
-    } else if (data === 'insight_inventory') {
-        // 재고 전략 처리
-        dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
-    } else if (data === 'insight_marketing') {
-        // 마케팅 전략 처리
-        dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
-    } else if (data === 'insight_content') {
-        // 콘텐츠 전략 처리
-        bot.sendMessage(chatId, '📝 콘텐츠 마케팅 전략 기능을 준비 중입니다...');
-    } else if (data === 'insight_risk') {
-        // 리스크 분석 처리
-        bot.sendMessage(chatId, '⚠️ 리스크 분석 기능을 준비 중입니다...');
-    } else if (data === 'insight_refresh') {
-        // 새로고침 처리
-        dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+    } catch (error) {
+        console.error('콜백 처리 오류:', error);
+        
+        // 에러 메시지를 사용자에게 표시
+        try {
+            await bot.sendMessage(chatId, `❌ 처리 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n메인 메뉴로 돌아갑니다.`, {
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+                    ]]
+                }
+            });
+        } catch (sendError) {
+            console.error('에러 메시지 전송 실패:', sendError);
+        }
     }
-    break;
+});
 
             // ===== 휴가 관리 관련 =====
             case 'leave_menu':
