@@ -18,6 +18,7 @@ const CITIES = {
   '울산': { lat: 35.5384, lon: 129.3114 },
   '세종': { lat: 36.4800, lon: 127.2890 },
   '경기': { lat: 37.4138, lon: 127.5183 },
+  '화성': { lat: 37.2061, lon: 126.8306 }, // 🆕 화성/동탄 좌표 추가
   '강원': { lat: 37.8228, lon: 128.1555 },
   '충북': { lat: 36.6356, lon: 127.4917 },
   '충남': { lat: 36.5184, lon: 126.8000 },
@@ -151,8 +152,10 @@ class WeatherManager {
       const forecasts = response.data.list.slice(0, 8); // 24시간 (3시간 간격 x 8)
       
       return forecasts.map(item => {
-        const date = new Date(item.dt * 1000);
-        const time = date.getHours();
+        // 🔧 시간대 수정: 한국 시간으로 변환
+        const utcDate = new Date(item.dt * 1000);
+        const koreaDate = new Date(utcDate.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+        const time = koreaDate.getHours();
         const temp = Math.round(item.main.temp);
         const weatherIcon = item.weather[0].icon;
         const weatherEmoji = this.getWeatherEmoji(weatherIcon);
@@ -171,9 +174,8 @@ class WeatherManager {
     }
   }
 
-  // 출근용 날씨 정보 포맷
-  // 🔧 수정: formatMorningWeather 메서드에서 한국 시간 사용
-formatMorningWeather(weatherData) {
+  // 🔧 수정: 출근용 날씨 정보 포맷 (한국 시간 적용)
+  formatMorningWeather(weatherData) {
     // 한국 시간으로 수정
     const now = new Date();
     const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
