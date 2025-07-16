@@ -520,45 +520,68 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            case 'todo_list':
-                try {
-                    const todos = await todoFunctions.getTodos(userId);
-                    if (todos.length === 0) {
-                        bot.sendMessage(chatId, `📝 ${getUserName(callbackQuery.from)}님의 할일이 없습니다.\n\n새로운 할일을 추가해보세요!`, {
-                            reply_markup: { 
-                                inline_keyboard: [
-                                    [{ text: '➕ 할일 추가', callback_data: 'todo_add' }],
-                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                                ]
-                            }
-                        });
-                    } else {
-                        let todoText = `📋 **${getUserName(callbackQuery.from)}님의 할일 목록**\n\n`;
-                        const todoButtons = [];
-                        
-                        todos.forEach((todo, index) => {
-                            const status = todo.done ? '✅' : '🔘';
-                            const strikethrough = todo.done ? '~~' : '';
-                            todoText += `${index + 1}. ${status} ${strikethrough}${todo.task}${strikethrough}\n`;
-                            
-                            todoButtons.push([
-                                { text: `${todo.done ? '↩️' : '✅'} ${index + 1}`, callback_data: `todo_toggle_${index}` },
-                                { text: `🗑️ ${index + 1}`, callback_data: `todo_delete_${index}` }
-                            ]);
-                        });
-                        
-                        todoButtons.push([{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]);
-                        
-                        bot.sendMessage(chatId, todoText, {
-                            parse_mode: 'Markdown',
-                            reply_markup: { inline_keyboard: todoButtons }
-                        });
-                    }
-                } catch (error) {
-                    console.error('할일 목록 조회 오류:', error);
-                    bot.sendMessage(chatId, '❌ 할일 목록을 불러오는 중 오류가 발생했습니다.');
+            // doomock_bot_modular.js의 할일 목록 표시 개선
+
+case 'todo_list':
+    try {
+        const todos = await todoFunctions.getTodos(userId);
+        if (todos.length === 0) {
+            bot.sendMessage(chatId, `📝 ${getUserName(callbackQuery.from)}님의 할일이 없습니다.\n\n새로운 할일을 추가해보세요!`, {
+                reply_markup: { 
+                    inline_keyboard: [
+                        [{ text: '➕ 할일 추가', callback_data: 'todo_add' }],
+                        [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                    ]
                 }
-                break;
+            });
+        } else {
+            // 🆕 완료/미완료 분리
+            const pendingTodos = todos.filter(todo => !todo.done);
+            const completedTodos = todos.filter(todo => todo.done);
+            
+            let todoText = `📋 **${getUserName(callbackQuery.from)}님의 할일 관리**\n\n`;
+            
+            // 진행 중인 할일
+            if (pendingTodos.length > 0) {
+                todoText += `🟢 **진행 중** (${pendingTodos.length}개)\n`;
+                pendingTodos.forEach((todo, index) => {
+                    const originalIndex = todos.findIndex(t => t._id === todo._id);
+                    todoText += `☐ ${todo.task}\n`;
+                });
+                todoText += '\n';
+            }
+            
+            // 완료된 할일
+            if (completedTodos.length > 0) {
+                todoText += `📌 **완료** (${completedTodos.length}개)\n`;
+                completedTodos.forEach((todo, index) => {
+                    const originalIndex = todos.findIndex(t => t._id === todo._id);
+                    todoText += `📌 ~~${todo.task}~~\n`;
+                });
+                todoText += '\n';
+            }
+            
+            // 버튼 생성 (원래 순서 유지)
+            const todoButtons = [];
+            todos.forEach((todo, index) => {
+                todoButtons.push([
+                    { text: `${todo.done ? '↩️' : '✅'} ${index + 1}`, callback_data: `todo_toggle_${index}` },
+                    { text: `🗑️ ${index + 1}`, callback_data: `todo_delete_${index}` }
+                ]);
+            });
+            
+            todoButtons.push([{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]);
+            
+            bot.sendMessage(chatId, todoText, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: todoButtons }
+            });
+        }
+    } catch (error) {
+        console.error('할일 목록 조회 오류:', error);
+        bot.sendMessage(chatId, '❌ 할일 목록을 불러오는 중 오류가 발생했습니다.');
+    }
+    break;
 
             case 'todo_add':
                 userStates.set(userId, { action: 'adding_todo' });
