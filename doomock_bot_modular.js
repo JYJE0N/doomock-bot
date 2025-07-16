@@ -891,7 +891,88 @@ bot.on('callback_query', async (callbackQuery) => {
                 );
                 break;
 
-            // ===== 도움말 =====
+                // ===== 날씨 관련 ===== (새로 추가)
+            case 'weather_menu':
+                const weatherMenuKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🌤️ 현재 날씨', callback_data: 'weather_current' },
+                            { text: '⏰ 시간별 예보', callback_data: 'weather_forecast' }
+                        ],
+                        [
+                            { text: '🏙️ 서울', callback_data: 'weather_seoul' },
+                            { text: '🌊 부산', callback_data: 'weather_busan' },
+                            { text: '🏔️ 대구', callback_data: 'weather_daegu' }
+                        ],
+                        [
+                            { text: '🌆 인천', callback_data: 'weather_incheon' },
+                            { text: '🌄 광주', callback_data: 'weather_gwangju' },
+                            { text: '🏛️ 대전', callback_data: 'weather_daejeon' }
+                        ],
+                        [
+                            { text: '🏭 울산', callback_data: 'weather_ulsan' },
+                            { text: '🏛️ 세종', callback_data: 'weather_sejong' },
+                            { text: '🏝️ 제주', callback_data: 'weather_jeju' }
+                        ],
+                        [
+                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                        ]
+                    ]
+                };
+
+                bot.editMessageText('🌤️ 날씨 정보 메뉴\n\n원하는 지역의 날씨를 확인해보세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: weatherMenuKeyboard
+                });
+                break;
+
+            case 'weather_current':
+                weather(bot, { chat: { id: chatId }, text: '/weather' });
+                break;
+
+            case 'weather_forecast':
+                weather(bot, { chat: { id: chatId }, text: '/weather 예보' });
+                break;
+
+            // 도시별 날씨
+            case 'weather_seoul':
+                weather(bot, { chat: { id: chatId }, text: '/weather 서울' });
+                break;
+
+            case 'weather_busan':
+                weather(bot, { chat: { id: chatId }, text: '/weather 부산' });
+                break;
+
+            case 'weather_daegu':
+                weather(bot, { chat: { id: chatId }, text: '/weather 대구' });
+                break;
+
+            case 'weather_incheon':
+                weather(bot, { chat: { id: chatId }, text: '/weather 인천' });
+                break;
+
+            case 'weather_gwangju':
+                weather(bot, { chat: { id: chatId }, text: '/weather 광주' });
+                break;
+
+            case 'weather_daejeon':
+                weather(bot, { chat: { id: chatId }, text: '/weather 대전' });
+                break;
+
+            case 'weather_ulsan':
+                weather(bot, { chat: { id: chatId }, text: '/weather 울산' });
+                break;
+
+            case 'weather_sejong':
+                weather(bot, { chat: { id: chatId }, text: '/weather 세종' });
+                break;
+
+            case 'weather_jeju':
+                weather(bot, { chat: { id: chatId }, text: '/weather 제주' });
+                break;
+
+            // ===== 도움말 ===== (업데이트됨)
             case 'help_menu':
                 bot.sendMessage(chatId, 
                     '❓ **두목봇 도움말**\n\n' +
@@ -901,14 +982,21 @@ bot.on('callback_query', async (callbackQuery) => {
                     '• ⏰ 타이머 - 작업 시간 측정\n' +
                     '• 🔔 리마인더 - 알림 설정\n' +
                     '• 🎯 운세 - 다양한 운세 확인\n' +
-                    '• 🕐 근무시간 - 출퇴근 시간 확인\n\n' +
+                    '• 🕐 근무시간 - 출퇴근 시간 확인\n' +
+                    '• 🌤️ 날씨 정보 - 실시간 날씨 & 예보\n\n' +
                     '**⌨️ 빠른 명령어:**\n' +
                     '• /start - 메인 메뉴\n' +
                     '• /add [내용] - 할일 추가\n' +
                     '• /timer start [작업명] - 타이머 시작\n' +
                     '• /remind [분] [내용] - 리마인더 설정\n' +
                     '• /fortune - 오늘의 운세\n' +
-                    '• /worktime - 근무시간 확인\n\n' +
+                    '• /worktime - 근무시간 확인\n' +
+                    '• /weather [도시] - 날씨 확인\n\n' +
+                    '**🌤️ 날씨 기능:**\n' +
+                    '• 전국 주요 도시 날씨 정보\n' +
+                    '• 실시간 기온, 습도, 바람\n' +
+                    '• 옷차림 추천 & 대기질 정보\n' +
+                    '• 24시간 날씨 예보\n\n' +
                     '문의사항이 있으시면 /start 를 입력해서 메뉴를 이용해주세요! 😊',
                     { 
                         parse_mode: 'Markdown',
@@ -1028,7 +1116,18 @@ bot.on('callback_query', async (callbackQuery) => {
                             ]
                         }
                     });
-                } else {
+                    } else if (data.startsWith('weather_refresh_')) {
+                        const city = data.replace('weather_refresh_', '');
+                        weather(bot, { chat: { id: chatId }, text: `/weather ${city}` });
+                    } else if (data.startsWith('weather_forecast_')) {
+                        const city = data.replace('weather_forecast_', '');
+                        weather(bot, { chat: { id: chatId }, text: `/weather ${city} 예보` });
+                    } else if (data === 'weather_cities') {
+                        bot.sendMessage(chatId, '🏙️ **지원 도시 목록**\n\n서울, 부산, 대구, 인천, 광주, 대전, 울산, 세종, 제주\n\n사용법: /weather [도시명]', {
+                            parse_mode: 'Markdown',
+                            reply_markup: { inline_keyboard: [[{ text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }]] }
+                        });
+                    } else {
                     // 정말 알 수 없는 콜백
                     console.log('❓ 알 수 없는 콜백 데이터:', data);
                     bot.sendMessage(chatId, `❌ 알 수 없는 명령입니다. /start 를 입력해서 메뉴를 다시 확인해주세요.`);
