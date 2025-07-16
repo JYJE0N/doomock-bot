@@ -427,15 +427,18 @@ userStates.clear();
 
 // 콜백 쿼리 핸들러 수정 - 함수명 오타 수정
 
+// 완전한 콜백 쿼리 핸들러 - 모든 케이스 포함
+
 bot.on('callback_query', async (callbackQuery) => {
     const message = callbackQuery.message;
     const data = callbackQuery.data;
     const chatId = message.chat.id;
     const userId = callbackQuery.from.id;
 
-    // 🔧 수정: 올바른 함수명 사용
-    // 기존: bot.answercallbackQuery(callbackQuery.id);
-    // 수정: bot.answerCallbackQuery(callbackQuery.id);
+    // 디버깅 로그 추가
+    console.log(`📞 콜백 쿼리 받음: "${data}" (사용자: ${userId})`);
+
+    // 콜백 쿼리 응답 (올바른 함수명 사용)
     bot.answerCallbackQuery(callbackQuery.id);
 
     try {
@@ -448,7 +451,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            // 휴가 관리 관련
+            // ===== 휴가 관리 관련 =====
             case 'leave_menu':
                 bot.editMessageText(`📅 ${getUserName(callbackQuery.from)}님의 휴가 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
                     chat_id: chatId,
@@ -499,13 +502,53 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            // 할일 관리 관련
+            // ===== 할일 관리 관련 =====
             case 'todo_menu':
                 bot.editMessageText(`📝 ${getUserName(callbackQuery.from)}님의 할일 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
                     chat_id: chatId,
                     message_id: message.message_id,
                     reply_markup: todoMenuKeyboard
                 });
+                break;
+
+            case 'todo_list':
+                try {
+                    const todos = await todoFunctions.getTodos(userId);
+                    if (todos.length === 0) {
+                        bot.sendMessage(chatId, `📝 ${getUserName(callbackQuery.from)}님의 할일이 없습니다.\n\n새로운 할일을 추가해보세요!`, {
+                            reply_markup: { 
+                                inline_keyboard: [
+                                    [{ text: '➕ 할일 추가', callback_data: 'todo_add' }],
+                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                                ]
+                            }
+                        });
+                    } else {
+                        let todoText = `📋 **${getUserName(callbackQuery.from)}님의 할일 목록**\n\n`;
+                        const todoButtons = [];
+                        
+                        todos.forEach((todo, index) => {
+                            const status = todo.done ? '✅' : '⭕';
+                            const strikethrough = todo.done ? '~~' : '';
+                            todoText += `${index + 1}. ${status} ${strikethrough}${todo.task}${strikethrough}\n`;
+                            
+                            todoButtons.push([
+                                { text: `${todo.done ? '↩️' : '✅'} ${index + 1}`, callback_data: `todo_toggle_${index}` },
+                                { text: `🗑️ ${index + 1}`, callback_data: `todo_delete_${index}` }
+                            ]);
+                        });
+                        
+                        todoButtons.push([{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]);
+                        
+                        bot.sendMessage(chatId, todoText, {
+                            parse_mode: 'Markdown',
+                            reply_markup: { inline_keyboard: todoButtons }
+                        });
+                    }
+                } catch (error) {
+                    console.error('할일 목록 조회 오류:', error);
+                    bot.sendMessage(chatId, '❌ 할일 목록을 불러오는 중 오류가 발생했습니다.');
+                }
                 break;
 
             case 'todo_add':
@@ -520,7 +563,256 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            // TTS 관련
+            case 'todo_stats':
+                try {
+                    const stats = await todoFunctions.getTodoStats(userId);
+                    const statsText = `📊 **할일 통계**\n\n` +
+                                     `📝 전체 할일: ${stats.total}개\n` +
+                                     `✅ 완료: ${stats.completed}개\n` +
+                                     `⏳ 미완료: ${stats.pending}개\n` +
+                                     `📈 완료율: ${stats.completionRate}%\n\n` +
+                                     `${stats.completionRate >= 80 ? '🎉 훌륭해요!' : 
+                                       stats.completionRate >= 50 ? '💪 좋은 진전이에요!' : 
+                                       '🔥 화이팅!'}`
+                    
+                    bot.sendMessage(chatId, statsText, {
+                        parse_mode: 'Markdown',
+                        reply_markup: { 
+                            inline_keyboard: [[{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]] 
+                        }
+                    });
+                } catch (error) {
+                    console.error('할일 통계 조회 오류:', error);
+                    bot.sendMessage(chatId, '❌ 통계를 불러오는 중 오류가 발생했습니다.');
+                }
+                break;
+
+            case 'todo_clear_completed':
+                try {
+                    const success = await todoFunctions.clearCompletedTodos(userId);
+                    if (success) {
+                        bot.sendMessage(chatId, '🗑️ 완료된 할일들이 삭제되었습니다!', {
+                            reply_markup: { 
+                                inline_keyboard: [
+                                    [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
+                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                                ]
+                            }
+                        });
+                    } else {
+                        bot.sendMessage(chatId, '❌ 완료된 할일 삭제 중 오류가 발생했습니다.');
+                    }
+                } catch (error) {
+                    console.error('완료된 할일 삭제 오류:', error);
+                    bot.sendMessage(chatId, '❌ 삭제 중 오류가 발생했습니다.');
+                }
+                break;
+
+            case 'todo_clear_all':
+                bot.sendMessage(chatId, 
+                    '⚠️ **정말로 모든 할일을 삭제하시겠습니까?**\n\n' +
+                    '이 작업은 되돌릴 수 없습니다!', 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: '✅ 네, 삭제합니다', callback_data: 'todo_clear_all_confirm' },
+                                    { text: '❌ 아니오', callback_data: 'todo_menu' }
+                                ]
+                            ]
+                        }
+                    }
+                );
+                break;
+
+            case 'todo_clear_all_confirm':
+                try {
+                    const success = await todoFunctions.clearTodos(userId);
+                    if (success) {
+                        bot.sendMessage(chatId, '🗑️ 모든 할일이 삭제되었습니다!', {
+                            reply_markup: { 
+                                inline_keyboard: [
+                                    [{ text: '➕ 새 할일 추가', callback_data: 'todo_add' }],
+                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                                ]
+                            }
+                        });
+                    } else {
+                        bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
+                    }
+                } catch (error) {
+                    console.error('모든 할일 삭제 오류:', error);
+                    bot.sendMessage(chatId, '❌ 삭제 중 오류가 발생했습니다.');
+                }
+                break;
+
+            // ===== 운세 관련 =====
+            case 'fortune_menu':
+                bot.editMessageText('🔮 운세 메뉴\n\n원하는 운세를 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: fortuneMenuKeyboard
+                });
+                break;
+
+            case 'fortune_general':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune' });
+                break;
+
+            case 'fortune_work':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune work' });
+                break;
+
+            case 'fortune_love':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune love' });
+                break;
+
+            case 'fortune_money':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune money' });
+                break;
+
+            case 'fortune_health':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune health' });
+                break;
+
+            case 'fortune_meeting':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune meeting' });
+                break;
+
+            case 'fortune_tarot':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune tarot' });
+                break;
+
+            case 'fortune_lucky':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune lucky' });
+                break;
+
+            case 'fortune_all':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune all' });
+                break;
+
+            // ===== 근무시간 관련 =====
+            case 'worktime_menu':
+                worktime(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from,
+                    text: undefined
+                });
+                break;
+
+            // ===== 타이머 관련 =====
+            case 'timer_menu':
+                bot.editMessageText('⏰ 타이머 메뉴\n\n원하는 기능을 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: timerMenuKeyboard
+                });
+                break;
+
+            case 'timer_start_prompt':
+                userStates.set(userId, { action: 'timer_start' });
+                bot.sendMessage(chatId, '⏰ **타이머 시작하기**\n\n작업명을 입력해주세요.\n\n예시:\n• 공부하기\n• [공부] 수학 문제풀이\n• [운동] 헬스장 가기', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
+                });
+                break;
+
+            case 'timer_stop':
+                timer(bot, { chat: { id: chatId }, text: '/timer stop' });
+                break;
+
+            case 'timer_status':
+                timer(bot, { chat: { id: chatId }, text: '/timer status' });
+                break;
+
+            case 'timer_history':
+                timer(bot, { chat: { id: chatId }, text: '/timer history' });
+                break;
+
+            case 'timer_stats':
+                timer(bot, { chat: { id: chatId }, text: '/timer stats' });
+                break;
+
+            case 'timer_help':
+                timer(bot, { chat: { id: chatId }, text: '/timer' });
+                break;
+
+            // ===== 리마인더 관련 =====
+            case 'reminder_menu':
+                bot.editMessageText('🔔 리마인더 메뉴\n\n원하는 설정 방식을 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: reminderMenuKeyboard
+                });
+                break;
+
+            case 'remind_minutes':
+                userStates.set(userId, { action: 'remind_minutes' });
+                bot.sendMessage(chatId, '⏰ **분 단위 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[분] [내용]`\n\n예시:\n• `30 독서하기`\n• `60 회의 준비`\n• `5 물 마시기`', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
+                });
+                break;
+
+            case 'remind_time':
+                userStates.set(userId, { action: 'remind_time' });
+                bot.sendMessage(chatId, '🕐 **시간 지정 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[시:분] [내용]`\n\n예시:\n• `14:30 점심약속`\n• `09:00 출근`\n• `18:00 퇴근`', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
+                });
+                break;
+
+            case 'remind_help':
+                bot.sendMessage(chatId, 
+                    '🔔 **리마인더 도움말**\n\n' +
+                    '**분 단위 설정:**\n• /remind 30 독서하기\n• /remind 5 물 마시기\n\n' +
+                    '**시간 지정:**\n• /remind 14:30 점심약속\n• /remind 09:00 출근\n\n' +
+                    '설정된 시간이 되면 알림을 보내드립니다!', 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [[{ text: '🔙 리마인더 메뉴', callback_data: 'reminder_menu' }]] }
+                    }
+                );
+                break;
+
+            // ===== 유틸리티 관련 =====
+            case 'utils_menu':
+                const utilsKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🔊 TTS 음성변환', callback_data: 'utils_tts' },
+                            { text: '🌍 언어 선택', callback_data: 'utils_language' }
+                        ],
+                        [
+                            { text: '❓ TTS 도움말', callback_data: 'utils_tts_help' },
+                            { text: '📋 사용 예시', callback_data: 'utils_examples' }
+                        ],
+                        [
+                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                        ]
+                    ]
+                };
+                
+                bot.editMessageText(`🛠️ ${getUserName(callbackQuery.from)}님의 유틸리티 메뉴\n\n원하는 기능을 선택해주세요:`, {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: utilsKeyboard
+                });
+                break;
+
             case 'utils_tts':
                 userStates.set(userId, { action: 'tts_input', language: 'ko' });
                 bot.sendMessage(chatId, `🔊 **${getUserName(callbackQuery.from)}님의 TTS 음성 변환**\n\n변환할 텍스트를 입력해주세요.\n\n예시:\n• 안녕하세요\n• 오늘 날씨가 좋네요\n• 두목봇 최고!`, {
@@ -533,7 +825,90 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            // 취소 액션
+            case 'utils_language':
+                const languageKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🇰🇷 한국어 (ko)', callback_data: 'utils_lang_ko' },
+                            { text: '🇺🇸 English (en)', callback_data: 'utils_lang_en' }
+                        ],
+                        [
+                            { text: '🇯🇵 日本語 (ja)', callback_data: 'utils_lang_ja' },
+                            { text: '🇨🇳 中文 (zh)', callback_data: 'utils_lang_zh' }
+                        ],
+                        [
+                            { text: '🇪🇸 Español (es)', callback_data: 'utils_lang_es' },
+                            { text: '🇫🇷 Français (fr)', callback_data: 'utils_lang_fr' }
+                        ],
+                        [
+                            { text: '🇩🇪 Deutsch (de)', callback_data: 'utils_lang_de' },
+                            { text: '🇷🇺 Русский (ru)', callback_data: 'utils_lang_ru' }
+                        ],
+                        [
+                            { text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }
+                        ]
+                    ]
+                };
+                
+                bot.sendMessage(chatId, '🌍 **언어 선택**\n\n사용할 언어를 선택해주세요:', {
+                    parse_mode: 'Markdown',
+                    reply_markup: languageKeyboard
+                });
+                break;
+
+            case 'utils_tts_help':
+                bot.sendMessage(chatId, 
+                    `🔊 **TTS 도움말**\n\n` +
+                    `**사용법:**\n• /tts [텍스트] - 한국어 음성\n• /tts [언어] [텍스트] - 특정 언어\n\n` +
+                    `**지원 언어:** ko, en, ja, zh, es, fr, de, ru\n\n` +
+                    `**예시:**\n• /tts 안녕하세요\n• /tts en Hello\n• /tts ja こんにちは\n\n` +
+                    `**제한:** 최대 200자`, 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] }
+                    }
+                );
+                break;
+
+            case 'utils_examples':
+                bot.sendMessage(chatId, 
+                    `📋 **TTS 예시**\n\n` +
+                    `🇰🇷 /tts 안녕하세요\n🇺🇸 /tts en Hello\n🇯🇵 /tts ja こんにちは\n🇨🇳 /tts zh 你好\n\n` +
+                    `💡 언어코드 생략 시 한국어로 생성됩니다!`, 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] }
+                    }
+                );
+                break;
+
+            // ===== 도움말 =====
+            case 'help_menu':
+                bot.sendMessage(chatId, 
+                    '❓ **두목봇 도움말**\n\n' +
+                    '**📱 주요 기능:**\n' +
+                    '• 📝 할일 관리 - 할일 추가/완료/삭제\n' +
+                    '• 📅 휴가 관리 - 연차 현황/사용/설정\n' +
+                    '• ⏰ 타이머 - 작업 시간 측정\n' +
+                    '• 🔔 리마인더 - 알림 설정\n' +
+                    '• 🎯 운세 - 다양한 운세 확인\n' +
+                    '• 🕐 근무시간 - 출퇴근 시간 확인\n\n' +
+                    '**⌨️ 빠른 명령어:**\n' +
+                    '• /start - 메인 메뉴\n' +
+                    '• /add [내용] - 할일 추가\n' +
+                    '• /timer start [작업명] - 타이머 시작\n' +
+                    '• /remind [분] [내용] - 리마인더 설정\n' +
+                    '• /fortune - 오늘의 운세\n' +
+                    '• /worktime - 근무시간 확인\n\n' +
+                    '문의사항이 있으시면 /start 를 입력해서 메뉴를 이용해주세요! 😊',
+                    { 
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [[{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]] }
+                    }
+                );
+                break;
+
+            // ===== 취소 액션 =====
             case 'cancel_action':
                 const currentState = userStates.get(userId);
                 userStates.delete(userId);
@@ -577,7 +952,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            // 다른 케이스들...
+            // ===== 기본 케이스 (할일 토글/삭제 등) =====
             default:
                 // 할일 토글/삭제 처리
                 if (data.startsWith('todo_toggle_')) {
@@ -621,9 +996,33 @@ bot.on('callback_query', async (callbackQuery) => {
                         console.error('할일 삭제 오류:', error);
                         bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
                     }
+                } else if (data.startsWith('utils_lang_')) {
+                    const language = data.replace('utils_lang_', '');
+                    userStates.set(userId, { action: 'tts_input', language: language });
+                    
+                    const langNames = {
+                        'ko': '한국어',
+                        'en': 'English',
+                        'ja': '日本語',
+                        'zh': '中文',
+                        'es': 'Español',
+                        'fr': 'Français',
+                        'de': 'Deutsch',
+                        'ru': 'Русский'
+                    };
+                    
+                    bot.sendMessage(chatId, `🔊 **TTS 음성 변환 (${langNames[language]})**\n\n변환할 텍스트를 입력해주세요.`, {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                            ]
+                        }
+                    });
                 } else {
-                    console.log('알 수 없는 콜백 데이터:', data);
-                    bot.sendMessage(chatId, '❌ 알 수 없는 명령입니다.');
+                    // 정말 알 수 없는 콜백
+                    console.log('❓ 알 수 없는 콜백 데이터:', data);
+                    bot.sendMessage(chatId, `❌ 알 수 없는 명령입니다. /start 를 입력해서 메뉴를 다시 확인해주세요.`);
                 }
                 break;
         }
