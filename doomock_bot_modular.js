@@ -161,7 +161,7 @@ const createMainMenuKeyboard = () => {
   
   // 네 번째 줄: 인사이트, 리마인더
   const fourthRow = [];
-  if (dustInsights) fourthRow.push({ text: '📊 인사이트', callback_data: 'insight_menu' }); // 'insight_menu'로 수정
+  if (dustInsights) fourthRow.push({ text: '📊 인사이트', callback_data: 'insight_menu' });
   if (remind) fourthRow.push({ text: '🔔 리마인더', callback_data: 'reminder_menu' });
   if (fourthRow.length > 0) keyboard.push(fourthRow);
   
@@ -358,7 +358,7 @@ bot.on("message", async (msg) => {
       return;
     }
 
-    // 🆕 자동 TTS 처리 (사용자 상태가 없을 때만)
+    // 자동 TTS 처리 (사용자 상태가 없을 때만)
     if (!userState && ttsUtils && ttsUtils.handleAutoTTS) {
       const ttsProcessed = await ttsUtils.handleAutoTTS(bot, chatId, userId, text);
       if (ttsProcessed) {
@@ -403,7 +403,6 @@ bot.on("message", async (msg) => {
     } else if (text === "/fortune") {
       await safeModuleCall(fortune, bot, msg, 'Fortune');
     } else if (text.startsWith("/tts")) {
-      // 🆕 개선된 TTS 명령어 처리
       if (ttsUtils && ttsUtils.handleTTSCommand) {
         await ttsUtils.handleTTSCommand(bot, chatId, userId, text);
       } else {
@@ -436,8 +435,7 @@ bot.on("message", async (msg) => {
   }
 });
 
-// 콜백 쿼리 핸들러 (완전 개선)
-// 콜백 쿼리 핸들러에서 인사이트 관련 케이스 추가
+// 콜백 쿼리 핸들러
 bot.on("callback_query", async (callbackQuery) => {
   const message = callbackQuery.message;
   const data = callbackQuery.data;
@@ -454,22 +452,62 @@ bot.on("callback_query", async (callbackQuery) => {
   }
 
   try {
+    // 인사이트 관련 콜백 처리 (맨 앞으로 이동)
+    if (data.startsWith('insight_')) {
+      if (!dustInsights) {
+        await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+        return;
+      }
+
+      if (dustInsights.handleCallback) {
+        try {
+          await dustInsights.handleCallback(bot, callbackQuery);
+        } catch (error) {
+          rLog(`인사이트 콜백 처리 오류: ${error.message}`, 'ERROR');
+          await sendNewMessage(bot, chatId, "❌ 인사이트 처리 중 오류가 발생했습니다.");
+        }
+      } else {
+        switch (data) {
+          case "insight_menu":
+            await handleInsightMenu(bot, chatId, callbackQuery.from);
+            break;
+          case "insight_full":
+            await handleInsightFull(bot, chatId, callbackQuery.from);
+            break;
+          case "insight_quick":
+            await handleInsightQuick(bot, chatId, callbackQuery.from);
+            break;
+          case "insight_dashboard":
+            await handleInsightDashboard(bot, chatId, callbackQuery.from);
+            break;
+          default:
+            await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 완전히 사용할 수 없습니다.");
+        }
+      }
+      return;
+    }
+
+    // TTS 관련 콜백 처리
+    if (data.startsWith('tts_')) {
+      if (ttsUtils && ttsUtils.handleTTSCallback) {
+        try {
+          await ttsUtils.handleTTSCallback(bot, callbackQuery);
+        } catch (error) {
+          rLog(`TTS 콜백 처리 오류: ${error.message}`, 'ERROR');
+          await sendNewMessage(bot, chatId, "❌ TTS 처리 중 오류가 발생했습니다.");
+        }
+      } else {
+        await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
+      }
+      return;
+    }
+
     // 메인 메뉴 처리
     if (data === "main_menu") {
       await sendNewMessage(bot, chatId,
         `🤖 안녕하세요 ${getUserName(callbackQuery.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`,
         { reply_markup: createMainMenuKeyboard() }
       );
-      return;
-    }
-
-    // 🆕 TTS 관련 콜백 처리
-    if (data.startsWith('tts_')) {
-      if (ttsUtils && ttsUtils.handleTTSCallback) {
-        await ttsUtils.handleTTSCallback(bot, callbackQuery);
-      } else {
-        await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
-      }
       return;
     }
 
@@ -600,7 +638,6 @@ bot.on("callback_query", async (callbackQuery) => {
       case "weather_more_cities":
         await handleWeatherMoreCities(bot, chatId);
         break;
-      // 추가 날씨 도시들
       case "weather_incheon":
         await handleWeatherCity(bot, chatId, "인천");
         break;
@@ -625,43 +662,7 @@ bot.on("callback_query", async (callbackQuery) => {
         await handleWorktimeMenu(bot, chatId, callbackQuery.from);
         break;
 
-      // 🔥 인사이트 관리 (추가/수정)
-      case "insight_menu":
-        await handleInsightMenu(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_full":
-        await handleInsightFull(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_quick":
-        await handleInsightQuick(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_dashboard":
-        await handleInsightDashboard(bot, chatId, callbackQuery.from);
-        break;
-      // 🆕 인사이트 상세 콜백 처리
-      case "insight_products":
-        await handleInsightProducts(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_pricing":
-        await handleInsightPricing(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_inventory":
-        await handleInsightInventory(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_marketing":
-        await handleInsightMarketing(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_regional":
-        await handleInsightRegional(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_competitor":
-        await handleInsightCompetitor(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_refresh":
-        await handleInsightRefresh(bot, chatId, callbackQuery.from);
-        break;
-
-      // 🆕 유틸리티 관리 (TTS 포함)
+      // 유틸리티 관리
       case "utils_menu":
         await handleUtilsMenu(bot, chatId, userId);
         break;
@@ -700,7 +701,6 @@ bot.on("callback_query", async (callbackQuery) => {
         } else if (data.startsWith("todo_delete_")) {
           await handleTodoDelete(bot, chatId, userId, data);
         } else {
-          // 알 수 없는 콜백
           rLog(`❓ 알 수 없는 콜백: ${data}`, 'WARN');
           await sendNewMessage(bot, chatId, 
             `❌ 알 수 없는 명령입니다. 메인 메뉴로 돌아갑니다.`,
@@ -714,144 +714,6 @@ bot.on("callback_query", async (callbackQuery) => {
     await sendNewMessage(bot, chatId, "❌ 처리 중 오류가 발생했습니다.");
   }
 });
-
-// 🆕 인사이트 핸들러 함수들 추가
-async function handleInsightProducts(bot, chatId, from) {
-  if (!dustInsights || !dustInsights.handleCallback) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  try {
-    const callbackQuery = {
-      data: 'insight_products',
-      message: { chat: { id: chatId } },
-      from: from
-    };
-    await dustInsights.handleCallback(bot, callbackQuery);
-  } catch (error) {
-    rLog(`인사이트 제품 전략 오류: ${error.message}`, 'ERROR');
-    await sendNewMessage(bot, chatId, "❌ 제품 전략 분석 중 오류가 발생했습니다.");
-  }
-}
-
-async function handleInsightPricing(bot, chatId, from) {
-  if (!dustInsights || !dustInsights.handleCallback) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  try {
-    const callbackQuery = {
-      data: 'insight_pricing',
-      message: { chat: { id: chatId } },
-      from: from
-    };
-    await dustInsights.handleCallback(bot, callbackQuery);
-  } catch (error) {
-    rLog(`인사이트 가격 전략 오류: ${error.message}`, 'ERROR');
-    await sendNewMessage(bot, chatId, "❌ 가격 전략 분석 중 오류가 발생했습니다.");
-  }
-}
-
-async function handleInsightInventory(bot, chatId, from) {
-  if (!dustInsights || !dustInsights.handleCallback) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  try {
-    const callbackQuery = {
-      data: 'insight_inventory',
-      message: { chat: { id: chatId } },
-      from: from
-    };
-    await dustInsights.handleCallback(bot, callbackQuery);
-  } catch (error) {
-    rLog(`인사이트 재고 전략 오류: ${error.message}`, 'ERROR');
-    await sendNewMessage(bot, chatId, "❌ 재고 전략 분석 중 오류가 발생했습니다.");
-  }
-}
-
-async function handleInsightMarketing(bot, chatId, from) {
-  if (!dustInsights || !dustInsights.handleCallback) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  try {
-    const callbackQuery = {
-      data: 'insight_marketing',
-      message: { chat: { id: chatId } },
-      from: from
-    };
-    await dustInsights.handleCallback(bot, callbackQuery);
-  } catch (error) {
-    rLog(`인사이트 마케팅 전략 오류: ${error.message}`, 'ERROR');
-    await sendNewMessage(bot, chatId, "❌ 마케팅 전략 분석 중 오류가 발생했습니다.");
-  }
-}
-
-async function handleInsightRegional(bot, chatId, from) {
-  if (!dustInsights || !dustInsights.handleCallback) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  try {
-    const callbackQuery = {
-      data: 'insight_regional',
-      message: { chat: { id: chatId } },
-      from: from
-    };
-    await dustInsights.handleCallback(bot, callbackQuery);
-  } catch (error) {
-    rLog(`인사이트 지역별 전략 오류: ${error.message}`, 'ERROR');
-    await sendNewMessage(bot, chatId, "❌ 지역별 전략 분석 중 오류가 발생했습니다.");
-  }
-}
-
-async function handleInsightCompetitor(bot, chatId, from) {
-  if (!dustInsights || !dustInsights.handleCallback) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  try {
-    const callbackQuery = {
-      data: 'insight_competitor',
-      message: { chat: { id: chatId } },
-      from: from
-    };
-    await dustInsights.handleCallback(bot, callbackQuery);
-  } catch (error) {
-    rLog(`인사이트 경쟁사 분석 오류: ${error.message}`, 'ERROR');
-    await sendNewMessage(bot, chatId, "❌ 경쟁사 분석 중 오류가 발생했습니다.");
-  }
-}
-
-async function handleInsightRefresh(bot, chatId, from) {
-  if (!dustInsights) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  try {
-    await sendNewMessage(bot, chatId, "🔄 최신 데이터로 인사이트를 새로고침합니다...");
-    
-    // 잠시 후 새로운 인사이트 생성
-    setTimeout(async () => {
-      await safeModuleCall(dustInsights, bot, { 
-        chat: { id: chatId }, 
-        from: from, 
-        text: '/insight' 
-      }, 'Insight');
-    }, 1000);
-  } catch (error) {
-    rLog(`인사이트 새로고침 오류: ${error.message}`, 'ERROR');
-    await sendNewMessage(bot, chatId, "❌ 인사이트 새로고침 중 오류가 발생했습니다.");
-  }
-}
 
 // ========================================
 // 할일 관리 핸들러들
@@ -1583,7 +1445,6 @@ async function handleWeatherBusan(bot, chatId) {
   await safeModuleCall(weather, bot, { chat: { id: chatId }, text: '/weather 부산' }, 'Weather');
 }
 
-// handleWeatherMoreCities 함수의 이어서 작성
 async function handleWeatherMoreCities(bot, chatId) {
   const moreCitiesKeyboard = {
     inline_keyboard: [
@@ -1614,7 +1475,6 @@ async function handleWeatherMoreCities(bot, chatId) {
   );
 }
 
-// 추가 도시들 핸들러
 async function handleWeatherCity(bot, chatId, city) {
   if (!weather) {
     await sendNewMessage(bot, chatId, "❌ 날씨 기능을 사용할 수 없습니다.");
@@ -1657,7 +1517,7 @@ async function handleInsightFull(bot, chatId, from) {
     return;
   }
 
-  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight full' }, 'Insight');
+  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight' }, 'Insight');
 }
 
 async function handleInsightQuick(bot, chatId, from) {
@@ -1666,7 +1526,7 @@ async function handleInsightQuick(bot, chatId, from) {
     return;
   }
 
-  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight' }, 'Insight');
+  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight quick' }, 'Insight');
 }
 
 async function handleInsightDashboard(bot, chatId, from) {
@@ -1675,7 +1535,16 @@ async function handleInsightDashboard(bot, chatId, from) {
     return;
   }
 
-  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight dashboard' }, 'Insight');
+  try {
+    if (dustInsights.showRealtimeDashboard) {
+      await dustInsights.showRealtimeDashboard(bot, chatId, getUserName(from));
+    } else {
+      await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight dashboard' }, 'Insight');
+    }
+  } catch (error) {
+    rLog(`인사이트 대시보드 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 대시보드 로딩 중 오류가 발생했습니다.");
+  }
 }
 
 // ========================================
@@ -1683,7 +1552,7 @@ async function handleInsightDashboard(bot, chatId, from) {
 // ========================================
 
 async function handleUtilsMenu(bot, chatId, userId) {
-  const ttsMode = ttsUtils ? ttsUtils.getTTSMode(userId) : { active: false, language: 'ko' };
+  const ttsMode = ttsUtils && ttsUtils.getTTSMode ? ttsUtils.getTTSMode(userId) : { active: false, language: 'ko' };
   
   const utilsText = `🛠️ **유틸리티 메뉴**\n\n` +
                    `**🔊 TTS (음성 변환)**\n` +
@@ -1713,7 +1582,6 @@ async function handleUtilsMenu(bot, chatId, userId) {
   });
 }
 
-// 5. TTS 도움말 핸들러 수정
 async function handleUtilsTTSHelp(bot, chatId) {
   const helpText = `🔊 **TTS 도움말**\n\n` +
                   `**🎯 두 가지 사용 방법**\n\n` +
@@ -1733,59 +1601,53 @@ async function handleUtilsTTSHelp(bot, chatId) {
                   `• 이전 음성 파일 자동 삭제\n` +
                   `• 자연스러운 음성 합성\n` +
                   `• 실시간 언어 변경 가능\n\n` +
-                  `**🔧 사용 팁**\n` +
-                  `• 명령어는 자동 변환 안됨\n` +
-                  `• 너무 짧은 텍스트는 건너뜀\n` +
-                  `• 언어별 최적화된 발음\n\n` +
                   `지금 바로 TTS 설정을 해보세요! 🚀`;
   
- async function handleUtilsHelp(bot, chatId) {
-  const utilsHelpText = `🛠️ **유틸리티 전체 도움말**\n\n` +
-                       `**🔊 TTS (음성 변환)**\n` +
-                       `• 텍스트를 자연스러운 음성으로 변환\n` +
-                       `• 8개 언어 지원 (한국어, 영어, 일본어, 중국어, 스페인어, 프랑스어, 독일어, 러시아어)\n` +
-                       `• 자동 모드와 수동 모드 지원\n\n` +
-                       `**⏰ 시간 유틸리티**\n` +
-                       `• 한국 시간 기준 동작\n` +
-                       `• 날짜/시간 포맷팅 지원\n` +
-                       `• 현재 연도 자동 감지\n\n` +
-                       `**📊 데이터 처리**\n` +
-                       `• 숫자 포맷팅 (천 단위 구분)\n` +
-                       `• 백분율 계산\n` +
-                       `• 텍스트 자르기 및 처리\n` +
-                       `• 배열 랜덤 선택 및 섞기\n\n` +
-                       `**🔧 개발자 도구**\n` +
-                       `• 지연 함수 (delay)\n` +
-                       `• 로그 함수 (성공/오류)\n` +
-                       `• 유효성 검사 (숫자/날짜)\n\n` +
-                       `**💡 사용 팁**\n` +
-                       `• 모든 기능은 24시간 사용 가능\n` +
-                       `• Railway 클라우드에서 안정적 동작\n` +
-                       `• 자동 파일 정리로 메모리 효율성 확보\n\n` +
-                       `**🚀 빠른 시작**\n` +
-                       `1. 🔊 TTS 설정 → TTS 모드 ON\n` +
-                       `2. 채팅창에 텍스트 입력\n` +
-                       `3. 자동으로 음성 변환!\n\n` +
-                       `더 자세한 사용법은 각 기능별 도움말을 참조하세요.`;
-
   const keyboard = {
     inline_keyboard: [
       [
         { text: '🔊 TTS 설정하기', callback_data: 'utils_tts_menu' },
-        { text: '❓ TTS 도움말', callback_data: 'utils_tts_help' }
-      ],
-      [
         { text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }
       ]
     ]
   };
-
-  await sendNewMessage(bot, chatId, utilsHelpText, {
+  
+  await sendNewMessage(bot, chatId, helpText, {
     parse_mode: 'Markdown',
     reply_markup: keyboard
   });
+}
 
-// 6. 언어 이름 반환 함수
+async function handleUtilsHelp(bot, chatId) {
+  const helpText = `🛠️ **유틸리티 도움말**\n\n` +
+                  `**🔊 TTS (Text-to-Speech)**\n` +
+                  `• 텍스트를 음성으로 변환\n` +
+                  `• 자동 모드와 수동 모드 지원\n` +
+                  `• 다국어 지원 (한/영/일/중/불/스페인어)\n\n` +
+                  `**📱 사용 방법**\n` +
+                  `• /tts [텍스트] - 수동 변환\n` +
+                  `• TTS 모드 ON - 자동 변환\n\n` +
+                  `**💡 특징**\n` +
+                  `• 최대 500자 지원\n` +
+                  `• 고품질 음성 합성\n` +
+                  `• 메모리 효율적 관리\n\n` +
+                  `더 자세한 사용법은 TTS 도움말을 참고하세요!`;
+  
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '🔊 TTS 도움말', callback_data: 'utils_tts_help' },
+        { text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }
+      ]
+    ]
+  };
+  
+  await sendNewMessage(bot, chatId, helpText, {
+    parse_mode: 'Markdown',
+    reply_markup: keyboard
+  });
+}
+
 function getLanguageName(langCode) {
   const languages = {
     'ko': '🇰🇷 한국어',
@@ -1798,56 +1660,12 @@ function getLanguageName(langCode) {
   return languages[langCode] || langCode;
 }
 
-// 7. 새로운 TTS 명령어 추가
-bot.onText(/\/tts_mode/, async (msg) => {
-  const chatId = msg.chat.id;
-  const userId = msg.from.id;
-  
-  if (ttsUtils && ttsUtils.handleTTSMenu) {
-    await ttsUtils.handleTTSMenu(bot, chatId, userId);
-  } else {
-    await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
-  }
-});
-
-// 8. 봇 종료 시 TTS 파일 정리
-process.on('SIGINT', () => {
-  rLog("🛑 SIGINT 신호 받음, 봇을 종료합니다...", 'INFO');
-  
-  // TTS 파일 정리
-  if (ttsUtils && ttsUtils.cleanupAllTTSFiles) {
-    ttsUtils.cleanupAllTTSFiles();
-  }
-  
-  if (bot) {
-    bot.stopPolling();
-  }
-  process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-  rLog("🛑 SIGTERM 신호 받음, 봇을 종료합니다...", 'INFO');
-  
-  // TTS 파일 정리
-  if (ttsUtils && ttsUtils.cleanupAllTTSFiles) {
-    ttsUtils.cleanupAllTTSFiles();
-  }
-  
-  if (bot) {
-    bot.stopPolling();
-  }
-  process.exit(0);
-});
-
-rLog("✅ 개선된 TTS 시스템 초기화 완료", 'SUCCESS');
-
 // ========================================
 // 도움말 핸들러
 // ========================================
 
 async function handleHelpMenu(bot, chatId) {
-  const helpText = `
-❓ **두목봇 도움말**
+  const helpText = `❓ **두목봇 도움말**
 
 🤖 **주요 기능:**
 • 📝 할일 관리 - 할일 추가/완료/삭제
@@ -1869,8 +1687,7 @@ async function handleHelpMenu(bot, chatId) {
 • /cancel 로 언제든 작업을 취소할 수 있습니다
 • 문제가 있으면 /start 로 초기화하세요
 
-🚀 **Railway 클라우드에서 24/7 운영 중!**
-  `;
+🚀 **Railway 클라우드에서 24/7 운영 중!**`;
 
   await sendNewMessage(bot, chatId, helpText, {
     parse_mode: 'Markdown',
@@ -1883,26 +1700,16 @@ async function handleHelpMenu(bot, chatId) {
 }
 
 // ========================================
-// 추가 콜백 핸들러들 (확장된 날씨 도시들)
-// ========================================
-
-// 콜백 쿼리 핸들러에 추가할 케이스들
-const additionalCallbackCases = {
-  // 추가 날씨 도시들
-  "weather_incheon": () => handleWeatherCity(bot, chatId, "인천"),
-  "weather_gwangju": () => handleWeatherCity(bot, chatId, "광주"),
-  "weather_daejeon": () => handleWeatherCity(bot, chatId, "대전"),
-  "weather_jeju": () => handleWeatherCity(bot, chatId, "제주"),
-  "weather_suwon": () => handleWeatherCity(bot, chatId, "수원"),
-  "weather_ulsan": () => handleWeatherCity(bot, chatId, "울산")
-};
-
-// ========================================
 // 프로세스 종료 핸들러
 // ========================================
 
 process.on('SIGINT', () => {
   rLog("🛑 SIGINT 신호 받음, 봇을 종료합니다...", 'INFO');
+  
+  if (ttsUtils && ttsUtils.cleanupAllTTSFiles) {
+    ttsUtils.cleanupAllTTSFiles();
+  }
+  
   if (bot) {
     bot.stopPolling();
   }
@@ -1911,6 +1718,11 @@ process.on('SIGINT', () => {
 
 process.on('SIGTERM', () => {
   rLog("🛑 SIGTERM 신호 받음, 봇을 종료합니다...", 'INFO');
+  
+  if (ttsUtils && ttsUtils.cleanupAllTTSFiles) {
+    ttsUtils.cleanupAllTTSFiles();
+  }
+  
   if (bot) {
     bot.stopPolling();
   }
@@ -1935,10 +1747,8 @@ rLog("🎉 두목봇이 성공적으로 시작되었습니다!", 'SUCCESS');
 rLog(`📱 봇 정보: ${bot.getMe ? '연결됨' : '대기중'}`, 'INFO');
 rLog(`🌍 환경: ${ENV_CHECK.NODE_ENV}`, 'INFO');
 
-// Railway 배포 정보
 if (process.env.RAILWAY_DEPLOYMENT_ID) {
   rLog(`🚂 Railway 배포 ID: ${process.env.RAILWAY_DEPLOYMENT_ID}`, 'INFO');
 }
 
 rLog("✅ 모든 핸들러가 등록되었습니다. 메시지를 기다리는 중...", 'INFO');
- }
