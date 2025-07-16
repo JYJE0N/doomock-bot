@@ -1,105 +1,210 @@
 require("dotenv").config();
-const TelegramBot = require("node-telegram-bot-api");
 
-const bot = new TelegramBot(process.env.BOT_TOKEN, { polling: true });
+// Railway 환경 확인 및 로그 함수
+const rLog = (message, type = 'INFO') => {
+  const time = new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' });
+  console.log(`[${time}] [${type}] ${message}`);
+};
 
-// 환경변수 디버깅
-console.log("=== 환경변수 확인 ===");
-console.log("BOT_TOKEN 존재:", !!process.env.BOT_TOKEN);
-console.log(
-  "BOT_TOKEN 길이:",
-  process.env.BOT_TOKEN ? process.env.BOT_TOKEN.length : 0
-);
-console.log(
-  "BOT_TOKEN 앞부분:",
-  process.env.BOT_TOKEN
-    ? process.env.BOT_TOKEN.substring(0, 10) + "..."
-    : "없음"
-);
-console.log(
-  "🔍 All MONGO env vars:",
-  Object.keys(process.env).filter((k) => k.includes("MONGO"))
-);
-console.log("========================");
+rLog("🚂 Railway에서 두목봇 시작...");
 
-if (!process.env.BOT_TOKEN) {
-  console.error("❌ BOT_TOKEN이 설정되지 않았습니다!");
+// 환경변수 확인
+const ENV_CHECK = {
+  BOT_TOKEN: process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN,
+  MONGO_URL: process.env.MONGO_URL || process.env.MONGODB_URI,
+  NODE_ENV: process.env.NODE_ENV || 'production'
+};
+
+rLog(`환경변수 확인 - BOT_TOKEN: ${!!ENV_CHECK.BOT_TOKEN}, MONGO_URL: ${!!ENV_CHECK.MONGO_URL}`);
+
+if (!ENV_CHECK.BOT_TOKEN) {
+  rLog("❌ BOT_TOKEN이 없습니다!", 'ERROR');
   process.exit(1);
 }
 
-bot.on("polling_error", (err) =>
-  console.error("polling error:", JSON.stringify(err, null, 2))
-);
+// TelegramBot 초기화 (안전하게)
+let bot;
+try {
+  const TelegramBot = require("node-telegram-bot-api");
+  bot = new TelegramBot(ENV_CHECK.BOT_TOKEN, { polling: true });
+  rLog("✅ 텔레그램 봇 초기화 성공");
+} catch (error) {
+  rLog(`❌ 텔레그램 봇 초기화 실패: ${error.message}`, 'ERROR');
+  process.exit(1);
+}
 
-console.log("🤖 두목봇 시작됨...");
+// 폴링 에러 핸들링
+bot.on("polling_error", (err) => {
+  rLog(`폴링 오류: ${err.message}`, 'ERROR');
+});
 
-// 모듈 불러오기
-const fortune = require("./fortune");
-const timer = require("./timer");
-const todoFunctions = require("./todos");
-const utils = require("./utils");
-const worktime = require("./worktime");
-const remind = require("./remind");
-const MonthlyLeave = require("./monthly_leave");
-const weather = require("./weather");
-const dustInsights = require("./dust_marketing_insights");
-const { getUserName, formatUserInfo } = require("./username_helper");
+// 안전한 모듈 로드 함수
+const safeLoadModule = (modulePath, isRequired = false) => {
+  try {
+    const module = require(modulePath);
+    rLog(`✅ ${modulePath} 모듈 로드 성공`);
+    return module;
+  } catch (error) {
+    rLog(`❌ ${modulePath} 모듈 로드 실패: ${error.message}`, 'ERROR');
+    if (isRequired) {
+      rLog(`필수 모듈 ${modulePath} 로드 실패로 종료`, 'ERROR');
+      process.exit(1);
+    }
+    return null;
+  }
+};
 
-// 연차 관리 인스턴스 생성
-const leaveManager = new MonthlyLeave();
+// 모듈 로드 (필수 모듈)
+rLog("필수 모듈 로드 중...");
+const todoFunctions = safeLoadModule('./todos', true);
+const { getUserName } = safeLoadModule('./username_helper', true);
 
-// 사용자 상태 관리 (메모리 기반)
+// 모듈 로드 (선택적 모듈)
+rLog("선택적 모듈 로드 중...");
+const fortune = safeLoadModule('./fortune');
+const timer = safeLoadModule('./timer');
+const utils = safeLoadModule('./utils');
+const worktime = safeLoadModule('./worktime');
+const remind = safeLoadModule('./remind');
+const weather = safeLoadModule('./weather');
+const dustInsights = safeLoadModule('./dust_marketing_insights');
+
+// 연차 관리 모듈 (특별 처리)
+let leaveManager = null;
+let MonthlyLeave = null;
+try {
+  MonthlyLeave = require('./monthly_leave');
+  leaveManager = new MonthlyLeave();
+  rLog("✅ 연차 관리 모듈 초기화 성공");
+} catch (error) {
+  rLog(`❌ 연차 관리 모듈 초기화 실패: ${error.message}`, 'ERROR');
+  // 연차 관리는 선택적 기능이므로 봇은 계속 실행
+}
+
+// 사용자 상태 관리
 const userStates = new Map();
 
-// 명령어 설정
-bot
-  .setMyCommands([
-    { command: "start", description: "📱 메인 메뉴 보기" },
-    { command: "help", description: "❓ 도움말 보기" },
-    { command: "fortune", description: "🔮 오늘의 운세" },
-    { command: "worktime", description: "🕐 근무시간 보기" },
-    { command: "timer", description: "⏰ 타이머 시작/종료" },
-    { command: "add", description: "➕ 할일 추가하기 (/add 할일내용)" },
-    {
-      command: "tts",
-      description: "🔊 텍스트를 음성으로 변환 (/tts 안녕하세요)",
-    },
-    {
-      command: "remind",
-      description: "🔔 리마인더 설정하기 (/remind 30 독서하기)",
-    },
-    { command: "weather", description: "🌤️ 날씨 정보 확인" },
-    { command: "insight", description: "📊 마케팅 인사이트 확인" },
-    { command: "cancel", description: "❌ 진행중인 작업 취소" },
-  ])
-  .then(() => {
-    console.log("✅ 명령어가 Telegram에 등록되었습니다.");
-  })
-  .catch(console.error);
-
-// Bot Menu 설정
-try {
-  if (typeof bot.setMyMenuButton === "function") {
-    bot
-      .setMyMenuButton({
-        menu_button: {
-          type: "commands",
-        },
-      })
-      .then(() => {
-        console.log("✅ Bot Menu가 활성화되었습니다.");
-      })
-      .catch((err) => {
-        console.log("⚠️ Bot Menu 설정 실패 (버전 미지원):", err.message);
-      });
-  } else {
-    console.log(
-      "⚠️ setMyMenuButton 메서드가 지원되지 않습니다. 명령어 목록만 사용됩니다."
-    );
+// 모듈 상태 리포트
+const moduleStatus = {
+  required: {
+    bot: !!bot,
+    todos: !!todoFunctions,
+    getUserName: !!getUserName
+  },
+  optional: {
+    fortune: !!fortune,
+    timer: !!timer,
+    utils: !!utils,
+    worktime: !!worktime,
+    remind: !!remind,
+    weather: !!weather,
+    dustInsights: !!dustInsights,
+    leaveManager: !!leaveManager
   }
-} catch (error) {
-  console.log("⚠️ Bot Menu 설정을 건너뜁니다:", error.message);
+};
+
+rLog("📊 모듈 로드 완료:");
+rLog(`필수 모듈: ${JSON.stringify(moduleStatus.required)}`);
+rLog(`선택적 모듈: ${JSON.stringify(moduleStatus.optional)}`);
+
+// 명령어 설정 (로드된 모듈만)
+const setupCommands = async () => {
+  try {
+    const commands = [
+      { command: 'start', description: '📱 메인 메뉴 보기' },
+      { command: 'help', description: '❓ 도움말 보기' },
+      { command: 'add', description: '➕ 할일 추가하기' }
+    ];
+
+    // 선택적 명령어 추가 (모듈이 로드된 경우만)
+    if (fortune) commands.push({ command: 'fortune', description: '🔮 오늘의 운세' });
+    if (worktime) commands.push({ command: 'worktime', description: '🕐 근무시간 보기' });
+    if (timer) commands.push({ command: 'timer', description: '⏰ 타이머 시작/종료' });
+    if (utils) commands.push({ command: 'tts', description: '🔊 텍스트 음성변환' });
+    if (remind) commands.push({ command: 'remind', description: '🔔 리마인더 설정' });
+    if (weather) commands.push({ command: 'weather', description: '🌤️ 날씨 정보' });
+    if (dustInsights) commands.push({ command: 'insight', description: '📊 마케팅 인사이트' });
+
+    await bot.setMyCommands(commands);
+    rLog(`✅ ${commands.length}개 명령어 등록 완료`);
+  } catch (error) {
+    rLog(`❌ 명령어 등록 실패: ${error.message}`, 'ERROR');
+  }
+};
+
+setupCommands();
+
+// 동적 키보드 생성 (로드된 모듈만)
+const createMainMenuKeyboard = () => {
+  const keyboard = [];
+  
+  // 첫 번째 줄: 할일 관리는 항상 포함, 연차 관리는 선택적
+  const firstRow = [{ text: '📝 할일 관리', callback_data: 'todo_menu' }];
+  if (leaveManager) firstRow.push({ text: '📅 휴가 관리', callback_data: 'leave_menu' });
+  keyboard.push(firstRow);
+  
+  // 두 번째 줄: 타이머, 운세
+  const secondRow = [];
+  if (timer) secondRow.push({ text: '⏰ 타이머', callback_data: 'timer_menu' });
+  if (fortune) secondRow.push({ text: '🎯 운세', callback_data: 'fortune_menu' });
+  if (secondRow.length > 0) keyboard.push(secondRow);
+  
+  // 세 번째 줄: 근무시간, 날씨
+  const thirdRow = [];
+  if (worktime) thirdRow.push({ text: '🕐 근무시간', callback_data: 'worktime_menu' });
+  if (weather) thirdRow.push({ text: '🌤️ 날씨', callback_data: 'weather_menu' });
+  if (thirdRow.length > 0) keyboard.push(thirdRow);
+  
+  // 네 번째 줄: 인사이트, 리마인더
+  const fourthRow = [];
+  if (dustInsights) fourthRow.push({ text: '📊 마케팅 인사이트', callback_data: 'insight_menu' });
+  if (remind) fourthRow.push({ text: '🔔 리마인더', callback_data: 'reminder_menu' });
+  if (fourthRow.length > 0) keyboard.push(fourthRow);
+  
+  // 마지막 줄: 유틸리티, 도움말
+  const lastRow = [];
+  if (utils) lastRow.push({ text: '🛠️ 유틸리티', callback_data: 'utils_menu' });
+  lastRow.push({ text: '❓ 도움말', callback_data: 'help_menu' });
+  keyboard.push(lastRow);
+  
+  return { inline_keyboard: keyboard };
+};
+
+// 안전한 모듈 함수 호출
+const safeModuleCall = async (moduleFn, bot, msg, context = '') => {
+  if (!moduleFn) {
+    rLog(`${context} 모듈을 사용할 수 없습니다`, 'WARN');
+    await bot.sendMessage(msg.chat.id, `❌ ${context} 기능을 일시적으로 사용할 수 없습니다.`);
+    return false;
+  }
+
+  try {
+    await moduleFn(bot, msg);
+    return true;
+  } catch (error) {
+    rLog(`${context} 모듈 실행 오류: ${error.message}`, 'ERROR');
+    await bot.sendMessage(msg.chat.id, `❌ ${context} 처리 중 오류가 발생했습니다.`);
+    return false;
+  }
+};
+
+// Railway 헬스체크 (간단버전)
+if (ENV_CHECK.NODE_ENV === 'production') {
+  const http = require('http');
+  const server = http.createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain' });
+    res.end('Doomock Bot is running!');
+  });
+  
+  const port = process.env.PORT || 3000;
+  server.listen(port, () => {
+    rLog(`헬스체크 서버 실행: 포트 ${port}`, 'SERVER');
+  });
 }
+
+rLog("🤖 두목봇 초기화 완료!");
+
+// 여기서부터 기존 메시지 핸들러와 콜백 핸들러 코드 계속...
 
 // 키보드 정의
 const mainMenuKeyboard = {
