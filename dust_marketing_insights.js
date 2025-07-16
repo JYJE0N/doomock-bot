@@ -1155,4 +1155,9 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
                 break;
 
             default:
-                bot.sendMessage(chat
+                bot.sendMessage(chatId, '⚠️ 알 수 없는 명령어입니다. 다시 시도해주세요.');
+                break;
+        }
+    } catch (error) {
+        console.error('❌ 콜백 처리 실패:', error);
+        bot.sendMessage(chatId, `
