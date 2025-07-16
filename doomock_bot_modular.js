@@ -136,6 +136,8 @@ const fortuneMenuKeyboard = {
 // 메인 메시지 핸들러
 bot.on('message', async (msg) => {
     const text = msg.text;
+    if (!text) return;  // 🛡️ 텍스트 없는 메시지 방어
+
     const chatId = msg.chat.id;
     const userId = msg.from.id;
 
