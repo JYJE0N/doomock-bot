@@ -147,7 +147,7 @@ const createMainMenuKeyboard = () => {
   
   // 네 번째 줄: 인사이트, 리마인더
   const fourthRow = [];
-  if (dustInsights) fourthRow.push({ text: '📊 마케팅 인사이트', callback_data: 'insight_menu' });
+  if (dustInsights) fourthRow.push({ text: '📊 인사이트', callback_data: 'insight_menu' }); // 'insight_menu'로 수정
   if (remind) fourthRow.push({ text: '🔔 리마인더', callback_data: 'reminder_menu' });
   if (fourthRow.length > 0) keyboard.push(fourthRow);
   
