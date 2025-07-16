@@ -1122,11 +1122,98 @@ bot.on('callback_query', async (callbackQuery) => {
                     } else if (data.startsWith('weather_forecast_')) {
                         const city = data.replace('weather_forecast_', '');
                         weather(bot, { chat: { id: chatId }, text: `/weather ${city} 예보` });
-                    } else if (data === 'weather_cities') {
-                        bot.sendMessage(chatId, '🏙️ **지원 도시 목록**\n\n서울, 부산, 대구, 인천, 광주, 대전, 울산, 세종, 제주\n\n사용법: /weather [도시명]', {
-                            parse_mode: 'Markdown',
-                            reply_markup: { inline_keyboard: [[{ text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }]] }
-                        });
+                    // 화성/동탄 맞춤 도시 선택 메뉴
+
+} else if (data === 'weather_cities') {
+    const cityListKeyboard = {
+        inline_keyboard: [
+            [
+                { text: '🏡 화성/동탄', callback_data: 'weather_hwaseong' }, // 🌟 가장 먼저!
+                { text: '🏙️ 서울', callback_data: 'weather_seoul' }
+            ],
+            [
+                { text: '🌆 인천', callback_data: 'weather_incheon' },
+                { text: '🏞️ 수원/경기', callback_data: 'weather_gyeonggi' }
+            ],
+            [
+                { text: '🌊 부산', callback_data: 'weather_busan' },
+                { text: '🏔️ 대구', callback_data: 'weather_daegu' }
+            ],
+            [
+                { text: '🌄 광주', callback_data: 'weather_gwangju' },
+                { text: '🏛️ 대전', callback_data: 'weather_daejeon' }
+            ],
+            [
+                { text: '🏝️ 제주', callback_data: 'weather_jeju' },
+                { text: '📍 더 많은 지역...', callback_data: 'weather_more_cities' }
+            ],
+            [
+                { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
+            ]
+        ]
+    };
+
+    bot.sendMessage(chatId, '🏙️ **지역 선택**\n\n🏡 화성/동탄 지역이 맨 위에 있어요! ⚡', {
+        parse_mode: 'Markdown',
+        reply_markup: cityListKeyboard
+    });
+
+// 화성 날씨 처리 (경기도 좌표 사용)
+} else if (data === 'weather_hwaseong') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
+
+// 더보기 메뉴
+} else if (data === 'weather_more_cities') {
+    const moreCitiesKeyboard = {
+        inline_keyboard: [
+            [
+                { text: '🏛️ 세종', callback_data: 'weather_sejong' },
+                { text: '🏭 울산', callback_data: 'weather_ulsan' }
+            ],
+            [
+                { text: '⛰️ 강원', callback_data: 'weather_gangwon' },
+                { text: '🌾 충북', callback_data: 'weather_chungbuk' }
+            ],
+            [
+                { text: '🌻 충남', callback_data: 'weather_chungnam' },
+                { text: '🌿 전북', callback_data: 'weather_jeonbuk' }
+            ],
+            [
+                { text: '🌺 전남', callback_data: 'weather_jeonnam' },
+                { text: '🏯 경북', callback_data: 'weather_gyeongbuk' }
+            ],
+            [
+                { text: '🏮 경남', callback_data: 'weather_gyeongnam' }
+            ],
+            [
+                { text: '⬅️ 주요 지역', callback_data: 'weather_cities' },
+                { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
+            ]
+        ]
+    };
+
+    bot.sendMessage(chatId, '🗺️ **전체 지역**\n\n원하는 지역을 선택해주세요:', {
+        parse_mode: 'Markdown',
+        reply_markup: moreCitiesKeyboard
+    });
+
+// 기타 도시들
+} else if (data === 'weather_gyeonggi') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
+} else if (data === 'weather_gangwon') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 강원' });
+} else if (data === 'weather_chungbuk') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 충북' });
+} else if (data === 'weather_chungnam') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 충남' });
+} else if (data === 'weather_jeonbuk') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 전북' });
+} else if (data === 'weather_jeonnam') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 전남' });
+} else if (data === 'weather_gyeongbuk') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 경북' });
+} else if (data === 'weather_gyeongnam') {
+    weather(bot, { chat: { id: chatId }, text: '/weather 경남' });
                     } else {
                     // 정말 알 수 없는 콜백
                     console.log('❓ 알 수 없는 콜백 데이터:', data);
