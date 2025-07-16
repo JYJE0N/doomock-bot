@@ -1739,20 +1739,51 @@ async function handleUtilsTTSHelp(bot, chatId) {
                   `• 언어별 최적화된 발음\n\n` +
                   `지금 바로 TTS 설정을 해보세요! 🚀`;
   
+ async function handleUtilsHelp(bot, chatId) {
+  const utilsHelpText = `🛠️ **유틸리티 전체 도움말**\n\n` +
+                       `**🔊 TTS (음성 변환)**\n` +
+                       `• 텍스트를 자연스러운 음성으로 변환\n` +
+                       `• 8개 언어 지원 (한국어, 영어, 일본어, 중국어, 스페인어, 프랑스어, 독일어, 러시아어)\n` +
+                       `• 자동 모드와 수동 모드 지원\n\n` +
+                       `**⏰ 시간 유틸리티**\n` +
+                       `• 한국 시간 기준 동작\n` +
+                       `• 날짜/시간 포맷팅 지원\n` +
+                       `• 현재 연도 자동 감지\n\n` +
+                       `**📊 데이터 처리**\n` +
+                       `• 숫자 포맷팅 (천 단위 구분)\n` +
+                       `• 백분율 계산\n` +
+                       `• 텍스트 자르기 및 처리\n` +
+                       `• 배열 랜덤 선택 및 섞기\n\n` +
+                       `**🔧 개발자 도구**\n` +
+                       `• 지연 함수 (delay)\n` +
+                       `• 로그 함수 (성공/오류)\n` +
+                       `• 유효성 검사 (숫자/날짜)\n\n` +
+                       `**💡 사용 팁**\n` +
+                       `• 모든 기능은 24시간 사용 가능\n` +
+                       `• Railway 클라우드에서 안정적 동작\n` +
+                       `• 자동 파일 정리로 메모리 효율성 확보\n\n` +
+                       `**🚀 빠른 시작**\n` +
+                       `1. 🔊 TTS 설정 → TTS 모드 ON\n` +
+                       `2. 채팅창에 텍스트 입력\n` +
+                       `3. 자동으로 음성 변환!\n\n` +
+                       `더 자세한 사용법은 각 기능별 도움말을 참조하세요.`;
+
   const keyboard = {
     inline_keyboard: [
       [
         { text: '🔊 TTS 설정하기', callback_data: 'utils_tts_menu' },
+        { text: '❓ TTS 도움말', callback_data: 'utils_tts_help' }
+      ],
+      [
         { text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }
       ]
     ]
   };
-  
-  await sendNewMessage(bot, chatId, helpText, {
+
+  await sendNewMessage(bot, chatId, utilsHelpText, {
     parse_mode: 'Markdown',
     reply_markup: keyboard
   });
-}
 
 // 6. 언어 이름 반환 함수
 function getLanguageName(langCode) {
