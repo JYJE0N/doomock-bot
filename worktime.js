@@ -97,6 +97,84 @@ class WorkTimeManager {
     };
   }
   
+  // 🆕 진행도 게이지 생성 메서드
+  createProgressBar(percentage, length = 10) {
+    const filled = Math.floor((percentage / 100) * length);
+    const empty = length - filled;
+    const bar = '■'.repeat(filled) + '□'.repeat(empty);
+    return `[${bar}] ${percentage}%`;
+  }
+  
+  // 🆕 컬러풀한 진행도 바 (이모지 버전)
+  createColorProgressBar(percentage) {
+    const segments = 10;
+    const filled = Math.floor((percentage / 100) * segments);
+    let bar = '';
+    
+    for (let i = 0; i < segments; i++) {
+      if (i < filled) {
+        // 진행 상황에 따라 색상 변경
+        if (percentage < 25) {
+          bar += '🟥'; // 빨강 (시작)
+        } else if (percentage < 50) {
+          bar += '🟧'; // 주황 (초반)
+        } else if (percentage < 75) {
+          bar += '🟨'; // 노랑 (중반)
+        } else {
+          bar += '🟩'; // 초록 (거의 완료)
+        }
+      } else {
+        bar += '⬜'; // 빈 칸
+      }
+    }
+    
+    return `${bar} ${percentage}%`;
+  }
+  
+  // 🆕 시간별 상세 진행도
+  getDetailedProgress() {
+    const currentWork = this.calculateCurrentWorkTime();
+    const totalWork = this.calculateTotalWorkHours();
+    
+    if (totalWork.totalMinutes === 0) {
+      return { percentage: 0, message: '근무 시작 전' };
+    }
+    
+    const percentage = Math.floor((currentWork.totalMinutes / totalWork.totalMinutes) * 100);
+    
+    let emoji = '';
+    let message = '';
+    
+    if (percentage === 0) {
+      emoji = '🌅';
+      message = '출근! 화이팅!';
+    } else if (percentage < 25) {
+      emoji = '☕';
+      message = '아직 시작이에요!';
+    } else if (percentage < 50) {
+      emoji = '💪';
+      message = '열심히 하고 있어요!';
+    } else if (percentage < 75) {
+      emoji = '🔥';
+      message = '절반 넘었네요!';
+    } else if (percentage < 90) {
+      emoji = '🎯';
+      message = '거의 다 왔어요!';
+    } else if (percentage < 100) {
+      emoji = '🏁';
+      message = '조금만 더!';
+    } else {
+      emoji = '🎉';
+      message = '수고하셨습니다!';
+    }
+    
+    return {
+      percentage: Math.min(percentage, 100), // 100% 넘지 않도록
+      emoji,
+      message
+    };
+  }
+  
   // 현재 상태에 따른 메시지
   getCurrentStatusMessage() {
     const now = new Date();
@@ -136,7 +214,7 @@ class WorkTimeManager {
     }
   }
   
-  // 전체 정보 포맷팅
+  // 🔧 수정된 formatSchedule 메서드 (진행도 포함)
   formatSchedule() {
     const startTime = formatTimeString(WORK_SCHEDULE.start);
     const lunchStart = formatTimeString(WORK_SCHEDULE.lunchStart);
@@ -146,16 +224,41 @@ class WorkTimeManager {
     const totalWork = this.calculateTotalWorkHours();
     const currentWork = this.calculateCurrentWorkTime();
     const statusMessage = this.getCurrentStatusMessage();
+    const progress = this.getDetailedProgress();
+    
+    // 현재 시간 표시
+    const now = new Date();
+    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+    const currentTime = `${koreaTime.getHours().toString().padStart(2, '0')}:${koreaTime.getMinutes().toString().padStart(2, '0')}`;
     
     return `⏰ 회사 근무시간
-출근: ${startTime}
+출근: ${startTime} | 퇴근: ${endTime}
 점심: ${lunchStart} ~ ${lunchEnd}
-퇴근: ${endTime}
+현재: ${currentTime}
 
-📊 근무 현황:
+📊 근무 진행도:
+${this.createColorProgressBar(progress.percentage)}
+${progress.emoji} ${progress.message}
+
+⏱️ 근무 현황:
 • 총 근무시간: ${totalWork.hours}시간 ${totalWork.minutes}분
 • 지금까지: ${currentWork.hours}시간 ${currentWork.minutes}분 일함
 • 현재 상태: ${currentWork.status}
+
+${statusMessage}`;
+  }
+  
+  // 🆕 간단한 버전 (메인 메뉴용)
+  formatSimpleSchedule() {
+    const progress = this.getDetailedProgress();
+    const currentWork = this.calculateCurrentWorkTime();
+    const statusMessage = this.getCurrentStatusMessage();
+    
+    return `⏰ 회사 근무시간
+출근: 08:30 | 퇴근: 17:30
+
+📊 ${this.createProgressBar(progress.percentage)}
+${progress.emoji} 지금까지 ${currentWork.hours}시간 ${currentWork.minutes}분 일함
 
 ${statusMessage}`;
   }
@@ -184,11 +287,11 @@ module.exports = function(bot, msg) {
       '• 퇴근: 17:30\n' +
       '• 총 근무시간: 7시간 30분\n\n' +
       '/worktime - 현재 근무 상태 확인\n\n' +
-      '현재 시간을 기준으로 실제 근무한 시간과 남은 시간을 알려드립니다! ⏰'
+      '실시간 진행도 게이지와 함께 근무 상황을 확인하세요! 📊⏰'
     );
   } else {
     // 버튼 클릭 시
-    const funMessage = '⏰ 돈을 벌면 좋읍니다.\n\n';
+    const funMessage = '💸 돈을 벌면 좋읍니다.\n\n';
     const scheduleText = workTimeManager.formatSchedule();
     
     bot.sendMessage(chatId, `${funMessage}${scheduleText}`);
