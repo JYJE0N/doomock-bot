@@ -1255,12 +1255,16 @@ module.exports.generateWeeklyReport = async function(bot, chatId, userName) {
 };
 
 // 🆕 실시간 모니터링 대시보드 함수
+// 실시간 대시보드 함수 (기존 코드 수정)
 module.exports.showRealtimeDashboard = async function(bot, chatId, userName) {
     const insightManager = new EnhancedDustMarketingInsights();
     
     console.log(`📱 실시간 대시보드 표시 (사용자: ${userName})`);
     
     try {
+        // 로딩 메시지 업데이트
+        await bot.sendMessage(chatId, '📊 실시간 대시보드 데이터를 불러오는 중...');
+        
         const dustData = await insightManager.getCurrentAirQuality();
         const insights = insightManager.generateMarketingInsights(dustData, userName);
         const season = insightManager.getCurrentSeason();
@@ -1287,7 +1291,7 @@ module.exports.showRealtimeDashboard = async function(bot, chatId, userName) {
             dashboard += `${index + 1}. ${action}\n`;
         });
         
-        // 🔥 여름철 특별 모니터링
+        // 여름철 특별 모니터링
         if (season === 'summer') {
             dashboard += `\n🔥 **여름철 특별 모니터링**\n`;
             dashboard += `• 프리미엄 라이트 마스크 우선 관리\n`;
@@ -1298,27 +1302,33 @@ module.exports.showRealtimeDashboard = async function(bot, chatId, userName) {
         const keyboard = {
             inline_keyboard: [
                 [
-                    { text: '🔄 새로고침', callback_data: 'dashboard_refresh' },
-                    { text: '📊 상세 분석', callback_data: 'insight_main' }
+                    { text: '🔄 새로고침', callback_data: 'insight_dashboard' },
+                    { text: '📊 상세 분석', callback_data: 'insight_full' }
                 ],
                 [
                     { text: '🎯 액션 플랜', callback_data: 'action_plan' },
                     { text: '📈 트렌드', callback_data: 'trend_analysis' }
                 ],
                 [
-                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                    { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
                 ]
             ]
         };
         
-        bot.sendMessage(chatId, dashboard, {
+        await bot.sendMessage(chatId, dashboard, {
             parse_mode: 'Markdown',
             reply_markup: keyboard
         });
         
     } catch (error) {
         console.error('❌ 실시간 대시보드 표시 실패:', error);
-        bot.sendMessage(chatId, `❌ 대시보드 표시 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
+        await bot.sendMessage(chatId, `❌ 대시보드 표시 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`, {
+            reply_markup: {
+                inline_keyboard: [[
+                    { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                ]]
+            }
+        });
     }
 };
 
@@ -1779,3 +1789,176 @@ async function showMainMenu(bot, chatId) {
         reply_markup: mainKeyboard
     });
 }
+
+// 3. 추가 에러 핸들링 함수
+function handleInsightError(bot, chatId, error, context = '') {
+    console.error(`❌ 인사이트 ${context} 오류:`, error);
+    
+    const errorMessage = `❌ ${context} 처리 중 오류가 발생했습니다.\n\n` +
+                        `오류: ${error.message}\n\n` +
+                        `잠시 후 다시 시도해주세요.`;
+    
+    const keyboard = {
+        inline_keyboard: [
+            [
+                { text: '🔄 다시 시도', callback_data: 'insight_refresh' },
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+            ]
+        ]
+    };
+    
+    bot.sendMessage(chatId, errorMessage, { reply_markup: keyboard });
+}
+
+// 4. 콜백 데이터 검증 함수
+function validateCallbackData(data) {
+    const validCallbacks = [
+        'insight_menu', 'insight_full', 'insight_quick', 'insight_dashboard',
+        'insight_inventory', 'insight_marketing', 'insight_content', 
+        'insight_risk', 'insight_refresh', 'main_menu'
+    ];
+    
+    return validCallbacks.includes(data);
+}
+
+// 5. 안전한 메시지 편집 함수
+async function safeEditMessage(bot, chatId, messageId, text, options = {}) {
+    try {
+        await bot.editMessageText(text, {
+            chat_id: chatId,
+            message_id: messageId,
+            ...options
+        });
+    } catch (error) {
+        console.error('메시지 편집 실패:', error);
+        // 편집 실패 시 새 메시지 전송
+        await bot.sendMessage(chatId, text, options);
+    }
+}
+
+// 6. 인사이트 모듈 연결 안전성 검증
+function verifyInsightModule() {
+    try {
+        if (typeof dustInsights === 'function') {
+            console.log('✅ 인사이트 모듈 연결 확인');
+            return true;
+        } else {
+            console.error('❌ 인사이트 모듈 함수가 아님');
+            return false;
+        }
+    } catch (error) {
+        console.error('❌ 인사이트 모듈 검증 실패:', error);
+        return false;
+    }
+}
+
+// 7. 봇 시작 시 모듈 검증
+console.log('🔍 인사이트 모듈 검증 중...');
+if (verifyInsightModule()) {
+    console.log('✅ 인사이트 모듈 준비 완료');
+} else {
+    console.log('⚠️ 인사이트 모듈 일부 기능 제한');
+}
+
+// 8. 추가 디버깅 로그
+console.log('📊 인사이트 관련 함수 확인:');
+console.log('- dustInsights:', typeof dustInsights);
+console.log('- dustInsights.showRealtimeDashboard:', typeof dustInsights.showRealtimeDashboard);
+console.log('- dustInsights.handleCallback:', typeof dustInsights.handleCallback);
+
+// 안전한 대시보드 표시 함수
+module.exports.showRealtimeDashboard = async function(bot, chatId, userName) {
+    console.log(`📱 안전한 대시보드 표시 시작 (사용자: ${userName})`);
+    
+    try {
+        const insightManager = new EnhancedDustMarketingInsights();
+        const dustData = await insightManager.getCurrentAirQuality();
+        const insights = insightManager.generateMarketingInsights(dustData, userName);
+        
+        const dashboard = `📱 **실시간 마케팅 대시보드**\n\n` +
+                         `⏰ **현재 상황** (${new Date().toLocaleTimeString('ko-KR')})\n` +
+                         `• 미세먼지: ${insights.currentSituation.details.dustLevel} ${dustData.pm25}㎍/㎥\n` +
+                         `• 기회점수: ${insights.marketingOpportunity.score}/10\n` +
+                         `• 매출배수: ${insights.inventoryStrategy.totalMultiplier}배\n\n` +
+                         `🔥 **여름철 특화 전략**\n` +
+                         `• 프리미엄 라이트 마스크 집중 관리\n` +
+                         `• 시원한 착용감 마케팅\n` +
+                         `• 컬러 다양성 부각\n\n` +
+                         `⚡ **즉시 실행 사항**\n` +
+                         `${insights.actionPlan.plans[0].tasks.slice(0, 3).map((task, i) => `${i+1}. ${task}`).join('\n')}`;
+        
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🔄 새로고침', callback_data: 'insight_dashboard' },
+                    { text: '📊 상세 분석', callback_data: 'insight_full' }
+                ],
+                [
+                    { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                ]
+            ]
+        };
+        
+        await bot.sendMessage(chatId, dashboard, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 대시보드 표시 실패:', error);
+        await bot.sendMessage(chatId, 
+            `❌ **대시보드 로딩 실패**\n\n` +
+            `오류: ${error.message}\n\n` +
+            `기본 인사이트를 이용해주세요.`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '📊 기본 인사이트', callback_data: 'insight_full' },
+                        { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                    ]]
+                }
+            }
+        );
+    }
+};
+
+// 에러 복구 함수
+module.exports.handleInsightError = function(bot, chatId, error, context = '인사이트') {
+    console.error(`❌ ${context} 에러:`, error);
+    
+    const errorMsg = `❌ **${context} 처리 실패**\n\n` +
+                    `오류: ${error.message}\n\n` +
+                    `다른 기능을 이용해주세요.`;
+    
+    const keyboard = {
+        inline_keyboard: [
+            [
+                { text: '🔄 다시 시도', callback_data: 'insight_refresh' },
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+            ]
+        ]
+    };
+    
+    bot.sendMessage(chatId, errorMsg, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+};
+
+// 모듈 상태 확인 함수
+module.exports.checkModuleStatus = function() {
+    const status = {
+        mainFunction: typeof module.exports === 'function',
+        dashboard: typeof module.exports.showRealtimeDashboard === 'function',
+        errorHandler: typeof module.exports.handleInsightError === 'function',
+        nationalStatus: typeof module.exports.getNationalStatus === 'function'
+    };
+    
+    console.log('📊 인사이트 모듈 상태:', status);
+    return status;
+};
+
+// 봇 시작 시 모듈 상태 확인
+console.log('🔍 인사이트 모듈 초기화 완료');
+module.exports.checkModuleStatus();
