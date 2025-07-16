@@ -537,7 +537,7 @@ bot.on('callback_query', async (callbackQuery) => {
                         const todoButtons = [];
                         
                         todos.forEach((todo, index) => {
-                            const status = todo.done ? '✅' : '⭕';
+                            const status = todo.done ? '✅' : '🔘';
                             const strikethrough = todo.done ? '~~' : '';
                             todoText += `${index + 1}. ${status} ${strikethrough}${todo.task}${strikethrough}\n`;
                             
