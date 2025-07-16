@@ -893,39 +893,46 @@ bot.on('callback_query', async (callbackQuery) => {
 
                 // ===== 날씨 관련 ===== (새로 추가)
             case 'weather_menu':
-                const weatherMenuKeyboard = {
-                    inline_keyboard: [
-                        [
-                            { text: '🌤️ 현재 날씨', callback_data: 'weather_current' },
-                            { text: '⏰ 시간별 예보', callback_data: 'weather_forecast' }
-                        ],
-                        [
-                            { text: '🏙️ 서울', callback_data: 'weather_seoul' },
-                            { text: '🌊 부산', callback_data: 'weather_busan' },
-                            { text: '🏔️ 대구', callback_data: 'weather_daegu' }
-                        ],
-                        [
-                            { text: '🌆 인천', callback_data: 'weather_incheon' },
-                            { text: '🌄 광주', callback_data: 'weather_gwangju' },
-                            { text: '🏛️ 대전', callback_data: 'weather_daejeon' }
-                        ],
-                        [
-                            { text: '🏭 울산', callback_data: 'weather_ulsan' },
-                            { text: '🏛️ 세종', callback_data: 'weather_sejong' },
-                            { text: '🏝️ 제주', callback_data: 'weather_jeju' }
-                        ],
-                        [
-                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-                        ]
+            const weatherMenuKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: '🏡 현재 날씨 (화성)', callback_data: 'weather_current' },
+                        { text: '⏰ 시간별 예보', callback_data: 'weather_forecast' }
+                    ],
+                    [
+                        { text: '🏡 화성/동탄 ⭐', callback_data: 'weather_hwaseong' },
+                        { text: '🏙️ 서울', callback_data: 'weather_seoul' },
+                        { text: '🌊 부산', callback_data: 'weather_busan' }
+                    ],
+                    [
+                        { text: '🏔️ 대구', callback_data: 'weather_daegu' },
+                        { text: '🌆 인천', callback_data: 'weather_incheon' },
+                        { text: '🌄 광주', callback_data: 'weather_gwangju' }
+                    ],
+                    [
+                        { text: '🏛️ 대전', callback_data: 'weather_daejeon' },
+                        { text: '🏭 울산', callback_data: 'weather_ulsan' },
+                        { text: '🏛️ 세종', callback_data: 'weather_sejong' }
+                    ],
+                    [
+                        { text: '🏝️ 제주', callback_data: 'weather_jeju' },
+                        { text: '🏞️ 수원', callback_data: 'weather_suwon' } // 🆕 수원 추가
+                    ],
+                    [
+                        { text: '📍 더 많은 지역...', callback_data: 'weather_more_cities' }
+                    ],
+                    [
+                        { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
                     ]
-                };
-
-                bot.editMessageText('🌤️ 날씨 정보 메뉴\n\n원하는 지역의 날씨를 확인해보세요:', {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: weatherMenuKeyboard
-                });
-                break;
+                ]
+            };
+        
+            bot.editMessageText('🌤️ 날씨 정보 메뉴\n\n🏡 화성/동탄이 기본 지역이에요! ⭐\n원하는 지역을 선택해보세요:', {
+                chat_id: chatId,
+                message_id: message.message_id,
+                reply_markup: weatherMenuKeyboard
+            });
+            break;
 
             case 'weather_current':
                 weather(bot, { chat: { id: chatId }, text: '/weather' });
@@ -936,40 +943,86 @@ bot.on('callback_query', async (callbackQuery) => {
                 break;
 
             // 도시별 날씨
+            // 기존 날씨 케이스들을 다음과 같이 수정:
+
+            case 'weather_hwaseong':
+            case 'weather_화성':  // 🆕 한글 케이스도 추가
+                weather(bot, { chat: { id: chatId }, text: '/weather 화성' });
+                break;
+            
             case 'weather_seoul':
                 weather(bot, { chat: { id: chatId }, text: '/weather 서울' });
                 break;
-
+            
             case 'weather_busan':
                 weather(bot, { chat: { id: chatId }, text: '/weather 부산' });
                 break;
-
+            
             case 'weather_daegu':
                 weather(bot, { chat: { id: chatId }, text: '/weather 대구' });
                 break;
-
+            
             case 'weather_incheon':
                 weather(bot, { chat: { id: chatId }, text: '/weather 인천' });
                 break;
-
+            
             case 'weather_gwangju':
                 weather(bot, { chat: { id: chatId }, text: '/weather 광주' });
                 break;
-
+            
             case 'weather_daejeon':
                 weather(bot, { chat: { id: chatId }, text: '/weather 대전' });
                 break;
-
+            
             case 'weather_ulsan':
                 weather(bot, { chat: { id: chatId }, text: '/weather 울산' });
                 break;
-
+            
             case 'weather_sejong':
                 weather(bot, { chat: { id: chatId }, text: '/weather 세종' });
                 break;
-
+            
             case 'weather_jeju':
                 weather(bot, { chat: { id: chatId }, text: '/weather 제주' });
+                break;
+            
+            // 🆕 수원 케이스 추가
+            case 'weather_suwon':
+                weather(bot, { chat: { id: chatId }, text: '/weather 수원' });
+                break;
+            
+            // 🔧 경기 케이스 수정 (기존과 동일하게 유지)
+            case 'weather_gyeonggi':
+                weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
+                break;
+            
+            // 🆕 추가 지역들
+            case 'weather_gangwon':
+                weather(bot, { chat: { id: chatId }, text: '/weather 강원' });
+                break;
+            
+            case 'weather_chungbuk':
+                weather(bot, { chat: { id: chatId }, text: '/weather 충북' });
+                break;
+            
+            case 'weather_chungnam':
+                weather(bot, { chat: { id: chatId }, text: '/weather 충남' });
+                break;
+            
+            case 'weather_jeonbuk':
+                weather(bot, { chat: { id: chatId }, text: '/weather 전북' });
+                break;
+            
+            case 'weather_jeonnam':
+                weather(bot, { chat: { id: chatId }, text: '/weather 전남' });
+                break;
+            
+            case 'weather_gyeongbuk':
+                weather(bot, { chat: { id: chatId }, text: '/weather 경북' });
+                break;
+            
+            case 'weather_gyeongnam':
+                weather(bot, { chat: { id: chatId }, text: '/weather 경남' });
                 break;
 
             // ===== 도움말 ===== (업데이트됨)
@@ -1133,7 +1186,7 @@ default:
                 ],
                 [
                     { text: '🌆 인천', callback_data: 'weather_incheon' },
-                    { text: '🏞️ 수원/경기', callback_data: 'weather_gyeonggi' }
+                    { text: '🏞️ 수원', callback_data: 'weather_suwon' }
                 ],
                 [
                     { text: '🌊 부산', callback_data: 'weather_busan' },
@@ -1157,6 +1210,8 @@ default:
             parse_mode: 'Markdown',
             reply_markup: cityListKeyboard
         });
+        break;
+        
     } else if (data === 'weather_hwaseong') {
         weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
     } else if (data === 'weather_more_cities') {
