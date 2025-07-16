@@ -14,6 +14,79 @@ function getKoreaTime() {
     return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
 }
 
+// 현재 연도 가져오기
+function getCurrentYear() {
+    return getKoreaTime().getFullYear();
+}
+
+// 날짜 포맷팅
+function formatDate(date) {
+    return date.toLocaleDateString('ko-KR');
+}
+
+// 시간 포맷팅
+function formatTime(date) {
+    return date.toLocaleTimeString('ko-KR');
+}
+
+// 날짜 시간 포맷팅
+function formatDateTime(date) {
+    return date.toLocaleString('ko-KR');
+}
+
+// 숫자 포맷팅
+function formatNumber(num) {
+    return num.toLocaleString('ko-KR');
+}
+
+// 백분율 계산
+function calculatePercentage(part, total) {
+    return total > 0 ? Math.round((part / total) * 100) : 0;
+}
+
+// 텍스트 자르기
+function truncateText(text, maxLength) {
+    return text.length > maxLength ? text.substring(0, maxLength) + '...' : text;
+}
+
+// 랜덤 선택
+function randomChoice(array) {
+    return array[Math.floor(Math.random() * array.length)];
+}
+
+// 배열 섞기
+function shuffleArray(array) {
+    const shuffled = [...array];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    return shuffled;
+}
+
+// 지연 함수
+function delay(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// 로그 함수들
+function logError(message, error) {
+    console.error(`❌ ${message}:`, error);
+}
+
+function logSuccess(message) {
+    console.log(`✅ ${message}`);
+}
+
+// 유효성 검사 함수들
+function isValidNumber(value) {
+    return !isNaN(value) && isFinite(value);
+}
+
+function isValidDate(date) {
+    return date instanceof Date && !isNaN(date.getTime());
+}
+
 // 🆕 모든 TTS 파일 정리 (사용자별)
 function cleanupUserTTSFiles(userId) {
     const existingFile = activeTTSFiles.get(userId);
@@ -389,25 +462,67 @@ async function handleTTSCommand(bot, chatId, userId, text) {
     }
 }
 
+// 도움말 생성 함수
+function getHelpMessage() {
+    return `🛠️ **유틸리티 도움말**\n\n` +
+           `**🔊 TTS (음성 변환)**\n` +
+           `• /tts [텍스트] - 텍스트를 음성으로 변환\n` +
+           `• /tts [언어] [텍스트] - 특정 언어로 음성 변환\n` +
+           `• 자동 모드: 유틸리티 메뉴에서 설정\n\n` +
+           `**⏰ 시간 유틸리티**\n` +
+           `• 한국 시간 기준 동작\n` +
+           `• 날짜/시간 포맷팅 지원\n\n` +
+           `**📊 데이터 유틸리티**\n` +
+           `• 숫자 포맷팅\n` +
+           `• 백분율 계산\n` +
+           `• 텍스트 처리\n\n` +
+           `**🌍 지원 언어**\n` +
+           `• 한국어 (ko) • English (en)\n` +
+           `• 日本語 (ja) • 中文 (zh)\n` +
+           `• Español (es) • Français (fr)\n\n` +
+           `모든 기능은 24시간 사용 가능합니다! 🚀`;
+}
+
+// 🆕 메인 유틸리티 핸들러 함수 (중요: 이 함수가 없어서 모듈이 작동하지 않았음)
+async function mainUtilsHandler(bot, msg) {
+    const text = msg.text || '';
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    
+    console.log(`🛠️ 유틸리티 요청: ${text} (사용자: ${userId})`);
+    
+    if (text === '/utils' || text === '/help') {
+        const helpText = getHelpMessage();
+        
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🔊 TTS 설정', callback_data: 'utils_tts_menu' },
+                    { text: '❓ TTS 도움말', callback_data: 'utils_tts_help' }
+                ],
+                [
+                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]
+            ]
+        };
+        
+        await bot.sendMessage(chatId, helpText, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+    } else if (text.startsWith('/tts')) {
+        await handleTTSCommand(bot, chatId, userId, text);
+    } else {
+        // 일반 유틸리티 도움말
+        const helpText = getHelpMessage();
+        await bot.sendMessage(chatId, helpText, { parse_mode: 'Markdown' });
+    }
+}
+
 // 🧹 자동 정리 작업
 setInterval(() => {
     cleanupAllTTSFiles();
 }, 2 * 60 * 1000); // 2분마다 정리
-
-// 프로세스 종료 시 정리
-process.on('exit', () => {
-    cleanupAllTTSFiles();
-});
-
-process.on('SIGINT', () => {
-    cleanupAllTTSFiles();
-    process.exit(0);
-});
-
-process.on('SIGTERM', () => {
-    cleanupAllTTSFiles();
-    process.exit(0);
-});
 
 // 프로세스 종료 시 정리
 process.on('exit', cleanupAllTTSFiles);
@@ -415,13 +530,17 @@ process.on('SIGINT', cleanupAllTTSFiles);
 process.on('SIGTERM', cleanupAllTTSFiles);
 
 // ========================
-// 모듈 내보내기 (통합)
+// 모듈 내보내기 (통합) - 수정됨
 // ========================
 
 module.exports = mainUtilsHandler;
 
 // 추가 함수들을 메인 함수의 속성으로 export
 module.exports.handleTTSCommand = handleTTSCommand;
+module.exports.handleTTSMenu = handleTTSMenu;
+module.exports.handleTTSCallback = handleTTSCallback;
+module.exports.handleAutoTTS = handleAutoTTS;
+module.exports.getTTSMode = getTTSMode;
 module.exports.cleanupUserTTSFiles = cleanupUserTTSFiles;
 module.exports.cleanupAllTTSFiles = cleanupAllTTSFiles;
 module.exports.getHelpMessage = getHelpMessage;
