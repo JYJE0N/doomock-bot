@@ -243,8 +243,9 @@ bot.on('message', async (msg) => {
             case text === '/help':
                 utils(bot, msg);
                 break;
+            // 메시지 핸들러에서
             case text === '/worktime':
-                worktime(bot, msg);
+                worktime(bot, msg); // 기존 그대로 (msg.from 존재)
                 break;
             case text === '/fortune':
                 fortune(bot, msg);
@@ -419,8 +420,13 @@ bot.on('callback_query', async (callbackQuery) => {
                 break;
 
             case 'worktime_menu':
-                worktime(bot, { chat: { id: chatId } });
-                break;
+            // from 정보를 포함해서 전달
+            worktime(bot, { 
+                chat: { id: chatId }, 
+                from: callbackQuery.from, // 사용자 정보 추가
+                text: undefined // 콜백 쿼리는 text가 없음을 명시
+            });
+            break;
 
             case 'timer_menu':
                 bot.sendMessage(chatId, '⏰ 타이머 기능\n\n타이머를 사용하려면:\n/timer 분\n\n예: /timer 25');
