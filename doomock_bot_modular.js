@@ -1359,6 +1359,7 @@ async function handleWeatherBusan(bot, chatId) {
   await safeModuleCall(weather, bot, { chat: { id: chatId }, text: '/weather 부산' }, 'Weather');
 }
 
+// handleWeatherMoreCities 함수의 이어서 작성
 async function handleWeatherMoreCities(bot, chatId) {
   const moreCitiesKeyboard = {
     inline_keyboard: [
@@ -1371,4 +1372,239 @@ async function handleWeatherMoreCities(bot, chatId) {
         { text: "🏝️ 제주", callback_data: "weather_jeju" }
       ],
       [
-        { text: "🌄 수원", callback_data: "weather_s
+        { text: "🌄 수원", callback_data: "weather_suwon" },
+        { text: "🌊 울산", callback_data: "weather_ulsan" }
+      ],
+      [
+        { text: "🔙 날씨 메뉴", callback_data: "weather_menu" }
+      ]
+    ]
+  };
+
+  await sendNewMessage(bot, chatId,
+    "🌍 **더 많은 지역**\n\n원하는 지역을 선택해주세요:",
+    {
+      parse_mode: 'Markdown',
+      reply_markup: moreCitiesKeyboard
+    }
+  );
+}
+
+// 추가 도시들 핸들러
+async function handleWeatherCity(bot, chatId, city) {
+  if (!weather) {
+    await sendNewMessage(bot, chatId, "❌ 날씨 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  await safeModuleCall(weather, bot, { chat: { id: chatId }, text: `/weather ${city}` }, 'Weather');
+}
+
+// ========================================
+// 근무시간 관리 핸들러들
+// ========================================
+
+async function handleWorktimeMenu(bot, chatId, from) {
+  if (!worktime) {
+    await sendNewMessage(bot, chatId, "❌ 근무시간 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  await safeModuleCall(worktime, bot, { chat: { id: chatId }, from: from, text: '/worktime' }, 'Worktime');
+}
+
+// ========================================
+// 인사이트 관리 핸들러들
+// ========================================
+
+async function handleInsightMenu(bot, chatId, from) {
+  await sendNewMessage(bot, chatId,
+    `📊 **${getUserName(from)}님의 마케팅 인사이트**\n\n원하는 기능을 선택해주세요:`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: insightMenuKeyboard
+    }
+  );
+}
+
+async function handleInsightFull(bot, chatId, from) {
+  if (!dustInsights) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight full' }, 'Insight');
+}
+
+async function handleInsightQuick(bot, chatId, from) {
+  if (!dustInsights) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight' }, 'Insight');
+}
+
+async function handleInsightDashboard(bot, chatId, from) {
+  if (!dustInsights) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: '/insight dashboard' }, 'Insight');
+}
+
+// ========================================
+// 유틸리티 관리 핸들러들
+// ========================================
+
+async function handleUtilsMenu(bot, chatId) {
+  await sendNewMessage(bot, chatId,
+    "🛠️ **유틸리티 메뉴**\n\n원하는 기능을 선택해주세요:",
+    {
+      parse_mode: 'Markdown',
+      reply_markup: utilsMenuKeyboard
+    }
+  );
+}
+
+async function handleUtilsTTSHelp(bot, chatId) {
+  await sendNewMessage(bot, chatId,
+    "🔊 **TTS 사용법**\n\n" +
+    "음성으로 변환하고 싶은 텍스트를 입력하세요.\n\n" +
+    "**사용법:**\n" +
+    "• /tts [텍스트]\n\n" +
+    "**예시:**\n" +
+    "• /tts 안녕하세요\n" +
+    "• /tts 오늘 날씨가 좋네요\n\n" +
+    "텍스트를 음성 파일로 변환해드립니다! 🎵",
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }]
+        ]
+      }
+    }
+  );
+}
+
+async function handleUtilsHelp(bot, chatId) {
+  await sendNewMessage(bot, chatId,
+    "🛠️ **유틸리티 도움말**\n\n" +
+    "**🔊 TTS (Text-to-Speech)**\n" +
+    "• /tts [텍스트] - 텍스트를 음성으로 변환\n\n" +
+    "**📱 기타 유틸리티**\n" +
+    "• 더 많은 유틸리티 기능이 추가될 예정입니다!\n\n" +
+    "필요한 기능이 있으면 알려주세요! 💡",
+    {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }]
+        ]
+      }
+    }
+  );
+}
+
+// ========================================
+// 도움말 핸들러
+// ========================================
+
+async function handleHelpMenu(bot, chatId) {
+  const helpText = `
+❓ **두목봇 도움말**
+
+🤖 **주요 기능:**
+• 📝 할일 관리 - 할일 추가/완료/삭제
+• 📅 휴가 관리 - 연차 사용/관리
+• 🔮 운세 - 다양한 운세 정보
+• ⏰ 타이머 - 작업 시간 관리
+• 🔔 리마인더 - 알림 설정
+• 🌤️ 날씨 - 날씨 정보
+• 📊 인사이트 - 마케팅 인사이트
+• 🛠️ 유틸리티 - TTS 등
+
+🎯 **빠른 명령어:**
+• /start - 메인 메뉴
+• /add [할일] - 할일 빠른 추가
+• /help - 도움말
+
+💡 **팁:**
+• 각 메뉴에서 버튼을 눌러 쉽게 사용하세요
+• /cancel 로 언제든 작업을 취소할 수 있습니다
+• 문제가 있으면 /start 로 초기화하세요
+
+🚀 **Railway 클라우드에서 24/7 운영 중!**
+  `;
+
+  await sendNewMessage(bot, chatId, helpText, {
+    parse_mode: 'Markdown',
+    reply_markup: {
+      inline_keyboard: [
+        [{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]
+      ]
+    }
+  });
+}
+
+// ========================================
+// 추가 콜백 핸들러들 (확장된 날씨 도시들)
+// ========================================
+
+// 콜백 쿼리 핸들러에 추가할 케이스들
+const additionalCallbackCases = {
+  // 추가 날씨 도시들
+  "weather_incheon": () => handleWeatherCity(bot, chatId, "인천"),
+  "weather_gwangju": () => handleWeatherCity(bot, chatId, "광주"),
+  "weather_daejeon": () => handleWeatherCity(bot, chatId, "대전"),
+  "weather_jeju": () => handleWeatherCity(bot, chatId, "제주"),
+  "weather_suwon": () => handleWeatherCity(bot, chatId, "수원"),
+  "weather_ulsan": () => handleWeatherCity(bot, chatId, "울산")
+};
+
+// ========================================
+// 프로세스 종료 핸들러
+// ========================================
+
+process.on('SIGINT', () => {
+  rLog("🛑 SIGINT 신호 받음, 봇을 종료합니다...", 'INFO');
+  if (bot) {
+    bot.stopPolling();
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  rLog("🛑 SIGTERM 신호 받음, 봇을 종료합니다...", 'INFO');
+  if (bot) {
+    bot.stopPolling();
+  }
+  process.exit(0);
+});
+
+process.on('uncaughtException', (error) => {
+  rLog(`💥 처리되지 않은 예외: ${error.message}`, 'ERROR');
+  rLog(error.stack, 'ERROR');
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  rLog(`🚫 처리되지 않은 Promise 거부: ${reason}`, 'ERROR');
+  rLog(`Promise: ${promise}`, 'ERROR');
+});
+
+// ========================================
+// 시작 로그
+// ========================================
+
+rLog("🎉 두목봇이 성공적으로 시작되었습니다!", 'SUCCESS');
+rLog(`📱 봇 정보: ${bot.getMe ? '연결됨' : '대기중'}`, 'INFO');
+rLog(`🌍 환경: ${ENV_CHECK.NODE_ENV}`, 'INFO');
+
+// Railway 배포 정보
+if (process.env.RAILWAY_DEPLOYMENT_ID) {
+  rLog(`🚂 Railway 배포 ID: ${process.env.RAILWAY_DEPLOYMENT_ID}`, 'INFO');
+}
+
+rLog("✅ 모든 핸들러가 등록되었습니다. 메시지를 기다리는 중...", 'INFO');
