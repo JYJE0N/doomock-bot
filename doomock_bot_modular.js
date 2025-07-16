@@ -232,7 +232,7 @@ bot.on('message', async (msg) => {
 
         // 일반 명령어 처리
         switch (true) {
-            case text === '/start':
+        case text.startsWith('/start'):
                 userStates.delete(userId); // 상태 초기화
                 bot.sendMessage(chatId, '🤖 두목봇 메인 메뉴\n\n원하는 기능을 선택해주세요:', {
                     reply_markup: mainMenuKeyboard
