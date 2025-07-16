@@ -201,7 +201,7 @@ async function handleTTSCommand(bot, chatId, userId, text) {
         }
 
         if (!actualText.trim()) {
-            bot.sendMessage(chatId, '❌ 변환할 텍스트를 입력해주세요.');
+            bot.sendMessage(chatId, `❌ ${language} 언어로 변환할 텍스트를 입력해주세요.`);
             return;
         }
 
@@ -218,7 +218,11 @@ async function handleTTSCommand(bot, chatId, userId, text) {
             });
 
             // 로딩 메시지 삭제
-            await bot.deleteMessage(chatId, loadingMsg.message_id);
+            try {
+                await bot.deleteMessage(chatId, loadingMsg.message_id);
+            } catch (deleteError) {
+                // 메시지 삭제 실패는 무시 (이미 삭제되었을 수 있음)
+            }
 
             // 5초 후 파일 삭제
             setTimeout(() => {
@@ -226,15 +230,20 @@ async function handleTTSCommand(bot, chatId, userId, text) {
             }, 5000);
 
         } catch (error) {
-            await bot.editMessageText(`❌ ${error.message}`, {
-                chat_id: chatId,
-                message_id: loadingMsg.message_id
-            });
+            try {
+                await bot.editMessageText(`❌ ${error.message}`, {
+                    chat_id: chatId,
+                    message_id: loadingMsg.message_id
+                });
+            } catch (editError) {
+                // 메시지 수정 실패 시 새 메시지 전송
+                bot.sendMessage(chatId, `❌ ${error.message}`);
+            }
         }
 
     } catch (error) {
         logError(error, 'TTS 처리');
-        bot.sendMessage(chatId, '❌ TTS 처리 중 오류가 발생했습니다.');
+        bot.sendMessage(chatId, '❌ TTS 기능을 사용할 수 없습니다. 관리자에게 문의해주세요.');
     }
 }
 
