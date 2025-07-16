@@ -124,6 +124,9 @@ module.exports = function(bot, msg) {
     const scheduleText = workTimeManager.formatSchedule();
     const status = workTimeManager.getWorkStatus();
     
-    bot.sendMessage(chatId, `${scheduleText}\n\n${status.message}`);
+    // 재미있는 메시지 추가
+    const funMessage = '⏰ 돈을 벌면 좋읍니다.\n\n';
+    
+    bot.sendMessage(chatId, `${funMessage}${scheduleText}\n\n${status.message}`);
   }
 };
