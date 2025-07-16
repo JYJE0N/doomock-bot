@@ -16,7 +16,11 @@
     "timer",
     "todo",
     "fortune",
-    "reminder"
+    "reminder",
+    "dust",
+    "air-quality",
+    "marketing",
+    "insights"
   ],
   "author": "JYJE0N",
   "license": "MIT",
