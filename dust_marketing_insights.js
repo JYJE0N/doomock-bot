@@ -1020,147 +1020,52 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
     const userName = getUserName(callbackQuery.from);
     const insightManager = new EnhancedDustMarketingInsights();
 
-    console.log(`📞 강화된 인사이트 콜백 처리: ${data}`);
+    console.log(`📞 통합 콜백 처리: ${data} (사용자: ${userName})`);
 
     try {
-        const dustData = await insightManager.getCurrentAirQuality();
-        const insights = insightManager.generateMarketingInsights(dustData, userName);
-
-        switch (data) {
-            case 'insight_products':
-                const productStrategy = insights.productStrategy;
-                let productMsg = `🎁 **제품 전략**\n\n`;
-                productMsg += `• 주력 상품: ${productStrategy.primaryProduct}\n`;
-                productMsg += `• 전략: ${productStrategy.focus}\n\n`;
-                
-                if (productStrategy.strategy) {
-                    productMsg += `**실행 전략**\n`;
-                    productStrategy.strategy.forEach(strategy => {
-                        productMsg += `• ${strategy}\n`;
-                    });
-                }
-                
-                if (productStrategy.bundling) {
-                    productMsg += `\n**번들링 제안**\n`;
-                    productStrategy.bundling.forEach(bundle => {
-                        productMsg += `• ${bundle}\n`;
-                    });
-                }
-                
-                bot.sendMessage(chatId, productMsg, { parse_mode: 'Markdown' });
-                break;
-
-            case 'insight_pricing':
-                const pricingStrategy = insights.pricingStrategy;
-                let pricingMsg = `💰 **가격 전략**\n\n`;
-                pricingMsg += `• 정책: ${pricingStrategy.strategy}\n`;
-                pricingMsg += `• 근거: ${pricingStrategy.reasoning}\n`;
-                pricingMsg += `• 계절 조정: ${pricingStrategy.seasonalAdjustment}배\n`;
-                pricingMsg += `• 미세먼지 조정: ${pricingStrategy.dustLevelAdjustment}배\n\n`;
-                
-                pricingMsg += `**실행 방안**\n`;
-                pricingStrategy.tactics.forEach(tactic => {
-                    pricingMsg += `• ${tactic}\n`;
-                });
-                
-                bot.sendMessage(chatId, pricingMsg, { parse_mode: 'Markdown' });
-                break;
-
-            case 'insight_inventory':
-                const inventoryStrategy = insights.inventoryStrategy;
-                let inventoryMsg = `📦 **재고 전략**\n\n`;
-                inventoryMsg += `• 재고 수준: ${inventoryStrategy.stockLevel}\n`;
-                inventoryMsg += `• 회전율: ${inventoryStrategy.turnoverRate}\n`;
-                inventoryMsg += `• 총 배수: ${inventoryStrategy.totalMultiplier}배\n`;
-                inventoryMsg += `• 핵심 관리: ${inventoryStrategy.criticalProducts.join(', ')}\n\n`;
-                
-                inventoryMsg += `**실행 전략**\n`;
-                inventoryStrategy.strategy.forEach(strategy => {
-                    inventoryMsg += `• ${strategy}\n`;
-                });
-                
-                bot.sendMessage(chatId, inventoryMsg, { parse_mode: 'Markdown' });
-                break;
-
-            case 'insight_marketing':
-                const marketingStrategy = insights.marketingStrategy;
-                let marketingMsg = `🎯 **마케팅 전략**\n\n`;
-                marketingMsg += `• 전략: ${marketingStrategy.mainStrategy.title}\n`;
-                marketingMsg += `• 포커스: ${marketingStrategy.mainStrategy.focus}\n`;
-                marketingMsg += `• 긴급도: ${marketingStrategy.mainStrategy.urgency}\n\n`;
-                
-                marketingMsg += `**디지털 전략**\n`;
-                marketingStrategy.digitalStrategy.channels.forEach(channel => {
-                    marketingMsg += `• ${channel}\n`;
-                });
-                marketingMsg += `• 예산: ${marketingStrategy.digitalStrategy.budget}\n\n`;
-                
-                marketingMsg += `**오프라인 전략**\n`;
-                marketingStrategy.offlineStrategy.channels.forEach(channel => {
-                    marketingMsg += `• ${channel}\n`;
-                });
-                
-                bot.sendMessage(chatId, marketingMsg, { parse_mode: 'Markdown' });
-                break;
-
-            case 'insight_regional':
-                const regionalStrategy = insights.regionalStrategy;
-                let regionalMsg = `🏙️ **지역별 전략**\n\n`;
-                
-                regionalMsg += `**서울/수도권**\n`;
-                regionalMsg += `• 특성: ${regionalStrategy.seoul.characteristics.join(', ')}\n`;
-                regionalMsg += `• 상품: ${regionalStrategy.seoul.products.join(', ')}\n`;
-                regionalMsg += `• 가격: ${regionalStrategy.seoul.pricing}\n\n`;
-                
-                regionalMsg += `**부산/경남**\n`;
-                regionalMsg += `• 특성: ${regionalStrategy.busan.characteristics.join(', ')}\n`;
-                regionalMsg += `• 상품: ${regionalStrategy.busan.products.join(', ')}\n`;
-                regionalMsg += `• 가격: ${regionalStrategy.busan.pricing}\n\n`;
-                
-                regionalMsg += `**지방 도시**\n`;
-                regionalMsg += `• 특성: ${regionalStrategy.rural.characteristics.join(', ')}\n`;
-                regionalMsg += `• 상품: ${regionalStrategy.rural.products.join(', ')}\n`;
-                regionalMsg += `• 가격: ${regionalStrategy.rural.pricing}\n`;
-                
-                bot.sendMessage(chatId, regionalMsg, { parse_mode: 'Markdown' });
-                break;
-
-            case 'insight_competitor':
-                const competitorStrategy = insights.competitorStrategy;
-                let competitorMsg = `⚔️ **경쟁사 분석**\n\n`;
-                
-                competitorMsg += `**모니터링 포인트**\n`;
-                competitorStrategy.monitoring.forEach(point => {
-                    competitorMsg += `• ${point}\n`;
-                });
-                
-                competitorMsg += `\n**기회 요소**\n`;
-                competitorStrategy.opportunities.forEach(opportunity => {
-                    competitorMsg += `• ${opportunity}\n`;
-                });
-                
-                competitorMsg += `\n**위협 요소**\n`;
-                competitorStrategy.threats.forEach(threat => {
-                    competitorMsg += `• ${threat}\n`;
-                });
-                
-                bot.sendMessage(chatId, competitorMsg, { parse_mode: 'Markdown' });
-                break;
-
-            case 'insight_refresh':
-                bot.sendMessage(chatId, '🔄 최신 데이터로 강화된 인사이트를 새로고침합니다...');
-                setTimeout(() => {
-                    module.exports(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
-                }, 1000);
-                break;
-
-            default:
-                bot.sendMessage(chatId, '⚠️ 알 수 없는 명령어입니다. 다시 시도해주세요.');
-                break;
+        // 인사이트 관련 콜백들은 데이터 필요
+        if (data.startsWith('insight_')) {
+            const dustData = await insightManager.getCurrentAirQuality();
+            const insights = insightManager.generateMarketingInsights(dustData, userName);
+            
+            switch (data) {
+                case 'insight_products':
+                    await handleProductStrategy(bot, chatId, insights);
+                    break;
+                case 'insight_pricing':
+                    await handlePricingStrategy(bot, chatId, insights);
+                    break;
+                case 'insight_inventory':
+                    await handleInventoryStrategy(bot, chatId, insights);
+                    break;
+                case 'insight_marketing':
+                    await handleMarketingStrategy(bot, chatId, insights);
+                    break;
+                case 'insight_regional':
+                    await handleRegionalStrategy(bot, chatId, insights);
+                    break;
+                case 'insight_competitor':
+                    await handleCompetitorStrategy(bot, chatId, insights);
+                    break;
+                case 'insight_refresh':
+                    await handleInsightRefresh(bot, chatId, callbackQuery.from);
+                    break;
+                case 'insight_dashboard':
+                    await module.exports.showRealtimeDashboard(bot, chatId, userName);
+                    break;
+                default:
+                    console.log(`⚠️ 처리되지 않은 인사이트 콜백: ${data}`);
+                    await bot.sendMessage(chatId, '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.');
+                    break;
+            }
+        } else {
+            // 일반 콜백 처리
+            await handleGeneralCallbacks(bot, callbackQuery, data, chatId, userName);
         }
+        
     } catch (error) {
         console.error('❌ 콜백 처리 실패:', error);
-        bot.sendMessage(chatId, `❌ 콜백 처리 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
+        await bot.sendMessage(chatId, `❌ 처리 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
     }
 };
 
@@ -1560,3 +1465,317 @@ module.exports.handleAdditionalCallbacks = async function(bot, callbackQuery) {
             break;
     }
 };
+
+// 제품 전략 콜백 처리
+async function handleProductStrategy(bot, chatId, insights) {
+    const productStrategy = insights.productStrategy;
+    let productMsg = `🎁 **제품 전략**\n\n`;
+    productMsg += `• 주력 상품: ${productStrategy.primaryProduct}\n`;
+    productMsg += `• 전략 포커스: ${productStrategy.focus}\n\n`;
+    
+    if (productStrategy.strategy) {
+        productMsg += `**📋 실행 전략**\n`;
+        productStrategy.strategy.forEach(strategy => {
+            productMsg += `• ${strategy}\n`;
+        });
+        productMsg += `\n`;
+    }
+    
+    if (productStrategy.crossSelling) {
+        productMsg += `**🔄 크로스셀링**\n`;
+        productStrategy.crossSelling.forEach(product => {
+            productMsg += `• ${product}\n`;
+        });
+        productMsg += `\n`;
+    }
+    
+    if (productStrategy.bundling) {
+        productMsg += `**📦 번들링 제안**\n`;
+        productStrategy.bundling.forEach(bundle => {
+            productMsg += `• ${bundle}\n`;
+        });
+    }
+    
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, productMsg, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
+// 가격 전략 콜백 처리
+async function handlePricingStrategy(bot, chatId, insights) {
+    const pricingStrategy = insights.pricingStrategy;
+    let pricingMsg = `💰 **가격 전략**\n\n`;
+    pricingMsg += `• 정책: ${pricingStrategy.strategy}\n`;
+    pricingMsg += `• 근거: ${pricingStrategy.reasoning}\n`;
+    pricingMsg += `• 계절 조정: ${pricingStrategy.seasonalAdjustment}배\n`;
+    pricingMsg += `• 미세먼지 조정: ${pricingStrategy.dustLevelAdjustment}배\n\n`;
+    
+    pricingMsg += `**🎯 실행 방안**\n`;
+    pricingStrategy.tactics.forEach(tactic => {
+        pricingMsg += `• ${tactic}\n`;
+    });
+    
+    if (pricingStrategy.recommendations) {
+        pricingMsg += `\n**💡 추천 사항**\n`;
+        pricingStrategy.recommendations.forEach(rec => {
+            pricingMsg += `• ${rec}\n`;
+        });
+    }
+    
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, pricingMsg, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
+// 재고 전략 콜백 처리
+async function handleInventoryStrategy(bot, chatId, insights) {
+    const inventoryStrategy = insights.inventoryStrategy;
+    let inventoryMsg = `📦 **재고 전략**\n\n`;
+    inventoryMsg += `• 권장 재고 수준: ${inventoryStrategy.stockLevel}\n`;
+    inventoryMsg += `• 예상 회전율: ${inventoryStrategy.turnoverRate}\n`;
+    inventoryMsg += `• 총 수요 배수: ${inventoryStrategy.totalMultiplier}배\n`;
+    inventoryMsg += `• 핵심 관리 상품: ${inventoryStrategy.criticalProducts.join(', ')}\n\n`;
+    
+    inventoryMsg += `**📊 수요 분석**\n`;
+    inventoryMsg += `• 계절 수요: ${inventoryStrategy.seasonalDemand}배\n`;
+    inventoryMsg += `• 미세먼지 수요: ${inventoryStrategy.dustDemand}배\n\n`;
+    
+    inventoryMsg += `**🎯 실행 전략**\n`;
+    inventoryStrategy.strategy.forEach(strategy => {
+        inventoryMsg += `• ${strategy}\n`;
+    });
+    
+    if (inventoryStrategy.riskProducts && inventoryStrategy.riskProducts.length > 0) {
+        inventoryMsg += `\n**⚠️ 위험 상품**\n`;
+        inventoryStrategy.riskProducts.forEach(product => {
+            inventoryMsg += `• ${product}\n`;
+        });
+    }
+    
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, inventoryMsg, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
+// 마케팅 전략 콜백 처리
+async function handleMarketingStrategy(bot, chatId, insights) {
+    const marketingStrategy = insights.marketingStrategy;
+    let marketingMsg = `🎯 **마케팅 전략**\n\n`;
+    marketingMsg += `• 전략명: ${marketingStrategy.mainStrategy.title}\n`;
+    marketingMsg += `• 포커스: ${marketingStrategy.mainStrategy.focus}\n`;
+    marketingMsg += `• 긴급도: ${marketingStrategy.mainStrategy.urgency}\n\n`;
+    
+    marketingMsg += `**📱 디지털 전략**\n`;
+    marketingStrategy.digitalStrategy.channels.forEach(channel => {
+        marketingMsg += `• ${channel}\n`;
+    });
+    marketingMsg += `• 예산 수준: ${marketingStrategy.digitalStrategy.budget}\n\n`;
+    
+    marketingMsg += `**🏪 오프라인 전략**\n`;
+    marketingStrategy.offlineStrategy.channels.forEach(channel => {
+        marketingMsg += `• ${channel}\n`;
+    });
+    marketingMsg += `• 집중 지역: ${marketingStrategy.offlineStrategy.focus}\n\n`;
+    
+    marketingMsg += `**📝 콘텐츠 전략**\n`;
+    marketingStrategy.contentStrategy.types.forEach(type => {
+        marketingMsg += `• ${type}\n`;
+    });
+    
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, marketingMsg, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
+// 지역별 전략 콜백 처리
+async function handleRegionalStrategy(bot, chatId, insights) {
+    const regionalStrategy = insights.regionalStrategy;
+    let regionalMsg = `🏙️ **지역별 전략**\n\n`;
+    
+    regionalMsg += `**🌆 서울/수도권**\n`;
+    regionalMsg += `• 특성: ${regionalStrategy.seoul.characteristics.join(', ')}\n`;
+    regionalMsg += `• 추천 상품: ${regionalStrategy.seoul.products.join(', ')}\n`;
+    regionalMsg += `• 가격 정책: ${regionalStrategy.seoul.pricing}\n`;
+    regionalMsg += `• 주력 채널: ${regionalStrategy.seoul.channels.join(', ')}\n\n`;
+    
+    regionalMsg += `**🌊 부산/경남**\n`;
+    regionalMsg += `• 특성: ${regionalStrategy.busan.characteristics.join(', ')}\n`;
+    regionalMsg += `• 추천 상품: ${regionalStrategy.busan.products.join(', ')}\n`;
+    regionalMsg += `• 가격 정책: ${regionalStrategy.busan.pricing}\n`;
+    regionalMsg += `• 주력 채널: ${regionalStrategy.busan.channels.join(', ')}\n\n`;
+    
+    regionalMsg += `**🏘️ 지방 도시**\n`;
+    regionalMsg += `• 특성: ${regionalStrategy.rural.characteristics.join(', ')}\n`;
+    regionalMsg += `• 추천 상품: ${regionalStrategy.rural.products.join(', ')}\n`;
+    regionalMsg += `• 가격 정책: ${regionalStrategy.rural.pricing}\n`;
+    regionalMsg += `• 주력 채널: ${regionalStrategy.rural.channels.join(', ')}\n\n`;
+    
+    regionalMsg += `**💡 종합 권장사항**\n`;
+    regionalMsg += `• ${regionalStrategy.recommendation}\n`;
+    
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, regionalMsg, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
+// 경쟁사 분석 콜백 처리
+async function handleCompetitorStrategy(bot, chatId, insights) {
+    const competitorStrategy = insights.competitorStrategy;
+    let competitorMsg = `⚔️ **경쟁사 분석**\n\n`;
+    
+    competitorMsg += `**🔍 모니터링 포인트**\n`;
+    competitorStrategy.monitoring.forEach(point => {
+        competitorMsg += `• ${point}\n`;
+    });
+    
+    competitorMsg += `\n**✅ 기회 요소**\n`;
+    competitorStrategy.opportunities.forEach(opportunity => {
+        competitorMsg += `• ${opportunity}\n`;
+    });
+    
+    competitorMsg += `\n**⚠️ 위협 요소**\n`;
+    competitorStrategy.threats.forEach(threat => {
+        competitorMsg += `• ${threat}\n`;
+    });
+    
+    competitorMsg += `\n**🎯 대응 전략**\n`;
+    competitorMsg += `• 경쟁사 재고 부족 시 적극적 마케팅\n`;
+    competitorMsg += `• 차별화 포인트 지속 강화\n`;
+    competitorMsg += `• 가격 경쟁력 유지 및 품질 우위 확보\n`;
+    
+    const keyboard = {
+        inline_keyboard: [
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, competitorMsg, { 
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
+// 인사이트 새로고침 처리
+async function handleInsightRefresh(bot, chatId, from) {
+    await bot.sendMessage(chatId, '🔄 최신 데이터로 강화된 인사이트를 새로고침합니다...');
+    
+    setTimeout(() => {
+        module.exports(bot, { 
+            chat: { id: chatId }, 
+            from: from, 
+            text: '/insight' 
+        });
+    }, 1000);
+}
+
+// 일반 콜백 처리
+async function handleGeneralCallbacks(bot, callbackQuery, data, chatId, userName) {
+    switch (data) {
+        case 'national_refresh':
+            if (module.exports.getNationalStatus) {
+                await module.exports.getNationalStatus(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from 
+                });
+            }
+            break;
+            
+        case 'insight_main':
+            await module.exports(bot, { 
+                chat: { id: chatId }, 
+                from: callbackQuery.from, 
+                text: '/insight' 
+            });
+            break;
+            
+        case 'dashboard_refresh':
+            if (module.exports.showRealtimeDashboard) {
+                await module.exports.showRealtimeDashboard(bot, chatId, userName);
+            }
+            break;
+            
+        case 'main_menu':
+            await showMainMenu(bot, chatId);
+            break;
+            
+        default:
+            console.log(`⚠️ 처리되지 않은 일반 콜백: ${data}`);
+            await bot.sendMessage(chatId, '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.');
+            await showMainMenu(bot, chatId);
+            break;
+    }
+}
+
+// 메인 메뉴 표시
+async function showMainMenu(bot, chatId) {
+    const mainMenuMessage = `🏠 **메인 메뉴**\n\n` +
+                          `**📊 핵심 기능**\n` +
+                          `• 종합 마케팅 인사이트\n` +
+                          `• 실시간 대시보드\n` +
+                          `• 전국 현황 모니터링\n` +
+                          `• 주간 리포트\n\n` +
+                          `**🔥 여름철 특화**\n` +
+                          `• 프리미엄 라이트 마스크 전략\n` +
+                          `• 쿨링 기능 마케팅\n` +
+                          `• 시원한 착용감 어필\n\n` +
+                          `원하시는 기능을 선택해주세요! 🚀`;
+    
+    const mainKeyboard = {
+        inline_keyboard: [
+            [
+                { text: '🎯 종합 인사이트', callback_data: 'insight_main' },
+                { text: '📱 실시간 대시보드', callback_data: 'dashboard_refresh' }
+            ],
+            [
+                { text: '🗺️ 전국 현황', callback_data: 'national_refresh' },
+                { text: '🔥 여름 특화', callback_data: 'summer_special' }
+            ]
+        ]
+    };
+    
+    await bot.sendMessage(chatId, mainMenuMessage, {
+        parse_mode: 'Markdown',
+        reply_markup: mainKeyboard
+    });
+}
