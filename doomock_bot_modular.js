@@ -311,7 +311,26 @@ bot.on('message', async (msg) => {
                 });
                 break;
             case text === '/help':
-                utils(bot, msg);
+                // utils가 함수가 아닐 경우 직접 도움말 메시지 전송
+                bot.sendMessage(chatId, 
+                    '❓ **두목봇 도움말**\n\n' +
+                    '**📱 주요 기능:**\n' +
+                    '• 📝 할일 관리 - 할일 추가/완료/삭제\n' +
+                    '• 📅 휴가 관리 - 연차 현황/사용/설정\n' +
+                    '• ⏰ 타이머 - 작업 시간 측정\n' +
+                    '• 🔔 리마인더 - 알림 설정\n' +
+                    '• 🎯 운세 - 다양한 운세 확인\n' +
+                    '• 🕐 근무시간 - 출퇴근 시간 확인\n\n' +
+                    '**⌨️ 빠른 명령어:**\n' +
+                    '• /start - 메인 메뉴\n' +
+                    '• /add [내용] - 할일 추가\n' +
+                    '• /timer start [작업명] - 타이머 시작\n' +
+                    '• /remind [분] [내용] - 리마인더 설정\n' +
+                    '• /fortune - 오늘의 운세\n' +
+                    '• /worktime - 근무시간 확인\n\n' +
+                    '문의사항이 있으시면 /start 를 입력해서 메뉴를 이용해주세요! 😊',
+                    { parse_mode: 'Markdown' }
+                );
                 break;
             case text === '/worktime':
                 worktime(bot, msg);
@@ -650,7 +669,25 @@ bot.on('callback_query', async (callbackQuery) => {
 
             // 도움말 및 기타
             case 'help_menu':
-                utils(bot, { chat: { id: chatId } });
+                bot.sendMessage(chatId, 
+                    '❓ **두목봇 도움말**\n\n' +
+                    '**📱 주요 기능:**\n' +
+                    '• 📝 할일 관리 - 할일 추가/완료/삭제\n' +
+                    '• 📅 휴가 관리 - 연차 현황/사용/설정\n' +
+                    '• ⏰ 타이머 - 작업 시간 측정\n' +
+                    '• 🔔 리마인더 - 알림 설정\n' +
+                    '• 🎯 운세 - 다양한 운세 확인\n' +
+                    '• 🕐 근무시간 - 출퇴근 시간 확인\n\n' +
+                    '**⌨️ 빠른 명령어:**\n' +
+                    '• /start - 메인 메뉴\n' +
+                    '• /add [내용] - 할일 추가\n' +
+                    '• /timer start [작업명] - 타이머 시작\n' +
+                    '• /remind [분] [내용] - 리마인더 설정\n' +
+                    '• /fortune - 오늘의 운세\n' +
+                    '• /worktime - 근무시간 확인\n\n' +
+                    '문의사항이 있으시면 /start 를 입력해서 메뉴를 이용해주세요! 😊',
+                    { parse_mode: 'Markdown' }
+                );
                 break;
 
             // 리마인더 관련
