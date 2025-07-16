@@ -59,6 +59,20 @@ rLog("선택적 모듈 로드 중...");
 const fortune = safeLoadModule('./fortune');
 const timer = safeLoadModule('./timer');
 const utils = safeLoadModule('./utils');
+let ttsUtils = null;
+
+// TTS 유틸리티 별도 로드
+try {
+    ttsUtils = require('./utils');
+    if (ttsUtils && ttsUtils.handleTTSMenu) {
+        rLog("✅ TTS 유틸리티 로드 성공");
+    } else {
+        rLog("❌ TTS 유틸리티 함수 없음", 'WARN');
+    }
+} catch (error) {
+    rLog(`❌ TTS 유틸리티 로드 실패: ${error.message}`, 'ERROR');
+}
+
 const worktime = safeLoadModule('./worktime');
 const remind = safeLoadModule('./remind');
 const weather = safeLoadModule('./weather');
@@ -344,6 +358,14 @@ bot.on("message", async (msg) => {
       return;
     }
 
+    // 🆕 자동 TTS 처리 (사용자 상태가 없을 때만)
+    if (!userState && ttsUtils && ttsUtils.handleAutoTTS) {
+      const ttsProcessed = await ttsUtils.handleAutoTTS(bot, chatId, userId, text);
+      if (ttsProcessed) {
+        return; // TTS로 처리되었으면 다른 처리 건너뛰기
+      }
+    }
+
     // 사용자 상태별 처리
     if (userState) {
       switch (userState.action) {
@@ -381,7 +403,12 @@ bot.on("message", async (msg) => {
     } else if (text === "/fortune") {
       await safeModuleCall(fortune, bot, msg, 'Fortune');
     } else if (text.startsWith("/tts")) {
-      await safeModuleCall(utils, bot, msg, 'TTS');
+      // 🆕 개선된 TTS 명령어 처리
+      if (ttsUtils && ttsUtils.handleTTSCommand) {
+        await ttsUtils.handleTTSCommand(bot, chatId, userId, text);
+      } else {
+        await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
+      }
     } else if (text.startsWith("/remind")) {
       await safeModuleCall(remind, bot, msg, 'Remind');
     } else if (text.startsWith("/timer")) {
@@ -433,6 +460,16 @@ bot.on("callback_query", async (callbackQuery) => {
         `🤖 안녕하세요 ${getUserName(callbackQuery.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`,
         { reply_markup: createMainMenuKeyboard() }
       );
+      return;
+    }
+
+    // 🆕 TTS 관련 콜백 처리
+    if (data.startsWith('tts_')) {
+      if (ttsUtils && ttsUtils.handleTTSCallback) {
+        await ttsUtils.handleTTSCallback(bot, callbackQuery);
+      } else {
+        await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
+      }
       return;
     }
 
@@ -624,9 +661,16 @@ bot.on("callback_query", async (callbackQuery) => {
         await handleInsightRefresh(bot, chatId, callbackQuery.from);
         break;
 
-      // 유틸리티 관리
+      // 🆕 유틸리티 관리 (TTS 포함)
       case "utils_menu":
-        await handleUtilsMenu(bot, chatId);
+        await handleUtilsMenu(bot, chatId, userId);
+        break;
+      case "utils_tts_menu":
+        if (ttsUtils && ttsUtils.handleTTSMenu) {
+          await ttsUtils.handleTTSMenu(bot, chatId, userId);
+        } else {
+          await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
+        }
         break;
       case "utils_tts_help":
         await handleUtilsTTSHelp(bot, chatId);
@@ -1638,55 +1682,133 @@ async function handleInsightDashboard(bot, chatId, from) {
 // 유틸리티 관리 핸들러들
 // ========================================
 
-async function handleUtilsMenu(bot, chatId) {
-  await sendNewMessage(bot, chatId,
-    "🛠️ **유틸리티 메뉴**\n\n원하는 기능을 선택해주세요:",
-    {
-      parse_mode: 'Markdown',
-      reply_markup: utilsMenuKeyboard
-    }
-  );
+async function handleUtilsMenu(bot, chatId, userId) {
+  const ttsMode = ttsUtils ? ttsUtils.getTTSMode(userId) : { active: false, language: 'ko' };
+  
+  const utilsText = `🛠️ **유틸리티 메뉴**\n\n` +
+                   `**🔊 TTS (음성 변환)**\n` +
+                   `• 현재 상태: ${ttsMode.active ? '🔊 ON' : '🔇 OFF'}\n` +
+                   `• 언어: ${getLanguageName(ttsMode.language)}\n\n` +
+                   `**📱 사용 방법**\n` +
+                   `• TTS 모드 ON → 채팅창에 텍스트 입력\n` +
+                   `• 자동으로 음성 변환됨\n\n` +
+                   `원하는 기능을 선택해주세요:`;
+  
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '🔊 TTS 설정', callback_data: 'utils_tts_menu' },
+        { text: '❓ TTS 도움말', callback_data: 'utils_tts_help' }
+      ],
+      [
+        { text: '🛠️ 전체 도움말', callback_data: 'utils_help' },
+        { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+      ]
+    ]
+  };
+  
+  await sendNewMessage(bot, chatId, utilsText, {
+    parse_mode: 'Markdown',
+    reply_markup: keyboard
+  });
 }
 
+// 5. TTS 도움말 핸들러 수정
 async function handleUtilsTTSHelp(bot, chatId) {
-  await sendNewMessage(bot, chatId,
-    "🔊 **TTS 사용법**\n\n" +
-    "음성으로 변환하고 싶은 텍스트를 입력하세요.\n\n" +
-    "**사용법:**\n" +
-    "• /tts [텍스트]\n\n" +
-    "**예시:**\n" +
-    "• /tts 안녕하세요\n" +
-    "• /tts 오늘 날씨가 좋네요\n\n" +
-    "텍스트를 음성 파일로 변환해드립니다! 🎵",
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }]
-        ]
-      }
-    }
-  );
+  const helpText = `🔊 **TTS 도움말**\n\n` +
+                  `**🎯 두 가지 사용 방법**\n\n` +
+                  `**1️⃣ 자동 모드 (추천)**\n` +
+                  `• 🛠️ 유틸리티 → 🔊 TTS 설정\n` +
+                  `• TTS 모드를 ON으로 설정\n` +
+                  `• 채팅창에 텍스트 입력\n` +
+                  `• 자동으로 음성 변환! 🎵\n\n` +
+                  `**2️⃣ 수동 모드**\n` +
+                  `• /tts [텍스트] 명령어 사용\n` +
+                  `• 예: /tts 안녕하세요\n\n` +
+                  `**🌍 지원 언어**\n` +
+                  `• 한국어, English, 日本語\n` +
+                  `• 中文, Español, Français\n\n` +
+                  `**💡 특징**\n` +
+                  `• 최대 500자까지 지원\n` +
+                  `• 이전 음성 파일 자동 삭제\n` +
+                  `• 자연스러운 음성 합성\n` +
+                  `• 실시간 언어 변경 가능\n\n` +
+                  `**🔧 사용 팁**\n` +
+                  `• 명령어는 자동 변환 안됨\n` +
+                  `• 너무 짧은 텍스트는 건너뜀\n` +
+                  `• 언어별 최적화된 발음\n\n` +
+                  `지금 바로 TTS 설정을 해보세요! 🚀`;
+  
+  const keyboard = {
+    inline_keyboard: [
+      [
+        { text: '🔊 TTS 설정하기', callback_data: 'utils_tts_menu' },
+        { text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }
+      ]
+    ]
+  };
+  
+  await sendNewMessage(bot, chatId, helpText, {
+    parse_mode: 'Markdown',
+    reply_markup: keyboard
+  });
 }
 
-async function handleUtilsHelp(bot, chatId) {
-  await sendNewMessage(bot, chatId,
-    "🛠️ **유틸리티 도움말**\n\n" +
-    "**🔊 TTS (Text-to-Speech)**\n" +
-    "• /tts [텍스트] - 텍스트를 음성으로 변환\n\n" +
-    "**📱 기타 유틸리티**\n" +
-    "• 더 많은 유틸리티 기능이 추가될 예정입니다!\n\n" +
-    "필요한 기능이 있으면 알려주세요! 💡",
-    {
-      parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }]
-        ]
-      }
-    }
-  );
+// 6. 언어 이름 반환 함수
+function getLanguageName(langCode) {
+  const languages = {
+    'ko': '🇰🇷 한국어',
+    'en': '🇺🇸 English',
+    'ja': '🇯🇵 日本語',
+    'zh': '🇨🇳 中文',
+    'es': '🇪🇸 Español',
+    'fr': '🇫🇷 Français'
+  };
+  return languages[langCode] || langCode;
 }
+
+// 7. 새로운 TTS 명령어 추가
+bot.onText(/\/tts_mode/, async (msg) => {
+  const chatId = msg.chat.id;
+  const userId = msg.from.id;
+  
+  if (ttsUtils && ttsUtils.handleTTSMenu) {
+    await ttsUtils.handleTTSMenu(bot, chatId, userId);
+  } else {
+    await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
+  }
+});
+
+// 8. 봇 종료 시 TTS 파일 정리
+process.on('SIGINT', () => {
+  rLog("🛑 SIGINT 신호 받음, 봇을 종료합니다...", 'INFO');
+  
+  // TTS 파일 정리
+  if (ttsUtils && ttsUtils.cleanupAllTTSFiles) {
+    ttsUtils.cleanupAllTTSFiles();
+  }
+  
+  if (bot) {
+    bot.stopPolling();
+  }
+  process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+  rLog("🛑 SIGTERM 신호 받음, 봇을 종료합니다...", 'INFO');
+  
+  // TTS 파일 정리
+  if (ttsUtils && ttsUtils.cleanupAllTTSFiles) {
+    ttsUtils.cleanupAllTTSFiles();
+  }
+  
+  if (bot) {
+    bot.stopPolling();
+  }
+  process.exit(0);
+});
+
+rLog("✅ 개선된 TTS 시스템 초기화 완료", 'SUCCESS');
 
 // ========================================
 // 도움말 핸들러
