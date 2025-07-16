@@ -28,6 +28,7 @@ const utils = require('./utils');
 const worktime = require('./worktime');
 const remind = require('./remind');
 const MonthlyLeave = require('./monthly_leave');
+const weather = require('./weather');
 const { getUserName, formatUserInfo } = require('./username_helper');
 
 // 연차 관리 인스턴스 생성
@@ -46,6 +47,7 @@ bot.setMyCommands([
     { command: 'add', description: '➕ 할일 추가하기 (/add 할일내용)' },
     { command: 'tts', description: '🔊 텍스트를 음성으로 변환 (/tts 안녕하세요)' },
     { command: 'remind', description: '🔔 리마인더 설정하기 (/remind 30 독서하기)' },
+    { command: 'weather', description: '🌤️ 날씨 정보 확인' },
     { command: 'cancel', description: '❌ 진행중인 작업 취소' }
 ]).then(() => {
     console.log('✅ 명령어가 Telegram에 등록되었습니다.');
@@ -83,10 +85,13 @@ const mainMenuKeyboard = {
         ],
         [
             { text: '🕐 근무시간', callback_data: 'worktime_menu' },
-            { text: '🔔 리마인더', callback_data: 'reminder_menu' }
+            { text: '🌤️ 날씨', callback_data: 'weather_menu' } // ← 추가
         ],
         [
-            { text: '🛠️ 유틸리티', callback_data: 'utils_menu' },
+            { text: '🔔 리마인더', callback_data: 'reminder_menu' },
+            { text: '🛠️ 유틸리티', callback_data: 'utils_menu' }
+        ],
+        [
             { text: '❓ 도움말', callback_data: 'help_menu' }
         ]
     ]
@@ -375,6 +380,10 @@ bot.on('message', async (msg) => {
         } else if (text.startsWith('/timer')) {
             userStates.delete(userId); // 상태 초기화
             timer(bot, msg);
+            //날씨
+        } else if (text.startsWith('/weather') || text.startsWith('/날씨')) {
+            userStates.delete(userId);
+            weather(bot, msg);
         } else if (text.startsWith('/add ')) {
             userStates.delete(userId); // 상태 초기화
             const taskText = text.replace('/add ', '');
