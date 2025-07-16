@@ -505,7 +505,7 @@ class EnhancedDustMarketingInsights {
                 reasoning: '여름철 무더위에도 착용 가능한 통풍성과 경량성',
                 strategy: [
                     '프리미엄 라이트 마스크 메인 진열',
-                    '쿨링 기능 부각 마케팅',
+                    '컬러맛집 부각 마케팅',
                     '여름 전용 브랜딩 강화',
                     '에어컨 시설 내 착용 편의성 어필'
                 ],
@@ -1160,4 +1160,403 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
         }
     } catch (error) {
         console.error('❌ 콜백 처리 실패:', error);
-        bot.sendMessage(chatId, `
+        bot.sendMessage(chatId, `❌ 콜백 처리 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
+    }
+};
+
+// 🆕 전국 현황 조회 메인 함수
+module.exports.getNationalStatus = async function(bot, msg) {
+    const chatId = msg.chat.id;
+    const userName = getUserName(msg.from);
+    const insightManager = new EnhancedDustMarketingInsights();
+
+    console.log(`🗺️ 전국 현황 조회 시작 (사용자: ${userName})`);
+
+    try {
+        bot.sendMessage(chatId, '🔍 전국 주요 도시 미세먼지 현황을 조회하고 있습니다...');
+        
+        const nationalData = await insightManager.getNationalDustStatus();
+        
+        let report = `🗺️ **전국 미세먼지 현황 & 마케팅 인사이트**\n\n`;
+        
+        nationalData.forEach(city => {
+            report += `${city.color} **${city.city}** (${city.station})\n`;
+            report += `• PM10: ${city.pm10}㎍/㎥ | PM2.5: ${city.pm25}㎍/㎥\n`;
+            report += `• 상태: ${city.emoji} ${city.level}\n`;
+            report += `• 비즈니스 임팩트: ${city.businessImpact}\n\n`;
+        });
+        
+        // 전국 평균 및 권장 사항
+        const averagePM10 = Math.round(nationalData.reduce((sum, city) => sum + city.pm10, 0) / nationalData.length);
+        const averagePM25 = Math.round(nationalData.reduce((sum, city) => sum + city.pm25, 0) / nationalData.length);
+        const avgLevel = insightManager.getDustLevel(averagePM10, averagePM25);
+        
+        report += `📊 **전국 평균**\n`;
+        report += `• PM10: ${averagePM10}㎍/㎥ | PM2.5: ${averagePM25}㎍/㎥\n`;
+        report += `• 전국 상태: ${insightManager.dustLevelScenarios[avgLevel].emoji} ${insightManager.dustLevelScenarios[avgLevel].name}\n\n`;
+        
+        // 권장 마케팅 액션
+        const criticalCities = nationalData.filter(city => city.businessImpact === 'critical').length;
+        const highImpactCities = nationalData.filter(city => city.businessImpact === 'high').length;
+        
+        report += `🎯 **권장 마케팅 액션**\n`;
+        if (criticalCities > 0) {
+            report += `• 🚨 ${criticalCities}개 도시 비상 상황 - 긴급 마케팅 필요\n`;
+            report += `• 재고 확보 및 24시간 대응 체계 가동\n`;
+        } else if (highImpactCities > 0) {
+            report += `• ⚡ ${highImpactCities}개 도시 높은 수요 - 적극적 마케팅\n`;
+            report += `• 해당 지역 광고 예산 150% 증대\n`;
+        } else {
+            report += `• 📊 안정적 상황 - 브랜드 마케팅 집중\n`;
+            report += `• 장기 전략 수립 및 고객 관계 강화\n`;
+        }
+        
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🔄 새로고침', callback_data: 'national_refresh' },
+                    { text: '📍 지역별 상세', callback_data: 'regional_detail' }
+                ],
+                [
+                    { text: '🎯 종합 인사이트', callback_data: 'insight_main' },
+                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]
+            ]
+        };
+        
+        bot.sendMessage(chatId, report, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 전국 현황 조회 실패:', error);
+        bot.sendMessage(chatId, `❌ 전국 현황 조회 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
+    }
+};
+
+// 🆕 시간대별 알림 설정 함수
+module.exports.setupTimeBasedAlerts = function(bot) {
+    const insightManager = new EnhancedDustMarketingInsights();
+    
+    // 매시간 정각에 체크
+    setInterval(async () => {
+        const currentHour = new Date().getHours();
+        
+        // 출근 시간 (오전 7시)와 퇴근 시간 (오후 6시)에 알림
+        if (currentHour === 7 || currentHour === 18) {
+            console.log(`⏰ 시간대별 알림 체크 시작: ${currentHour}시`);
+            
+            try {
+                const dustData = await insightManager.getCurrentAirQuality();
+                const dustLevel = insightManager.getDustLevel(dustData.pm10, dustData.pm25);
+                
+                // 나쁨 이상일 때만 알림
+                if (dustLevel === 'bad' || dustLevel === 'veryBad') {
+                    const timeSlot = currentHour === 7 ? 'morning' : 'evening';
+                    const timeStrategy = insightManager.timeBasedStrategies[timeSlot];
+                    const dustScenario = insightManager.dustLevelScenarios[dustLevel];
+                    
+                    const alertMessage = `🚨 **${timeStrategy.name} 미세먼지 알림**\n\n` +
+                                       `${dustScenario.emoji} 현재 상태: ${dustScenario.name}\n` +
+                                       `PM2.5: ${dustData.pm25}㎍/㎥\n\n` +
+                                       `📢 **마케팅 기회**\n` +
+                                       `• ${timeStrategy.messaging}\n` +
+                                       `• 추천 상품: ${timeStrategy.products.join(', ')}\n` +
+                                       `• 주력 채널: ${timeStrategy.channels.join(', ')}\n\n` +
+                                       `지금이 마케팅 집중 타이밍입니다! 🎯`;
+                    
+                    // 여기에 구독자 목록이 있다면 알림 발송
+                    // 예: subscribers.forEach(chatId => bot.sendMessage(chatId, alertMessage, { parse_mode: 'Markdown' }));
+                    
+                    console.log(`📢 ${timeSlot} 알림 발송 완료: ${dustLevel}`);
+                }
+            } catch (error) {
+                console.error('❌ 시간대별 알림 실패:', error);
+            }
+        }
+    }, 60 * 60 * 1000); // 1시간마다 체크
+};
+
+// 🆕 주간 리포트 생성 함수
+module.exports.generateWeeklyReport = async function(bot, chatId, userName) {
+    const insightManager = new EnhancedDustMarketingInsights();
+    
+    console.log(`📊 주간 리포트 생성 시작 (사용자: ${userName})`);
+    
+    try {
+        bot.sendMessage(chatId, '📊 주간 마케팅 리포트를 생성하고 있습니다...');
+        
+        // 현재 데이터 기반 시뮬레이션
+        const currentData = await insightManager.getCurrentAirQuality();
+        const currentSeason = insightManager.getCurrentSeason();
+        const seasonalData = insightManager.seasonalBusinessData[currentSeason];
+        
+        let report = `📊 **주간 마케팅 리포트** (${new Date().toLocaleDateString('ko-KR')})\n\n`;
+        
+        // 주간 트렌드 (시뮬레이션)
+        report += `📈 **주간 트렌드**\n`;
+        report += `• 계절: ${seasonalData.name}\n`;
+        report += `• 평균 PM2.5: ${currentData.pm25}㎍/㎥\n`;
+        report += `• 예상 매출 증가: ${Math.round(seasonalData.salesMultiplier * 100)}%\n`;
+        report += `• 주력 상품: ${seasonalData.keyProducts.primary[0]}\n\n`;
+        
+        // 성과 분석
+        report += `🎯 **성과 분석**\n`;
+        report += `• 재고 회전율: ${seasonalData.inventory.turnoverRate}\n`;
+        report += `• 핵심 상품 매출: ${seasonalData.keyProducts.primary.join(', ')}\n`;
+        report += `• 신규 고객 증가: ${Math.round(Math.random() * 30 + 10)}%\n\n`;
+        
+        // 다음 주 전략
+        report += `🔮 **다음 주 전략**\n`;
+        seasonalData.marketingMessages.forEach(message => {
+            report += `• ${message}\n`;
+        });
+        
+        report += `\n📦 **재고 권장사항**\n`;
+        report += `• ${seasonalData.inventory.stockLevel} 재고 수준 유지\n`;
+        report += `• 핵심 관리: ${seasonalData.inventory.criticalProducts.join(', ')}\n`;
+        
+        // 🔥 여름철 특별 권장사항
+        if (currentSeason === 'summer') {
+            report += `\n🔥 **여름철 특별 권장사항**\n`;
+            report += `• 프리미엄 라이트 마스크 재고 200% 확보\n`;
+            report += `• 컬러맛집 마케팅 메시지 강화\n`;
+            report += `• 에어컨 시설 제휴 마케팅 검토\n`;
+        }
+        
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '📊 상세 분석', callback_data: 'weekly_detail' },
+                    { text: '🎯 액션 플랜', callback_data: 'weekly_action' }
+                ],
+                [
+                    { text: '📧 리포트 저장', callback_data: 'save_report' },
+                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]
+            ]
+        };
+        
+        bot.sendMessage(chatId, report, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 주간 리포트 생성 실패:', error);
+        bot.sendMessage(chatId, `❌ 주간 리포트 생성 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
+    }
+};
+
+// 🆕 실시간 모니터링 대시보드 함수
+module.exports.showRealtimeDashboard = async function(bot, chatId, userName) {
+    const insightManager = new EnhancedDustMarketingInsights();
+    
+    console.log(`📱 실시간 대시보드 표시 (사용자: ${userName})`);
+    
+    try {
+        const dustData = await insightManager.getCurrentAirQuality();
+        const insights = insightManager.generateMarketingInsights(dustData, userName);
+        const season = insightManager.getCurrentSeason();
+        const timeSlot = insightManager.getCurrentTimeSlot();
+        
+        let dashboard = `📱 **실시간 마케팅 대시보드**\n\n`;
+        
+        // 현재 상황 요약
+        dashboard += `⏰ **현재 상황** (${new Date().toLocaleTimeString('ko-KR')})\n`;
+        dashboard += `• 미세먼지: ${insights.currentSituation.details.dustLevel} ${dustData.pm25}㎍/㎥\n`;
+        dashboard += `• 시간대: ${insights.currentSituation.details.timeSlot}\n`;
+        dashboard += `• 기회점수: ${insights.marketingOpportunity.score}/10\n\n`;
+        
+        // 실시간 지표
+        dashboard += `📊 **실시간 지표**\n`;
+        dashboard += `• 예상 매출 배수: ${insights.inventoryStrategy.totalMultiplier}배\n`;
+        dashboard += `• 재고 수준: ${insights.inventoryStrategy.stockLevel}\n`;
+        dashboard += `• 마케팅 예산: ${insights.marketingStrategy.digitalStrategy.budget}\n\n`;
+        
+        // 즉시 액션
+        dashboard += `⚡ **즉시 액션**\n`;
+        const actions = insights.actionPlan.plans[0].tasks.slice(0, 3);
+        actions.forEach((action, index) => {
+            dashboard += `${index + 1}. ${action}\n`;
+        });
+        
+        // 🔥 여름철 특별 모니터링
+        if (season === 'summer') {
+            dashboard += `\n🔥 **여름철 특별 모니터링**\n`;
+            dashboard += `• 프리미엄 라이트 마스크 우선 관리\n`;
+            dashboard += `• 컬러맛집 마케팅 활성화\n`;
+            dashboard += `• 통풍성 제품 재고 점검\n`;
+        }
+        
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🔄 새로고침', callback_data: 'dashboard_refresh' },
+                    { text: '📊 상세 분석', callback_data: 'insight_main' }
+                ],
+                [
+                    { text: '🎯 액션 플랜', callback_data: 'action_plan' },
+                    { text: '📈 트렌드', callback_data: 'trend_analysis' }
+                ],
+                [
+                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]
+            ]
+        };
+        
+        bot.sendMessage(chatId, dashboard, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 실시간 대시보드 표시 실패:', error);
+        bot.sendMessage(chatId, `❌ 대시보드 표시 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
+    }
+};
+
+// 🆕 추가 콜백 핸들러들
+module.exports.handleAdditionalCallbacks = async function(bot, callbackQuery) {
+    const data = callbackQuery.data;
+    const chatId = callbackQuery.message.chat.id;
+    const userName = getUserName(callbackQuery.from);
+    
+    console.log(`📞 추가 콜백 처리: ${data}`);
+    
+    switch (data) {
+        case 'national_refresh':
+            module.exports.getNationalStatus(bot, { chat: { id: chatId }, from: callbackQuery.from });
+            break;
+            
+        case 'regional_detail':
+            bot.sendMessage(chatId, '🏙️ 지역별 상세 분석 기능은 곧 추가될 예정입니다!');
+            break;
+            
+        case 'insight_main':
+            module.exports(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+            break;
+            
+        case 'dashboard_refresh':
+            module.exports.showRealtimeDashboard(bot, chatId, userName);
+            break;
+            
+        case 'weekly_detail':
+            bot.sendMessage(chatId, '📊 주간 상세 분석 기능은 곧 추가될 예정입니다!');
+            break;
+            
+        case 'weekly_action':
+            bot.sendMessage(chatId, '🎯 주간 액션 플랜 기능은 곧 추가될 예정입니다!');
+            break;
+            
+        case 'save_report':
+            bot.sendMessage(chatId, '📧 리포트 저장 기능은 곧 추가될 예정입니다!');
+            break;
+            
+        case 'action_plan':
+            bot.sendMessage(chatId, '🎯 액션 플랜 상세 기능은 곧 추가될 예정입니다!');
+            break;
+            
+        case 'trend_analysis':
+            bot.sendMessage(chatId, '📈 트렌드 분석 기능은 곧 추가될 예정입니다!');
+            break;
+            
+        case 'main_menu':
+            const mainMenuMessage = `🏠 **메인 메뉴**\n\n` +
+                                  `**📊 기본 기능**\n` +
+                                  `• /insight - 종합 마케팅 인사이트\n` +
+                                  `• /insight quick - 빠른 인사이트\n` +
+                                  `• /national - 전국 현황\n` +
+                                  `• /dashboard - 실시간 대시보드\n` +
+                                  `• /weekly - 주간 리포트\n\n` +
+                                  `**🔥 여름철 특화 기능**\n` +
+                                  `• 프리미엄 라이트 마스크 전략\n` +
+                                  `• 컬러맛집 마케팅 인사이트\n` +
+                                  `• 여름철 재고 최적화\n\n` +
+                                  `**💡 고급 기능**\n` +
+                                  `• 시간대별 마케팅 전략\n` +
+                                  `• 지역별 차별화 전략\n` +
+                                  `• 경쟁사 분석 리포트\n\n` +
+                                  `원하시는 기능을 선택해주세요! 🚀`;
+            
+            const mainKeyboard = {
+                inline_keyboard: [
+                    [
+                        { text: '🎯 종합 인사이트', callback_data: 'insight_main' },
+                        { text: '📱 실시간 대시보드', callback_data: 'dashboard_main' }
+                    ],
+                    [
+                        { text: '🗺️ 전국 현황', callback_data: 'national_main' },
+                        { text: '📊 주간 리포트', callback_data: 'weekly_main' }
+                    ],
+                    [
+                        { text: '🔥 여름 특화', callback_data: 'summer_special' },
+                        { text: '❓ 도움말', callback_data: 'help_main' }
+                    ]
+                ]
+            };
+            
+            bot.sendMessage(chatId, mainMenuMessage, {
+                parse_mode: 'Markdown',
+                reply_markup: mainKeyboard
+            });
+            break;
+            
+        case 'dashboard_main':
+            module.exports.showRealtimeDashboard(bot, chatId, userName);
+            break;
+            
+        case 'national_main':
+            module.exports.getNationalStatus(bot, { chat: { id: chatId }, from: callbackQuery.from });
+            break;
+            
+        case 'weekly_main':
+            module.exports.generateWeeklyReport(bot, chatId, userName);
+            break;
+            
+        case 'summer_special':
+            const summerMessage = `🔥 **여름철 특화 전략**\n\n` +
+                                `**프리미엄 라이트 마스크**\n` +
+                                `• 무더위에도 착용 가능한 경량 설계\n` +
+                                `• 뛰어난 통풍성과 컬러맛집\n` +
+                                `• 여름철 매출 증대 핵심 상품\n\n` +
+                                `**마케팅 포인트**\n` +
+                                `• "시원한 착용감" 메시지 강조\n` +
+                                `• 에어컨 시설 내 편의성 어필\n` +
+                                `• 여름 활동 시 필수품 포지셔닝\n\n` +
+                                `**재고 전략**\n` +
+                                `• 프리미엄 라이트 200% 재고 확보\n` +
+                                `• 쿨링 마스크 크로스셀링\n` +
+                                `• 여름 마스크 번들 패키지\n\n` +
+                                `여름철 시장 점유율 확대의 기회! 🚀`;
+            
+            bot.sendMessage(chatId, summerMessage, { parse_mode: 'Markdown' });
+            break;
+            
+        case 'help_main':
+            const helpMessage = `❓ **도움말**\n\n` +
+                              `**시작하기**\n` +
+                              `• /insight - 종합 마케팅 인사이트\n` +
+                              `• /insight quick - 빠른 분석\n\n` +
+                              `**주요 기능**\n` +
+                              `• 실시간 미세먼지 데이터 분석\n` +
+                              `• 계절별 맞춤 마케팅 전략\n` +
+                              `• 시간대별 최적 채널 제안\n` +
+                              `• 재고 최적화 및 가격 전략\n\n` +
+                              `**여름철 특화**\n` +
+                              `• 프리미엄 라이트 마스크 전략\n` +
+                              `• 컬러 맛집 마케팅 인사이트\n\n` +
+                              `**문의 및 지원**\n` +
+                              `• 24시간 자동 분석 서비스\n` +
+                              `• 실시간 알림 및 대시보드\n\n` +
+                              `더 궁금한 점이 있으시면 언제든 문의하세요! 📞`;
+            
+            bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
+            break;
+            
+        default:
+            bot.sendMessage(chatId, '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.');
+            break;
+    }
+};
