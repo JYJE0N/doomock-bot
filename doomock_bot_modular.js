@@ -192,7 +192,8 @@ const timerMenuKeyboard = {
     ]
 };
 
-// 메인 메시지 핸들러
+// 메시지 핸들러 수정 - default 케이스 문제 해결
+
 bot.on('message', async (msg) => {
     const text = msg.text;
     if (!text) return;  // 🛡️ 텍스트 없는 메시지 방어
@@ -236,23 +237,25 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // TTS 관련 상태 처리
+        // TTS 관련 상태 처리 (수정됨)
         if (userState && userState.action === 'tts_input') {
             try {
                 const language = userState.language || 'ko';
+                userStates.delete(userId); // 상태 먼저 삭제
+                
                 if (typeof utils.handleTTSCommand === 'function') {
                     utils.handleTTSCommand(bot, chatId, userId, `/tts ${language} ${text}`);
                 } else {
                     bot.sendMessage(chatId, `📝 TTS 요청: "${text}" (${language})\n⚠️ TTS 패키지가 설치되지 않았습니다.`);
                 }
-                userStates.delete(userId);
             } catch (error) {
                 console.error('TTS 처리 오류:', error);
                 bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, TTS 처리 중 오류가 발생했습니다.`);
-                userStates.delete(userId);
             }
             return;
         }
+
+        // 리마인더 상태 처리
         if (userState && userState.action === 'remind_minutes') {
             try {
                 remind(bot, { chat: { id: chatId }, text: `/remind ${text}` });
@@ -260,6 +263,7 @@ bot.on('message', async (msg) => {
             } catch (error) {
                 console.error('리마인더 설정 오류:', error);
                 bot.sendMessage(chatId, '❌ 리마인더 설정 중 오류가 발생했습니다.');
+                userStates.delete(userId);
             }
             return;
         }
@@ -271,9 +275,12 @@ bot.on('message', async (msg) => {
             } catch (error) {
                 console.error('리마인더 설정 오류:', error);
                 bot.sendMessage(chatId, '❌ 리마인더 설정 중 오류가 발생했습니다.');
+                userStates.delete(userId);
             }
             return;
         }
+
+        // 타이머 상태 처리
         if (userState && userState.action === 'timer_start') {
             try {
                 timer(bot, { chat: { id: chatId }, text: `/timer start ${text}` });
@@ -281,6 +288,7 @@ bot.on('message', async (msg) => {
             } catch (error) {
                 console.error('타이머 시작 오류:', error);
                 bot.sendMessage(chatId, '❌ 타이머 시작 중 오류가 발생했습니다.');
+                userStates.delete(userId);
             }
             return;
         }
@@ -344,110 +352,78 @@ bot.on('message', async (msg) => {
         }
 
         // 일반 명령어 처리
-        switch (true) {
-            case text.startsWith('/start'):
-                userStates.delete(userId); // 상태 초기화
-                bot.sendMessage(chatId, `🤖 안녕하세요 ${getUserName(msg.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`, {
-                    reply_markup: mainMenuKeyboard
-                });
-                break;
-            case text === '/help':
-                utils(bot, msg);
-                break;
-            case text === '/worktime':
-                worktime(bot, msg);
-                break;
-            case text === '/fortune':
-                fortune(bot, msg);
-                break;
-            case text.startsWith('/tts'):
-                utils(bot, msg);
-                break;
-            case text.startsWith('/remind'):
-                remind(bot, msg);
-                break;
-            case text.startsWith('/timer'):
-                timer(bot, msg);
-                break;
-            case text.startsWith('/add '):
-                const taskText = text.replace('/add ', '');
-                if (taskText.trim()) {
-                    try {
-                        const success = await todoFunctions.addTodo(userId, taskText);
-                        if (success) {
-                            bot.sendMessage(chatId, 
-                                `✅ ${getUserName(msg.from)}님, 할일이 추가되었습니다!\n\n📝 "${taskText}"`, 
-                                { 
-                                    reply_markup: { 
-                                        inline_keyboard: [[{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }]] 
-                                    }
+        if (text.startsWith('/start')) {
+            userStates.delete(userId); // 상태 초기화
+            bot.sendMessage(chatId, `🤖 안녕하세요 ${getUserName(msg.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`, {
+                reply_markup: mainMenuKeyboard
+            });
+        } else if (text === '/help') {
+            userStates.delete(userId); // 상태 초기화
+            utils(bot, msg);
+        } else if (text === '/worktime') {
+            userStates.delete(userId); // 상태 초기화
+            worktime(bot, msg);
+        } else if (text === '/fortune') {
+            userStates.delete(userId); // 상태 초기화
+            fortune(bot, msg);
+        } else if (text.startsWith('/tts')) {
+            userStates.delete(userId); // 상태 초기화
+            utils(bot, msg);
+        } else if (text.startsWith('/remind')) {
+            userStates.delete(userId); // 상태 초기화
+            remind(bot, msg);
+        } else if (text.startsWith('/timer')) {
+            userStates.delete(userId); // 상태 초기화
+            timer(bot, msg);
+        } else if (text.startsWith('/add ')) {
+            userStates.delete(userId); // 상태 초기화
+            const taskText = text.replace('/add ', '');
+            if (taskText.trim()) {
+                try {
+                    const success = await todoFunctions.addTodo(userId, taskText);
+                    if (success) {
+                        bot.sendMessage(chatId, 
+                            `✅ ${getUserName(msg.from)}님, 할일이 추가되었습니다!\n\n📝 "${taskText}"`, 
+                            { 
+                                reply_markup: { 
+                                    inline_keyboard: [[{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }]] 
                                 }
-                            );
-                        } else {
-                            bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, 할일 추가 중 오류가 발생했습니다.`);
-                        }
-                    } catch (error) {
-                        console.error('할일 추가 오류:', error);
-                        bot.sendMessage(chatId, '❌ 할일 추가 중 오류가 발생했습니다.');
+                            }
+                        );
+                    } else {
+                        bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, 할일 추가 중 오류가 발생했습니다.`);
                     }
-                } else {
-                    bot.sendMessage(chatId, `📝 ${getUserName(msg.from)}님, 할일 내용을 입력해주세요.\n예: /add 회의 준비하기`);
+                } catch (error) {
+                    console.error('할일 추가 오류:', error);
+                    bot.sendMessage(chatId, '❌ 할일 추가 중 오류가 발생했습니다.');
                 }
-                break;
-            default:
-            case 'cancel_action':
-                const currentState = userStates.get(userId);
+            } else {
+                bot.sendMessage(chatId, `📝 ${getUserName(msg.from)}님, 할일 내용을 입력해주세요.\n예: /add 회의 준비하기`);
+            }
+        } else {
+            // 일반 텍스트 처리 (수정된 부분)
+            if (userState) {
+                // 알 수 없는 상태라면 상태를 초기화하고 안내
+                console.log(`알 수 없는 사용자 상태: ${userState.action}`);
                 userStates.delete(userId);
-                
-                let cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 작업이 취소되었습니다.`;
-                let backButton = 'main_menu';
-                
-                if (currentState) {
-                    switch (currentState.action) {
-                        case 'adding_todo':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 할일 추가가 취소되었습니다.`;
-                            backButton = 'todo_menu';
-                            break;
-                        case 'using_leave':
-                        case 'setting_total_leave':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 연차 설정이 취소되었습니다.`;
-                            backButton = 'leave_menu';
-                            break;
-                        case 'timer_start':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 타이머 시작이 취소되었습니다.`;
-                            backButton = 'timer_menu';
-                            break;
-                        case 'tts_input':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, TTS 변환이 취소되었습니다.`;
-                            backButton = 'utils_menu';
-                            break;
-                        case 'remind_minutes':
-                        case 'remind_time':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 리마인더 설정이 취소되었습니다.`;
-                            backButton = 'reminder_menu';
-                            break;
-                    }
-                }
-                
-                bot.sendMessage(chatId, cancelMessage, {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '🔙 돌아가기', callback_data: backButton }]
-                        ]
-                    }
-                });
-                break;
-                // 명령어가 아닌 일반 텍스트는 무시
-                if (text.startsWith('/')) {
-                    bot.sendMessage(chatId, `😅 ${getUserName(msg.from)}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`);
-                }
-                break;
+                bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, 진행 중이던 작업이 취소되었습니다. /start 를 입력해서 다시 시작해주세요.`);
+            } else if (text.startsWith('/')) {
+                // 알 수 없는 명령어
+                bot.sendMessage(chatId, `😅 ${getUserName(msg.from)}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`);
+            }
+            // 일반 텍스트는 무시 (응답하지 않음)
         }
+        
     } catch (error) {
         console.error('메시지 처리 오류:', error);
-        bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다.');
+        userStates.delete(userId); // 오류 시 상태 초기화
+        bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요.');
     }
 });
+
+// 추가: 봇 재시작 시 모든 사용자 상태 초기화
+console.log('🔄 봇 시작 시 사용자 상태 초기화...');
+userStates.clear();
 
 // 콜백 쿼리 핸들러
 bot.on('callback_query', async (callbackQuery) => {
