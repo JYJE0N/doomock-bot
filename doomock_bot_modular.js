@@ -38,7 +38,7 @@ const leaveManager = new MonthlyLeave();
 // 사용자 상태 관리 (메모리 기반)
 const userStates = new Map();
 
-//setCommands 및 BotMenu 세팅
+// 명령어 설정
 bot.setMyCommands([
     { command: 'start', description: '📱 메인 메뉴 보기' },
     { command: 'help', description: '❓ 도움말 보기' },
@@ -49,13 +49,13 @@ bot.setMyCommands([
     { command: 'tts', description: '🔊 텍스트를 음성으로 변환 (/tts 안녕하세요)' },
     { command: 'remind', description: '🔔 리마인더 설정하기 (/remind 30 독서하기)' },
     { command: 'weather', description: '🌤️ 날씨 정보 확인' },
-    { command: 'insight', description: '📊 마케팅 인사이트 확인' },  // 🆕 추가
+    { command: 'insight', description: '📊 마케팅 인사이트 확인' },
     { command: 'cancel', description: '❌ 진행중인 작업 취소' }
 ]).then(() => {
     console.log('✅ 명령어가 Telegram에 등록되었습니다.');
 }).catch(console.error);
 
-// Bot Menu 설정 (안전한 방법으로 시도)
+// Bot Menu 설정
 try {
     if (typeof bot.setMyMenuButton === 'function') {
         bot.setMyMenuButton({
@@ -74,7 +74,7 @@ try {
     console.log('⚠️ Bot Menu 설정을 건너뜁니다:', error.message);
 }
 
-// 메인 메뉴 키보드
+// 키보드 정의
 const mainMenuKeyboard = {
     inline_keyboard: [
         [
@@ -90,7 +90,7 @@ const mainMenuKeyboard = {
             { text: '🌤️ 날씨', callback_data: 'weather_menu' }
         ],
         [
-            { text: '📊 마케팅 인사이트', callback_data: 'insight_menu' },  // 🆕 추가
+            { text: '📊 마케팅 인사이트', callback_data: 'insight_menu' },
             { text: '🔔 리마인더', callback_data: 'reminder_menu' }
         ],
         [
@@ -100,7 +100,6 @@ const mainMenuKeyboard = {
     ]
 };
 
-// 휴가 관리 메뉴
 const leaveMenuKeyboard = {
     inline_keyboard: [
         [
@@ -117,7 +116,6 @@ const leaveMenuKeyboard = {
     ]
 };
 
-// 할일 관리 메뉴
 const todoMenuKeyboard = {
     inline_keyboard: [
         [
@@ -137,7 +135,6 @@ const todoMenuKeyboard = {
     ]
 };
 
-// 운세 메뉴 키보드
 const fortuneMenuKeyboard = {
     inline_keyboard: [
         [
@@ -165,7 +162,6 @@ const fortuneMenuKeyboard = {
     ]
 };
 
-// 리마인더 메뉴 키보드
 const reminderMenuKeyboard = {
     inline_keyboard: [
         [
@@ -180,6 +176,7 @@ const reminderMenuKeyboard = {
         ]
     ]
 };
+
 const timerMenuKeyboard = {
     inline_keyboard: [
         [
@@ -200,7 +197,6 @@ const timerMenuKeyboard = {
     ]
 };
 
-// ===== 인사이트 메뉴 키보드 추가 =====
 const insightMenuKeyboard = {
     inline_keyboard: [
         [
@@ -225,20 +221,7 @@ const insightMenuKeyboard = {
     ]
 };
 
-// 에러 복구용 안전한 키보드
-const safeInsightKeyboard = {
-    inline_keyboard: [
-        [
-            { text: '📊 기본 인사이트', callback_data: 'insight_full' },
-            { text: '🔄 새로고침', callback_data: 'insight_refresh' }
-        ],
-        [
-            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-        ]
-    ]
-};
-
-// 핸들 인사이트 콜백 함수 정의
+// 인사이트 콜백 핸들러
 async function handleInsightCallback(bot, callbackQuery, data) {
     const chatId = callbackQuery.message.chat.id;
     const messageId = callbackQuery.message.message_id;
@@ -268,11 +251,16 @@ async function handleInsightCallback(bot, callbackQuery, data) {
                 });
                 
                 setTimeout(() => {
-                    dustInsights(bot, { 
-                        chat: { id: chatId }, 
-                        from: callbackQuery.from, 
-                        text: '/insight' 
-                    });
+                    try {
+                        dustInsights(bot, { 
+                            chat: { id: chatId }, 
+                            from: callbackQuery.from, 
+                            text: '/insight' 
+                        });
+                    } catch (error) {
+                        console.error('인사이트 생성 실패:', error);
+                        bot.sendMessage(chatId, `❌ 인사이트 생성 실패: ${error.message}`);
+                    }
                 }, 1000);
                 break;
 
@@ -287,50 +275,103 @@ async function handleInsightCallback(bot, callbackQuery, data) {
                         if (dustInsights && dustInsights.showRealtimeDashboard) {
                             await dustInsights.showRealtimeDashboard(bot, chatId, userName);
                         } else {
-                            await bot.sendMessage(chatId, '📱 대시보드 기능을 준비 중입니다...');
+                            bot.sendMessage(chatId, '📱 대시보드 기능을 준비 중입니다...');
                         }
                     } catch (error) {
                         console.error('대시보드 로딩 실패:', error);
-                        await bot.sendMessage(chatId, `❌ 대시보드 로딩 실패: ${error.message}`);
+                        bot.sendMessage(chatId, `❌ 대시보드 로딩 실패: ${error.message}`);
                     }
                 }, 1000);
                 break;
 
+            case 'insight_quick':
+                await bot.editMessageText('⚡ 빠른 인사이트 생성 중...', {
+                    chat_id: chatId,
+                    message_id: messageId
+                });
+                
+                setTimeout(() => {
+                    dustInsights(bot, { 
+                        chat: { id: chatId }, 
+                        from: callbackQuery.from, 
+                        text: '/insight quick' 
+                    });
+                }, 1000);
+                break;
+
+            case 'insight_refresh':
+                await bot.editMessageText('🔄 데이터 새로고침 중...', {
+                    chat_id: chatId,
+                    message_id: messageId
+                });
+                
+                setTimeout(() => {
+                    dustInsights(bot, { 
+                        chat: { id: chatId }, 
+                        from: callbackQuery.from, 
+                        text: '/insight' 
+                    });
+                }, 1500);
+                break;
+
+            case 'insight_inventory':
+                await bot.sendMessage(chatId, '📦 재고 전략 기능을 준비 중입니다...');
+                break;
+
+            case 'insight_marketing':
+                await bot.sendMessage(chatId, '🎯 마케팅 전략 기능을 준비 중입니다...');
+                break;
+
+            case 'insight_content':
+                await bot.sendMessage(chatId, '📝 콘텐츠 전략 기능을 준비 중입니다...');
+                break;
+
+            case 'insight_risk':
+                await bot.sendMessage(chatId, '⚠️ 리스크 분석 기능을 준비 중입니다...');
+                break;
+
             default:
                 console.log(`❓ 알 수 없는 인사이트 콜백: ${data}`);
-                await bot.sendMessage(chatId, '❌ 알 수 없는 인사이트 명령어입니다.');
+                await bot.sendMessage(chatId, 
+                    `❌ **알 수 없는 명령어**\n\n` +
+                    `"${data}" 명령어를 처리할 수 없습니다.`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [[
+                                { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                            ]]
+                        }
+                    }
+                );
                 break;
-        } // ✅ switch 문 제대로 닫힘
-        
+        }
     } catch (error) {
         console.error(`❌ 인사이트 콜백 처리 실패 (${data}):`, error);
-        await bot.sendMessage(chatId, `❌ 처리 중 오류 발생: ${error.message}`);
-    }
-} // ✅ 함수 제대로 닫힘
         
-        // 에러 발생 시 안전한 메뉴로 복구
         await bot.sendMessage(chatId, 
             `❌ **처리 중 오류 발생**\n\n` +
             `기능: ${data}\n` +
-            `오류: ${error.message}\n\n` +
-            `잠시 후 다시 시도해주세요.`,
+            `오류: ${error.message}`,
             {
                 parse_mode: 'Markdown',
-                reply_markup: safeInsightKeyboard
+                reply_markup: {
+                    inline_keyboard: [[
+                        { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                    ]]
+                }
             }
         );
     }
 }
 
-// 메시지 핸들러 수정 - default 케이스 문제 해결
+// 메시지 핸들러
 bot.on('message', async (msg) => {
     const text = msg.text;
-    if (!text) return;  // 🛡️ 텍스트 없는 메시지 방어
+    if (!text) return;
 
     const chatId = msg.chat.id;
     const userId = msg.from.id;
-
-    // 사용자 상태 확인
     const userState = userStates.get(userId);
 
     try {
@@ -341,7 +382,7 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // 할일 관리 상태 처리
+        // 상태별 처리
         if (userState && userState.action === 'adding_todo') {
             try {
                 const success = await todoFunctions.addTodo(userId, text);
@@ -366,155 +407,38 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // TTS 관련 상태 처리 (수정됨)
-        if (userState && userState.action === 'tts_input') {
-            try {
-                const language = userState.language || 'ko';
-                userStates.delete(userId); // 상태 먼저 삭제
-                
-                if (typeof utils.handleTTSCommand === 'function') {
-                    utils.handleTTSCommand(bot, chatId, userId, `/tts ${language} ${text}`);
-                } else {
-                    bot.sendMessage(chatId, `📝 TTS 요청: "${text}" (${language})\n⚠️ TTS 패키지가 설치되지 않았습니다.`);
-                }
-            } catch (error) {
-                console.error('TTS 처리 오류:', error);
-                bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, TTS 처리 중 오류가 발생했습니다.`);
-            }
-            return;
-        }
-
-        // 리마인더 상태 처리
-        if (userState && userState.action === 'remind_minutes') {
-            try {
-                remind(bot, { chat: { id: chatId }, text: `/remind ${text}` });
-                userStates.delete(userId);
-            } catch (error) {
-                console.error('리마인더 설정 오류:', error);
-                bot.sendMessage(chatId, '❌ 리마인더 설정 중 오류가 발생했습니다.');
-                userStates.delete(userId);
-            }
-            return;
-        }
-
-        if (userState && userState.action === 'remind_time') {
-            try {
-                remind(bot, { chat: { id: chatId }, text: `/remind ${text}` });
-                userStates.delete(userId);
-            } catch (error) {
-                console.error('리마인더 설정 오류:', error);
-                bot.sendMessage(chatId, '❌ 리마인더 설정 중 오류가 발생했습니다.');
-                userStates.delete(userId);
-            }
-            return;
-        }
-
-        // 타이머 상태 처리
-        if (userState && userState.action === 'timer_start') {
-            try {
-                timer(bot, { chat: { id: chatId }, text: `/timer start ${text}` });
-                userStates.delete(userId);
-            } catch (error) {
-                console.error('타이머 시작 오류:', error);
-                bot.sendMessage(chatId, '❌ 타이머 시작 중 오류가 발생했습니다.');
-                userStates.delete(userId);
-            }
-            return;
-        }
-
-        // 연차 관리 상태 처리
-        if (userState && userState.action === 'setting_total_leave') {
-            const totalLeaves = parseInt(text);
-            if (isNaN(totalLeaves) || totalLeaves <= 0 || totalLeaves > 50) {
-                bot.sendMessage(chatId, '❌ 올바른 연차 일수를 입력해주세요. (1-50일)');
-                return;
-            }
-
-            try {
-                const result = await leaveManager.setTotalLeaves(userId, totalLeaves);
-                bot.sendMessage(chatId, 
-                    `✅ 연차가 설정되었습니다!\n\n` +
-                    `📅 총 연차: ${result.totalLeaves}일\n` +
-                    `⏳ 남은 연차: ${result.remainingLeaves}일`, 
-                    { 
-                        reply_markup: { 
-                            inline_keyboard: [[{ text: '🔙 휴가 메뉴', callback_data: 'leave_menu' }]] 
-                        }
-                    }
-                );
-                userStates.delete(userId);
-            } catch (error) {
-                console.error('연차 설정 오류:', error);
-                bot.sendMessage(chatId, '❌ 연차 설정 중 오류가 발생했습니다.');
-                userStates.delete(userId);
-            }
-            return;
-        }
-
-        if (userState && userState.action === 'using_leave') {
-            const days = parseFloat(text);
-            if (isNaN(days) || (days !== 0.5 && days !== 1 && days !== parseInt(days)) || days <= 0 || days > 20) {
-                bot.sendMessage(chatId, '❌ 올바른 연차 일수를 입력해주세요.\n예: 1 (하루), 0.5 (반차), 2 (이틀)');
-                return;
-            }
-
-            try {
-                const result = await leaveManager.useLeave(userId, days, '사용자 입력');
-                bot.sendMessage(chatId, 
-                    `✅ 연차가 사용되었습니다!\n\n` +
-                    `🏖️ 사용한 연차: ${days}일\n` +
-                    `📊 총 사용: ${result.usedLeaves}일\n` +
-                    `⏳ 남은 연차: ${result.remainingLeaves}일`, 
-                    { 
-                        reply_markup: { 
-                            inline_keyboard: [[{ text: '🔙 휴가 메뉴', callback_data: 'leave_menu' }]] 
-                        }
-                    }
-                );
-                userStates.delete(userId);
-            } catch (error) {
-                console.error('연차 사용 오류:', error);
-                bot.sendMessage(chatId, `❌ ${error.message}`);
-                userStates.delete(userId);
-            }
-            return;
-        }
-
         // 일반 명령어 처리
         if (text.startsWith('/start')) {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             bot.sendMessage(chatId, `🤖 안녕하세요 ${getUserName(msg.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`, {
                 reply_markup: mainMenuKeyboard
             });
         } else if (text === '/help') {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             utils(bot, msg);
         } else if (text === '/worktime') {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             worktime(bot, msg);
         } else if (text === '/fortune') {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             fortune(bot, msg);
         } else if (text.startsWith('/tts')) {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             utils(bot, msg);
         } else if (text.startsWith('/remind')) {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             remind(bot, msg);
         } else if (text.startsWith('/timer')) {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             timer(bot, msg);
-            //날씨
         } else if (text.startsWith('/weather') || text.startsWith('/날씨')) {
             userStates.delete(userId);
             weather(bot, msg);
-        //인사이트
-        } else if (text.startsWith('/insight') || text.startsWith('/인사이트')) {  // 🆕 추가
+        } else if (text.startsWith('/insight') || text.startsWith('/인사이트')) {
             userStates.delete(userId);
             dustInsights(bot, msg);
-        //할 일
         } else if (text.startsWith('/add ')) {
-            userStates.delete(userId); // 상태 초기화
+            userStates.delete(userId);
             const taskText = text.replace('/add ', '');
             if (taskText.trim()) {
                 try {
@@ -539,35 +463,24 @@ bot.on('message', async (msg) => {
                 bot.sendMessage(chatId, `📝 ${getUserName(msg.from)}님, 할일 내용을 입력해주세요.\n예: /add 회의 준비하기`);
             }
         } else {
-            // 일반 텍스트 처리 (수정된 부분)
+            // 일반 텍스트 처리
             if (userState) {
-                // 알 수 없는 상태라면 상태를 초기화하고 안내
                 console.log(`알 수 없는 사용자 상태: ${userState.action}`);
                 userStates.delete(userId);
                 bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, 진행 중이던 작업이 취소되었습니다. /start 를 입력해서 다시 시작해주세요.`);
             } else if (text.startsWith('/')) {
-                // 알 수 없는 명령어
                 bot.sendMessage(chatId, `😅 ${getUserName(msg.from)}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`);
             }
-            // 일반 텍스트는 무시 (응답하지 않음)
         }
         
     } catch (error) {
         console.error('메시지 처리 오류:', error);
-        userStates.delete(userId); // 오류 시 상태 초기화
+        userStates.delete(userId);
         bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요.');
     }
 });
 
-// 추가: 봇 재시작 시 모든 사용자 상태 초기화
-console.log('🔄 봇 시작 시 사용자 상태 초기화...');
-userStates.clear();
-
-// 콜백 쿼리 핸들러 수정 - 함수명 오타 수정
-
-// 완전한 콜백 쿼리 핸들러 - 모든 케이스 포함
-// 1. 콜백 쿼리 핸들러 수정 (기존 코드의 문제점 해결)
-// ✅ 올바른 수정 버전
+// 콜백 쿼리 핸들러 (수정된 버전)
 bot.on('callback_query', async (callbackQuery) => {
     const message = callbackQuery.message;
     const data = callbackQuery.data;
@@ -587,7 +500,7 @@ bot.on('callback_query', async (callbackQuery) => {
         // 인사이트 관련 콜백 처리
         if (data.startsWith('insight_')) {
             await handleInsightCallback(bot, callbackQuery, data);
-            return; // 다른 처리 방지
+            return;
         }
 
         // 메인 switch 문
@@ -600,14 +513,6 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            case 'leave_menu':
-                await bot.editMessageText(`📅 ${getUserName(callbackQuery.from)}님의 휴가 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: leaveMenuKeyboard
-                });
-                break;
-
             case 'todo_menu':
                 await bot.editMessageText(`📝 ${getUserName(callbackQuery.from)}님의 할일 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
                     chat_id: chatId,
@@ -616,7 +521,6 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            // 할일 관련 케이스들
             case 'todo_list':
                 try {
                     const todos = await todoFunctions.getTodos(userId);
@@ -630,8 +534,42 @@ bot.on('callback_query', async (callbackQuery) => {
                             }
                         });
                     } else {
-                        // 할일 목록 표시 로직
-                        // ... 기존 코드 ...
+                        // 할일 목록 표시
+                        const pendingTodos = todos.filter(todo => !todo.done);
+                        const completedTodos = todos.filter(todo => todo.done);
+                        
+                        let todoText = `📋 **${getUserName(callbackQuery.from)}님의 할일 관리**\n\n`;
+                        
+                        if (pendingTodos.length > 0) {
+                            todoText += `🟢 **진행 중** (${pendingTodos.length}개)\n`;
+                            pendingTodos.forEach((todo) => {
+                                todoText += `☐ ${todo.task}\n`;
+                            });
+                            todoText += '\n';
+                        }
+                        
+                        if (completedTodos.length > 0) {
+                            todoText += `📌 **완료** (${completedTodos.length}개)\n`;
+                            completedTodos.forEach((todo) => {
+                                todoText += `📌 ~~${todo.task}~~\n`;
+                            });
+                            todoText += '\n';
+                        }
+                        
+                        const todoButtons = [];
+                        todos.forEach((todo, index) => {
+                            todoButtons.push([
+                                { text: `${todo.done ? '↩️' : '✅'} ${index + 1}`, callback_data: `todo_toggle_${index}` },
+                                { text: `🗑️ ${index + 1}`, callback_data: `todo_delete_${index}` }
+                            ]);
+                        });
+                        
+                        todoButtons.push([{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]);
+                        
+                        await bot.sendMessage(chatId, todoText, {
+                            parse_mode: 'Markdown',
+                            reply_markup: { inline_keyboard: todoButtons }
+                        });
                     }
                 } catch (error) {
                     console.error('할일 목록 조회 오류:', error);
@@ -639,11 +577,124 @@ bot.on('callback_query', async (callbackQuery) => {
                 }
                 break;
 
-            // 기타 케이스들...
-            case 'cancel_action':
-                const currentState = userStates.get(userId);
-                userStates.delete(userId);
+            case 'todo_add':
+                userStates.set(userId, { action: 'adding_todo' });
+                await bot.sendMessage(chatId, '📝 **할일 추가하기**\n\n추가할 할일을 입력해주세요.', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
+                });
+                break;
+
+            case 'fortune_menu':
+                await bot.editMessageText('🔮 운세 메뉴\n\n원하는 운세를 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: fortuneMenuKeyboard
+                });
+                break;
+
+            case 'fortune_general':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune' });
+                break;
+
+            case 'weather_menu':
+                const weatherMenuKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🏡 현재날씨(화성)', callback_data: 'weather_current' },
+                            { text: '⏰ 시간별 예보', callback_data: 'weather_forecast' }
+                        ],
+                        [
+                            { text: '🏡 동탄', callback_data: 'weather_hwaseong' },
+                            { text: '🏙️ 서울', callback_data: 'weather_seoul' }
+                        ],
+                        [
+                            { text: '🌊 부산', callback_data: 'weather_busan' },
+                            { text: '📍 더 많은 지역', callback_data: 'weather_more_cities' }
+                        ],
+                        [
+                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                        ]
+                    ]
+                };
                 
+                await bot.editMessageText('🌤️ **날씨 정보 메뉴**\n\n원하는 지역을 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    parse_mode: 'Markdown',
+                    reply_markup: weatherMenuKeyboard
+                });
+                break;
+
+            case 'weather_current':
+                weather(bot, { chat: { id: chatId }, text: '/weather' });
+                break;
+
+            case 'weather_hwaseong':
+                weather(bot, { chat: { id: chatId }, text: '/weather 화성' });
+                break;
+
+            case 'weather_seoul':
+                weather(bot, { chat: { id: chatId }, text: '/weather 서울' });
+                break;
+
+            case 'weather_busan':
+                weather(bot, { chat: { id: chatId }, text: '/weather 부산' });
+                break;
+
+            case 'weather_more_cities':
+                const moreCitiesKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🌆 인천', callback_data: 'weather_incheon' },
+                            { text: '🌄 광주', callback_data: 'weather_gwangju' }
+                        ],
+                        [
+                            { text: '🏛️ 대전', callback_data: 'weather_daejeon' },
+                            { text: '🏝️ 제주', callback_data: 'weather_jeju' }
+                        ],
+                        [
+                            { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
+                        ]
+                    ]
+                };
+
+                await bot.sendMessage(chatId, '🗺️ **전체 지역**\n\n원하는 지역을 선택해주세요:', {
+                    parse_mode: 'Markdown',
+                    reply_markup: moreCitiesKeyboard
+                });
+                break;
+
+            case 'weather_incheon':
+                weather(bot, { chat: { id: chatId }, text: '/weather 인천' });
+                break;
+
+            case 'weather_gwangju':
+                weather(bot, { chat: { id: chatId }, text: '/weather 광주' });
+                break;
+
+            case 'weather_daejeon':
+                weather(bot, { chat: { id: chatId }, text: '/weather 대전' });
+                break;
+
+            case 'weather_jeju':
+                weather(bot, { chat: { id: chatId }, text: '/weather 제주' });
+                break;
+
+            case 'worktime_menu':
+                worktime(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from,
+                    text: undefined
+                });
+                break;
+
+            case 'cancel_action':
+                userStates.delete(userId);
                 await bot.sendMessage(chatId, `❌ ${getUserName(callbackQuery.from)}님, 작업이 취소되었습니다.`, {
                     reply_markup: {
                         inline_keyboard: [
@@ -684,885 +735,39 @@ bot.on('callback_query', async (callbackQuery) => {
                     await bot.sendMessage(chatId, `❌ 알 수 없는 명령입니다. /start 를 입력해서 메뉴를 다시 확인해주세요.`);
                 }
                 break;
-        } // ✅ switch 문 제대로 닫힘
+        }
         
     } catch (error) {
         console.error('콜백 처리 오류:', error);
         await bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다.');
     }
-}); // ✅ 함수 제대로 닫힘
-
-            // ===== 휴가 관리 관련 =====
-            case 'leave_menu':
-                bot.editMessageText(`📅 ${getUserName(callbackQuery.from)}님의 휴가 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: leaveMenuKeyboard
-                });
-                break;
-
-            case 'leave_status':
-                const user = await leaveManager.getUserLeaves(userId);
-                const status = leaveManager.formatLeaveStatus(user);
-                bot.sendMessage(chatId, status, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 휴가 메뉴', callback_data: 'leave_menu' }]] }
-                });
-                break;
-
-            case 'leave_history':
-                const history = await leaveManager.getLeaveHistory(userId);
-                const historyText = leaveManager.formatLeaveHistory(history);
-                bot.sendMessage(chatId, historyText, { 
-                    parse_mode: 'Markdown',
-                    reply_markup: { inline_keyboard: [[{ text: '🔙 휴가 메뉴', callback_data: 'leave_menu' }]] }
-                });
-                break;
-
-            case 'use_leave':
-                userStates.set(userId, { action: 'using_leave' });
-                bot.sendMessage(chatId, '🏖️ **연차 사용하기**\n\n사용할 연차 일수를 입력해주세요.\n예: 1 (하루), 0.5 (반차)', {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                        ]
-                    }
-                });
-                break;
-
-            case 'set_leave':
-                userStates.set(userId, { action: 'setting_total_leave' });
-                bot.sendMessage(chatId, '⚙️ **연차 설정하기**\n\n총 연차 일수를 입력해주세요.\n예: 15', {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                        ]
-                    }
-                });
-                break;
-
-            // ===== 할일 관리 관련 =====
-            case 'todo_menu':
-                bot.editMessageText(`📝 ${getUserName(callbackQuery.from)}님의 할일 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: todoMenuKeyboard
-                });
-                break;
-
-            // doomock_bot_modular.js의 할일 목록 표시 개선
-
-case 'todo_list':
-    try {
-        const todos = await todoFunctions.getTodos(userId);
-        if (todos.length === 0) {
-            bot.sendMessage(chatId, `📝 ${getUserName(callbackQuery.from)}님의 할일이 없습니다.\n\n새로운 할일을 추가해보세요!`, {
-                reply_markup: { 
-                    inline_keyboard: [
-                        [{ text: '➕ 할일 추가', callback_data: 'todo_add' }],
-                        [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                    ]
-                }
-            });
-        } else {
-            // 🆕 완료/미완료 분리
-            const pendingTodos = todos.filter(todo => !todo.done);
-            const completedTodos = todos.filter(todo => todo.done);
-            
-            let todoText = `📋 **${getUserName(callbackQuery.from)}님의 할일 관리**\n\n`;
-            
-            // 진행 중인 할일
-            if (pendingTodos.length > 0) {
-                todoText += `🟢 **진행 중** (${pendingTodos.length}개)\n`;
-                pendingTodos.forEach((todo, index) => {
-                    const originalIndex = todos.findIndex(t => t._id === todo._id);
-                    todoText += `☐ ${todo.task}\n`;
-                });
-                todoText += '\n';
-            }
-            
-            // 완료된 할일
-            if (completedTodos.length > 0) {
-                todoText += `📌 **완료** (${completedTodos.length}개)\n`;
-                completedTodos.forEach((todo, index) => {
-                    const originalIndex = todos.findIndex(t => t._id === todo._id);
-                    todoText += `📌 ~~${todo.task}~~\n`;
-                });
-                todoText += '\n';
-            }
-            
-            // 버튼 생성 (원래 순서 유지)
-            const todoButtons = [];
-            todos.forEach((todo, index) => {
-                todoButtons.push([
-                    { text: `${todo.done ? '↩️' : '✅'} ${index + 1}`, callback_data: `todo_toggle_${index}` },
-                    { text: `🗑️ ${index + 1}`, callback_data: `todo_delete_${index}` }
-                ]);
-            });
-            
-            todoButtons.push([{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]);
-            
-            bot.sendMessage(chatId, todoText, {
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: todoButtons }
-            });
-        }
-    } catch (error) {
-        console.error('할일 목록 조회 오류:', error);
-        bot.sendMessage(chatId, '❌ 할일 목록을 불러오는 중 오류가 발생했습니다.');
-    }
-    break;
-
-            case 'todo_add':
-                userStates.set(userId, { action: 'adding_todo' });
-                bot.sendMessage(chatId, '📝 **할일 추가하기**\n\n추가할 할일을 입력해주세요.', {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                        ]
-                    }
-                });
-                break;
-
-            case 'todo_stats':
-                try {
-                    const stats = await todoFunctions.getTodoStats(userId);
-                    const statsText = `📊 **할일 통계**\n\n` +
-                                     `📝 전체 할일: ${stats.total}개\n` +
-                                     `✅ 완료: ${stats.completed}개\n` +
-                                     `⏳ 미완료: ${stats.pending}개\n` +
-                                     `📈 완료율: ${stats.completionRate}%\n\n` +
-                                     `${stats.completionRate >= 80 ? '🎉 훌륭해요!' : 
-                                       stats.completionRate >= 50 ? '💪 좋은 진전이에요!' : 
-                                       '🔥 화이팅!'}`
-                    
-                    bot.sendMessage(chatId, statsText, {
-                        parse_mode: 'Markdown',
-                        reply_markup: { 
-                            inline_keyboard: [[{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]] 
-                        }
-                    });
-                } catch (error) {
-                    console.error('할일 통계 조회 오류:', error);
-                    bot.sendMessage(chatId, '❌ 통계를 불러오는 중 오류가 발생했습니다.');
-                }
-                break;
-
-            case 'todo_clear_completed':
-                try {
-                    const success = await todoFunctions.clearCompletedTodos(userId);
-                    if (success) {
-                        bot.sendMessage(chatId, '🗑️ 완료된 할일들이 삭제되었습니다!', {
-                            reply_markup: { 
-                                inline_keyboard: [
-                                    [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
-                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                                ]
-                            }
-                        });
-                    } else {
-                        bot.sendMessage(chatId, '❌ 완료된 할일 삭제 중 오류가 발생했습니다.');
-                    }
-                } catch (error) {
-                    console.error('완료된 할일 삭제 오류:', error);
-                    bot.sendMessage(chatId, '❌ 삭제 중 오류가 발생했습니다.');
-                }
-                break;
-
-            case 'todo_clear_all':
-                bot.sendMessage(chatId, 
-                    '⚠️ **정말로 모든 할일을 삭제하시겠습니까?**\n\n' +
-                    '이 작업은 되돌릴 수 없습니다!', 
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [
-                                    { text: '✅ 네, 삭제합니다', callback_data: 'todo_clear_all_confirm' },
-                                    { text: '❌ 아니오', callback_data: 'todo_menu' }
-                                ]
-                            ]
-                        }
-                    }
-                );
-                break;
-
-            case 'todo_clear_all_confirm':
-                try {
-                    const success = await todoFunctions.clearTodos(userId);
-                    if (success) {
-                        bot.sendMessage(chatId, '🗑️ 모든 할일이 삭제되었습니다!', {
-                            reply_markup: { 
-                                inline_keyboard: [
-                                    [{ text: '➕ 새 할일 추가', callback_data: 'todo_add' }],
-                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                                ]
-                            }
-                        });
-                    } else {
-                        bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
-                    }
-                } catch (error) {
-                    console.error('모든 할일 삭제 오류:', error);
-                    bot.sendMessage(chatId, '❌ 삭제 중 오류가 발생했습니다.');
-                }
-                break;
-
-            // ===== 운세 관련 =====
-            case 'fortune_menu':
-                bot.editMessageText('🔮 운세 메뉴\n\n원하는 운세를 선택해주세요:', {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: fortuneMenuKeyboard
-                });
-                break;
-
-            case 'fortune_general':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune' });
-                break;
-
-            case 'fortune_work':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune work' });
-                break;
-
-            case 'fortune_love':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune love' });
-                break;
-
-            case 'fortune_money':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune money' });
-                break;
-
-            case 'fortune_health':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune health' });
-                break;
-
-            case 'fortune_meeting':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune meeting' });
-                break;
-
-            case 'fortune_tarot':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune tarot' });
-                break;
-
-            case 'fortune_lucky':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune lucky' });
-                break;
-
-            case 'fortune_all':
-                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune all' });
-                break;
-
-            // ===== 근무시간 관련 =====
-            case 'worktime_menu':
-                worktime(bot, { 
-                    chat: { id: chatId }, 
-                    from: callbackQuery.from,
-                    text: undefined
-                });
-                break;
-
-            // ===== 타이머 관련 =====
-            case 'timer_menu':
-                bot.editMessageText('⏰ 타이머 메뉴\n\n원하는 기능을 선택해주세요:', {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: timerMenuKeyboard
-                });
-                break;
-
-            case 'timer_start_prompt':
-                userStates.set(userId, { action: 'timer_start' });
-                bot.sendMessage(chatId, '⏰ **타이머 시작하기**\n\n작업명을 입력해주세요.\n\n예시:\n• 공부하기\n• [공부] 수학 문제풀이\n• [운동] 헬스장 가기', {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                        ]
-                    }
-                });
-                break;
-
-            case 'timer_stop':
-                timer(bot, { chat: { id: chatId }, text: '/timer stop' });
-                break;
-
-            case 'timer_status':
-                timer(bot, { chat: { id: chatId }, text: '/timer status' });
-                break;
-
-            case 'timer_history':
-                timer(bot, { chat: { id: chatId }, text: '/timer history' });
-                break;
-
-            case 'timer_stats':
-                timer(bot, { chat: { id: chatId }, text: '/timer stats' });
-                break;
-
-            case 'timer_help':
-                timer(bot, { chat: { id: chatId }, text: '/timer' });
-                break;
-
-            // ===== 리마인더 관련 =====
-            case 'reminder_menu':
-                bot.editMessageText('🔔 리마인더 메뉴\n\n원하는 설정 방식을 선택해주세요:', {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: reminderMenuKeyboard
-                });
-                break;
-
-            case 'remind_minutes':
-                userStates.set(userId, { action: 'remind_minutes' });
-                bot.sendMessage(chatId, '⏰ **분 단위 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[분] [내용]`\n\n예시:\n• `30 독서하기`\n• `60 회의 준비`\n• `5 물 마시기`', {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                        ]
-                    }
-                });
-                break;
-
-            case 'remind_time':
-                userStates.set(userId, { action: 'remind_time' });
-                bot.sendMessage(chatId, '🕐 **시간 지정 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[시:분] [내용]`\n\n예시:\n• `14:30 점심약속`\n• `09:00 출근`\n• `18:00 퇴근`', {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                        ]
-                    }
-                });
-                break;
-
-            case 'remind_help':
-                bot.sendMessage(chatId, 
-                    '🔔 **리마인더 도움말**\n\n' +
-                    '**분 단위 설정:**\n• /remind 30 독서하기\n• /remind 5 물 마시기\n\n' +
-                    '**시간 지정:**\n• /remind 14:30 점심약속\n• /remind 09:00 출근\n\n' +
-                    '설정된 시간이 되면 알림을 보내드립니다!', 
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: [[{ text: '🔙 리마인더 메뉴', callback_data: 'reminder_menu' }]] }
-                    }
-                );
-                break;
-
-            // ===== 유틸리티 관련 =====
-            case 'utils_menu':
-                const utilsKeyboard = {
-                    inline_keyboard: [
-                        [
-                            { text: '🔊 TTS 음성변환', callback_data: 'utils_tts' },
-                            { text: '🌍 언어 선택', callback_data: 'utils_language' }
-                        ],
-                        [
-                            { text: '❓ TTS 도움말', callback_data: 'utils_tts_help' },
-                            { text: '📋 사용 예시', callback_data: 'utils_examples' }
-                        ],
-                        [
-                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-                        ]
-                    ]
-                };
-                
-                bot.editMessageText(`🛠️ ${getUserName(callbackQuery.from)}님의 유틸리티 메뉴\n\n원하는 기능을 선택해주세요:`, {
-                    chat_id: chatId,
-                    message_id: message.message_id,
-                    reply_markup: utilsKeyboard
-                });
-                break;
-
-            case 'utils_tts':
-                userStates.set(userId, { action: 'tts_input', language: 'ko' });
-                bot.sendMessage(chatId, `🔊 **${getUserName(callbackQuery.from)}님의 TTS 음성 변환**\n\n변환할 텍스트를 입력해주세요.\n\n예시:\n• 안녕하세요\n• 오늘 날씨가 좋네요\n• 두목봇 최고!`, {
-                    parse_mode: 'Markdown',
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                        ]
-                    }
-                });
-                break;
-
-            case 'utils_language':
-                const languageKeyboard = {
-                    inline_keyboard: [
-                        [
-                            { text: '🇰🇷 한국어 (ko)', callback_data: 'utils_lang_ko' },
-                            { text: '🇺🇸 English (en)', callback_data: 'utils_lang_en' }
-                        ],
-                        [
-                            { text: '🇯🇵 日本語 (ja)', callback_data: 'utils_lang_ja' },
-                            { text: '🇨🇳 中文 (zh)', callback_data: 'utils_lang_zh' }
-                        ],
-                        [
-                            { text: '🇪🇸 Español (es)', callback_data: 'utils_lang_es' },
-                            { text: '🇫🇷 Français (fr)', callback_data: 'utils_lang_fr' }
-                        ],
-                        [
-                            { text: '🇩🇪 Deutsch (de)', callback_data: 'utils_lang_de' },
-                            { text: '🇷🇺 Русский (ru)', callback_data: 'utils_lang_ru' }
-                        ],
-                        [
-                            { text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }
-                        ]
-                    ]
-                };
-                
-                bot.sendMessage(chatId, '🌍 **언어 선택**\n\n사용할 언어를 선택해주세요:', {
-                    parse_mode: 'Markdown',
-                    reply_markup: languageKeyboard
-                });
-                break;
-
-            case 'utils_tts_help':
-                bot.sendMessage(chatId, 
-                    `🔊 **TTS 도움말**\n\n` +
-                    `**사용법:**\n• /tts [텍스트] - 한국어 음성\n• /tts [언어] [텍스트] - 특정 언어\n\n` +
-                    `**지원 언어:** ko, en, ja, zh, es, fr, de, ru\n\n` +
-                    `**예시:**\n• /tts 안녕하세요\n• /tts en Hello\n• /tts ja こんにちは\n\n` +
-                    `**제한:** 최대 200자`, 
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] }
-                    }
-                );
-                break;
-
-            case 'utils_examples':
-                bot.sendMessage(chatId, 
-                    `📋 **TTS 예시**\n\n` +
-                    `🇰🇷 /tts 안녕하세요\n🇺🇸 /tts en Hello\n🇯🇵 /tts ja こんにちは\n🇨🇳 /tts zh 你好\n\n` +
-                    `💡 언어코드 생략 시 한국어로 생성됩니다!`, 
-                    {
-                        parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] }
-                    }
-                );
-                break;
-
-                // ===== 날씨 관련 ===== (새로 추가)
-            case 'weather_menu':
-            const weatherMenuKeyboard = {
-                inline_keyboard: [
-                    [
-                        { text: '🏡 현재날씨(화성)', callback_data: 'weather_current' },
-                        { text: '⏰ 시간별 예보', callback_data: 'weather_forecast' }
-                    ],
-                    [
-                        { text: '🏡 동탄', callback_data: 'weather_hwaseong' },
-                        { text: '🏙️ 서울', callback_data: 'weather_seoul' },
-                        { text: '🏞️ 수원', callback_data: 'weather_suwon' }
-                    ],
-                    [
-                        { text: '🌆 인천', callback_data: 'weather_incheon' },
-                        { text: '🏛️ 대전', callback_data: 'weather_daejeon' },
-                        { text: '🏛️ 세종', callback_data: 'weather_sejong' }
-                    ],
-                    [
-                        { text: '🌄 광주', callback_data: 'weather_gwangju' },
-                        { text: '🏭 울산', callback_data: 'weather_ulsan' },
-                        { text: '🏔️ 대구', callback_data: 'weather_daegu' }
-                    ],
-                    [
-                        { text: '🌊 부산', callback_data: 'weather_busan' },
-                        { text: '🏝️ 제주', callback_data: 'weather_jeju' },
-                        { text: '📍 그 외', callback_data: 'weather_more_cities' }
-                    ],
-                    [
-                        { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-                    ]
-                ]
-            };
-        
-            bot.editMessageText('🌤️ **날씨 정보 메뉴**\n\n🏡 동탄/화성이 기본 지역이에요!\n원하는 지역을 선택해주세요:', {
-                chat_id: chatId,
-                message_id: message.message_id,
-                parse_mode: 'Markdown',
-                reply_markup: weatherMenuKeyboard
-            });
-            break;
-
-            case 'weather_current':
-                weather(bot, { chat: { id: chatId }, text: '/weather' });
-                break;
-
-            case 'weather_forecast':
-                weather(bot, { chat: { id: chatId }, text: '/weather 예보' });
-                break;
-
-            // 도시별 날씨
-            // 기존 날씨 케이스들을 다음과 같이 수정:
-
-            case 'weather_hwaseong':
-            case 'weather_화성':  // 🆕 한글 케이스도 추가
-                weather(bot, { chat: { id: chatId }, text: '/weather 화성' });
-                break;
-            
-            case 'weather_seoul':
-                weather(bot, { chat: { id: chatId }, text: '/weather 서울' });
-                break;
-            
-            case 'weather_busan':
-                weather(bot, { chat: { id: chatId }, text: '/weather 부산' });
-                break;
-            
-            case 'weather_daegu':
-                weather(bot, { chat: { id: chatId }, text: '/weather 대구' });
-                break;
-            
-            case 'weather_incheon':
-                weather(bot, { chat: { id: chatId }, text: '/weather 인천' });
-                break;
-            
-            case 'weather_gwangju':
-                weather(bot, { chat: { id: chatId }, text: '/weather 광주' });
-                break;
-            
-            case 'weather_daejeon':
-                weather(bot, { chat: { id: chatId }, text: '/weather 대전' });
-                break;
-            
-            case 'weather_ulsan':
-                weather(bot, { chat: { id: chatId }, text: '/weather 울산' });
-                break;
-            
-            case 'weather_sejong':
-                weather(bot, { chat: { id: chatId }, text: '/weather 세종' });
-                break;
-            
-            case 'weather_jeju':
-                weather(bot, { chat: { id: chatId }, text: '/weather 제주' });
-                break;
-            
-            // 🆕 수원 케이스 추가
-            case 'weather_suwon':
-                weather(bot, { chat: { id: chatId }, text: '/weather 수원' });
-                break;
-            
-            // 🔧 경기 케이스 수정 (기존과 동일하게 유지)
-            case 'weather_gyeonggi':
-                weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
-                break;
-            
-            // 🆕 추가 지역들
-            case 'weather_gangwon':
-                weather(bot, { chat: { id: chatId }, text: '/weather 강원' });
-                break;
-            
-            case 'weather_chungbuk':
-                weather(bot, { chat: { id: chatId }, text: '/weather 충북' });
-                break;
-            
-            case 'weather_chungnam':
-                weather(bot, { chat: { id: chatId }, text: '/weather 충남' });
-                break;
-            
-            case 'weather_jeonbuk':
-                weather(bot, { chat: { id: chatId }, text: '/weather 전북' });
-                break;
-            
-            case 'weather_jeonnam':
-                weather(bot, { chat: { id: chatId }, text: '/weather 전남' });
-                break;
-            
-            case 'weather_gyeongbuk':
-                weather(bot, { chat: { id: chatId }, text: '/weather 경북' });
-                break;
-            
-            case 'weather_gyeongnam':
-                weather(bot, { chat: { id: chatId }, text: '/weather 경남' });
-                break;
-
-            // ===== 도움말 ===== (업데이트됨)
-            case 'help_menu':
-               bot.sendMessage(chatId, 
-                    '❓ **두목봇 도움말**\n\n' +
-                    '**📱 주요 기능:**\n' +
-                    '• 📝 할일 관리 - 할일 추가/완료/삭제\n' +
-                    '• 📅 휴가 관리 - 연차 현황/사용/설정\n' +
-                    '• ⏰ 타이머 - 작업 시간 측정\n' +
-                    '• 🔔 리마인더 - 알림 설정\n' +
-                    '• 🎯 운세 - 다양한 운세 확인\n' +
-                    '• 🕐 근무시간 - 출퇴근 시간 확인\n' +
-                    '• 🌤️ 날씨 정보 - 실시간 날씨 & 예보\n' +
-                    '• 📊 마케팅 인사이트 - 미세먼지 기반 마케팅 전략\n\n' +  // 🆕 추가
-                    '**⌨️ 빠른 명령어:**\n' +
-                    '• /start - 메인 메뉴\n' +
-                    '• /add [내용] - 할일 추가\n' +
-                    '• /timer start [작업명] - 타이머 시작\n' +
-                    '• /remind [분] [내용] - 리마인더 설정\n' +
-                    '• /fortune - 오늘의 운세\n' +
-                    '• /worktime - 근무시간 확인\n' +
-                    '• /weather [도시] - 날씨 확인\n' +
-                    '• /insight - 마케팅 인사이트\n\n' +  // 🆕 추가
-                    '**📊 마케팅 인사이트 기능:**\n' +  // 🆕 추가
-                    '• 실시간 미세먼지 기반 마케팅 기회 분석\n' +
-                    '• 계절별 맞춤 전략 제안\n' +
-                    '• 재고 관리 최적화 가이드\n' +
-                    '• 콘텐츠 마케팅 전략\n' +
-                    '• 리스크 관리 및 대응 방안\n' +
-                    '• 즉시 실행 가능한 액션 플랜\n\n' +
-                    '문의사항이 있으시면 /start 를 입력해서 메뉴를 이용해주세요! 😊',
-                    { 
-                        parse_mode: 'Markdown',
-                        reply_markup: { inline_keyboard: [[{ text: '🔙 메인 메뉴', callback_data: 'main_menu' }]] }
-                    }
-                );
-                break;
-
-            // ===== 취소 액션 =====
-            case 'cancel_action':
-                const currentState = userStates.get(userId);
-                userStates.delete(userId);
-                
-                let cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 작업이 취소되었습니다.`;
-                let backButton = 'main_menu';
-                
-                if (currentState) {
-                    switch (currentState.action) {
-                        case 'adding_todo':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 할일 추가가 취소되었습니다.`;
-                            backButton = 'todo_menu';
-                            break;
-                        case 'using_leave':
-                        case 'setting_total_leave':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 연차 설정이 취소되었습니다.`;
-                            backButton = 'leave_menu';
-                            break;
-                        case 'timer_start':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 타이머 시작이 취소되었습니다.`;
-                            backButton = 'timer_menu';
-                            break;
-                        case 'tts_input':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, TTS 변환이 취소되었습니다.`;
-                            backButton = 'utils_menu';
-                            break;
-                        case 'remind_minutes':
-                        case 'remind_time':
-                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 리마인더 설정이 취소되었습니다.`;
-                            backButton = 'reminder_menu';
-                            break;
-                    }
-                }
-                
-                bot.sendMessage(chatId, cancelMessage, {
-                    reply_markup: {
-                        inline_keyboard: [
-                            [{ text: '🔙 돌아가기', callback_data: backButton }]
-                        ]
-                    }
-                });
-                break;
-
-            // default 케이스 수정 - 올바른 구조로 변경
-
-// ===== 기본 케이스 (할일 토글/삭제 등) =====
-default:
-    // 할일 토글/삭제 처리
-    if (data.startsWith('todo_toggle_')) {
-        const todoIndex = parseInt(data.replace('todo_toggle_', ''));
-        try {
-            const newStatus = await todoFunctions.toggleTodo(userId, todoIndex);
-            if (newStatus !== null) {
-                const statusText = newStatus ? '완료' : '미완료';
-                bot.sendMessage(chatId, `✅ 할일 ${todoIndex + 1}번이 ${statusText}로 변경되었습니다!`, {
-                    reply_markup: { 
-                        inline_keyboard: [
-                            [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
-                            [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                        ]
-                    }
-                });
-            } else {
-                bot.sendMessage(chatId, '❌ 할일 상태 변경 중 오류가 발생했습니다.');
-            }
-        } catch (error) {
-            console.error('할일 토글 오류:', error);
-            bot.sendMessage(chatId, '❌ 할일 상태 변경 중 오류가 발생했습니다.');
-        }
-    } else if (data.startsWith('todo_delete_')) {
-        const todoIndex = parseInt(data.replace('todo_delete_', ''));
-        try {
-            const success = await todoFunctions.deleteTodo(userId, todoIndex);
-            if (success) {
-                bot.sendMessage(chatId, `🗑️ 할일 ${todoIndex + 1}번이 삭제되었습니다!`, {
-                    reply_markup: { 
-                        inline_keyboard: [
-                            [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
-                            [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                        ]
-                    }
-                });
-            } else {
-                bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
-            }
-        } catch (error) {
-            console.error('할일 삭제 오류:', error);
-            bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
-        }
-    } else if (data.startsWith('utils_lang_')) {
-        const language = data.replace('utils_lang_', '');
-        userStates.set(userId, { action: 'tts_input', language: language });
-        
-        const langNames = {
-            'ko': '한국어',
-            'en': 'English',
-            'ja': '日本語',
-            'zh': '中文',
-            'es': 'Español',
-            'fr': 'Français',
-            'de': 'Deutsch',
-            'ru': 'Русский'
-        };
-        
-        bot.sendMessage(chatId, `🔊 **TTS 음성 변환 (${langNames[language]})**\n\n변환할 텍스트를 입력해주세요.`, {
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [
-                    [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                ]
-            }
-        });
-    } else if (data.startsWith('weather_refresh_')) {
-        const city = data.replace('weather_refresh_', '');
-        weather(bot, { chat: { id: chatId }, text: `/weather ${city}` });
-    } else if (data.startsWith('weather_forecast_')) {
-        const city = data.replace('weather_forecast_', '');
-        weather(bot, { chat: { id: chatId }, text: `/weather ${city} 예보` });
-    } else if (data === 'weather_cities') {
-        const cityListKeyboard = {
-            inline_keyboard: [
-                [
-                    { text: '🏡 화성/동탄', callback_data: 'weather_hwaseong' },
-                    { text: '🏙️ 서울', callback_data: 'weather_seoul' }
-                ],
-                [
-                    { text: '🌆 인천', callback_data: 'weather_incheon' },
-                    { text: '🏞️ 수원', callback_data: 'weather_suwon' }
-                ],
-                [
-                    { text: '🌊 부산', callback_data: 'weather_busan' },
-                    { text: '🏔️ 대구', callback_data: 'weather_daegu' }
-                ],
-                [
-                    { text: '🌄 광주', callback_data: 'weather_gwangju' },
-                    { text: '🏛️ 대전', callback_data: 'weather_daejeon' }
-                ],
-                [
-                    { text: '🏝️ 제주', callback_data: 'weather_jeju' },
-                    { text: '📍 더 많은 지역...', callback_data: 'weather_more_cities' }
-                ],
-                [
-                    { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
-                ]
-            ]
-        };
-
-        bot.sendMessage(chatId, '🏙️ **지역 선택**\n\n🏡 화성/동탄 지역이 맨 위에 있어요! ⚡', {
-            parse_mode: 'Markdown',
-            reply_markup: cityListKeyboard
-        });
-        break;
-        
-    } else if (data === 'weather_hwaseong') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
-    } else if (data === 'weather_more_cities') {
-        const moreCitiesKeyboard = {
-            inline_keyboard: [
-                [
-                    { text: '🏛️ 세종', callback_data: 'weather_sejong' },
-                    { text: '🏭 울산', callback_data: 'weather_ulsan' }
-                ],
-                [
-                    { text: '⛰️ 강원', callback_data: 'weather_gangwon' },
-                    { text: '🌾 충북', callback_data: 'weather_chungbuk' }
-                ],
-                [
-                    { text: '🌻 충남', callback_data: 'weather_chungnam' },
-                    { text: '🌿 전북', callback_data: 'weather_jeonbuk' }
-                ],
-                [
-                    { text: '🌺 전남', callback_data: 'weather_jeonnam' },
-                    { text: '🏯 경북', callback_data: 'weather_gyeongbuk' }
-                ],
-                [
-                    { text: '🏮 경남', callback_data: 'weather_gyeongnam' }
-                ],
-                [
-                    { text: '⬅️ 주요 지역', callback_data: 'weather_cities' },
-                    { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
-                ]
-            ]
-        };
-
-        bot.sendMessage(chatId, '🗺️ **전체 지역**\n\n원하는 지역을 선택해주세요:', {
-            parse_mode: 'Markdown',
-            reply_markup: moreCitiesKeyboard
-        });
-    } else if (data === 'weather_gyeonggi') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
-    } else if (data === 'weather_gangwon') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 강원' });
-    } else if (data === 'weather_chungbuk') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 충북' });
-    } else if (data === 'weather_chungnam') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 충남' });
-    } else if (data === 'weather_jeonbuk') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 전북' });
-    } else if (data === 'weather_jeonnam') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 전남' });
-    } else if (data === 'weather_gyeongbuk') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 경북' });
-    } else if (data === 'weather_gyeongnam') {
-        weather(bot, { chat: { id: chatId }, text: '/weather 경남' });
-    } else {
-        // 정말 알 수 없는 콜백
-        console.log('❓ 알 수 없는 콜백 데이터:', data);
-        bot.sendMessage(chatId, `❌ 알 수 없는 명령입니다. /start 를 입력해서 메뉴를 다시 확인해주세요.`);
-    }
-    break;
-        }
-    } catch (error) {
-        console.error('콜백 처리 오류:', error);
-        bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다.');
-    }
 });
 
-// 추가 팁: 함수명 확인을 위한 디버깅
-console.log('Bot 객체의 answerCallbackQuery 함수 존재 여부:', typeof bot.answerCallbackQuery === 'function');
-console.log('Bot 객체의 answercallbackQuery 함수 존재 여부:', typeof bot.answercallbackQuery === 'function');
+// 봇 시작 시 상태 초기화
+console.log('🔄 봇 시작 시 사용자 상태 초기화...');
+userStates.clear();
 
 // 프로세스 종료 시 정리
 process.on('SIGINT', async () => {
     console.log('봇 종료 중...');
     
-    // TTS 파일 정리
     if (typeof utils.cleanupAllTTSFiles === 'function') {
         utils.cleanupAllTTSFiles();
     }
     
-    // 연차 관리 종료
     await leaveManager.close();
-    
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
     console.log('봇 종료 중...');
     
-    // TTS 파일 정리  
     if (typeof utils.cleanupAllTTSFiles === 'function') {
         utils.cleanupAllTTSFiles();
     }
     
-    // 연차 관리 종료
     await leaveManager.close();
-    
     process.exit(0);
 });
+
+console.log('✅ 두목봇이 성공적으로 시작되었습니다!');
