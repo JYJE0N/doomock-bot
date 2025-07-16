@@ -1941,3 +1941,4 @@ if (process.env.RAILWAY_DEPLOYMENT_ID) {
 }
 
 rLog("✅ 모든 핸들러가 등록되었습니다. 메시지를 기다리는 중...", 'INFO');
+ }
