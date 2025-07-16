@@ -29,6 +29,7 @@ const worktime = require('./worktime');
 const remind = require('./remind');
 const MonthlyLeave = require('./monthly_leave');
 const weather = require('./weather');
+const dustInsights = require('./dust_marketing_insights');
 const { getUserName, formatUserInfo } = require('./username_helper');
 
 // 연차 관리 인스턴스 생성
@@ -48,6 +49,7 @@ bot.setMyCommands([
     { command: 'tts', description: '🔊 텍스트를 음성으로 변환 (/tts 안녕하세요)' },
     { command: 'remind', description: '🔔 리마인더 설정하기 (/remind 30 독서하기)' },
     { command: 'weather', description: '🌤️ 날씨 정보 확인' },
+    { command: 'insight', description: '📊 마케팅 인사이트 확인' },  // 🆕 추가
     { command: 'cancel', description: '❌ 진행중인 작업 취소' }
 ]).then(() => {
     console.log('✅ 명령어가 Telegram에 등록되었습니다.');
@@ -85,13 +87,14 @@ const mainMenuKeyboard = {
         ],
         [
             { text: '🕐 근무시간', callback_data: 'worktime_menu' },
-            { text: '🌤️ 날씨', callback_data: 'weather_menu' } // ← 추가
+            { text: '🌤️ 날씨', callback_data: 'weather_menu' }
         ],
         [
-            { text: '🔔 리마인더', callback_data: 'reminder_menu' },
-            { text: '🛠️ 유틸리티', callback_data: 'utils_menu' }
+            { text: '📊 마케팅 인사이트', callback_data: 'insight_menu' },  // 🆕 추가
+            { text: '🔔 리마인더', callback_data: 'reminder_menu' }
         ],
         [
+            { text: '🛠️ 유틸리티', callback_data: 'utils_menu' },
             { text: '❓ 도움말', callback_data: 'help_menu' }
         ]
     ]
@@ -190,6 +193,31 @@ const timerMenuKeyboard = {
         [
             { text: '📊 타이머 통계', callback_data: 'timer_stats' },
             { text: '❓ 사용법', callback_data: 'timer_help' }
+        ],
+        [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+        ]
+    ]
+};
+
+// ===== 인사이트 메뉴 키보드 추가 =====
+const insightMenuKeyboard = {
+    inline_keyboard: [
+        [
+            { text: '📊 종합 인사이트', callback_data: 'insight_full' },
+            { text: '⚡ 빠른 인사이트', callback_data: 'insight_quick' }
+        ],
+        [
+            { text: '📦 재고 전략', callback_data: 'insight_inventory' },
+            { text: '🎯 마케팅 전략', callback_data: 'insight_marketing' }
+        ],
+        [
+            { text: '📝 콘텐츠 전략', callback_data: 'insight_content' },
+            { text: '⚠️ 리스크 분석', callback_data: 'insight_risk' }
+        ],
+        [
+            { text: '📈 대시보드', callback_data: 'insight_dashboard' },
+            { text: '🔄 새로고침', callback_data: 'insight_refresh' }
         ],
         [
             { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
@@ -384,6 +412,11 @@ bot.on('message', async (msg) => {
         } else if (text.startsWith('/weather') || text.startsWith('/날씨')) {
             userStates.delete(userId);
             weather(bot, msg);
+        //인사이트
+        } else if (text.startsWith('/insight') || text.startsWith('/인사이트')) {  // 🆕 추가
+            userStates.delete(userId);
+            dustInsights(bot, msg);
+        //할 일
         } else if (text.startsWith('/add ')) {
             userStates.delete(userId); // 상태 초기화
             const taskText = text.replace('/add ', '');
@@ -458,6 +491,32 @@ bot.on('callback_query', async (callbackQuery) => {
                     message_id: message.message_id,
                     reply_markup: mainMenuKeyboard
                 });
+                break;
+
+             // ===== 인사이트 메뉴 케이스들 =====
+            case 'insight_menu':
+                bot.editMessageText(`📊 ${getUserName(callbackQuery.from)}님의 마케팅 인사이트\n\n미세먼지 기반 마케팅 전략을 확인해보세요:`, {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: insightMenuKeyboard
+                });
+                break;
+
+            case 'insight_full':
+                dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+                break;
+
+            case 'insight_quick':
+                dustInsights(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight quick' });
+                break;
+
+            case 'insight_dashboard':
+            case 'insight_inventory':
+            case 'insight_marketing':
+            case 'insight_content':
+            case 'insight_risk':
+            case 'insight_refresh':
+                dustInsights.handleCallback(bot, callbackQuery);
                 break;
 
             // ===== 휴가 관리 관련 =====
@@ -1049,7 +1108,7 @@ case 'todo_list':
 
             // ===== 도움말 ===== (업데이트됨)
             case 'help_menu':
-                bot.sendMessage(chatId, 
+               bot.sendMessage(chatId, 
                     '❓ **두목봇 도움말**\n\n' +
                     '**📱 주요 기능:**\n' +
                     '• 📝 할일 관리 - 할일 추가/완료/삭제\n' +
@@ -1058,7 +1117,8 @@ case 'todo_list':
                     '• 🔔 리마인더 - 알림 설정\n' +
                     '• 🎯 운세 - 다양한 운세 확인\n' +
                     '• 🕐 근무시간 - 출퇴근 시간 확인\n' +
-                    '• 🌤️ 날씨 정보 - 실시간 날씨 & 예보\n\n' +
+                    '• 🌤️ 날씨 정보 - 실시간 날씨 & 예보\n' +
+                    '• 📊 마케팅 인사이트 - 미세먼지 기반 마케팅 전략\n\n' +  // 🆕 추가
                     '**⌨️ 빠른 명령어:**\n' +
                     '• /start - 메인 메뉴\n' +
                     '• /add [내용] - 할일 추가\n' +
@@ -1066,12 +1126,15 @@ case 'todo_list':
                     '• /remind [분] [내용] - 리마인더 설정\n' +
                     '• /fortune - 오늘의 운세\n' +
                     '• /worktime - 근무시간 확인\n' +
-                    '• /weather [도시] - 날씨 확인\n\n' +
-                    '**🌤️ 날씨 기능:**\n' +
-                    '• 전국 주요 도시 날씨 정보\n' +
-                    '• 실시간 기온, 습도, 바람\n' +
-                    '• 옷차림 추천 & 대기질 정보\n' +
-                    '• 24시간 날씨 예보\n\n' +
+                    '• /weather [도시] - 날씨 확인\n' +
+                    '• /insight - 마케팅 인사이트\n\n' +  // 🆕 추가
+                    '**📊 마케팅 인사이트 기능:**\n' +  // 🆕 추가
+                    '• 실시간 미세먼지 기반 마케팅 기회 분석\n' +
+                    '• 계절별 맞춤 전략 제안\n' +
+                    '• 재고 관리 최적화 가이드\n' +
+                    '• 콘텐츠 마케팅 전략\n' +
+                    '• 리스크 관리 및 대응 방안\n' +
+                    '• 즉시 실행 가능한 액션 플랜\n\n' +
                     '문의사항이 있으시면 /start 를 입력해서 메뉴를 이용해주세요! 😊',
                     { 
                         parse_mode: 'Markdown',
