@@ -585,6 +585,122 @@ bot.on("callback_query", async (callbackQuery) => {
         await handleFortuneTarot(bot, chatId, userId);
         break;
       case "fortune_lucky":
+// 콜백 쿼리 핸들러 (완전 대체)
+bot.on("callback_query", async (callbackQuery) => {
+  const message = callbackQuery.message;
+  const data = callbackQuery.data;
+  const chatId = message.chat.id;
+  const userId = callbackQuery.from.id;
+
+  rLog(`📞 콜백 처리: ${data} (사용자: ${userId})`);
+
+  // 콜백 쿼리 응답
+  try {
+    await bot.answerCallbackQuery(callbackQuery.id);
+  } catch (error) {
+    rLog(`콜백 응답 실패: ${error.message}`, 'ERROR');
+  }
+
+  try {
+    // 인사이트 관련 콜백 우선 처리
+    if (data.startsWith('insight_')) {
+      await handleInsightCallback(bot, callbackQuery, data);
+      return;
+    }
+
+    // TTS 관련 콜백 처리
+    if (data.startsWith('tts_')) {
+      if (ttsUtils && ttsUtils.handleTTSCallback) {
+        await ttsUtils.handleTTSCallback(bot, callbackQuery);
+      } else {
+        await sendNewMessage(bot, chatId, "❌ TTS 기능을 사용할 수 없습니다.");
+      }
+      return;
+    }
+
+    // 메인 메뉴 처리
+    if (data === "main_menu") {
+      await sendNewMessage(bot, chatId,
+        `🤖 안녕하세요 ${getUserName(callbackQuery.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`,
+        { reply_markup: createMainMenuKeyboard() }
+      );
+      return;
+    }
+
+    // 각 모듈별 콜백 처리
+    switch (data) {
+      // 할일 관리
+      case "todo_menu":
+        await handleTodoMenu(bot, chatId, callbackQuery.from);
+        break;
+      case "todo_list":
+        await handleTodoList(bot, chatId, userId, callbackQuery.from);
+        break;
+      case "todo_add":
+        await handleTodoAdd(bot, chatId, userId);
+        break;
+      case "todo_stats":
+        await handleTodoStats(bot, chatId, userId);
+        break;
+      case "todo_clear_completed":
+        await handleTodoClearCompleted(bot, chatId, userId);
+        break;
+      case "todo_clear_all":
+        await handleTodoClearAll(bot, chatId, userId);
+        break;
+
+      // 휴가 관리
+      case "leave_menu":
+        await handleLeaveMenu(bot, chatId, userId);
+        break;
+      case "leave_status":
+        await handleLeaveStatus(bot, chatId, userId);
+        break;
+      case "leave_use":
+        await handleLeaveUse(bot, chatId);
+        break;
+      case "leave_history":
+        await handleLeaveHistory(bot, chatId, userId);
+        break;
+      case "leave_setting":
+        await handleLeaveSetting(bot, chatId, userId);
+        break;
+      case "use_leave_1":
+        await processLeaveUsage(bot, chatId, userId, 1);
+        break;
+      case "use_leave_0.5":
+        await processLeaveUsage(bot, chatId, userId, 0.5);
+        break;
+      case "use_leave_custom":
+        await handleLeaveCustom(bot, chatId, userId);
+        break;
+
+      // 운세 관리
+      case "fortune_menu":
+        await handleFortuneMenu(bot, chatId);
+        break;
+      case "fortune_general":
+        await handleFortuneGeneral(bot, chatId, userId);
+        break;
+      case "fortune_work":
+        await handleFortuneWork(bot, chatId, userId);
+        break;
+      case "fortune_love":
+        await handleFortuneLove(bot, chatId, userId);
+        break;
+      case "fortune_money":
+        await handleFortuneMoney(bot, chatId, userId);
+        break;
+      case "fortune_health":
+        await handleFortuneHealth(bot, chatId, userId);
+        break;
+      case "fortune_meeting":
+        await handleFortuneMeeting(bot, chatId, userId);
+        break;
+      case "fortune_tarot":
+        await handleFortuneTarot(bot, chatId, userId);
+        break;
+      case "fortune_lucky":
         await handleFortuneLucky(bot, chatId, userId);
         break;
       case "fortune_all":
@@ -714,6 +830,46 @@ bot.on("callback_query", async (callbackQuery) => {
     await sendNewMessage(bot, chatId, "❌ 처리 중 오류가 발생했습니다.");
   }
 });
+
+// 인사이트 콜백 통합 핸들러
+async function handleInsightCallback(bot, callbackQuery, data) {
+  const chatId = callbackQuery.message.chat.id;
+  
+  if (!dustInsights) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  // dustInsights.handleCallback이 있으면 우선 사용
+  if (dustInsights.handleCallback) {
+    try {
+      await dustInsights.handleCallback(bot, callbackQuery);
+      return;
+    } catch (error) {
+      rLog(`dustInsights.handleCallback 오류: ${error.message}`, 'ERROR');
+      // 실패 시 폴백 처리로 계속
+    }
+  }
+
+  // 폴백 처리
+  switch (data) {
+    case "insight_menu":
+      await handleInsightMenu(bot, chatId, callbackQuery.from);
+      break;
+    case "insight_full":
+      await handleInsightFull(bot, chatId, callbackQuery.from);
+      break;
+    case "insight_quick":
+      await handleInsightQuick(bot, chatId, callbackQuery.from);
+      break;
+    case "insight_dashboard":
+      await handleInsightDashboard(bot, chatId, callbackQuery.from);
+      break;
+    default:
+      rLog(`처리되지 않은 인사이트 콜백: ${data}`, 'WARN');
+      await sendNewMessage(bot, chatId, "❌ 해당 인사이트 기능을 사용할 수 없습니다.");
+  }
+}
 
 // ========================================
 // 할일 관리 핸들러들
