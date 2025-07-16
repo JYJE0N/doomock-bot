@@ -34,6 +34,19 @@ const leaveManager = new MonthlyLeave();
 // 사용자 상태 관리 (메모리 기반)
 const userStates = new Map();
 
+
+//setCommands 세팅
+bot.setMyCommands([
+    { command: 'start', description: '📱 메인 메뉴 보기' },
+    { command: 'help', description: '❓ 도움말 보기' },
+    { command: 'fortune', description: '🔮 오늘의 운세' },
+    { command: 'worktime', description: '🕐 근무시간 보기' },
+    { command: 'add', description: '➕ 할일 추가하기 (/add 할일내용)' },
+    { command: 'cancel', description: '❌ 진행중인 작업 취소' }
+]).then(() => {
+    console.log('✅ 명령어가 Telegram에 등록되었습니다.');
+}).catch(console.error);
+
 // 메인 메뉴 키보드
 const mainMenuKeyboard = {
     inline_keyboard: [
