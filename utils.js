@@ -1,156 +1,69 @@
 // utils.js - 통합 유틸리티 모듈
-
 const gtts = require('gtts');
 const fs = require('fs');
 const path = require('path');
 
-// ========================
-// 기본 유틸리티 함수들
-// ========================
+// TTS 모드 관리 (사용자별)
+const ttsMode = new Map(); // userId -> { active: boolean, language: string }
+
+// 활성 TTS 파일 추적 (사용자별) - 단일 파일만 유지
+const activeTTSFiles = new Map(); // userId -> { filePath: string, timestamp: number }
 
 // 한국 시간 가져오기
 function getKoreaTime() {
     return new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
 }
 
-// 현재 년도 가져오기
-function getCurrentYear() {
-    return getKoreaTime().getFullYear();
-}
-
-// 날짜 포맷팅 (YYYY-MM-DD)
-function formatDate(date) {
-    if (!date) return '';
-    const d = new Date(date);
-    return d.toLocaleDateString('ko-KR');
-}
-
-// 시간 포맷팅 (HH:MM)
-function formatTime(date) {
-    if (!date) return '';
-    const d = new Date(date);
-    return d.toLocaleTimeString('ko-KR', { 
-        hour: '2-digit', 
-        minute: '2-digit',
-        hour12: false 
-    });
-}
-
-// 날짜와 시간 포맷팅
-function formatDateTime(date) {
-    if (!date) return '';
-    return `${formatDate(date)} ${formatTime(date)}`;
-}
-
-// 숫자를 소수점 1자리까지 표시
-function formatNumber(num, decimals = 1) {
-    return parseFloat(num).toFixed(decimals);
-}
-
-// 퍼센트 계산
-function calculatePercentage(used, total) {
-    if (total === 0) return 0;
-    return ((used / total) * 100).toFixed(1);
-}
-
-// 텍스트 자르기
-function truncateText(text, maxLength = 100) {
-    if (!text) return '';
-    if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength) + '...';
-}
-
-// 랜덤 선택
-function randomChoice(array) {
-    if (!Array.isArray(array) || array.length === 0) return null;
-    return array[Math.floor(Math.random() * array.length)];
-}
-
-// 배열 섞기
-function shuffleArray(array) {
-    const shuffled = [...array];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-    return shuffled;
-}
-
-// 지연 함수
-function delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// 에러 로깅
-function logError(error, context = '') {
-    console.error(`[${getKoreaTime().toISOString()}] ${context}:`, error);
-}
-
-// 성공 로깅
-function logSuccess(message, context = '') {
-    console.log(`[${getKoreaTime().toISOString()}] ${context}: ${message}`);
-}
-
-// 유효한 숫자인지 확인
-function isValidNumber(value) {
-    return !isNaN(value) && isFinite(value) && value >= 0;
-}
-
-// 유효한 날짜인지 확인
-function isValidDate(date) {
-    return date instanceof Date && !isNaN(date);
-}
-
-// ========================
-// TTS 관련 함수들
-// ========================
-
-// 활성 TTS 파일 추적 (사용자별)
-const activeTTSFiles = new Map(); // userId -> filePath
-
-// TTS 파일 정리 함수
+// 🆕 모든 TTS 파일 정리 (사용자별)
 function cleanupUserTTSFiles(userId) {
     const existingFile = activeTTSFiles.get(userId);
-    if (existingFile && fs.existsSync(existingFile)) {
+    if (existingFile && fs.existsSync(existingFile.filePath)) {
         try {
-            fs.unlinkSync(existingFile);
-            logSuccess(`이전 TTS 파일 삭제: ${existingFile}`, 'TTS');
+            fs.unlinkSync(existingFile.filePath);
+            console.log(`✅ 이전 TTS 파일 삭제: ${existingFile.filePath}`);
         } catch (error) {
-            logError(error, 'TTS 파일 삭제');
+            console.error('TTS 파일 삭제 오류:', error);
         }
     }
     activeTTSFiles.delete(userId);
 }
 
-// 모든 임시 파일 정리
+// 🆕 오래된 TTS 파일들 일괄 정리
 function cleanupAllTTSFiles() {
     const tempDir = path.join(__dirname, 'temp');
     if (fs.existsSync(tempDir)) {
         const files = fs.readdirSync(tempDir);
+        const now = Date.now();
+        
         files.forEach(file => {
             if (file.startsWith('tts_') && file.endsWith('.mp3')) {
+                const filePath = path.join(tempDir, file);
                 try {
-                    fs.unlinkSync(path.join(tempDir, file));
-                    logSuccess(`정리된 TTS 파일: ${file}`, 'TTS');
+                    const stats = fs.statSync(filePath);
+                    // 5분 이상 된 파일 삭제
+                    if (now - stats.mtime.getTime() > 5 * 60 * 1000) {
+                        fs.unlinkSync(filePath);
+                        console.log(`🧹 오래된 TTS 파일 정리: ${file}`);
+                    }
                 } catch (error) {
-                    logError(error, 'TTS 파일 정리');
+                    console.error('TTS 파일 정리 오류:', error);
                 }
             }
         });
     }
 }
 
-// TTS 생성 함수
+// 🆕 TTS 생성 함수 (개선된 버전)
 async function generateTTS(text, language, userId) {
-    // 기존 파일 먼저 삭제
+    // 기존 파일 먼저 삭제 (중복 방지)
     cleanupUserTTSFiles(userId);
     
     if (!text || text.trim().length === 0) {
         throw new Error('텍스트가 비어있습니다.');
     }
     
-    if (text.length > 200) {
-        throw new Error('텍스트가 너무 깁니다. (최대 200자)');
+    if (text.length > 500) {
+        throw new Error('텍스트가 너무 깁니다. (최대 500자)');
     }
 
     // temp 폴더 확인/생성
@@ -159,7 +72,8 @@ async function generateTTS(text, language, userId) {
         fs.mkdirSync(tempDir, { recursive: true });
     }
 
-    const fileName = `tts_${userId}_${Date.now()}.mp3`;
+    const timestamp = Date.now();
+    const fileName = `tts_${userId}_${timestamp}.mp3`;
     const filePath = path.join(tempDir, fileName);
 
     return new Promise((resolve, reject) => {
@@ -167,24 +81,253 @@ async function generateTTS(text, language, userId) {
         
         tts.save(filePath, (err) => {
             if (err) {
-                logError(err, 'TTS 생성');
+                console.error('TTS 생성 오류:', err);
                 reject(new Error('음성 생성 실패'));
             } else {
                 // 새 파일을 활성 파일로 등록
-                activeTTSFiles.set(userId, filePath);
-                logSuccess(`TTS 생성: ${fileName}`, 'TTS');
+                activeTTSFiles.set(userId, {
+                    filePath: filePath,
+                    timestamp: timestamp
+                });
+                console.log(`✅ TTS 생성: ${fileName}`);
                 resolve(filePath);
             }
         });
     });
 }
 
-// TTS 명령어 처리
+// 🆕 TTS 모드 토글 함수
+function toggleTTSMode(userId, language = 'ko') {
+    const currentMode = ttsMode.get(userId) || { active: false, language: 'ko' };
+    const newMode = {
+        active: !currentMode.active,
+        language: language
+    };
+    
+    ttsMode.set(userId, newMode);
+    console.log(`🔊 사용자 ${userId} TTS 모드: ${newMode.active ? 'ON' : 'OFF'} (${newMode.language})`);
+    
+    return newMode;
+}
+
+// 🆕 TTS 모드 확인 함수
+function getTTSMode(userId) {
+    return ttsMode.get(userId) || { active: false, language: 'ko' };
+}
+
+// 🆕 자동 TTS 처리 함수
+async function handleAutoTTS(bot, chatId, userId, text) {
+    try {
+        const mode = getTTSMode(userId);
+        
+        if (!mode.active) {
+            return false; // TTS 모드가 아니면 처리하지 않음
+        }
+        
+        // 명령어나 특수 문자로 시작하면 TTS 처리하지 않음
+        if (text.startsWith('/') || text.startsWith('!') || text.startsWith('#')) {
+            return false;
+        }
+        
+        // 너무 짧은 텍스트도 처리하지 않음
+        if (text.trim().length < 2) {
+            return false;
+        }
+        
+        console.log(`🔊 자동 TTS 처리: "${text}" (언어: ${mode.language})`);
+        
+        // 로딩 메시지 (잠시 표시)
+        const loadingMsg = await bot.sendMessage(chatId, '🔊 음성 생성 중...');
+        
+        try {
+            // TTS 생성
+            const filePath = await generateTTS(text, mode.language, userId);
+            
+            // 음성 파일 전송
+            await bot.sendVoice(chatId, filePath, {
+                caption: `🔊 "${text.length > 50 ? text.substring(0, 50) + '...' : text}"`
+            });
+            
+            // 로딩 메시지 삭제
+            try {
+                await bot.deleteMessage(chatId, loadingMsg.message_id);
+            } catch (deleteError) {
+                // 삭제 실패는 무시
+            }
+            
+            // 3초 후 파일 삭제 (메모리 절약)
+            setTimeout(() => {
+                cleanupUserTTSFiles(userId);
+            }, 3000);
+            
+            return true;
+            
+        } catch (error) {
+            console.error('자동 TTS 처리 오류:', error);
+            
+            try {
+                await bot.editMessageText(`❌ 음성 생성 실패: ${error.message}`, {
+                    chat_id: chatId,
+                    message_id: loadingMsg.message_id
+                });
+            } catch (editError) {
+                await bot.sendMessage(chatId, `❌ 음성 생성 실패: ${error.message}`);
+            }
+            
+            return false;
+        }
+        
+    } catch (error) {
+        console.error('자동 TTS 처리 오류:', error);
+        return false;
+    }
+}
+
+// 🆕 TTS 메뉴 키보드
+const createTTSMenuKeyboard = (userId) => {
+    const mode = getTTSMode(userId);
+    
+    return {
+        inline_keyboard: [
+            [
+                {
+                    text: mode.active ? '🔊 TTS 모드 ON' : '🔇 TTS 모드 OFF',
+                    callback_data: 'tts_toggle'
+                }
+            ],
+            [
+                { text: '🇰🇷 한국어', callback_data: 'tts_lang_ko' },
+                { text: '🇺🇸 English', callback_data: 'tts_lang_en' }
+            ],
+            [
+                { text: '🇯🇵 日本語', callback_data: 'tts_lang_ja' },
+                { text: '🇨🇳 中文', callback_data: 'tts_lang_zh' }
+            ],
+            [
+                { text: '🇪🇸 Español', callback_data: 'tts_lang_es' },
+                { text: '🇫🇷 Français', callback_data: 'tts_lang_fr' }
+            ],
+            [
+                { text: '🔙 유틸리티 메뉴', callback_data: 'utils_menu' }
+            ]
+        ]
+    };
+};
+
+// 🆕 TTS 도움말 생성
+function getTTSHelpText(userId) {
+    const mode = getTTSMode(userId);
+    
+    return `🔊 **TTS (음성 변환) 도움말**\n\n` +
+           `**현재 상태**\n` +
+           `• 모드: ${mode.active ? '🔊 ON' : '🔇 OFF'}\n` +
+           `• 언어: ${getLanguageName(mode.language)}\n\n` +
+           `**사용 방법**\n` +
+           `1️⃣ **자동 모드 (추천)**\n` +
+           `• TTS 모드를 ON으로 설정\n` +
+           `• 채팅창에 텍스트 입력\n` +
+           `• 자동으로 음성 변환됨\n\n` +
+           `2️⃣ **수동 모드**\n` +
+           `• /tts [텍스트] 명령어 사용\n` +
+           `• 예: /tts 안녕하세요\n\n` +
+           `**📝 사용 팁**\n` +
+           `• 최대 500자까지 입력 가능\n` +
+           `• 명령어(/)로 시작하는 텍스트는 자동 변환 안됨\n` +
+           `• 언어별 자연스러운 발음 지원\n` +
+           `• 이전 음성 파일은 자동 삭제됨\n\n` +
+           `**🌍 지원 언어**\n` +
+           `• 한국어 (ko) • English (en)\n` +
+           `• 日本語 (ja) • 中文 (zh)\n` +
+           `• Español (es) • Français (fr)\n\n` +
+           `${mode.active ? '🔊 현재 자동 모드 활성화됨!' : '💡 TTS 모드를 ON으로 설정해보세요!'}`;
+}
+
+// 언어 이름 반환
+function getLanguageName(langCode) {
+    const languages = {
+        'ko': '🇰🇷 한국어',
+        'en': '🇺🇸 English',
+        'ja': '🇯🇵 日本語',
+        'zh': '🇨🇳 中文',
+        'es': '🇪🇸 Español',
+        'fr': '🇫🇷 Français',
+        'de': '🇩🇪 Deutsch',
+        'ru': '🇷🇺 Русский'
+    };
+    return languages[langCode] || langCode;
+}
+
+// 🆕 메인 TTS 핸들러 함수
+async function handleTTSMenu(bot, chatId, userId) {
+    const helpText = getTTSHelpText(userId);
+    const keyboard = createTTSMenuKeyboard(userId);
+    
+    await bot.sendMessage(chatId, helpText, {
+        parse_mode: 'Markdown',
+        reply_markup: keyboard
+    });
+}
+
+// 🆕 TTS 콜백 처리 함수
+async function handleTTSCallback(bot, callbackQuery) {
+    const chatId = callbackQuery.message.chat.id;
+    const userId = callbackQuery.from.id;
+    const data = callbackQuery.data;
+    
+    try {
+        switch (data) {
+            case 'tts_toggle':
+                const newMode = toggleTTSMode(userId);
+                const statusText = newMode.active ? 
+                    `🔊 **TTS 모드 활성화됨!**\n\n이제 채팅창에 텍스트를 입력하면 자동으로 음성으로 변환됩니다.\n\n언어: ${getLanguageName(newMode.language)}` :
+                    `🔇 **TTS 모드 비활성화됨**\n\n수동으로 /tts 명령어를 사용하세요.`;
+                
+                await bot.editMessageText(statusText, {
+                    chat_id: chatId,
+                    message_id: callbackQuery.message.message_id,
+                    parse_mode: 'Markdown',
+                    reply_markup: createTTSMenuKeyboard(userId)
+                });
+                break;
+                
+            case 'tts_lang_ko':
+            case 'tts_lang_en':
+            case 'tts_lang_ja':
+            case 'tts_lang_zh':
+            case 'tts_lang_es':
+            case 'tts_lang_fr':
+                const langCode = data.replace('tts_lang_', '');
+                const currentMode = getTTSMode(userId);
+                ttsMode.set(userId, {
+                    active: currentMode.active,
+                    language: langCode
+                });
+                
+                const langText = `🌍 **언어 변경됨**\n\n` +
+                                `새 언어: ${getLanguageName(langCode)}\n` +
+                                `모드: ${currentMode.active ? '🔊 ON' : '🔇 OFF'}\n\n` +
+                                `${currentMode.active ? '이제 채팅창에 텍스트를 입력해보세요!' : 'TTS 모드를 활성화해보세요!'}`;
+                
+                await bot.editMessageText(langText, {
+                    chat_id: chatId,
+                    message_id: callbackQuery.message.message_id,
+                    parse_mode: 'Markdown',
+                    reply_markup: createTTSMenuKeyboard(userId)
+                });
+                break;
+        }
+    } catch (error) {
+        console.error('TTS 콜백 처리 오류:', error);
+        await bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다.');
+    }
+}
+
+// 🆕 기존 TTS 명령어 처리 (기존 방식 유지)
 async function handleTTSCommand(bot, chatId, userId, text) {
     try {
         const ttsText = text.replace('/tts ', '').trim();
         if (!ttsText) {
-            bot.sendMessage(chatId, '❌ 텍스트를 입력해주세요.\n예: /tts 안녕하세요');
+            await bot.sendMessage(chatId, '❌ 텍스트를 입력해주세요.\n예: /tts 안녕하세요');
             return;
         }
 
@@ -201,7 +344,7 @@ async function handleTTSCommand(bot, chatId, userId, text) {
         }
 
         if (!actualText.trim()) {
-            bot.sendMessage(chatId, `❌ ${language} 언어로 변환할 텍스트를 입력해주세요.`);
+            await bot.sendMessage(chatId, `❌ ${language} 언어로 변환할 텍스트를 입력해주세요.`);
             return;
         }
 
@@ -214,20 +357,20 @@ async function handleTTSCommand(bot, chatId, userId, text) {
             
             // 음성 파일 전송
             await bot.sendVoice(chatId, filePath, {
-                caption: `🔊 "${truncateText(actualText, 50)}" (${language})`
+                caption: `🔊 "${actualText.length > 50 ? actualText.substring(0, 50) + '...' : actualText}" (${getLanguageName(language)})`
             });
 
             // 로딩 메시지 삭제
             try {
                 await bot.deleteMessage(chatId, loadingMsg.message_id);
             } catch (deleteError) {
-                // 메시지 삭제 실패는 무시 (이미 삭제되었을 수 있음)
+                // 삭제 실패는 무시
             }
 
-            // 5초 후 파일 삭제
+            // 3초 후 파일 삭제
             setTimeout(() => {
                 cleanupUserTTSFiles(userId);
-            }, 5000);
+            }, 3000);
 
         } catch (error) {
             try {
@@ -236,53 +379,35 @@ async function handleTTSCommand(bot, chatId, userId, text) {
                     message_id: loadingMsg.message_id
                 });
             } catch (editError) {
-                // 메시지 수정 실패 시 새 메시지 전송
-                bot.sendMessage(chatId, `❌ ${error.message}`);
+                await bot.sendMessage(chatId, `❌ ${error.message}`);
             }
         }
 
     } catch (error) {
-        logError(error, 'TTS 처리');
-        bot.sendMessage(chatId, '❌ TTS 기능을 사용할 수 없습니다. 관리자에게 문의해주세요.');
+        console.error('TTS 명령어 처리 오류:', error);
+        await bot.sendMessage(chatId, '❌ TTS 기능을 사용할 수 없습니다.');
     }
 }
 
-// 도움말 메시지
-function getHelpMessage() {
-    return `❓ **두목봇 도움말**\n\n` +
-           `**📱 주요 기능:**\n` +
-           `• 📝 할일 관리\n• 📅 휴가 관리\n• ⏰ 타이머\n• 🔔 리마인더\n• 🎯 운세\n• 🕐 근무시간\n• 🔊 TTS\n\n` +
-           `**⌨️ 빠른 명령어:**\n` +
-           `• /start - 메인 메뉴\n• /tts [텍스트] - 음성 변환\n• /add [할일] - 할일 추가\n\n` +
-           `**🔊 TTS 사용법:**\n` +
-           `• /tts 안녕하세요\n• /tts en Hello\n• /tts ja こんにちは\n\n` +
-           `지원 언어: ko, en, ja, zh, es, fr, de, ru`;
-}
-
-// ========================
-// 메인 함수
-// ========================
-
-function mainUtilsHandler(bot, msg) {
-    const text = msg.text || '';
-    const chatId = msg.chat.id;
-    const userId = msg.from?.id || chatId;
-
-    if (text.startsWith('/tts ')) {
-        handleTTSCommand(bot, chatId, userId, text);
-    } else {
-        bot.sendMessage(chatId, getHelpMessage(), { parse_mode: 'Markdown' });
-    }
-}
-
-// ========================
-// 자동 정리 및 이벤트 처리
-// ========================
-
-// 30초마다 오래된 파일 정리
+// 🧹 자동 정리 작업
 setInterval(() => {
     cleanupAllTTSFiles();
-}, 30000);
+}, 2 * 60 * 1000); // 2분마다 정리
+
+// 프로세스 종료 시 정리
+process.on('exit', () => {
+    cleanupAllTTSFiles();
+});
+
+process.on('SIGINT', () => {
+    cleanupAllTTSFiles();
+    process.exit(0);
+});
+
+process.on('SIGTERM', () => {
+    cleanupAllTTSFiles();
+    process.exit(0);
+});
 
 // 프로세스 종료 시 정리
 process.on('exit', cleanupAllTTSFiles);
