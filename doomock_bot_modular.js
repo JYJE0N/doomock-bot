@@ -896,30 +896,28 @@ bot.on('callback_query', async (callbackQuery) => {
             const weatherMenuKeyboard = {
                 inline_keyboard: [
                     [
-                        { text: '🏡 현재 날씨 (화성)', callback_data: 'weather_current' },
+                        { text: '🏡 현재날씨(화성)', callback_data: 'weather_current' },
                         { text: '⏰ 시간별 예보', callback_data: 'weather_forecast' }
                     ],
                     [
-                        { text: '🏡 화성/동탄 ⭐', callback_data: 'weather_hwaseong' },
+                        { text: '🏡 동탄', callback_data: 'weather_hwaseong' },
                         { text: '🏙️ 서울', callback_data: 'weather_seoul' },
-                        { text: '🌊 부산', callback_data: 'weather_busan' }
+                        { text: '🏞️ 수원', callback_data: 'weather_suwon' }
                     ],
                     [
-                        { text: '🏔️ 대구', callback_data: 'weather_daegu' },
                         { text: '🌆 인천', callback_data: 'weather_incheon' },
-                        { text: '🌄 광주', callback_data: 'weather_gwangju' }
-                    ],
-                    [
                         { text: '🏛️ 대전', callback_data: 'weather_daejeon' },
-                        { text: '🏭 울산', callback_data: 'weather_ulsan' },
                         { text: '🏛️ 세종', callback_data: 'weather_sejong' }
                     ],
                     [
-                        { text: '🏝️ 제주', callback_data: 'weather_jeju' },
-                        { text: '🏞️ 수원', callback_data: 'weather_suwon' } // 🆕 수원 추가
+                        { text: '🌄 광주', callback_data: 'weather_gwangju' },
+                        { text: '🏭 울산', callback_data: 'weather_ulsan' },
+                        { text: '🏔️ 대구', callback_data: 'weather_daegu' }
                     ],
                     [
-                        { text: '📍 더 많은 지역...', callback_data: 'weather_more_cities' }
+                        { text: '🌊 부산', callback_data: 'weather_busan' },
+                        { text: '🏝️ 제주', callback_data: 'weather_jeju' },
+                        { text: '📍 그 외', callback_data: 'weather_more_cities' }
                     ],
                     [
                         { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
@@ -927,9 +925,10 @@ bot.on('callback_query', async (callbackQuery) => {
                 ]
             };
         
-            bot.editMessageText('🌤️ 날씨 정보 메뉴\n\n🏡 화성/동탄이 기본 지역이에요! ⭐\n원하는 지역을 선택해보세요:', {
+            bot.editMessageText('🌤️ **날씨 정보 메뉴**\n\n🏡 동탄/화성이 기본 지역이에요!\n원하는 지역을 선택해주세요:', {
                 chat_id: chatId,
                 message_id: message.message_id,
+                parse_mode: 'Markdown',
                 reply_markup: weatherMenuKeyboard
             });
             break;
