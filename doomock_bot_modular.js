@@ -1049,177 +1049,171 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            // ===== 기본 케이스 (할일 토글/삭제 등) =====
-            default:
-                // 할일 토글/삭제 처리
-                if (data.startsWith('todo_toggle_')) {
-                    const todoIndex = parseInt(data.replace('todo_toggle_', ''));
-                    try {
-                        const newStatus = await todoFunctions.toggleTodo(userId, todoIndex);
-                        if (newStatus !== null) {
-                            const statusText = newStatus ? '완료' : '미완료';
-                            bot.sendMessage(chatId, `✅ 할일 ${todoIndex + 1}번이 ${statusText}로 변경되었습니다!`, {
-                                reply_markup: { 
-                                    inline_keyboard: [
-                                        [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
-                                        [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                                    ]
-                                }
-                            });
-                        } else {
-                            bot.sendMessage(chatId, '❌ 할일 상태 변경 중 오류가 발생했습니다.');
-                        }
-                    } catch (error) {
-                        console.error('할일 토글 오류:', error);
-                        bot.sendMessage(chatId, '❌ 할일 상태 변경 중 오류가 발생했습니다.');
+            // default 케이스 수정 - 올바른 구조로 변경
+
+// ===== 기본 케이스 (할일 토글/삭제 등) =====
+default:
+    // 할일 토글/삭제 처리
+    if (data.startsWith('todo_toggle_')) {
+        const todoIndex = parseInt(data.replace('todo_toggle_', ''));
+        try {
+            const newStatus = await todoFunctions.toggleTodo(userId, todoIndex);
+            if (newStatus !== null) {
+                const statusText = newStatus ? '완료' : '미완료';
+                bot.sendMessage(chatId, `✅ 할일 ${todoIndex + 1}번이 ${statusText}로 변경되었습니다!`, {
+                    reply_markup: { 
+                        inline_keyboard: [
+                            [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
+                            [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                        ]
                     }
-                } else if (data.startsWith('todo_delete_')) {
-                    const todoIndex = parseInt(data.replace('todo_delete_', ''));
-                    try {
-                        const success = await todoFunctions.deleteTodo(userId, todoIndex);
-                        if (success) {
-                            bot.sendMessage(chatId, `🗑️ 할일 ${todoIndex + 1}번이 삭제되었습니다!`, {
-                                reply_markup: { 
-                                    inline_keyboard: [
-                                        [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
-                                        [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
-                                    ]
-                                }
-                            });
-                        } else {
-                            bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
-                        }
-                    } catch (error) {
-                        console.error('할일 삭제 오류:', error);
-                        bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
+                });
+            } else {
+                bot.sendMessage(chatId, '❌ 할일 상태 변경 중 오류가 발생했습니다.');
+            }
+        } catch (error) {
+            console.error('할일 토글 오류:', error);
+            bot.sendMessage(chatId, '❌ 할일 상태 변경 중 오류가 발생했습니다.');
+        }
+    } else if (data.startsWith('todo_delete_')) {
+        const todoIndex = parseInt(data.replace('todo_delete_', ''));
+        try {
+            const success = await todoFunctions.deleteTodo(userId, todoIndex);
+            if (success) {
+                bot.sendMessage(chatId, `🗑️ 할일 ${todoIndex + 1}번이 삭제되었습니다!`, {
+                    reply_markup: { 
+                        inline_keyboard: [
+                            [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
+                            [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                        ]
                     }
-                } else if (data.startsWith('utils_lang_')) {
-                    const language = data.replace('utils_lang_', '');
-                    userStates.set(userId, { action: 'tts_input', language: language });
-                    
-                    const langNames = {
-                        'ko': '한국어',
-                        'en': 'English',
-                        'ja': '日本語',
-                        'zh': '中文',
-                        'es': 'Español',
-                        'fr': 'Français',
-                        'de': 'Deutsch',
-                        'ru': 'Русский'
-                    };
-                    
-                    bot.sendMessage(chatId, `🔊 **TTS 음성 변환 (${langNames[language]})**\n\n변환할 텍스트를 입력해주세요.`, {
-                        parse_mode: 'Markdown',
-                        reply_markup: {
-                            inline_keyboard: [
-                                [{ text: '❌ 취소', callback_data: 'cancel_action' }]
-                            ]
-                        }
-                    });
-                    } else if (data.startsWith('weather_refresh_')) {
-                        const city = data.replace('weather_refresh_', '');
-                        weather(bot, { chat: { id: chatId }, text: `/weather ${city}` });
-                    } else if (data.startsWith('weather_forecast_')) {
-                        const city = data.replace('weather_forecast_', '');
-                        weather(bot, { chat: { id: chatId }, text: `/weather ${city} 예보` });
-                    // 화성/동탄 맞춤 도시 선택 메뉴
-
-} else if (data === 'weather_cities') {
-    const cityListKeyboard = {
-        inline_keyboard: [
-            [
-                { text: '🏡 화성/동탄', callback_data: 'weather_hwaseong' }, // 🌟 가장 먼저!
-                { text: '🏙️ 서울', callback_data: 'weather_seoul' }
-            ],
-            [
-                { text: '🌆 인천', callback_data: 'weather_incheon' },
-                { text: '🏞️ 수원/경기', callback_data: 'weather_gyeonggi' }
-            ],
-            [
-                { text: '🌊 부산', callback_data: 'weather_busan' },
-                { text: '🏔️ 대구', callback_data: 'weather_daegu' }
-            ],
-            [
-                { text: '🌄 광주', callback_data: 'weather_gwangju' },
-                { text: '🏛️ 대전', callback_data: 'weather_daejeon' }
-            ],
-            [
-                { text: '🏝️ 제주', callback_data: 'weather_jeju' },
-                { text: '📍 더 많은 지역...', callback_data: 'weather_more_cities' }
-            ],
-            [
-                { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
+                });
+            } else {
+                bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
+            }
+        } catch (error) {
+            console.error('할일 삭제 오류:', error);
+            bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
+        }
+    } else if (data.startsWith('utils_lang_')) {
+        const language = data.replace('utils_lang_', '');
+        userStates.set(userId, { action: 'tts_input', language: language });
+        
+        const langNames = {
+            'ko': '한국어',
+            'en': 'English',
+            'ja': '日本語',
+            'zh': '中文',
+            'es': 'Español',
+            'fr': 'Français',
+            'de': 'Deutsch',
+            'ru': 'Русский'
+        };
+        
+        bot.sendMessage(chatId, `🔊 **TTS 음성 변환 (${langNames[language]})**\n\n변환할 텍스트를 입력해주세요.`, {
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [
+                    [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                ]
+            }
+        });
+    } else if (data.startsWith('weather_refresh_')) {
+        const city = data.replace('weather_refresh_', '');
+        weather(bot, { chat: { id: chatId }, text: `/weather ${city}` });
+    } else if (data.startsWith('weather_forecast_')) {
+        const city = data.replace('weather_forecast_', '');
+        weather(bot, { chat: { id: chatId }, text: `/weather ${city} 예보` });
+    } else if (data === 'weather_cities') {
+        const cityListKeyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🏡 화성/동탄', callback_data: 'weather_hwaseong' },
+                    { text: '🏙️ 서울', callback_data: 'weather_seoul' }
+                ],
+                [
+                    { text: '🌆 인천', callback_data: 'weather_incheon' },
+                    { text: '🏞️ 수원/경기', callback_data: 'weather_gyeonggi' }
+                ],
+                [
+                    { text: '🌊 부산', callback_data: 'weather_busan' },
+                    { text: '🏔️ 대구', callback_data: 'weather_daegu' }
+                ],
+                [
+                    { text: '🌄 광주', callback_data: 'weather_gwangju' },
+                    { text: '🏛️ 대전', callback_data: 'weather_daejeon' }
+                ],
+                [
+                    { text: '🏝️ 제주', callback_data: 'weather_jeju' },
+                    { text: '📍 더 많은 지역...', callback_data: 'weather_more_cities' }
+                ],
+                [
+                    { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
+                ]
             ]
-        ]
-    };
+        };
 
-    bot.sendMessage(chatId, '🏙️ **지역 선택**\n\n🏡 화성/동탄 지역이 맨 위에 있어요! ⚡', {
-        parse_mode: 'Markdown',
-        reply_markup: cityListKeyboard
-    });
-
-// 화성 날씨 처리 (경기도 좌표 사용)
-} else if (data === 'weather_hwaseong') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
-
-// 더보기 메뉴
-} else if (data === 'weather_more_cities') {
-    const moreCitiesKeyboard = {
-        inline_keyboard: [
-            [
-                { text: '🏛️ 세종', callback_data: 'weather_sejong' },
-                { text: '🏭 울산', callback_data: 'weather_ulsan' }
-            ],
-            [
-                { text: '⛰️ 강원', callback_data: 'weather_gangwon' },
-                { text: '🌾 충북', callback_data: 'weather_chungbuk' }
-            ],
-            [
-                { text: '🌻 충남', callback_data: 'weather_chungnam' },
-                { text: '🌿 전북', callback_data: 'weather_jeonbuk' }
-            ],
-            [
-                { text: '🌺 전남', callback_data: 'weather_jeonnam' },
-                { text: '🏯 경북', callback_data: 'weather_gyeongbuk' }
-            ],
-            [
-                { text: '🏮 경남', callback_data: 'weather_gyeongnam' }
-            ],
-            [
-                { text: '⬅️ 주요 지역', callback_data: 'weather_cities' },
-                { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
+        bot.sendMessage(chatId, '🏙️ **지역 선택**\n\n🏡 화성/동탄 지역이 맨 위에 있어요! ⚡', {
+            parse_mode: 'Markdown',
+            reply_markup: cityListKeyboard
+        });
+    } else if (data === 'weather_hwaseong') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
+    } else if (data === 'weather_more_cities') {
+        const moreCitiesKeyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🏛️ 세종', callback_data: 'weather_sejong' },
+                    { text: '🏭 울산', callback_data: 'weather_ulsan' }
+                ],
+                [
+                    { text: '⛰️ 강원', callback_data: 'weather_gangwon' },
+                    { text: '🌾 충북', callback_data: 'weather_chungbuk' }
+                ],
+                [
+                    { text: '🌻 충남', callback_data: 'weather_chungnam' },
+                    { text: '🌿 전북', callback_data: 'weather_jeonbuk' }
+                ],
+                [
+                    { text: '🌺 전남', callback_data: 'weather_jeonnam' },
+                    { text: '🏯 경북', callback_data: 'weather_gyeongbuk' }
+                ],
+                [
+                    { text: '🏮 경남', callback_data: 'weather_gyeongnam' }
+                ],
+                [
+                    { text: '⬅️ 주요 지역', callback_data: 'weather_cities' },
+                    { text: '🔙 날씨 메뉴', callback_data: 'weather_menu' }
+                ]
             ]
-        ]
-    };
+        };
 
-    bot.sendMessage(chatId, '🗺️ **전체 지역**\n\n원하는 지역을 선택해주세요:', {
-        parse_mode: 'Markdown',
-        reply_markup: moreCitiesKeyboard
-    });
-
-// 기타 도시들
-} else if (data === 'weather_gyeonggi') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
-} else if (data === 'weather_gangwon') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 강원' });
-} else if (data === 'weather_chungbuk') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 충북' });
-} else if (data === 'weather_chungnam') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 충남' });
-} else if (data === 'weather_jeonbuk') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 전북' });
-} else if (data === 'weather_jeonnam') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 전남' });
-} else if (data === 'weather_gyeongbuk') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 경북' });
-} else if (data === 'weather_gyeongnam') {
-    weather(bot, { chat: { id: chatId }, text: '/weather 경남' });
-                    } else {
-                    // 정말 알 수 없는 콜백
-                    console.log('❓ 알 수 없는 콜백 데이터:', data);
-                    bot.sendMessage(chatId, `❌ 알 수 없는 명령입니다. /start 를 입력해서 메뉴를 다시 확인해주세요.`);
-                }
-                break;
+        bot.sendMessage(chatId, '🗺️ **전체 지역**\n\n원하는 지역을 선택해주세요:', {
+            parse_mode: 'Markdown',
+            reply_markup: moreCitiesKeyboard
+        });
+    } else if (data === 'weather_gyeonggi') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 경기' });
+    } else if (data === 'weather_gangwon') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 강원' });
+    } else if (data === 'weather_chungbuk') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 충북' });
+    } else if (data === 'weather_chungnam') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 충남' });
+    } else if (data === 'weather_jeonbuk') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 전북' });
+    } else if (data === 'weather_jeonnam') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 전남' });
+    } else if (data === 'weather_gyeongbuk') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 경북' });
+    } else if (data === 'weather_gyeongnam') {
+        weather(bot, { chat: { id: chatId }, text: '/weather 경남' });
+    } else {
+        // 정말 알 수 없는 콜백
+        console.log('❓ 알 수 없는 콜백 데이터:', data);
+        bot.sendMessage(chatId, `❌ 알 수 없는 명령입니다. /start 를 입력해서 메뉴를 다시 확인해주세요.`);
+    }
+    break;
         }
     } catch (error) {
         console.error('콜백 처리 오류:', error);
