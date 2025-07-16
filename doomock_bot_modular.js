@@ -457,7 +457,7 @@ bot.on('callback_query', async (callbackQuery) => {
     const userId = callbackQuery.from.id;
 
     // 콜백 쿼리 응답 (로딩 표시 제거)
-    bot.answerCallbackQuery(callbackQuery.id);
+    bot.answercallbackQuery(callbackQuery.id);
 
     try {
         switch (data) {
