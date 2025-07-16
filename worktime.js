@@ -9,7 +9,12 @@ const formatTimeString = (time) => {
   return `${hours}:${minutes}`;
 };
 
+// 🔧 수정된 getUserName 함수 - 안전한 접근
 const getUserName = (msg) => {
+  // msg.from이 존재하는지 먼저 확인
+  if (!msg || !msg.from) {
+    return '사용자';
+  }
   return msg.from.first_name || msg.from.username || '사용자';
 };
 
@@ -94,7 +99,7 @@ const workTimeManager = new WorkTimeManager();
 module.exports = function(bot, msg) {
   const text = msg.text;
   const chatId = msg.chat.id;
-  const userName = getUserName(msg);
+  const userName = getUserName(msg); // 이제 안전하게 호출됨
   
   if (text === '/worktime') {
     // 현재 업무시간 및 상태 보기
@@ -114,5 +119,11 @@ module.exports = function(bot, msg) {
       '/worktime - 현재 근무 상태 확인\n\n' +
       '현재 시간을 기준으로 업무 시작/종료까지 남은 시간을 알려드립니다! ⏰'
     );
+  } else {
+    // text가 없는 경우 (콜백 쿼리에서 호출될 때)
+    const scheduleText = workTimeManager.formatSchedule();
+    const status = workTimeManager.getWorkStatus();
+    
+    bot.sendMessage(chatId, `${scheduleText}\n\n${status.message}`);
   }
 };
