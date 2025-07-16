@@ -1,7 +1,28 @@
-// dust_marketing_insights.js - 미세먼지 마케팅 인사이트 봇
+// dust_marketing_insights.js - 오류 수정 버전
 
 const axios = require('axios');
 const { getUserName } = require('./username_helper');
+
+// 한국 주요 도시 측정소 정보
+const MONITORING_STATIONS = {
+    '서울': '종로구',
+    '부산': '부산',
+    '대구': '대구',
+    '인천': '인천',
+    '광주': '광주',
+    '대전': '대전',
+    '울산': '울산',
+    '세종': '세종',
+    '경기': '수원',
+    '강원': '춘천',
+    '충북': '청주',
+    '충남': '천안',
+    '전북': '전주',
+    '전남': '목포',
+    '경북': '포항',
+    '경남': '창원',
+    '제주': '제주'
+};
 
 class DustMarketingInsights {
     constructor() {
@@ -36,14 +57,92 @@ class DustMarketingInsights {
                 keyProducts: ['방한마스크', '실내필터', '가습기필터']
             }
         };
-        
-        // 이커머스 준비 체크리스트
-        this.ecommercePreparation = {
-            inventory: '재고 관리',
-            marketing: '마케팅 전략',
-            content: '콘텐츠 준비',
-            customer: '고객 서비스',
-            logistics: '물류 준비'
+    }
+
+    // 🔧 수정된 실시간 대기질 정보 가져오기
+    async getCurrentAirQuality(stationName = '종로구') {
+        try {
+            console.log(`🔍 API 호출 시작: ${stationName}`);
+            
+            const response = await axios.get(`${this.baseUrl}/getMsrstnAcctoRltmMesureDnsty`, {
+                params: {
+                    serviceKey: this.airKoreaApiKey,
+                    returnType: 'json',
+                    numOfRows: 1,
+                    pageNo: 1,
+                    stationName: stationName,
+                    dataTerm: 'DAILY',
+                    ver: '1.0'
+                },
+                timeout: 10000 // 10초 타임아웃
+            });
+
+            console.log('📡 API 응답 받음');
+            
+            // 🔧 안전한 응답 체크
+            if (response && response.data && response.data.response) {
+                const apiResponse = response.data.response;
+                
+                // 헤더 확인
+                if (apiResponse.header && apiResponse.header.resultCode === '00') {
+                    // 바디 확인
+                    if (apiResponse.body && apiResponse.body.items && apiResponse.body.items.length > 0) {
+                        const data = apiResponse.body.items[0];
+                        
+                        console.log('✅ API 데이터 파싱 성공');
+                        return {
+                            station: stationName,
+                            pm10: parseInt(data.pm10Value) || 0,
+                            pm25: parseInt(data.pm25Value) || 0,
+                            o3: parseFloat(data.o3Value) || 0,
+                            no2: parseFloat(data.no2Value) || 0,
+                            co: parseFloat(data.coValue) || 0,
+                            so2: parseFloat(data.so2Value) || 0,
+                            dataTime: data.dataTime || new Date().toISOString()
+                        };
+                    } else {
+                        console.log('⚠️ API 데이터 없음, 더미 데이터 사용');
+                        return this.getDummyAirQuality(stationName);
+                    }
+                } else {
+                    console.log('⚠️ API 오류 응답:', apiResponse.header?.resultMsg || 'Unknown error');
+                    return this.getDummyAirQuality(stationName);
+                }
+            } else {
+                console.log('⚠️ API 응답 구조 오류, 더미 데이터 사용');
+                return this.getDummyAirQuality(stationName);
+            }
+        } catch (error) {
+            console.error('❌ API 호출 실패:', error.message);
+            console.log('🔄 더미 데이터로 대체');
+            return this.getDummyAirQuality(stationName);
+        }
+    }
+
+    // 🔧 수정된 더미 데이터 생성
+    getDummyAirQuality(stationName) {
+        const season = this.getCurrentSeason();
+        const baseValues = {
+            spring: { pm10: 65, pm25: 35 }, // 봄철 높음
+            summer: { pm10: 35, pm25: 20 }, // 여름철 보통
+            autumn: { pm10: 55, pm25: 28 }, // 가을철 높음
+            winter: { pm10: 45, pm25: 25 }  // 겨울철 보통
+        };
+
+        const base = baseValues[season];
+        const variation = Math.floor(Math.random() * 30) - 15;
+
+        console.log(`🎲 더미 데이터 생성 (${season}): PM10=${base.pm10}, PM2.5=${base.pm25}`);
+
+        return {
+            station: stationName,
+            pm10: Math.max(0, base.pm10 + variation),
+            pm25: Math.max(0, base.pm25 + variation),
+            o3: 0.03 + Math.random() * 0.02,
+            no2: 0.02 + Math.random() * 0.01,
+            co: 0.5 + Math.random() * 0.3,
+            so2: 0.003 + Math.random() * 0.002,
+            dataTime: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
     }
 
@@ -79,59 +178,95 @@ class DustMarketingInsights {
         return Math.min(10, baseScores[dustLevel] * seasonMultiplier * weekendMultiplier);
     }
 
-    // 실시간 대기질 정보 가져오기
-    async getCurrentAirQuality(stationName = '종로구') {
-        try {
-            const response = await axios.get(`${this.baseUrl}/getMsrstnAcctoRltmMesureDnsty`, {
-                params: {
-                    serviceKey: this.airKoreaApiKey,
-                    returnType: 'json',
-                    numOfRows: 1,
-                    pageNo: 1,
-                    stationName: stationName,
-                    dataTerm: 'DAILY',
-                    ver: '1.0'
-                }
-            });
+    // 🔧 수정된 전국 현황 조회
+    async getNationalDustStatus() {
+        const results = [];
+        const cities = Object.entries(MONITORING_STATIONS).slice(0, 5); // 주요 5개 도시만
 
-            if (response.data.response.header.resultCode === '00') {
-                const data = response.data.response.body.items[0];
-                return {
+        console.log('🗺️ 전국 현황 조회 시작...');
+
+        for (const [cityName, stationName] of cities) {
+            try {
+                const data = await this.getCurrentAirQuality(stationName);
+                const recommendation = this.getMaskRecommendation(data.pm10, data.pm25);
+                
+                results.push({
+                    city: cityName,
                     station: stationName,
-                    pm10: parseInt(data.pm10Value) || 0,
-                    pm25: parseInt(data.pm25Value) || 0,
-                    o3: parseFloat(data.o3Value) || 0,
-                    dataTime: data.dataTime
-                };
+                    pm10: data.pm10,
+                    pm25: data.pm25,
+                    level: recommendation.level,
+                    emoji: recommendation.emoji,
+                    color: recommendation.color,
+                    mask: recommendation.mask
+                });
+            } catch (error) {
+                console.error(`❌ ${cityName} 데이터 조회 실패:`, error.message);
+                // 오류 발생 시 더미 데이터 추가
+                const dummyData = this.getDummyAirQuality(stationName);
+                const recommendation = this.getMaskRecommendation(dummyData.pm10, dummyData.pm25);
+                
+                results.push({
+                    city: cityName,
+                    station: stationName,
+                    pm10: dummyData.pm10,
+                    pm25: dummyData.pm25,
+                    level: recommendation.level,
+                    emoji: recommendation.emoji,
+                    color: recommendation.color,
+                    mask: recommendation.mask
+                });
             }
-        } catch (error) {
-            console.error('대기질 정보 조회 실패:', error);
         }
-        
-        // 실패 시 더미 데이터 반환
-        return this.getDummyAirQuality(stationName);
+
+        console.log(`✅ 전국 현황 조회 완료: ${results.length}개 도시`);
+        return results;
     }
 
-    // 더미 데이터 생성
-    getDummyAirQuality(stationName) {
-        const season = this.getCurrentSeason();
-        const baseValues = {
-            spring: { pm10: 65, pm25: 35 }, // 봄철 높음
-            summer: { pm10: 35, pm25: 20 }, // 여름철 보통
-            autumn: { pm10: 55, pm25: 28 }, // 가을철 높음
-            winter: { pm10: 45, pm25: 25 }  // 겨울철 보통
+    // 미세먼지 농도에 따른 마스크 추천
+    getMaskRecommendation(pm10, pm25) {
+        const dustLevel = this.getDustLevel(pm10, pm25);
+        
+        const recommendations = {
+            good: {
+                level: '좋음',
+                emoji: '😊',
+                color: '🟢',
+                mask: '일반 마스크 또는 마스크 불필요',
+                filterType: '일반 부직포',
+                advice: '야외 활동하기 좋은 날입니다!',
+                businessTip: '마스크 판매량 낮음, 프로모션 적기'
+            },
+            moderate: {
+                level: '보통',
+                emoji: '😐',
+                color: '🟡',
+                mask: 'KF80 마스크 권장',
+                filterType: 'KF80 필터',
+                advice: '민감한 분들은 마스크 착용 권장',
+                businessTip: 'KF80 제품 재고 확인 필요'
+            },
+            bad: {
+                level: '나쁨',
+                emoji: '😷',
+                color: '🟠',
+                mask: 'KF94 마스크 필수',
+                filterType: 'KF94 고성능 필터',
+                advice: '외출 시 마스크 필수 착용',
+                businessTip: 'KF94 재고 긴급 확인, 마케팅 강화'
+            },
+            veryBad: {
+                level: '매우나쁨',
+                emoji: '😵',
+                color: '🔴',
+                mask: 'KF94 마스크 + 실내 공기청정기',
+                filterType: 'KF94 + 공기청정기 필터',
+                advice: '외출 자제, 마스크 필수 착용',
+                businessTip: '전 제품 재고 확인, 긴급 주문 검토'
+            }
         };
 
-        const base = baseValues[season];
-        const variation = Math.floor(Math.random() * 30) - 15;
-
-        return {
-            station: stationName,
-            pm10: Math.max(0, base.pm10 + variation),
-            pm25: Math.max(0, base.pm25 + variation),
-            o3: 0.03 + Math.random() * 0.02,
-            dataTime: new Date().toISOString().replace('T', ' ').substring(0, 19)
-        };
+        return recommendations[dustLevel];
     }
 
     // 종합 마케팅 인사이트 생성
@@ -141,20 +276,17 @@ class DustMarketingInsights {
         const isWeekend = [0, 6].includes(new Date().getDay());
         const opportunityScore = this.calculateMarketingOpportunityScore(dustLevel, season, isWeekend);
         
-        const insights = {
+        console.log(`💡 인사이트 생성: ${dustLevel} (점수: ${opportunityScore})`);
+        
+        return {
             currentSituation: this.analyzCurrentSituation(dustData, dustLevel, season),
             marketingOpportunity: this.getMarketingOpportunity(dustLevel, season, opportunityScore),
             inventoryStrategy: this.getInventoryStrategy(dustLevel, season),
             marketingStrategy: this.getMarketingStrategy(dustLevel, season),
             contentStrategy: this.getContentStrategy(dustLevel, season),
-            customerService: this.getCustomerServiceStrategy(dustLevel, season),
-            competitorAnalysis: this.getCompetitorAnalysis(dustLevel, season),
             actionPlan: this.getActionPlan(dustLevel, season, opportunityScore),
-            riskManagement: this.getRiskManagement(dustLevel, season),
-            longTermStrategy: this.getLongTermStrategy(season)
+            riskManagement: this.getRiskManagement(dustLevel, season)
         };
-
-        return insights;
     }
 
     // 현재 상황 분석
@@ -302,17 +434,6 @@ class DustMarketingInsights {
                     '유튜브 프리롤 광고 (건강 관련 콘텐츠)'
                 ]
             });
-            
-            strategies.push({
-                channel: 'content',
-                title: '📝 콘텐츠 마케팅',
-                tactics: [
-                    '미세먼지 대응 가이드 제작',
-                    '제품 착용법 영상 제작',
-                    '고객 후기 및 사용 팁 수집',
-                    '전문가 인터뷰 콘텐츠'
-                ]
-            });
         } else {
             strategies.push({
                 channel: 'brand',
@@ -347,17 +468,6 @@ class DustMarketingInsights {
                     '건강한 생활 습관 가이드'
                 ]
             });
-            
-            contentTypes.push({
-                type: 'urgency',
-                title: '🚨 긴급성 콘텐츠',
-                content: [
-                    '오늘의 미세먼지 현황',
-                    '즉시 필요한 보호 조치',
-                    '응급 상황 대응법',
-                    '어린이/노인 특별 주의사항'
-                ]
-            });
         } else {
             contentTypes.push({
                 type: 'lifestyle',
@@ -377,94 +487,8 @@ class DustMarketingInsights {
         };
     }
 
-    // 고객 서비스 전략
-    getCustomerServiceStrategy(dustLevel, season) {
-        const strategies = [];
-        
-        if (dustLevel === 'veryBad' || dustLevel === 'bad') {
-            strategies.push({
-                type: 'immediate',
-                title: '🚨 긴급 고객 대응',
-                actions: [
-                    'CS팀 인력 2배 증원',
-                    '24시간 문의 대응 체계',
-                    '배송 지연 사전 안내',
-                    '대량 주문 우선 처리'
-                ]
-            });
-        } else {
-            strategies.push({
-                type: 'normal',
-                title: '😊 일반 고객 서비스',
-                actions: [
-                    '정기 고객 만족도 조사',
-                    '제품 사용법 안내',
-                    '리뷰 관리 및 답변',
-                    '고객 피드백 수집'
-                ]
-            });
-        }
-
-        return {
-            urgency: dustLevel === 'veryBad' ? 'high' : 'normal',
-            strategies: strategies
-        };
-    }
-
-    // 경쟁사 분석
-    getCompetitorAnalysis(dustLevel, season) {
-        const analysis = [];
-        
-        if (dustLevel === 'veryBad' || dustLevel === 'bad') {
-            analysis.push({
-                focus: 'pricing',
-                title: '💰 가격 경쟁력',
-                checks: [
-                    '주요 경쟁사 가격 실시간 모니터링',
-                    '프로모션 및 할인 정책 분석',
-                    '배송비 정책 비교',
-                    '번들 상품 구성 분석'
-                ]
-            });
-            
-            analysis.push({
-                focus: 'availability',
-                title: '📦 재고 및 가용성',
-                checks: [
-                    '경쟁사 품절 상황 모니터링',
-                    '신제품 출시 동향',
-                    '공급업체 겹침 분석',
-                    '배송 속도 비교'
-                ]
-            });
-        } else {
-            analysis.push({
-                focus: 'strategy',
-                title: '🎯 전략적 분석',
-                checks: [
-                    '브랜드 포지셔닝 분석',
-                    '마케팅 메시지 분석',
-                    '고객 리뷰 트렌드',
-                    '신규 진입 업체 모니터링'
-                ]
-            });
-        }
-
-        return {
-            urgency: dustLevel === 'veryBad' ? 'high' : 'normal',
-            analysis: analysis
-        };
-    }
-
     // 액션 플랜
     getActionPlan(dustLevel, season, score) {
-        const timeframes = {
-            immediate: '즉시 (1-2시간)',
-            short: '단기 (1-3일)',
-            medium: '중기 (1-2주)',
-            long: '장기 (1개월 이상)'
-        };
-
         const plans = [];
         
         if (score >= 8) {
@@ -476,17 +500,6 @@ class DustMarketingInsights {
                     '광고 예산 증액 승인',
                     'CS팀 비상 대기',
                     '주요 고객사 연락'
-                ]
-            });
-            
-            plans.push({
-                timeframe: 'short',
-                title: '📈 단기 실행 (1-3일)',
-                tasks: [
-                    '긴급 마케팅 캠페인 런칭',
-                    '콘텐츠 제작 및 배포',
-                    '배송 체계 점검',
-                    '경쟁사 대응 전략 수립'
                 ]
             });
         } else {
@@ -524,18 +537,6 @@ class DustMarketingInsights {
                     '공급업체와 긴밀한 소통'
                 ]
             });
-            
-            risks.push({
-                type: 'logistics',
-                title: '🚚 물류 리스크',
-                description: '배송 지연 및 고객 불만 증가',
-                mitigation: [
-                    '물류 업체 비상 계획 수립',
-                    '배송 지연 사전 안내',
-                    '우선 배송 시스템 구축',
-                    '대안 배송 방법 확보'
-                ]
-            });
         } else {
             risks.push({
                 type: 'market',
@@ -553,38 +554,6 @@ class DustMarketingInsights {
         return {
             level: dustLevel === 'veryBad' ? 'high' : dustLevel === 'bad' ? 'medium' : 'low',
             risks: risks
-        };
-    }
-
-    // 장기 전략
-    getLongTermStrategy(season) {
-        const strategies = [];
-        
-        strategies.push({
-            area: 'product',
-            title: '🔬 제품 개발',
-            plans: [
-                '계절별 맞춤 제품 개발',
-                '기술 혁신 투자',
-                '친환경 제품 라인 확대',
-                '고객 맞춤형 솔루션'
-            ]
-        });
-        
-        strategies.push({
-            area: 'market',
-            title: '🌐 시장 확대',
-            plans: [
-                'B2B 시장 진출',
-                '해외 시장 개척',
-                '온라인 채널 다각화',
-                '구독 모델 도입'
-            ]
-        });
-
-        return {
-            horizon: '6개월-1년',
-            strategies: strategies
         };
     }
 
@@ -693,10 +662,15 @@ module.exports = function(bot, msg) {
     const userName = getUserName(msg.from);
     const insightManager = new DustMarketingInsights();
 
+    console.log(`📥 인사이트 요청: ${text} (사용자: ${userName})`);
+
     if (text === '/insight' || text === '/인사이트') {
+        console.log('🔍 종합 마케팅 인사이트 생성 시작...');
+        
         // 종합 마케팅 인사이트 생성
         insightManager.getCurrentAirQuality()
             .then(dustData => {
+                console.log('📊 대기질 데이터 획득 완료');
                 const insights = insightManager.generateMarketingInsights(dustData, userName);
                 const report = insightManager.formatInsightReport(insights, dustData, userName);
                 
@@ -720,16 +694,20 @@ module.exports = function(bot, msg) {
                     ]
                 };
                 
+                console.log('✅ 인사이트 전송 준비 완료');
                 bot.sendMessage(chatId, report, {
                     parse_mode: 'Markdown',
                     reply_markup: keyboard
                 });
             })
             .catch(error => {
-                bot.sendMessage(chatId, `❌ 인사이트 생성 중 오류 발생: ${error.message}`);
+                console.error('❌ 인사이트 생성 실패:', error);
+                bot.sendMessage(chatId, `❌ 인사이트 생성 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
             });
 
     } else if (text === '/insight quick' || text === '/인사이트 간단') {
+        console.log('⚡ 빠른 인사이트 생성 시작...');
+        
         // 빠른 인사이트
         insightManager.getCurrentAirQuality()
             .then(dustData => {
@@ -749,6 +727,7 @@ module.exports = function(bot, msg) {
                 bot.sendMessage(chatId, quickReport, { parse_mode: 'Markdown' });
             })
             .catch(error => {
+                console.error('❌ 빠른 인사이트 생성 실패:', error);
                 bot.sendMessage(chatId, `❌ 빠른 인사이트 생성 실패: ${error.message}`);
             });
 
@@ -775,12 +754,14 @@ module.exports = function(bot, msg) {
     }
 };
 
-// 콜백 처리 함수
+// 🔧 수정된 콜백 처리 함수
 module.exports.handleCallback = async function(bot, callbackQuery) {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
     const userName = getUserName(callbackQuery.from);
     const insightManager = new DustMarketingInsights();
+
+    console.log(`📞 인사이트 콜백 처리: ${data}`);
 
     try {
         const dustData = await insightManager.getCurrentAirQuality();
@@ -847,13 +828,18 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
 
             case 'insight_refresh':
                 bot.sendMessage(chatId, '🔄 최신 데이터로 인사이트를 새로고침합니다...');
+                // 새로고침 후 메인 인사이트 재전송
+                setTimeout(() => {
+                    module.exports(bot, { chat: { id: chatId }, from: callbackQuery.from, text: '/insight' });
+                }, 1000);
                 break;
 
             default:
                 bot.sendMessage(chatId, '🚧 해당 기능은 개발 중입니다!');
         }
     } catch (error) {
-        bot.sendMessage(chatId, `❌ 처리 중 오류 발생: ${error.message}`);
+        console.error('❌ 콜백 처리 중 오류:', error);
+        bot.sendMessage(chatId, `❌ 처리 중 오류 발생: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
     }
 };
 
