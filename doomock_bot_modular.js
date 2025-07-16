@@ -277,8 +277,11 @@ bot.on('message', async (msg) => {
                 }
                 break;
             default:
-                bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.');
+        // 명령어가 아닌 일반 텍스트는 무시
+        if (text.startsWith('/')) {
+            bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.');
         }
+        break;
     } catch (error) {
         console.error('메시지 처리 오류:', error);
         bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다.');
