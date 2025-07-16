@@ -231,6 +231,7 @@ bot.on('message', async (msg) => {
             } catch (error) {
                 console.error('할일 추가 오류:', error);
                 bot.sendMessage(chatId, '❌ 할일 추가 중 오류가 발생했습니다.');
+                userStates.delete(userId);
             }
             return;
         }
@@ -239,11 +240,16 @@ bot.on('message', async (msg) => {
         if (userState && userState.action === 'tts_input') {
             try {
                 const language = userState.language || 'ko';
-                utils.handleTTSCommand(bot, chatId, userId, `/tts ${language} ${text}`);
+                if (typeof utils.handleTTSCommand === 'function') {
+                    utils.handleTTSCommand(bot, chatId, userId, `/tts ${language} ${text}`);
+                } else {
+                    bot.sendMessage(chatId, `📝 TTS 요청: "${text}" (${language})\n⚠️ TTS 패키지가 설치되지 않았습니다.`);
+                }
                 userStates.delete(userId);
             } catch (error) {
                 console.error('TTS 처리 오류:', error);
-                bot.sendMessage(chatId, '❌ TTS 처리 중 오류가 발생했습니다.');
+                bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, TTS 처리 중 오류가 발생했습니다.`);
+                userStates.delete(userId);
             }
             return;
         }
@@ -303,6 +309,7 @@ bot.on('message', async (msg) => {
             } catch (error) {
                 console.error('연차 설정 오류:', error);
                 bot.sendMessage(chatId, '❌ 연차 설정 중 오류가 발생했습니다.');
+                userStates.delete(userId);
             }
             return;
         }
@@ -331,6 +338,7 @@ bot.on('message', async (msg) => {
             } catch (error) {
                 console.error('연차 사용 오류:', error);
                 bot.sendMessage(chatId, `❌ ${error.message}`);
+                userStates.delete(userId);
             }
             return;
         }
@@ -387,6 +395,48 @@ bot.on('message', async (msg) => {
                 }
                 break;
             default:
+            case 'cancel_action':
+                const currentState = userStates.get(userId);
+                userStates.delete(userId);
+                
+                let cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 작업이 취소되었습니다.`;
+                let backButton = 'main_menu';
+                
+                if (currentState) {
+                    switch (currentState.action) {
+                        case 'adding_todo':
+                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 할일 추가가 취소되었습니다.`;
+                            backButton = 'todo_menu';
+                            break;
+                        case 'using_leave':
+                        case 'setting_total_leave':
+                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 연차 설정이 취소되었습니다.`;
+                            backButton = 'leave_menu';
+                            break;
+                        case 'timer_start':
+                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 타이머 시작이 취소되었습니다.`;
+                            backButton = 'timer_menu';
+                            break;
+                        case 'tts_input':
+                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, TTS 변환이 취소되었습니다.`;
+                            backButton = 'utils_menu';
+                            break;
+                        case 'remind_minutes':
+                        case 'remind_time':
+                            cancelMessage = `❌ ${getUserName(callbackQuery.from)}님, 리마인더 설정이 취소되었습니다.`;
+                            backButton = 'reminder_menu';
+                            break;
+                    }
+                }
+                
+                bot.sendMessage(chatId, cancelMessage, {
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '🔙 돌아가기', callback_data: backButton }]
+                        ]
+                    }
+                });
+                break;
                 // 명령어가 아닌 일반 텍스트는 무시
                 if (text.startsWith('/')) {
                     bot.sendMessage(chatId, `😅 ${getUserName(msg.from)}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`);
@@ -448,12 +498,26 @@ bot.on('callback_query', async (callbackQuery) => {
 
             case 'use_leave':
                 userStates.set(userId, { action: 'using_leave' });
-                bot.sendMessage(chatId, '🏖️ 연차 사용하기\n\n사용할 연차 일수를 입력해주세요.\n예: 1 (하루), 0.5 (반차)\n\n취소하려면 /cancel 을 입력하세요.');
+                bot.sendMessage(chatId, '🏖️ **연차 사용하기**\n\n사용할 연차 일수를 입력해주세요.\n예: 1 (하루), 0.5 (반차)', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
+                });
                 break;
 
             case 'set_leave':
                 userStates.set(userId, { action: 'setting_total_leave' });
-                bot.sendMessage(chatId, '⚙️ 연차 설정하기\n\n총 연차 일수를 입력해주세요.\n예: 15\n\n취소하려면 /cancel 을 입력하세요.');
+                bot.sendMessage(chatId, '⚙️ **연차 설정하기**\n\n총 연차 일수를 입력해주세요.\n예: 15', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
+                });
                 break;
 
             // 할일 관리 관련
@@ -507,7 +571,14 @@ bot.on('callback_query', async (callbackQuery) => {
 
             case 'todo_add':
                 userStates.set(userId, { action: 'adding_todo' });
-                bot.sendMessage(chatId, '📝 **할일 추가하기**\n\n추가할 할일을 입력해주세요.\n\n취소하려면 /cancel 을 입력하세요.');
+                bot.sendMessage(chatId, '📝 **할일 추가하기**\n\n추가할 할일을 입력해주세요.', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
+                });
                 break;
 
             case 'todo_stats':
@@ -659,8 +730,13 @@ bot.on('callback_query', async (callbackQuery) => {
 
             case 'timer_start_prompt':
                 userStates.set(userId, { action: 'timer_start' });
-                bot.sendMessage(chatId, '⏰ **타이머 시작하기**\n\n작업명을 입력해주세요.\n\n예시:\n• 공부하기\n• [공부] 수학 문제풀이\n• [운동] 헬스장 가기\n\n취소하려면 /cancel 을 입력하세요.', {
-                    parse_mode: 'Markdown'
+                bot.sendMessage(chatId, '⏰ **타이머 시작하기**\n\n작업명을 입력해주세요.\n\n예시:\n• 공부하기\n• [공부] 수학 문제풀이\n• [운동] 헬스장 가기', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
                 });
                 break;
 
@@ -718,57 +794,120 @@ bot.on('callback_query', async (callbackQuery) => {
 
             case 'remind_minutes':
                 userStates.set(userId, { action: 'remind_minutes' });
-                bot.sendMessage(chatId, '⏰ **분 단위 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[분] [내용]`\n\n예시:\n• `30 독서하기`\n• `60 회의 준비`\n• `5 물 마시기`\n\n취소하려면 /cancel 을 입력하세요.', {
-                    parse_mode: 'Markdown'
+                bot.sendMessage(chatId, '⏰ **분 단위 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[분] [내용]`\n\n예시:\n• `30 독서하기`\n• `60 회의 준비`\n• `5 물 마시기`', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
                 });
                 break;
 
             case 'remind_time':
                 userStates.set(userId, { action: 'remind_time' });
-                bot.sendMessage(chatId, '🕐 **시간 지정 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[시:분] [내용]`\n\n예시:\n• `14:30 점심약속`\n• `09:00 출근`\n• `18:00 퇴근`\n\n취소하려면 /cancel 을 입력하세요.', {
-                    parse_mode: 'Markdown'
+                bot.sendMessage(chatId, '🕐 **시간 지정 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[시:분] [내용]`\n\n예시:\n• `14:30 점심약속`\n• `09:00 출근`\n• `18:00 퇴근`', {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
                 });
                 break;
 
             // 유틸리티 관련
             case 'utils_menu':
-                bot.editMessageText('🛠️ 유틸리티 메뉴\n\n원하는 기능을 선택해주세요:', {
+                const utilsKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🔊 TTS 음성변환', callback_data: 'utils_tts' },
+                            { text: '🌍 언어 선택', callback_data: 'utils_language' }
+                        ],
+                        [
+                            { text: '❓ TTS 도움말', callback_data: 'utils_tts_help' },
+                            { text: '📋 사용 예시', callback_data: 'utils_examples' }
+                        ],
+                        [
+                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                        ]
+                    ]
+                };
+                
+                bot.editMessageText(`🛠️ ${getUserName(callbackQuery.from)}님의 유틸리티 메뉴\n\n원하는 기능을 선택해주세요:`, {
                     chat_id: chatId,
                     message_id: message.message_id,
-                    reply_markup: utils.utilsManager.getUtilsMenuKeyboard()
+                    reply_markup: utilsKeyboard
                 });
                 break;
 
             case 'utils_tts':
                 userStates.set(userId, { action: 'tts_input', language: 'ko' });
-                bot.sendMessage(chatId, `🔊 **${getUserName(callbackQuery.from)}님의 TTS 음성 변환**\n\n변환할 텍스트를 입력해주세요.\n\n예시:\n• 안녕하세요\n• 오늘 날씨가 좋네요\n• 두목봇 최고!\n\n취소하려면 /cancel 을 입력하세요.`, {
-                    parse_mode: 'Markdown'
+                bot.sendMessage(chatId, `🔊 **${getUserName(callbackQuery.from)}님의 TTS 음성 변환**\n\n변환할 텍스트를 입력해주세요.\n\n예시:\n• 안녕하세요\n• 오늘 날씨가 좋네요\n• 두목봇 최고!`, {
+                    parse_mode: 'Markdown',
+                    reply_markup: {
+                        inline_keyboard: [
+                            [{ text: '❌ 취소', callback_data: 'cancel_action' }]
+                        ]
+                    }
                 });
                 break;
 
             case 'utils_language':
+                const languageKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🇰🇷 한국어 (ko)', callback_data: 'utils_lang_ko' },
+                            { text: '🇺🇸 English (en)', callback_data: 'utils_lang_en' }
+                        ],
+                        [
+                            { text: '🇯🇵 日本語 (ja)', callback_data: 'utils_lang_ja' },
+                            { text: '🇨🇳 中文 (zh)', callback_data: 'utils_lang_zh' }
+                        ],
+                        [
+                            { text: '🇪🇸 Español (es)', callback_data: 'utils_lang_es' },
+                            { text: '🇫🇷 Français (fr)', callback_data: 'utils_lang_fr' }
+                        ],
+                        [
+                            { text: '🇩🇪 Deutsch (de)', callback_data: 'utils_lang_de' },
+                            { text: '🇷🇺 Русский (ru)', callback_data: 'utils_lang_ru' }
+                        ],
+                        [
+                            { text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }
+                        ]
+                    ]
+                };
+                
                 bot.sendMessage(chatId, '🌍 **언어 선택**\n\n사용할 언어를 선택해주세요:', {
                     parse_mode: 'Markdown',
-                    reply_markup: utils.utilsManager.getLanguageKeyboard()
+                    reply_markup: languageKeyboard
                 });
                 break;
 
             case 'utils_tts_help':
-                bot.sendMessage(chatId, utils.utilsManager.getTTSHelp(), {
-                    parse_mode: 'Markdown',
-                    reply_markup: { 
-                        inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] 
+                bot.sendMessage(chatId, 
+                    `🔊 **TTS 도움말**\n\n` +
+                    `**사용법:**\n• /tts [텍스트] - 한국어 음성\n• /tts [언어] [텍스트] - 특정 언어\n\n` +
+                    `**지원 언어:** ko, en, ja, zh, es, fr, de, ru\n\n` +
+                    `**예시:**\n• /tts 안녕하세요\n• /tts en Hello\n• /tts ja こんにちは\n\n` +
+                    `**제한:** 최대 200자`, 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] }
                     }
-                });
+                );
                 break;
 
             case 'utils_examples':
-                bot.sendMessage(chatId, utils.utilsManager.getExamplesMessage(), {
-                    parse_mode: 'Markdown',
-                    reply_markup: { 
-                        inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] 
+                bot.sendMessage(chatId, 
+                    `📋 **TTS 예시**\n\n` +
+                    `🇰🇷 /tts 안녕하세요\n🇺🇸 /tts en Hello\n🇯🇵 /tts ja こんにちは\n🇨🇳 /tts zh 你好\n\n` +
+                    `💡 언어코드 생략 시 한국어로 생성됩니다!`, 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: { inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] }
                     }
-                });
+                );
                 break;
 
             default:
@@ -827,12 +966,28 @@ bot.on('callback_query', async (callbackQuery) => {
 // 프로세스 종료 시 정리
 process.on('SIGINT', async () => {
     console.log('봇 종료 중...');
+    
+    // TTS 파일 정리
+    if (typeof utils.cleanupAllTTSFiles === 'function') {
+        utils.cleanupAllTTSFiles();
+    }
+    
+    // 연차 관리 종료
     await leaveManager.close();
+    
     process.exit(0);
 });
 
 process.on('SIGTERM', async () => {
     console.log('봇 종료 중...');
+    
+    // TTS 파일 정리  
+    if (typeof utils.cleanupAllTTSFiles === 'function') {
+        utils.cleanupAllTTSFiles();
+    }
+    
+    // 연차 관리 종료
     await leaveManager.close();
+    
     process.exit(0);
 });
