@@ -208,15 +208,15 @@ const insightMenuKeyboard = {
             { text: '⚡ 빠른 인사이트', callback_data: 'insight_quick' }
         ],
         [
-            { text: '📦 재고 전략', callback_data: 'insight_inventory' },
-            { text: '🎯 마케팅 전략', callback_data: 'insight_marketing' }
+            { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' },
+            { text: '📦 재고 전략', callback_data: 'insight_inventory' }
         ],
         [
-            { text: '📝 콘텐츠 전략', callback_data: 'insight_content' },
-            { text: '⚠️ 리스크 분석', callback_data: 'insight_risk' }
+            { text: '🎯 마케팅 전략', callback_data: 'insight_marketing' },
+            { text: '📝 콘텐츠 전략', callback_data: 'insight_content' }
         ],
         [
-            { text: '📈 대시보드', callback_data: 'insight_dashboard' },
+            { text: '⚠️ 리스크 분석', callback_data: 'insight_risk' },
             { text: '🔄 새로고침', callback_data: 'insight_refresh' }
         ],
         [
@@ -225,8 +225,269 @@ const insightMenuKeyboard = {
     ]
 };
 
-// 메시지 핸들러 수정 - default 케이스 문제 해결
+// 에러 복구용 안전한 키보드
+const safeInsightKeyboard = {
+    inline_keyboard: [
+        [
+            { text: '📊 기본 인사이트', callback_data: 'insight_full' },
+            { text: '🔄 새로고침', callback_data: 'insight_refresh' }
+        ],
+        [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+        ]
+    ]
+};
 
+// 인사이트 콜백 처리 개선
+async function handleInsightCallback(bot, callbackQuery, data) {
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+    const userName = getUserName(callbackQuery.from);
+    
+    console.log(`📊 인사이트 콜백 처리: ${data} (사용자: ${userName})`);
+    
+    try {
+        switch (data) {
+            case 'insight_menu':
+                await bot.editMessageText(
+                    `📊 **${userName}님의 마케팅 인사이트**\n\n` +
+                    `미세먼지 기반 마케팅 전략을 확인해보세요:\n\n` +
+                    `🔥 **여름철 특화 전략**\n` +
+                    `• 프리미엄 라이트 마스크 집중 분석\n` +
+                    `• 시원한 착용감 마케팅 전략\n` +
+                    `• 계절별 맞춤 재고 관리\n\n` +
+                    `원하는 분석을 선택해주세요:`,
+                    {
+                        chat_id: chatId,
+                        message_id: messageId,
+                        parse_mode: 'Markdown',
+                        reply_markup: insightMenuKeyboard
+                    }
+                );
+                break;
+
+            case 'insight_full':
+                await bot.editMessageText('🔍 **종합 인사이트 생성 중...**\n\n데이터 분석 및 전략 수립 중입니다.', {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                });
+                
+                // 잠시 후 인사이트 생성
+                setTimeout(() => {
+                    try {
+                        dustInsights(bot, { 
+                            chat: { id: chatId }, 
+                            from: callbackQuery.from, 
+                            text: '/insight' 
+                        });
+                    } catch (error) {
+                        console.error('인사이트 생성 실패:', error);
+                        bot.sendMessage(chatId, `❌ 인사이트 생성 실패: ${error.message}`, {
+                            reply_markup: safeInsightKeyboard
+                        });
+                    }
+                }, 1000);
+                break;
+
+            case 'insight_quick':
+                await bot.editMessageText('⚡ **빠른 인사이트 생성 중...**\n\n핵심 지표 분석 중입니다.', {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                });
+                
+                setTimeout(() => {
+                    try {
+                        dustInsights(bot, { 
+                            chat: { id: chatId }, 
+                            from: callbackQuery.from, 
+                            text: '/insight quick' 
+                        });
+                    } catch (error) {
+                        console.error('빠른 인사이트 생성 실패:', error);
+                        bot.sendMessage(chatId, `❌ 빠른 인사이트 생성 실패: ${error.message}`, {
+                            reply_markup: safeInsightKeyboard
+                        });
+                    }
+                }, 1000);
+                break;
+
+            case 'insight_dashboard':
+                await bot.editMessageText('📱 **실시간 대시보드 로딩 중...**\n\n최신 데이터를 불러오고 있습니다.', {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                });
+                
+                setTimeout(async () => {
+                    try {
+                        if (dustInsights.showRealtimeDashboard) {
+                            await dustInsights.showRealtimeDashboard(bot, chatId, userName);
+                        } else {
+                            throw new Error('대시보드 함수를 찾을 수 없습니다');
+                        }
+                    } catch (error) {
+                        console.error('대시보드 로딩 실패:', error);
+                        await bot.sendMessage(chatId, 
+                            `❌ **대시보드 로딩 실패**\n\n` +
+                            `오류: ${error.message}\n\n` +
+                            `기본 인사이트를 이용해주세요.`, 
+                            {
+                                parse_mode: 'Markdown',
+                                reply_markup: safeInsightKeyboard
+                            }
+                        );
+                    }
+                }, 1000);
+                break;
+
+            case 'insight_inventory':
+                await bot.editMessageText('📦 **재고 전략 분석 중...**\n\n재고 최적화 전략을 수립하고 있습니다.', {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                });
+                
+                setTimeout(() => {
+                    try {
+                        dustInsights(bot, { 
+                            chat: { id: chatId }, 
+                            from: callbackQuery.from, 
+                            text: '/insight inventory' 
+                        });
+                    } catch (error) {
+                        console.error('재고 전략 분석 실패:', error);
+                        bot.sendMessage(chatId, `❌ 재고 전략 분석 실패: ${error.message}`, {
+                            reply_markup: safeInsightKeyboard
+                        });
+                    }
+                }, 1000);
+                break;
+
+            case 'insight_marketing':
+                await bot.editMessageText('🎯 **마케팅 전략 분석 중...**\n\n효과적인 마케팅 전략을 수립하고 있습니다.', {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                });
+                
+                setTimeout(() => {
+                    try {
+                        dustInsights(bot, { 
+                            chat: { id: chatId }, 
+                            from: callbackQuery.from, 
+                            text: '/insight marketing' 
+                        });
+                    } catch (error) {
+                        console.error('마케팅 전략 분석 실패:', error);
+                        bot.sendMessage(chatId, `❌ 마케팅 전략 분석 실패: ${error.message}`, {
+                            reply_markup: safeInsightKeyboard
+                        });
+                    }
+                }, 1000);
+                break;
+
+            case 'insight_content':
+                await bot.sendMessage(chatId, 
+                    `📝 **콘텐츠 마케팅 전략**\n\n` +
+                    `이 기능은 현재 개발 중입니다.\n\n` +
+                    `**개발 예정 기능:**\n` +
+                    `• 미세먼지 상황별 콘텐츠 전략\n` +
+                    `• SNS 마케팅 메시지 제안\n` +
+                    `• 고객 교육 콘텐츠 기획\n` +
+                    `• 인플루언서 협업 전략\n\n` +
+                    `곧 업데이트될 예정입니다! 🚀`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [[
+                                { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                            ]]
+                        }
+                    }
+                );
+                break;
+
+            case 'insight_risk':
+                await bot.sendMessage(chatId, 
+                    `⚠️ **리스크 분석**\n\n` +
+                    `이 기능은 현재 개발 중입니다.\n\n` +
+                    `**개발 예정 기능:**\n` +
+                    `• 공급망 리스크 분석\n` +
+                    `• 계절별 위험 요소 식별\n` +
+                    `• 경쟁사 동향 모니터링\n` +
+                    `• 시장 변동 대응 전략\n\n` +
+                    `곧 업데이트될 예정입니다! 🚀`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [[
+                                { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                            ]]
+                        }
+                    }
+                );
+                break;
+
+            case 'insight_refresh':
+                await bot.editMessageText('🔄 **데이터 새로고침 중...**\n\n최신 정보로 업데이트하고 있습니다.', {
+                    chat_id: chatId,
+                    message_id: messageId,
+                    parse_mode: 'Markdown'
+                });
+                
+                setTimeout(() => {
+                    try {
+                        dustInsights(bot, { 
+                            chat: { id: chatId }, 
+                            from: callbackQuery.from, 
+                            text: '/insight' 
+                        });
+                    } catch (error) {
+                        console.error('인사이트 새로고침 실패:', error);
+                        bot.sendMessage(chatId, `❌ 새로고침 실패: ${error.message}`, {
+                            reply_markup: safeInsightKeyboard
+                        });
+                    }
+                }, 1500);
+                break;
+
+            default:
+                console.log(`❓ 알 수 없는 인사이트 콜백: ${data}`);
+                await bot.sendMessage(chatId, 
+                    `❌ **알 수 없는 명령어**\n\n` +
+                    `"${data}" 명령어를 처리할 수 없습니다.\n\n` +
+                    `인사이트 메뉴로 돌아갑니다.`,
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [[
+                                { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                            ]]
+                        }
+                    }
+                );
+                break;
+        }
+    } catch (error) {
+        console.error(`❌ 인사이트 콜백 처리 실패 (${data}):`, error);
+        
+        // 에러 발생 시 안전한 메뉴로 복구
+        await bot.sendMessage(chatId, 
+            `❌ **처리 중 오류 발생**\n\n` +
+            `기능: ${data}\n` +
+            `오류: ${error.message}\n\n` +
+            `잠시 후 다시 시도해주세요.`,
+            {
+                parse_mode: 'Markdown',
+                reply_markup: safeInsightKeyboard
+            }
+        );
+    }
+}
+
+// 메시지 핸들러 수정 - default 케이스 문제 해결
 bot.on('message', async (msg) => {
     const text = msg.text;
     if (!text) return;  // 🛡️ 텍스트 없는 메시지 방어
@@ -487,6 +748,11 @@ bot.on('callback_query', async (callbackQuery) => {
     }
 
     try {
+            // 🔥 여기에 추가!
+            if (data.startsWith('insight_')) {
+                await handleInsightCallback(bot, callbackQuery, data);
+                return;
+        }
         switch (data) {
             // ===== 인사이트 관련 콜백 =====
             case 'insight_menu':
