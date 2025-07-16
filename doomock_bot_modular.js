@@ -26,6 +26,7 @@ const timer = require('./timer');
 const todoFunctions = require('./todos');
 const utils = require('./utils');
 const worktime = require('./worktime');
+const remind = require('./remind');
 const MonthlyLeave = require('./monthly_leave');
 
 // 연차 관리 인스턴스 생성
@@ -34,14 +35,15 @@ const leaveManager = new MonthlyLeave();
 // 사용자 상태 관리 (메모리 기반)
 const userStates = new Map();
 
-
 //setCommands 세팅
 bot.setMyCommands([
     { command: 'start', description: '📱 메인 메뉴 보기' },
     { command: 'help', description: '❓ 도움말 보기' },
     { command: 'fortune', description: '🔮 오늘의 운세' },
     { command: 'worktime', description: '🕐 근무시간 보기' },
+    { command: 'timer', description: '⏰ 타이머 시작/종료' },
     { command: 'add', description: '➕ 할일 추가하기 (/add 할일내용)' },
+    { command: 'remind', description: '🔔 리마인더 설정하기 (/remind 30 독서하기)' },
     { command: 'cancel', description: '❌ 진행중인 작업 취소' }
 ]).then(() => {
     console.log('✅ 명령어가 Telegram에 등록되었습니다.');
@@ -133,6 +135,41 @@ const fortuneMenuKeyboard = {
     ]
 };
 
+// 리마인더 메뉴 키보드
+const reminderMenuKeyboard = {
+    inline_keyboard: [
+        [
+            { text: '⏰ 분 단위 설정', callback_data: 'remind_minutes' },
+            { text: '🕐 시간 설정', callback_data: 'remind_time' }
+        ],
+        [
+            { text: '❓ 사용법', callback_data: 'remind_help' }
+        ],
+        [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+        ]
+    ]
+};
+const timerMenuKeyboard = {
+    inline_keyboard: [
+        [
+            { text: '▶️ 타이머 시작', callback_data: 'timer_start_prompt' },
+            { text: '⏹️ 타이머 정지', callback_data: 'timer_stop' }
+        ],
+        [
+            { text: '⏱️ 현재 상태', callback_data: 'timer_status' },
+            { text: '📋 타이머 기록', callback_data: 'timer_history' }
+        ],
+        [
+            { text: '📊 타이머 통계', callback_data: 'timer_stats' },
+            { text: '❓ 사용법', callback_data: 'timer_help' }
+        ],
+        [
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+        ]
+    ]
+};
+
 // 메인 메시지 핸들러
 bot.on('message', async (msg) => {
     const text = msg.text;
@@ -172,6 +209,39 @@ bot.on('message', async (msg) => {
             } catch (error) {
                 console.error('할일 추가 오류:', error);
                 bot.sendMessage(chatId, '❌ 할일 추가 중 오류가 발생했습니다.');
+            }
+            return;
+        }
+
+        // 리마인더 시작 상태 처리
+        if (userState && userState.action === 'remind_minutes') {
+            try {
+                remind(bot, { chat: { id: chatId }, text: `/remind ${text}` });
+                userStates.delete(userId);
+            } catch (error) {
+                console.error('리마인더 설정 오류:', error);
+                bot.sendMessage(chatId, '❌ 리마인더 설정 중 오류가 발생했습니다.');
+            }
+            return;
+        }
+
+        if (userState && userState.action === 'remind_time') {
+            try {
+                remind(bot, { chat: { id: chatId }, text: `/remind ${text}` });
+                userStates.delete(userId);
+            } catch (error) {
+                console.error('리마인더 설정 오류:', error);
+                bot.sendMessage(chatId, '❌ 리마인더 설정 중 오류가 발생했습니다.');
+            }
+            return;
+        }
+        if (userState && userState.action === 'timer_start') {
+            try {
+                timer(bot, { chat: { id: chatId }, text: `/timer start ${text}` });
+                userStates.delete(userId);
+            } catch (error) {
+                console.error('타이머 시작 오류:', error);
+                bot.sendMessage(chatId, '❌ 타이머 시작 중 오류가 발생했습니다.');
             }
             return;
         }
@@ -234,7 +304,7 @@ bot.on('message', async (msg) => {
 
         // 일반 명령어 처리
         switch (true) {
-        case text.startsWith('/start'):
+            case text.startsWith('/start'):
                 userStates.delete(userId); // 상태 초기화
                 bot.sendMessage(chatId, '🤖 두목봇 메인 메뉴\n\n원하는 기능을 선택해주세요:', {
                     reply_markup: mainMenuKeyboard
@@ -243,15 +313,19 @@ bot.on('message', async (msg) => {
             case text === '/help':
                 utils(bot, msg);
                 break;
-            // 메시지 핸들러에서
             case text === '/worktime':
-                worktime(bot, msg); // 기존 그대로 (msg.from 존재)
+                worktime(bot, msg);
                 break;
             case text === '/fortune':
                 fortune(bot, msg);
                 break;
+            case text.startsWith('/remind'):
+                remind(bot, msg);
+                break;
+            case text.startsWith('/timer'):
+                timer(bot, msg);
+                break;
             case text.startsWith('/add '):
-                // 기존 /add 명령어도 유지
                 const taskText = text.replace('/add ', '');
                 if (taskText.trim()) {
                     try {
@@ -277,11 +351,12 @@ bot.on('message', async (msg) => {
                 }
                 break;
             default:
-        // 명령어가 아닌 일반 텍스트는 무시
-        if (text.startsWith('/')) {
-            bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.');
+                // 명령어가 아닌 일반 텍스트는 무시
+                if (text.startsWith('/')) {
+                    bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.');
+                }
+                break;
         }
-        break;
     } catch (error) {
         console.error('메시지 처리 오류:', error);
         bot.sendMessage(chatId, '❌ 처리 중 오류가 발생했습니다.');
@@ -308,6 +383,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
+            // 휴가 관리 관련
             case 'leave_menu':
                 bot.editMessageText('📅 휴가 관리 메뉴\n\n원하는 기능을 선택해주세요:', {
                     chat_id: chatId,
@@ -344,6 +420,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 bot.sendMessage(chatId, '⚙️ 연차 설정하기\n\n총 연차 일수를 입력해주세요.\n예: 15\n\n취소하려면 /cancel 을 입력하세요.');
                 break;
 
+            // 할일 관리 관련
             case 'todo_menu':
                 bot.editMessageText('📝 할일 관리 메뉴\n\n원하는 기능을 선택해주세요:', {
                     chat_id: chatId,
@@ -373,7 +450,6 @@ bot.on('callback_query', async (callbackQuery) => {
                             const strikethrough = todo.done ? '~~' : '';
                             todoText += `${index + 1}. ${status} ${strikethrough}${todo.task}${strikethrough}\n`;
                             
-                            // 각 할일마다 토글/삭제 버튼 추가
                             todoButtons.push([
                                 { text: `${todo.done ? '↩️' : '✅'} ${index + 1}`, callback_data: `todo_toggle_${index}` },
                                 { text: `🗑️ ${index + 1}`, callback_data: `todo_delete_${index}` }
@@ -398,6 +474,91 @@ bot.on('callback_query', async (callbackQuery) => {
                 bot.sendMessage(chatId, '📝 **할일 추가하기**\n\n추가할 할일을 입력해주세요.\n\n취소하려면 /cancel 을 입력하세요.');
                 break;
 
+            case 'todo_stats':
+                try {
+                    const stats = await todoFunctions.getTodoStats(userId);
+                    const statsText = `📊 **할일 통계**\n\n` +
+                                     `📝 전체 할일: ${stats.total}개\n` +
+                                     `✅ 완료: ${stats.completed}개\n` +
+                                     `⏳ 미완료: ${stats.pending}개\n` +
+                                     `📈 완료율: ${stats.completionRate}%\n\n` +
+                                     `${stats.completionRate >= 80 ? '🎉 훌륭해요!' : 
+                                       stats.completionRate >= 50 ? '💪 좋은 진전이에요!' : 
+                                       '🔥 화이팅!'}`
+                    
+                    bot.sendMessage(chatId, statsText, {
+                        parse_mode: 'Markdown',
+                        reply_markup: { 
+                            inline_keyboard: [[{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]] 
+                        }
+                    });
+                } catch (error) {
+                    console.error('할일 통계 조회 오류:', error);
+                    bot.sendMessage(chatId, '❌ 통계를 불러오는 중 오류가 발생했습니다.');
+                }
+                break;
+
+            case 'todo_clear_completed':
+                try {
+                    const success = await todoFunctions.clearCompletedTodos(userId);
+                    if (success) {
+                        bot.sendMessage(chatId, '🗑️ 완료된 할일들이 삭제되었습니다!', {
+                            reply_markup: { 
+                                inline_keyboard: [
+                                    [{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }],
+                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                                ]
+                            }
+                        });
+                    } else {
+                        bot.sendMessage(chatId, '❌ 완료된 할일 삭제 중 오류가 발생했습니다.');
+                    }
+                } catch (error) {
+                    console.error('완료된 할일 삭제 오류:', error);
+                    bot.sendMessage(chatId, '❌ 삭제 중 오류가 발생했습니다.');
+                }
+                break;
+
+            case 'todo_clear_all':
+                bot.sendMessage(chatId, 
+                    '⚠️ **정말로 모든 할일을 삭제하시겠습니까?**\n\n' +
+                    '이 작업은 되돌릴 수 없습니다!', 
+                    {
+                        parse_mode: 'Markdown',
+                        reply_markup: {
+                            inline_keyboard: [
+                                [
+                                    { text: '✅ 네, 삭제합니다', callback_data: 'todo_clear_all_confirm' },
+                                    { text: '❌ 아니오', callback_data: 'todo_menu' }
+                                ]
+                            ]
+                        }
+                    }
+                );
+                break;
+
+            case 'todo_clear_all_confirm':
+                try {
+                    const success = await todoFunctions.clearTodos(userId);
+                    if (success) {
+                        bot.sendMessage(chatId, '🗑️ 모든 할일이 삭제되었습니다!', {
+                            reply_markup: { 
+                                inline_keyboard: [
+                                    [{ text: '➕ 새 할일 추가', callback_data: 'todo_add' }],
+                                    [{ text: '🔙 할일 메뉴', callback_data: 'todo_menu' }]
+                                ]
+                            }
+                        });
+                    } else {
+                        bot.sendMessage(chatId, '❌ 할일 삭제 중 오류가 발생했습니다.');
+                    }
+                } catch (error) {
+                    console.error('모든 할일 삭제 오류:', error);
+                    bot.sendMessage(chatId, '❌ 삭제 중 오류가 발생했습니다.');
+                }
+                break;
+
+            // 운세 관련
             case 'fortune_menu':
                 bot.editMessageText('🔮 운세 메뉴\n\n원하는 운세를 선택해주세요:', {
                     chat_id: chatId,
@@ -418,25 +579,105 @@ bot.on('callback_query', async (callbackQuery) => {
                 fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune love' });
                 break;
 
+            case 'fortune_money':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune money' });
+                break;
+
+            case 'fortune_health':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune health' });
+                break;
+
+            case 'fortune_meeting':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune meeting' });
+                break;
+
+            case 'fortune_tarot':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune tarot' });
+                break;
+
+            case 'fortune_lucky':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune lucky' });
+                break;
+
+            case 'fortune_all':
+                fortune(bot, { chat: { id: chatId }, from: { id: userId }, text: '/fortune all' });
+                break;
+
+            // 근무시간 관련
+            case 'worktime_menu':
+                worktime(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from,
+                    text: undefined
+                });
+                break;
+
+            // 타이머 관련
+            case 'timer_menu':
+                bot.editMessageText('⏰ 타이머 메뉴\n\n원하는 기능을 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: timerMenuKeyboard
+                });
+                break;
+
+            case 'timer_start_prompt':
+                userStates.set(userId, { action: 'timer_start' });
+                bot.sendMessage(chatId, '⏰ **타이머 시작하기**\n\n작업명을 입력해주세요.\n\n예시:\n• 공부하기\n• [공부] 수학 문제풀이\n• [운동] 헬스장 가기\n\n취소하려면 /cancel 을 입력하세요.', {
+                    parse_mode: 'Markdown'
+                });
+                break;
+
+            case 'timer_stop':
+                timer(bot, { chat: { id: chatId }, text: '/timer stop' });
+                break;
+
+            case 'timer_status':
+                timer(bot, { chat: { id: chatId }, text: '/timer status' });
+                break;
+
+            case 'timer_history':
+                timer(bot, { chat: { id: chatId }, text: '/timer history' });
+                break;
+
+            case 'timer_stats':
+                timer(bot, { chat: { id: chatId }, text: '/timer stats' });
+                break;
+
+            case 'timer_help':
+                timer(bot, { chat: { id: chatId }, text: '/timer' });
+                break;
+
+            // 도움말 및 기타
             case 'help_menu':
                 utils(bot, { chat: { id: chatId } });
                 break;
 
-            case 'worktime_menu':
-            // from 정보를 포함해서 전달
-            worktime(bot, { 
-                chat: { id: chatId }, 
-                from: callbackQuery.from, // 사용자 정보 추가
-                text: undefined // 콜백 쿼리는 text가 없음을 명시
-            });
-            break;
-
-            case 'timer_menu':
-                bot.sendMessage(chatId, '⏰ 타이머 기능\n\n타이머를 사용하려면:\n/timer 분\n\n예: /timer 25');
+            // 리마인더 관련
+            case 'reminder_menu':
+                bot.editMessageText('🔔 리마인더 메뉴\n\n원하는 설정 방식을 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: reminderMenuKeyboard
+                });
                 break;
 
-            case 'reminder_menu':
-                bot.sendMessage(chatId, '🔔 리마인더 기능은 곧 추가될 예정입니다.');
+            case 'remind_minutes':
+                userStates.set(userId, { action: 'remind_minutes' });
+                bot.sendMessage(chatId, '⏰ **분 단위 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[분] [내용]`\n\n예시:\n• `30 독서하기`\n• `60 회의 준비`\n• `5 물 마시기`\n\n취소하려면 /cancel 을 입력하세요.', {
+                    parse_mode: 'Markdown'
+                });
+                break;
+
+            case 'remind_time':
+                userStates.set(userId, { action: 'remind_time' });
+                bot.sendMessage(chatId, '🕐 **시간 지정 리마인더 설정**\n\n다음 형식으로 입력해주세요:\n`[시:분] [내용]`\n\n예시:\n• `14:30 점심약속`\n• `09:00 출근`\n• `18:00 퇴근`\n\n취소하려면 /cancel 을 입력하세요.', {
+                    parse_mode: 'Markdown'
+                });
+                break;
+
+            case 'remind_help':
+                remind(bot, { chat: { id: chatId }, text: '/remind' });
                 break;
 
             default:
