@@ -28,6 +28,7 @@ const utils = require('./utils');
 const worktime = require('./worktime');
 const remind = require('./remind');
 const MonthlyLeave = require('./monthly_leave');
+const { getUserName, formatUserInfo } = require('./username_helper');
 
 // 연차 관리 인스턴스 생성
 const leaveManager = new MonthlyLeave();
@@ -35,7 +36,7 @@ const leaveManager = new MonthlyLeave();
 // 사용자 상태 관리 (메모리 기반)
 const userStates = new Map();
 
-//setCommands 세팅
+//setCommands 및 BotMenu 세팅
 bot.setMyCommands([
     { command: 'start', description: '📱 메인 메뉴 보기' },
     { command: 'help', description: '❓ 도움말 보기' },
@@ -43,10 +44,20 @@ bot.setMyCommands([
     { command: 'worktime', description: '🕐 근무시간 보기' },
     { command: 'timer', description: '⏰ 타이머 시작/종료' },
     { command: 'add', description: '➕ 할일 추가하기 (/add 할일내용)' },
+    { command: 'tts', description: '🔊 텍스트를 음성으로 변환 (/tts 안녕하세요)' },
     { command: 'remind', description: '🔔 리마인더 설정하기 (/remind 30 독서하기)' },
     { command: 'cancel', description: '❌ 진행중인 작업 취소' }
 ]).then(() => {
     console.log('✅ 명령어가 Telegram에 등록되었습니다.');
+}).catch(console.error);
+
+// Bot Menu (햄버거 메뉴) 설정
+bot.setMyMenuButton({
+    menu_button: {
+        type: 'commands'
+    }
+}).then(() => {
+    console.log('✅ Bot Menu가 활성화되었습니다.');
 }).catch(console.error);
 
 // 메인 메뉴 키보드
@@ -65,6 +76,7 @@ const mainMenuKeyboard = {
             { text: '🔔 리마인더', callback_data: 'reminder_menu' }
         ],
         [
+            { text: '🛠️ 유틸리티', callback_data: 'utils_menu' },
             { text: '❓ 도움말', callback_data: 'help_menu' }
         ]
     ]
@@ -185,7 +197,7 @@ bot.on('message', async (msg) => {
         // 취소 명령어 처리
         if (text === '/cancel') {
             userStates.delete(userId);
-            bot.sendMessage(chatId, '❌ 작업이 취소되었습니다.');
+            bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, 작업이 취소되었습니다.`);
             return;
         }
 
@@ -195,7 +207,7 @@ bot.on('message', async (msg) => {
                 const success = await todoFunctions.addTodo(userId, text);
                 if (success) {
                     bot.sendMessage(chatId, 
-                        `✅ 할일이 추가되었습니다!\n\n📝 "${text}"`, 
+                        `✅ ${getUserName(msg.from)}님, 할일이 추가되었습니다!\n\n📝 "${text}"`, 
                         { 
                             reply_markup: { 
                                 inline_keyboard: [[{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }]] 
@@ -203,7 +215,7 @@ bot.on('message', async (msg) => {
                         }
                     );
                 } else {
-                    bot.sendMessage(chatId, '❌ 할일 추가 중 오류가 발생했습니다.');
+                    bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, 할일 추가 중 오류가 발생했습니다.`);
                 }
                 userStates.delete(userId);
             } catch (error) {
@@ -213,7 +225,18 @@ bot.on('message', async (msg) => {
             return;
         }
 
-        // 리마인더 시작 상태 처리
+        // TTS 관련 상태 처리
+        if (userState && userState.action === 'tts_input') {
+            try {
+                const language = userState.language || 'ko';
+                utils.handleTTSCommand(bot, chatId, userId, `/tts ${language} ${text}`);
+                userStates.delete(userId);
+            } catch (error) {
+                console.error('TTS 처리 오류:', error);
+                bot.sendMessage(chatId, '❌ TTS 처리 중 오류가 발생했습니다.');
+            }
+            return;
+        }
         if (userState && userState.action === 'remind_minutes') {
             try {
                 remind(bot, { chat: { id: chatId }, text: `/remind ${text}` });
@@ -306,37 +329,21 @@ bot.on('message', async (msg) => {
         switch (true) {
             case text.startsWith('/start'):
                 userStates.delete(userId); // 상태 초기화
-                bot.sendMessage(chatId, '🤖 두목봇 메인 메뉴\n\n원하는 기능을 선택해주세요:', {
+                bot.sendMessage(chatId, `🤖 안녕하세요 ${getUserName(msg.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`, {
                     reply_markup: mainMenuKeyboard
                 });
                 break;
             case text === '/help':
-                // utils가 함수가 아닐 경우 직접 도움말 메시지 전송
-                bot.sendMessage(chatId, 
-                    '❓ **두목봇 도움말**\n\n' +
-                    '**📱 주요 기능:**\n' +
-                    '• 📝 할일 관리 - 할일 추가/완료/삭제\n' +
-                    '• 📅 휴가 관리 - 연차 현황/사용/설정\n' +
-                    '• ⏰ 타이머 - 작업 시간 측정\n' +
-                    '• 🔔 리마인더 - 알림 설정\n' +
-                    '• 🎯 운세 - 다양한 운세 확인\n' +
-                    '• 🕐 근무시간 - 출퇴근 시간 확인\n\n' +
-                    '**⌨️ 빠른 명령어:**\n' +
-                    '• /start - 메인 메뉴\n' +
-                    '• /add [내용] - 할일 추가\n' +
-                    '• /timer start [작업명] - 타이머 시작\n' +
-                    '• /remind [분] [내용] - 리마인더 설정\n' +
-                    '• /fortune - 오늘의 운세\n' +
-                    '• /worktime - 근무시간 확인\n\n' +
-                    '문의사항이 있으시면 /start 를 입력해서 메뉴를 이용해주세요! 😊',
-                    { parse_mode: 'Markdown' }
-                );
+                utils(bot, msg);
                 break;
             case text === '/worktime':
                 worktime(bot, msg);
                 break;
             case text === '/fortune':
                 fortune(bot, msg);
+                break;
+            case text.startsWith('/tts'):
+                utils(bot, msg);
                 break;
             case text.startsWith('/remind'):
                 remind(bot, msg);
@@ -351,7 +358,7 @@ bot.on('message', async (msg) => {
                         const success = await todoFunctions.addTodo(userId, taskText);
                         if (success) {
                             bot.sendMessage(chatId, 
-                                `✅ 할일이 추가되었습니다!\n\n📝 "${taskText}"`, 
+                                `✅ ${getUserName(msg.from)}님, 할일이 추가되었습니다!\n\n📝 "${taskText}"`, 
                                 { 
                                     reply_markup: { 
                                         inline_keyboard: [[{ text: '📋 할일 목록 보기', callback_data: 'todo_list' }]] 
@@ -359,20 +366,20 @@ bot.on('message', async (msg) => {
                                 }
                             );
                         } else {
-                            bot.sendMessage(chatId, '❌ 할일 추가 중 오류가 발생했습니다.');
+                            bot.sendMessage(chatId, `❌ ${getUserName(msg.from)}님, 할일 추가 중 오류가 발생했습니다.`);
                         }
                     } catch (error) {
                         console.error('할일 추가 오류:', error);
                         bot.sendMessage(chatId, '❌ 할일 추가 중 오류가 발생했습니다.');
                     }
                 } else {
-                    bot.sendMessage(chatId, '📝 할일 내용을 입력해주세요.\n예: /add 회의 준비하기');
+                    bot.sendMessage(chatId, `📝 ${getUserName(msg.from)}님, 할일 내용을 입력해주세요.\n예: /add 회의 준비하기`);
                 }
                 break;
             default:
                 // 명령어가 아닌 일반 텍스트는 무시
                 if (text.startsWith('/')) {
-                    bot.sendMessage(chatId, '😅 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.');
+                    bot.sendMessage(chatId, `😅 ${getUserName(msg.from)}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`);
                 }
                 break;
         }
@@ -395,7 +402,7 @@ bot.on('callback_query', async (callbackQuery) => {
     try {
         switch (data) {
             case 'main_menu':
-                bot.editMessageText('🤖 두목봇 메인 메뉴\n\n원하는 기능을 선택해주세요:', {
+                bot.editMessageText(`🤖 안녕하세요 ${getUserName(callbackQuery.from)}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`, {
                     chat_id: chatId,
                     message_id: message.message_id,
                     reply_markup: mainMenuKeyboard
@@ -404,7 +411,7 @@ bot.on('callback_query', async (callbackQuery) => {
 
             // 휴가 관리 관련
             case 'leave_menu':
-                bot.editMessageText('📅 휴가 관리 메뉴\n\n원하는 기능을 선택해주세요:', {
+                bot.editMessageText(`📅 ${getUserName(callbackQuery.from)}님의 휴가 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
                     chat_id: chatId,
                     message_id: message.message_id,
                     reply_markup: leaveMenuKeyboard
@@ -441,7 +448,7 @@ bot.on('callback_query', async (callbackQuery) => {
 
             // 할일 관리 관련
             case 'todo_menu':
-                bot.editMessageText('📝 할일 관리 메뉴\n\n원하는 기능을 선택해주세요:', {
+                bot.editMessageText(`📝 ${getUserName(callbackQuery.from)}님의 할일 관리 메뉴\n\n원하는 기능을 선택해주세요:`, {
                     chat_id: chatId,
                     message_id: message.message_id,
                     reply_markup: todoMenuKeyboard
@@ -452,7 +459,7 @@ bot.on('callback_query', async (callbackQuery) => {
                 try {
                     const todos = await todoFunctions.getTodos(userId);
                     if (todos.length === 0) {
-                        bot.sendMessage(chatId, '📝 할일이 없습니다.\n\n새로운 할일을 추가해보세요!', {
+                        bot.sendMessage(chatId, `📝 ${getUserName(callbackQuery.from)}님의 할일이 없습니다.\n\n새로운 할일을 추가해보세요!`, {
                             reply_markup: { 
                                 inline_keyboard: [
                                     [{ text: '➕ 할일 추가', callback_data: 'todo_add' }],
@@ -461,7 +468,7 @@ bot.on('callback_query', async (callbackQuery) => {
                             }
                         });
                     } else {
-                        let todoText = '📋 **할일 목록**\n\n';
+                        let todoText = `📋 **${getUserName(callbackQuery.from)}님의 할일 목록**\n\n`;
                         const todoButtons = [];
                         
                         todos.forEach((todo, index) => {
@@ -713,8 +720,45 @@ bot.on('callback_query', async (callbackQuery) => {
                 });
                 break;
 
-            case 'remind_help':
-                remind(bot, { chat: { id: chatId }, text: '/remind' });
+            // 유틸리티 관련
+            case 'utils_menu':
+                bot.editMessageText('🛠️ 유틸리티 메뉴\n\n원하는 기능을 선택해주세요:', {
+                    chat_id: chatId,
+                    message_id: message.message_id,
+                    reply_markup: utils.utilsManager.getUtilsMenuKeyboard()
+                });
+                break;
+
+            case 'utils_tts':
+                userStates.set(userId, { action: 'tts_input', language: 'ko' });
+                bot.sendMessage(chatId, `🔊 **${getUserName(callbackQuery.from)}님의 TTS 음성 변환**\n\n변환할 텍스트를 입력해주세요.\n\n예시:\n• 안녕하세요\n• 오늘 날씨가 좋네요\n• 두목봇 최고!\n\n취소하려면 /cancel 을 입력하세요.`, {
+                    parse_mode: 'Markdown'
+                });
+                break;
+
+            case 'utils_language':
+                bot.sendMessage(chatId, '🌍 **언어 선택**\n\n사용할 언어를 선택해주세요:', {
+                    parse_mode: 'Markdown',
+                    reply_markup: utils.utilsManager.getLanguageKeyboard()
+                });
+                break;
+
+            case 'utils_tts_help':
+                bot.sendMessage(chatId, utils.utilsManager.getTTSHelp(), {
+                    parse_mode: 'Markdown',
+                    reply_markup: { 
+                        inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] 
+                    }
+                });
+                break;
+
+            case 'utils_examples':
+                bot.sendMessage(chatId, utils.utilsManager.getExamplesMessage(), {
+                    parse_mode: 'Markdown',
+                    reply_markup: { 
+                        inline_keyboard: [[{ text: '🔙 유틸 메뉴', callback_data: 'utils_menu' }]] 
+                    }
+                });
                 break;
 
             default:
