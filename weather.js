@@ -172,9 +172,12 @@ class WeatherManager {
   }
 
   // 출근용 날씨 정보 포맷
-  formatMorningWeather(weatherData) {
+  // 🔧 수정: formatMorningWeather 메서드에서 한국 시간 사용
+formatMorningWeather(weatherData) {
+    // 한국 시간으로 수정
     const now = new Date();
-    const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+    const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
+    const timeStr = `${koreaTime.getHours().toString().padStart(2, '0')}:${koreaTime.getMinutes().toString().padStart(2, '0')}`;
     
     let message = `🌤️ **${weatherData.city} 날씨** (${timeStr})\n\n`;
     message += `${weatherData.weatherEmoji} ${weatherData.weatherDesc}\n`;
