@@ -8,9 +8,12 @@ const WEATHER_API_KEY = process.env.WEATHER_API_KEY || 'YOUR_API_KEY_HERE';
 const WEATHER_BASE_URL = 'https://api.openweathermap.org/data/2.5';
 
 // 한국 주요 도시 좌표 (화성이 맨 위!)
+// weather.js의 CITIES 객체에 수원 추가
+
 const CITIES = {
-  '화성': { lat: 37.2061, lon: 126.8306 }, // 🆕 화성/동탄을 맨 위로!
+  '화성': { lat: 37.2061, lon: 126.8306 }, // 화성/동탄 (기본값)
   '서울': { lat: 37.5665, lon: 126.9780 },
+  '수원': { lat: 37.2636, lon: 127.0286 }, // 🆕 수원 좌표 추가
   '부산': { lat: 35.1796, lon: 129.0756 },
   '대구': { lat: 35.8714, lon: 128.6014 },
   '인천': { lat: 37.4563, lon: 126.7052 },
@@ -18,7 +21,7 @@ const CITIES = {
   '대전': { lat: 36.3504, lon: 127.3845 },
   '울산': { lat: 35.5384, lon: 129.3114 },
   '세종': { lat: 36.4800, lon: 127.2890 },
-  '경기': { lat: 37.4138, lon: 127.5183 },
+  '경기': { lat: 37.4138, lon: 127.5183 }, // 경기도 일반
   '강원': { lat: 37.8228, lon: 128.1555 },
   '충북': { lat: 36.6356, lon: 127.4917 },
   '충남': { lat: 36.5184, lon: 126.8000 },
