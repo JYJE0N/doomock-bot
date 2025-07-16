@@ -410,6 +410,7 @@ bot.on("message", async (msg) => {
 });
 
 // 콜백 쿼리 핸들러 (완전 개선)
+// 콜백 쿼리 핸들러에서 인사이트 관련 케이스 추가
 bot.on("callback_query", async (callbackQuery) => {
   const message = callbackQuery.message;
   const data = callbackQuery.data;
@@ -562,13 +563,32 @@ bot.on("callback_query", async (callbackQuery) => {
       case "weather_more_cities":
         await handleWeatherMoreCities(bot, chatId);
         break;
+      // 추가 날씨 도시들
+      case "weather_incheon":
+        await handleWeatherCity(bot, chatId, "인천");
+        break;
+      case "weather_gwangju":
+        await handleWeatherCity(bot, chatId, "광주");
+        break;
+      case "weather_daejeon":
+        await handleWeatherCity(bot, chatId, "대전");
+        break;
+      case "weather_jeju":
+        await handleWeatherCity(bot, chatId, "제주");
+        break;
+      case "weather_suwon":
+        await handleWeatherCity(bot, chatId, "수원");
+        break;
+      case "weather_ulsan":
+        await handleWeatherCity(bot, chatId, "울산");
+        break;
 
       // 근무시간 관리
       case "worktime_menu":
         await handleWorktimeMenu(bot, chatId, callbackQuery.from);
         break;
 
-      // 인사이트 관리
+      // 🔥 인사이트 관리 (추가/수정)
       case "insight_menu":
         await handleInsightMenu(bot, chatId, callbackQuery.from);
         break;
@@ -580,6 +600,28 @@ bot.on("callback_query", async (callbackQuery) => {
         break;
       case "insight_dashboard":
         await handleInsightDashboard(bot, chatId, callbackQuery.from);
+        break;
+      // 🆕 인사이트 상세 콜백 처리
+      case "insight_products":
+        await handleInsightProducts(bot, chatId, callbackQuery.from);
+        break;
+      case "insight_pricing":
+        await handleInsightPricing(bot, chatId, callbackQuery.from);
+        break;
+      case "insight_inventory":
+        await handleInsightInventory(bot, chatId, callbackQuery.from);
+        break;
+      case "insight_marketing":
+        await handleInsightMarketing(bot, chatId, callbackQuery.from);
+        break;
+      case "insight_regional":
+        await handleInsightRegional(bot, chatId, callbackQuery.from);
+        break;
+      case "insight_competitor":
+        await handleInsightCompetitor(bot, chatId, callbackQuery.from);
+        break;
+      case "insight_refresh":
+        await handleInsightRefresh(bot, chatId, callbackQuery.from);
         break;
 
       // 유틸리티 관리
@@ -628,6 +670,144 @@ bot.on("callback_query", async (callbackQuery) => {
     await sendNewMessage(bot, chatId, "❌ 처리 중 오류가 발생했습니다.");
   }
 });
+
+// 🆕 인사이트 핸들러 함수들 추가
+async function handleInsightProducts(bot, chatId, from) {
+  if (!dustInsights || !dustInsights.handleCallback) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  try {
+    const callbackQuery = {
+      data: 'insight_products',
+      message: { chat: { id: chatId } },
+      from: from
+    };
+    await dustInsights.handleCallback(bot, callbackQuery);
+  } catch (error) {
+    rLog(`인사이트 제품 전략 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 제품 전략 분석 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleInsightPricing(bot, chatId, from) {
+  if (!dustInsights || !dustInsights.handleCallback) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  try {
+    const callbackQuery = {
+      data: 'insight_pricing',
+      message: { chat: { id: chatId } },
+      from: from
+    };
+    await dustInsights.handleCallback(bot, callbackQuery);
+  } catch (error) {
+    rLog(`인사이트 가격 전략 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 가격 전략 분석 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleInsightInventory(bot, chatId, from) {
+  if (!dustInsights || !dustInsights.handleCallback) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  try {
+    const callbackQuery = {
+      data: 'insight_inventory',
+      message: { chat: { id: chatId } },
+      from: from
+    };
+    await dustInsights.handleCallback(bot, callbackQuery);
+  } catch (error) {
+    rLog(`인사이트 재고 전략 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 재고 전략 분석 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleInsightMarketing(bot, chatId, from) {
+  if (!dustInsights || !dustInsights.handleCallback) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  try {
+    const callbackQuery = {
+      data: 'insight_marketing',
+      message: { chat: { id: chatId } },
+      from: from
+    };
+    await dustInsights.handleCallback(bot, callbackQuery);
+  } catch (error) {
+    rLog(`인사이트 마케팅 전략 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 마케팅 전략 분석 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleInsightRegional(bot, chatId, from) {
+  if (!dustInsights || !dustInsights.handleCallback) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  try {
+    const callbackQuery = {
+      data: 'insight_regional',
+      message: { chat: { id: chatId } },
+      from: from
+    };
+    await dustInsights.handleCallback(bot, callbackQuery);
+  } catch (error) {
+    rLog(`인사이트 지역별 전략 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 지역별 전략 분석 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleInsightCompetitor(bot, chatId, from) {
+  if (!dustInsights || !dustInsights.handleCallback) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  try {
+    const callbackQuery = {
+      data: 'insight_competitor',
+      message: { chat: { id: chatId } },
+      from: from
+    };
+    await dustInsights.handleCallback(bot, callbackQuery);
+  } catch (error) {
+    rLog(`인사이트 경쟁사 분석 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 경쟁사 분석 중 오류가 발생했습니다.");
+  }
+}
+
+async function handleInsightRefresh(bot, chatId, from) {
+  if (!dustInsights) {
+    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
+    return;
+  }
+
+  try {
+    await sendNewMessage(bot, chatId, "🔄 최신 데이터로 인사이트를 새로고침합니다...");
+    
+    // 잠시 후 새로운 인사이트 생성
+    setTimeout(async () => {
+      await safeModuleCall(dustInsights, bot, { 
+        chat: { id: chatId }, 
+        from: from, 
+        text: '/insight' 
+      }, 'Insight');
+    }, 1000);
+  } catch (error) {
+    rLog(`인사이트 새로고침 오류: ${error.message}`, 'ERROR');
+    await sendNewMessage(bot, chatId, "❌ 인사이트 새로고침 중 오류가 발생했습니다.");
+  }
+}
 
 // ========================================
 // 할일 관리 핸들러들
