@@ -469,8 +469,8 @@ bot.on("callback_query", async (callbackQuery) => {
       } else {
         switch (data) {
           case "insight_menu":
-            await handleInsightMenu(bot, chatId, callbackQuery.from);
-            break;
+  await handleInsightMenu(bot, chatId, callbackQuery.from);
+  break;
           case "insight_full":
             await handleInsightFull(bot, chatId, callbackQuery.from);
             break;
@@ -1908,3 +1908,8 @@ if (process.env.RAILWAY_DEPLOYMENT_ID) {
 }
 
 rLog("✅ 모든 핸들러가 등록되었습니다. 메시지를 기다리는 중...", 'INFO');
+
+    async function handleInsightMenu(bot, chatId, from) {
+  await sendNewMessage(bot, chatId, "📊 인사이트 메뉴입니다.", 
+    { reply_markup: insightMenuKeyboard });
+    }
