@@ -184,56 +184,74 @@ class WeatherManager {
     const koreaTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Seoul"}));
     const timeStr = `${koreaTime.getHours().toString().padStart(2, '0')}:${koreaTime.getMinutes().toString().padStart(2, '0')}`;
     
-    let message = `🌤️ **${weatherData.city} 날씨** (${timeStr})\n\n`;
+    let message = `━━━━━━━━━━━━━━━━━━━━━\n`;
+    message += `🌤️ **${weatherData.city} 날씨** (${timeStr})\n`;
+    message += `━━━━━━━━━━━━━━━━━━━━━\n\n`;
     
-    // 🏡 화성일 때 특별 메시지!
+    // 🏡 화성일 때 특별 메시지
     if (weatherData.city === '화성') {
-      message += `🏡 동탄/화성 지역 현재 날씨입니다!\n\n`;
+        message += `🏡 **동탄/화성 지역**\n\n`;
     }
     
-    message += `${weatherData.weatherEmoji} ${weatherData.weatherDesc}\n`;
-    message += `🌡️ 기온: ${weatherData.temp}°C (체감 ${weatherData.feelsLike}°C)\n`;
-    message += `💧 습도: ${weatherData.humidity}%\n`;
-    message += `💨 바람: ${weatherData.windSpeed}m/s\n\n`;
+    // 핵심 날씨 정보만
+    message += `${weatherData.weatherEmoji} **${weatherData.weatherDesc}**\n\n`;
     
+    message += `🌡️ **${weatherData.temp}°C** (체감 ${weatherData.feelsLike}°C)\n`;
+    message += `💧 습도: ${weatherData.humidity}%\n`;
+    
+    // 바람은 강할 때만 표시
+    if (weatherData.windSpeed > 3) {
+        message += `💨 바람: ${weatherData.windSpeed}m/s\n`;
+    }
+    
+    message += `\n━━━━━━━━━━━━━━━━━━━━━\n`;
+    
+    // 옷차림 추천
     message += `${weatherData.clothing.emoji} **오늘의 옷차림**\n`;
     message += `${weatherData.clothing.text}\n\n`;
     
-    if (weatherData.airQuality) {
-      message += `🏭 **대기질**: ${weatherData.airQuality.color} ${weatherData.airQuality.level}\n`;
-      message += `${weatherData.airQuality.emoji} ${weatherData.airQuality.advice}\n\n`;
+    // 대기질은 나쁠 때만 표시
+    if (weatherData.airQuality && weatherData.airQuality.level !== '좋음') {
+        message += `🏭 **대기질**: ${weatherData.airQuality.color} ${weatherData.airQuality.level}\n`;
+        message += `${weatherData.airQuality.emoji} ${weatherData.airQuality.advice}\n\n`;
     }
     
-    // 날씨에 따른 추가 조언
+    // 날씨 주의사항
+    let alerts = [];
     if (weatherData.weatherDesc.includes('비')) {
-      message += `☂️ **우산을 챙기세요!**\n`;
+        alerts.push('☂️ 우산 필수!');
     }
     if (weatherData.temp <= 5) {
-      message += `🧣 **따뜻하게 입고 나가세요!**\n`;
+        alerts.push('🧣 따뜻하게!');
     }
     if (weatherData.temp >= 30) {
-      message += `🧴 **자외선 차단제를 바르세요!**\n`;
+        alerts.push('🧴 자외선 차단제!');
     }
     
-    // 🏡 화성 지역 특별 정보
+    if (alerts.length > 0) {
+        message += `⚠️ **주의사항**\n`;
+        alerts.forEach(alert => {
+            message += `• ${alert}\n`;
+        });
+        message += '\n';
+    }
+    
+    // 🏡 화성 지역 통근 TIP (간소화)
     if (weatherData.city === '화성') {
-      message += `\n🚌 **동탄 통근 TIP:**\n`;
-      if (weatherData.temp <= 0) {
-        message += `• 버스 대기 시간이 길 수 있으니 따뜻하게!\n`;
-      }
-      if (weatherData.weatherDesc.includes('비')) {
-        message += `• 동탄역 지하보도를 이용하세요!\n`;
-      }
+        message += `━━━━━━━━━━━━━━━━━━━━━\n`;
+        message += `🚌 **동탄 통근 TIP**\n`;
+        
+        if (weatherData.temp <= 0) {
+            message += `• 버스 대기시간 고려해서 따뜻하게!\n`;
+        } else if (weatherData.weatherDesc.includes('비')) {
+            message += `• 동탄역 지하보도 이용 추천!\n`;
+        } else {
+            message += `• 좋은 하루 되세요! 🌈\n`;
+        }
     }
     
     return message;
-  }
-
-  // 간단한 날씨 정보 (메뉴용)
-  formatSimpleWeather(weatherData) {
-    const locationEmoji = weatherData.city === '화성' ? '🏡' : '🌤️';
-    return `${locationEmoji} ${weatherData.weatherEmoji} ${weatherData.temp}°C ${weatherData.weatherDesc}\n${weatherData.clothing.emoji} ${weatherData.clothing.text}`;
-  }
+}
 
   // 24시간 예보 포맷
   formatHourlyForecast(forecasts) {
