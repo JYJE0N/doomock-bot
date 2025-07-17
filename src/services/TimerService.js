@@ -1,5 +1,5 @@
-const { TimeHelper } = require('../utils/TimeHelper');
-const { Logger } = require('../utils/Logger');
+const { TimerService } = require('../services/TimerService');
+const  Logger  = require('../utils/Logger');
 
 class TimerService {
     constructor() {

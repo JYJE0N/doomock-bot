@@ -3,6 +3,7 @@
 const gtts = require('gtts');
 const fs = require('fs');
 const path = require('path');
+const { TTSService } = require('../services/TTSService')
 
 class TTSService {
     constructor() {

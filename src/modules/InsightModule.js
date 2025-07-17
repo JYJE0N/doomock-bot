@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule');
-const { InsightService } = require('../services/InsightService');
+const  InsightModule  = require('../modules/InsightModule');
 const { getUserName } = require('../utils/UserHelper');
 
 class InsightModule extends BaseModule {
@@ -238,4 +238,4 @@ class InsightModule extends BaseModule {
     }
 }
 
-module.exports = InsightModule;
+module.exports =  InsightModule ;

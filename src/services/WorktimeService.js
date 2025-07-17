@@ -1,4 +1,5 @@
 // src/services/WorktimeService.js
+const { WorktimeService } = require ('../services/WorktimeService')
 
 class WorktimeService {
     constructor() {

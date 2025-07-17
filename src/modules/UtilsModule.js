@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const { TTSService } = require('../services/TTSService');
+const  UtilsModule  = require('../modules/UtilsModule');
 const { getUserName } = require('../utils/UserHelper');
 const { ValidationHelper } = require('../utils/ValidationHelper');
 

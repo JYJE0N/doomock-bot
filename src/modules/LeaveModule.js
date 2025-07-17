@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const { LeaveModule } = require('../modules/LeaveModule');
+const  LeaveModule  = require('../modules/LeaveModule');
 const { getUserName } = require('../utils/UserHelper');
 const { ValidationHelper } = require('../utils/ValidationHelper');
 
@@ -266,4 +266,4 @@ class LeaveModule extends BaseModule {
     }
 }
 
-module.exports = LeaveModule;
+module.exports =  LeaveModule ;

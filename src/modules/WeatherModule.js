@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const { WeatherService } = require('../services/WeatherService');
+const  WeatherModule  = require('../modules/WeatherModule');
 const { getUserName } = require('../utils/UserHelper');
 
 class WeatherModule extends BaseModule {

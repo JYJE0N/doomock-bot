@@ -308,4 +308,4 @@ class ReminderService {
     }
 }
 
-module.exports = ReminderService;
+module.exports = { ReminderService };

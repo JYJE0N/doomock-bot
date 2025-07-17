@@ -1,7 +1,7 @@
 // src/services/LeaveService.js - import 수정
 
 const DatabaseManager = require('../database/DatabaseManager');
-const { TimeHelper } = require('../utils/TimeHelper');
+const { LeaveService } = require('../services/LeaveService ');
 const Logger = require('../utils/Logger');
 
 class LeaveService {

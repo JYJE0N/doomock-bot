@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const { TodoService } = require('../services/TodoService');
+const  TodoModule  = require('../modules/TodoModule');
 const { getUserName } = require('../utils/UserHelper');
 const { ValidationHelper } = require('../utils/ValidationHelper');
 

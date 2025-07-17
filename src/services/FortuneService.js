@@ -1,6 +1,6 @@
 // src/services/FortuneService.js - 수정된 버전
 
-const { TimeHelper } = require('../utils/TimeHelper');
+const { FortuneService } = require('../services/FortuneService');
 
 class FortuneService {
     constructor() {

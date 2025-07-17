@@ -2,7 +2,7 @@
 
 const BaseModule = require('./BaseModule');
 const { getUserName } = require('../utils/UserHelper');
-const { FortuneService } = require('../services/FortuneService');
+const  FortuneModule  = require('../modules/FortuneModule');
 
 class FortuneModule extends BaseModule {
     constructor() {

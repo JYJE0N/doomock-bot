@@ -1,6 +1,6 @@
 // src/services/WeatherService.js
 //test
-
+const { WeatherService } = require ('../services/WeatherService')
 const axios = require('axios');
 
 class WeatherService {

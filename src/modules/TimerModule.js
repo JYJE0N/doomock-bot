@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const { TimerService } = require('../services/TimerService');
+const  TimerModule  = require('../modules/TimerModule');
 const { getUserName } = require('../utils/UserHelper');
 const { ValidationHelper } = require('../utils/ValidationHelper');
 
@@ -240,4 +240,4 @@ class TimerModule extends BaseModule {
     }
 }
 
-module.exports = TimerModule;
+module.exports =  TimerModule ;
