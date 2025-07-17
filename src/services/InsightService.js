@@ -46,4 +46,5 @@ class InsightService {
     }
 }
 
-module.exports = { InsightService };
+// ✅ 수정
+module.exports = InsightService;
