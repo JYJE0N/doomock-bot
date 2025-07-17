@@ -1,3 +1,5 @@
+// src/services/FortuneService.js - 수정된 버전
+
 const { TimeHelper } = require('../utils/TimeHelper');
 
 class FortuneService {
@@ -99,7 +101,7 @@ class FortuneService {
     }
 
     getRandomMessage(messages, userId) {
-        const today = TimeHelper.formatDate(new Date());
+        const today = TimeHelper.formatDate ? TimeHelper.formatDate(new Date()) : new Date().toDateString();
         const seed = parseInt(userId.toString() + today.replace(/\D/g, ''));
         const index = seed % messages.length;
         return messages[index];
@@ -115,7 +117,7 @@ class FortuneService {
     }
 
     getLucky(userId) {
-        const today = TimeHelper.formatDate(new Date());
+        const today = TimeHelper.formatDate ? TimeHelper.formatDate(new Date()) : new Date().toDateString();
         const seed = parseInt(userId.toString() + today.replace(/\D/g, ''));
         
         return `🍀 **오늘의 행운 정보**\n\n` +
@@ -181,7 +183,4 @@ class FortuneService {
     }
 }
 
-module.exports = { FortuneService };/**
- * 두목봇 전체 모듈 구현 코드
- * 리팩토링된 구조에 맞춘 완전한 구현
- */
+module.exports = { FortuneService };

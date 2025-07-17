@@ -124,9 +124,35 @@ class BaseModule {
         throw new Error(`${this.name} 모듈에서 handleMessage 메서드를 구현해야 합니다`);
     }
 
-    // 콜백 처리 (추상 메서드)
-    async handleCallback(bot, callbackQuery) {
-        throw new Error(`${this.name} 모듈에서 handleCallback 메서드를 구현해야 합니다`);
+    // 콜백 처리 (기본 구현)
+async handleCallback(bot, callbackQuery, subAction, params) {
+    try {
+        this.updateStats('callback');
+        
+        const result = await this.processCallback(bot, callbackQuery, subAction, params);
+        
+        Logger.userAction(callbackQuery.from.id, `${this.name}:${subAction}`, {
+            params,
+            success: true
+        });
+        
+        return result;
+        
+    } catch (error) {
+        this.updateStats('error');
+        Logger.error(`콜백 처리 실패 [${this.name}:${subAction}]:`, error);
+        
+        await this.sendErrorMessage(bot, callbackQuery.message.chat.id, error);
+        return false;
+    }
+}
+
+    // 실제 콜백 처리 (서브클래스에서 구현)
+    async processCallback(bot, callbackQuery, subAction, params) {
+        // 기본 구현 - 서브클래스에서 오버라이드하여 사용
+        const chatId = callbackQuery.message.chat.id;
+        await this.sendMessage(bot, chatId, `❌ ${this.name}에서 ${subAction} 액션을 처리할 수 없습니다.`);
+        return false;
     }
 
     // 명령어 처리 (기본 구현)

@@ -31,13 +31,13 @@ class TodoModule extends BaseModule {
         return false;
     }
 
-    async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
+    async processCallback(bot, callbackQuery, subAction, params) {
         const { message: { chat: { id: chatId }, message_id: messageId }, from: { id: userId } } = callbackQuery;
         const userName = getUserName(callbackQuery.from);
 
         switch (subAction) {
             case 'menu':
-                await this.showTodoMenu(bot, chatId, messageId, userName, menuManager);
+                await this.showTodoMenu(bot, chatId, messageId, userName);
                 break;
             case 'list':
                 await this.showTodoList(bot, chatId, messageId, userId, userName);
@@ -63,12 +63,29 @@ class TodoModule extends BaseModule {
                 break;
             default:
                 await this.sendMessage(bot, chatId, '❌ 알 수 없는 할일 관리 명령입니다.');
+                return false;
         }
+        return true;
     }
 
-    async showTodoMenu(bot, chatId, messageId, userName, menuManager) {
-        const menuText = menuManager.getMenuText('todo', userName);
-        const keyboard = menuManager.createKeyboard('todo');
+    async showTodoMenu(bot, chatId, messageId, userName) {
+        const menuText = `📝 **${userName}님의 할일 관리**\n\n할일을 효율적으로 관리해보세요:`;
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '📝 할일 추가', callback_data: 'todo_add' },
+                    { text: '📋 할일 목록', callback_data: 'todo_list' }
+                ],
+                [
+                    { text: '📊 통계 보기', callback_data: 'todo_stats' },
+                    { text: '🗑️ 완료 삭제', callback_data: 'todo_clear_completed' }
+                ],
+                [
+                    { text: '⚠️ 전체 삭제', callback_data: 'todo_clear_all' },
+                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]
+            ]
+        };
         
         await this.editMessage(bot, chatId, messageId, menuText, {
             parse_mode: 'Markdown',

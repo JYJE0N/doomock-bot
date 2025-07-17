@@ -1,11 +1,13 @@
+// src/modules/FortuneModule.js - 수정된 버전
+
 const BaseModule = require('./BaseModule');
 const { getUserName } = require('../utils/UserHelper');
-const fortuneService = require('../services/FortuneService'); // 서비스 구조에 맞게 조정
+const { FortuneService } = require('../services/FortuneService');
 
 class FortuneModule extends BaseModule {
     constructor() {
         super('FortuneModule');
-        this.fortuneService = fortuneService;
+        this.fortuneService = new FortuneService();
     }
 
     async handleMessage(bot, msg) {
@@ -88,8 +90,31 @@ class FortuneModule extends BaseModule {
     }
 
     async showFortuneMenu(bot, chatId, messageId, userName, menuManager) {
-        const menuText = menuManager.getMenuText('fortune', userName);
-        const keyboard = menuManager.createKeyboard('fortune');
+        const menuText = `🔮 **${userName}님의 운세 메뉴**\n\n오늘의 운세를 확인해보세요:`;
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🌟 일반운세', callback_data: 'fortune_general' },
+                    { text: '💼 업무운', callback_data: 'fortune_work' }
+                ],
+                [
+                    { text: '💕 연애운', callback_data: 'fortune_love' },
+                    { text: '💰 재물운', callback_data: 'fortune_money' }
+                ],
+                [
+                    { text: '🌿 건강운', callback_data: 'fortune_health' },
+                    { text: '🍻 회식운', callback_data: 'fortune_meeting' }
+                ],
+                [
+                    { text: '🃏 타로카드', callback_data: 'fortune_tarot' },
+                    { text: '🍀 행운정보', callback_data: 'fortune_lucky' }
+                ],
+                [
+                    { text: '🔮 종합운세', callback_data: 'fortune_all' },
+                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]
+            ]
+        };
         
         await this.editMessage(bot, chatId, messageId, menuText, {
             parse_mode: 'Markdown',
