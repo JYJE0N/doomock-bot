@@ -563,17 +563,9 @@ bot.on("callback_query", async (callbackQuery) => {
         break;
 
       // 인사이트 관리
+      // 인사이트 메뉴 (기본 메뉴만)
       case "insight_menu":
         await sendInsightMenu(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_full":
-        await handleInsight(bot, chatId, callbackQuery.from, '/insight');
-        break;
-      case "insight_quick":
-        await handleInsight(bot, chatId, callbackQuery.from, '/insight quick');
-        break;
-      case "insight_dashboard":
-        await handleInsightDashboard(bot, chatId, callbackQuery.from);
         break;
 
       // 유틸리티 관리
