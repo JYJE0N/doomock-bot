@@ -1194,6 +1194,20 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
     console.log(`📞 새부리형/귀편한 마스크 콜백 처리: ${data} (사용자: ${userName})`);
 
     try {
+        // 메인 봇에서 처리해야 하는 콜백들은 여기서 처리하지 않음
+        const mainBotCallbacks = [
+            'insight_menu',
+            'insight_quick',      // ✅ 추가
+            'insight_dashboard',  // ✅ 추가
+            'insight_national',   // ✅ 추가
+            'insight_refresh'     // ✅ 추가
+        ];
+        
+        if (mainBotCallbacks.includes(data)) {
+            console.log(`🔄 ${data}는 메인 봇에서 처리됨 - 스킵`);
+            return; // 처리하지 않고 메인 봇으로 위임
+        }
+        
         // 데이터가 필요한 콜백들은 미리 인사이트 생성
         let insights = null;
         let dustData = null;
@@ -1262,45 +1276,14 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
                 }
                 break;
                 
-            case 'insight_dashboard':
-                await handleInsightDashboard(bot, chatId, callbackQuery.from);
-                break;
-                
-            case 'insight_national':
-                await module.exports(bot, { 
-                    chat: { id: chatId }, 
-                    from: callbackQuery.from, 
-                    text: '/insight national' 
-                });
-                break;
-                
-            case 'insight_refresh':
-                await bot.sendMessage(chatId, '🔄 최신 새부리형/귀편한 마스크 인사이트로 새로고침합니다...');
-                setTimeout(async () => {
-                    await module.exports(bot, { 
-                        chat: { id: chatId }, 
-                        from: callbackQuery.from, 
-                        text: '/insight' 
-                    });
-                }, 1000);
-                break;
-                
             case 'main_menu':
                 await showMainMenu(bot, chatId);
                 break;
                 
             default:
                 console.log(`⚠️ 처리되지 않은 새부리형/귀편한 마스크 콜백: ${data}`);
-                await bot.sendMessage(chatId, 
-                    '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.',
-                    { 
-                        reply_markup: { 
-                            inline_keyboard: [[
-                                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-                            ]] 
-                        } 
-                    }
-                );
+                // ❌ 오류 메시지를 보내지 않고 조용히 무시
+                // 메인 봇에서 처리될 수 있도록 함
                 break;
         }
         
