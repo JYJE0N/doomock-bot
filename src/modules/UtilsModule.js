@@ -7,7 +7,7 @@ const { ValidationHelper } = require('../utils/ValidationHelper');
 class UtilsModule extends BaseModule {
     constructor() {
         super('UtilsModule');
-        this.ttsService = new TTSHelper();
+        this.ttsService = new TTSService();
         this.userStates = new Map();
     }
 
