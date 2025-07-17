@@ -1,4 +1,4 @@
-// src/database/DatabaseManager.js
+// src/database/DatabaseManager.js - 수정된 버전
 const { MongoClient } = require('mongodb');
 const Logger = require('../utils/Logger');
 
@@ -38,8 +38,12 @@ class DatabaseManager {
 
             await this.client.connect();
             
-            // 데이터베이스 이름 추출
-            const dbName = this.extractDbName(this.mongoUrl) || 'doomock85';
+            // 데이터베이스 이름 추출 및 검증
+            let dbName = this.extractDbName(this.mongoUrl);
+            
+            // 🔧 데이터베이스 이름 검증 및 정리
+            dbName = this.sanitizeDbName(dbName) || 'doomock85';
+            
             this.db = this.client.db(dbName);
             
             this.isConnected = true;
@@ -65,6 +69,33 @@ class DatabaseManager {
         } catch {
             return null;
         }
+    }
+
+    // 🆕 데이터베이스 이름 정리 함수
+    sanitizeDbName(dbName) {
+        if (!dbName) return null;
+        
+        // MongoDB에서 허용하지 않는 문자들 제거/변경
+        let sanitized = dbName
+            .replace(/\./g, '_')           // 점을 언더스코어로
+            .replace(/\s+/g, '_')          // 공백을 언더스코어로
+            .replace(/[\/\\:"*?<>|]/g, '') // 특수문자 제거
+            .replace(/^[._]+/, '')         // 시작부분 점이나 언더스코어 제거
+            .replace(/[._]+$/, '')         // 끝부분 점이나 언더스코어 제거
+            .toLowerCase();                // 소문자로 변환
+        
+        // 길이 제한 (MongoDB는 64바이트 제한)
+        if (sanitized.length > 64) {
+            sanitized = sanitized.substring(0, 64);
+        }
+        
+        // 빈 문자열이면 기본값 반환
+        if (!sanitized || sanitized.length === 0) {
+            return 'doomock_bot';
+        }
+        
+        Logger.info(`데이터베이스 이름 정리: ${dbName} → ${sanitized}`);
+        return sanitized;
     }
 
     // 이벤트 리스너 설정
