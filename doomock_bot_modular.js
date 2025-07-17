@@ -412,8 +412,8 @@ bot.on("callback_query", async (callbackQuery) => {
       return;
     }
 
-    // 🔥 인사이트 관련 콜백 처리 (우선순위를 높여서 switch문 앞에 배치)
-    if (data.startsWith('insight_')) {
+    // 🔥 인사이트 관련 콜백 처리 (insight_menu 제외)
+    if (data.startsWith('insight_') && data !== 'insight_menu') {
       rLog(`🎯 인사이트 콜백 처리 시작: ${data}`, 'INFO');
       
       // dust_marketing_insights.js의 handleCallback 함수 호출 시도
@@ -562,10 +562,11 @@ bot.on("callback_query", async (callbackQuery) => {
         await sendWeatherMoreCities(bot, chatId);
         break;
 
-      // 인사이트 관리
-      // 인사이트 메뉴 (기본 메뉴만)
+      // 🔥 인사이트 메뉴 (메인에서 처리)
       case "insight_menu":
+        rLog(`📊 인사이트 메뉴 처리 시작`, 'INFO');
         await sendInsightMenu(bot, chatId, callbackQuery.from);
+        rLog(`✅ 인사이트 메뉴 처리 완료`, 'SUCCESS');
         break;
 
       // 유틸리티 관리
