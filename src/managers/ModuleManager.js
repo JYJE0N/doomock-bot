@@ -627,6 +627,57 @@ async loadModule(moduleName, config) {
             throw error;
         }
     }
+
+    // 활성화된 모듈 목록 반환
+    getEnabledModules() {
+        const enabledModules = [];
+        
+        for (const [moduleName, moduleData] of this.modules) {
+            if (moduleData.status === 'initialized') {
+                enabledModules.push({
+                    name: moduleName,
+                    instance: moduleData.instance,
+                    config: moduleData.config
+                });
+            }
+        }
+        
+        return enabledModules;
+    }
+
+    // 모듈 맵 반환 (기존 getModules 함수 오버라이드)
+    getModules() {
+        const modules = {};
+        
+        for (const [moduleName, moduleData] of this.modules) {
+            if (moduleData.status === 'initialized') {
+                // 모듈명을 소문자로 변환해서 반환
+                const key = moduleName.replace('Module', '').toLowerCase();
+                modules[key] = moduleData.instance;
+            }
+        }
+        
+        return modules;
+    }
+
+    // 초기화된 모듈 개수 반환
+    getInitializedModuleCount() {
+        return Array.from(this.modules.values())
+            .filter(moduleData => moduleData.status === 'initialized')
+            .length;
+    }
+
+    // 모든 모듈 상태 반환
+    getAllModules() {
+        return Array.from(this.modules.entries()).map(([name, data]) => ({
+            name,
+            status: data.status,
+            instance: data.instance,
+            config: data.config,
+            error: data.error,
+            loadTime: data.loadTime
+        }));
+    }
 }
 
 module.exports = ModuleManager;
