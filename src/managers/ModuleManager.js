@@ -81,7 +81,7 @@ async loadModule(moduleName, config) {
             return; // 모듈 로드 실패 시 그냥 스킵
         }
 
-        // 모듈 인스턴스 생성
+        // 모듈 인스턴스 생성_임시생성
         const moduleInstance = new ModuleClass(config);
 
         // 모듈 등록
