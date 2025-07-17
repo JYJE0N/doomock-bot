@@ -412,40 +412,83 @@ bot.on("callback_query", async (callbackQuery) => {
       return;
     }
 
-    // 🔥 인사이트 관련 콜백 처리 (insight_menu 제외)
-    if (data.startsWith('insight_') && data !== 'insight_menu') {
-      rLog(`🎯 인사이트 콜백 처리 시작: ${data}`, 'INFO');
+    // 🔥 메인 봇에서 직접 처리할 인사이트 콜백들
+    const mainBotInsightCallbacks = [
+      'insight_menu',
+      'insight_quick', 
+      'insight_dashboard',
+      'insight_national',
+      'insight_refresh'
+    ];
+
+    async function handleMainBotInsightCallback(bot, callbackQuery, data) {
+  const chatId = callbackQuery.message.chat.id;
+  
+  switch (data) {
+    case 'insight_menu':
+      await sendNewMessage(bot, chatId,
+        `📊 **${getUserName(callbackQuery.from)}님의 마케팅 인사이트**\n\n원하는 기능을 선택해주세요:`,
+        {
+          parse_mode: 'Markdown',
+          reply_markup: insightMenuKeyboard
+        }
+      );
+      break;
       
-      // dust_marketing_insights.js의 handleCallback 함수 호출 시도
+    case 'insight_quick':
+      await handleInsight(bot, chatId, callbackQuery.from, '/insight quick');
+      break;
+      
+    case 'insight_dashboard':
+      await handleInsightDashboard(bot, chatId, callbackQuery.from);
+      break;
+      
+    case 'insight_national':
+      await handleInsight(bot, chatId, callbackQuery.from, '/insight national');
+      break;
+      
+    case 'insight_refresh':
+      await sendNewMessage(bot, chatId, '🔄 최신 새부리형/귀편한 마스크 인사이트로 새로고침합니다...');
+      setTimeout(async () => {
+        await handleInsight(bot, chatId, callbackQuery.from, '/insight');
+      }, 1000);
+      break;
+      
+    default:
+      rLog(`❓ 처리되지 않은 메인 봇 인사이트 콜백: ${data}`, 'WARN');
+      break;
+  }
+}
+
+    if (dustInsightCallbacks.includes(data)) {
+      rLog(`🎯 dust_insights 모듈로 전달: ${data}`, 'INFO');
+      
+      // dust_marketing_insights.js의 handleCallback 함수 호출
       if (dustInsights && typeof dustInsights.handleCallback === 'function') {
         try {
           await dustInsights.handleCallback(bot, callbackQuery);
-          rLog(`✅ 인사이트 콜백 처리 완료: ${data}`, 'SUCCESS');
+          rLog(`✅ dust_insights 처리 완료: ${data}`, 'SUCCESS');
           return;
         } catch (error) {
-          rLog(`❌ 인사이트 콜백 처리 실패: ${error.message}`, 'ERROR');
-          // 폴백으로 진행
+          rLog(`❌ dust_insights 처리 실패: ${error.message}`, 'ERROR');
+          // 폴백으로 진행하지 않고 오류 처리
+          await sendNewMessage(bot, chatId, 
+            `❌ ${data} 처리 중 오류가 발생했습니다.`,
+            { 
+              reply_markup: { 
+                inline_keyboard: [[
+                  { text: '📊 종합 인사이트', callback_data: 'insight_full' },
+                  { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]] 
+              } 
+            }
+          );
+          return;
         }
-      }
-      
-      // 폴백 처리 - 직접 구현
-      try {
+      } else {
+        // dust_insights 모듈이 없으면 폴백 처리
+        rLog(`🔧 dust_insights 모듈 없음, 폴백 처리: ${data}`, 'INFO');
         await handleInsightCallbackFallback(bot, callbackQuery, data);
-        rLog(`✅ 인사이트 폴백 처리 완료: ${data}`, 'SUCCESS');
-        return;
-      } catch (error) {
-        rLog(`❌ 인사이트 폴백 처리 실패: ${error.message}`, 'ERROR');
-        await sendNewMessage(bot, chatId, 
-          `❌ ${data} 처리 중 오류가 발생했습니다.`,
-          { 
-            reply_markup: { 
-              inline_keyboard: [[
-                { text: '📊 종합 인사이트', callback_data: 'insight_full' },
-                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
-              ]] 
-            } 
-          }
-        );
         return;
       }
     }
