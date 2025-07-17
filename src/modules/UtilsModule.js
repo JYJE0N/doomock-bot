@@ -27,7 +27,7 @@ class UtilsModule extends BaseModule {
         return false;
     }
 
-    async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
+    async processCallback(bot, callbackQuery, subAction, params, menuManager) {
         const { message: { chat: { id: chatId }, message_id: messageId }, from: { id: userId } } = callbackQuery;
         const userName = getUserName(callbackQuery.from);
 
