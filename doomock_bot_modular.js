@@ -412,6 +412,44 @@ bot.on("callback_query", async (callbackQuery) => {
       return;
     }
 
+    // 🔥 인사이트 관련 콜백 처리 (우선순위를 높여서 switch문 앞에 배치)
+    if (data.startsWith('insight_')) {
+      rLog(`🎯 인사이트 콜백 처리 시작: ${data}`, 'INFO');
+      
+      // dust_marketing_insights.js의 handleCallback 함수 호출 시도
+      if (dustInsights && typeof dustInsights.handleCallback === 'function') {
+        try {
+          await dustInsights.handleCallback(bot, callbackQuery);
+          rLog(`✅ 인사이트 콜백 처리 완료: ${data}`, 'SUCCESS');
+          return;
+        } catch (error) {
+          rLog(`❌ 인사이트 콜백 처리 실패: ${error.message}`, 'ERROR');
+          // 폴백으로 진행
+        }
+      }
+      
+      // 폴백 처리 - 직접 구현
+      try {
+        await handleInsightCallbackFallback(bot, callbackQuery, data);
+        rLog(`✅ 인사이트 폴백 처리 완료: ${data}`, 'SUCCESS');
+        return;
+      } catch (error) {
+        rLog(`❌ 인사이트 폴백 처리 실패: ${error.message}`, 'ERROR');
+        await sendNewMessage(bot, chatId, 
+          `❌ ${data} 처리 중 오류가 발생했습니다.`,
+          { 
+            reply_markup: { 
+              inline_keyboard: [[
+                { text: '📊 종합 인사이트', callback_data: 'insight_full' },
+                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+              ]] 
+            } 
+          }
+        );
+        return;
+      }
+    }
+
     // 메인 콜백 처리
     switch (data) {
       case "main_menu":
@@ -1016,117 +1054,249 @@ async function sendWeatherMoreCities(bot, chatId) {
   );
 }
 
-// 인사이트 관리 함수들
-async function sendInsightMenu(bot, chatId, from) {
-  await sendNewMessage(bot, chatId,
-    `📊 **${getUserName(from)}님의 마케팅 인사이트**\n\n원하는 기능을 선택해주세요:`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: insightMenuKeyboard
-    }
-  );
-}
-
-async function handleInsight(bot, chatId, from, command) {
-  if (!dustInsights) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: command }, 'Insight');
-}
-
-//수정 위치
-async function handleInsightDashboard(bot, chatId, from) {
-  // 1차: dustInsights.showRealtimeDashboard 시도
-  if (dustInsights && dustInsights.showRealtimeDashboard) {
-    try {
-      rLog(`📱 대시보드 호출 시도: ${getUserName(from)}`, 'INFO');
-      await dustInsights.showRealtimeDashboard(bot, chatId, getUserName(from));
-      return;
-    } catch (error) {
-      rLog(`❌ 대시보드 1차 시도 실패: ${error.message}`, 'ERROR');
-    }
-  }
-
-  // 2차: 일반 인사이트로 폴백
-  if (dustInsights) {
-    try {
-      rLog(`📊 인사이트 폴백 시도`, 'INFO');
-      await safeModuleCall(dustInsights, bot, { 
-        chat: { id: chatId }, 
-        from: from, 
-        text: '/insight' 
-      }, 'Insight');
-      return;
-    } catch (error) {
-      rLog(`❌ 인사이트 폴백 실패: ${error.message}`, 'ERROR');
-    }
-  }
-
-  // 3차: 수동 대시보드 생성
-  try {
-    rLog(`🔧 수동 대시보드 생성`, 'INFO');
-    
-    const now = new Date();
-    const koreaTime = now.toLocaleTimeString('ko-KR', { 
-      timeZone: 'Asia/Seoul',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    
-    const dashboardText = `📱 **실시간 마케팅 대시보드**\n\n` +
-                         `⏰ **현재 시간** (${koreaTime})\n` +
-                         `• 시스템 상태: 🟢 정상 운영\n` +
-                         `• 사용자: ${getUserName(from)}님\n\n` +
-                         `📊 **기본 정보**\n` +
-                         `• 인사이트 모듈: ${dustInsights ? '✅ 로드됨' : '❌ 오류'}\n` +
-                         `• 대시보드 상태: 🔧 수동 모드\n\n` +
-                         `⚡ **빠른 액션**\n` +
-                         `• 종합 인사이트로 상세 분석 가능\n` +
-                         `• 전체 마케팅 데이터 조회 가능\n\n` +
-                         `💡 **안내**\n` +
-                         `고급 대시보드 기능이 일시적으로 제한됩니다.\n` +
-                         `종합 인사이트를 이용해주세요.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📊 종합 인사이트", callback_data: "insight_full" },
-          { text: "⚡ 빠른 인사이트", callback_data: "insight_quick" }
-        ],
-        [
-          { text: "🔄 다시 시도", callback_data: "insight_dashboard" },
-          { text: "🔙 인사이트 메뉴", callback_data: "insight_menu" }
-        ]
-      ]
-    };
-
-    await sendNewMessage(bot, chatId, dashboardText, {
-      parse_mode: 'Markdown',
-      reply_markup: keyboard
-    });
-
-    rLog(`✅ 수동 대시보드 생성 성공`, 'SUCCESS');
-    
-  } catch (error) {
-    rLog(`❌ 수동 대시보드 생성 실패: ${error.message}`, 'ERROR');
-    
-    // 최종 폴백
-    await sendNewMessage(bot, chatId, 
-      "❌ 실시간 대시보드를 표시할 수 없습니다.\n\n" +
-      "📊 종합 인사이트를 이용해주세요.",
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "📊 종합 인사이트", callback_data: "insight_full" },
-              { text: "🔙 인사이트 메뉴", callback_data: "insight_menu" }
-            ]
-          ]
+// 🔥 인사이트 콜백 폴백 함수
+async function handleInsightCallbackFallback(bot, callbackQuery, data) {
+  const chatId = callbackQuery.message.chat.id;
+  const userName = getUserName(callbackQuery.from);
+  
+  rLog(`🔧 인사이트 폴백 처리: ${data}`, 'INFO');
+  
+  switch (data) {
+    case 'insight_full':
+      await handleInsight(bot, chatId, callbackQuery.from, '/insight');
+      break;
+      
+    case 'insight_quick':
+      await handleInsight(bot, chatId, callbackQuery.from, '/insight quick');
+      break;
+      
+    case 'insight_dashboard':
+      await handleInsightDashboard(bot, chatId, callbackQuery.from);
+      break;
+      
+    case 'insight_national':
+      await handleInsight(bot, chatId, callbackQuery.from, '/insight national');
+      break;
+      
+    case 'insight_refresh':
+      await sendNewMessage(bot, chatId, '🔄 최신 새부리형/귀편한 마스크 인사이트로 새로고침합니다...');
+      setTimeout(async () => {
+        await handleInsight(bot, chatId, callbackQuery.from, '/insight');
+      }, 1000);
+      break;
+      
+    // 상세 분석 기능들
+    case 'insight_products':
+      await sendNewMessage(bot, chatId, 
+        `🎁 **새부리형/귀편한 마스크 제품 전략**\n\n` +
+        `⚡ **여름철 비수기 전략**\n` +
+        `• 주력 상품: 숨쉬기 편한 새부리형\n` +
+        `• 전략 포커스: 통풍성과 편의성 강조\n` +
+        `• 크로스셀링: 통풍 새부리형, 메쉬 귀편한\n` +
+        `• 번들링: 여름용 새부리형 세트\n\n` +
+        `🔥 **핵심 전략**\n` +
+        `• 무더위에도 편안한 착용감\n` +
+        `• 귀편한 마스크 편의성 마케팅\n` +
+        `• 비수기 가성비 브랜딩 강화`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: { 
+            inline_keyboard: [
+              [
+                { text: '📊 종합 인사이트', callback_data: 'insight_full' },
+                { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' }
+              ],
+              [
+                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+              ]
+            ] 
+          } 
         }
-      }
-    );
+      );
+      break;
+      
+    case 'insight_pricing':
+      await sendNewMessage(bot, chatId, 
+        `💰 **새부리형/귀편한 마스크 가격 전략**\n\n` +
+        `• 가격 정책: 가성비 가격 정책\n` +
+        `• 계절 배수: 1.2배 (비수기)\n` +
+        `• 미세먼지 배수: 0.8배 (좋음)\n` +
+        `• **총 기회 배수: 0.96배**\n\n` +
+        `🎯 **실행 방안**\n` +
+        `• 기능성 부각 마케팅\n` +
+        `• 비교 광고 (경쟁사 대비)\n` +
+        `• 대용량 할인 혜택\n\n` +
+        `💡 **추천 사항**\n` +
+        `• 비수기 가성비 마케팅 강화\n` +
+        `• 귀편한 마스크 편의성 가치 부각`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: { 
+            inline_keyboard: [
+              [
+                { text: '🎁 제품 전략', callback_data: 'insight_products' },
+                { text: '📦 재고 전략', callback_data: 'insight_inventory' }
+              ],
+              [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' }
+              ]
+            ] 
+          } 
+        }
+      );
+      break;
+      
+    case 'insight_inventory':
+      await sendNewMessage(bot, chatId, 
+        `📦 **새부리형/귀편한 마스크 재고 전략**\n\n` +
+        `• 권장 재고 수준: 150% (비수기)\n` +
+        `• 예상 회전율: steady (안정적)\n` +
+        `• 총 수요 배수: 0.96배\n` +
+        `• 핵심 관리: 숨쉬기 편한 새부리형, 귀편한 여름용\n\n` +
+        `📊 **수요 분석**\n` +
+        `• 계절 수요: 1.2배 (비수기)\n` +
+        `• 미세먼지 수요: 0.8배 (좋음)\n\n` +
+        `🎯 **실행 전략**\n` +
+        `• 비수기 적정 재고 수준 유지\n` +
+        `• 숨쉬기 편한 새부리형 우선 관리\n` +
+        `• 여름철 특화 제품 재고 확보`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: { 
+            inline_keyboard: [
+              [
+                { text: '🎁 제품 전략', callback_data: 'insight_products' },
+                { text: '💰 가격 전략', callback_data: 'insight_pricing' }
+              ],
+              [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' }
+              ]
+            ] 
+          } 
+        }
+      );
+      break;
+      
+    case 'insight_marketing':
+      await sendNewMessage(bot, chatId, 
+        `🎯 **새부리형/귀편한 마스크 마케팅 전략**\n\n` +
+        `• 전략명: 주간 시간대 좋음 새부리형/귀편한 마스크 전략\n` +
+        `• 포커스: 업무 환경 + 장시간 착용\n` +
+        `• 긴급도: low (낮음)\n\n` +
+        `📱 **디지털 전략**\n` +
+        `• 채널: 네이버 스마트스토어, 쿠팡, 11번가\n` +
+        `• 예산 수준: 정상 운영\n` +
+        `• 핵심 키워드: 새부리형 마스크, 귀편한 마스크, 숨쉬기 편한\n\n` +
+        `🏪 **오프라인 전략**\n` +
+        `• 채널: 약국, 마트, 편의점\n` +
+        `• 집중 지역: 주거지 매장\n` +
+        `• 진열 전략: 새부리형 구조와 귀편한 착용감 강조`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: { 
+            inline_keyboard: [
+              [
+                { text: '🏙️ 지역별 전략', callback_data: 'insight_regional' },
+                { text: '⚔️ 경쟁사 분석', callback_data: 'insight_competitor' }
+              ],
+              [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' }
+              ]
+            ] 
+          } 
+        }
+      );
+      break;
+      
+    case 'insight_regional':
+      await sendNewMessage(bot, chatId, 
+        `🏙️ **새부리형/귀편한 마스크 지역별 전략**\n\n` +
+        `**🌆 서울/수도권**\n` +
+        `• 특성: 높은 구매력, 브랜드 선호, 편의성 중시\n` +
+        `• 추천: 프리미엄 새부리형, 디자인 귀편한 마스크\n` +
+        `• 가격: 프리미엄 정책\n` +
+        `• 메시지: 세련된 새부리형, 편안한 일상\n\n` +
+        `**🌊 부산/경남**\n` +
+        `• 특성: 실용성 중시, 가성비 중요\n` +
+        `• 추천: 기본형 새부리형, 대용량 귀편한 팩\n` +
+        `• 가격: 가성비 정책\n` +
+        `• 메시지: 실용적인 새부리형, 가성비 최고\n\n` +
+        `**🏘️ 지방 도시**\n` +
+        `• 특성: 가격 민감, 기능성 중시\n` +
+        `• 추천: 경제형 새부리형, 농업용 귀편한\n` +
+        `• 가격: 경제적 정책`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: { 
+            inline_keyboard: [
+              [
+                { text: '🎯 마케팅 전략', callback_data: 'insight_marketing' },
+                { text: '⚔️ 경쟁사 분석', callback_data: 'insight_competitor' }
+              ],
+              [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' }
+              ]
+            ] 
+          } 
+        }
+      );
+      break;
+      
+    case 'insight_competitor':
+      rLog(`🔍 경쟁사 분석 콜백 처리 중...`, 'INFO');
+      await sendNewMessage(bot, chatId, 
+        `⚔️ **새부리형/귀편한 마스크 경쟁사 분석**\n\n` +
+        `**🔍 모니터링 포인트**\n` +
+        `• 경쟁사 새부리형 마스크 가격\n` +
+        `• 귀편한 마스크 재고 현황\n` +
+        `• 마케팅 메시지 분석\n` +
+        `• 신제품 출시 동향\n\n` +
+        `**✅ 기회 요소**\n` +
+        `• 경쟁사 품절 시 새부리형 마스크 점유율 확대\n` +
+        `• 귀편한 마스크 차별화 메시지 강화\n\n` +
+        `**⚠️ 위협 요소**\n` +
+        `• 새부리형 마스크 가격 경쟁 심화\n` +
+        `• 신규 귀편한 마스크 진입자 증가\n\n` +
+        `**🎯 대응 전략**\n` +
+        `• 새부리형 구조의 우수성 지속 어필\n` +
+        `• 귀편한 착용감 차별화 포인트 강화\n` +
+        `• 품질 우위와 편의성 경쟁력 확보`,
+        { 
+          parse_mode: 'Markdown',
+          reply_markup: { 
+            inline_keyboard: [
+              [
+                { text: '🏙️ 지역별 전략', callback_data: 'insight_regional' },
+                { text: '🎯 마케팅 전략', callback_data: 'insight_marketing' }
+              ],
+              [
+                { text: '📊 종합 인사이트', callback_data: 'insight_full' },
+                { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' }
+              ],
+              [
+                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+              ]
+            ] 
+          } 
+        }
+      );
+      rLog(`✅ 경쟁사 분석 콜백 처리 완료`, 'SUCCESS');
+      break;
+      
+    default:
+      rLog(`❓ 처리되지 않은 인사이트 콜백: ${data}`, 'WARN');
+      await sendNewMessage(bot, chatId, 
+        `❌ 알 수 없는 인사이트 명령: ${data}`,
+        { 
+          reply_markup: { 
+            inline_keyboard: [[
+              { text: '📊 종합 인사이트', callback_data: 'insight_full' },
+              { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+            ]] 
+          } 
+        }
+      );
+      break;
   }
 }
 
