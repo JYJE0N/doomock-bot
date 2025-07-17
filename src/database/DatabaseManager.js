@@ -39,7 +39,7 @@ class DatabaseManager {
             await this.client.connect();
             
             // 데이터베이스 이름 추출
-            const dbName = this.extractDbName(this.mongoUrl) || 'doomock_bot';
+            const dbName = this.extractDbName(this.mongoUrl) || 'test';
             this.db = this.client.db(dbName);
             
             this.isConnected = true;

@@ -1,7 +1,6 @@
 // src/services/LeaveService.js - import 수정
 
-const DatabaseManager = require('../database/DatabaseManager');
-// const { LeaveService } = require('../services/LeaveService ');
+const { ensureConnection, getCollection } = require('../database/DatabaseManager');
 const Logger = require('../utils/Logger');
 
 class LeaveService {
