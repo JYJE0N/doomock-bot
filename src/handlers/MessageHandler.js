@@ -1,6 +1,6 @@
 const { ModuleManager } = require("../managers/ModuleManager");
 const { getUserName } = require("../utils/UserHelper");
-const { Logger } = require("../utils/Logger");
+const  Logger  = require("../utils/Logger");
 
 class MessageHandler {
   constructor(bot, menuManager) {
