@@ -3,7 +3,8 @@
 const MenuManager = require('../managers/MenuManager');
 const CallbackManager = require('../managers/CallbackManager');
 const ModuleManager = require('../managers/ModuleManager');
-const MessageHandler = require('../handlers/MessageHandler');
+// import 방식 변경
+const { MessageHandler } = require('../handlers/MessageHandler');
 const CommandHandler = require('../handlers/CommandHandler');
 const DatabaseManager = require('../services/DatabaseManager');
 const Logger = require('../utils/Logger');

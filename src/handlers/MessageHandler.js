@@ -154,4 +154,5 @@ class MessageHandler {
   }
 }
 
-module.exports = { MessageHandler };
+// 마지막 줄을 이렇게 변경
+module.exports = MessageHandler; // ✅ 클래스 직접 export
