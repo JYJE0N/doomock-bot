@@ -2,12 +2,13 @@
 
 const BaseModule = require('./BaseModule');
 const { getUserName } = require('../utils/UserHelper');
-const  FortuneModule  = require('../modules/FortuneModule');
+// const  FortuneModule  = require('../modules/FortuneModule');
+const { FortuneService } = require ('../services/FortuneService')
 
 class FortuneModule extends BaseModule {
     constructor() {
         super('FortuneModule');
-        this.fortuneService = new FortuneService();
+        this.FortuneService = new FortuneService();
     }
 
     async handleMessage(bot, msg) {

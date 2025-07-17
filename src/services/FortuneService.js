@@ -1,6 +1,6 @@
 // src/services/FortuneService.js - 수정된 버전
 
-const { FortuneService } = require('../services/FortuneService');
+// const { FortuneModule } = require('../modules/FortuneModule');
 
 class FortuneService {
     constructor() {
