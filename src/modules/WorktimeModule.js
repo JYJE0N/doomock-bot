@@ -99,4 +99,4 @@ class WorktimeModule extends BaseModule {
     }
 }
 
-module.exports = { WorktimeModule };
+module.exports =  WorktimeModule ;
