@@ -72,6 +72,7 @@ class DatabaseManager {
     }
 
     // 🆕 데이터베이스 이름 정리 함수
+    // 🆕 데이터베이스 이름 정리 함수 - 수정된 버전
     sanitizeDbName(dbName) {
         if (!dbName) return null;
         
@@ -84,17 +85,20 @@ class DatabaseManager {
             .replace(/[._]+$/, '')         // 끝부분 점이나 언더스코어 제거
             .toLowerCase();                // 소문자로 변환
         
-        // 길이 제한 (MongoDB는 64바이트 제한)
-        if (sanitized.length > 64) {
-            sanitized = sanitized.substring(0, 64);
+        // 🔧 길이 제한 (MongoDB는 63바이트 제한)
+        if (sanitized.length > 63) {
+            sanitized = sanitized.substring(0, 63);
         }
+        
+        // 끝에 언더스코어가 있으면 제거
+        sanitized = sanitized.replace(/[._]+$/, '');
         
         // 빈 문자열이면 기본값 반환
         if (!sanitized || sanitized.length === 0) {
             return 'doomock_bot';
         }
         
-        Logger.info(`데이터베이스 이름 정리: ${dbName} → ${sanitized}`);
+        Logger.info(`데이터베이스 이름 정리: ${dbName} → ${sanitized} (길이: ${sanitized.length})`);
         return sanitized;
     }
 
