@@ -13,8 +13,8 @@ class DatabaseManager {
         try {
             this.client = new MongoClient(this.mongoUrl);
             await this.client.connect();
-            this.db = this.client.db('test');  // ✅ 형님 MongoDB 이름 정확히 반영
-            console.log('✅ [DatabaseManager] MongoDB 연결 성공 (test DB)');
+            this.db = this.client.db('doomock85');  // ✅ 형님 MongoDB 이름 정확히 반영
+            console.log('✅ [DatabaseManager] MongoDB 연결 성공 (doomock85 DB)');
         } catch (error) {
             console.error('❌ [DatabaseManager] MongoDB 연결 실패:', error);
             throw error;
