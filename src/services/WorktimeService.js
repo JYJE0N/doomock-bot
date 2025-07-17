@@ -36,4 +36,4 @@ class WorktimeService {
     }
 }
 
-module.exports = WorktimeService;
+module.exports = { WorktimeService };
