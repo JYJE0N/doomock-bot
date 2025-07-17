@@ -412,7 +412,18 @@ bot.on("callback_query", async (callbackQuery) => {
       return;
     }
 
-    // 메인 콜백 처리
+    // 🆕 인사이트 관련 콜백 추가
+    if (data.startsWith('insight_')) {
+      if (dustInsights && dustInsights.handleCallback) {
+        await dustInsights.handleCallback(bot, callbackQuery);
+      } else {
+        // 폴백 처리 - 직접 인사이트 모듈 호출
+        await handleInsightCallback(bot, callbackQuery, data);
+      }
+      return;
+    }
+
+    // 기존 메인 콜백 처리
     switch (data) {
       case "main_menu":
         await sendNewMessage(bot, chatId,
@@ -524,18 +535,9 @@ bot.on("callback_query", async (callbackQuery) => {
         await sendWeatherMoreCities(bot, chatId);
         break;
 
-      // 인사이트 관리
+      // 인사이트 관리 (기본 메뉴만 여기서 처리)
       case "insight_menu":
         await sendInsightMenu(bot, chatId, callbackQuery.from);
-        break;
-      case "insight_full":
-        await handleInsight(bot, chatId, callbackQuery.from, '/insight');
-        break;
-      case "insight_quick":
-        await handleInsight(bot, chatId, callbackQuery.from, '/insight quick');
-        break;
-      case "insight_dashboard":
-        await handleInsightDashboard(bot, chatId, callbackQuery.from);
         break;
 
       // 유틸리티 관리
@@ -1016,115 +1018,75 @@ async function sendWeatherMoreCities(bot, chatId) {
   );
 }
 
-// 인사이트 관리 함수들
-async function sendInsightMenu(bot, chatId, from) {
-  await sendNewMessage(bot, chatId,
-    `📊 **${getUserName(from)}님의 마케팅 인사이트**\n\n원하는 기능을 선택해주세요:`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: insightMenuKeyboard
-    }
-  );
-}
-
-async function handleInsight(bot, chatId, from, command) {
-  if (!dustInsights) {
-    await sendNewMessage(bot, chatId, "❌ 인사이트 기능을 사용할 수 없습니다.");
-    return;
-  }
-
-  await safeModuleCall(dustInsights, bot, { chat: { id: chatId }, from: from, text: command }, 'Insight');
-}
-
-//수정 위치
-async function handleInsightDashboard(bot, chatId, from) {
-  // 1차: dustInsights.showRealtimeDashboard 시도
-  if (dustInsights && dustInsights.showRealtimeDashboard) {
-    try {
-      rLog(`📱 대시보드 호출 시도: ${getUserName(from)}`, 'INFO');
-      await dustInsights.showRealtimeDashboard(bot, chatId, getUserName(from));
-      return;
-    } catch (error) {
-      rLog(`❌ 대시보드 1차 시도 실패: ${error.message}`, 'ERROR');
-    }
-  }
-
-  // 2차: 일반 인사이트로 폴백
-  if (dustInsights) {
-    try {
-      rLog(`📊 인사이트 폴백 시도`, 'INFO');
-      await safeModuleCall(dustInsights, bot, { 
-        chat: { id: chatId }, 
-        from: from, 
-        text: '/insight' 
-      }, 'Insight');
-      return;
-    } catch (error) {
-      rLog(`❌ 인사이트 폴백 실패: ${error.message}`, 'ERROR');
-    }
-  }
-
-  // 3차: 수동 대시보드 생성
+// 🆕 인사이트 콜백 폴백 함수 추가
+async function handleInsightCallback(bot, callbackQuery, data) {
+  const chatId = callbackQuery.message.chat.id;
+  
   try {
-    rLog(`🔧 수동 대시보드 생성`, 'INFO');
-    
-    const now = new Date();
-    const koreaTime = now.toLocaleTimeString('ko-KR', { 
-      timeZone: 'Asia/Seoul',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-    
-    const dashboardText = `📱 **실시간 마케팅 대시보드**\n\n` +
-                         `⏰ **현재 시간** (${koreaTime})\n` +
-                         `• 시스템 상태: 🟢 정상 운영\n` +
-                         `• 사용자: ${getUserName(from)}님\n\n` +
-                         `📊 **기본 정보**\n` +
-                         `• 인사이트 모듈: ${dustInsights ? '✅ 로드됨' : '❌ 오류'}\n` +
-                         `• 대시보드 상태: 🔧 수동 모드\n\n` +
-                         `⚡ **빠른 액션**\n` +
-                         `• 종합 인사이트로 상세 분석 가능\n` +
-                         `• 전체 마케팅 데이터 조회 가능\n\n` +
-                         `💡 **안내**\n` +
-                         `고급 대시보드 기능이 일시적으로 제한됩니다.\n` +
-                         `종합 인사이트를 이용해주세요.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📊 종합 인사이트", callback_data: "insight_full" },
-          { text: "⚡ 빠른 인사이트", callback_data: "insight_quick" }
-        ],
-        [
-          { text: "🔄 다시 시도", callback_data: "insight_dashboard" },
-          { text: "🔙 인사이트 메뉴", callback_data: "insight_menu" }
-        ]
-      ]
-    };
-
-    await sendNewMessage(bot, chatId, dashboardText, {
-      parse_mode: 'Markdown',
-      reply_markup: keyboard
-    });
-
-    rLog(`✅ 수동 대시보드 생성 성공`, 'SUCCESS');
-    
+    switch (data) {
+      case 'insight_full':
+        await handleInsight(bot, chatId, callbackQuery.from, '/insight');
+        break;
+      case 'insight_quick':
+        await handleInsight(bot, chatId, callbackQuery.from, '/insight quick');
+        break;
+      case 'insight_dashboard':
+        await handleInsightDashboard(bot, chatId, callbackQuery.from);
+        break;
+      case 'insight_national':
+        await handleInsight(bot, chatId, callbackQuery.from, '/insight national');
+        break;
+      case 'insight_refresh':
+        await sendNewMessage(bot, chatId, '🔄 최신 인사이트로 새로고침합니다...');
+        setTimeout(async () => {
+          await handleInsight(bot, chatId, callbackQuery.from, '/insight');
+        }, 1000);
+        break;
+      case 'insight_products':
+      case 'insight_pricing':
+      case 'insight_inventory':
+      case 'insight_marketing':
+      case 'insight_regional':
+      case 'insight_competitor':
+        // 상세 인사이트 기능들은 아직 구현 중
+        await sendNewMessage(bot, chatId, 
+          `🚧 **${data.replace('insight_', '')} 기능은 준비 중입니다**\n\n곧 업데이트될 예정입니다!`,
+          {
+            parse_mode: 'Markdown',
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: '📊 종합 인사이트', callback_data: 'insight_full' },
+                  { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                ]
+              ]
+            }
+          }
+        );
+        break;
+      default:
+        await sendNewMessage(bot, chatId, 
+          '❌ 알 수 없는 인사이트 명령입니다.',
+          { 
+            reply_markup: { 
+              inline_keyboard: [[
+                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+              ]] 
+            } 
+          }
+        );
+        break;
+    }
   } catch (error) {
-    rLog(`❌ 수동 대시보드 생성 실패: ${error.message}`, 'ERROR');
-    
-    // 최종 폴백
+    rLog(`인사이트 콜백 폴백 처리 오류: ${error.message}`, 'ERROR');
     await sendNewMessage(bot, chatId, 
-      "❌ 실시간 대시보드를 표시할 수 없습니다.\n\n" +
-      "📊 종합 인사이트를 이용해주세요.",
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "📊 종합 인사이트", callback_data: "insight_full" },
-              { text: "🔙 인사이트 메뉴", callback_data: "insight_menu" }
-            ]
-          ]
-        }
+      '❌ 인사이트 처리 중 오류가 발생했습니다.',
+      { 
+        reply_markup: { 
+          inline_keyboard: [[
+            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+          ]] 
+        } 
       }
     );
   }
