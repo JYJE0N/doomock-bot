@@ -1029,34 +1029,55 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
             const insights = insightManager.generateMarketingInsights(dustData, userName);
             
             switch (data) {
-                case 'insight_products':
-                    await handleProductStrategy(bot, chatId, insights);
-                    break;
-                case 'insight_pricing':
-                    await handlePricingStrategy(bot, chatId, insights);
-                    break;
-                case 'insight_inventory':
-                    await handleInventoryStrategy(bot, chatId, insights);
-                    break;
-                case 'insight_marketing':
-                    await handleMarketingStrategy(bot, chatId, insights);
-                    break;
-                case 'insight_regional':
-                    await handleRegionalStrategy(bot, chatId, insights);
-                    break;
-                case 'insight_competitor':
-                    await handleCompetitorStrategy(bot, chatId, insights);
-                    break;
-                case 'insight_refresh':
-                    await handleInsightRefresh(bot, chatId, callbackQuery.from);
-                    break;
-                case 'insight_dashboard':
-                    await module.exports.showRealtimeDashboard(bot, chatId, userName);
-                    break;
-                default:
-                    console.log(`⚠️ 처리되지 않은 인사이트 콜백: ${data}`);
-                    await bot.sendMessage(chatId, '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.');
-                    break;
+                case "insight_menu":
+    await handleInsightMenu(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_full":
+    await handleInsightFull(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_quick":
+    await handleInsightQuick(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_dashboard":
+    await handleInsightDashboard(bot, chatId, callbackQuery.from);
+    break;
+
+  // 🆕 실시간 대시보드 세부 콜백 추가
+  case "insight_products":
+    await handleInsightProducts(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_pricing":
+    await handleInsightPricing(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_inventory":
+    await handleInsightInventory(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_marketing":
+    await handleInsightMarketing(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_regional":
+    await handleInsightRegional(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_competitor":
+    await handleInsightCompetitor(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_refresh":
+    await handleInsightRefresh(bot, chatId, callbackQuery.from);
+    break;
+
+  // 🆕 추가 대시보드 콜백들
+  case "action_plan":
+    await handleActionPlan(bot, chatId, callbackQuery.from);
+    break;
+  case "trend_analysis":
+    await handleTrendAnalysis(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_content":
+    await handleInsightContent(bot, chatId, callbackQuery.from);
+    break;
+  case "insight_risk":
+    await handleInsightRisk(bot, chatId, callbackQuery.from);
+    break;
             }
         } else {
             // 일반 콜백 처리
