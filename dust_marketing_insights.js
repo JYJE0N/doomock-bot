@@ -1013,84 +1013,306 @@ module.exports = function(bot, msg) {
     }
 };
 
-// 강화된 콜백 처리 함수
+// 강화된 콜백 처리 함수 (완전 수정)
 module.exports.handleCallback = async function(bot, callbackQuery) {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
     const userName = getUserName(callbackQuery.from);
     const insightManager = new EnhancedDustMarketingInsights();
 
-    console.log(`📞 통합 콜백 처리: ${data} (사용자: ${userName})`);
+    console.log(`📞 dust_marketing_insights 콜백 처리: ${data} (사용자: ${userName})`);
 
     try {
-        // 인사이트 관련 콜백들은 데이터 필요
-        if (data.startsWith('insight_') && data !== 'main_menu') {
+        // 🔥 데이터가 필요한 콜백들은 미리 인사이트 생성
+        let insights = null;
+        if (data.startsWith('insight_') && data !== 'insight_menu' && data !== 'insight_refresh') {
             const dustData = await insightManager.getCurrentAirQuality();
-            const insights = insightManager.generateMarketingInsights(dustData, userName);
-            
-            switch (data) {
-                case "insight_menu":
-    await handleInsightMenu(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_full":
-    await handleInsightFull(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_quick":
-    await handleInsightQuick(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_dashboard":
-    await handleInsightDashboard(bot, chatId, callbackQuery.from);
-    break;
-
-  // 🆕 실시간 대시보드 세부 콜백 추가
-  case "insight_products":
-    await handleInsightProducts(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_pricing":
-    await handleInsightPricing(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_inventory":
-    await handleInsightInventory(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_marketing":
-    await handleInsightMarketing(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_regional":
-    await handleInsightRegional(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_competitor":
-    await handleInsightCompetitor(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_refresh":
-    await handleInsightRefresh(bot, chatId, callbackQuery.from);
-    break;
-
-  // 🆕 추가 대시보드 콜백들
-  case "action_plan":
-    await handleActionPlan(bot, chatId, callbackQuery.from);
-    break;
-  case "trend_analysis":
-    await handleTrendAnalysis(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_content":
-    await handleInsightContent(bot, chatId, callbackQuery.from);
-    break;
-  case "insight_risk":
-    await handleInsightRisk(bot, chatId, callbackQuery.from);
-    break;
-            }
-        } else {
-            // 일반 콜백 처리
-            await handleGeneralCallbacks(bot, callbackQuery, data, chatId, userName);
+            insights = insightManager.generateMarketingInsights(dustData, userName);
+        }
+        
+        switch (data) {
+            case 'insight_products':
+                if (insights) {
+                    await handleProductStrategy(bot, chatId, insights);
+                } else {
+                    await bot.sendMessage(chatId, "❌ 제품 전략 데이터를 불러올 수 없습니다.");
+                }
+                break;
+                
+            case 'insight_pricing':
+                if (insights) {
+                    await handlePricingStrategy(bot, chatId, insights);
+                } else {
+                    await bot.sendMessage(chatId, "❌ 가격 전략 데이터를 불러올 수 없습니다.");
+                }
+                break;
+                
+            case 'insight_inventory':
+                if (insights) {
+                    await handleInventoryStrategy(bot, chatId, insights);
+                } else {
+                    await bot.sendMessage(chatId, "❌ 재고 전략 데이터를 불러올 수 없습니다.");
+                }
+                break;
+                
+            case 'insight_marketing':
+                if (insights) {
+                    await handleMarketingStrategy(bot, chatId, insights);
+                } else {
+                    await bot.sendMessage(chatId, "❌ 마케팅 전략 데이터를 불러올 수 없습니다.");
+                }
+                break;
+                
+            case 'insight_regional':
+                if (insights) {
+                    await handleRegionalStrategy(bot, chatId, insights);
+                } else {
+                    await bot.sendMessage(chatId, "❌ 지역별 전략 데이터를 불러올 수 없습니다.");
+                }
+                break;
+                
+            case 'insight_competitor':
+                if (insights) {
+                    await handleCompetitorStrategy(bot, chatId, insights);
+                } else {
+                    await bot.sendMessage(chatId, "❌ 경쟁사 분석 데이터를 불러올 수 없습니다.");
+                }
+                break;
+                
+            case 'insight_refresh':
+                await bot.sendMessage(chatId, '🔄 최신 데이터로 강화된 인사이트를 새로고침합니다...');
+                setTimeout(async () => {
+                    await module.exports(bot, { 
+                        chat: { id: chatId }, 
+                        from: callbackQuery.from, 
+                        text: '/insight' 
+                    });
+                }, 1000);
+                break;
+                
+            case 'insight_dashboard':
+                await handleInsightDashboard(bot, chatId, callbackQuery.from);
+                break;
+                
+            case 'action_plan':
+                await handleActionPlan(bot, chatId, callbackQuery.from);
+                break;
+                
+            case 'trend_analysis':
+                await handleTrendAnalysis(bot, chatId, callbackQuery.from);
+                break;
+                
+            case 'insight_content':
+                await handleInsightContent(bot, chatId, callbackQuery.from);
+                break;
+                
+            case 'insight_risk':
+                await handleInsightRisk(bot, chatId, callbackQuery.from);
+                break;
+                
+            case 'main_menu':
+                await showMainMenu(bot, chatId);
+                break;
+                
+            default:
+                console.log(`⚠️ 처리되지 않은 인사이트 콜백: ${data}`);
+                await bot.sendMessage(chatId, 
+                    '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.',
+                    { 
+                        reply_markup: { 
+                            inline_keyboard: [[
+                                { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                            ]] 
+                        } 
+                    }
+                );
+                break;
         }
         
     } catch (error) {
-        console.error('❌ 콜백 처리 실패:', error);
-        await bot.sendMessage(chatId, `❌ 처리 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
+        console.error('❌ dust_marketing_insights 콜백 처리 실패:', error);
+        await bot.sendMessage(chatId, `❌ 처리 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
     }
 };
 
-// 제품 전략 콜백 처리
+// ===========================================
+// 🔧 누락된 핸들러 함수들 구현
+// ===========================================
+
+async function handleInsightDashboard(bot, chatId, from) {
+    try {
+        const insightManager = new EnhancedDustMarketingInsights();
+        const dustData = await insightManager.getCurrentAirQuality();
+        const insights = insightManager.generateMarketingInsights(dustData, getUserName(from));
+        const season = insightManager.getCurrentSeason();
+        
+        let dashboard = `📱 **실시간 마케팅 대시보드**\n\n`;
+        
+        // 현재 상황 요약
+        dashboard += `⏰ **현재 상황** (${new Date().toLocaleTimeString('ko-KR')})\n`;
+        dashboard += `• 미세먼지: ${insights.currentSituation.details.dustLevel} ${dustData.pm25}㎍/㎥\n`;
+        dashboard += `• 시간대: ${insights.currentSituation.details.timeSlot}\n`;
+        dashboard += `• 기회점수: ${insights.marketingOpportunity.score}/10\n\n`;
+        
+        // 실시간 지표
+        dashboard += `📊 **실시간 지표**\n`;
+        dashboard += `• 예상 매출 배수: ${insights.inventoryStrategy.totalMultiplier}배\n`;
+        dashboard += `• 재고 수준: ${insights.inventoryStrategy.stockLevel}\n`;
+        dashboard += `• 마케팅 예산: ${insights.marketingStrategy.digitalStrategy.budget}\n\n`;
+        
+        // 즉시 액션
+        dashboard += `⚡ **즉시 액션**\n`;
+        const actions = insights.actionPlan.plans[0].tasks.slice(0, 3);
+        actions.forEach((action, index) => {
+            dashboard += `${index + 1}. ${action}\n`;
+        });
+        
+        // 여름철 특별 모니터링
+        if (season === 'summer') {
+            dashboard += `\n🔥 **여름철 특별 모니터링**\n`;
+            dashboard += `• 프리미엄 라이트 마스크 우선 관리\n`;
+            dashboard += `• 컬러맛집 마케팅 활성화\n`;
+            dashboard += `• 통풍성 제품 재고 점검\n`;
+        }
+        
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🔄 새로고침', callback_data: 'insight_dashboard' },
+                    { text: '📊 상세 분석', callback_data: 'insight_full' }
+                ],
+                [
+                    { text: '🎯 액션 플랜', callback_data: 'action_plan' },
+                    { text: '📈 트렌드', callback_data: 'trend_analysis' }
+                ],
+                [
+                    { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
+                ]
+            ]
+        };
+        
+        await bot.sendMessage(chatId, dashboard, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 대시보드 표시 실패:', error);
+        await bot.sendMessage(chatId, `❌ 대시보드 표시 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
+    }
+}
+
+async function handleActionPlan(bot, chatId, from) {
+    try {
+        const insightManager = new EnhancedDustMarketingInsights();
+        const dustData = await insightManager.getCurrentAirQuality();
+        const insights = insightManager.generateMarketingInsights(dustData, getUserName(from));
+        
+        let actionMsg = `🎯 **액션 플랜**\n\n`;
+        
+        insights.actionPlan.plans.forEach(plan => {
+            actionMsg += `**${plan.title}**\n`;
+            plan.tasks.forEach((task, index) => {
+                actionMsg += `${index + 1}. ${task}\n`;
+            });
+            actionMsg += `\n`;
+        });
+        
+        actionMsg += `⏰ **실행 우선순위**\n`;
+        actionMsg += `• 긴급도: ${insights.marketingOpportunity.level}\n`;
+        actionMsg += `• 기회점수: ${insights.marketingOpportunity.score}/10\n`;
+        
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '🔙 대시보드', callback_data: 'insight_dashboard' }],
+                [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            ]
+        };
+        
+        await bot.sendMessage(chatId, actionMsg, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 액션 플랜 처리 실패:', error);
+        await bot.sendMessage(chatId, '❌ 액션 플랜 처리 중 오류가 발생했습니다.');
+    }
+}
+
+async function handleTrendAnalysis(bot, chatId, from) {
+    try {
+        const insightManager = new EnhancedDustMarketingInsights();
+        const season = insightManager.getCurrentSeason();
+        const timeSlot = insightManager.getCurrentTimeSlot();
+        
+        let trendMsg = `📈 **트렌드 분석**\n\n`;
+        
+        trendMsg += `🗓️ **현재 트렌드**\n`;
+        trendMsg += `• 계절: ${season} (${insightManager.seasonalBusinessData[season].name})\n`;
+        trendMsg += `• 시간대: ${timeSlot} (${insightManager.timeBasedStrategies[timeSlot].name})\n\n`;
+        
+        trendMsg += `📊 **주요 인사이트**\n`;
+        const seasonalData = insightManager.seasonalBusinessData[season];
+        seasonalData.marketingMessages.forEach(message => {
+            trendMsg += `• ${message}\n`;
+        });
+        
+        trendMsg += `\n🎯 **추천 액션**\n`;
+        trendMsg += `• 주력 상품: ${seasonalData.keyProducts.primary[0]}\n`;
+        trendMsg += `• 가격 전략: ${seasonalData.priceStrategy}\n`;
+        trendMsg += `• 매출 예상: ${seasonalData.salesMultiplier}배\n`;
+        
+        const keyboard = {
+            inline_keyboard: [
+                [{ text: '🔙 대시보드', callback_data: 'insight_dashboard' }],
+                [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            ]
+        };
+        
+        await bot.sendMessage(chatId, trendMsg, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 트렌드 분석 처리 실패:', error);
+        await bot.sendMessage(chatId, '❌ 트렌드 분석 처리 중 오류가 발생했습니다.');
+    }
+}
+
+async function handleInsightContent(bot, chatId, from) {
+    await bot.sendMessage(chatId, 
+        '📝 **콘텐츠 전략**\n\n콘텐츠 전략 분석 기능은 개발 중입니다.\n곧 업데이트될 예정입니다!',
+        { 
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [[
+                    { text: '🔙 대시보드', callback_data: 'insight_dashboard' }
+                ]]
+            }
+        }
+    );
+}
+
+async function handleInsightRisk(bot, chatId, from) {
+    await bot.sendMessage(chatId, 
+        '⚠️ **리스크 관리**\n\n리스크 관리 분석 기능은 개발 중입니다.\n곧 업데이트될 예정입니다!',
+        { 
+            parse_mode: 'Markdown',
+            reply_markup: {
+                inline_keyboard: [[
+                    { text: '🔙 대시보드', callback_data: 'insight_dashboard' }
+                ]]
+            }
+        }
+    );
+}
+
+// ===========================================
+// 🔧 기존 핸들러 함수들 수정 (async/await 추가)
+// ===========================================
+
 async function handleProductStrategy(bot, chatId, insights) {
     const productStrategy = insights.productStrategy;
     let productMsg = `🎁 **제품 전략**\n\n`;
@@ -1122,7 +1344,7 @@ async function handleProductStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
             [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
         ]
     };
@@ -1133,7 +1355,6 @@ async function handleProductStrategy(bot, chatId, insights) {
     });
 }
 
-// 가격 전략 콜백 처리
 async function handlePricingStrategy(bot, chatId, insights) {
     const pricingStrategy = insights.pricingStrategy;
     let pricingMsg = `💰 **가격 전략**\n\n`;
@@ -1156,7 +1377,7 @@ async function handlePricingStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
             [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
         ]
     };
@@ -1167,7 +1388,6 @@ async function handlePricingStrategy(bot, chatId, insights) {
     });
 }
 
-// 재고 전략 콜백 처리
 async function handleInventoryStrategy(bot, chatId, insights) {
     const inventoryStrategy = insights.inventoryStrategy;
     let inventoryMsg = `📦 **재고 전략**\n\n`;
@@ -1194,7 +1414,7 @@ async function handleInventoryStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
             [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
         ]
     };
@@ -1205,7 +1425,6 @@ async function handleInventoryStrategy(bot, chatId, insights) {
     });
 }
 
-// 마케팅 전략 콜백 처리
 async function handleMarketingStrategy(bot, chatId, insights) {
     const marketingStrategy = insights.marketingStrategy;
     let marketingMsg = `🎯 **마케팅 전략**\n\n`;
@@ -1232,7 +1451,7 @@ async function handleMarketingStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
             [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
         ]
     };
@@ -1243,7 +1462,6 @@ async function handleMarketingStrategy(bot, chatId, insights) {
     });
 }
 
-// 지역별 전략 콜백 처리
 async function handleRegionalStrategy(bot, chatId, insights) {
     const regionalStrategy = insights.regionalStrategy;
     let regionalMsg = `🏙️ **지역별 전략**\n\n`;
@@ -1271,7 +1489,7 @@ async function handleRegionalStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
             [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
         ]
     };
@@ -1282,7 +1500,6 @@ async function handleRegionalStrategy(bot, chatId, insights) {
     });
 }
 
-// 경쟁사 분석 콜백 처리
 async function handleCompetitorStrategy(bot, chatId, insights) {
     const competitorStrategy = insights.competitorStrategy;
     let competitorMsg = `⚔️ **경쟁사 분석**\n\n`;
@@ -1309,7 +1526,7 @@ async function handleCompetitorStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_main' }],
+            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
             [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
         ]
     };
@@ -1320,58 +1537,6 @@ async function handleCompetitorStrategy(bot, chatId, insights) {
     });
 }
 
-// 인사이트 새로고침 처리
-async function handleInsightRefresh(bot, chatId, from) {
-    await bot.sendMessage(chatId, '🔄 최신 데이터로 강화된 인사이트를 새로고침합니다...');
-    
-    setTimeout(() => {
-        module.exports(bot, { 
-            chat: { id: chatId }, 
-            from: from, 
-            text: '/insight' 
-        });
-    }, 1000);
-}
-
-// 일반 콜백 처리
-async function handleGeneralCallbacks(bot, callbackQuery, data, chatId, userName) {
-    switch (data) {
-        case 'national_refresh':
-            if (module.exports.getNationalStatus) {
-                await module.exports.getNationalStatus(bot, { 
-                    chat: { id: chatId }, 
-                    from: callbackQuery.from 
-                });
-            }
-            break;
-            
-        case 'insight_main':
-            await module.exports(bot, { 
-                chat: { id: chatId }, 
-                from: callbackQuery.from, 
-                text: '/insight' 
-            });
-            break;
-            
-        case 'dashboard_refresh':
-            if (module.exports.showRealtimeDashboard) {
-                await module.exports.showRealtimeDashboard(bot, chatId, userName);
-            }
-            break;
-            
-        case 'main_menu':
-            await showMainMenu(bot, chatId);
-            break;
-            
-        default:
-            console.log(`⚠️ 처리되지 않은 일반 콜백: ${data}`);
-            await bot.sendMessage(chatId, '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.');
-            await showMainMenu(bot, chatId);
-            break;
-    }
-}
-
-// 메인 메뉴 표시
 async function showMainMenu(bot, chatId) {
     const mainMenuMessage = `🏠 **메인 메뉴**\n\n` +
                           `**📊 핵심 기능**\n` +
@@ -1389,7 +1554,7 @@ async function showMainMenu(bot, chatId) {
         inline_keyboard: [
             [
                 { text: '🎯 종합 인사이트', callback_data: 'insight_main' },
-                { text: '📱 실시간 대시보드', callback_data: 'dashboard_refresh' }
+                { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' }
             ],
             [
                 { text: '🗺️ 전국 현황', callback_data: 'national_refresh' },
