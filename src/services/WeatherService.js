@@ -1,6 +1,6 @@
 // src/services/WeatherService.js
-//test
-// const { WeatherService } = require ('../services/WeatherService')
+// ✅ 올바른 임포트
+const { ensureConnection, getCollection } = require('../database/DatabaseManager');
 const axios = require('axios');
 
 class WeatherService {

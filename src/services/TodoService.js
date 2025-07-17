@@ -1,5 +1,6 @@
+// src/services/TodoService.js - 수정된 버전
 const { ensureConnection, getCollection } = require('../database/DatabaseManager');
-const  Logger  = require('../utils/Logger');
+const Logger = require('../utils/Logger');
 
 class TodoService {
     constructor() {
@@ -8,8 +9,8 @@ class TodoService {
 
     async addTodo(userId, task) {
         try {
-            await DatabaseManager.ensureConnection();
-            const collection = DatabaseManager.getCollection(this.collectionName);
+            await ensureConnection();
+            const collection = getCollection(this.collectionName);
             
             const todoItem = {
                 userId: userId.toString(),
@@ -30,8 +31,8 @@ class TodoService {
 
     async getTodos(userId) {
         try {
-            await DatabaseManager.ensureConnection();
-            const collection = DatabaseManager.getCollection(this.collectionName);
+            await ensureConnection();
+            const collection = getCollection(this.collectionName);
             
             const todos = await collection
                 .find({ userId: userId.toString() })
@@ -47,8 +48,8 @@ class TodoService {
 
     async toggleTodo(userId, todoIndex) {
         try {
-            await DatabaseManager.ensureConnection();
-            const collection = DatabaseManager.getCollection(this.collectionName);
+            await ensureConnection();
+            const collection = getCollection(this.collectionName);
             
             const todos = await this.getTodos(userId);
             if (todoIndex < 0 || todoIndex >= todos.length) {
@@ -78,8 +79,8 @@ class TodoService {
 
     async deleteTodo(userId, todoIndex) {
         try {
-            await DatabaseManager.ensureConnection();
-            const collection = DatabaseManager.getCollection(this.collectionName);
+            await ensureConnection();
+            const collection = getCollection(this.collectionName);
             
             const todos = await this.getTodos(userId);
             if (todoIndex < 0 || todoIndex >= todos.length) {
@@ -99,8 +100,8 @@ class TodoService {
 
     async clearCompletedTodos(userId) {
         try {
-            await DatabaseManager.ensureConnection();
-            const collection = DatabaseManager.getCollection(this.collectionName);
+            await ensureConnection();
+            const collection = getCollection(this.collectionName);
             
             const result = await collection.deleteMany({ 
                 userId: userId.toString(), 
@@ -117,8 +118,8 @@ class TodoService {
 
     async clearAllTodos(userId) {
         try {
-            await DatabaseManager.ensureConnection();
-            const collection = DatabaseManager.getCollection(this.collectionName);
+            await ensureConnection();
+            const collection = getCollection(this.collectionName);
             
             const result = await collection.deleteMany({ 
                 userId: userId.toString()

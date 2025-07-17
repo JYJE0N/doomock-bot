@@ -1,5 +1,6 @@
 // src/services/WorktimeService.js
-// const { WorktimeService } = require ('../services/WorktimeService')
+// ✅ 올바른 임포트
+const { ensureConnection, getCollection } = require('../database/DatabaseManager');
 
 class WorktimeService {
     constructor() {

@@ -58,18 +58,16 @@ class BotController {
         }
     }
     
+    // BotController.js의 initializeDatabase() 함수 수정
     async initializeDatabase() {
         if (this.config.mongoUrl) {
-            try {
-                this.dbManager = new DatabaseManager(this.config.mongoUrl);
-                await this.dbManager.connect();
-                Logger.success('✅ 데이터베이스 연결 성공');
-            } catch (error) {
-                Logger.error('❌ 데이터베이스 연결 실패:', error);
-                Logger.warn('⚠️ 일부 기능이 제한됩니다.');
-            }
+            // 🔧 수정된 부분
+            const { DatabaseManager } = require('../database/DatabaseManager');
+            this.dbManager = new DatabaseManager(this.config.mongoUrl);
+            await this.dbManager.connect();
+            Logger.success('데이터베이스 연결 성공');
         } else {
-            Logger.warn('⚠️ MongoDB URL이 없습니다. 일부 기능이 제한됩니다.');
+            Logger.warn('MongoDB URL이 없습니다. 일부 기능이 제한됩니다.');
         }
     }
     
