@@ -1024,7 +1024,7 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
 
     try {
         // 인사이트 관련 콜백들은 데이터 필요
-        if (data.startsWith('insight_')) {
+        if (data.startsWith('insight_') && data !== 'main_menu') {
             const dustData = await insightManager.getCurrentAirQuality();
             const insights = insightManager.generateMarketingInsights(dustData, userName);
             
