@@ -1,12 +1,12 @@
 const BaseModule = require('./BaseModule')
-const { TTSService } = require('../utils/TTSService');
+const { TTSHelper } = require('../utils/TTSHelper');
 const { getUserName } = require('../utils/UserHelper');
 const { ValidationHelper } = require('../utils/ValidationHelper');
 
 class UtilsModule extends BaseModule {
     constructor() {
         super('UtilsModule');
-        this.ttsService = new TTSService();
+        this.ttsService = new TTSHelper();
         this.userStates = new Map();
     }
 
