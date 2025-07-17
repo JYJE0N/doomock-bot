@@ -72,8 +72,14 @@ async loadModule(moduleName, config) {
             throw new Error(`❌ ${moduleName} 모듈에 path 값이 없습니다.`);
         }
 
-        // 모듈 클래스 import (수정된 부분)
-        const ModuleClass = require(config.path);
+        // 모듈 클래스 import - 파일 존재 확인 추가
+        let ModuleClass;
+        try {
+            ModuleClass = require(config.path);
+        } catch (requireError) {
+            Logger.warn(`⚠️ 모듈 파일 ${config.path}을 찾을 수 없습니다. 스킵합니다.`);
+            return; // 모듈 로드 실패 시 그냥 스킵
+        }
 
         // 모듈 인스턴스 생성
         const moduleInstance = new ModuleClass(config);
@@ -90,6 +96,11 @@ async loadModule(moduleName, config) {
 
     } catch (error) {
         Logger.error(`❌ 모듈 ${moduleName} 로드 실패:`, error);
+        // 필수 모듈이 아니면 에러를 던지지 않음
+        if (!config.required) {
+            Logger.warn(`⚠️ 선택적 모듈 ${moduleName} 로드 실패, 계속 진행합니다.`);
+            return;
+        }
         throw error;
     }
 }
