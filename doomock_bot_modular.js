@@ -563,12 +563,39 @@ bot.on("callback_query", async (callbackQuery) => {
         break;
 
       // 🔥 인사이트 메뉴 (메인에서 처리)
-      case "insight_menu":
-        rLog(`📊 인사이트 메뉴 처리 시작`, 'INFO');
-        await sendInsightMenu(bot, chatId, callbackQuery.from);
-        rLog(`✅ 인사이트 메뉴 처리 완료`, 'SUCCESS');
-        break;
-
+      //case "insight_menu":
+        //rLog(`📊 인사이트 메뉴 처리 시작`, 'INFO');
+        //await sendInsightMenu(bot, chatId, callbackQuery.from);
+        //rLog(`✅ 인사이트 메뉴 처리 완료`, 'SUCCESS');
+        //break;
+    
+        // 🔥 인사이트 메뉴 (간단한 인라인 처리)
+        case "insight_menu":
+          rLog(`📊 인사이트 메뉴 처리 시작`, 'INFO');
+          try {
+            await sendNewMessage(bot, chatId,
+              `📊 **${getUserName(callbackQuery.from)}님의 마케팅 인사이트**\n\n원하는 기능을 선택해주세요:`,
+              {
+                parse_mode: 'Markdown',
+                reply_markup: insightMenuKeyboard
+              }
+            );
+            rLog(`✅ 인사이트 메뉴 처리 완료`, 'SUCCESS');
+          } catch (error) {
+            rLog(`❌ 인사이트 메뉴 처리 실패: ${error.message}`, 'ERROR');
+            await sendNewMessage(bot, chatId, 
+              "❌ 인사이트 메뉴를 불러오는 중 오류가 발생했습니다.",
+              { 
+                reply_markup: { 
+                  inline_keyboard: [[
+                    { text: "🔙 메인 메뉴", callback_data: "main_menu" }
+                  ]] 
+                } 
+              }
+            );
+          }
+          break;
+        
       // 유틸리티 관리
       case "utils_menu":
         await sendUtilsMenu(bot, chatId, userId);
