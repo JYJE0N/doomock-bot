@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const  TimerModule  = require('../modules/TimerModule');
+const  { TimerService }  = require('../services/TimerService');
 const { getUserName } = require('../utils/UserHelper');
 const { ValidationHelper } = require('../utils/ValidationHelper');
 

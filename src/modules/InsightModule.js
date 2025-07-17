@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule');
-const  InsightModule  = require('../modules/InsightModule');
+const  { InsightService }  = require('../services/InsightService');
 const { getUserName } = require('../utils/UserHelper');
 
 class InsightModule extends BaseModule {

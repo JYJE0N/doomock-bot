@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const  WorktimeModule  = require('../modules/WorktimeModule');
+const  { WorktimeService }  = require('../services/WorktimeService');
 const { getUserName } = require('../utils/UserHelper');
 
 class WorktimeModule extends BaseModule {

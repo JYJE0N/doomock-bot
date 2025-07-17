@@ -1,5 +1,5 @@
 const BaseModule = require('./BaseModule')
-const  ReminderModule = require('../modules/ReminderModule');
+const  { ReminderService } = require('../services/ReminderService');
 const { getUserName } = require('../utils/UserHelper');
 const { ValidationHelper } = require('../utils/ValidationHelper');
 
