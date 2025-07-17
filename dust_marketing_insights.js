@@ -1,4 +1,4 @@
-// enhanced_dust_marketing_insights.js - 실제 비즈니스 반영 강화 버전
+// enhanced_dust_marketing_insights.js - 새부리형/귀편한 마스크 특화 리팩토링 버전
 
 const axios = require('axios');
 const { getUserName } = require('./username_helper');
@@ -29,266 +29,273 @@ class EnhancedDustMarketingInsights {
         this.airKoreaApiKey = process.env.AIR_KOREA_API_KEY || 'YOUR_API_KEY_HERE';
         this.baseUrl = 'http://apis.data.go.kr/B552584/ArpltnInforInqireSvc';
         
-        // 🆕 실제 비즈니스 데이터 반영 - 계절별 상품 전략
+        // 🆕 새부리형/귀편한 마스크 중심 계절별 비즈니스 전략
         this.seasonalBusinessData = {
-            spring: { // 3-5월 (황사철)
-                name: '봄철 황사 시즌',
+            spring: { // 3-5월 (성수기 - 황사철)
+                name: '봄철 황사 성수기',
+                season_type: '성수기',
                 dustEvents: ['황사', '꽃가루', '미세먼지', '중국발 스모그'],
                 peakMonths: [3, 4, 5],
-                salesMultiplier: 2.8,
+                salesMultiplier: 3.2, // 높은 성수기 배수
                 keyProducts: {
-                    primary: ['KF94 황사마스크', 'N95 마스크', '어린이용 KF94'],
-                    secondary: ['공기청정기 필터', '차량용 에어필터', '안경닦이'],
-                    emerging: ['황사 방지 스카프', '실외 활동용 마스크', '스포츠마스크']
+                    primary: ['KF94 새부리형 마스크', '귀편한 황사방지 마스크', 'N95 새부리형'],
+                    secondary: ['어린이용 새부리형', '공기청정기 필터', '차량용 에어필터'],
+                    trending: ['2D 새부리형 마스크', '귀아프지않는 마스크', '황사차단 새부리형']
                 },
                 marketingMessages: [
-                    '황사 완벽 차단! KF94 마스크',
-                    '봄철 외출 필수템',
-                    '아이들 건강 지키는 선택',
-                    '황사 시즌 대비 완료'
+                    '황사 완벽 차단! 새부리형 KF94',
+                    '귀 아프지 않는 편안한 착용감',
+                    '봄철 외출 필수템 새부리형',
+                    '숨쉬기 편한 2D 새부리 구조'
                 ],
-                priceStrategy: 'premium', // 높은 수요로 프리미엄 가격
+                priceStrategy: 'premium', // 성수기 프리미엄 가격
                 inventory: {
-                    stockLevel: 'high', // 300% 재고 확보
-                    turnoverRate: 'fast', // 빠른 회전율
-                    criticalProducts: ['KF94 황사마스크', 'N95 마스크']
+                    stockLevel: 'high', // 400% 재고 확보
+                    turnoverRate: 'very_fast', // 매우 빠른 회전율
+                    criticalProducts: ['KF94 새부리형 마스크', '귀편한 황사방지 마스크']
                 }
             },
-            summer: { // 6-8월 (무더위 + 오존)
-                name: '여름철 쾌적 마스크 시즌',
-                dustEvents: ['오존', '자외선', '폭염', '도시 스모그'],
+            summer: { // 6-8월 (비수기 - 숨쉬기 편한 마스크 중심)
+                name: '하절기 비수기 (숨쉬기 편한 마스크)',
+                season_type: '비수기',
+                dustEvents: ['오존', '자외선', '폭염', '실내 냉방'],
                 peakMonths: [6, 7, 8],
-                salesMultiplier: 1.5,
+                salesMultiplier: 1.2, // 비수기 낮은 배수
                 keyProducts: {
-                    primary: ['프리미엄 라이트 마스크', '쿨링 마스크', '썸머 브리드 마스크'],
-                    secondary: ['UV 차단 마스크', '스포츠 마스크', '메쉬 마스크'],
-                    emerging: ['아이스 마스크', '냉감 마스크', '통풍 마스크']
+                    primary: ['숨쉬기 편한 새부리형', '통풍 새부리 마스크', '귀편한 여름용'],
+                    secondary: ['메쉬 새부리형', 'UV차단 새부리형', '경량 귀편한 마스크'],
+                    trending: ['시원한 새부리형', '여름용 귀편한', '통기성 새부리 마스크']
                 },
                 marketingMessages: [
-                    '무더위에도 시원한 프리미엄 라이트!',
-                    '여름철 필수템, 쿨링 마스크',
-                    '통풍 좋은 여름 전용 마스크',
-                    '시원하게 보호하는 선택'
+                    '무더위에도 숨쉬기 편한 새부리형!',
+                    '귀 아프지 않는 여름 필수템',
+                    '통풍 좋은 2D 새부리 구조',
+                    '여름철에도 편안한 착용감'
                 ],
-                priceStrategy: 'value', // 기능성 대비 가성비 어필
+                priceStrategy: 'value', // 비수기 가성비 어필
                 inventory: {
                     stockLevel: 'medium', // 150% 재고 확보
-                    turnoverRate: 'steady', // 꾸준한 회전율
-                    criticalProducts: ['프리미엄 라이트 마스크', '쿨링 마스크']
+                    turnoverRate: 'steady', // 안정적 회전율
+                    criticalProducts: ['숨쉬기 편한 새부리형', '귀편한 여름용']
                 }
             },
-            autumn: { // 9-11월 (미세먼지 재시작)
-                name: '가을철 미세먼지 대응 시즌',
+            autumn: { // 9-11월 (성수기 - 미세먼지 재시작)
+                name: '가을철 미세먼지 성수기',
+                season_type: '성수기',
                 dustEvents: ['미세먼지', '초미세먼지', '대기 정체', '중국발 스모그'],
                 peakMonths: [9, 10, 11],
-                salesMultiplier: 2.2,
+                salesMultiplier: 2.8,
                 keyProducts: {
-                    primary: ['KF94 일반형', 'KF80 경량형', '데일리 마스크'],
-                    secondary: ['실내용 마스크', '사무실용 마스크', '장시간 착용형'],
-                    emerging: ['패션 마스크', '컬러 마스크', '디자인 마스크']
+                    primary: ['KF94 새부리형 일반', '귀편한 데일리 마스크', 'KF80 새부리형'],
+                    secondary: ['실내용 새부리형', '사무실용 귀편한', '장시간용 새부리형'],
+                    trending: ['패션 새부리형', '컬러 귀편한 마스크', '슬림 새부리형']
                 },
                 marketingMessages: [
-                    '가을 미세먼지 완벽 대응',
-                    '일상 속 건강 지키기',
-                    '장시간 착용도 편안한',
-                    '스타일과 보호 모두'
+                    '가을 미세먼지 완벽 대응 새부리형',
+                    '하루종일 귀 편한 착용감',
+                    '장시간 착용도 숨쉬기 편한',
+                    '스타일과 보호 모두, 새부리형'
                 ],
                 priceStrategy: 'balanced', // 균형잡힌 가격 정책
                 inventory: {
-                    stockLevel: 'high', // 250% 재고 확보
+                    stockLevel: 'high', // 300% 재고 확보
                     turnoverRate: 'fast', // 빠른 회전율
-                    criticalProducts: ['KF94 일반형', 'KF80 경량형']
+                    criticalProducts: ['KF94 새부리형 일반', '귀편한 데일리 마스크']
                 }
             },
-            winter: { // 12-2월 (한파 + 미세먼지)
-                name: '겨울철 방한 + 방진 시즌',
+            winter: { // 12-2월 (성수기 - 최대 성수기)
+                name: '동절기 최대 성수기 (방한+방진)',
+                season_type: '최대 성수기',
                 dustEvents: ['미세먼지', '난방 오염', '스모그', '실내 공기 오염'],
                 peakMonths: [12, 1, 2],
-                salesMultiplier: 2.5,
+                salesMultiplier: 3.5, // 최고 성수기 배수
                 keyProducts: {
-                    primary: ['방한 마스크', '윈터 마스크', 'KF94 보온형'],
+                    primary: ['방한 새부리형 마스크', '귀편한 윈터 마스크', 'KF94 보온 새부리형'],
                     secondary: ['실내용 공기청정기', '가습기 필터', '헤파필터'],
-                    emerging: ['목도리 일체형', '귀마개 일체형', '방한 기능성']
+                    trending: ['목도리 일체형 새부리', '귀마개 일체형', '보온 귀편한 마스크']
                 },
                 marketingMessages: [
-                    '추위와 미세먼지 동시 차단',
-                    '따뜻하게 보호하는 겨울 마스크',
-                    '실내 공기도 깨끗하게',
-                    '겨울철 완벽 방어'
+                    '추위와 미세먼지 동시 차단 새부리형',
+                    '따뜻하고 귀편한 겨울 마스크',
+                    '실내외 완벽 보호 새부리형',
+                    '겨울철 최고의 선택, 귀편한 마스크'
                 ],
-                priceStrategy: 'premium', // 기능성 프리미엄 가격
+                priceStrategy: 'premium', // 최대 성수기 프리미엄
                 inventory: {
-                    stockLevel: 'medium', // 200% 재고 확보
-                    turnoverRate: 'steady', // 꾸준한 회전율
-                    criticalProducts: ['방한 마스크', 'KF94 보온형']
+                    stockLevel: 'very_high', // 500% 재고 확보
+                    turnoverRate: 'very_fast', // 매우 빠른 회전율
+                    criticalProducts: ['방한 새부리형 마스크', '귀편한 윈터 마스크']
                 }
             }
         };
 
-        // 🆕 미세먼지 농도별 상세 시나리오
+        // 🆕 미세먼지 농도별 새부리형/귀편한 마스크 중심 시나리오
         this.dustLevelScenarios = {
-            good: { // 0-30㎍/㎥
+            good: { // 0-30㎍/㎥ (깨끗함)
                 name: '좋음',
                 emoji: '😊',
                 color: '🟢',
                 businessImpact: 'low',
-                salesMultiplier: 0.7,
+                salesMultiplier: 0.8,
                 scenarios: [
                     {
                         situation: '맑은 날씨 지속',
-                        strategy: '브랜드 마케팅 집중',
-                        products: ['일반 마스크', '패션 마스크', '예비용 마스크'],
-                        messaging: '건강한 일상을 위한 준비',
+                        strategy: '예방 마케팅 + 편의성 강조',
+                        products: ['귀편한 일반 마스크', '패션 새부리형', '예비용 새부리형'],
+                        messaging: '평상시에도 편안한 새부리형',
                         urgency: 'low'
                     },
                     {
                         situation: '야외 활동 증가',
-                        strategy: '라이프스타일 마케팅',
-                        products: ['스포츠 마스크', '아웃도어 마스크', '휴대용 마스크'],
-                        messaging: '활동적인 하루를 위한 선택',
+                        strategy: '라이프스타일 + 편의성 마케팅',
+                        products: ['스포츠 새부리형', '아웃도어 귀편한', '휴대용 새부리형'],
+                        messaging: '활동적인 하루, 귀편한 선택',
                         urgency: 'low'
                     }
                 ]
             },
-            moderate: { // 31-80㎍/㎥
+            moderate: { // 31-80㎍/㎥ (보통)
                 name: '보통',
                 emoji: '😐',
                 color: '🟡',
                 businessImpact: 'medium',
-                salesMultiplier: 1.3,
+                salesMultiplier: 1.5,
                 scenarios: [
                     {
                         situation: '일상적 착용 필요',
-                        strategy: '실용성 어필',
-                        products: ['KF80 마스크', '일회용 마스크', '다량 패키지'],
-                        messaging: '일상 속 안전한 선택',
+                        strategy: '편안함 + 실용성 어필',
+                        products: ['KF80 새부리형', '귀편한 일회용', '다량 새부리형 팩'],
+                        messaging: '하루종일 귀편한 새부리형',
                         urgency: 'medium'
                     },
                     {
                         situation: '민감군 주의',
-                        strategy: '건강 관리 마케팅',
-                        products: ['어린이용 마스크', '고령자용 마스크', '민감군 전용'],
-                        messaging: '소중한 가족 건강 지키기',
+                        strategy: '건강 + 편의성 마케팅',
+                        products: ['어린이용 새부리형', '고령자용 귀편한', '민감군 전용 새부리형'],
+                        messaging: '소중한 가족, 편안한 새부리형으로',
                         urgency: 'medium'
                     }
                 ]
             },
-            bad: { // 81-150㎍/㎥
+            bad: { // 81-150㎍/㎥ (나쁨)
                 name: '나쁨',
                 emoji: '😷',
                 color: '🟠',
                 businessImpact: 'high',
-                salesMultiplier: 2.5,
+                salesMultiplier: 3.0,
                 scenarios: [
                     {
                         situation: '외출 시 필수 착용',
-                        strategy: '긴급 대응 마케팅',
-                        products: ['KF94 마스크', '고성능 필터', '대용량 팩'],
-                        messaging: '지금 바로 필요한 강력한 보호',
+                        strategy: '보호력 + 편안함 강조 마케팅',
+                        products: ['KF94 새부리형', '고성능 귀편한 마스크', '대용량 새부리형 팩'],
+                        messaging: '강력한 보호, 편안한 착용감',
                         urgency: 'high'
                     },
                     {
                         situation: '학교/직장 대응',
-                        strategy: 'B2B 마케팅 강화',
-                        products: ['단체용 마스크', '사무실용 팩', '학교 납품용'],
-                        messaging: '우리 모두의 건강한 환경',
+                        strategy: 'B2B + 편의성 강화',
+                        products: ['단체용 새부리형', '사무실용 귀편한 팩', '학교 납품용 새부리형'],
+                        messaging: '모두가 편안한 새부리형 마스크',
                         urgency: 'high'
                     },
                     {
                         situation: '실내 공기질 관리',
-                        strategy: '토탈 솔루션',
-                        products: ['공기청정기', '필터 교체', '실내용 마스크'],
-                        messaging: '실내외 완벽 차단 솔루션',
+                        strategy: '토탈 솔루션 + 편안함',
+                        products: ['공기청정기', '필터 교체', '실내용 귀편한 마스크'],
+                        messaging: '실내외 완벽 차단, 귀편한 솔루션',
                         urgency: 'high'
                     }
                 ]
             },
-            veryBad: { // 151㎍/㎥+
+            veryBad: { // 151㎍/㎥+ (매우나쁨)
                 name: '매우나쁨',
                 emoji: '😵',
                 color: '🔴',
                 businessImpact: 'critical',
-                salesMultiplier: 4.0,
+                salesMultiplier: 4.5,
                 scenarios: [
                     {
                         situation: '비상 상황 대응',
-                        strategy: '비상 마케팅',
-                        products: ['KF94 프리미엄', 'N95 마스크', '의료진용 마스크'],
-                        messaging: '생명과 직결된 선택',
+                        strategy: '최고 보호력 + 장시간 착용 편의성',
+                        products: ['KF94 프리미엄 새부리형', 'N95 귀편한 마스크', '의료진용 새부리형'],
+                        messaging: '생명 보호, 하루종일 편안한',
                         urgency: 'critical'
                     },
                     {
                         situation: '대량 수요 폭증',
-                        strategy: '공급 최우선',
-                        products: ['재고 확보 상품', '긴급 배송 상품', '대량 할인팩'],
-                        messaging: '지금 확보하세요',
+                        strategy: '공급 최우선 + 품질 보증',
+                        products: ['재고 확보 새부리형', '긴급 배송 귀편한', '대량 할인 새부리형 팩'],
+                        messaging: '지금 확보하세요, 새부리형',
                         urgency: 'critical'
                     },
                     {
                         situation: '미디어 주목',
-                        strategy: 'PR 마케팅',
-                        products: ['뉴스 언급 상품', '전문가 추천', '인증 마스크'],
-                        messaging: '전문가가 선택한 믿을 수 있는',
+                        strategy: 'PR + 브랜드 신뢰성',
+                        products: ['뉴스 언급 새부리형', '전문가 추천 귀편한', '인증 새부리형 마스크'],
+                        messaging: '전문가 선택, 신뢰의 새부리형',
                         urgency: 'critical'
                     }
                 ]
             }
         };
 
-        // 🆕 시간대별 마케팅 전략
+        // 🆕 시간대별 새부리형/귀편한 마스크 마케팅 전략
         this.timeBasedStrategies = {
             morning: { // 06:00-09:00
                 name: '출근 시간대',
-                focus: '외출 준비',
-                products: ['휴대용 마스크', '출근용 마스크', '대중교통용'],
-                messaging: '안전한 출근길 동반자',
+                focus: '외출 준비 + 하루종일 편안함',
+                products: ['휴대용 새부리형', '출근용 귀편한 마스크', '대중교통용 새부리형'],
+                messaging: '하루종일 편안한 출근 동반자',
                 channels: ['지하철 광고', '버스 광고', '모바일 푸시']
             },
             daytime: { // 09:00-17:00
                 name: '주간 시간대',
-                focus: '업무 환경',
-                products: ['사무용 마스크', '장시간 착용형', '회의용 마스크'],
-                messaging: '편안한 업무 환경',
+                focus: '업무 환경 + 장시간 착용',
+                products: ['사무용 새부리형', '장시간 귀편한', '회의용 새부리형'],
+                messaging: '업무 중에도 귀편한 착용감',
                 channels: ['온라인 광고', '사무용품 쇼핑몰', 'B2B 영업']
             },
             evening: { // 17:00-21:00
                 name: '퇴근 시간대',
-                focus: '귀가 및 여가',
-                products: ['일회용 마스크', '스포츠 마스크', '외출용 마스크'],
-                messaging: '건강한 저녁 시간',
+                focus: '귀가 + 여가 활동',
+                products: ['일회용 새부리형', '스포츠 귀편한', '외출용 새부리형'],
+                messaging: '퇴근 후에도 편안한 새부리형',
                 channels: ['퇴근길 광고', '쇼핑몰 배너', 'SNS 광고']
             },
             night: { // 21:00-06:00
                 name: '야간 시간대',
-                focus: '온라인 쇼핑',
-                products: ['대용량 팩', '가족용 세트', '할인 상품'],
-                messaging: '내일을 위한 준비',
+                focus: '온라인 쇼핑 + 대용량',
+                products: ['대용량 새부리형 팩', '가족용 귀편한 세트', '할인 새부리형'],
+                messaging: '가족 모두 편안한 새부리형',
                 channels: ['온라인 쇼핑몰', '라이브 커머스', '새벽 배송']
             }
         };
 
-        // 🆕 지역별 특성화 전략
+        // 🆕 지역별 새부리형/귀편한 마스크 특성화 전략
         this.regionalStrategies = {
             seoul: {
                 name: '서울 수도권',
-                characteristics: ['높은 구매력', '트렌드 민감', '프리미엄 선호'],
-                products: ['프리미엄 라이트 마스크', '디자인 마스크', '브랜드 마스크'],
+                characteristics: ['높은 구매력', '브랜드 선호', '편의성 중시'],
+                products: ['프리미엄 새부리형', '디자인 귀편한 마스크', '브랜드 새부리형'],
                 pricing: 'premium',
-                channels: ['강남역 광고', '명동 매장', '온라인 프리미엄']
+                channels: ['강남역 광고', '명동 매장', '온라인 프리미엄'],
+                messaging: '세련된 새부리형, 편안한 일상'
             },
             busan: {
                 name: '부산 경남',
-                characteristics: ['실용성 중시', '가성비 중요', '해안 지역'],
-                products: ['기본형 마스크', '대용량 팩', '습도 대응형'],
+                characteristics: ['실용성 중시', '가성비 중요', '습도 대응'],
+                products: ['기본형 새부리형', '대용량 귀편한 팩', '습도 대응 새부리형'],
                 pricing: 'value',
-                channels: ['지역 마트', '온라인 할인', '로컬 광고']
+                channels: ['지역 마트', '온라인 할인', '로컬 광고'],
+                messaging: '실용적인 새부리형, 가성비 최고'
             },
             rural: {
                 name: '지방 도시',
                 characteristics: ['가격 민감', '기능성 중시', '오프라인 선호'],
-                products: ['경제형 마스크', '농업용 마스크', '작업용 마스크'],
+                products: ['경제형 새부리형', '농업용 귀편한', '작업용 새부리형'],
                 pricing: 'economy',
-                channels: ['마트 진열', '농협 판매', '지역 신문']
+                channels: ['마트 진열', '농협 판매', '지역 신문'],
+                messaging: '경제적인 새부리형, 실속형 선택'
             }
         };
     }
@@ -369,49 +376,49 @@ class EnhancedDustMarketingInsights {
         }
     }
 
-    // 🆕 강화된 더미 데이터 생성 (계절별 현실적 데이터)
+    // 🆕 계절별 성수기/비수기 반영 더미 데이터
     getDummyAirQuality(stationName) {
         const season = this.getCurrentSeason();
         const timeSlot = this.getCurrentTimeSlot();
         
-        // 계절별 기본 농도 (실제 패턴 반영)
+        // 성수기/비수기별 기본 농도 (실제 패턴 반영)
         const seasonalBase = {
-            spring: { pm10: 75, pm25: 40 }, // 봄철 황사로 높음
-            summer: { pm10: 35, pm25: 18 }, // 여름철 비교적 낮음
-            autumn: { pm10: 60, pm25: 32 }, // 가을철 중간
-            winter: { pm10: 55, pm25: 28 }  // 겨울철 난방으로 중간
+            spring: { pm10: 85, pm25: 45 },  // 봄철 성수기 - 높음
+            summer: { pm10: 25, pm25: 12 },  // 여름철 비수기 - 낮음  
+            autumn: { pm10: 70, pm25: 35 },  // 가을철 성수기 - 중간
+            winter: { pm10: 75, pm25: 38 }   // 겨울철 최대 성수기 - 높음
         };
 
-        // 시간대별 변동 (출퇴근 시간 높음)
+        // 시간대별 변동
         const timeMultiplier = {
-            morning: 1.3,   // 출근 시간 높음
+            morning: 1.4,   // 출근 시간 높음
             daytime: 1.0,   // 주간 보통
-            evening: 1.2,   // 퇴근 시간 약간 높음
-            night: 0.8      // 야간 낮음
+            evening: 1.3,   // 퇴근 시간 높음
+            night: 0.7      // 야간 낮음
         };
 
         const base = seasonalBase[season];
         const multiplier = timeMultiplier[timeSlot];
-        const variation = Math.floor(Math.random() * 20) - 10;
+        const variation = Math.floor(Math.random() * 25) - 12;
 
         const pm10 = Math.max(0, Math.round((base.pm10 + variation) * multiplier));
         const pm25 = Math.max(0, Math.round((base.pm25 + variation) * multiplier));
 
-        console.log(`🎲 ${season}/${timeSlot} 더미 데이터: PM10=${pm10}, PM2.5=${pm25}`);
+        console.log(`🎲 ${season}(${this.seasonalBusinessData[season].season_type})/${timeSlot} 더미 데이터: PM10=${pm10}, PM2.5=${pm25}`);
 
         return {
             station: stationName,
             pm10: pm10,
             pm25: pm25,
-            o3: 0.03 + Math.random() * 0.02,
-            no2: 0.02 + Math.random() * 0.01,
-            co: 0.5 + Math.random() * 0.3,
-            so2: 0.003 + Math.random() * 0.002,
+            o3: 0.025 + Math.random() * 0.03,
+            no2: 0.015 + Math.random() * 0.02,
+            co: 0.4 + Math.random() * 0.4,
+            so2: 0.002 + Math.random() * 0.003,
             dataTime: new Date().toISOString().replace('T', ' ').substring(0, 19)
         };
     }
 
-    // 🆕 종합 마케팅 인사이트 생성 (대폭 강화)
+    // 🆕 새부리형/귀편한 마스크 중심 종합 인사이트 생성
     generateMarketingInsights(dustData, userName) {
         const dustLevel = this.getDustLevel(dustData.pm10, dustData.pm25);
         const season = this.getCurrentSeason();
@@ -421,7 +428,7 @@ class EnhancedDustMarketingInsights {
         const dustScenario = this.dustLevelScenarios[dustLevel];
         const timeStrategy = this.timeBasedStrategies[timeSlot];
 
-        console.log(`💡 강화된 인사이트 생성: ${season}/${dustLevel}/${timeSlot}`);
+        console.log(`💡 새부리형/귀편한 마스크 인사이트 생성: ${season}(${seasonalData.season_type})/${dustLevel}/${timeSlot}`);
         
         return {
             currentSituation: this.analyzeCurrentSituation(dustData, dustLevel, season, timeSlot),
@@ -437,7 +444,7 @@ class EnhancedDustMarketingInsights {
         };
     }
 
-    // 🆕 현재 상황 분석 (강화)
+    // 🆕 현재 상황 분석 (성수기/비수기 포함)
     analyzeCurrentSituation(dustData, dustLevel, season, timeSlot) {
         const seasonalData = this.seasonalBusinessData[season];
         const dustScenario = this.dustLevelScenarios[dustLevel];
@@ -449,18 +456,93 @@ class EnhancedDustMarketingInsights {
                 pm10: dustData.pm10,
                 pm25: dustData.pm25,
                 season: seasonalData.name,
+                seasonType: seasonalData.season_type,
                 timeSlot: timeStrategy.name,
                 dustLevel: dustScenario.name,
                 businessImpact: dustScenario.businessImpact,
                 seasonalEvents: seasonalData.dustEvents.join(', '),
-                riskLevel: dustScenario.businessImpact === 'critical' ? 'critical' : 
-                          dustScenario.businessImpact === 'high' ? 'high' : 
-                          dustScenario.businessImpact === 'medium' ? 'medium' : 'low'
+                primaryProducts: seasonalData.keyProducts.primary.join(', '),
+                riskLevel: this.calculateRiskLevel(dustScenario.businessImpact, seasonalData.season_type)
             }
         };
     }
 
-    // 🆕 마케팅 기회 분석 (강화)
+    // 리스크 레벨 계산 (성수기/비수기 + 미세먼지 수준)
+    calculateRiskLevel(businessImpact, seasonType) {
+        const seasonRisk = {
+            '최대 성수기': 3,
+            '성수기': 2,
+            '비수기': 1
+        };
+        
+        const impactRisk = {
+            'critical': 4,
+            'high': 3,
+            'medium': 2,
+            'low': 1
+        };
+        
+        const totalRisk = seasonRisk[seasonType] + impactRisk[businessImpact];
+        
+        if (totalRisk >= 6) return 'critical';
+        if (totalRisk >= 5) return 'high';
+        if (totalRisk >= 3) return 'medium';
+        return 'low';
+    }
+
+    // 🆕 제품 전략 (새부리형/귀편한 마스크 특화)
+    getProductStrategy(dustLevel, season, timeSlot) {
+        const seasonalData = this.seasonalBusinessData[season];
+        const dustScenario = this.dustLevelScenarios[dustLevel];
+        const timeStrategy = this.timeBasedStrategies[timeSlot];
+
+        // 🔥 여름철 비수기 특별 전략
+        if (season === 'summer') {
+            return {
+                focus: '숨쉬기 편한 새부리형 마스크 집중 마케팅',
+                primaryProduct: '숨쉬기 편한 새부리형',
+                reasoning: '하절기 비수기 - 무더위에도 편안한 착용감과 통풍성 강조',
+                strategy: [
+                    '숨쉬기 편한 새부리형 메인 진열',
+                    '귀편한 마스크 편의성 마케팅',
+                    '비수기 가성비 브랜딩 강화',
+                    '냉방 시설 내 장시간 착용 편의성 어필'
+                ],
+                crossSelling: ['통풍 새부리형', '메쉬 귀편한', '경량 새부리형'],
+                bundling: ['숨쉬기 편한 + 귀편한 세트', '여름용 새부리형 3종 세트'],
+                seasonContext: '하절기 비수기 전략'
+            };
+        }
+
+        // 성수기 전략
+        if (seasonalData.season_type === '성수기' || seasonalData.season_type === '최대 성수기') {
+            return {
+                focus: `${seasonalData.season_type} 새부리형/귀편한 마스크 전략`,
+                primaryProduct: seasonalData.keyProducts.primary[0],
+                reasoning: `${seasonalData.season_type} - 높은 수요 대비 최고 품질과 편의성 제공`,
+                strategy: [
+                    `${seasonalData.keyProducts.primary[0]} 최우선 진열`,
+                    '귀편한 마스크 장점 집중 홍보',
+                    `${seasonalData.season_type} 프리미엄 브랜딩`,
+                    '새부리형 구조의 우수성 강조'
+                ],
+                crossSelling: seasonalData.keyProducts.secondary,
+                bundling: this.generateBundlingStrategy(season, dustLevel),
+                seasonContext: seasonalData.season_type
+            };
+        }
+
+        return {
+            focus: `${seasonalData.name} 핵심 상품`,
+            primaryProduct: seasonalData.keyProducts.primary[0],
+            strategy: this.generateProductStrategy(dustLevel, season, seasonalData),
+            crossSelling: seasonalData.keyProducts.secondary,
+            bundling: this.generateBundlingStrategy(season, dustLevel),
+            seasonContext: seasonalData.season_type
+        };
+    }
+
+    // 🆕 마케팅 기회 분석 (성수기/비수기 강화)
     getMarketingOpportunity(dustLevel, season, dustScenario, seasonalData) {
         const baseScore = dustScenario.salesMultiplier * seasonalData.salesMultiplier;
         const finalScore = Math.min(10, Math.round(baseScore));
@@ -470,6 +552,7 @@ class EnhancedDustMarketingInsights {
         return {
             score: finalScore,
             level: dustScenario.businessImpact,
+            seasonType: seasonalData.season_type,
             scenario: selectedScenario,
             seasonalMultiplier: seasonalData.salesMultiplier,
             opportunities: [{
@@ -478,63 +561,144 @@ class EnhancedDustMarketingInsights {
                 description: selectedScenario.strategy,
                 messaging: selectedScenario.messaging,
                 products: selectedScenario.products,
-                actions: this.generateActions(dustLevel, season, selectedScenario.urgency)
+                actions: this.generateActions(dustLevel, season, selectedScenario.urgency),
+                seasonContext: `${seasonalData.season_type} 대응 전략`
             }]
         };
     }
 
-    // 🆕 제품 전략 (실제 비즈니스 반영)
-    getProductStrategy(dustLevel, season, timeSlot) {
-        const seasonalData = this.seasonalBusinessData[season];
-        const dustScenario = this.dustLevelScenarios[dustLevel];
-        const timeStrategy = this.timeBasedStrategies[timeSlot];
+    // 🆕 강화된 리포트 포맷팅 (새부리형/귀편한 마스크 중심)
+    formatEnhancedInsightReport(insights, dustData, userName) {
+        const koreaTime = new Date(dustData.dataTime).toLocaleString('ko-KR', {
+            timeZone: 'Asia/Seoul',
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
+        });
 
-        // 계절별 주력 상품 + 미세먼지 농도별 추가 상품
-        const recommendedProducts = {
-            primary: seasonalData.keyProducts.primary,
-            secondary: seasonalData.keyProducts.secondary,
-            timeSpecific: timeStrategy.products,
-            dustSpecific: dustScenario.scenarios[0].products
-        };
-
-        // 🔥 여름철 프리미엄 라이트 마스크 특별 전략
-        if (season === 'summer') {
-            return {
-                focus: '프리미엄 라이트 마스크 집중 마케팅',
-                primaryProduct: '프리미엄 라이트 마스크',
-                reasoning: '여름철 무더위에도 착용 가능한 통풍성과 경량성',
-                strategy: [
-                    '프리미엄 라이트 마스크 메인 진열',
-                    '컬러맛집 부각 마케팅',
-                    '여름 전용 브랜딩 강화',
-                    '에어컨 시설 내 착용 편의성 어필'
-                ],
-                crossSelling: ['쿨링 마스크', '아이스 마스크', '메쉬 마스크'],
-                bundling: ['프리미엄 라이트 + 쿨링 젤', '여름 마스크 3종 세트']
-            };
+        let report = `📊 **${userName}님의 새부리형/귀편한 마스크 인사이트**\n\n`;
+        
+        // 현재 상황 (성수기/비수기 포함)
+        report += `🌫️ **현재 상황** (${koreaTime})\n`;
+        report += `• 측정소: ${dustData.station}\n`;
+        report += `• PM10: ${dustData.pm10}㎍/㎥ | PM2.5: ${dustData.pm25}㎍/㎥\n`;
+        report += `• 상태: ${insights.currentSituation.summary}\n`;
+        report += `• 시기: ${insights.currentSituation.details.seasonType}\n`;
+        report += `• 시간대: ${insights.currentSituation.details.timeSlot}\n`;
+        report += `• 비즈니스 리스크: ${insights.currentSituation.details.riskLevel}\n\n`;
+        
+        // 마케팅 기회 (성수기/비수기 강화)
+        report += `🎯 **마케팅 기회 점수: ${insights.marketingOpportunity.score}/10**\n`;
+        const opportunity = insights.marketingOpportunity.opportunities[0];
+        report += `${opportunity.title}\n`;
+        report += `📢 메시지: ${opportunity.messaging}\n`;
+        report += `🎁 핵심 상품: ${opportunity.products.join(', ')}\n`;
+        report += `📅 시기 전략: ${opportunity.seasonContext}\n\n`;
+        
+        // 🔥 제품 전략 (새부리형/귀편한 마스크 특화)
+        report += `🎁 **제품 전략** (${insights.productStrategy.seasonContext})\n`;
+        report += `• 주력 상품: ${insights.productStrategy.primaryProduct}\n`;
+        report += `• 전략 포커스: ${insights.productStrategy.focus}\n`;
+        if (insights.productStrategy.crossSelling) {
+            report += `• 크로스셀링: ${insights.productStrategy.crossSelling.join(', ')}\n`;
         }
-
-        return {
-            focus: `${seasonalData.name} 핵심 상품`,
-            primaryProduct: seasonalData.keyProducts.primary[0],
-            recommendedProducts: recommendedProducts,
-            strategy: this.generateProductStrategy(dustLevel, season, seasonalData),
-            crossSelling: seasonalData.keyProducts.secondary,
-            bundling: this.generateBundlingStrategy(season, dustLevel)
-        };
+        if (insights.productStrategy.bundling) {
+            report += `• 번들링: ${insights.productStrategy.bundling.join(', ')}\n`;
+        }
+        report += '\n';
+        
+        // 가격 전략 (성수기/비수기 반영)
+        report += `💰 **가격 전략**\n`;
+        report += `• 정책: ${insights.pricingStrategy.strategy}\n`;
+        report += `• 계절 배수: ${insights.pricingStrategy.seasonalAdjustment}배\n`;
+        report += `• 미세먼지 배수: ${insights.pricingStrategy.dustLevelAdjustment}배\n`;
+        report += `• 총 기회 배수: ${Math.round(insights.pricingStrategy.seasonalAdjustment * insights.pricingStrategy.dustLevelAdjustment * 100) / 100}배\n\n`;
+        
+        // 재고 전략
+        report += `📦 **재고 전략**\n`;
+        report += `• 재고 수준: ${insights.inventoryStrategy.stockLevel}\n`;
+        report += `• 회전율: ${insights.inventoryStrategy.turnoverRate}\n`;
+        report += `• 총 배수: ${insights.inventoryStrategy.totalMultiplier}배\n`;
+        report += `• 핵심 관리: ${insights.inventoryStrategy.criticalProducts.join(', ')}\n\n`;
+        
+        // 액션 플랜
+        report += `📋 **즉시 액션 플랜**\n`;
+        insights.actionPlan.plans.forEach(plan => {
+            report += `**${plan.title}**\n`;
+            plan.tasks.slice(0, 3).forEach(task => {
+                report += `• ${task}\n`;
+            });
+        });
+        
+        return report;
     }
 
-    // 🆕 가격 전략
+    // 헬퍼 메서드들 (새부리형/귀편한 마스크 중심으로 수정)
+    generateProductStrategy(dustLevel, season, seasonalData) {
+        return [
+            `${seasonalData.keyProducts.primary[0]} 주력 상품 집중`,
+            '새부리형 마스크 구조적 우수성 강조',
+            '귀편한 마스크 편의성 마케팅',
+            `${seasonalData.name} 특화 전략`
+        ];
+    }
+
+    generateBundlingStrategy(season, dustLevel) {
+        const bundles = {
+            spring: ['새부리형 황사 대응 패키지', '귀편한 봄철 건강 세트', '가족 보호 새부리형 패키지'],
+            summer: ['숨쉬기 편한 여름 패키지', '귀편한 새부리형 세트', '통풍 마스크 콤보'],
+            autumn: ['새부리형 가을 미세먼지 세트', '귀편한 일상 보호 패키지', '장시간 착용 새부리형 세트'],
+            winter: ['방한 새부리형 겨울 패키지', '귀편한 실내외 보호 세트', '보온 새부리형 시즌 세트']
+        };
+
+        return bundles[season] || ['기본 새부리형 패키지'];
+    }
+
+    generateActions(dustLevel, season, urgency) {
+        const seasonalData = this.seasonalBusinessData[season];
+        const actions = {
+            critical: [
+                `즉시 ${seasonalData.keyProducts.primary[0]} 재고 확보`,
+                '24시간 새부리형/귀편한 마스크 CS 대응',
+                '전 채널 새부리형 마스크 광고 최대 투입',
+                '언론 대응 및 브랜드 PR 활동'
+            ],
+            high: [
+                `${seasonalData.keyProducts.primary[0]} 재고 점검 및 추가 주문`,
+                '새부리형/귀편한 마스크 마케팅 예산 150% 증대',
+                '고객 문의 대응 강화 (편의성 중심)',
+                '경쟁사 동향 모니터링'
+            ],
+            medium: [
+                '새부리형 마스크 재고 현황 확인',
+                '귀편한 마스크 타겟 마케팅 실행',
+                '고객 교육 콘텐츠 제작 (착용법, 장점)',
+                '판매 데이터 분석'
+            ],
+            low: [
+                '새부리형/귀편한 마스크 브랜드 마케팅 강화',
+                '고객 관계 관리 (만족도 조사)',
+                '제품 개선 피드백 수집',
+                '장기 전략 수립'
+            ]
+        };
+
+        return actions[urgency] || actions.medium;
+    }
+
+    // 나머지 메서드들도 새부리형/귀편한 마스크 중심으로 조정
     getPricingStrategy(dustLevel, season, seasonalData) {
         const priceStrategies = {
             premium: {
                 approach: '프리미엄 가격 정책',
-                reasoning: '높은 수요와 품질 대비 프리미엄 가격 책정',
-                tactics: ['한정판 마케팅', '프리미엄 브랜딩', '품질 보증']
+                reasoning: `${seasonalData.season_type} 높은 수요 대비 최고 품질 새부리형/귀편한 마스크 제공`,
+                tactics: ['한정판 새부리형 마케팅', '프리미엄 브랜딩', '품질 보증']
             },
             value: {
                 approach: '가성비 가격 정책',
-                reasoning: '기능성 대비 합리적 가격으로 시장 점유율 확대',
+                reasoning: '편의성과 품질 대비 합리적 가격으로 시장 점유율 확대',
                 tactics: ['기능성 부각', '비교 광고', '대용량 할인']
             },
             balanced: {
@@ -556,7 +720,78 @@ class EnhancedDustMarketingInsights {
         };
     }
 
-    // 🆕 마케팅 전략 (시간대별 강화)
+    generatePricingRecommendations(dustLevel, season) {
+        const seasonalData = this.seasonalBusinessData[season];
+        const recommendations = [];
+        
+        if (seasonalData.season_type === '최대 성수기') {
+            recommendations.push('최대 성수기 프리미엄 가격 적용');
+            recommendations.push('새부리형/귀편한 마스크 번들 할인');
+        } else if (seasonalData.season_type === '성수기') {
+            recommendations.push('성수기 가격 + 15% 적용');
+            recommendations.push('대량 구매 시 새부리형 마스크 할인');
+        } else if (seasonalData.season_type === '비수기') {
+            recommendations.push('비수기 가성비 마케팅 강화');
+            recommendations.push('귀편한 마스크 편의성 가치 부각');
+        }
+
+        return recommendations;
+    }
+
+    getInventoryStrategy(dustLevel, season, seasonalData) {
+        const inventory = seasonalData.inventory;
+        const dustMultiplier = this.dustLevelScenarios[dustLevel].salesMultiplier;
+        
+        const stockLevels = {
+            very_high: '500%',
+            high: '400%',
+            medium: '200%',
+            low: '150%'
+        };
+
+        return {
+            stockLevel: stockLevels[inventory.stockLevel] || '200%',
+            turnoverRate: inventory.turnoverRate,
+            criticalProducts: inventory.criticalProducts,
+            seasonalDemand: seasonalData.salesMultiplier,
+            dustDemand: dustMultiplier,
+            totalMultiplier: Math.round(seasonalData.salesMultiplier * dustMultiplier * 100) / 100,
+            strategy: this.generateInventoryStrategy(dustLevel, season, inventory),
+            riskProducts: this.identifyRiskProducts(dustLevel, season)
+        };
+    }
+
+    generateInventoryStrategy(dustLevel, season, inventory) {
+        const seasonalData = this.seasonalBusinessData[season];
+        return [
+            `${seasonalData.season_type} ${inventory.stockLevel} 재고 수준 유지`,
+            `${inventory.turnoverRate} 회전율 예상`,
+            `새부리형/귀편한 마스크 우선 관리: ${inventory.criticalProducts.join(', ')}`,
+            '공급업체 다변화 및 품질 관리 강화'
+        ];
+    }
+
+    identifyRiskProducts(dustLevel, season) {
+        const seasonalData = this.seasonalBusinessData[season];
+        const riskProducts = [];
+        
+        if (dustLevel === 'veryBad') {
+            riskProducts.push('모든 새부리형 KF94 제품군');
+            riskProducts.push('귀편한 N95 마스크');
+        } else if (dustLevel === 'bad') {
+            riskProducts.push('KF94 새부리형 일반');
+            riskProducts.push('어린이용 귀편한 마스크');
+        }
+
+        // 성수기 추가 리스크 상품
+        if (seasonalData.season_type === '성수기' || seasonalData.season_type === '최대 성수기') {
+            riskProducts.push(...seasonalData.keyProducts.primary);
+        }
+
+        return riskProducts;
+    }
+
+    // 나머지 메서드들 (기존과 동일하지만 새부리형/귀편한 마스크 키워드 포함)
     getMarketingStrategy(dustLevel, season, timeSlot) {
         const seasonalData = this.seasonalBusinessData[season];
         const timeStrategy = this.timeBasedStrategies[timeSlot];
@@ -564,7 +799,7 @@ class EnhancedDustMarketingInsights {
 
         return {
             mainStrategy: {
-                title: `${timeStrategy.name} ${dustScenario.name} 대응 전략`,
+                title: `${timeStrategy.name} ${dustScenario.name} 새부리형/귀편한 마스크 전략`,
                 focus: timeStrategy.focus,
                 urgency: dustScenario.businessImpact,
                 messaging: seasonalData.marketingMessages,
@@ -576,208 +811,88 @@ class EnhancedDustMarketingInsights {
         };
     }
 
-    // 🆕 재고 전략 (비즈니스 데이터 반영)
-    getInventoryStrategy(dustLevel, season, seasonalData) {
-        const inventory = seasonalData.inventory;
-        const dustMultiplier = this.dustLevelScenarios[dustLevel].salesMultiplier;
-        
-        const stockLevels = {
-            high: '300%',
-            medium: '200%',
-            low: '150%'
-        };
-
-        return {
-            stockLevel: stockLevels[inventory.stockLevel],
-            turnoverRate: inventory.turnoverRate,
-            criticalProducts: inventory.criticalProducts,
-            seasonalDemand: seasonalData.salesMultiplier,
-            dustDemand: dustMultiplier,
-            totalMultiplier: Math.round(seasonalData.salesMultiplier * dustMultiplier * 100) / 100,
-            strategy: this.generateInventoryStrategy(dustLevel, season, inventory),
-            riskProducts: this.identifyRiskProducts(dustLevel, season)
-        };
-    }
-
-    // 🆕 다양한 헬퍼 메서드들
-    generateActions(dustLevel, season, urgency) {
-        const actions = {
-            critical: [
-                '즉시 재고 확보 및 긴급 주문',
-                '24시간 CS 대응 체계 가동',
-                '전 채널 광고 예산 최대 투입',
-                '언론 대응 및 PR 활동'
-            ],
-            high: [
-                '재고 점검 및 추가 주문',
-                '마케팅 예산 150% 증대',
-                '고객 문의 대응 강화',
-                '경쟁사 동향 모니터링'
-            ],
-            medium: [
-                '재고 현황 확인',
-                '타겟 마케팅 실행',
-                '고객 교육 콘텐츠 제작',
-                '판매 데이터 분석'
-            ],
-            low: [
-                '브랜드 마케팅 강화',
-                '고객 관계 관리',
-                '제품 개선 피드백 수집',
-                '장기 전략 수립'
-            ]
-        };
-
-        return actions[urgency] || actions.medium;
-    }
-
-    generateProductStrategy(dustLevel, season, seasonalData) {
-        return [
-            `${seasonalData.keyProducts.primary[0]} 주력 상품 집중`,
-            `${seasonalData.name} 특화 마케팅`,
-            '고객 세분화 맞춤 전략',
-            '크로스셀링 기회 확대'
-        ];
-    }
-
-    generateBundlingStrategy(season, dustLevel) {
-        const bundles = {
-            spring: ['황사 대응 패키지', '봄철 건강 세트', '가족 보호 패키지'],
-            summer: ['여름 쾌적 패키지', '프리미엄 라이트 세트', '쿨링 마스크 콤보'],
-            autumn: ['가을 미세먼지 세트', '일상 보호 패키지', '장기 착용 세트'],
-            winter: ['겨울 방한 패키지', '실내외 보호 세트', '난방 시즌 세트']
-        };
-
-        return bundles[season] || ['기본 패키지'];
-    }
-
-    generatePricingRecommendations(dustLevel, season) {
-        const recommendations = [];
-        
-        if (dustLevel === 'veryBad') {
-            recommendations.push('긴급 상황으로 프리미엄 가격 적용');
-            recommendations.push('대량 구매 시 할인 제공');
-        } else if (dustLevel === 'bad') {
-            recommendations.push('표준 가격 + 10% 적용');
-            recommendations.push('번들 상품 할인 제공');
-        } else {
-            recommendations.push('표준 가격 정책 유지');
-            recommendations.push('정기 구매 고객 할인');
-        }
-
-        return recommendations;
-    }
-
     getDigitalStrategy(dustLevel, season, timeSlot) {
         return {
             channels: ['네이버 스마트스토어', '쿠팡', '11번가', '온라인 자체몰'],
-            tactics: ['검색 광고 강화', 'SNS 광고', '인플루언서 협업', '라이브 커머스'],
-            budget: dustLevel === 'veryBad' ? '최대 투입' : dustLevel === 'bad' ? '200% 증대' : '정상 운영'
+            tactics: ['새부리형 마스크 검색 광고', 'SNS 귀편한 마스크 광고', '인플루언서 협업', '라이브 커머스'],
+            budget: dustLevel === 'veryBad' ? '최대 투입' : dustLevel === 'bad' ? '200% 증대' : '정상 운영',
+            keywords: ['새부리형 마스크', '귀편한 마스크', '숨쉬기 편한', 'KF94 새부리형']
         };
     }
 
     getOfflineStrategy(dustLevel, season, timeSlot) {
         return {
             channels: ['약국', '마트', '편의점', '대형마트'],
-            tactics: ['진열 위치 최적화', '매장 프로모션', '샘플 제공', 'POP 광고'],
-            focus: timeSlot === 'morning' ? '출근길 매장' : timeSlot === 'evening' ? '퇴근길 매장' : '주거지 매장'
+            tactics: ['새부리형 마스크 진열 최적화', '귀편한 마스크 매장 프로모션', '샘플 제공', 'POP 광고'],
+            focus: timeSlot === 'morning' ? '출근길 매장' : timeSlot === 'evening' ? '퇴근길 매장' : '주거지 매장',
+            displayFocus: '새부리형 구조와 귀편한 착용감 강조'
         };
     }
 
     getContentStrategy(dustLevel, season, timeSlot) {
         return {
-            types: ['교육 콘텐츠', '사용법 가이드', '건강 정보', '제품 비교'],
+            types: ['새부리형 마스크 교육 콘텐츠', '귀편한 착용법 가이드', '건강 정보', '제품 비교'],
             platforms: ['유튜브', '인스타그램', '네이버 블로그', '카카오톡'],
-            urgency: dustLevel === 'veryBad' ? '긴급 제작' : '정기 제작'
+            urgency: dustLevel === 'veryBad' ? '긴급 제작' : '정기 제작',
+            focus: '새부리형 마스크의 우수성과 귀편한 착용감 강조'
         };
     }
 
-    generateInventoryStrategy(dustLevel, season, inventory) {
-        return [
-            `${inventory.stockLevel} 재고 수준 유지`,
-            `${inventory.turnoverRate} 회전율 예상`,
-            `${inventory.criticalProducts.join(', ')} 핵심 관리`,
-            '공급업체 다변화 필요'
-        ];
-    }
-
-    identifyRiskProducts(dustLevel, season) {
-        const riskProducts = [];
-        
-        if (dustLevel === 'veryBad') {
-            riskProducts.push('모든 KF94 제품군');
-            riskProducts.push('N95 마스크');
-        } else if (dustLevel === 'bad') {
-            riskProducts.push('KF94 일반형');
-            riskProducts.push('어린이용 마스크');
-        }
-
-        return riskProducts;
-    }
-
-    // 🆕 지역별 전략
-    getRegionalStrategy(dustLevel, season) {
-        return {
-            seoul: this.regionalStrategies.seoul,
-            busan: this.regionalStrategies.busan,
-            rural: this.regionalStrategies.rural,
-            recommendation: '지역별 맞춤 전략 필요'
-        };
-    }
-
-    // 🆕 경쟁사 분석
     getCompetitorStrategy(dustLevel, season) {
         return {
-            monitoring: ['가격 정책', '재고 현황', '마케팅 메시지', '신제품 출시'],
-            opportunities: ['경쟁사 품절 시 점유율 확대', '차별화 메시지 강화'],
-            threats: ['가격 경쟁 심화', '신규 진입자 증가']
+            monitoring: ['경쟁사 새부리형 마스크 가격', '귀편한 마스크 재고 현황', '마케팅 메시지', '신제품 출시'],
+            opportunities: ['경쟁사 품절 시 새부리형 마스크 점유율 확대', '귀편한 마스크 차별화 메시지 강화'],
+            threats: ['새부리형 마스크 가격 경쟁 심화', '신규 귀편한 마스크 진입자 증가']
         };
     }
 
-    // 🆕 리스크 관리
     getRiskManagement(dustLevel, season, dustScenario) {
+        const seasonalData = this.seasonalBusinessData[season];
         const risks = [];
         
-        if (dustScenario.businessImpact === 'critical') {
+        if (dustScenario.businessImpact === 'critical' || seasonalData.season_type === '최대 성수기') {
             risks.push({
                 type: 'supply',
-                title: '공급 부족 리스크',
+                title: '새부리형/귀편한 마스크 공급 부족 리스크',
                 probability: 'high',
                 impact: 'critical',
-                mitigation: ['긴급 발주', '대체 공급업체 확보', '생산 라인 확대']
+                mitigation: ['긴급 발주', '대체 공급업체 확보', '생산 라인 확대', '핵심 제품 우선 생산']
             });
         }
 
         return {
             level: dustScenario.businessImpact,
+            seasonRisk: seasonalData.season_type,
             risks: risks
         };
     }
 
-    // 🆕 액션 플랜
     getActionPlan(dustLevel, season, timeSlot, dustScenario) {
+        const seasonalData = this.seasonalBusinessData[season];
         const plans = [];
         
-        if (dustScenario.businessImpact === 'critical') {
+        if (dustScenario.businessImpact === 'critical' || seasonalData.season_type === '최대 성수기') {
             plans.push({
                 timeframe: 'immediate',
                 title: '🚨 비상 대응 (즉시)',
                 tasks: [
                     '전 직원 비상 소집',
-                    '재고 현황 실시간 점검',
+                    '새부리형/귀편한 마스크 재고 실시간 점검',
                     '언론 대응 준비',
-                    '24시간 CS 체계 가동'
+                    '24시간 CS 체계 가동',
+                    '핵심 제품 긴급 생산 지시'
                 ]
             });
-        } else if (dustScenario.businessImpact === 'high') {
+        } else if (dustScenario.businessImpact === 'high' || seasonalData.season_type === '성수기') {
             plans.push({
                 timeframe: 'urgent',
                 title: '⚡ 긴급 대응 (1-2시간)',
                 tasks: [
-                    '재고 확보 및 주문',
+                    '새부리형/귀편한 마스크 재고 확보',
                     '마케팅 예산 증대',
                     '고객 문의 대응 강화',
-                    '경쟁사 동향 모니터링'
+                    '경쟁사 동향 모니터링',
+                    '주요 판매처 재고 점검'
                 ]
             });
         } else {
@@ -786,88 +901,37 @@ class EnhancedDustMarketingInsights {
                 title: '📊 일반 대응 (1-2일)',
                 tasks: [
                     '정기 재고 점검',
-                    '마케팅 최적화',
+                    '새부리형/귀편한 마스크 마케팅 최적화',
                     '고객 피드백 수집',
-                    '장기 전략 수립'
+                    '장기 전략 수립',
+                    '제품 개선 검토'
                 ]
             });
         }
 
         return {
             totalPlans: plans.length,
-            plans: plans
+            plans: plans,
+            seasonContext: seasonalData.season_type
         };
     }
 
-    // 🆕 강화된 리포트 포맷팅
-    formatEnhancedInsightReport(insights, dustData, userName) {
-        const koreaTime = new Date(dustData.dataTime).toLocaleString('ko-KR', {
-            timeZone: 'Asia/Seoul',
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-
-        let report = `📊 **${userName}님의 강화된 미세먼지 마케팅 인사이트**\n\n`;
-        
-        // 현재 상황 (강화)
-        report += `🌫️ **현재 상황** (${koreaTime})\n`;
-        report += `• 측정소: ${dustData.station}\n`;
-        report += `• PM10: ${dustData.pm10}㎍/㎥ | PM2.5: ${dustData.pm25}㎍/㎥\n`;
-        report += `• 상태: ${insights.currentSituation.summary}\n`;
-        report += `• 시간대: ${insights.currentSituation.details.timeSlot}\n`;
-        report += `• 비즈니스 임팩트: ${insights.currentSituation.details.businessImpact}\n\n`;
-        
-        // 마케팅 기회 (강화)
-        report += `🎯 **마케팅 기회 점수: ${insights.marketingOpportunity.score}/10**\n`;
-        const opportunity = insights.marketingOpportunity.opportunities[0];
-        report += `${opportunity.title}\n`;
-        report += `📢 메시지: ${opportunity.messaging}\n`;
-        report += `🎁 핵심 상품: ${opportunity.products.join(', ')}\n\n`;
-        
-        // 🔥 제품 전략 (여름철 프리미엄 라이트 특화)
-        report += `🎁 **제품 전략**\n`;
-        report += `• 주력 상품: ${insights.productStrategy.primaryProduct}\n`;
-        if (insights.productStrategy.focus.includes('프리미엄 라이트')) {
-            report += `• 🔥 여름 특화: ${insights.productStrategy.focus}\n`;
-            report += `• 크로스셀링: ${insights.productStrategy.crossSelling.join(', ')}\n`;
-            report += `• 번들링: ${insights.productStrategy.bundling.join(', ')}\n`;
-        }
-        report += '\n';
-        
-        // 가격 전략
-        report += `💰 **가격 전략**\n`;
-        report += `• 정책: ${insights.pricingStrategy.strategy}\n`;
-        report += `• 계절 조정: ${insights.pricingStrategy.seasonalAdjustment}배\n`;
-        report += `• 미세먼지 조정: ${insights.pricingStrategy.dustLevelAdjustment}배\n\n`;
-        
-        // 재고 전략
-        report += `📦 **재고 전략**\n`;
-        report += `• 재고 수준: ${insights.inventoryStrategy.stockLevel}\n`;
-        report += `• 회전율: ${insights.inventoryStrategy.turnoverRate}\n`;
-        report += `• 총 배수: ${insights.inventoryStrategy.totalMultiplier}배\n`;
-        report += `• 핵심 관리: ${insights.inventoryStrategy.criticalProducts.join(', ')}\n\n`;
-        
-        // 마케팅 전략
-        report += `🎯 **마케팅 전략**\n`;
-        const mainStrategy = insights.marketingStrategy.mainStrategy;
-        report += `• 전략: ${mainStrategy.title}\n`;
-        report += `• 포커스: ${mainStrategy.focus}\n`;
-        report += `• 채널: ${mainStrategy.channels.join(', ')}\n`;
-        report += `• 예산: ${insights.marketingStrategy.digitalStrategy.budget}\n\n`;
-        
-        // 액션 플랜
-        report += `📋 **액션 플랜**\n`;
-        insights.actionPlan.plans.forEach(plan => {
-            report += `**${plan.title}**\n`;
-            plan.tasks.forEach(task => {
-                report += `• ${task}\n`;
-            });
-        });
-        
-        return report;
+    getRegionalStrategy(dustLevel, season) {
+        return {
+            seoul: {
+                ...this.regionalStrategies.seoul,
+                focus: '프리미엄 새부리형/귀편한 마스크'
+            },
+            busan: {
+                ...this.regionalStrategies.busan,
+                focus: '실용적 새부리형/귀편한 마스크'
+            },
+            rural: {
+                ...this.regionalStrategies.rural,
+                focus: '경제적 새부리형/귀편한 마스크'
+            },
+            recommendation: '지역별 새부리형/귀편한 마스크 맞춤 전략 필요'
+        };
     }
 
     // 전국 현황 조회
@@ -880,6 +944,8 @@ class EnhancedDustMarketingInsights {
                 const data = await this.getCurrentAirQuality(stationName);
                 const dustLevel = this.getDustLevel(data.pm10, data.pm25);
                 const dustScenario = this.dustLevelScenarios[dustLevel];
+                const season = this.getCurrentSeason();
+                const seasonalData = this.seasonalBusinessData[season];
                 
                 results.push({
                     city: cityName,
@@ -889,7 +955,9 @@ class EnhancedDustMarketingInsights {
                     level: dustScenario.name,
                     emoji: dustScenario.emoji,
                     color: dustScenario.color,
-                    businessImpact: dustScenario.businessImpact
+                    businessImpact: dustScenario.businessImpact,
+                    seasonType: seasonalData.season_type,
+                    recommendedProduct: seasonalData.keyProducts.primary[0]
                 });
             } catch (error) {
                 console.error(`❌ ${cityName} 데이터 조회 실패:`, error.message);
@@ -907,10 +975,10 @@ module.exports = function(bot, msg) {
     const userName = getUserName(msg.from);
     const insightManager = new EnhancedDustMarketingInsights();
 
-    console.log(`📥 강화된 인사이트 요청: ${text} (사용자: ${userName})`);
+    console.log(`📥 새부리형/귀편한 마스크 인사이트 요청: ${text} (사용자: ${userName})`);
 
     if (text === '/insight' || text === '/인사이트') {
-        console.log('🔍 강화된 종합 마케팅 인사이트 생성 시작...');
+        console.log('🔍 새부리형/귀편한 마스크 중심 종합 인사이트 생성 시작...');
         
         insightManager.getCurrentAirQuality()
             .then(dustData => {
@@ -933,104 +1001,219 @@ module.exports = function(bot, msg) {
                             { text: '⚔️ 경쟁사 분석', callback_data: 'insight_competitor' }
                         ],
                         [
+                            { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' },
+                            { text: '🗺️ 전국 현황', callback_data: 'insight_national' }
+                        ],
+                        [
                             { text: '🔄 새로고침', callback_data: 'insight_refresh' },
                             { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
                         ]
                     ]
                 };
                 
-                console.log('✅ 강화된 인사이트 전송 준비 완료');
+                console.log('✅ 새부리형/귀편한 마스크 인사이트 전송 준비 완료');
                 bot.sendMessage(chatId, report, {
                     parse_mode: 'Markdown',
                     reply_markup: keyboard
                 });
             })
             .catch(error => {
-                console.error('❌ 강화된 인사이트 생성 실패:', error);
+                console.error('❌ 새부리형/귀편한 마스크 인사이트 생성 실패:', error);
                 bot.sendMessage(chatId, `❌ 인사이트 생성 중 오류가 발생했습니다.\n\n오류: ${error.message}\n\n잠시 후 다시 시도해주세요.`);
             });
 
     } else if (text === '/insight quick' || text === '/인사이트 간단') {
-        console.log('⚡ 강화된 빠른 인사이트 생성 시작...');
+        console.log('⚡ 새부리형/귀편한 마스크 빠른 인사이트 생성 시작...');
         
         insightManager.getCurrentAirQuality()
             .then(dustData => {
                 const insights = insightManager.generateMarketingInsights(dustData, userName);
                 const season = insightManager.getCurrentSeason();
+                const seasonalData = insightManager.seasonalBusinessData[season];
                 
-                let quickReport = `⚡ **강화된 빠른 인사이트**\n\n`;
+                let quickReport = `⚡ **새부리형/귀편한 마스크 빠른 인사이트**\n\n`;
                 quickReport += `🌫️ 미세먼지: ${insights.currentSituation.details.dustLevel} (${dustData.pm25}㎍/㎥)\n`;
+                quickReport += `📅 시기: ${seasonalData.season_type}\n`;
                 quickReport += `🎯 기회 점수: ${insights.marketingOpportunity.score}/10\n`;
                 quickReport += `🎁 주력 상품: ${insights.productStrategy.primaryProduct}\n`;
-                quickReport += `💰 가격 전략: ${insights.pricingStrategy.strategy}\n`;
-                quickReport += `📦 재고 배수: ${insights.inventoryStrategy.totalMultiplier}배\n\n`;
+                quickReport += `💰 총 기회 배수: ${Math.round(insights.pricingStrategy.seasonalAdjustment * insights.pricingStrategy.dustLevelAdjustment * 100) / 100}배\n\n`;
                 
-                // 🔥 여름철 프리미엄 라이트 특별 메시지
+                // 🔥 계절별 특별 메시지
                 if (season === 'summer') {
-                    quickReport += `🔥 **여름 특화 전략**\n`;
-                    quickReport += `프리미엄 라이트 마스크 집중 마케팅!\n`;
-                    quickReport += `무더위에도 시원한 착용감으로 매출 증대 기대\n\n`;
+                    quickReport += `🔥 **하절기 비수기 전략**\n`;
+                    quickReport += `숨쉬기 편한 새부리형 마스크 집중!\n`;
+                    quickReport += `무더위에도 편안한 착용감으로 차별화\n\n`;
+                } else if (seasonalData.season_type === '최대 성수기') {
+                    quickReport += `🚨 **최대 성수기 전략**\n`;
+                    quickReport += `새부리형/귀편한 마스크 최대 수요 예상!\n`;
+                    quickReport += `재고 확보와 프리미엄 전략 필수\n\n`;
+                } else if (seasonalData.season_type === '성수기') {
+                    quickReport += `📈 **성수기 전략**\n`;
+                    quickReport += `새부리형/귀편한 마스크 수요 증가!\n`;
+                    quickReport += `적극적 마케팅과 재고 관리 필요\n\n`;
                 }
                 
-                quickReport += `📋 **즉시 실행**\n`;
-                const actions = insights.actionPlan.plans[0].tasks;
+                quickReport += `📋 **즉시 실행 사항**\n`;
+                const actions = insights.actionPlan.plans[0].tasks.slice(0, 3);
                 actions.forEach((action, index) => {
                     quickReport += `${index + 1}. ${action}\n`;
                 });
                 
-                bot.sendMessage(chatId, quickReport, { parse_mode: 'Markdown' });
+                const quickKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '📊 상세 인사이트', callback_data: 'insight_full' },
+                            { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' }
+                        ],
+                        [
+                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                        ]
+                    ]
+                };
+                
+                bot.sendMessage(chatId, quickReport, { 
+                    parse_mode: 'Markdown',
+                    reply_markup: quickKeyboard
+                });
             })
             .catch(error => {
-                console.error('❌ 강화된 빠른 인사이트 생성 실패:', error);
+                console.error('❌ 새부리형/귀편한 마스크 빠른 인사이트 생성 실패:', error);
                 bot.sendMessage(chatId, `❌ 빠른 인사이트 생성 실패: ${error.message}`);
+            });
+
+    } else if (text === '/insight national' || text === '/인사이트 전국') {
+        console.log('🗺️ 전국 새부리형/귀편한 마스크 현황 조회 시작...');
+        
+        insightManager.getNationalDustStatus()
+            .then(nationalData => {
+                let nationalReport = `🗺️ **전국 새부리형/귀편한 마스크 현황**\n\n`;
+                
+                nationalData.forEach(city => {
+                    nationalReport += `${city.color} **${city.city}** (${city.station})\n`;
+                    nationalReport += `• PM10: ${city.pm10}㎍/㎥ | PM2.5: ${city.pm25}㎍/㎥\n`;
+                    nationalReport += `• 상태: ${city.emoji} ${city.level}\n`;
+                    nationalReport += `• 시기: ${city.seasonType}\n`;
+                    nationalReport += `• 추천: ${city.recommendedProduct}\n\n`;
+                });
+                
+                // 전국 평균 및 권장 사항
+                const averagePM10 = Math.round(nationalData.reduce((sum, city) => sum + city.pm10, 0) / nationalData.length);
+                const averagePM25 = Math.round(nationalData.reduce((sum, city) => sum + city.pm25, 0) / nationalData.length);
+                const season = insightManager.getCurrentSeason();
+                const seasonalData = insightManager.seasonalBusinessData[season];
+                
+                nationalReport += `📊 **전국 평균 & 전략**\n`;
+                nationalReport += `• 평균 PM10: ${averagePM10}㎍/㎥ | PM2.5: ${averagePM25}㎍/㎥\n`;
+                nationalReport += `• 현재 시기: ${seasonalData.season_type}\n`;
+                nationalReport += `• 전국 주력 상품: ${seasonalData.keyProducts.primary[0]}\n\n`;
+                
+                // 권장 마케팅 액션
+                const criticalCities = nationalData.filter(city => city.businessImpact === 'critical').length;
+                const highImpactCities = nationalData.filter(city => city.businessImpact === 'high').length;
+                
+                nationalReport += `🎯 **권장 마케팅 액션**\n`;
+                if (criticalCities > 0) {
+                    nationalReport += `• 🚨 ${criticalCities}개 도시 비상 - 새부리형/귀편한 마스크 긴급 공급\n`;
+                    nationalReport += `• 24시간 대응 체계 및 재고 확보 필수\n`;
+                } else if (highImpactCities > 0) {
+                    nationalReport += `• ⚡ ${highImpactCities}개 도시 높은 수요 - 적극적 새부리형 마케팅\n`;
+                    nationalReport += `• 해당 지역 귀편한 마스크 광고 예산 200% 증대\n`;
+                } else {
+                    nationalReport += `• 📊 안정적 상황 - 새부리형/귀편한 마스크 브랜드 마케팅\n`;
+                    nationalReport += `• 장기 전략 수립 및 고객 만족도 제고\n`;
+                }
+                
+                if (seasonalData.season_type === '최대 성수기' || seasonalData.season_type === '성수기') {
+                    nationalReport += `• 🔥 ${seasonalData.season_type} - 새부리형/귀편한 마스크 최대 기회\n`;
+                    nationalReport += `• 전국 재고 확보 및 프리미엄 전략 실행\n`;
+                }
+                
+                const nationalKeyboard = {
+                    inline_keyboard: [
+                        [
+                            { text: '🔄 새로고침', callback_data: 'insight_national' },
+                            { text: '📊 상세 분석', callback_data: 'insight_full' }
+                        ],
+                        [
+                            { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' },
+                            { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                        ]
+                    ]
+                };
+                
+                bot.sendMessage(chatId, nationalReport, {
+                    parse_mode: 'Markdown',
+                    reply_markup: nationalKeyboard
+                });
+            })
+            .catch(error => {
+                console.error('❌ 전국 새부리형/귀편한 마스크 현황 조회 실패:', error);
+                bot.sendMessage(chatId, `❌ 전국 현황 조회 실패: ${error.message}`);
             });
 
     } else {
         // 강화된 도움말
-        const helpMessage = `📊 **강화된 미세먼지 마케팅 인사이트**\n\n` +
+        const helpMessage = `📊 **새부리형/귀편한 마스크 특화 인사이트**\n\n` +
                            `**📱 명령어**\n` +
-                           `• /insight 또는 /인사이트 - 강화된 종합 분석\n` +
-                           `• /insight quick - 강화된 빠른 인사이트\n\n` +
-                           `**🆕 새로운 강화 기능**\n` +
-                           `• 계절별 실제 상품 전략 (여름철 프리미엄 라이트 특화)\n` +
-                           `• 시간대별 맞춤 마케팅 전략\n` +
-                           `• 미세먼지 농도별 상세 시나리오\n` +
-                           `• 지역별 차별화 전략\n` +
-                           `• 실제 비즈니스 데이터 반영\n\n` +
-                           `**🎯 핵심 특징**\n` +
-                           `• 🔥 여름철 프리미엄 라이트 마스크 집중 분석\n` +
-                           `• 실시간 재고 배수 계산\n` +
-                           `• 계절별 가격 전략 제안\n` +
-                           `• 시간대별 마케팅 채널 최적화\n\n` +
-                           `**💡 활용 시나리오**\n` +
-                           `• 여름철 무더위 → 프리미엄 라이트 마스크 집중\n` +
-                           `• 봄철 황사 → KF94 황사마스크 프리미엄 전략\n` +
-                           `• 출근 시간 → 휴대용 마스크 지하철 광고\n` +
-                           `• 미세먼지 매우나쁨 → 비상 재고 확보\n\n` +
-                           `실제 비즈니스 데이터 기반 맞춤형 전략! 🚀`;
+                           `• /insight - 종합 마케팅 인사이트\n` +
+                           `• /insight quick - 빠른 인사이트\n` +
+                           `• /insight national - 전국 현황\n\n` +
+                           `**🆕 새부리형/귀편한 마스크 특화 기능**\n` +
+                           `• 성수기/비수기별 차별화 전략\n` +
+                           `• 새부리형 마스크 구조적 우수성 강조\n` +
+                           `• 귀편한 마스크 편의성 마케팅\n` +
+                           `• 숨쉬기 편한 착용감 중심 전략\n\n` +
+                           `**🎯 핵심 키워드**\n` +
+                           `• 🔥 새부리형 마스크 - 2D 구조, 숨쉬기 편함\n` +
+                           `• 🔥 귀편한 마스크 - 장시간 착용, 편안함\n` +
+                           `• 하절기 비수기 - 통풍성, 가성비\n` +
+                           `• 동절기 성수기 - 보온성, 프리미엄\n\n` +
+                           `**💡 계절별 전략**\n` +
+                           `• 🌸 봄철 성수기 → 황사 차단 새부리형\n` +
+                           `• ☀️ 여름철 비수기 → 숨쉬기 편한 새부리형\n` +
+                           `• 🍂 가을철 성수기 → 일상 보호 귀편한\n` +
+                           `• ❄️ 겨울철 최대 성수기 → 방한 새부리형\n\n` +
+                           `**📊 비즈니스 인사이트**\n` +
+                           `• 실시간 성수기/비수기 판단\n` +
+                           `• 미세먼지 농도별 맞춤 전략\n` +
+                           `• 지역별 새부리형/귀편한 마스크 차별화\n` +
+                           `• 시간대별 최적 마케팅 채널\n\n` +
+                           `새부리형/귀편한 마스크로 시장을 선도하세요! 🚀`;
 
         bot.sendMessage(chatId, helpMessage, { parse_mode: 'Markdown' });
     }
 };
 
-// 강화된 콜백 처리 함수 (완전 수정)
+// 🆕 강화된 콜백 처리 함수 (새부리형/귀편한 마스크 중심)
 module.exports.handleCallback = async function(bot, callbackQuery) {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
     const userName = getUserName(callbackQuery.from);
     const insightManager = new EnhancedDustMarketingInsights();
 
-    console.log(`📞 dust_marketing_insights 콜백 처리: ${data} (사용자: ${userName})`);
+    console.log(`📞 새부리형/귀편한 마스크 콜백 처리: ${data} (사용자: ${userName})`);
 
     try {
-        // 🔥 데이터가 필요한 콜백들은 미리 인사이트 생성
+        // 데이터가 필요한 콜백들은 미리 인사이트 생성
         let insights = null;
-        if (data.startsWith('insight_') && data !== 'insight_menu' && data !== 'insight_refresh') {
-            const dustData = await insightManager.getCurrentAirQuality();
+        let dustData = null;
+        
+        if (data.startsWith('insight_') && 
+            !['insight_menu', 'insight_refresh', 'insight_help'].includes(data)) {
+            dustData = await insightManager.getCurrentAirQuality();
             insights = insightManager.generateMarketingInsights(dustData, userName);
         }
         
         switch (data) {
+            case 'insight_full':
+                // 전체 인사이트 재생성
+                await module.exports(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from, 
+                    text: '/insight' 
+                });
+                break;
+                
             case 'insight_products':
                 if (insights) {
                     await handleProductStrategy(bot, chatId, insights);
@@ -1079,8 +1262,20 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
                 }
                 break;
                 
+            case 'insight_dashboard':
+                await handleInsightDashboard(bot, chatId, callbackQuery.from);
+                break;
+                
+            case 'insight_national':
+                await module.exports(bot, { 
+                    chat: { id: chatId }, 
+                    from: callbackQuery.from, 
+                    text: '/insight national' 
+                });
+                break;
+                
             case 'insight_refresh':
-                await bot.sendMessage(chatId, '🔄 최신 데이터로 강화된 인사이트를 새로고침합니다...');
+                await bot.sendMessage(chatId, '🔄 최신 새부리형/귀편한 마스크 인사이트로 새로고침합니다...');
                 setTimeout(async () => {
                     await module.exports(bot, { 
                         chat: { id: chatId }, 
@@ -1090,32 +1285,12 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
                 }, 1000);
                 break;
                 
-            case 'insight_dashboard':
-                await handleInsightDashboard(bot, chatId, callbackQuery.from);
-                break;
-                
-            case 'action_plan':
-                await handleActionPlan(bot, chatId, callbackQuery.from);
-                break;
-                
-            case 'trend_analysis':
-                await handleTrendAnalysis(bot, chatId, callbackQuery.from);
-                break;
-                
-            case 'insight_content':
-                await handleInsightContent(bot, chatId, callbackQuery.from);
-                break;
-                
-            case 'insight_risk':
-                await handleInsightRisk(bot, chatId, callbackQuery.from);
-                break;
-                
             case 'main_menu':
                 await showMainMenu(bot, chatId);
                 break;
                 
             default:
-                console.log(`⚠️ 처리되지 않은 인사이트 콜백: ${data}`);
+                console.log(`⚠️ 처리되지 않은 새부리형/귀편한 마스크 콜백: ${data}`);
                 await bot.sendMessage(chatId, 
                     '⚠️ 알 수 없는 명령어입니다. 메인 메뉴로 돌아갑니다.',
                     { 
@@ -1130,197 +1305,29 @@ module.exports.handleCallback = async function(bot, callbackQuery) {
         }
         
     } catch (error) {
-        console.error('❌ dust_marketing_insights 콜백 처리 실패:', error);
+        console.error('❌ 새부리형/귀편한 마스크 콜백 처리 실패:', error);
         await bot.sendMessage(chatId, `❌ 처리 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
     }
 };
 
 // ===========================================
-// 🔧 누락된 핸들러 함수들 구현
-// ===========================================
-
-async function handleInsightDashboard(bot, chatId, from) {
-    try {
-        const insightManager = new EnhancedDustMarketingInsights();
-        const dustData = await insightManager.getCurrentAirQuality();
-        const insights = insightManager.generateMarketingInsights(dustData, getUserName(from));
-        const season = insightManager.getCurrentSeason();
-        
-        let dashboard = `📱 **실시간 마케팅 대시보드**\n\n`;
-        
-        // 현재 상황 요약
-        dashboard += `⏰ **현재 상황** (${new Date().toLocaleTimeString('ko-KR')})\n`;
-        dashboard += `• 미세먼지: ${insights.currentSituation.details.dustLevel} ${dustData.pm25}㎍/㎥\n`;
-        dashboard += `• 시간대: ${insights.currentSituation.details.timeSlot}\n`;
-        dashboard += `• 기회점수: ${insights.marketingOpportunity.score}/10\n\n`;
-        
-        // 실시간 지표
-        dashboard += `📊 **실시간 지표**\n`;
-        dashboard += `• 예상 매출 배수: ${insights.inventoryStrategy.totalMultiplier}배\n`;
-        dashboard += `• 재고 수준: ${insights.inventoryStrategy.stockLevel}\n`;
-        dashboard += `• 마케팅 예산: ${insights.marketingStrategy.digitalStrategy.budget}\n\n`;
-        
-        // 즉시 액션
-        dashboard += `⚡ **즉시 액션**\n`;
-        const actions = insights.actionPlan.plans[0].tasks.slice(0, 3);
-        actions.forEach((action, index) => {
-            dashboard += `${index + 1}. ${action}\n`;
-        });
-        
-        // 여름철 특별 모니터링
-        if (season === 'summer') {
-            dashboard += `\n🔥 **여름철 특별 모니터링**\n`;
-            dashboard += `• 프리미엄 라이트 마스크 우선 관리\n`;
-            dashboard += `• 컬러맛집 마케팅 활성화\n`;
-            dashboard += `• 통풍성 제품 재고 점검\n`;
-        }
-        
-        const keyboard = {
-            inline_keyboard: [
-                [
-                    { text: '🔄 새로고침', callback_data: 'insight_dashboard' },
-                    { text: '📊 상세 분석', callback_data: 'insight_full' }
-                ],
-                [
-                    { text: '🎯 액션 플랜', callback_data: 'action_plan' },
-                    { text: '📈 트렌드', callback_data: 'trend_analysis' }
-                ],
-                [
-                    { text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }
-                ]
-            ]
-        };
-        
-        await bot.sendMessage(chatId, dashboard, {
-            parse_mode: 'Markdown',
-            reply_markup: keyboard
-        });
-        
-    } catch (error) {
-        console.error('❌ 대시보드 표시 실패:', error);
-        await bot.sendMessage(chatId, `❌ 대시보드 표시 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
-    }
-}
-
-async function handleActionPlan(bot, chatId, from) {
-    try {
-        const insightManager = new EnhancedDustMarketingInsights();
-        const dustData = await insightManager.getCurrentAirQuality();
-        const insights = insightManager.generateMarketingInsights(dustData, getUserName(from));
-        
-        let actionMsg = `🎯 **액션 플랜**\n\n`;
-        
-        insights.actionPlan.plans.forEach(plan => {
-            actionMsg += `**${plan.title}**\n`;
-            plan.tasks.forEach((task, index) => {
-                actionMsg += `${index + 1}. ${task}\n`;
-            });
-            actionMsg += `\n`;
-        });
-        
-        actionMsg += `⏰ **실행 우선순위**\n`;
-        actionMsg += `• 긴급도: ${insights.marketingOpportunity.level}\n`;
-        actionMsg += `• 기회점수: ${insights.marketingOpportunity.score}/10\n`;
-        
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '🔙 대시보드', callback_data: 'insight_dashboard' }],
-                [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
-            ]
-        };
-        
-        await bot.sendMessage(chatId, actionMsg, {
-            parse_mode: 'Markdown',
-            reply_markup: keyboard
-        });
-        
-    } catch (error) {
-        console.error('❌ 액션 플랜 처리 실패:', error);
-        await bot.sendMessage(chatId, '❌ 액션 플랜 처리 중 오류가 발생했습니다.');
-    }
-}
-
-async function handleTrendAnalysis(bot, chatId, from) {
-    try {
-        const insightManager = new EnhancedDustMarketingInsights();
-        const season = insightManager.getCurrentSeason();
-        const timeSlot = insightManager.getCurrentTimeSlot();
-        
-        let trendMsg = `📈 **트렌드 분석**\n\n`;
-        
-        trendMsg += `🗓️ **현재 트렌드**\n`;
-        trendMsg += `• 계절: ${season} (${insightManager.seasonalBusinessData[season].name})\n`;
-        trendMsg += `• 시간대: ${timeSlot} (${insightManager.timeBasedStrategies[timeSlot].name})\n\n`;
-        
-        trendMsg += `📊 **주요 인사이트**\n`;
-        const seasonalData = insightManager.seasonalBusinessData[season];
-        seasonalData.marketingMessages.forEach(message => {
-            trendMsg += `• ${message}\n`;
-        });
-        
-        trendMsg += `\n🎯 **추천 액션**\n`;
-        trendMsg += `• 주력 상품: ${seasonalData.keyProducts.primary[0]}\n`;
-        trendMsg += `• 가격 전략: ${seasonalData.priceStrategy}\n`;
-        trendMsg += `• 매출 예상: ${seasonalData.salesMultiplier}배\n`;
-        
-        const keyboard = {
-            inline_keyboard: [
-                [{ text: '🔙 대시보드', callback_data: 'insight_dashboard' }],
-                [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
-            ]
-        };
-        
-        await bot.sendMessage(chatId, trendMsg, {
-            parse_mode: 'Markdown',
-            reply_markup: keyboard
-        });
-        
-    } catch (error) {
-        console.error('❌ 트렌드 분석 처리 실패:', error);
-        await bot.sendMessage(chatId, '❌ 트렌드 분석 처리 중 오류가 발생했습니다.');
-    }
-}
-
-async function handleInsightContent(bot, chatId, from) {
-    await bot.sendMessage(chatId, 
-        '📝 **콘텐츠 전략**\n\n콘텐츠 전략 분석 기능은 개발 중입니다.\n곧 업데이트될 예정입니다!',
-        { 
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [[
-                    { text: '🔙 대시보드', callback_data: 'insight_dashboard' }
-                ]]
-            }
-        }
-    );
-}
-
-async function handleInsightRisk(bot, chatId, from) {
-    await bot.sendMessage(chatId, 
-        '⚠️ **리스크 관리**\n\n리스크 관리 분석 기능은 개발 중입니다.\n곧 업데이트될 예정입니다!',
-        { 
-            parse_mode: 'Markdown',
-            reply_markup: {
-                inline_keyboard: [[
-                    { text: '🔙 대시보드', callback_data: 'insight_dashboard' }
-                ]]
-            }
-        }
-    );
-}
-
-// ===========================================
-// 🔧 기존 핸들러 함수들 수정 (async/await 추가)
+// 🔧 새부리형/귀편한 마스크 특화 핸들러 함수들
 // ===========================================
 
 async function handleProductStrategy(bot, chatId, insights) {
     const productStrategy = insights.productStrategy;
-    let productMsg = `🎁 **제품 전략**\n\n`;
+    let productMsg = `🎁 **새부리형/귀편한 마스크 제품 전략**\n\n`;
+    productMsg += `• 계절 상황: ${productStrategy.seasonContext}\n`;
     productMsg += `• 주력 상품: ${productStrategy.primaryProduct}\n`;
     productMsg += `• 전략 포커스: ${productStrategy.focus}\n\n`;
     
+    if (productStrategy.reasoning) {
+        productMsg += `**📋 전략 근거**\n`;
+        productMsg += `${productStrategy.reasoning}\n\n`;
+    }
+    
     if (productStrategy.strategy) {
-        productMsg += `**📋 실행 전략**\n`;
+        productMsg += `**🎯 실행 전략**\n`;
         productStrategy.strategy.forEach(strategy => {
             productMsg += `• ${strategy}\n`;
         });
@@ -1328,7 +1335,7 @@ async function handleProductStrategy(bot, chatId, insights) {
     }
     
     if (productStrategy.crossSelling) {
-        productMsg += `**🔄 크로스셀링**\n`;
+        productMsg += `**🔄 크로스셀링 (새부리형/귀편한)**\n`;
         productStrategy.crossSelling.forEach(product => {
             productMsg += `• ${product}\n`;
         });
@@ -1344,8 +1351,14 @@ async function handleProductStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
-            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            [
+                { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' },
+                { text: '📦 재고 전략', callback_data: 'insight_inventory' }
+            ],
+            [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' },
+                { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
         ]
     };
     
@@ -1357,11 +1370,12 @@ async function handleProductStrategy(bot, chatId, insights) {
 
 async function handlePricingStrategy(bot, chatId, insights) {
     const pricingStrategy = insights.pricingStrategy;
-    let pricingMsg = `💰 **가격 전략**\n\n`;
-    pricingMsg += `• 정책: ${pricingStrategy.strategy}\n`;
-    pricingMsg += `• 근거: ${pricingStrategy.reasoning}\n`;
-    pricingMsg += `• 계절 조정: ${pricingStrategy.seasonalAdjustment}배\n`;
-    pricingMsg += `• 미세먼지 조정: ${pricingStrategy.dustLevelAdjustment}배\n\n`;
+    let pricingMsg = `💰 **새부리형/귀편한 마스크 가격 전략**\n\n`;
+    pricingMsg += `• 가격 정책: ${pricingStrategy.strategy}\n`;
+    pricingMsg += `• 전략 근거: ${pricingStrategy.reasoning}\n`;
+    pricingMsg += `• 계절 배수: ${pricingStrategy.seasonalAdjustment}배\n`;
+    pricingMsg += `• 미세먼지 배수: ${pricingStrategy.dustLevelAdjustment}배\n`;
+    pricingMsg += `• **총 기회 배수: ${Math.round(pricingStrategy.seasonalAdjustment * pricingStrategy.dustLevelAdjustment * 100) / 100}배**\n\n`;
     
     pricingMsg += `**🎯 실행 방안**\n`;
     pricingStrategy.tactics.forEach(tactic => {
@@ -1369,7 +1383,7 @@ async function handlePricingStrategy(bot, chatId, insights) {
     });
     
     if (pricingStrategy.recommendations) {
-        pricingMsg += `\n**💡 추천 사항**\n`;
+        pricingMsg += `\n**💡 새부리형/귀편한 마스크 추천 사항**\n`;
         pricingStrategy.recommendations.forEach(rec => {
             pricingMsg += `• ${rec}\n`;
         });
@@ -1377,8 +1391,14 @@ async function handlePricingStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
-            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            [
+                { text: '🎁 제품 전략', callback_data: 'insight_products' },
+                { text: '📦 재고 전략', callback_data: 'insight_inventory' }
+            ],
+            [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' },
+                { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
         ]
     };
     
@@ -1390,7 +1410,7 @@ async function handlePricingStrategy(bot, chatId, insights) {
 
 async function handleInventoryStrategy(bot, chatId, insights) {
     const inventoryStrategy = insights.inventoryStrategy;
-    let inventoryMsg = `📦 **재고 전략**\n\n`;
+    let inventoryMsg = `📦 **새부리형/귀편한 마스크 재고 전략**\n\n`;
     inventoryMsg += `• 권장 재고 수준: ${inventoryStrategy.stockLevel}\n`;
     inventoryMsg += `• 예상 회전율: ${inventoryStrategy.turnoverRate}\n`;
     inventoryMsg += `• 총 수요 배수: ${inventoryStrategy.totalMultiplier}배\n`;
@@ -1400,13 +1420,13 @@ async function handleInventoryStrategy(bot, chatId, insights) {
     inventoryMsg += `• 계절 수요: ${inventoryStrategy.seasonalDemand}배\n`;
     inventoryMsg += `• 미세먼지 수요: ${inventoryStrategy.dustDemand}배\n\n`;
     
-    inventoryMsg += `**🎯 실행 전략**\n`;
+    inventoryMsg += `**🎯 실행 전략 (새부리형/귀편한 마스크)**\n`;
     inventoryStrategy.strategy.forEach(strategy => {
         inventoryMsg += `• ${strategy}\n`;
     });
     
     if (inventoryStrategy.riskProducts && inventoryStrategy.riskProducts.length > 0) {
-        inventoryMsg += `\n**⚠️ 위험 상품**\n`;
+        inventoryMsg += `\n**⚠️ 위험 상품 (재고 부족 우려)**\n`;
         inventoryStrategy.riskProducts.forEach(product => {
             inventoryMsg += `• ${product}\n`;
         });
@@ -1414,8 +1434,14 @@ async function handleInventoryStrategy(bot, chatId, insights) {
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
-            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            [
+                { text: '🎁 제품 전략', callback_data: 'insight_products' },
+                { text: '💰 가격 전략', callback_data: 'insight_pricing' }
+            ],
+            [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' },
+                { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
         ]
     };
     
@@ -1427,7 +1453,7 @@ async function handleInventoryStrategy(bot, chatId, insights) {
 
 async function handleMarketingStrategy(bot, chatId, insights) {
     const marketingStrategy = insights.marketingStrategy;
-    let marketingMsg = `🎯 **마케팅 전략**\n\n`;
+    let marketingMsg = `🎯 **새부리형/귀편한 마스크 마케팅 전략**\n\n`;
     marketingMsg += `• 전략명: ${marketingStrategy.mainStrategy.title}\n`;
     marketingMsg += `• 포커스: ${marketingStrategy.mainStrategy.focus}\n`;
     marketingMsg += `• 긴급도: ${marketingStrategy.mainStrategy.urgency}\n\n`;
@@ -1436,23 +1462,40 @@ async function handleMarketingStrategy(bot, chatId, insights) {
     marketingStrategy.digitalStrategy.channels.forEach(channel => {
         marketingMsg += `• ${channel}\n`;
     });
-    marketingMsg += `• 예산 수준: ${marketingStrategy.digitalStrategy.budget}\n\n`;
+    marketingMsg += `• 예산 수준: ${marketingStrategy.digitalStrategy.budget}\n`;
+    if (marketingStrategy.digitalStrategy.keywords) {
+        marketingMsg += `• 핵심 키워드: ${marketingStrategy.digitalStrategy.keywords.join(', ')}\n`;
+    }
+    marketingMsg += `\n`;
     
     marketingMsg += `**🏪 오프라인 전략**\n`;
     marketingStrategy.offlineStrategy.channels.forEach(channel => {
         marketingMsg += `• ${channel}\n`;
     });
-    marketingMsg += `• 집중 지역: ${marketingStrategy.offlineStrategy.focus}\n\n`;
+    marketingMsg += `• 집중 지역: ${marketingStrategy.offlineStrategy.focus}\n`;
+    if (marketingStrategy.offlineStrategy.displayFocus) {
+        marketingMsg += `• 진열 전략: ${marketingStrategy.offlineStrategy.displayFocus}\n`;
+    }
+    marketingMsg += `\n`;
     
     marketingMsg += `**📝 콘텐츠 전략**\n`;
     marketingStrategy.contentStrategy.types.forEach(type => {
         marketingMsg += `• ${type}\n`;
     });
+    if (marketingStrategy.contentStrategy.focus) {
+        marketingMsg += `• 콘텐츠 포커스: ${marketingStrategy.contentStrategy.focus}\n`;
+    }
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
-            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            [
+                { text: '🏙️ 지역별 전략', callback_data: 'insight_regional' },
+                { text: '⚔️ 경쟁사 분석', callback_data: 'insight_competitor' }
+            ],
+            [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' },
+                { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
         ]
     };
     
@@ -1464,33 +1507,45 @@ async function handleMarketingStrategy(bot, chatId, insights) {
 
 async function handleRegionalStrategy(bot, chatId, insights) {
     const regionalStrategy = insights.regionalStrategy;
-    let regionalMsg = `🏙️ **지역별 전략**\n\n`;
+    let regionalMsg = `🏙️ **새부리형/귀편한 마스크 지역별 전략**\n\n`;
     
     regionalMsg += `**🌆 서울/수도권**\n`;
     regionalMsg += `• 특성: ${regionalStrategy.seoul.characteristics.join(', ')}\n`;
     regionalMsg += `• 추천 상품: ${regionalStrategy.seoul.products.join(', ')}\n`;
     regionalMsg += `• 가격 정책: ${regionalStrategy.seoul.pricing}\n`;
-    regionalMsg += `• 주력 채널: ${regionalStrategy.seoul.channels.join(', ')}\n\n`;
+    regionalMsg += `• 주력 채널: ${regionalStrategy.seoul.channels.join(', ')}\n`;
+    regionalMsg += `• 메시지: ${regionalStrategy.seoul.messaging}\n`;
+    regionalMsg += `• 포커스: ${regionalStrategy.seoul.focus}\n\n`;
     
     regionalMsg += `**🌊 부산/경남**\n`;
     regionalMsg += `• 특성: ${regionalStrategy.busan.characteristics.join(', ')}\n`;
     regionalMsg += `• 추천 상품: ${regionalStrategy.busan.products.join(', ')}\n`;
     regionalMsg += `• 가격 정책: ${regionalStrategy.busan.pricing}\n`;
-    regionalMsg += `• 주력 채널: ${regionalStrategy.busan.channels.join(', ')}\n\n`;
+    regionalMsg += `• 주력 채널: ${regionalStrategy.busan.channels.join(', ')}\n`;
+    regionalMsg += `• 메시지: ${regionalStrategy.busan.messaging}\n`;
+    regionalMsg += `• 포커스: ${regionalStrategy.busan.focus}\n\n`;
     
     regionalMsg += `**🏘️ 지방 도시**\n`;
     regionalMsg += `• 특성: ${regionalStrategy.rural.characteristics.join(', ')}\n`;
     regionalMsg += `• 추천 상품: ${regionalStrategy.rural.products.join(', ')}\n`;
     regionalMsg += `• 가격 정책: ${regionalStrategy.rural.pricing}\n`;
-    regionalMsg += `• 주력 채널: ${regionalStrategy.rural.channels.join(', ')}\n\n`;
+    regionalMsg += `• 주력 채널: ${regionalStrategy.rural.channels.join(', ')}\n`;
+    regionalMsg += `• 메시지: ${regionalStrategy.rural.messaging}\n`;
+    regionalMsg += `• 포커스: ${regionalStrategy.rural.focus}\n\n`;
     
     regionalMsg += `**💡 종합 권장사항**\n`;
     regionalMsg += `• ${regionalStrategy.recommendation}\n`;
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
-            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            [
+                { text: '🎯 마케팅 전략', callback_data: 'insight_marketing' },
+                { text: '⚔️ 경쟁사 분석', callback_data: 'insight_competitor' }
+            ],
+            [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' },
+                { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
         ]
     };
     
@@ -1502,7 +1557,7 @@ async function handleRegionalStrategy(bot, chatId, insights) {
 
 async function handleCompetitorStrategy(bot, chatId, insights) {
     const competitorStrategy = insights.competitorStrategy;
-    let competitorMsg = `⚔️ **경쟁사 분석**\n\n`;
+    let competitorMsg = `⚔️ **새부리형/귀편한 마스크 경쟁사 분석**\n\n`;
     
     competitorMsg += `**🔍 모니터링 포인트**\n`;
     competitorStrategy.monitoring.forEach(point => {
@@ -1519,15 +1574,22 @@ async function handleCompetitorStrategy(bot, chatId, insights) {
         competitorMsg += `• ${threat}\n`;
     });
     
-    competitorMsg += `\n**🎯 대응 전략**\n`;
-    competitorMsg += `• 경쟁사 재고 부족 시 적극적 마케팅\n`;
-    competitorMsg += `• 차별화 포인트 지속 강화\n`;
-    competitorMsg += `• 가격 경쟁력 유지 및 품질 우위 확보\n`;
+    competitorMsg += `\n**🎯 새부리형/귀편한 마스크 대응 전략**\n`;
+    competitorMsg += `• 경쟁사 재고 부족 시 새부리형 마스크 적극 마케팅\n`;
+    competitorMsg += `• 귀편한 마스크 차별화 포인트 지속 강화\n`;
+    competitorMsg += `• 새부리형 구조의 우수성 지속 어필\n`;
+    competitorMsg += `• 가격 경쟁력 유지 및 편의성 품질 우위 확보\n`;
     
     const keyboard = {
         inline_keyboard: [
-            [{ text: '🔙 인사이트 메뉴', callback_data: 'insight_menu' }],
-            [{ text: '🏠 메인 메뉴', callback_data: 'main_menu' }]
+            [
+                { text: '🏙️ 지역별 전략', callback_data: 'insight_regional' },
+                { text: '🎯 마케팅 전략', callback_data: 'insight_marketing' }
+            ],
+            [
+                { text: '🔙 인사이트 메뉴', callback_data: 'insight_full' },
+                { text: '🏠 메인 메뉴', callback_data: 'main_menu' }
+            ]
         ]
     };
     
@@ -1537,28 +1599,104 @@ async function handleCompetitorStrategy(bot, chatId, insights) {
     });
 }
 
+async function handleInsightDashboard(bot, chatId, from) {
+    try {
+        const insightManager = new EnhancedDustMarketingInsights();
+        const dustData = await insightManager.getCurrentAirQuality();
+        const insights = insightManager.generateMarketingInsights(dustData, getUserName(from));
+        const season = insightManager.getCurrentSeason();
+        const seasonalData = insightManager.seasonalBusinessData[season];
+        
+        let dashboard = `📱 **새부리형/귀편한 마스크 실시간 대시보드**\n\n`;
+        
+        // 현재 상황 요약
+        dashboard += `⏰ **현재 상황** (${new Date().toLocaleTimeString('ko-KR')})\n`;
+        dashboard += `• 미세먼지: ${insights.currentSituation.details.dustLevel} ${dustData.pm25}㎍/㎥\n`;
+        dashboard += `• 시기: ${seasonalData.season_type}\n`;
+        dashboard += `• 시간대: ${insights.currentSituation.details.timeSlot}\n`;
+        dashboard += `• 기회점수: ${insights.marketingOpportunity.score}/10\n\n`;
+        
+        // 실시간 지표
+        dashboard += `📊 **실시간 지표**\n`;
+        dashboard += `• 예상 매출 배수: ${insights.inventoryStrategy.totalMultiplier}배\n`;
+        dashboard += `• 재고 수준: ${insights.inventoryStrategy.stockLevel}\n`;
+        dashboard += `• 주력 상품: ${insights.productStrategy.primaryProduct}\n`;
+        dashboard += `• 마케팅 예산: ${insights.marketingStrategy.digitalStrategy.budget}\n\n`;
+        
+        // 즉시 액션
+        dashboard += `⚡ **즉시 액션**\n`;
+        const actions = insights.actionPlan.plans[0].tasks.slice(0, 3);
+        actions.forEach((action, index) => {
+            dashboard += `${index + 1}. ${action}\n`;
+        });
+        
+        // 계절별 특별 모니터링
+        if (season === 'summer') {
+            dashboard += `\n☀️ **하절기 비수기 특별 모니터링**\n`;
+            dashboard += `• 숨쉬기 편한 새부리형 마스크 우선 관리\n`;
+            dashboard += `• 귀편한 마스크 편의성 마케팅 활성화\n`;
+            dashboard += `• 통풍성 제품 재고 점검\n`;
+        } else if (seasonalData.season_type === '최대 성수기') {
+            dashboard += `\n❄️ **최대 성수기 특별 모니터링**\n`;
+            dashboard += `• 방한 새부리형 마스크 최대 수요 대비\n`;
+            dashboard += `• 귀편한 윈터 마스크 재고 확보\n`;
+            dashboard += `• 프리미엄 전략 실행 상황\n`;
+        } else if (seasonalData.season_type === '성수기') {
+            dashboard += `\n🍂 **성수기 특별 모니터링**\n`;
+            dashboard += `• 새부리형/귀편한 마스크 수요 증가 대비\n`;
+            dashboard += `• 핵심 제품 재고 관리 강화\n`;
+            dashboard += `• 마케팅 효과 실시간 모니터링\n`;
+        }
+        
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '🔄 새로고침', callback_data: 'insight_dashboard' },
+                    { text: '📊 상세 분석', callback_data: 'insight_full' }
+                ],
+                [
+                    { text: '🗺️ 전국 현황', callback_data: 'insight_national' },
+                    { text: '⚡ 빠른 인사이트', callback_data: 'insight_quick' }
+                ],
+                [
+                    { text: '🔙 메인 메뉴', callback_data: 'main_menu' }
+                ]
+            ]
+        };
+        
+        await bot.sendMessage(chatId, dashboard, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
+        
+    } catch (error) {
+        console.error('❌ 새부리형/귀편한 마스크 대시보드 표시 실패:', error);
+        await bot.sendMessage(chatId, `❌ 대시보드 표시 중 오류가 발생했습니다.\n\n오류: ${error.message}`);
+    }
+}
+
 async function showMainMenu(bot, chatId) {
     const mainMenuMessage = `🏠 **메인 메뉴**\n\n` +
-                          `**📊 핵심 기능**\n` +
+                          `**📊 새부리형/귀편한 마스크 인사이트**\n` +
                           `• 종합 마케팅 인사이트\n` +
                           `• 실시간 대시보드\n` +
                           `• 전국 현황 모니터링\n` +
-                          `• 주간 리포트\n\n` +
-                          `**🔥 여름철 특화**\n` +
-                          `• 프리미엄 라이트 마스크 전략\n` +
-                          `• 쿨링 기능 마케팅\n` +
-                          `• 시원한 착용감 어필\n\n` +
+                          `• 성수기/비수기별 전략\n\n` +
+                          `**🔥 핵심 키워드**\n` +
+                          `• 새부리형 마스크 - 2D 구조\n` +
+                          `• 귀편한 마스크 - 편안한 착용감\n` +
+                          `• 숨쉬기 편한 - 통풍성 우수\n\n` +
                           `원하시는 기능을 선택해주세요! 🚀`;
     
     const mainKeyboard = {
         inline_keyboard: [
             [
-                { text: '🎯 종합 인사이트', callback_data: 'insight_main' },
+                { text: '🎯 종합 인사이트', callback_data: 'insight_full' },
                 { text: '📱 실시간 대시보드', callback_data: 'insight_dashboard' }
             ],
             [
-                { text: '🗺️ 전국 현황', callback_data: 'national_refresh' },
-                { text: '🔥 여름 특화', callback_data: 'summer_special' }
+                { text: '⚡ 빠른 인사이트', callback_data: 'insight_quick' },
+                { text: '🗺️ 전국 현황', callback_data: 'insight_national' }
             ]
         ]
     };
