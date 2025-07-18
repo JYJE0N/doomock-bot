@@ -97,9 +97,11 @@ class BotController {
     });
 
     // 모듈 선택 메뉴
-    this.menuRouter.set("module_select", {
-      handler: this.handleModuleSelect.bind(this),
-      submenus: [], // 동적으로 로드
+    this.messageHandler = new MessageHandler(this.bot, {
+      moduleManager: this.managers.module,
+      menuManager: this.managers.menu,
+      callbackManager: this.managers.callback,
+      userStates: this.userStates,
     });
 
     // 설정 메뉴
