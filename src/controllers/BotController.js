@@ -164,42 +164,60 @@ async initializeDatabase() {
         Logger.success('이벤트 리스너 등록 완료');
     }
     
-    async handleMessage(msg) {
-        const text = msg.text;
-        if (!text) return;
+    // BotController.js의 handleMessage 메서드에 추가
+
+async handleMessage(msg) {
+    const text = msg.text;
+    if (!text) return;
+    
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const userName = UserHelper.getUserName(msg.from);
+    
+    Logger.info(`💬 메시지: "${text}" (사용자: ${userName}, ID: ${userId})`);
+    
+    // /start 명령어 직접 처리 (임시)
+    if (text === '/start') {
+        const welcomeText = `🤖 **두목봇에 오신걸 환영합니다!**\n\n` +
+                          `안녕하세요 ${userName}님! 👋\n\n` +
+                          `두목봇은 직장인을 위한 종합 생산성 도구입니다.\n` +
+                          `아래 메뉴에서 원하는 기능을 선택해주세요:`;
         
-        const chatId = msg.chat.id;
-        const userId = msg.from.id;
-        const userName = UserHelper.getUserName(msg.from);
+        const keyboard = {
+            inline_keyboard: [
+                [
+                    { text: '📝 할일 관리', callback_data: 'todo_menu' },
+                    { text: '📅 휴가 관리', callback_data: 'leave_menu' }
+                ],
+                [
+                    { text: '⏰ 타이머', callback_data: 'timer_menu' },
+                    { text: '🔮 운세', callback_data: 'fortune_menu' }
+                ],
+                [
+                    { text: '🕐 근무시간', callback_data: 'worktime_menu' },
+                    { text: '🌤️ 날씨', callback_data: 'weather_menu' }
+                ],
+                [
+                    { text: '📊 인사이트', callback_data: 'insight_menu' },
+                    { text: '🔔 리마인더', callback_data: 'reminder_menu' }
+                ],
+                [
+                    { text: '🛠️ 유틸리티', callback_data: 'utils_menu' },
+                    { text: '❓ 도움말', callback_data: 'help_menu' }
+                ]
+            ]
+        };
         
-        Logger.info(`💬 메시지: "${text}" (사용자: ${userName}, ID: ${userId})`);
+        await this.bot.sendMessage(chatId, welcomeText, {
+            parse_mode: 'Markdown',
+            reply_markup: keyboard
+        });
         
-        // 사용자 상태 확인
-        const userState = this.userStates.get(userId);
-        
-        // 취소 명령어 처리
-        if (text === '/cancel') {
-            this.userStates.delete(userId);
-            await this.bot.sendMessage(chatId, 
-                `❌ ${userName}님, 작업이 취소되었습니다.`
-            );
-            return;
-        }
-        
-        // 사용자 상태가 있는 경우 상태별 처리
-        if (userState) {
-            await this.messageHandler.handleUserState(msg, userState);
-            return;
-        }
-        
-        // 명령어 처리
-        if (text.startsWith('/')) {
-            await this.commandHandler.handleCommand(msg);
-        } else {
-            // 일반 메시지 처리 (자동 TTS 등)
-            await this.messageHandler.handleMessage(msg);
-        }
+        return;
     }
+    
+    // ... 나머지 코드
+}
     
     async handleCallbackQuery(callbackQuery) {
         await this.callbackManager.handleCallback(callbackQuery);
