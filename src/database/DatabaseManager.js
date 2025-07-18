@@ -1,7 +1,7 @@
-// src/database/DatabaseManager.js - MongoDB 연결 관리
+// src/database/DatabaseManager.js - MongoDB 연결 관리 (최신 버전)
+
 const mongoose = require("mongoose");
 const Logger = require("../utils/Logger");
-const config = require("../config/config");
 
 class DatabaseManager {
   constructor() {
@@ -18,12 +18,11 @@ class DatabaseManager {
 
       Logger.info("MongoDB 연결 시도 중...");
 
-      // Mongoose 옵션 설정
+      // Mongoose 7.x/8.x 옵션 (구버전 옵션 제거)
       const options = {
-        useNewUrlParser: true,
-        useUnifiedTopology: true,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 45000,
+        // useNewUrlParser와 useUnifiedTopology 제거 (더 이상 필요 없음)
       };
 
       // MongoDB 연결
@@ -46,6 +45,11 @@ class DatabaseManager {
         Logger.warn("MongoDB 연결 끊김");
         this.isConnected = false;
       });
+
+      // MongoDB 버전 정보 로깅 (선택사항)
+      const adminDb = mongoose.connection.db.admin();
+      const info = await adminDb.serverStatus();
+      Logger.info(`MongoDB 버전: ${info.version}`);
 
       Logger.success("데이터베이스 연결 완료");
       return this.connection;
@@ -105,6 +109,7 @@ class DatabaseManager {
         status: "healthy",
         message: "Database is responsive",
         state: this.getConnectionStatus(),
+        mongooseVersion: mongoose.version,
       };
     } catch (error) {
       return {
@@ -112,6 +117,23 @@ class DatabaseManager {
         message: error.message,
         state: this.getConnectionStatus(),
       };
+    }
+  }
+
+  // 컬렉션 목록 가져오기 (디버깅용)
+  async getCollections() {
+    try {
+      if (!this.isReady()) {
+        throw new Error("Database not connected");
+      }
+
+      const collections = await mongoose.connection.db
+        .listCollections()
+        .toArray();
+      return collections.map((col) => col.name);
+    } catch (error) {
+      Logger.error("컬렉션 목록 조회 실패:", error);
+      return [];
     }
   }
 }
