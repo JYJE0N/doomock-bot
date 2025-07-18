@@ -63,7 +63,11 @@ class BotController {
     this.managers.menu = new MenuManager(this.bot);
     this.managers.callback = new CallbackManager(this.bot);
     this.managers.module = new ModuleManager(this.bot);
-    this.managers.message = new MessageHandler(this.bot);
+    this.managers.message = new MessageHandler(this.bot, {
+      moduleManager: this.managers.module,
+      menuManager: this.managers.menu,
+      userStates: this.userStates,
+    });
 
     // 각 매니저에 필요한 의존성 주입
     this.managers.menu.setDependencies({
