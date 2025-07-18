@@ -836,6 +836,59 @@ class ModuleManager {
           [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
         ],
       },
+      // 실제 기능들에 대한 기본 응답 추가
+      fortune_today: {
+        text: "🌟 **오늘의 종합 운세**\n\n✨ 오늘은 전반적으로 좋은 기운이 흘러요!\n\n💼 **업무**: 새로운 기회가 찾아올 것 같아요\n💕 **인간관계**: 소통이 활발해질 예정\n💰 **금전**: 작은 행운이 있을지도?\n\n운세는 참고만 하세요! 😊",
+        buttons: [
+          [{ text: "💼 업무 운세", callback_data: "fortune_work" }],
+          [{ text: "🎴 타로카드", callback_data: "fortune_tarot" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+        ],
+      },
+      fortune_work: {
+        text: "💼 **업무 운세**\n\n🚀 오늘의 업무 운:\n\n⭐ 집중력이 좋을 것 같아요!\n📈 새로운 아이디어가 떠오를 수 있어요\n🤝 동료와의 협업이 순조로울 예정\n\n열심히 하되 적당히 쉬어가면서 해요! 💪",
+        buttons: [
+          [{ text: "🌟 종합 운세", callback_data: "fortune_today" }],
+          [{ text: "🎴 타로카드", callback_data: "fortune_tarot" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+        ],
+      },
+      fortune_tarot: {
+        text: '🎴 **타로카드**\n\n🔮 카드를 뽑았습니다...\n\n**🌟 "별" 카드가 나왔어요!**\n\n✨ 의미: 희망과 영감의 시기\n🎯 조언: 꿈을 향해 한 걸음씩 나아가세요\n💫 키워드: 희망, 치유, 영감\n\n타로는 단지 재미로만 봐주세요! 😄',
+        buttons: [
+          [{ text: "🔄 다시 뽑기", callback_data: "fortune_tarot" }],
+          [{ text: "🌟 종합 운세", callback_data: "fortune_today" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+        ],
+      },
+      todo_add: {
+        text: "➕ **할일 추가**\n\n할일 추가 기능은 준비 중입니다! 🚧\n\n곧 멋진 할일 관리 기능을 만나보실 수 있을 거예요!\n\n그때까지 조금만 기다려주세요~ 😊",
+        buttons: [
+          [{ text: "📋 할일 목록", callback_data: "todo_list" }],
+          [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+        ],
+      },
+      todo_list: {
+        text: "📋 **할일 목록**\n\n할일 목록 기능은 준비 중입니다! 🚧\n\n더 나은 할일 관리 경험을 위해 열심히 개발 중이에요!\n\n조금만 더 기다려주세요~ ⏰",
+        buttons: [
+          [{ text: "➕ 할일 추가", callback_data: "todo_add" }],
+          [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+        ],
+      },
+      weather_current: {
+        text: "📍 **현재 날씨**\n\n🌤️ 화성/동탄 지역 날씨:\n\n🌡️ 온도: 15°C\n☁️ 날씨: 구름 많음\n💨 바람: 서풍 2m/s\n💧 습도: 65%\n\n(실제 날씨 API 연동 준비 중입니다!) 🚧",
+        buttons: [
+          [{ text: "📅 날씨 예보", callback_data: "weather_forecast" }],
+          [{ text: "🔙 날씨 메뉴", callback_data: "weather_menu" }],
+        ],
+      },
+      weather_forecast: {
+        text: "📅 **날씨 예보**\n\n🗓️ 3일간 예보 (화성/동탄):\n\n**오늘**: ☁️ 구름많음 15°C\n**내일**: 🌤️ 맑음 18°C  \n**모레**: 🌧️ 비 12°C\n\n(실제 기상청 API 연동 예정!) ⛅",
+        buttons: [
+          [{ text: "📍 현재 날씨", callback_data: "weather_current" }],
+          [{ text: "🔙 날씨 메뉴", callback_data: "weather_menu" }],
+        ],
+      },
     };
 
     // 기본 응답이 있는 경우
@@ -853,14 +906,26 @@ class ModuleManager {
         return true;
       } catch (error) {
         Logger.error("기본 메뉴 응답 실패:", error);
+        // 메시지 편집이 실패하면 새 메시지 전송
+        try {
+          await bot.sendMessage(chatId, response.text, {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: response.buttons,
+            },
+          });
+          return true;
+        } catch (sendError) {
+          Logger.error("새 메시지 전송도 실패:", sendError);
+        }
       }
     }
 
-    // 기본 응답
+    // 기본 응답 (해당 콜백에 대한 정의가 없는 경우)
     const moduleName = this.getModuleDisplayName(
       module.constructor.name || "Unknown"
     );
-    const defaultText = `${this.getModuleIcon(module.constructor.name)} **${moduleName}**\n\n서비스 준비 중입니다! 🚧`;
+    const defaultText = `${this.getModuleIcon(module.constructor.name)} **${moduleName}**\n\n이 기능은 곧 추가될 예정입니다! 🚧\n\n조금만 기다려주세요~ 😊`;
 
     try {
       await bot.editMessageText(defaultText, {
