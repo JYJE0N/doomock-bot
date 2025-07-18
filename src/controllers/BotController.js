@@ -35,13 +35,14 @@ class BotController {
       // 1. 데이터베이스 연결
       await this.initializeDatabase();
 
-      // 2. 모듈 매니저 초기화
+      // 2. 모듈 매니저 초기화 (모듈 로드 + 초기화)
       await this.initializeModuleManager();
 
-      // 3. 메뉴 매니저 초기화 (직접 처리)
-      const enabledModules = this.moduleManager.getEnabledModules();
-      this.menuManager = new MenuManager(this.bot, enabledModules);
-      Logger.success("메뉴 매니저 초기화 완료");
+      // 모듈 초기화 완료 확인
+      Logger.info(
+        "초기화된 모듈 수:",
+        this.moduleManager.getInitializedModuleCount()
+      );
 
       // 4. 콜백 매니저 초기화
       this.initializeCallbackManager();
@@ -94,6 +95,12 @@ class BotController {
   }
 
   initializeCallbackManager() {
+    // 먼저 로드된 모듈 확인
+    Logger.info(
+      "현재 로드된 모듈:",
+      this.moduleManager.getAllModules().map((m) => m.name)
+    );
+
     // 모듈들을 직접 전달하는 방식으로 변경
     const modules = {
       todo: this.moduleManager.getModule("TodoModule"),
@@ -107,24 +114,23 @@ class BotController {
       worktime: this.moduleManager.getModule("WorktimeModule"),
     };
 
-    // null인 모듈 제거
+    // 각 모듈 상태 확인
     Object.keys(modules).forEach((key) => {
       if (!modules[key]) {
+        Logger.warn(`❌ 모듈 ${key}가 로드되지 않았습니다`);
         delete modules[key];
-        Logger.warn(`모듈 ${key}가 로드되지 않았습니다`);
+      } else {
+        Logger.success(`✅ 모듈 ${key} 확인됨`);
       }
     });
+
+    if (Object.keys(modules).length === 0) {
+      Logger.error("⚠️ 로드된 모듈이 하나도 없습니다!");
+    }
 
     Logger.info("CallbackManager에 전달할 모듈들:", Object.keys(modules));
 
     this.callbackManager = new CallbackManager(this.bot, modules);
-
-    // MenuManager를 CallbackManager에 설정
-    if (this.menuManager) {
-      this.callbackManager.setMenuManager(this.menuManager);
-      Logger.success("MenuManager가 CallbackManager에 성공적으로 연결됨");
-    }
-
     Logger.success("콜백 매니저 초기화 완료");
   }
 
