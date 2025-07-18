@@ -427,13 +427,22 @@ class ModuleManager {
 
     switch (command) {
       case "start":
-        // 그룹에서는 start 명령어 제한
+        // 그룹과 개인 채팅 모두에서 start 명령어 처리
         if (isGroupChat) {
-          await bot.sendMessage(
-            chatId,
-            "🤖 안녕하세요! 개인 메시지로 대화해주세요.",
-            { reply_to_message_id: msg.message_id }
-          );
+          // 그룹에서는 간단한 환영 메시지
+          const { getUserName } = require("../utils/UserHelper");
+          const userName = getUserName(msg.from);
+
+          const groupWelcomeMessage =
+            `🤖 안녕하세요 ${userName}님!\n\n` +
+            `두목봇입니다. 다음 명령어를 사용해보세요:\n` +
+            `• /fortune - 운세\n` +
+            `• /weather - 날씨\n` +
+            `• /help - 도움말`;
+
+          await bot.sendMessage(chatId, groupWelcomeMessage, {
+            reply_to_message_id: msg.message_id,
+          });
         } else {
           await this.handleStartCommand(bot, msg);
         }
