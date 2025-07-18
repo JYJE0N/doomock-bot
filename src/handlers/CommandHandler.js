@@ -15,6 +15,10 @@ class CommandHandler {
     this.setupCommandRouter();
   }
 
+  setDependencies(dependencies) {
+    this.dependencies = dependencies;
+  }
+
   setupCommandRouter() {
     // 시스템 명령어
     this.commandRouter.set("/start", this.handleStart.bind(this));

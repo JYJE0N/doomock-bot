@@ -17,6 +17,10 @@ class CallbackManager {
     );
   }
 
+  setDependencies(dependencies) {
+    this.dependencies = dependencies;
+  }
+
   // MenuManager 설정 메서드 추가
   setMenuManager(menuManager) {
     this.menuManager = menuManager;

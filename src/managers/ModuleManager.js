@@ -15,6 +15,10 @@ class ModuleManager {
     Logger.debug(`modules 타입: ${this.modules.constructor.name}`); // "Map" 출력 확인
   }
 
+  setDependencies(dependencies) {
+    this.dependencies = dependencies;
+  }
+
   // 초기화
   async initialize() {
     try {
