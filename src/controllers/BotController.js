@@ -106,9 +106,9 @@ class BotController {
     });
 
     // 설정 메뉴
-    this.menuRouter.set("settings", {
-      handler: this.handleSettings.bind(this),
-      submenus: ["language", "notifications", "back"],
+    this.menuRouter.set("main", {
+      handler: this.managers.message.showMainMenu.bind(this.managers.message),
+      submenus: ["start", "help", "status", "cancel"],
     });
   }
 
