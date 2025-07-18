@@ -38,10 +38,11 @@
   },
   "dependencies": {
     "axios": "^1.6.0",
-    "dotenv": "^16.0.3",
+    "dotenv": "^16.0.1",
     "form-data": "^4.0.0",
     "gtts": "^0.2.1",
     "mongodb": "^5.1.0",
+    "mongoose": "^8.0.0",
     "node-telegram-bot-api": "^0.64.0"
   },
   "devDependencies": {
