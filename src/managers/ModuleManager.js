@@ -1,4 +1,4 @@
-// src/managers/ModuleManager.js - 리팩토링된 모듈 관리자
+// src/managers/ModuleManager.js - 완전한 리팩토링된 모듈 관리자
 const Logger = require("../utils/Logger");
 const AppConfig = require("../config/AppConfig");
 const ModuleConfig = require("../config/ModuleConfig");
@@ -221,8 +221,28 @@ class ModuleManager {
         if (moduleData.status !== "initialized") continue;
 
         const instance = moduleData.instance;
+
+        // canHandleCommand 메서드가 있는 경우
         if (instance.canHandleCommand && instance.canHandleCommand(command)) {
           Logger.debug(`명령어 ${command}를 ${moduleName}에서 처리`);
+          return instance;
+        }
+
+        // 설정에서 명령어 목록 확인
+        const commands = moduleData.config.commands || [];
+        if (commands.includes(command)) {
+          Logger.debug(
+            `명령어 ${command}를 ${moduleName}에서 처리 (설정 기반)`
+          );
+          return instance;
+        }
+
+        // 모듈별 기본 명령어 확인
+        const moduleCommands = this.getModuleCommands(moduleName);
+        if (moduleCommands.includes(command)) {
+          Logger.debug(
+            `명령어 ${command}를 ${moduleName}에서 처리 (기본 명령어)`
+          );
           return instance;
         }
       }
@@ -287,35 +307,85 @@ class ModuleManager {
   async handleCommand(bot, msg) {
     const text = msg.text || "";
     const userId = msg.from.id;
+    const chatId = msg.chat.id;
+    const isGroupChat =
+      msg.chat.type === "group" || msg.chat.type === "supergroup";
 
-    Logger.info(`명령어 처리: ${text}`, { userId });
+    Logger.info(`명령어 처리: ${text}`, {
+      userId,
+      chatId,
+      isGroup: isGroupChat,
+      chatType: msg.chat.type,
+    });
 
     if (!text.startsWith("/")) return false;
 
-    const parts = text.split(" ").filter(Boolean);
-    const command = parts[0].substring(1); // '/' 제거
-    const args = parts.slice(1);
+    // 명령어 파싱 (그룹에서 @봇이름 제거)
+    let command, args;
+    try {
+      const parts = text.split(" ").filter(Boolean);
+      let commandPart = parts[0].substring(1); // '/' 제거
 
-    // 시스템 명령어 우선 처리
-    if (await this.handleSystemCommand(bot, msg, command)) {
-      return true;
-    }
-
-    // 모듈 명령어 처리
-    const module = this.findModuleForCommand(command);
-    if (module) {
-      try {
-        return await module.handleCommand(bot, msg, command, args);
-      } catch (error) {
-        Logger.error(`명령어 ${command} 처리 실패:`, error);
-        await this.sendErrorMessage(bot, msg.chat.id, error);
-        return false;
+      // 그룹에서 @봇이름 처리 (예: /fortune@doomock_todoBot -> fortune)
+      if (commandPart.includes("@")) {
+        commandPart = commandPart.split("@")[0];
       }
+
+      command = commandPart;
+      args = parts.slice(1);
+
+      Logger.debug(`파싱된 명령어: ${command}`, { args, originalText: text });
+    } catch (parseError) {
+      Logger.error("명령어 파싱 오류:", parseError);
+      return false;
     }
 
-    // 알 수 없는 명령어
-    await this.handleUnknownCommand(bot, msg, command);
-    return true;
+    // 빈 명령어 체크
+    if (!command) {
+      Logger.warn("빈 명령어 감지");
+      return false;
+    }
+
+    try {
+      // 시스템 명령어 우선 처리
+      if (await this.handleSystemCommand(bot, msg, command, isGroupChat)) {
+        return true;
+      }
+
+      // 모듈 명령어 처리
+      const module = this.findModuleForCommand(command);
+      if (module) {
+        try {
+          const result = await module.handleCommand(bot, msg, command, args);
+          Logger.info(`명령어 ${command} 처리 완료`, { success: !!result });
+          return result;
+        } catch (error) {
+          Logger.error(`명령어 ${command} 처리 실패:`, error);
+          await this.sendCommandErrorMessage(
+            bot,
+            chatId,
+            command,
+            error,
+            isGroupChat
+          );
+          return false;
+        }
+      }
+
+      // 알 수 없는 명령어 처리
+      await this.handleUnknownCommand(bot, msg, command, isGroupChat);
+      return true;
+    } catch (error) {
+      Logger.error("명령어 처리 중 예외:", error);
+      await this.sendCommandErrorMessage(
+        bot,
+        chatId,
+        command,
+        error,
+        isGroupChat
+      );
+      return false;
+    }
   }
 
   async handleCallback(bot, callbackQuery) {
@@ -352,20 +422,45 @@ class ModuleManager {
 
   // ========== 시스템 명령어 처리 ==========
 
-  async handleSystemCommand(bot, msg, command) {
+  async handleSystemCommand(bot, msg, command, isGroupChat = false) {
+    const chatId = msg.chat.id;
+
     switch (command) {
       case "start":
-        await this.handleStartCommand(bot, msg);
+        // 그룹에서는 start 명령어 제한
+        if (isGroupChat) {
+          await bot.sendMessage(
+            chatId,
+            "🤖 안녕하세요! 개인 메시지로 대화해주세요.",
+            { reply_to_message_id: msg.message_id }
+          );
+        } else {
+          await this.handleStartCommand(bot, msg);
+        }
         return true;
+
       case "help":
-        await this.handleHelpCommand(bot, msg);
+        await this.handleHelpCommand(bot, msg, isGroupChat);
         return true;
+
       case "status":
-        await this.handleStatusCommand(bot, msg);
+        // 관리자만 사용 가능
+        if (this.isAdmin(msg.from)) {
+          await this.handleStatusCommand(bot, msg);
+        } else {
+          await bot.sendMessage(chatId, "🚫 관리자만 사용할 수 있습니다.");
+        }
         return true;
+
       case "modules":
-        await this.handleModulesCommand(bot, msg);
+        // 관리자만 사용 가능
+        if (this.isAdmin(msg.from)) {
+          await this.handleModulesCommand(bot, msg);
+        } else {
+          await bot.sendMessage(chatId, "🚫 관리자만 사용할 수 있습니다.");
+        }
         return true;
+
       default:
         return false;
     }
@@ -387,45 +482,61 @@ class ModuleManager {
     });
   }
 
-  async handleHelpCommand(bot, msg) {
-    let helpMessage = `❓ **두목봇 도움말**\n\n`;
+  async handleHelpCommand(bot, msg, isGroupChat = false) {
+    const chatId = msg.chat.id;
+    let helpMessage;
 
-    // 활성화된 모듈들의 도움말 수집
-    const moduleHelps = [];
-    for (const [moduleName, moduleData] of this.modules.entries()) {
-      if (moduleData.status !== "initialized") continue;
+    if (isGroupChat) {
+      // 그룹에서는 간단한 도움말
+      helpMessage =
+        `❓ **두목봇 명령어**\n\n` +
+        `• /fortune - 운세 보기\n` +
+        `• /weather - 날씨 정보\n` +
+        `• /help - 도움말\n\n` +
+        `더 많은 기능은 개인 메시지로 /start 를 보내주세요!`;
 
-      const instance = moduleData.instance;
-      if (instance.getHelpMessage) {
-        try {
-          const moduleHelp = await instance.getHelpMessage();
-          moduleHelps.push(moduleHelp);
-        } catch (error) {
-          Logger.error(`모듈 ${moduleName} 도움말 생성 실패:`, error);
+      await bot.sendMessage(chatId, helpMessage, {
+        parse_mode: "Markdown",
+        reply_to_message_id: msg.message_id,
+      });
+    } else {
+      // 개인 채팅에서는 상세한 도움말
+      const moduleHelps = [];
+      for (const [moduleName, moduleData] of this.modules.entries()) {
+        if (moduleData.status !== "initialized") continue;
+
+        const instance = moduleData.instance;
+        if (instance.getHelpMessage) {
+          try {
+            const moduleHelp = await instance.getHelpMessage();
+            moduleHelps.push(moduleHelp);
+          } catch (error) {
+            Logger.error(`모듈 ${moduleName} 도움말 생성 실패:`, error);
+          }
         }
       }
+
+      helpMessage = `❓ **두목봇 도움말**\n\n`;
+
+      if (moduleHelps.length > 0) {
+        helpMessage += moduleHelps.join("\n\n");
+      } else {
+        helpMessage += "사용 가능한 모듈이 없습니다.";
+      }
+
+      helpMessage += `\n\n**🔧 시스템 명령어**\n`;
+      helpMessage += `• /start - 메인 메뉴\n`;
+      helpMessage += `• /help - 도움말\n`;
+
+      await bot.sendMessage(chatId, helpMessage, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+          ],
+        },
+      });
     }
-
-    if (moduleHelps.length > 0) {
-      helpMessage += moduleHelps.join("\n\n");
-    } else {
-      helpMessage += "사용 가능한 모듈이 없습니다.";
-    }
-
-    helpMessage += `\n\n**🔧 시스템 명령어**\n`;
-    helpMessage += `• /start - 메인 메뉴\n`;
-    helpMessage += `• /help - 도움말\n`;
-    helpMessage += `• /status - 봇 상태\n`;
-    helpMessage += `• /modules - 모듈 목록\n`;
-
-    await bot.sendMessage(msg.chat.id, helpMessage, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-        ],
-      },
-    });
   }
 
   async handleStatusCommand(bot, msg) {
@@ -486,22 +597,46 @@ class ModuleManager {
     });
   }
 
-  async handleUnknownCommand(bot, msg, command) {
-    const message =
-      `❓ 알 수 없는 명령어입니다: /${command}\n\n` +
-      `/help 명령어로 사용 가능한 기능을 확인하거나\n` +
-      `/start 명령어로 메인 메뉴로 이동하세요.`;
+  async handleUnknownCommand(bot, msg, command, isGroupChat = false) {
+    const chatId = msg.chat.id;
+    const userName = this.getUserName(msg.from);
 
-    await bot.sendMessage(msg.chat.id, message, {
-      reply_markup: {
+    let message;
+    let replyMarkup = null;
+
+    if (isGroupChat) {
+      // 그룹에서는 간단한 응답
+      message = `❓ 알 수 없는 명령어: /${command}`;
+
+      // 그룹에서는 인라인 키보드 없이 텍스트만
+      await bot.sendMessage(chatId, message, {
+        reply_to_message_id: msg.message_id,
+      });
+    } else {
+      // 개인 채팅에서는 자세한 안내
+      message =
+        `❓ **알 수 없는 명령어입니다: /${command}**\n\n` +
+        `${userName}님, 다음 명령어를 사용해보세요:\n\n` +
+        `• /start - 메인 메뉴\n` +
+        `• /help - 도움말\n` +
+        `• /fortune - 운세 보기\n` +
+        `• /weather - 날씨 정보\n` +
+        `• /todo - 할일 관리\n`;
+
+      replyMarkup = {
         inline_keyboard: [
           [
             { text: "🔙 메인 메뉴", callback_data: "main_menu" },
             { text: "❓ 도움말", callback_data: "help" },
           ],
         ],
-      },
-    });
+      };
+
+      await bot.sendMessage(chatId, message, {
+        parse_mode: "Markdown",
+        reply_markup: replyMarkup,
+      });
+    }
   }
 
   // ========== 시스템 콜백 처리 ==========
@@ -561,6 +696,83 @@ class ModuleManager {
       default:
         return false;
     }
+  }
+
+  // ========== 헬퍼 메서드 ==========
+
+  sendCommandErrorMessage(bot, chatId, command, error, isGroupChat = false) {
+    try {
+      let message;
+      let options = {};
+
+      if (isGroupChat) {
+        // 그룹에서는 간단한 에러 메시지
+        message = `❌ /${command} 명령어 처리 중 오류가 발생했습니다.`;
+      } else {
+        // 개인 채팅에서는 자세한 에러 메시지
+        message =
+          `❌ **명령어 처리 오류**\n\n` +
+          `/${command} 명령어 처리 중 오류가 발생했습니다.\n` +
+          `잠시 후 다시 시도해주세요.`;
+
+        options = {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+            ],
+          },
+        };
+      }
+
+      return bot.sendMessage(chatId, message, options);
+    } catch (sendError) {
+      Logger.error("명령어 에러 메시지 전송 실패:", sendError);
+    }
+  }
+
+  getUserName(user) {
+    if (!user) return "사용자";
+
+    if (user.first_name && user.last_name) {
+      return `${user.first_name} ${user.last_name}`;
+    }
+
+    if (user.first_name) {
+      return user.first_name;
+    }
+
+    if (user.username) {
+      return `@${user.username}`;
+    }
+
+    return `User${user.id}`;
+  }
+
+  isAdmin(user) {
+    if (!user) return false;
+
+    // 환경변수에서 관리자 ID 목록 가져오기
+    const adminIds = (process.env.ADMIN_IDS || "")
+      .split(",")
+      .map((id) => parseInt(id.trim()));
+    return adminIds.includes(user.id);
+  }
+
+  getModuleCommands(moduleName) {
+    const commandMap = {
+      TodoModule: ["todo", "todo_add", "todo_list", "todo_done"],
+      FortuneModule: ["fortune", "tarot", "luck"],
+      WeatherModule: ["weather", "forecast", "w"],
+      TimerModule: ["timer", "pomodoro", "countdown"],
+      LeaveModule: ["leave", "vacation", "annual"],
+      WorktimeModule: ["worktime", "work", "checkin", "checkout"],
+      InsightModule: ["insight", "analytics", "report"],
+      UtilsModule: ["tts", "utils", "tools"],
+      ReminderModule: ["remind", "reminder", "alarm"],
+    };
+
+    return commandMap[moduleName] || [];
   }
 
   // ========== UI 헬퍼 ==========

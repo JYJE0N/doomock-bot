@@ -1,36 +1,24 @@
-// src/managers/CallbackManager.js - 수정된 버전
+// src/managers/CallbackManager.js - handleSystemCallback 메서드 추가
+
 const Logger = require("../utils/Logger");
 
 class CallbackManager {
-  constructor(bot) {
+  constructor(bot, modules) {
     this.bot = bot;
-    this.modules = {}; // 빈 상태로 시작
-    this.menuManager = null; // 나중에 주입
+    this.modules = modules || {};
+    this.menuManager = null; // MenuManager 참조 추가
 
-    // 기존 routes는 유지
+    // 콜백 라우팅 맵
     this.routes = new Map();
     this.initializeRoutes();
 
-    Logger.info("📞 CallbackManager 초기화됨 (모듈 연결 대기 중)");
+    Logger.info(`📞 CallbackManager 초기화됨 (모듈 연결 대기 중)`);
   }
 
-  // 새로 추가: 모듈들 설정
-  setModules(modules) {
-    this.modules = modules;
-    Logger.info(
-      `📞 CallbackManager에 모듈 연결됨: ${Object.keys(modules).join(", ")}`
-    );
-  }
-
-  // 새로 추가: MenuManager 설정
+  // MenuManager 설정 메서드 추가
   setMenuManager(menuManager) {
     this.menuManager = menuManager;
     Logger.info("📞 CallbackManager에 MenuManager 연결됨");
-  }
-
-  // 새로 추가 : 메뉴 모듈 매니저 설정
-  setDependencies(dependencies) {
-    this.dependencies = dependencies;
   }
 
   initializeRoutes() {
@@ -84,36 +72,15 @@ class CallbackManager {
       module: "fortune",
       method: "showMoney",
     });
-    this.routes.set("fortune_health", {
-      module: "fortune",
-      method: "showHealth",
-    });
-    this.routes.set("fortune_meeting", {
-      module: "fortune",
-      method: "showMeeting",
-    });
-    this.routes.set("fortune_tarot", {
-      module: "fortune",
-      method: "showTarot",
-    });
-    this.routes.set("fortune_tarot3", {
-      module: "fortune",
-      method: "showTarotThreeSpread",
-    });
-    this.routes.set("fortune_lucky", {
-      module: "fortune",
-      method: "showLucky",
-    });
-    this.routes.set("fortune_all", { module: "fortune", method: "showAll" });
 
     // 타이머 관리
     this.routes.set("timer_menu", { module: "timer", method: "showMenu" });
-    this.routes.set("timer_start_prompt", {
+    this.routes.set("timer_pomodoro", {
       module: "timer",
-      method: "startPrompt",
+      method: "startPomodoro",
     });
-    this.routes.set("timer_stop", { module: "timer", method: "stop" });
-    this.routes.set("timer_status", { module: "timer", method: "showStatus" });
+    this.routes.set("timer_custom", { module: "timer", method: "startCustom" });
+    this.routes.set("timer_list", { module: "timer", method: "showList" });
 
     // 날씨 관리
     this.routes.set("weather_menu", { module: "weather", method: "showMenu" });
@@ -125,34 +92,9 @@ class CallbackManager {
       module: "weather",
       method: "showForecast",
     });
-    this.routes.set("weather_seoul", {
-      module: "weather",
-      method: "showSeoul",
-    });
-    this.routes.set("weather_busan", {
-      module: "weather",
-      method: "showBusan",
-    });
-    this.routes.set("weather_more_cities", {
-      module: "weather",
-      method: "showMoreCities",
-    });
 
     // 인사이트 관리
     this.routes.set("insight_menu", { module: "insight", method: "showMenu" });
-    this.routes.set("insight_full", { module: "insight", method: "showFull" });
-    this.routes.set("insight_quick", {
-      module: "insight",
-      method: "showQuick",
-    });
-    this.routes.set("insight_dashboard", {
-      module: "insight",
-      method: "showDashboard",
-    });
-    this.routes.set("insight_national", {
-      module: "insight",
-      method: "showNational",
-    });
     this.routes.set("insight_refresh", {
       module: "insight",
       method: "refresh",
@@ -191,7 +133,6 @@ class CallbackManager {
 
   async handleCallback(callbackQuery) {
     const data = callbackQuery.data;
-    const chatId = callbackQuery.message.chat.id;
 
     Logger.info(`📞 콜백 처리 시작: ${data}`);
 
@@ -199,54 +140,96 @@ class CallbackManager {
       // 콜백 응답
       await this.bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
-      Logger.debug("콜백 응답 실패 (이미 응답됨)");
+      Logger.debug("콜백 응답 실패 (이미 응답됨):", error);
     }
 
     try {
-      // 1. 시스템 콜백 우선 처리
+      // 시스템 콜백 우선 처리
       if (await this.handleSystemCallback(callbackQuery)) {
         return true;
       }
 
-      // 2. 콜백 데이터 파싱
-      const parts = data.split("_");
-      const moduleKey = parts[0]; // todo, fortune, weather 등
-
-      // 3. 해당 모듈 찾기
-      const module = this.modules[moduleKey];
-
-      if (module && module.handleCallback) {
-        Logger.info(`📞 모듈 ${moduleKey}로 콜백 전달`);
-
-        const action = parts[1];
-        const params = parts.slice(2);
-
-        const result = await module.handleCallback(
-          this.bot,
-          callbackQuery,
-          action,
-          params,
-          this.menuManager
-        );
-
-        Logger.info(`📞 모듈 ${moduleKey} 처리 결과: ${result}`);
-        return result;
+      // 동적 콜백 처리 (todo_toggle_1, todo_delete_1 등)
+      if (data.includes("_")) {
+        const handled = await this.handleDynamicCallback(callbackQuery);
+        if (handled) return true;
       }
 
-      // 4. 기존 라우팅 방식으로 폴백
+      // 라우팅된 콜백 처리
       const route = this.routes.get(data);
       if (route) {
-        Logger.info(`📞 라우트로 처리: ${data}`);
         await this.executeRoute(route, callbackQuery);
         return true;
+      } else {
+        Logger.warn(`알 수 없는 콜백: ${data}`);
+        await this.handleUnknownCallback(callbackQuery);
+        return false;
       }
-
-      Logger.warn(`📞 처리할 수 없는 콜백: ${data}`);
-      return false;
     } catch (error) {
       Logger.error("📞 콜백 처리 오류:", error);
-      await this.sendErrorMessage(chatId);
+      Logger.error("❌ Stack trace:", error);
+      await this.sendErrorMessage(callbackQuery.message.chat.id);
       return false;
+    }
+  }
+
+  // ========== 시스템 콜백 처리 추가 ==========
+  async handleSystemCallback(callbackQuery) {
+    const data = callbackQuery.data;
+
+    switch (data) {
+      case "main_menu":
+        try {
+          const { getUserName } = require("../utils/UserHelper");
+          const userName = getUserName(callbackQuery.from);
+
+          const welcomeMessage =
+            `🤖 **두목봇 메인 메뉴**\n\n` +
+            `안녕하세요 ${userName}님! 👋\n\n` +
+            `원하는 기능을 선택해주세요:`;
+
+          await this.bot.editMessageText(welcomeMessage, {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            parse_mode: "Markdown",
+            reply_markup: this.createMainMenuKeyboard(),
+          });
+        } catch (error) {
+          Logger.error("메인 메뉴 표시 실패:", error);
+          await this.bot.sendMessage(
+            callbackQuery.message.chat.id,
+            "메인 메뉴로 돌아갑니다.",
+            {
+              reply_markup: this.createMainMenuKeyboard(),
+            }
+          );
+        }
+        return true;
+
+      case "help":
+      case "help_menu":
+        await this.showHelpMenu(callbackQuery);
+        return true;
+
+      case "noop":
+        // 아무것도 하지 않음 (페이지네이션 등에서 사용)
+        return true;
+
+      case "cancel":
+      case "cancel_action":
+        await this.bot.editMessageText("❌ 작업이 취소되었습니다.", {
+          chat_id: callbackQuery.message.chat.id,
+          message_id: callbackQuery.message.message_id,
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+            ],
+          },
+        });
+        return true;
+
+      default:
+        return false;
     }
   }
 
@@ -257,6 +240,34 @@ class CallbackManager {
     if (data.startsWith("todo_toggle_") || data.startsWith("todo_delete_")) {
       if (this.modules.todo) {
         await this.modules.todo.handleDynamicCallback(callbackQuery);
+        return true;
+      }
+    }
+
+    // leave_confirm_ 형식 처리
+    if (data.startsWith("leave_confirm_") || data.startsWith("leave_cancel_")) {
+      if (this.modules.leave) {
+        await this.modules.leave.handleDynamicCallback(callbackQuery);
+        return true;
+      }
+    }
+
+    // fortune_detail_ 형식 처리
+    if (data.startsWith("fortune_detail_")) {
+      if (this.modules.fortune) {
+        await this.modules.fortune.handleDynamicCallback(callbackQuery);
+        return true;
+      }
+    }
+
+    // timer_start_, timer_stop_ 형식 처리
+    if (
+      data.startsWith("timer_start_") ||
+      data.startsWith("timer_stop_") ||
+      data.startsWith("timer_pause_")
+    ) {
+      if (this.modules.timer) {
+        await this.modules.timer.handleDynamicCallback(callbackQuery);
         return true;
       }
     }
@@ -285,6 +296,22 @@ class CallbackManager {
       }
     }
 
+    // worktime 관련 동적 콜백
+    if (data.startsWith("worktime_") && !this.routes.has(data)) {
+      if (this.modules.worktime) {
+        await this.modules.worktime.handleDynamicCallback(callbackQuery);
+        return true;
+      }
+    }
+
+    // reminder 관련 동적 콜백
+    if (data.startsWith("remind_") && !this.routes.has(data)) {
+      if (this.modules.reminder) {
+        await this.modules.reminder.handleDynamicCallback(callbackQuery);
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -293,7 +320,6 @@ class CallbackManager {
 
     // 특별 처리: menu와 common은 별도 처리
     if (moduleName === "menu") {
-      // MenuManager를 통해 처리
       if (methodName === "showMainMenu") {
         await this.showMainMenu(callbackQuery);
       } else if (methodName === "showHelpMenu") {
@@ -309,7 +335,7 @@ class CallbackManager {
       return;
     }
 
-    // 일반 모듈 처리 - menuManager 전달
+    // 일반 모듈 처리
     const module = this.modules[moduleName];
     if (module) {
       await this.handleModuleCallback(module, callbackQuery, methodName);
@@ -319,7 +345,6 @@ class CallbackManager {
     }
   }
 
-  // 모듈 콜백 처리 - menuManager 전달 추가
   async handleModuleCallback(module, callbackQuery, methodName) {
     try {
       const data = callbackQuery.data;
@@ -335,63 +360,113 @@ class CallbackManager {
         hasMenuManager: !!this.menuManager,
       });
 
-      // handleCallback 메서드에 menuManager 전달
+      // 모듈의 handleCallback 메서드 호출
       if (module.handleCallback) {
-        await module.handleCallback(
+        const result = await module.handleCallback(
           this.bot,
           callbackQuery,
           subAction,
-          params,
-          this.menuManager // menuManager 전달
+          params
         );
-      } else {
-        Logger.warn(
-          `모듈 ${module.constructor.name}에 handleCallback 메서드가 없습니다`
-        );
+        return result;
       }
+
+      // 구식 메서드 지원 (하위 호환성)
+      if (module[methodName]) {
+        const result = await module[methodName](this.bot, callbackQuery);
+        return result;
+      }
+
+      Logger.warn(
+        `모듈 ${module.constructor.name}에 ${methodName} 메서드가 없음`
+      );
+      await this.handleUnknownCallback(callbackQuery);
     } catch (error) {
-      Logger.error(`모듈 ${module.constructor.name} 콜백 처리 실패:`, error);
-      throw error;
+      Logger.error(`모듈 콜백 처리 실패:`, error);
+      await this.sendErrorMessage(callbackQuery.message.chat.id);
     }
   }
 
-  async showMainMenu(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-    const userName = callbackQuery.from.first_name || "사용자";
+  // ========== UI 헬퍼 메서드들 ==========
 
-    await this.bot.sendMessage(
-      chatId,
-      `🤖 안녕하세요 ${userName}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`,
-      { reply_markup: this.createMainMenuKeyboard() }
-    );
+  async showMainMenu(callbackQuery) {
+    try {
+      const { getUserName } = require("../utils/UserHelper");
+      const userName = getUserName(callbackQuery.from);
+
+      const welcomeMessage =
+        `🤖 **두목봇 메인 메뉴**\n\n` +
+        `안녕하세요 ${userName}님! 👋\n\n` +
+        `원하는 기능을 선택해주세요:`;
+
+      await this.bot.editMessageText(welcomeMessage, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: this.createMainMenuKeyboard(),
+      });
+    } catch (error) {
+      Logger.error("메인 메뉴 표시 실패:", error);
+      await this.bot.sendMessage(
+        callbackQuery.message.chat.id,
+        "메인 메뉴로 돌아갑니다.",
+        {
+          reply_markup: this.createMainMenuKeyboard(),
+        }
+      );
+    }
   }
 
   async showHelpMenu(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
+    const helpMessage =
+      `❓ **두목봇 도움말**\n\n` +
+      `**📝 할일 관리**\n` +
+      `• /todo - 할일 목록 보기\n` +
+      `• /todo_add [내용] - 할일 추가\n\n` +
+      `**📅 휴가 관리**\n` +
+      `• /leave - 휴가 현황 보기\n` +
+      `• /use_leave [일수] - 휴가 사용\n\n` +
+      `**🔮 운세**\n` +
+      `• /fortune - 오늘의 운세\n\n` +
+      `**⏰ 타이머**\n` +
+      `• /timer [분] - 타이머 설정\n` +
+      `• /pomodoro - 포모도로 타이머\n\n` +
+      `**🌤️ 날씨**\n` +
+      `• /weather - 현재 날씨\n` +
+      `• /forecast - 날씨 예보\n\n` +
+      `**🛠️ 기타 명령어**\n` +
+      `• /start - 메인 메뉴\n` +
+      `• /help - 도움말\n` +
+      `• /status - 봇 상태`;
 
-    const helpText = `
-❓ **두목봇 도움말**
+    try {
+      await this.bot.editMessageText(helpMessage, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+          ],
+        },
+      });
+    } catch (error) {
+      Logger.error("도움말 표시 실패:", error);
+      await this.bot.sendMessage(callbackQuery.message.chat.id, helpMessage, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+          ],
+        },
+      });
+    }
+  }
 
-🤖 **주요 기능:**
-- 📝 할일 관리 - 할일 추가/완료/삭제
-- 📅 휴가 관리 - 연차 사용/관리
-- 🔮 운세 - 다양한 운세 정보
-- ⏰ 타이머 - 작업 시간 관리
-- 🔔 리마인더 - 알림 설정
-- 🌤️ 날씨 - 날씨 정보
-- 📊 인사이트 - 마케팅 인사이트
-- 🛠️ 유틸리티 - TTS 등
-
-🎯 **빠른 명령어:**
-- /start - 메인 메뉴
-- /add [할일] - 할일 빠른 추가
-- /help - 도움말
-
-🚀 **Railway 클라우드에서 24/7 운영 중!**
-        `;
-
-    await this.bot.sendMessage(chatId, helpText, {
-      parse_mode: "Markdown",
+  async handleCancel(callbackQuery) {
+    await this.bot.editMessageText("❌ 작업이 취소되었습니다.", {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
       reply_markup: {
         inline_keyboard: [
           [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
@@ -400,33 +475,12 @@ class CallbackManager {
     });
   }
 
-  async handleCancel(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-    const userId = callbackQuery.from.id;
-    const userName = callbackQuery.from.first_name || "사용자";
-
-    // 사용자 상태 초기화는 BotController에서 처리
-
-    await this.bot.sendMessage(
-      chatId,
-      `❌ ${userName}님, 작업이 취소되었습니다.`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
-      }
-    );
-  }
-
   async handleUnknownCallback(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-
-    await this.bot.sendMessage(
-      chatId,
-      `❌ 알 수 없는 명령입니다. 메인 메뉴로 돌아갑니다.`,
+    await this.bot.editMessageText(
+      `❓ 알 수 없는 요청입니다: ${callbackQuery.data}`,
       {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
         reply_markup: {
           inline_keyboard: [
             [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
@@ -438,7 +492,13 @@ class CallbackManager {
 
   async sendErrorMessage(chatId) {
     try {
-      await this.bot.sendMessage(chatId, "❌ 처리 중 오류가 발생했습니다.");
+      await this.bot.sendMessage(chatId, "❌ 처리 중 오류가 발생했습니다.", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+          ],
+        },
+      });
     } catch (error) {
       Logger.error("오류 메시지 전송 실패:", error);
     }
@@ -459,7 +519,7 @@ class CallbackManager {
     if (this.modules.timer)
       secondRow.push({ text: "⏰ 타이머", callback_data: "timer_menu" });
     if (this.modules.fortune)
-      secondRow.push({ text: "🎯 운세", callback_data: "fortune_menu" });
+      secondRow.push({ text: "🔮 운세", callback_data: "fortune_menu" });
     if (secondRow.length > 0) keyboard.push(secondRow);
 
     const thirdRow = [];

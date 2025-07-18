@@ -183,16 +183,19 @@ class BotController {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const userName = UserHelper.getUserName(msg.from);
+    const isGroupChat = UserHelper.isGroupChat(msg.chat);
 
-    Logger.info(`💬 메시지: "${text}" (사용자: ${userName}, ID: ${userId})`);
+    Logger.info(
+      `💬 메시지: "${text}" (사용자: ${userName}, 그룹: ${isGroupChat})`
+    );
 
     // ModuleManager에서 처리하도록 위임
     const handled = await this.moduleManager.handleMessage(this.bot, msg);
 
     // 처리되지 않은 메시지 대응
     if (!handled) {
-      // 일반 텍스트 메시지에 대한 기본 응답
-      if (!text.startsWith("/")) {
+      // 일반 텍스트 메시지에 대한 기본 응답 (개인 채팅만)
+      if (!text.startsWith("/") && !isGroupChat) {
         const helpMessage =
           `안녕하세요 ${userName}님! 👋\n\n` +
           `무엇을 도와드릴까요?\n` +
@@ -206,31 +209,30 @@ class BotController {
           },
         });
       }
+      // 그룹에서는 명령어가 아닌 일반 메시지에는 반응하지 않음
     }
   }
 
   async handleCallbackQuery(callbackQuery) {
     const data = callbackQuery.data;
 
-    // ModuleManager에서 콜백 처리하도록 위임
-    const handled = await this.moduleManager.handleCallback(
-      this.bot,
-      callbackQuery
-    );
+    try {
+      // 1차: ModuleManager에서 콜백 처리 시도
+      const handled = await this.moduleManager.handleCallback(
+        this.bot,
+        callbackQuery
+      );
 
-    // 처리되지 않은 콜백에 대한 대응
-    if (!handled) {
-      // CallbackManager로 폴백
-      if (this.callbackManager) {
-        try {
-          await this.callbackManager.handleCallback(callbackQuery);
-        } catch (error) {
-          Logger.error("CallbackManager 폴백 처리 실패:", error);
-          await this.sendUnknownCallbackError(callbackQuery);
-        }
-      } else {
-        await this.sendUnknownCallbackError(callbackQuery);
+      // 2차: 처리되지 않은 경우 CallbackManager로 폴백
+      if (!handled && this.callbackManager) {
+        Logger.debug(
+          `ModuleManager에서 처리되지 않은 콜백, CallbackManager로 폴백: ${data}`
+        );
+        await this.callbackManager.handleCallback(callbackQuery);
       }
+    } catch (error) {
+      Logger.error("콜백 처리 중 오류:", error);
+      await this.sendUnknownCallbackError(callbackQuery);
     }
   }
 
