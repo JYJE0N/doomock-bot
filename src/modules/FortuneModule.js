@@ -74,6 +74,9 @@ class FortuneModule extends BaseModule {
       case "tarot":
         await this.showTarot(bot, chatId, messageId, from.id);
         break;
+      case "tarot3":
+        await this.showTarotThreeSpread(bot, chatId, messageId, from.id);
+        break;
       case "lucky":
         await this.showLucky(bot, chatId, messageId, from.id);
         break;
