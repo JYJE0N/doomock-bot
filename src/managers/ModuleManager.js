@@ -1640,7 +1640,7 @@ class ModuleManager {
 
   // ========== CommandHandler/BotController 호환성 ==========
 
-  async getAvailableModules(userId = null) {
+  async getAvailableModules(_userId = null) {
     try {
       const availableModules = [];
       for (const [moduleName, moduleData] of this.modules) {
