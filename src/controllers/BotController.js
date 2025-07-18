@@ -3,10 +3,11 @@
 const MenuManager = require('../managers/MenuManager');
 const CallbackManager = require('../managers/CallbackManager');
 const ModuleManager = require('../managers/ModuleManager');
-const MessageHandler = require('../handlers/MessageHandler');
-const { DatabaseManager } = require('../database/DatabaseManager');
+const { MessageHandler } = require('../handlers/MessageHandler');
+const CommandHandler = require('../handlers/CommandHandler');
+const DatabaseManager = require('../services/DatabaseManager');
 const Logger = require('../utils/Logger');
-const { getUserName } = require('../utils/UserHelper');
+const UserHelper = require('../utils/UserHelper');
 
 class BotController {
     constructor(bot, config) {
@@ -21,16 +22,15 @@ class BotController {
         
         // 핸들러들
         this.messageHandler = null;
+        this.commandHandler = null;
         
         // 사용자 상태 관리
         this.userStates = new Map();
-        
-        Logger.info('BotController 생성됨');
     }
     
     async initialize() {
         try {
-            Logger.info('🤖 BotController 초기화 시작...');
+            Logger.info('BotController 초기화 시작...');
             
             // 1. 데이터베이스 연결
             await this.initializeDatabase();
@@ -41,7 +41,7 @@ class BotController {
             // 3. 메뉴 매니저 초기화
             this.initializeMenuManager();
             
-            // 4. 콜백 매니저 초기화
+            // 4. 콜백 매니저 초기화 - 중요: MenuManager 이후에 초기화
             this.initializeCallbackManager();
             
             // 5. 핸들러 초기화
@@ -50,19 +50,16 @@ class BotController {
             // 6. 이벤트 리스너 등록
             this.registerEventListeners();
             
-            Logger.success('✅ BotController 초기화 완료');
+            Logger.success('BotController 초기화 완료');
             
         } catch (error) {
-            Logger.error('❌ BotController 초기화 실패:', error);
+            Logger.error('BotController 초기화 실패:', error);
             throw error;
         }
     }
     
-    // BotController.js의 initializeDatabase() 함수 수정
     async initializeDatabase() {
         if (this.config.mongoUrl) {
-            // 🔧 수정된 부분
-            const { DatabaseManager } = require('../database/DatabaseManager');
             this.dbManager = new DatabaseManager(this.config.mongoUrl);
             await this.dbManager.connect();
             Logger.success('데이터베이스 연결 성공');
@@ -72,20 +69,37 @@ class BotController {
     }
     
     async initializeModuleManager() {
-        this.moduleManager = new ModuleManager();
-        await this.moduleManager.initialize();
-        Logger.success('✅ 모듈 매니저 초기화 완료');
+        this.moduleManager = new ModuleManager(this.bot, {
+            dbManager: this.dbManager,
+            userStates: this.userStates
+        });
+        
+        await this.moduleManager.loadModules();
+        Logger.success('모듈 매니저 초기화 완료');
     }
     
     initializeMenuManager() {
+        // ModuleManager를 MenuManager에 전달
         this.menuManager = new MenuManager(this.moduleManager);
-        Logger.success('✅ 메뉴 매니저 초기화 완료');
+        Logger.success('메뉴 매니저 초기화 완료');
     }
     
     initializeCallbackManager() {
         const modules = this.moduleManager.getModules();
+        
+        // 새로운 CallbackManager 생성 방식
         this.callbackManager = new CallbackManager(this.bot, modules);
-        Logger.success('✅ 콜백 매니저 초기화 완료');
+        
+        // MenuManager를 CallbackManager에 설정 - 이 부분이 핵심!
+        if (this.menuManager) {
+            this.callbackManager.setMenuManager(this.menuManager);
+            Logger.success('MenuManager가 CallbackManager에 성공적으로 연결됨');
+        } else {
+            Logger.error('MenuManager가 없어서 CallbackManager에 연결 실패!');
+            throw new Error('MenuManager 초기화 필요');
+        }
+        
+        Logger.success('콜백 매니저 초기화 완료');
     }
     
     initializeHandlers() {
@@ -97,7 +111,14 @@ class BotController {
             userStates: this.userStates
         });
         
-        Logger.success('✅ 핸들러 초기화 완료');
+        // 명령어 핸들러
+        this.commandHandler = new CommandHandler(this.bot, {
+            moduleManager: this.moduleManager,
+            menuManager: this.menuManager,
+            userStates: this.userStates
+        });
+        
+        Logger.success('핸들러 초기화 완료');
     }
     
     registerEventListeners() {
@@ -126,7 +147,7 @@ class BotController {
             Logger.error('폴링 오류:', error);
         });
         
-        Logger.success('✅ 이벤트 리스너 등록 완료');
+        Logger.success('이벤트 리스너 등록 완료');
     }
     
     async handleMessage(msg) {
@@ -135,7 +156,7 @@ class BotController {
         
         const chatId = msg.chat.id;
         const userId = msg.from.id;
-        const userName = getUserName(msg.from);
+        const userName = UserHelper.getUserName(msg.from);
         
         Logger.info(`💬 메시지: "${text}" (사용자: ${userName}, ID: ${userId})`);
         
@@ -151,8 +172,19 @@ class BotController {
             return;
         }
         
-        // 메시지 핸들러에 위임
-        await this.messageHandler.handleMessage(msg);
+        // 사용자 상태가 있는 경우 상태별 처리
+        if (userState) {
+            await this.messageHandler.handleUserState(msg, userState);
+            return;
+        }
+        
+        // 명령어 처리
+        if (text.startsWith('/')) {
+            await this.commandHandler.handleCommand(msg);
+        } else {
+            // 일반 메시지 처리 (자동 TTS 등)
+            await this.messageHandler.handleMessage(msg);
+        }
     }
     
     async handleCallbackQuery(callbackQuery) {
@@ -170,7 +202,7 @@ class BotController {
     }
     
     async shutdown() {
-        Logger.info('🛑 BotController 종료 시작...');
+        Logger.info('BotController 종료 시작...');
         
         try {
             // 모듈 종료
@@ -188,9 +220,9 @@ class BotController {
                 await this.bot.stopPolling();
             }
             
-            Logger.success('✅ BotController 종료 완료');
+            Logger.success('BotController 종료 완료');
         } catch (error) {
-            Logger.error('❌ BotController 종료 중 오류:', error);
+            Logger.error('BotController 종료 중 오류:', error);
         }
     }
 }

@@ -5,12 +5,16 @@ const Logger = require('../utils/Logger');
 class CallbackManager {
     constructor(bot, modules) {
         this.bot = bot;
-        this.modules = modules;
+        this.modules = modules || {};
         this.menuManager = null; // MenuManager 참조 저장
         
         // 콜백 라우팅 맵
         this.routes = new Map();
         this.initializeRoutes();
+        
+        Logger.info('CallbackManager 생성됨', { 
+            modulesCount: Object.keys(this.modules).length 
+        });
     }
     
     // MenuManager 설정 메서드 추가
@@ -204,6 +208,13 @@ class CallbackManager {
             const action = parts[0];
             const subAction = parts.slice(1).join('_');
             const params = parts.slice(2);
+            
+            // 디버그 로그
+            Logger.debug('handleModuleCallback 호출', {
+                module: module.constructor.name,
+                data: data,
+                hasMenuManager: !!this.menuManager
+            });
             
             // handleCallback 메서드에 menuManager 전달
             if (module.handleCallback) {
