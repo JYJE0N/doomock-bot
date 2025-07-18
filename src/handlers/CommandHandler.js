@@ -100,39 +100,52 @@ class CommandHandler {
   }
 
   async handleStart(msg, command, args) {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    const userName = msg.from.first_name || "사용자";
-    const config = require("../config/config");
+    try {
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+      const userName = msg.from.first_name || "사용자";
 
-    // 사용자 상태 초기화
-    this.userStates.delete(userId);
+      // 사용자 상태 초기화
+      if (this.userStates) {
+        this.userStates.delete(userId);
+      }
 
-    // 딥링크 처리
-    if (args.length > 0) {
-      await this.handleDeepLink(msg, args[0]);
-      return;
+      // 딥링크 처리
+      if (args && args.length > 0) {
+        await this.handleDeepLink(msg, args[0]);
+        return;
+      }
+
+      // 환영 메시지
+      const welcomeText = `안녕하세요 ${userName}님! 👋\n\n🤖 *두목 봇 v3.0*에 오신 것을 환영합니다.\n\n아래 메뉴에서 원하는 기능을 선택해주세요.`;
+
+      // 메인 메뉴 키보드
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "📱 모듈 선택", callback_data: "module:list" }],
+          [{ text: "⚙️ 설정", callback_data: "settings:main" }],
+          [{ text: "❓ 도움말", callback_data: "help:main" }],
+        ],
+      };
+
+      // 메시지 전송
+      await this.bot.sendMessage(chatId, welcomeText, {
+        reply_markup: keyboard,
+        parse_mode: "Markdown",
+      });
+
+      Logger.info("Start 명령어 처리 완료", { userId, userName });
+    } catch (error) {
+      Logger.error("Start 명령어 처리 오류:", error);
+
+      // 기본 응답
+      if (msg && msg.chat && msg.chat.id) {
+        await this.bot.sendMessage(
+          msg.chat.id,
+          "봇을 시작하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        );
+      }
     }
-
-    // 환영 메시지와 메인 메뉴
-    const welcomeText = `안녕하세요 ${userName}님! 👋
-
-${config.emoji.bot} *${config.bot.name} v${config.bot.version}*에 오신 것을 환영합니다.
-
-아래 메뉴에서 원하는 기능을 선택해주세요.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "📱 모듈 선택", callback_data: "main:modules" }],
-        [{ text: "❓ 도움말", callback_data: "main:help" }],
-        [{ text: "⚙️ 설정", callback_data: "main:settings" }],
-      ],
-    };
-
-    await this.bot.sendMessage(chatId, welcomeText, {
-      reply_markup: keyboard,
-      parse_mode: "Markdown",
-    });
   }
 
   async handleHelp(msg, command, args) {

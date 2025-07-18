@@ -393,6 +393,57 @@ class ModuleManager {
     });
   }
 
+  // 모듈이 로드되었는지 확인
+  isModuleLoaded(moduleId) {
+    const module = this.modules.get(moduleId);
+    return module ? module.loaded : false;
+  }
+
+  // 모듈이 활성화되었는지 확인
+  isModuleActive(userId, moduleId) {
+    const activeModuleId = this.activeModules.get(userId);
+    return activeModuleId === moduleId;
+  }
+
+  // 모듈 존재 여부 확인
+  hasModule(moduleId) {
+    return this.modules.has(moduleId);
+  }
+
+  // 사용자의 활성 모듈 ID 가져오기
+  getActiveModuleId(userId) {
+    return this.activeModules.get(userId);
+  }
+
+  // 모듈 정보 가져오기
+  getModuleInfo(moduleId) {
+    const module = this.modules.get(moduleId);
+    if (!module) return null;
+
+    return {
+      id: module.id,
+      name: module.name,
+      icon: module.icon,
+      description: module.description,
+      loaded: module.loaded,
+      commands: module.commands,
+    };
+  }
+
+  // 모든 모듈 ID 목록
+  getModuleIds() {
+    return Array.from(this.modules.keys());
+  }
+
+  // 로드된 모듈 수
+  getLoadedModuleCount() {
+    let count = 0;
+    for (const module of this.modules.values()) {
+      if (module.loaded) count++;
+    }
+    return count;
+  }
+
   // /help 명령어 처리
   async handleHelpCommand(bot, msg) {
     let helpMessage = `❓ **두목봇 도움말**\n\n`;

@@ -158,35 +158,153 @@ class BotController {
     }
   }
 
+  // 콜백 쿼리 처리 메서드
   async handleCallbackQuery(query) {
     try {
-      const { data, message } = query;
-      const [action, ...params] = data.split(":");
+      // query 검증
+      if (!query || !query.message) {
+        Logger.error("잘못된 콜백 쿼리 형식");
+        return;
+      }
+
+      const { data, message, from } = query;
+      const chatId = message.chat.id;
+      const messageId = message.message_id;
+      const userId = from.id;
+
+      Logger.info("콜백 쿼리 처리", {
+        data,
+        chatId,
+        userId,
+        messageId,
+      });
 
       // 콜백 응답 (버튼 로딩 제거)
       await this.bot.answerCallbackQuery(query.id);
 
-      // 라우터를 통한 처리
-      const route = this.menuRouter.get(action);
-      if (route) {
-        await route.handler(query, params);
+      // data가 없는 경우
+      if (!data) {
+        Logger.warn("콜백 데이터가 없음");
         return;
       }
 
-      // 모듈별 콜백 처리
-      if (action.startsWith("module_")) {
-        await this.managers.module.handleCallback(query, action, params);
+      // 콜백 데이터 파싱
+      const [action, ...params] = data.split(":");
+
+      // 메뉴 관련 콜백
+      if (action === "menu") {
+        const menuId = params[0];
+        if (menuId && this.menuManager) {
+          await this.menuManager.showMenu(chatId, menuId, messageId, userId);
+        }
         return;
       }
 
-      // 기본 콜백 처리
-      await this.managers.callback.handle(query);
+      // 모듈 관련 콜백
+      if (action === "module") {
+        const moduleAction = params[0];
+
+        if (moduleAction === "list") {
+          // 모듈 목록 표시
+          await this.showModuleList(chatId, messageId, userId);
+        } else if (this.moduleManager) {
+          // 특정 모듈 처리
+          await this.moduleManager.handleCallback(query, action, params);
+        }
+        return;
+      }
+
+      // 메인 메뉴로 돌아가기
+      if (action === "main") {
+        await this.showMainMenu(chatId, messageId, userId);
+        return;
+      }
+
+      // 설정 관련 콜백
+      if (action === "settings") {
+        await this.handleSettingsCallback(query, params);
+        return;
+      }
+
+      // 기본 콜백 매니저로 전달
+      if (this.callbackManager) {
+        await this.callbackManager.handle(query);
+      }
     } catch (error) {
       Logger.error("콜백 쿼리 처리 오류:", error);
-      await this.bot.answerCallbackQuery(query.id, {
-        text: "처리 중 오류가 발생했습니다.",
-        show_alert: true,
+
+      // 에러 발생 시 사용자에게 알림
+      if (query && query.id) {
+        try {
+          await this.bot.answerCallbackQuery(query.id, {
+            text: "처리 중 오류가 발생했습니다.",
+            show_alert: true,
+          });
+        } catch (e) {
+          Logger.error("콜백 응답 오류:", e);
+        }
+      }
+    }
+  }
+
+  // 메인 메뉴 표시 메서드
+  async showMainMenu(chatId, messageId, userId) {
+    try {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "📱 모듈", callback_data: "module:list" }],
+          [{ text: "⚙️ 설정", callback_data: "settings:main" }],
+          [{ text: "❓ 도움말", callback_data: "help:main" }],
+        ],
+      };
+
+      const text = "🤖 두목 봇 메인 메뉴\n\n원하는 기능을 선택하세요:";
+
+      if (messageId) {
+        await this.bot.editMessageText(text, {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: keyboard,
+        });
+      } else {
+        await this.bot.sendMessage(chatId, text, {
+          reply_markup: keyboard,
+        });
+      }
+    } catch (error) {
+      Logger.error("메인 메뉴 표시 오류:", error);
+      throw error;
+    }
+  }
+
+  // 모듈 목록 표시
+  async showModuleList(chatId, messageId, userId) {
+    try {
+      const modules = await this.moduleManager.getAvailableModules(userId);
+
+      const keyboard = {
+        inline_keyboard: [
+          ...modules.map((m) => [
+            {
+              text: `${m.icon} ${m.name}`,
+              callback_data: `module:select:${m.id}`,
+            },
+          ]),
+          [{ text: "⬅️ 뒤로", callback_data: "main:menu" }],
+        ],
+      };
+
+      const text =
+        "📱 사용 가능한 모듈:\n\n" +
+        modules.map((m) => `${m.icon} ${m.name} - ${m.description}`).join("\n");
+
+      await this.bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: messageId,
+        reply_markup: keyboard,
       });
+    } catch (error) {
+      Logger.error("모듈 목록 표시 오류:", error);
     }
   }
 
