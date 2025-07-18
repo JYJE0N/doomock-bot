@@ -864,12 +864,15 @@ class ModuleManager {
 
     for (const [moduleName, moduleData] of this.modules) {
       if (moduleData.status === "initialized") {
-        // 모듈명을 소문자로 변환해서 반환
+        // 모듈명을 소문자로 변환해서 반환 (todo, fortune, weather 등)
         const key = moduleName.replace("Module", "").toLowerCase();
         modules[key] = moduleData.instance;
+
+        Logger.debug(`모듈 등록: ${key} -> ${moduleName}`);
       }
     }
 
+    Logger.info(`활성 모듈: ${Object.keys(modules).join(", ")}`);
     return modules;
   }
 

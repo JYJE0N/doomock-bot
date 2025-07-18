@@ -59,26 +59,26 @@ class BotController {
     const MenuManager = require("../managers/MenuManager");
     const CallbackManager = require("../managers/CallbackManager");
     const ModuleManager = require("../managers/ModuleManager");
-    const MessageHandler = require("../handlers/MessageHandler");
 
-    this.managers.menu = new MenuManager(this.bot);
-    this.managers.callback = new CallbackManager(this.bot);
+    // 1단계: 기본 매니저들 생성 (의존성 없이)
     this.managers.module = new ModuleManager(this.bot);
-    this.managers.message = new MessageHandler(this.bot, {
-      moduleManager: this.managers.module,
-      menuManager: this.managers.menu,
-      userStates: this.userStates,
-    });
+    this.managers.menu = new MenuManager(); // 빈 상태로 생성
+    this.managers.callback = new CallbackManager(this.bot);
 
-    // 각 매니저에 필요한 의존성 주입
-    this.managers.menu.setDependencies({
-      moduleManager: this.managers.module,
-      callbackManager: this.managers.callback,
-    });
+    // 2단계: 모듈 매니저 먼저 완전히 초기화
+    await this.managers.module.initialize();
+    console.log("🔧 ModuleManager 초기화 완료");
 
-    this.managers.module.setDependencies({
-      menuManager: this.managers.menu,
-    });
+    // 3단계: 의존성 주입
+    this.managers.menu.setModuleManager(this.managers.module);
+    this.managers.callback.setModules(this.managers.module.getModules());
+    this.managers.callback.setMenuManager(this.managers.menu);
+
+    console.log("🔗 의존성 주입 완료");
+    console.log(
+      "📊 로드된 모듈:",
+      Object.keys(this.managers.module.getModules())
+    );
   }
 
   async initializeHandlers() {
@@ -159,28 +159,24 @@ class BotController {
   }
 
   // 콜백 쿼리 처리 메서드
+  // BotController.js - handleCallbackQuery 완전 수정
+
   async handleCallbackQuery(query) {
     try {
-      // query 검증
-      if (!query || !query.message) {
-        Logger.error("잘못된 콜백 쿼리 형식");
-        return;
-      }
-
-      const { data, message, from } = query;
-      const chatId = message.chat.id;
-      const messageId = message.message_id;
-      const userId = from.id;
-
-      Logger.info("콜백 쿼리 처리", {
-        data,
-        chatId,
-        userId,
-        messageId,
+      console.log("🔍 콜백 디버깅:", {
+        data: query.data,
+        hasModuleManager: !!this.managers.module,
+        hasMenuManager: !!this.managers.menu,
+        hasCallbackManager: !!this.managers.callback,
+        modules: this.managers.module
+          ? Object.keys(this.managers.module.getModules())
+          : [],
       });
 
       // 콜백 응답 (버튼 로딩 제거)
       await this.bot.answerCallbackQuery(query.id);
+
+      const data = query.data; // 🚨 이 변수를 누락하셨습니다!
 
       // data가 없는 경우
       if (!data) {
@@ -188,72 +184,20 @@ class BotController {
         return;
       }
 
-      // 콜백 데이터 파싱
-      const [action, ...params] = data.split(":");
+      // 🔥 새로운 간단한 라우팅 방식으로 교체
+      console.log(`🎯 콜백 처리 시작: ${data}`);
 
-      // 콜백 라우터
-      switch (action) {
-        case "main":
-          // 메인 관련 액션
-          if (params[0] === "menu") {
-            await this.showMainMenu(chatId, messageId, userId);
-          } else if (params[0] === "modules") {
-            await this.showModuleList(chatId, messageId, userId);
-          }
-          break;
-
-        case "menu":
-          // 메뉴 관련 액션
-          if (this.menuManager) {
-            await this.menuManager.showMenu(
-              chatId,
-              params[0],
-              messageId,
-              userId
-            );
-          }
-          break;
-
-        case "module":
-          // 모듈 관련 액션
-          if (params[0] === "list") {
-            await this.showModuleList(chatId, messageId, userId);
-          } else if (params[0] === "select" && params[1]) {
-            await this.selectModule(chatId, messageId, userId, params[1]);
-          } else if (this.moduleManager) {
-            await this.moduleManager.handleCallback(query, action, params);
-          }
-          break;
-
-        case "settings":
-          // 설정 관련 액션
-          await this.handleSettingsCallback(query, params);
-          break;
-
-        case "help":
-          // 도움말 관련 액션
-          await this.handleHelpCallback(query, params);
-          break;
-
-        case "setlang":
-          // 언어 설정
-          await this.handleLanguageChange(query, params[0]);
-          break;
-
-        case "toggle_notification":
-          // 알림 토글
-          await this.handleNotificationToggle(query, params[0]);
-          break;
-
-        default:
-          // 기본 콜백 매니저로 전달
-          if (this.callbackManager) {
-            const handled = await this.callbackManager.handle(query);
-            if (!handled) {
-              Logger.warn(`처리되지 않은 콜백: ${action}`);
-            }
-          }
+      // 1. 먼저 CallbackManager로 시도
+      if (this.managers.callback) {
+        const handled = await this.managers.callback.handleCallback(query);
+        if (handled) {
+          console.log("✅ CallbackManager에서 처리 성공");
+          return;
+        }
       }
+
+      // 2. 기본 시스템 콜백들 처리
+      await this.handleSystemCallbacks(query);
     } catch (error) {
       Logger.error("콜백 쿼리 처리 오류:", error);
 
@@ -271,20 +215,116 @@ class BotController {
     }
   }
 
-  // 도움말 콜백 처리
-  async handleHelpCallback(query, params) {
-    const { message } = query;
-    const chatId = message.chat.id;
-    const messageId = message.message_id;
+  // 새로 추가: 시스템 콜백 처리
+  async handleSystemCallbacks(query) {
+    const data = query.data;
+    const chatId = query.message.chat.id;
+    const messageId = query.message.message_id;
+    const userId = query.from.id;
 
+    console.log(`🔧 시스템 콜백 처리: ${data}`);
+
+    // 메인 메뉴 표시
+    if (data === "main_menu") {
+      await this.showMainMenuSimple(chatId, messageId, userId);
+      return;
+    }
+
+    // 도움말
+    if (data === "help_menu") {
+      await this.showHelpMenuSimple(chatId, messageId);
+      return;
+    }
+
+    console.log(`❓ 처리되지 않은 콜백: ${data}`);
+  }
+
+  // 간단한 메인 메뉴 표시 (임시)
+  async showMainMenuSimple(chatId, messageId, userId) {
+    try {
+      // 로드된 모듈들 확인
+      const modules = this.managers.module
+        ? this.managers.module.getModules()
+        : {};
+      console.log("🎮 사용 가능한 모듈:", Object.keys(modules));
+
+      const keyboard = {
+        inline_keyboard: [],
+      };
+
+      // 동적으로 모듈 버튼 추가
+      const moduleButtons = [];
+
+      if (modules.todo) {
+        moduleButtons.push({
+          text: "📝 할일 관리",
+          callback_data: "todo_menu",
+        });
+      }
+      if (modules.fortune) {
+        moduleButtons.push({ text: "🔮 운세", callback_data: "fortune_menu" });
+      }
+      if (modules.weather) {
+        moduleButtons.push({ text: "🌤️ 날씨", callback_data: "weather_menu" });
+      }
+      if (modules.timer) {
+        moduleButtons.push({ text: "⏰ 타이머", callback_data: "timer_menu" });
+      }
+      if (modules.utils) {
+        moduleButtons.push({
+          text: "🛠️ 유틸리티",
+          callback_data: "utils_menu",
+        });
+      }
+
+      // 2개씩 행으로 배치
+      for (let i = 0; i < moduleButtons.length; i += 2) {
+        const row = moduleButtons.slice(i, i + 2);
+        keyboard.inline_keyboard.push(row);
+      }
+
+      // 도움말 버튼 추가
+      keyboard.inline_keyboard.push([
+        { text: "❓ 도움말", callback_data: "help_menu" },
+      ]);
+
+      const text = `🤖 **두목 봇 메인 메뉴**\n\n사용 가능한 모듈: ${Object.keys(modules).length}개\n\n원하는 기능을 선택하세요:`;
+
+      if (messageId) {
+        await this.bot.editMessageText(text, {
+          chat_id: chatId,
+          message_id: messageId,
+          reply_markup: keyboard,
+          parse_mode: "Markdown",
+        });
+      } else {
+        await this.bot.sendMessage(chatId, text, {
+          reply_markup: keyboard,
+          parse_mode: "Markdown",
+        });
+      }
+
+      console.log("✅ 메인 메뉴 표시 완료");
+    } catch (error) {
+      Logger.error("메인 메뉴 표시 오류:", error);
+      await this.bot.sendMessage(chatId, "❌ 메뉴를 불러올 수 없습니다.");
+    }
+  }
+
+  // 간단한 도움말 표시
+  async showHelpMenuSimple(chatId, messageId) {
     const helpText =
-      "❓ *도움말*\n\n" +
-      "• 모듈 선택: 사용하고 싶은 기능을 선택하세요\n" +
-      "• 설정: 언어, 알림 등을 변경할 수 있습니다\n" +
-      "• 명령어: /help 를 입력하면 전체 명령어를 볼 수 있습니다";
+      `❓ **두목봇 도움말**\n\n` +
+      `🤖 **주요 기능:**\n` +
+      `• 📝 할일 관리 - 할일 추가/완료/삭제\n` +
+      `• 🔮 운세 - 다양한 운세 정보\n` +
+      `• 🌤️ 날씨 - 날씨 정보\n` +
+      `• ⏰ 타이머 - 작업 시간 관리\n` +
+      `• 🛠️ 유틸리티 - TTS 등\n\n` +
+      `**/start** - 메인 메뉴로 이동`;
 
     const keyboard = {
-      inline_keyboard: [[{ text: "⬅️ 메인 메뉴", callback_data: "main:menu" }]],
+      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main_menu" }]],
     };
 
     await this.bot.editMessageText(helpText, {

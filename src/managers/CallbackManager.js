@@ -2,27 +2,35 @@
 const Logger = require("../utils/Logger");
 
 class CallbackManager {
-  constructor(bot, modules) {
+  constructor(bot) {
     this.bot = bot;
-    this.modules = modules || {};
-    this.menuManager = null; // MenuManager 참조 추가
+    this.modules = {}; // 빈 상태로 시작
+    this.menuManager = null; // 나중에 주입
 
-    // 콜백 라우팅 맵
+    // 기존 routes는 유지
     this.routes = new Map();
     this.initializeRoutes();
 
+    Logger.info("📞 CallbackManager 초기화됨 (모듈 연결 대기 중)");
+  }
+
+  // 새로 추가: 모듈들 설정
+  setModules(modules) {
+    this.modules = modules;
     Logger.info(
-      `📞 CallbackManager 초기화됨. 모듈 수: ${Object.keys(this.modules).length}`
+      `📞 CallbackManager에 모듈 연결됨: ${Object.keys(modules).join(", ")}`
     );
   }
 
-  setDependencies(dependencies) {
-    this.dependencies = dependencies;
-  }
-
-  // MenuManager 설정 메서드 추가
+  // 새로 추가: MenuManager 설정
   setMenuManager(menuManager) {
     this.menuManager = menuManager;
+    Logger.info("📞 CallbackManager에 MenuManager 연결됨");
+  }
+
+  // 새로 추가 : 메뉴 모듈 매니저 설정
+  setDependencies(dependencies) {
+    this.dependencies = dependencies;
   }
 
   initializeRoutes() {
@@ -185,33 +193,60 @@ class CallbackManager {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
 
-    Logger.info(`📞 콜백 처리: ${data}`);
+    Logger.info(`📞 콜백 처리 시작: ${data}`);
 
     try {
       // 콜백 응답
       await this.bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
-      Logger.error("콜백 응답 실패:", error);
+      Logger.debug("콜백 응답 실패 (이미 응답됨)");
     }
 
     try {
-      // 동적 콜백 처리 (todo_toggle_1, todo_delete_1 등)
-      if (data.includes("_")) {
-        const handled = await this.handleDynamicCallback(callbackQuery);
-        if (handled) return;
+      // 1. 시스템 콜백 우선 처리
+      if (await this.handleSystemCallback(callbackQuery)) {
+        return true;
       }
 
-      // 라우팅된 콜백 처리
+      // 2. 콜백 데이터 파싱
+      const parts = data.split("_");
+      const moduleKey = parts[0]; // todo, fortune, weather 등
+
+      // 3. 해당 모듈 찾기
+      const module = this.modules[moduleKey];
+
+      if (module && module.handleCallback) {
+        Logger.info(`📞 모듈 ${moduleKey}로 콜백 전달`);
+
+        const action = parts[1];
+        const params = parts.slice(2);
+
+        const result = await module.handleCallback(
+          this.bot,
+          callbackQuery,
+          action,
+          params,
+          this.menuManager
+        );
+
+        Logger.info(`📞 모듈 ${moduleKey} 처리 결과: ${result}`);
+        return result;
+      }
+
+      // 4. 기존 라우팅 방식으로 폴백
       const route = this.routes.get(data);
       if (route) {
+        Logger.info(`📞 라우트로 처리: ${data}`);
         await this.executeRoute(route, callbackQuery);
-      } else {
-        Logger.warn(`알 수 없는 콜백: ${data}`);
-        await this.handleUnknownCallback(callbackQuery);
+        return true;
       }
+
+      Logger.warn(`📞 처리할 수 없는 콜백: ${data}`);
+      return false;
     } catch (error) {
-      Logger.error("콜백 처리 오류:", error);
+      Logger.error("📞 콜백 처리 오류:", error);
       await this.sendErrorMessage(chatId);
+      return false;
     }
   }
 

@@ -5,16 +5,26 @@ const MenuConfig = require("../config/MenuConfig");
 const AppConfig = require("../config/AppConfig");
 
 class MenuManager {
-  constructor(moduleManager) {
-    this.moduleManager = moduleManager;
+  constructor() {
+    this.moduleManager = null; // 나중에 주입받을 예정
     this.menuCache = new Map();
-    this.cacheTimeout = 5 * 60 * 1000; // 5분 캐시
+    this.cacheTimeout = 5 * 60 * 1000;
 
-    Logger.info("📋 MenuManager 초기화됨");
+    Logger.info("📋 MenuManager 초기화됨 (ModuleManager 대기 중)");
   }
 
+  // 새로 추가: ModuleManager 설정
   setDependencies(dependencies) {
     this.dependencies = dependencies;
+    if (dependencies.moduleManager) {
+      this.setModuleManager(dependencies.moduleManager);
+    }
+  }
+
+  // 모듈 매니저 설정
+  setModuleManager(moduleManager) {
+    this.moduleManager = moduleManager;
+    Logger.info("📋 MenuManager에 ModuleManager 연결됨");
   }
 
   // 메인 메뉴 키보드 생성
@@ -299,24 +309,31 @@ class MenuManager {
 
   // 모듈 활성화 상태 확인
   isModuleEnabled(moduleKey) {
+    if (!this.moduleManager) {
+      Logger.warn(`MenuManager: ModuleManager가 아직 설정되지 않음`);
+      return false;
+    }
+
     const moduleMapping = {
-      todo: AppConfig.FEATURES.TODO_MODULE,
-      leave: AppConfig.FEATURES.LEAVE_MODULE,
-      weather: AppConfig.FEATURES.WEATHER_MODULE,
-      fortune: AppConfig.FEATURES.FORTUNE_MODULE,
-      timer: AppConfig.FEATURES.TIMER_MODULE,
-      insight: AppConfig.FEATURES.INSIGHT_MODULE,
-      utils: AppConfig.FEATURES.UTILS_MODULE,
-      reminder: AppConfig.FEATURES.REMINDER_MODULE,
-      worktime: AppConfig.FEATURES.WORKTIME_MODULE,
+      todo: "TodoModule",
+      leave: "LeaveModule",
+      weather: "WeatherModule",
+      fortune: "FortuneModule",
+      timer: "TimerModule",
+      insight: "InsightModule",
+      utils: "UtilsModule",
+      reminder: "ReminderModule",
+      worktime: "WorktimeModule",
     };
 
-    const isEnabled = moduleMapping[moduleKey];
-    const isModuleLoaded = this.moduleManager.isModuleLoaded(
-      `${moduleKey.charAt(0).toUpperCase()}${moduleKey.slice(1)}Module`
-    );
+    const moduleName = moduleMapping[moduleKey];
+    if (!moduleName) return false;
 
-    return isEnabled !== false && isModuleLoaded;
+    const module = this.moduleManager.getModule(moduleName);
+    const isEnabled = module !== null;
+
+    Logger.debug(`모듈 ${moduleKey} (${moduleName}) 활성화 상태: ${isEnabled}`);
+    return isEnabled;
   }
 
   // 사용자 맞춤 메뉴 생성
