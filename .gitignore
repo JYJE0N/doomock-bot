@@ -26,14 +26,10 @@ Thumbs.db
 *.swp
 *.swo
 
+# Database
+*.db
+*.sqlite
+
 # Build output
 dist/
 build/
-
-# Test coverage
-coverage/
-.nyc_output/
-
-# Package manager files
-package-lock.json
-yarn.lock
