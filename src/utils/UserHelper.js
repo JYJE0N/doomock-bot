@@ -10,18 +10,18 @@
  * @returns {string} 사용자 표시 이름
  */
 function getUserName(user) {
-    if (!user) return '사용자';
-    
-    // 우선순위: first_name > username > id
-    if (user.first_name) {
-        return user.first_name;
-    }
-    
-    if (user.username) {
-        return user.username;
-    }
-    
-    return `사용자${user.id}`;
+  if (!user) return "사용자";
+
+  // 우선순위: first_name > username > id
+  if (user.first_name) {
+    return user.first_name;
+  }
+
+  if (user.username) {
+    return user.username;
+  }
+
+  return `사용자${user.id}`;
 }
 
 /**
@@ -30,19 +30,19 @@ function getUserName(user) {
  * @returns {string} 전체 이름
  */
 function getFullUserName(user) {
-    if (!user) return '사용자';
-    
-    let fullName = '';
-    
-    if (user.first_name) {
-        fullName += user.first_name;
-    }
-    
-    if (user.last_name) {
-        fullName += ' ' + user.last_name;
-    }
-    
-    return fullName.trim() || getUserName(user);
+  if (!user) return "사용자";
+
+  let fullName = "";
+
+  if (user.first_name) {
+    fullName += user.first_name;
+  }
+
+  if (user.last_name) {
+    fullName += " " + user.last_name;
+  }
+
+  return fullName.trim() || getUserName(user);
 }
 
 /**
@@ -51,15 +51,15 @@ function getFullUserName(user) {
  * @returns {string} 멘션 텍스트
  */
 function getUserMention(user) {
-    if (!user) return '사용자';
-    
-    const name = getUserName(user);
-    
-    if (user.username) {
-        return `@${user.username}`;
-    }
-    
-    return `[${name}](tg://user?id=${user.id})`;
+  if (!user) return "사용자";
+
+  const name = getUserName(user);
+
+  if (user.username) {
+    return `@${user.username}`;
+  }
+
+  return `[${name}](tg://user?id=${user.id})`;
 }
 
 /**
@@ -68,26 +68,26 @@ function getUserMention(user) {
  * @returns {Object} 사용자 정보 요약
  */
 function getUserSummary(user) {
-    if (!user) {
-        return {
-            id: null,
-            name: '사용자',
-            username: null,
-            fullName: '사용자',
-            mention: '사용자',
-            isBot: false
-        };
-    }
-    
+  if (!user) {
     return {
-        id: user.id,
-        name: getUserName(user),
-        username: user.username || null,
-        fullName: getFullUserName(user),
-        mention: getUserMention(user),
-        isBot: user.is_bot || false,
-        languageCode: user.language_code || 'ko'
+      id: null,
+      name: "사용자",
+      username: null,
+      fullName: "사용자",
+      mention: "사용자",
+      isBot: false,
     };
+  }
+
+  return {
+    id: user.id,
+    name: getUserName(user),
+    username: user.username || null,
+    fullName: getFullUserName(user),
+    mention: getUserMention(user),
+    isBot: user.is_bot || false,
+    languageCode: user.language_code || "ko",
+  };
 }
 
 /**
@@ -96,7 +96,7 @@ function getUserSummary(user) {
  * @returns {boolean} 유효한 사용자 ID인지 여부
  */
 function isValidUserId(userId) {
-    return typeof userId === 'number' && userId > 0 && userId < 2147483647;
+  return typeof userId === "number" && userId > 0 && userId < 2147483647;
 }
 
 /**
@@ -106,8 +106,8 @@ function isValidUserId(userId) {
  * @returns {boolean} 관리자 권한 여부
  */
 function isAdmin(user, adminIds = []) {
-    if (!user || !Array.isArray(adminIds)) return false;
-    return adminIds.includes(user.id);
+  if (!user || !Array.isArray(adminIds)) return false;
+  return adminIds.includes(user.id);
 }
 
 /**
@@ -117,8 +117,8 @@ function isAdmin(user, adminIds = []) {
  * @returns {boolean} 차단된 사용자인지 여부
  */
 function isBlocked(user, blockedIds = []) {
-    if (!user || !Array.isArray(blockedIds)) return false;
-    return blockedIds.includes(user.id);
+  if (!user || !Array.isArray(blockedIds)) return false;
+  return blockedIds.includes(user.id);
 }
 
 /**
@@ -128,12 +128,12 @@ function isBlocked(user, blockedIds = []) {
  * @returns {boolean} 허용된 사용자인지 여부
  */
 function isAllowed(user, allowedIds = []) {
-    if (!user) return false;
-    
-    // 빈 배열이면 모든 사용자 허용
-    if (allowedIds.length === 0) return true;
-    
-    return allowedIds.includes(user.id);
+  if (!user) return false;
+
+  // 빈 배열이면 모든 사용자 허용
+  if (allowedIds.length === 0) return true;
+
+  return allowedIds.includes(user.id);
 }
 
 /**
@@ -142,25 +142,25 @@ function isAllowed(user, allowedIds = []) {
  * @returns {string} 정규화된 언어 코드
  */
 function normalizeLanguageCode(languageCode) {
-    const supportedLanguages = {
-        'ko': 'ko',
-        'kr': 'ko',
-        'en': 'en',
-        'us': 'en',
-        'ja': 'ja',
-        'jp': 'ja',
-        'zh': 'zh',
-        'cn': 'zh',
-        'es': 'es',
-        'fr': 'fr',
-        'de': 'de',
-        'ru': 'ru'
-    };
-    
-    if (!languageCode) return 'ko';
-    
-    const normalized = languageCode.toLowerCase().substring(0, 2);
-    return supportedLanguages[normalized] || 'ko';
+  const supportedLanguages = {
+    ko: "ko",
+    kr: "ko",
+    en: "en",
+    us: "en",
+    ja: "ja",
+    jp: "ja",
+    zh: "zh",
+    cn: "zh",
+    es: "es",
+    fr: "fr",
+    de: "de",
+    ru: "ru",
+  };
+
+  if (!languageCode) return "ko";
+
+  const normalized = languageCode.toLowerCase().substring(0, 2);
+  return supportedLanguages[normalized] || "ko";
 }
 
 /**
@@ -169,21 +169,21 @@ function normalizeLanguageCode(languageCode) {
  * @returns {string} 시간대 문자열
  */
 function estimateUserTimezone(user) {
-    if (!user) return 'Asia/Seoul';
-    
-    const timezoneMap = {
-        'ko': 'Asia/Seoul',
-        'ja': 'Asia/Tokyo',
-        'zh': 'Asia/Shanghai',
-        'en': 'America/New_York',
-        'es': 'Europe/Madrid',
-        'fr': 'Europe/Paris',
-        'de': 'Europe/Berlin',
-        'ru': 'Europe/Moscow'
-    };
-    
-    const langCode = normalizeLanguageCode(user.language_code);
-    return timezoneMap[langCode] || 'Asia/Seoul';
+  if (!user) return "Asia/Seoul";
+
+  const timezoneMap = {
+    ko: "Asia/Seoul",
+    ja: "Asia/Tokyo",
+    zh: "Asia/Shanghai",
+    en: "America/New_York",
+    es: "Europe/Madrid",
+    fr: "Europe/Paris",
+    de: "Europe/Berlin",
+    ru: "Europe/Moscow",
+  };
+
+  const langCode = normalizeLanguageCode(user.language_code);
+  return timezoneMap[langCode] || "Asia/Seoul";
 }
 
 /**
@@ -192,19 +192,19 @@ function estimateUserTimezone(user) {
  * @param {string} format - 표시 형식 ('short', 'long', 'mention')
  * @returns {string} 형식에 맞는 사용자 표시 이름
  */
-function formatUserDisplay(user, format = 'short') {
-    if (!user) return '사용자';
-    
-    switch (format) {
-        case 'short':
-            return getUserName(user);
-        case 'long':
-            return getFullUserName(user);
-        case 'mention':
-            return getUserMention(user);
-        default:
-            return getUserName(user);
-    }
+function formatUserDisplay(user, format = "short") {
+  if (!user) return "사용자";
+
+  switch (format) {
+    case "short":
+      return getUserName(user);
+    case "long":
+      return getFullUserName(user);
+    case "mention":
+      return getUserMention(user);
+    default:
+      return getUserName(user);
+  }
 }
 
 /**
@@ -215,14 +215,14 @@ function formatUserDisplay(user, format = 'short') {
  * @returns {Object} 로그 객체
  */
 function createUserActivityLog(user, action, metadata = {}) {
-    return {
-        timestamp: new Date().toISOString(),
-        userId: user?.id || null,
-        userName: getUserName(user),
-        action: action,
-        metadata: metadata,
-        userAgent: user?.language_code || 'unknown'
-    };
+  return {
+    timestamp: new Date().toISOString(),
+    userId: user?.id || null,
+    userName: getUserName(user),
+    action: action,
+    metadata: metadata,
+    userAgent: user?.language_code || "unknown",
+  };
 }
 
 /**
@@ -231,16 +231,16 @@ function createUserActivityLog(user, action, metadata = {}) {
  * @returns {Object} 익명화된 사용자 정보
  */
 function anonymizeUser(user) {
-    if (!user) return null;
-    
-    return {
-        id: user.id,
-        isBot: user.is_bot || false,
-        languageCode: user.language_code || 'ko',
-        hasUsername: !!user.username,
-        hasFirstName: !!user.first_name,
-        hasLastName: !!user.last_name
-    };
+  if (!user) return null;
+
+  return {
+    id: user.id,
+    isBot: user.is_bot || false,
+    languageCode: user.language_code || "ko",
+    hasUsername: !!user.username,
+    hasFirstName: !!user.first_name,
+    hasLastName: !!user.last_name,
+  };
 }
 
 /**
@@ -249,7 +249,7 @@ function anonymizeUser(user) {
  * @returns {boolean} 그룹 채팅인지 여부
  */
 function isGroupChat(chat) {
-    return chat && (chat.type === 'group' || chat.type === 'supergroup');
+  return chat && (chat.type === "group" || chat.type === "supergroup");
 }
 
 /**
@@ -258,23 +258,23 @@ function isGroupChat(chat) {
  * @returns {boolean} 개인 채팅인지 여부
  */
 function isPrivateChat(chat) {
-    return chat && chat.type === 'private';
+  return chat && chat.type === "private";
 }
 
 module.exports = {
-    getUserName,
-    getFullUserName,
-    getUserMention,
-    getUserSummary,
-    isValidUserId,
-    isAdmin,
-    isBlocked,
-    isAllowed,
-    normalizeLanguageCode,
-    estimateUserTimezone,
-    formatUserDisplay,
-    createUserActivityLog,
-    anonymizeUser,
-    isGroupChat,
-    isPrivateChat
+  getUserName,
+  getFullUserName,
+  getUserMention,
+  getUserSummary,
+  isValidUserId,
+  isAdmin,
+  isBlocked,
+  isAllowed,
+  normalizeLanguageCode,
+  estimateUserTimezone,
+  formatUserDisplay,
+  createUserActivityLog,
+  anonymizeUser,
+  isGroupChat,
+  isPrivateChat,
 };
