@@ -2,7 +2,6 @@
 const Logger = require("../utils/Logger");
 const AppConfig = require("../config/AppConfig");
 const ModuleConfig = require("../config/ModuleConfig");
-const ModuleHelper = require("../utils/ModuleHelper");
 
 class ModuleManager {
   constructor(bot = null, config = {}) {

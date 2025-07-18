@@ -2,7 +2,6 @@
 const Logger = require("../utils/Logger");
 const MessageHandler = require("../handlers/MessageHandler");
 const CommandHandler = require("../handlers/CommandHandler");
-const DatabaseManager = require("../database/DatabaseManager");
 
 class BotController {
   constructor(bot, config) {
