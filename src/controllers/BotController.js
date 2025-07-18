@@ -38,10 +38,12 @@ class BotController {
       // 2. 모듈 매니저 초기화
       await this.initializeModuleManager();
 
-      // 3. 메뉴 매니저 초기화
-      this.initializeMenuManager();
+      // 3. 메뉴 매니저 초기화 (직접 처리)
+      const enabledModules = this.moduleManager.getEnabledModules();
+      this.menuManager = new MenuManager(this.bot, enabledModules);
+      Logger.success("메뉴 매니저 초기화 완료");
 
-      // 4. 콜백 매니저 초기화 - 중요: MenuManager 이후에 초기화
+      // 4. 콜백 매니저 초기화
       this.initializeCallbackManager();
 
       // 5. 핸들러 초기화
