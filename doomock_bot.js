@@ -9,19 +9,34 @@ const config = require("./src/config/config");
 
 // 환경 변수 검증
 function validateEnvironment() {
-  const required = ["TELEGRAM_BOT_TOKEN", "MONGODB_URI"];
-  const missing = required.filter((key) => !process.env[key]);
+  // 텔레그램 봇 토큰 확인 (여러 변수명 지원)
+  const token = process.env.BOT_TOKEN || process.env.BOT_TOKEN;
+  // MongoDB URI 확인 (여러 변수명 지원)
+  const mongoUri =
+    process.env.MONGODB_URI ||
+    process.env.MONGO_URL ||
+    process.env.DATABASE_URL;
 
-  if (missing.length > 0) {
+  if (!token) {
     throw new Error(
-      `Missing required environment variables: ${missing.join(", ")}`
+      "봇 토큰이 설정되지 않았습니다. TELEGRAM_BOT_TOKEN 또는 BOT_TOKEN을 설정하세요."
     );
   }
+
+  if (!mongoUri) {
+    throw new Error(
+      "MongoDB URI가 설정되지 않았습니다. MONGODB_URI, MONGO_URL, 또는 DATABASE_URL을 설정하세요."
+    );
+  }
+
+  // 환경변수를 global로 설정 (다른 곳에서 사용하기 위해)
+  process.env.BOT_TOKEN = token;
+  process.env.MONGODB_URI = mongoUri;
 }
 
 // 봇 인스턴스 생성 (폴링 전용)
 function createBot() {
-  const token = process.env.TELEGRAM_BOT_TOKEN;
+  const token = process.env.BOT_TOKEN;
 
   const bot = new TelegramBot(token, {
     polling: {
