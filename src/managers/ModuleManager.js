@@ -346,16 +346,14 @@ class ModuleManager {
     Logger.info(`자연어 메인 메뉴 트리거: "${msg.text}" (사용자: ${userName})`);
 
     if (isGroupChat) {
-      // 그룹에서는 간단한 응답
+      // 그룹에서도 인라인 키보드 제공
       const groupResponse =
         `🤖 네, ${userName}님! 두목봇입니다.\n\n` +
-        `다음 명령어를 사용해보세요:\n` +
-        `• /fortune - 운세 보기\n` +
-        `• /weather - 날씨 정보\n` +
-        `• /help - 도움말`;
+        `무엇을 도와드릴까요? 아래 메뉴를 선택해주세요:`;
 
       await bot.sendMessage(chatId, groupResponse, {
         reply_to_message_id: msg.message_id,
+        reply_markup: this.createMainMenuKeyboard(),
       });
     } else {
       // 개인 채팅에서는 풀 메뉴
@@ -496,19 +494,17 @@ class ModuleManager {
       case "start":
         // 그룹과 개인 채팅 모두에서 start 명령어 처리
         if (isGroupChat) {
-          // 그룹에서는 간단한 환영 메시지
+          // 그룹에서도 인라인 키보드 제공
           const { getUserName } = require("../utils/UserHelper");
           const userName = getUserName(msg.from);
 
           const groupWelcomeMessage =
             `🤖 안녕하세요 ${userName}님!\n\n` +
-            `두목봇입니다. 다음 명령어를 사용해보세요:\n` +
-            `• /fortune - 운세\n` +
-            `• /weather - 날씨\n` +
-            `• /help - 도움말`;
+            `두목봇입니다. 아래 메뉴를 선택해주세요:`;
 
           await bot.sendMessage(chatId, groupWelcomeMessage, {
             reply_to_message_id: msg.message_id,
+            reply_markup: this.createMainMenuKeyboard(),
           });
         } else {
           await this.handleStartCommand(bot, msg);
