@@ -4,7 +4,9 @@ const AppConfig = require("../config/AppConfig");
 const ModuleConfig = require("../config/ModuleConfig");
 
 class ModuleManager {
-  constructor() {
+  constructor(bot = null, config = {}) {
+    this.bot = bot;
+    this.config = config;
     this.modules = new Map();
     this.moduleOrder = [];
     this.isInitialized = false;
@@ -185,20 +187,15 @@ class ModuleManager {
       return null;
     }
 
-    if (moduleData.status !== "initialized") {
-      Logger.debug(
-        `모듈 ${moduleName}은 초기화되지 않음. 상태: ${moduleData.status}`
-      );
-      return null;
+    // 'loaded' 상태도 일단 반환 (초기화 전이라도)
+    if (moduleData.status === "initialized" || moduleData.status === "loaded") {
+      return moduleData.instance;
     }
 
-    return moduleData.instance;
-  }
-
-  // 모듈 로드 여부 확인
-  isModuleLoaded(moduleName) {
-    const moduleData = this.modules.get(moduleName);
-    return moduleData && moduleData.status === "initialized";
+    Logger.debug(
+      `모듈 ${moduleName}은 사용할 수 없는 상태. 상태: ${moduleData.status}`
+    );
+    return null;
   }
 
   // 명령어 처리할 모듈 찾기
@@ -310,7 +307,7 @@ class ModuleManager {
   }
 
   // 시스템 명령어 처리
-  async handleSystemCommand(bot, msg, command, args) {
+  async handleSystemCommand(bot, msg, command) {
     switch (command) {
       case "start":
         await this.handleStartCommand(bot, msg);

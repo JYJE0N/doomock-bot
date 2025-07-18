@@ -90,7 +90,19 @@ class BotController {
       userStates: this.userStates,
     });
 
-    await this.moduleManager.loadModules();
+    // initialize() 메서드가 loadModules()와 initializeModules()를 모두 처리
+    await this.moduleManager.initialize();
+
+    // 초기화 결과 확인
+    const loadedModules = this.moduleManager.getAllModules();
+    Logger.info(
+      "로드된 모듈 정보:",
+      loadedModules.map((m) => ({
+        name: m.name,
+        status: m.status,
+      }))
+    );
+
     Logger.success("모듈 매니저 초기화 완료");
   }
 
