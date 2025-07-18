@@ -5,7 +5,7 @@ const CallbackManager = require('../managers/CallbackManager');
 const ModuleManager = require('../managers/ModuleManager');
 const { MessageHandler } = require('../handlers/MessageHandler');
 const CommandHandler = require('../handlers/CommandHandler');
-const DatabaseManager = require('../services/DatabaseManager');
+const { DatabaseManager } = require('../database/DatabaseManager');
 const Logger = require('../utils/Logger');
 const UserHelper = require('../utils/UserHelper');
 
@@ -58,15 +58,29 @@ class BotController {
         }
     }
     
-    async initializeDatabase() {
-        if (this.config.mongoUrl) {
+    // BotController.js - initializeDatabase 메서드
+
+async initializeDatabase() {
+    if (this.config.mongoUrl) {
+        try {
             this.dbManager = new DatabaseManager(this.config.mongoUrl);
             await this.dbManager.connect();
+            
+            // 싱글톤 인스턴스 설정 (서비스들이 사용할 수 있도록)
+            if (DatabaseManager.setInstance) {
+                DatabaseManager.setInstance(this.dbManager);
+            }
+            
             Logger.success('데이터베이스 연결 성공');
-        } else {
-            Logger.warn('MongoDB URL이 없습니다. 일부 기능이 제한됩니다.');
+        } catch (error) {
+            Logger.error('데이터베이스 연결 실패:', error);
+            // DB 연결 실패해도 봇은 계속 실행
+            Logger.warn('MongoDB 없이 봇을 실행합니다. 일부 기능이 제한됩니다.');
         }
+    } else {
+        Logger.warn('MongoDB URL이 없습니다. 일부 기능이 제한됩니다.');
     }
+}
     
     async initializeModuleManager() {
         this.moduleManager = new ModuleManager(this.bot, {
