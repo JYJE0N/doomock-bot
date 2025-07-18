@@ -289,6 +289,12 @@ class ModuleManager {
       return true;
     }
 
+    // 재미있는 자연어 응답들
+    if (this.shouldRespondToChat(text)) {
+      await this.handleCasualChat(bot, msg);
+      return true;
+    }
+
     // 일반 메시지 처리 (모든 모듈에 전달)
     let handled = false;
     for (const [moduleName, moduleData] of this.modules.entries()) {
@@ -312,13 +318,196 @@ class ModuleManager {
     return handled;
   }
 
+  // 캐주얼한 대화에 응답할지 판단
+  shouldRespondToChat(text) {
+    if (!text) return false;
+
+    const normalizedText = text.toLowerCase().trim();
+
+    const chatTriggers = [
+      // 인사
+      "안녕",
+      "hello",
+      "hi",
+      "하이",
+      "헬로",
+      "안뇽",
+      "안냥",
+      // 감사
+      "고마워",
+      "감사",
+      "thank",
+      "땡큐",
+      "고맙",
+      "감사해",
+      "고마워요",
+      // 칭찬
+      "멋져",
+      "대단해",
+      "짱",
+      "최고",
+      "좋아",
+      "굿",
+      "good",
+      "great",
+      "완벽",
+      // 질문
+      "뭐해",
+      "뭐하니",
+      "뭐하는거야",
+      "뭐하고있어",
+      "심심해",
+      "놀자",
+      // 인정
+      "그래",
+      "맞아",
+      "맞네",
+      "인정",
+      "맞다",
+      "그렇네",
+      // 놀람
+      "헐",
+      "와",
+      "대박",
+      "오오",
+      "우와",
+      "쩐다",
+      "미쳤다",
+      // 이모티콘만 있는 경우
+      "😀",
+      "😊",
+      "👍",
+      "❤️",
+      "💖",
+      "🥰",
+      "😍",
+      "🔥",
+      "💪",
+      "✨",
+    ];
+
+    return chatTriggers.some((trigger) => normalizedText.includes(trigger));
+  }
+
+  // 캐주얼한 대화 응답
+  async handleCasualChat(bot, msg) {
+    const { getUserName } = require("../utils/UserHelper");
+    const userName = getUserName(msg.from);
+    const text = msg.text.toLowerCase().trim();
+    const isGroupChat =
+      msg.chat.type === "group" || msg.chat.type === "supergroup";
+
+    let response = "";
+    let includeMenu = false;
+
+    // 텍스트 기반 응답 선택
+    if (
+      text.includes("안녕") ||
+      text.includes("hello") ||
+      text.includes("hi")
+    ) {
+      const hellos = [
+        `안녕하세요 ${userName}님! 😊`,
+        `${userName}님 안녕! 👋✨`,
+        `하이 ${userName}님! 🌟`,
+        `헬로 ${userName}님! 반가워요! 🎉`,
+        `${userName}님! 안뇽~ 😄`,
+      ];
+      response = hellos[Math.floor(Math.random() * hellos.length)];
+      includeMenu = true;
+    } else if (
+      text.includes("고마") ||
+      text.includes("감사") ||
+      text.includes("thank")
+    ) {
+      const thanks = [
+        `${userName}님! 천만에요~ 😊`,
+        `도움이 되어서 기뻐요! 💖`,
+        `${userName}님을 위해서라면! 🔥`,
+        `언제든지 말씀하세요! ✨`,
+        `저야말로 감사해요! 🥰`,
+      ];
+      response = thanks[Math.floor(Math.random() * thanks.length)];
+    } else if (
+      text.includes("멋져") ||
+      text.includes("대단") ||
+      text.includes("짱") ||
+      text.includes("최고") ||
+      text.includes("good")
+    ) {
+      const compliments = [
+        `${userName}님이 더 멋져요! 😎`,
+        `${userName}님 덕분이에요! 🌟`,
+        `칭찬해주셔서 감사해요! 💪`,
+        `${userName}님이 진짜 최고! 🔥`,
+        `${userName}님 센스 쩔어요! ✨`,
+      ];
+      response = compliments[Math.floor(Math.random() * compliments.length)];
+    } else if (
+      text.includes("뭐해") ||
+      text.includes("뭐하") ||
+      text.includes("심심") ||
+      text.includes("놀자")
+    ) {
+      const activities = [
+        `${userName}님을 기다리고 있었어요! 😄`,
+        `${userName}님과 함께 일할 준비 중이에요! 💼`,
+        `날씨나 운세 궁금하지 않나요? 🌤️🔮`,
+        `할일 정리라도 해볼까요? 📝`,
+        `뭐든 도와드릴게요! 🛠️`,
+      ];
+      response = activities[Math.floor(Math.random() * activities.length)];
+      includeMenu = true;
+    } else if (
+      text.includes("헐") ||
+      text.includes("와") ||
+      text.includes("대박") ||
+      text.includes("우와")
+    ) {
+      const surprises = [
+        `${userName}님도 놀라셨나요? 😲`,
+        `정말 대박이죠! 🔥`,
+        `${userName}님 반응이 최고에요! 😄`,
+        `저도 깜짝 놀랐어요! ⚡`,
+        `${userName}님과 같은 반응! 🤝`,
+      ];
+      response = surprises[Math.floor(Math.random() * surprises.length)];
+    } else {
+      // 기본 친근한 응답
+      const defaults = [
+        `${userName}님! 🥰`,
+        `네네 ${userName}님! 😊`,
+        `${userName}님 말씀이 맞아요! 👍`,
+        `${userName}님과 대화하니 즐거워요! ✨`,
+        `${userName}님! 더 얘기해요! 💬`,
+      ];
+      response = defaults[Math.floor(Math.random() * defaults.length)];
+    }
+
+    // 응답 전송
+    const sendOptions = isGroupChat
+      ? { reply_to_message_id: msg.message_id }
+      : {};
+
+    if (includeMenu && !isGroupChat) {
+      // 개인 채팅에서만 메뉴 제공
+      sendOptions.reply_markup = {
+        inline_keyboard: [
+          [{ text: "🎯 메뉴 보기", callback_data: "main_menu" }],
+        ],
+      };
+    }
+
+    await bot.sendMessage(msg.chat.id, response, sendOptions);
+  }
+
   // 자연어에서 메인 메뉴 트리거 여부 확인
   shouldTriggerMainMenu(text) {
     if (!text) return false;
 
     const normalizedText = text.toLowerCase().trim();
 
-    // "두목" 단어가 포함된 경우
+    // "두목" 단어가 포함된 경우 + 재미있는 표현들
     const triggerWords = [
       "두목",
       "두목봇",
@@ -332,9 +521,46 @@ class ModuleManager {
       "두목 시작",
       "두목 도움",
       "두목 도와줘",
+      // 재미있는 표현들 추가
+      "두목님",
+      "두목 형",
+      "두목 누나",
+      "두목 언니",
+      "두목 오빠",
+      "두목 형님",
+      "보스",
+      "boss",
+      "우두머리",
+      "두목 여기",
+      "두목 와봐",
+      "두목 나와",
+      "두목 뭐해",
+      "두목 심심해",
+      "두목 놀자",
+      "헬로 두목",
+      "hi 두목",
+      "hello 두목",
     ];
 
     return triggerWords.some((word) => normalizedText.includes(word));
+  }
+
+  // 추가: 재미있는 응답들
+  getRandomGreeting(userName) {
+    const greetings = [
+      `🤖 네, ${userName}님! 두목봇 출동! 💪`,
+      `🚀 ${userName}님! 두목봇이 달려왔습니다! ⚡`,
+      `🎯 ${userName}님을 위한 두목봇 서비스! 👋`,
+      `💎 ${userName}님! 두목봇이 여기 있어요! ✨`,
+      `🔥 ${userName}님! 두목봇 준비 완료! 🎉`,
+      `⭐ ${userName}님 안녕하세요! 두목봇입니다! 🌟`,
+      `🎊 ${userName}님! 두목봇이 도착했어요! 🎈`,
+      `🚁 ${userName}님! 두목봇 헬기 착륙! 🛬`,
+      `🎮 ${userName}님! 두목봇 게임 시작! 🕹️`,
+      `🍕 ${userName}님! 두목봇 배달 왔어요! 🛵`,
+    ];
+
+    return greetings[Math.floor(Math.random() * greetings.length)];
   }
 
   // 자연어로 메인 메뉴 호출
@@ -345,11 +571,13 @@ class ModuleManager {
 
     Logger.info(`자연어 메인 메뉴 트리거: "${msg.text}" (사용자: ${userName})`);
 
+    // 재미있는 랜덤 인사말
+    const greeting = this.getRandomGreeting(userName);
+
     if (isGroupChat) {
       // 그룹에서도 인라인 키보드 제공
       const groupResponse =
-        `🤖 네, ${userName}님! 두목봇입니다.\n\n` +
-        `무엇을 도와드릴까요? 아래 메뉴를 선택해주세요:`;
+        `${greeting}\n\n` + `무엇을 도와드릴까요? 아래 메뉴를 선택해주세요:`;
 
       await bot.sendMessage(chatId, groupResponse, {
         reply_to_message_id: msg.message_id,
@@ -358,7 +586,7 @@ class ModuleManager {
     } else {
       // 개인 채팅에서는 풀 메뉴
       const welcomeMessage =
-        `🤖 **네, ${userName}님! 두목봇입니다!**\n\n` +
+        `**${greeting}**\n\n` +
         `무엇을 도와드릴까요? 👋\n\n` +
         `아래 메뉴에서 원하는 기능을 선택해주세요:`;
 
