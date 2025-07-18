@@ -3,7 +3,7 @@
 const MenuManager = require('../managers/MenuManager');
 const CallbackManager = require('../managers/CallbackManager');
 const ModuleManager = require('../managers/ModuleManager');
-const { MessageHandler } = require('../handlers/MessageHandler');
+const MessageHandler = require('../handlers/MessageHandler');
 const CommandHandler = require('../handlers/CommandHandler');
 const { DatabaseManager } = require('../database/DatabaseManager');
 const Logger = require('../utils/Logger');
