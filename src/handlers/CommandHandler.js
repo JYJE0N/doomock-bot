@@ -32,41 +32,70 @@ class CommandHandler {
     this.commandRouter.set("/admin", this.handleAdmin.bind(this));
   }
 
+  //핸들 메서드 수정
   async handle(msg) {
-    const text = msg.text;
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-
-    // 명령어 파싱
-    const parts = text.split(" ");
-    const command = parts[0].substring(1); // '/' 제거
-    const args = parts.slice(1);
-
-    Logger.info(`명령어 처리: ${command}`, { userId, args });
-
     try {
-      // 시스템 명령어 확인
-      const handler = this.commandRouter.get(`/${command}`);
-      if (handler) {
-        await handler(msg, command, args);
+      // 메시지 검증
+      if (!msg || !msg.text) {
+        Logger.warn("텍스트가 없는 메시지");
         return;
       }
 
-      // 모듈 명령어 확인
-      const moduleCommand = await this.moduleManager.handleCommand(
-        msg,
-        command,
-        args
-      );
-      if (moduleCommand) {
+      const text = msg.text;
+      const chatId = msg.chat.id;
+      const userId = msg.from.id;
+
+      // 명령어가 아닌 경우
+      if (!text.startsWith("/")) {
         return;
       }
 
-      // 알 수 없는 명령어
-      await this.handleUnknownCommand(msg, command);
+      // 명령어 파싱 (안전하게)
+      const parts = text.split(" ").filter(Boolean);
+      const commandWithSlash = parts[0];
+      const command = commandWithSlash.substring(1); // '/' 제거
+      const args = parts.slice(1);
+
+      Logger.info(`명령어 처리: /${command}`, {
+        userId,
+        args,
+        fullText: text,
+      });
+
+      // 봇 멘션 제거 (그룹 채팅에서)
+      const cleanCommand = command.replace(/@\w+$/, "");
+
+      try {
+        // 시스템 명령어 확인
+        const handler = this.commandRouter.get(`/${cleanCommand}`);
+        if (handler) {
+          await handler(msg, cleanCommand, args);
+          return;
+        }
+
+        // 모듈 명령어 확인
+        if (this.moduleManager) {
+          const moduleCommand = await this.moduleManager.handleCommand(
+            msg,
+            cleanCommand,
+            args
+          );
+          if (moduleCommand) {
+            return;
+          }
+        }
+
+        // 알 수 없는 명령어
+        await this.handleUnknownCommand(msg, cleanCommand);
+      } catch (error) {
+        Logger.error(`명령어 처리 실패 [${cleanCommand}]:`, error);
+        await this.sendErrorMessage(chatId, error);
+      }
     } catch (error) {
-      Logger.error(`명령어 처리 실패 [${command}]:`, error);
-      await this.sendErrorMessage(chatId, error);
+      Logger.error("명령어 핸들러 오류:", error);
+      if (msg && msg.chat && msg.chat.id) {
+        await this.sendErrorMessage(msg.chat.id, error);
+      }
     }
   }
 

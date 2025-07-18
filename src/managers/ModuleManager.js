@@ -276,38 +276,75 @@ class ModuleManager {
   }
 
   // 명령어 처리
-  async handleCommand(bot, msg) {
-    const text = msg.text;
-    const parts = text.split(" ");
-    const command = parts[0].substring(1); // '/' 제거
-    const args = parts.slice(1);
+  async handleCommand(msg, command, args) {
+    try {
+      const userId = msg.from.id;
+      const chatId = msg.chat.id;
+      const text = msg.text || ""; // undefined 방지
 
-    Logger.userAction(msg.from.id, "command", { command, args });
+      Logger.info(`모듈 명령어 처리 시도: ${command}`, {
+        userId,
+        args,
+        text,
+      });
 
-    // 시스템 명령어 우선 처리
-    if (await this.handleSystemCommand(bot, msg, command, args)) {
-      return true;
-    }
-
-    // 모듈에서 명령어 처리
-    const module = this.findModuleForCommand(command);
-    if (module) {
-      try {
-        const timer = Logger.startTimer(`command:${command}`);
-        const result = await module.handleCommand(bot, msg, command, args);
-        timer.end({ module: module.name, success: !!result });
-
-        return result;
-      } catch (error) {
-        Logger.error(`명령어 ${command} 처리 실패:`, error);
-        await this.sendErrorMessage(bot, msg.chat.id, error);
+      // text가 없는 경우 처리
+      if (!text) {
+        Logger.warn("텍스트가 없는 명령어", { command });
         return false;
       }
-    }
 
-    // 알 수 없는 명령어
-    await this.handleUnknownCommand(bot, msg, command);
-    return false;
+      // command가 없는 경우 처리
+      if (!command) {
+        Logger.warn("명령어가 없음");
+        return false;
+      }
+
+      // 명령어 파싱 (안전하게)
+      const parts = text.split ? text.split(" ").filter(Boolean) : [];
+      const cmd = parts[0] ? parts[0].substring(1) : command; // '/' 제거
+      const cmdArgs = parts.slice(1);
+
+      // 등록된 모듈 명령어 확인
+      for (const [moduleId, module] of this.modules) {
+        if (!module.commands || !Array.isArray(module.commands)) {
+          continue;
+        }
+
+        // 모듈의 명령어와 일치하는지 확인
+        if (
+          module.commands.includes(cmd) ||
+          module.commands.includes(command)
+        ) {
+          Logger.info(`모듈 명령어 매칭: ${moduleId} - ${cmd}`);
+
+          // 모듈 활성화
+          await this.activateModule(userId, moduleId);
+
+          // 모듈에 명령어 전달
+          if (
+            module.loaded &&
+            module.instance &&
+            module.instance.handleCommand
+          ) {
+            return await module.instance.handleCommand(msg, cmd, cmdArgs);
+          }
+
+          return true;
+        }
+      }
+
+      // tts 명령어 특별 처리 (모듈이 없는 경우)
+      if (command === "tts" || cmd === "tts") {
+        await this.bot.sendMessage(chatId, "TTS 기능은 아직 준비 중입니다. 🔊");
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      Logger.error("모듈 명령어 처리 오류:", error);
+      return false;
+    }
   }
 
   // 시스템 명령어 처리
