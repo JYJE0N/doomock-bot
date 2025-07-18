@@ -722,13 +722,14 @@ class ModuleManager {
       case "start":
         // 그룹과 개인 채팅 모두에서 start 명령어 처리
         if (isGroupChat) {
-          // 그룹에서도 인라인 키보드 제공
+          // 그룹에서도 인라인 키보드 제공 (자연스러운 메시지)
           const { getUserName } = require("../utils/UserHelper");
           const userName = getUserName(msg.from);
 
+          // 랜덤 재미있는 인사말 사용
+          const greeting = this.getRandomGreeting(userName);
           const groupWelcomeMessage =
-            `🤖 안녕하세요 ${userName}님!\n\n` +
-            `두목봇입니다. 아래 메뉴를 선택해주세요:`;
+            `${greeting}\n\n` + `아래 메뉴를 선택해주세요:`;
 
           await bot.sendMessage(chatId, groupWelcomeMessage, {
             reply_to_message_id: msg.message_id,
@@ -770,10 +771,12 @@ class ModuleManager {
     const { getUserName } = require("../utils/UserHelper");
     const userName = getUserName(msg.from);
 
+    // 랜덤 재미있는 인사말 사용
+    const greeting = this.getRandomGreeting(userName);
+
     const welcomeMessage =
-      `🤖 **두목봇에 오신걸 환영합니다!**\n\n` +
-      `안녕하세요 ${userName}님! 👋\n\n` +
-      `두목봇은 직장인을 위한 종합 생산성 도구입니다.\n` +
+      `**${greeting}**\n\n` +
+      `무엇을 도와드릴까요? 👋\n\n` +
       `아래 메뉴에서 원하는 기능을 선택해주세요:`;
 
     await bot.sendMessage(msg.chat.id, welcomeMessage, {
@@ -905,28 +908,42 @@ class ModuleManager {
     let replyMarkup = null;
 
     if (isGroupChat) {
-      // 그룹에서는 간단한 응답
-      message = `❓ 알 수 없는 명령어: /${command}`;
+      // 그룹에서는 간단하고 친근한 응답
+      const responses = [
+        `❓ "${command}" 명령어를 몰라요~ 😅`,
+        `🤔 "${command}"... 처음 들어보는데요?`,
+        `😊 "${command}" 대신 다른 걸 해볼까요?`,
+        `🎯 "${command}"보다 이런 건 어때요?`,
+      ];
+      message = responses[Math.floor(Math.random() * responses.length)];
 
-      // 그룹에서는 인라인 키보드 없이 텍스트만
       await bot.sendMessage(chatId, message, {
         reply_to_message_id: msg.message_id,
       });
     } else {
-      // 개인 채팅에서는 자세한 안내
+      // 개인 채팅에서는 도움이 되는 안내
+      const helpResponses = [
+        `🤷‍♂️ **"${command}" 명령어를 찾을 수 없어요!**\n\n${userName}님, 이런 건 어떠세요?`,
+        `😅 **"${command}" 아직 배우지 못했어요!**\n\n${userName}님, 대신 이런 기능들이 있어요:`,
+        `🎯 **"${command}" 대신 다른 걸 해볼까요?**\n\n${userName}님을 위한 추천 기능들:`,
+        `💡 **앗, "${command}" 모르겠어요!**\n\n${userName}님, 이런 기능들을 사용해보세요:`,
+      ];
+
+      const randomHelp =
+        helpResponses[Math.floor(Math.random() * helpResponses.length)];
+
       message =
-        `❓ **알 수 없는 명령어입니다: /${command}**\n\n` +
-        `${userName}님, 다음 명령어를 사용해보세요:\n\n` +
-        `• /start - 메인 메뉴\n` +
-        `• /help - 도움말\n` +
-        `• /fortune - 운세 보기\n` +
-        `• /weather - 날씨 정보\n` +
-        `• /todo - 할일 관리\n`;
+        `${randomHelp}\n\n` +
+        `• 🔮 /fortune - 운세 보기\n` +
+        `• 🌤️ /weather - 날씨 정보\n` +
+        `• 📝 /todo - 할일 관리\n` +
+        `• ❓ /help - 전체 도움말\n\n` +
+        `또는 "두목"이라고 불러주세요! 😊`;
 
       replyMarkup = {
         inline_keyboard: [
           [
-            { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+            { text: "🎯 메뉴 보기", callback_data: "main_menu" },
             { text: "❓ 도움말", callback_data: "help" },
           ],
         ],
