@@ -97,7 +97,7 @@ class BotController {
       submenus: ["start", "help", "status", "cancel"],
     });
 
-    // 모듈 선택 메뉴
+    // MessageHandler 생성 (올바른 위치로 이동)
     this.messageHandler = new MessageHandler(this.bot, {
       moduleManager: this.managers.module,
       menuManager: this.managers.menu,
@@ -105,11 +105,11 @@ class BotController {
       userStates: this.userStates,
     });
 
-    // 설정 메뉴
-    this.menuRouter.set("main", {
-      handler: this.managers.message.showMainMenu.bind(this.managers.message),
-      submenus: ["start", "help", "status", "cancel"],
-    });
+    // ❌ 이 부분 주석 처리 (오류 원인)
+    // this.menuRouter.set("main", {
+    //   handler: this.managers.message.showMainMenu.bind(this.managers.message),
+    //   submenus: ["start", "help", "status", "cancel"],
+    // });
   }
 
   registerEventListeners() {

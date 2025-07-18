@@ -48,6 +48,9 @@ class ModuleManager {
       ([, a], [, b]) => (a.priority || 100) - (b.priority || 100)
     );
 
+    // 🚀 병렬로 모듈 로드 (속도 개선)
+    const loadPromises = [];
+
     for (const [moduleName, config] of sortedConfigs) {
       try {
         // 기능 토글 확인
@@ -56,21 +59,30 @@ class ModuleManager {
           continue;
         }
 
-        await this.loadModule(moduleName, config);
-        this.moduleOrder.push(moduleName);
+        // 병렬 로드를 위해 Promise 추가
+        loadPromises.push(this.loadModuleAsync(moduleName, config));
       } catch (error) {
         Logger.error(`❌ 모듈 ${moduleName} 로드 실패:`, error);
-
-        // 필수 모듈인 경우 전체 시스템 중단
-        if (config.required) {
-          throw new Error(`필수 모듈 ${moduleName} 로드 실패`);
-        }
       }
     }
+
+    // 🚀 모든 모듈을 병렬로 로드
+    const results = await Promise.allSettled(loadPromises);
+
+    // 결과 처리
+    results.forEach((result, index) => {
+      if (result.status === "fulfilled") {
+        const moduleName = result.value;
+        this.moduleOrder.push(moduleName);
+        Logger.success(`✅ 모듈 ${moduleName} 로드 완료`);
+      } else {
+        Logger.error(`❌ 모듈 로드 실패:`, result.reason);
+      }
+    });
   }
 
-  // 개별 모듈 로드
-  async loadModule(moduleName, config) {
+  // 새로 추가: 비동기 모듈 로드
+  async loadModuleAsync(moduleName, config) {
     try {
       Logger.info(`📦 모듈 ${moduleName} 로드 중...`);
 
@@ -86,10 +98,10 @@ class ModuleManager {
         Logger.warn(
           `⚠️ 모듈 파일 ${config.path}을 찾을 수 없습니다. 스킵합니다.`
         );
-        return; // 모듈 로드 실패 시 그냥 스킵
+        return null;
       }
 
-      // 모듈 인스턴스 생성_임시생성
+      // 모듈 인스턴스 생성
       const moduleInstance = new ModuleClass(config);
 
       // 모듈 등록
@@ -100,14 +112,9 @@ class ModuleManager {
         loadTime: new Date(),
       });
 
-      Logger.success(`✅ 모듈 ${moduleName} 로드 완료`);
+      return moduleName;
     } catch (error) {
       Logger.error(`❌ 모듈 ${moduleName} 로드 실패:`, error);
-      // 필수 모듈이 아니면 에러를 던지지 않음
-      if (!config.required) {
-        Logger.warn(`⚠️ 선택적 모듈 ${moduleName} 로드 실패, 계속 진행합니다.`);
-        return;
-      }
       throw error;
     }
   }
