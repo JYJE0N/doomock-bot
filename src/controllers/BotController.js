@@ -1,3 +1,5 @@
+// src/controllers/BotController.js - 개선된 버전 3
+
 const Logger = require("../utils/Logger");
 
 class BotController {
@@ -45,7 +47,10 @@ class BotController {
   async initializeDatabase() {
     const DatabaseManager = require("../database/DatabaseManager");
     this.dbManager = new DatabaseManager();
-    await this.dbManager.connect();
+
+    // BotController 생성시 전달받은 mongoUri 사용
+    const mongoUri = this.config.mongoUri;
+    await this.dbManager.connect(mongoUri);
   }
 
   async initializeManagers() {
