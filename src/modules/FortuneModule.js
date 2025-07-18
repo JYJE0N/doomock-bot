@@ -42,41 +42,6 @@ class FortuneModule extends BaseModule {
       from,
     } = callbackQuery;
     const userName = getUserName(from);
-
-    // 운세 관리
-    this.routes.set("fortune_menu", { module: "fortune", method: "showMenu" });
-    this.routes.set("fortune_general", {
-      module: "fortune",
-      method: "showGeneral",
-    });
-    this.routes.set("fortune_work", { module: "fortune", method: "showWork" });
-    this.routes.set("fortune_love", { module: "fortune", method: "showLove" });
-    this.routes.set("fortune_money", {
-      module: "fortune",
-      method: "showMoney",
-    });
-    this.routes.set("fortune_health", {
-      module: "fortune",
-      method: "showHealth",
-    });
-    this.routes.set("fortune_meeting", {
-      module: "fortune",
-      method: "showMeeting",
-    });
-    this.routes.set("fortune_tarot", {
-      module: "fortune",
-      method: "showTarot",
-    });
-    this.routes.set("fortune_tarot3", {
-      module: "fortune",
-      method: "showTarotThreeSpread",
-    });
-    this.routes.set("fortune_lucky", {
-      module: "fortune",
-      method: "showLucky",
-    });
-    this.routes.set("fortune_all", { module: "fortune", method: "showAll" });
-
     switch (subAction) {
       case "menu":
         await this.showFortuneMenu(
