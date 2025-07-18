@@ -13,6 +13,10 @@ class MenuManager {
     Logger.info("📋 MenuManager 초기화됨");
   }
 
+  setDependencies(dependencies) {
+    this.dependencies = dependencies;
+  }
+
   // 메인 메뉴 키보드 생성
   async getMainMenuKeyboard() {
     try {
