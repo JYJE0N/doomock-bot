@@ -281,6 +281,14 @@ class ModuleManager {
       return await this.handleCommand(bot, msg);
     }
 
+    // 자연어 처리 - "두목" 단어 감지
+    if (this.shouldTriggerMainMenu(text)) {
+      const isGroupChat =
+        msg.chat.type === "group" || msg.chat.type === "supergroup";
+      await this.handleNaturalLanguageMainMenu(bot, msg, isGroupChat);
+      return true;
+    }
+
     // 일반 메시지 처리 (모든 모듈에 전달)
     let handled = false;
     for (const [moduleName, moduleData] of this.modules.entries()) {
@@ -302,6 +310,65 @@ class ModuleManager {
     }
 
     return handled;
+  }
+
+  // 자연어에서 메인 메뉴 트리거 여부 확인
+  shouldTriggerMainMenu(text) {
+    if (!text) return false;
+
+    const normalizedText = text.toLowerCase().trim();
+
+    // "두목" 단어가 포함된 경우
+    const triggerWords = [
+      "두목",
+      "두목봇",
+      "두목아",
+      "두목이",
+      "두목이야",
+      "두목봇아",
+      "안녕 두목",
+      "두목 안녕",
+      "두목 메뉴",
+      "두목 시작",
+      "두목 도움",
+      "두목 도와줘",
+    ];
+
+    return triggerWords.some((word) => normalizedText.includes(word));
+  }
+
+  // 자연어로 메인 메뉴 호출
+  async handleNaturalLanguageMainMenu(bot, msg, isGroupChat = false) {
+    const { getUserName } = require("../utils/UserHelper");
+    const userName = getUserName(msg.from);
+    const chatId = msg.chat.id;
+
+    Logger.info(`자연어 메인 메뉴 트리거: "${msg.text}" (사용자: ${userName})`);
+
+    if (isGroupChat) {
+      // 그룹에서는 간단한 응답
+      const groupResponse =
+        `🤖 네, ${userName}님! 두목봇입니다.\n\n` +
+        `다음 명령어를 사용해보세요:\n` +
+        `• /fortune - 운세 보기\n` +
+        `• /weather - 날씨 정보\n` +
+        `• /help - 도움말`;
+
+      await bot.sendMessage(chatId, groupResponse, {
+        reply_to_message_id: msg.message_id,
+      });
+    } else {
+      // 개인 채팅에서는 풀 메뉴
+      const welcomeMessage =
+        `🤖 **네, ${userName}님! 두목봇입니다!**\n\n` +
+        `무엇을 도와드릴까요? 👋\n\n` +
+        `아래 메뉴에서 원하는 기능을 선택해주세요:`;
+
+      await bot.sendMessage(chatId, welcomeMessage, {
+        parse_mode: "Markdown",
+        reply_markup: this.createMainMenuKeyboard(),
+      });
+    }
   }
 
   async handleCommand(bot, msg) {
