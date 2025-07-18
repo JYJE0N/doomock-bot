@@ -254,6 +254,68 @@ class ModuleManager {
 
   findModuleForCallback(callbackData) {
     try {
+      // 정확한 매핑으로 먼저 확인
+      const moduleMapping = {
+        todo_menu: "TodoModule",
+        fortune_menu: "FortuneModule",
+        weather_menu: "WeatherModule",
+        timer_menu: "TimerModule",
+        leave_menu: "LeaveModule",
+        worktime_menu: "WorktimeModule",
+        insight_menu: "InsightModule",
+        utils_menu: "UtilsModule",
+        reminder_menu: "ReminderModule",
+        // 추가 콜백들
+        fortune_today: "FortuneModule",
+        fortune_work: "FortuneModule",
+        fortune_love: "FortuneModule",
+        fortune_tarot: "FortuneModule",
+        weather_current: "WeatherModule",
+        weather_forecast: "WeatherModule",
+        todo_add: "TodoModule",
+        todo_list: "TodoModule",
+        timer_start: "TimerModule",
+        timer_stop: "TimerModule",
+      };
+
+      // 정확한 매핑이 있는 경우
+      if (moduleMapping[callbackData]) {
+        const moduleName = moduleMapping[callbackData];
+        const moduleData = this.modules.get(moduleName);
+        if (moduleData && moduleData.status === "initialized") {
+          Logger.debug(
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (정확 매핑)`
+          );
+          return moduleData.instance;
+        }
+      }
+
+      // 접두사 기반 매핑
+      const prefix = callbackData.split("_")[0];
+      const prefixMapping = {
+        todo: "TodoModule",
+        fortune: "FortuneModule",
+        weather: "WeatherModule",
+        timer: "TimerModule",
+        leave: "LeaveModule",
+        worktime: "WorktimeModule",
+        insight: "InsightModule",
+        utils: "UtilsModule",
+        reminder: "ReminderModule",
+      };
+
+      if (prefixMapping[prefix]) {
+        const moduleName = prefixMapping[prefix];
+        const moduleData = this.modules.get(moduleName);
+        if (moduleData && moduleData.status === "initialized") {
+          Logger.debug(
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (접두사 매핑)`
+          );
+          return moduleData.instance;
+        }
+      }
+
+      // 기존 방식으로 폴백
       for (const [moduleName, moduleData] of this.modules.entries()) {
         if (moduleData.status !== "initialized") continue;
 
@@ -262,7 +324,9 @@ class ModuleManager {
           instance.canHandleCallback &&
           instance.canHandleCallback(callbackData)
         ) {
-          Logger.debug(`콜백 ${callbackData}를 ${moduleName}에서 처리`);
+          Logger.debug(
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (canHandleCallback)`
+          );
           return instance;
         }
       }
@@ -701,7 +765,18 @@ class ModuleManager {
     const module = this.findModuleForCallback(data);
     if (module) {
       try {
-        return await module.handleCallback(bot, callbackQuery);
+        // 모듈에 handleCallback 메서드가 있는지 확인
+        if (typeof module.handleCallback === "function") {
+          return await module.handleCallback(bot, callbackQuery);
+        } else {
+          // 기본 메뉴 표시 처리
+          return await this.handleBasicModuleCallback(
+            bot,
+            callbackQuery,
+            module,
+            data
+          );
+        }
       } catch (error) {
         Logger.error(`콜백 ${data} 처리 실패:`, error);
         await this.sendErrorMessage(bot, callbackQuery.message.chat.id, error);
@@ -711,6 +786,98 @@ class ModuleManager {
 
     Logger.warn(`처리할 수 없는 콜백: ${data}`);
     return false;
+  }
+
+  // 기본 모듈 콜백 처리 (모듈에 handleCallback이 없는 경우)
+  async handleBasicModuleCallback(bot, callbackQuery, module, data) {
+    const chatId = callbackQuery.message.chat.id;
+    const moduleType = data.split("_")[0];
+
+    // 기본 메뉴 응답들
+    const basicResponses = {
+      todo_menu: {
+        text: "📝 **할일 관리**\n\n할일을 효율적으로 관리해보세요!",
+        buttons: [
+          [{ text: "➕ 할일 추가", callback_data: "todo_add" }],
+          [{ text: "📋 할일 목록", callback_data: "todo_list" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      },
+      fortune_menu: {
+        text: "🔮 **오늘의 운세**\n\n어떤 운세를 보시겠어요?",
+        buttons: [
+          [{ text: "🌟 종합 운세", callback_data: "fortune_today" }],
+          [{ text: "💼 업무 운세", callback_data: "fortune_work" }],
+          [{ text: "🎴 타로카드", callback_data: "fortune_tarot" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      },
+      weather_menu: {
+        text: "🌤️ **날씨 정보**\n\n날씨를 확인해보세요!",
+        buttons: [
+          [{ text: "📍 현재 날씨", callback_data: "weather_current" }],
+          [{ text: "📅 날씨 예보", callback_data: "weather_forecast" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      },
+      timer_menu: {
+        text: "⏰ **타이머**\n\n작업 시간을 관리해보세요!",
+        buttons: [
+          [{ text: "▶️ 타이머 시작", callback_data: "timer_start" }],
+          [{ text: "⏹️ 타이머 정지", callback_data: "timer_stop" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      },
+      utils_menu: {
+        text: "🛠️ **유틸리티**\n\n편리한 도구들을 사용해보세요!",
+        buttons: [
+          [{ text: "🗣️ TTS (말하기)", callback_data: "utils_tts" }],
+          [{ text: "📋 도구 목록", callback_data: "utils_list" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      },
+    };
+
+    // 기본 응답이 있는 경우
+    if (basicResponses[data]) {
+      const response = basicResponses[data];
+      try {
+        await bot.editMessageText(response.text, {
+          chat_id: chatId,
+          message_id: callbackQuery.message.message_id,
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: response.buttons,
+          },
+        });
+        return true;
+      } catch (error) {
+        Logger.error("기본 메뉴 응답 실패:", error);
+      }
+    }
+
+    // 기본 응답
+    const moduleName = this.getModuleDisplayName(
+      module.constructor.name || "Unknown"
+    );
+    const defaultText = `${this.getModuleIcon(module.constructor.name)} **${moduleName}**\n\n서비스 준비 중입니다! 🚧`;
+
+    try {
+      await bot.editMessageText(defaultText, {
+        chat_id: chatId,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+          ],
+        },
+      });
+      return true;
+    } catch (error) {
+      Logger.error("기본 콜백 응답 실패:", error);
+      return false;
+    }
   }
 
   // ========== 시스템 명령어 처리 ==========
