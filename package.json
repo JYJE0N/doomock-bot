@@ -1,7 +1,7 @@
 {
   "name": "doomock-bot",
-  "version": "2.0.0",
-  "description": "리팩토링된 두목봇 - 직장인을 위한 스마트 어시스턴트",
+  "version": "3.0.1",
+  "description": "두목봇 - 직장인을 위한 어시스턴트",
   "main": "doomock_bot.js",
   "scripts": {
     "start": "node doomock_bot.js",
