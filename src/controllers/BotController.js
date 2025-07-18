@@ -191,44 +191,68 @@ class BotController {
       // 콜백 데이터 파싱
       const [action, ...params] = data.split(":");
 
-      // 메뉴 관련 콜백
-      if (action === "menu") {
-        const menuId = params[0];
-        if (menuId && this.menuManager) {
-          await this.menuManager.showMenu(chatId, menuId, messageId, userId);
-        }
-        return;
-      }
+      // 콜백 라우터
+      switch (action) {
+        case "main":
+          // 메인 관련 액션
+          if (params[0] === "menu") {
+            await this.showMainMenu(chatId, messageId, userId);
+          } else if (params[0] === "modules") {
+            await this.showModuleList(chatId, messageId, userId);
+          }
+          break;
 
-      // 모듈 관련 콜백
-      if (action === "module") {
-        const moduleAction = params[0];
+        case "menu":
+          // 메뉴 관련 액션
+          if (this.menuManager) {
+            await this.menuManager.showMenu(
+              chatId,
+              params[0],
+              messageId,
+              userId
+            );
+          }
+          break;
 
-        if (moduleAction === "list") {
-          // 모듈 목록 표시
-          await this.showModuleList(chatId, messageId, userId);
-        } else if (this.moduleManager) {
-          // 특정 모듈 처리
-          await this.moduleManager.handleCallback(query, action, params);
-        }
-        return;
-      }
+        case "module":
+          // 모듈 관련 액션
+          if (params[0] === "list") {
+            await this.showModuleList(chatId, messageId, userId);
+          } else if (params[0] === "select" && params[1]) {
+            await this.selectModule(chatId, messageId, userId, params[1]);
+          } else if (this.moduleManager) {
+            await this.moduleManager.handleCallback(query, action, params);
+          }
+          break;
 
-      // 메인 메뉴로 돌아가기
-      if (action === "main") {
-        await this.showMainMenu(chatId, messageId, userId);
-        return;
-      }
+        case "settings":
+          // 설정 관련 액션
+          await this.handleSettingsCallback(query, params);
+          break;
 
-      // 설정 관련 콜백
-      if (action === "settings") {
-        await this.handleSettingsCallback(query, params);
-        return;
-      }
+        case "help":
+          // 도움말 관련 액션
+          await this.handleHelpCallback(query, params);
+          break;
 
-      // 기본 콜백 매니저로 전달
-      if (this.callbackManager) {
-        await this.callbackManager.handle(query);
+        case "setlang":
+          // 언어 설정
+          await this.handleLanguageChange(query, params[0]);
+          break;
+
+        case "toggle_notification":
+          // 알림 토글
+          await this.handleNotificationToggle(query, params[0]);
+          break;
+
+        default:
+          // 기본 콜백 매니저로 전달
+          if (this.callbackManager) {
+            const handled = await this.callbackManager.handle(query);
+            if (!handled) {
+              Logger.warn(`처리되지 않은 콜백: ${action}`);
+            }
+          }
       }
     } catch (error) {
       Logger.error("콜백 쿼리 처리 오류:", error);
@@ -245,6 +269,75 @@ class BotController {
         }
       }
     }
+  }
+
+  // 도움말 콜백 처리
+  async handleHelpCallback(query, params) {
+    const { message } = query;
+    const chatId = message.chat.id;
+    const messageId = message.message_id;
+
+    const helpText =
+      "❓ *도움말*\n\n" +
+      "• 모듈 선택: 사용하고 싶은 기능을 선택하세요\n" +
+      "• 설정: 언어, 알림 등을 변경할 수 있습니다\n" +
+      "• 명령어: /help 를 입력하면 전체 명령어를 볼 수 있습니다";
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "⬅️ 메인 메뉴", callback_data: "main:menu" }]],
+    };
+
+    await this.bot.editMessageText(helpText, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: keyboard,
+      parse_mode: "Markdown",
+    });
+  }
+
+  // 언어 변경 처리
+  async handleLanguageChange(query, language) {
+    const { message } = query;
+    const chatId = message.chat.id;
+    const userId = query.from.id;
+
+    // 여기서 실제로 언어 설정을 저장
+    // await this.saveUserLanguage(userId, language);
+
+    const languages = {
+      ko: "한국어",
+      en: "English",
+      ja: "日本語",
+    };
+
+    await this.bot.answerCallbackQuery(query.id, {
+      text: `언어가 ${languages[language] || language}로 변경되었습니다.`,
+      show_alert: true,
+    });
+
+    // 설정 메뉴로 돌아가기
+    await this.showSettingsMenu(chatId, message.message_id);
+  }
+
+  // 알림 토글 처리
+  async handleNotificationToggle(query, enabled) {
+    const userId = query.from.id;
+    const isEnabled = enabled === "true";
+
+    // 여기서 실제로 알림 설정을 저장
+    // await this.saveNotificationSetting(userId, isEnabled);
+
+    await this.bot.answerCallbackQuery(query.id, {
+      text: `알림이 ${isEnabled ? "켜졌습니다" : "꺼졌습니다"}.`,
+      show_alert: true,
+    });
+
+    // 알림 설정 메뉴 새로고침
+    await this.showNotificationSettings(
+      query.message.chat.id,
+      query.message.message_id,
+      userId
+    );
   }
 
   // 메인 메뉴 표시 메서드
@@ -356,6 +449,131 @@ class BotController {
     });
   }
 
+  // 설정 콜백 처리 메서드
+  // BotController.js에 추가할 메서드들
+
+  async handleSettingsCallback(query, params) {
+    try {
+      const { message } = query;
+      const chatId = message.chat.id;
+      const messageId = message.message_id;
+      const userId = query.from.id;
+      const [action] = params;
+
+      switch (action) {
+        case "main":
+          await this.showSettingsMenu(chatId, messageId);
+          break;
+
+        case "language":
+          await this.showLanguageSettings(chatId, messageId);
+          break;
+
+        case "notifications":
+          await this.showNotificationSettings(chatId, messageId, userId);
+          break;
+
+        case "profile":
+          await this.showProfileSettings(chatId, messageId, userId);
+          break;
+
+        default:
+          Logger.warn(`알 수 없는 설정 액션: ${action}`);
+      }
+    } catch (error) {
+      Logger.error("설정 콜백 처리 오류:", error);
+      throw error;
+    }
+  }
+
+  async showSettingsMenu(chatId, messageId) {
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🌐 언어 설정", callback_data: "settings:language" }],
+        [{ text: "🔔 알림 설정", callback_data: "settings:notifications" }],
+        [{ text: "👤 프로필 설정", callback_data: "settings:profile" }],
+        [{ text: "⬅️ 메인 메뉴", callback_data: "main:menu" }],
+      ],
+    };
+
+    const text = "⚙️ *설정*\n\n변경하고 싶은 항목을 선택하세요:";
+
+    await this.bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: keyboard,
+      parse_mode: "Markdown",
+    });
+  }
+
+  async showLanguageSettings(chatId, messageId) {
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🇰🇷 한국어", callback_data: "setlang:ko" }],
+        [{ text: "🇺🇸 English", callback_data: "setlang:en" }],
+        [{ text: "🇯🇵 日本語", callback_data: "setlang:ja" }],
+        [{ text: "⬅️ 뒤로", callback_data: "settings:main" }],
+      ],
+    };
+
+    const text = "🌐 *언어 설정*\n\n사용할 언어를 선택하세요:";
+
+    await this.bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: keyboard,
+      parse_mode: "Markdown",
+    });
+  }
+
+  async showNotificationSettings(chatId, messageId, userId) {
+    // 현재 알림 설정 상태 (나중에 DB에서 가져오기)
+    const notificationsEnabled = true;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: notificationsEnabled ? "🔔 알림 켜짐" : "🔕 알림 꺼짐",
+            callback_data: `toggle_notification:${!notificationsEnabled}`,
+          },
+        ],
+        [{ text: "⬅️ 뒤로", callback_data: "settings:main" }],
+      ],
+    };
+
+    const text = `🔔 *알림 설정*\n\n현재 상태: ${notificationsEnabled ? "켜짐" : "꺼짐"}`;
+
+    await this.bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: keyboard,
+      parse_mode: "Markdown",
+    });
+  }
+
+  async showProfileSettings(chatId, messageId, userId) {
+    // 사용자 정보 가져오기
+    const user = await this.bot.getChat(userId);
+
+    const text =
+      `👤 *프로필 정보*\n\n` +
+      `이름: ${user.first_name || "N/A"}\n` +
+      `성: ${user.last_name || "N/A"}\n` +
+      `사용자명: @${user.username || "N/A"}\n` +
+      `ID: \`${userId}\``;
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "⬅️ 뒤로", callback_data: "settings:main" }]],
+    };
+
+    await this.bot.editMessageText(text, {
+      chat_id: chatId,
+      message_id: messageId,
+      reply_markup: keyboard,
+      parse_mode: "Markdown",
+    });
+  }
   getUserState(userId) {
     return this.userStates.get(userId);
   }

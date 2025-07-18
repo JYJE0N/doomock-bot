@@ -149,47 +149,71 @@ class CommandHandler {
   }
 
   async handleHelp(msg, command, args) {
-    const chatId = msg.chat.id;
+    try {
+      const chatId = msg.chat.id;
 
-    // 특정 모듈의 도움말
-    if (args.length > 0) {
-      const moduleName = args[0];
-      const moduleHelp = await this.moduleManager.getModuleHelp(moduleName);
+      // 특정 모듈의 도움말
+      if (args && args.length > 0) {
+        const moduleName = args[0];
+        if (this.moduleManager) {
+          const moduleHelp = await this.moduleManager.getModuleHelp(moduleName);
 
-      if (moduleHelp) {
-        await this.bot.sendMessage(chatId, moduleHelp, {
-          parse_mode: "Markdown",
-        });
-        return;
+          if (moduleHelp) {
+            await this.bot.sendMessage(chatId, moduleHelp, {
+              parse_mode: "Markdown",
+            });
+            return;
+          }
+        }
       }
-    }
 
-    // 전체 도움말
-    const helpText = `
-*${config.bot.name} 도움말* 📖
-버전: ${config.bot.version}
+      // 전체 도움말 (Markdown 특수문자 이스케이프)
+      const helpText = `
+📖 *두목 봇 도움말*
+버전: 3.0.0
 
 *기본 명령어:*
-/start - 봇 시작 및 메인 메뉴
-/help - 도움말 보기
-/modules - 사용 가능한 모듈 목록
-/status - 현재 상태 확인
-/cancel - 현재 작업 취소
+• /start - 봇 시작 및 메인 메뉴
+• /help - 도움말 보기
+• /modules - 사용 가능한 모듈 목록
+• /status - 현재 상태 확인
+• /cancel - 현재 작업 취소
 
 *모듈별 도움말:*
 각 모듈을 선택한 후 도움말 버튼을 누르거나
 \`/help [모듈이름]\` 명령어를 사용하세요.
 
 *문의사항:*
-문제가 있으시면 @doomock_support 로 연락주세요.
-
-*GitHub:*
-${config.bot.repository}
+문제가 있으시면 @doomock\\_support 로 연락주세요.
         `.trim();
 
-    await this.bot.sendMessage(chatId, helpText, {
-      parse_mode: "Markdown",
-    });
+      await this.bot.sendMessage(chatId, helpText, {
+        parse_mode: "Markdown",
+        disable_web_page_preview: true,
+      });
+    } catch (error) {
+      Logger.error("/help 명령어 처리 오류:", error);
+
+      // Markdown 파싱 오류 시 일반 텍스트로 재시도
+      try {
+        const simpleHelp = `
+📖 두목 봇 도움말 (v3.0.1)
+
+기본 명령어:
+• /start - 봇 시작 및 메인 메뉴
+• /help - 도움말 보기
+• /modules - 사용 가능한 모듈 목록
+• /status - 현재 상태 확인
+• /cancel - 현재 작업 취소
+
+각 모듈의 도움말은 모듈 선택 후 확인하세요.
+            `.trim();
+
+        await this.bot.sendMessage(msg.chat.id, simpleHelp);
+      } catch (e) {
+        Logger.error("도움말 전송 실패:", e);
+      }
+    }
   }
 
   async handleModules(msg, command, args) {
