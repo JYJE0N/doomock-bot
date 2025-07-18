@@ -1,6 +1,6 @@
 // src/managers/CallbackManager.js - 수정된 버전
-
 const Logger = require("../utils/Logger");
+const { getModuleName } = require("../utils/ModuleHelper");
 
 class CallbackManager {
   constructor(bot, modules) {

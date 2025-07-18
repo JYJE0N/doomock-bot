@@ -1,6 +1,8 @@
 // src/controllers/BotController.js - 개선된 버전 3
-
 const Logger = require("../utils/Logger");
+const MessageHandler = require("../handlers/MessageHandler");
+const CommandHandler = require("../handlers/CommandHandler");
+const DatabaseManager = require("../database/DatabaseManager");
 
 class BotController {
   constructor(bot, config) {

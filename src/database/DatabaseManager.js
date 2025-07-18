@@ -1,7 +1,7 @@
 // src/database/DatabaseManager.js - MongoDB 연결 관리
-
 const mongoose = require("mongoose");
 const Logger = require("../utils/Logger");
+const config = require("../config/config");
 
 class DatabaseManager {
   constructor() {

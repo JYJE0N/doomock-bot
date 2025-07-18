@@ -3,6 +3,7 @@ const Logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const MenuConfig = require("../config/MenuConfig");
 const AppConfig = require("../config/AppConfig");
+const { getModuleName } = require("../utils/ModuleHelper");
 
 class MenuManager {
   constructor(moduleManager) {
