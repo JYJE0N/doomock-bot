@@ -43,6 +43,40 @@ class FortuneModule extends BaseModule {
     } = callbackQuery;
     const userName = getUserName(from);
 
+    // 운세 관리
+    this.routes.set("fortune_menu", { module: "fortune", method: "showMenu" });
+    this.routes.set("fortune_general", {
+      module: "fortune",
+      method: "showGeneral",
+    });
+    this.routes.set("fortune_work", { module: "fortune", method: "showWork" });
+    this.routes.set("fortune_love", { module: "fortune", method: "showLove" });
+    this.routes.set("fortune_money", {
+      module: "fortune",
+      method: "showMoney",
+    });
+    this.routes.set("fortune_health", {
+      module: "fortune",
+      method: "showHealth",
+    });
+    this.routes.set("fortune_meeting", {
+      module: "fortune",
+      method: "showMeeting",
+    });
+    this.routes.set("fortune_tarot", {
+      module: "fortune",
+      method: "showTarot",
+    });
+    this.routes.set("fortune_tarot3", {
+      module: "fortune",
+      method: "showTarotThreeSpread",
+    });
+    this.routes.set("fortune_lucky", {
+      module: "fortune",
+      method: "showLucky",
+    });
+    this.routes.set("fortune_all", { module: "fortune", method: "showAll" });
+
     switch (subAction) {
       case "menu":
         await this.showFortuneMenu(
@@ -84,7 +118,7 @@ class FortuneModule extends BaseModule {
         await this.showAllFortune(bot, chatId, messageId, from);
         break;
       default:
-        await this.sendMessage(bot, chatId, "❌ 알 수 없는 운세 명령입니다.");
+        await this.sendMessage(bot, chatId, "❌ 알 수 없는 미래입니다.");
     }
   }
 

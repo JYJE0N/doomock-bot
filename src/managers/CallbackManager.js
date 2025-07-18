@@ -85,6 +85,10 @@ class CallbackManager {
       module: "fortune",
       method: "showTarot",
     });
+    this.routes.set("fortune_tarot3", {
+      module: "fortune",
+      method: "showTarotThreeSpread",
+    });
     this.routes.set("fortune_lucky", {
       module: "fortune",
       method: "showLucky",
