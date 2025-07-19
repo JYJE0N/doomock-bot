@@ -11,6 +11,8 @@ class AppConfig {
     // 🤖 봇 설정
     this.BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
     this.BOT_USERNAME = process.env.BOT_USERNAME || "doomock_bot";
+    // 호환성을 위한 alias 추가
+    this.mongoUrl = this.MONGO_URL;
 
     // 🌍 환경 설정
     this.NODE_ENV = process.env.NODE_ENV || "development";
@@ -47,25 +49,25 @@ class AppConfig {
       LEAVE_MODULE: this.parseBoolean(process.env.ENABLE_LEAVE_MODULE, true),
       WEATHER_MODULE: this.parseBoolean(
         process.env.ENABLE_WEATHER_MODULE,
-        true,
+        true
       ),
       FORTUNE_MODULE: this.parseBoolean(
         process.env.ENABLE_FORTUNE_MODULE,
-        true,
+        true
       ),
       TIMER_MODULE: this.parseBoolean(process.env.ENABLE_TIMER_MODULE, true),
       INSIGHT_MODULE: this.parseBoolean(
         process.env.ENABLE_INSIGHT_MODULE,
-        true,
+        true
       ),
       UTILS_MODULE: this.parseBoolean(process.env.ENABLE_UTILS_MODULE, true),
       REMINDER_MODULE: this.parseBoolean(
         process.env.ENABLE_REMINDER_MODULE,
-        true,
+        true
       ),
       WORKTIME_MODULE: this.parseBoolean(
         process.env.ENABLE_WORKTIME_MODULE,
-        true,
+        true
       ),
       TTS_FEATURE: this.parseBoolean(process.env.ENABLE_TTS_FEATURE, true),
       VOICE_FEATURE: this.parseBoolean(process.env.ENABLE_VOICE_FEATURE, true),
@@ -122,7 +124,7 @@ class AppConfig {
         parseInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT) || 30000,
       HEALTH_CHECK_ENABLED: this.parseBoolean(
         process.env.HEALTH_CHECK_ENABLED,
-        true,
+        true
       ),
       METRICS_ENABLED: this.parseBoolean(process.env.METRICS_ENABLED, false),
       AUTO_RESTART: this.parseBoolean(process.env.AUTO_RESTART, true),
@@ -206,10 +208,10 @@ class AppConfig {
   parseUserIds(idsString) {
     return idsString
       .split(",")
-      .map(id => id.trim())
-      .filter(id => id && !isNaN(id))
-      .map(id => parseInt(id))
-      .filter(id => id > 0); // 유효한 텔레그램 사용자 ID만
+      .map((id) => id.trim())
+      .filter((id) => id && !isNaN(id))
+      .map((id) => parseInt(id))
+      .filter((id) => id > 0); // 유효한 텔레그램 사용자 ID만
   }
 
   // 불린 값 파싱
@@ -247,7 +249,7 @@ class AppConfig {
     }
 
     // 관리자 사용자 ID 검증
-    if (this.ADMIN_USER_IDS.some(id => id <= 0)) {
+    if (this.ADMIN_USER_IDS.some((id) => id <= 0)) {
       errors.push("관리자 사용자 ID가 유효하지 않습니다");
     }
 
@@ -263,7 +265,7 @@ class AppConfig {
     const validLogLevels = ["error", "warn", "info", "debug", "trace"];
     if (!validLogLevels.includes(this.LOGGING.LEVEL)) {
       errors.push(
-        `로그 레벨이 유효하지 않습니다. 사용 가능: ${validLogLevels.join(", ")}`,
+        `로그 레벨이 유효하지 않습니다. 사용 가능: ${validLogLevels.join(", ")}`
       );
     }
 
@@ -400,7 +402,7 @@ class AppConfig {
     if (config.MONGO_URL) {
       config.MONGO_URL = config.MONGO_URL.replace(
         /\/\/([^:]+):([^@]+)@/,
-        "//***:***@",
+        "//***:***@"
       );
     }
     if (config.WEATHER_API_KEY) {

@@ -43,7 +43,7 @@ class BotController {
       // 모듈 초기화 완료 확인
       Logger.info(
         "초기화된 모듈 수:",
-        this.moduleManager.getInitializedModuleCount(),
+        this.moduleManager.getInitializedModuleCount()
       );
 
       // 3. 콜백 매니저 초기화
@@ -70,25 +70,25 @@ class BotController {
     // ✅ 디버깅 로그 추가
     Logger.info("🔍 데이터베이스 초기화 디버깅:");
     Logger.info(`  - config 객체: ${JSON.stringify(this.config, null, 2)}`);
-    Logger.info(`  - config.mongoUrl: "${this.config.mongoUrl}"`);
-    Logger.info(`  - mongoUrl 타입: ${typeof this.config.mongoUrl}`);
+    Logger.info(`  - MONGO_URL: "${this.MONGO_URL}"`);
+    Logger.info(`  - mongoUrl 타입: ${typeof this.MONGO_URL}`);
     Logger.info(
-      `  - mongoUrl 길이: ${this.config.mongoUrl ? this.config.mongoUrl.length : "undefined"}`,
+      `  - mongoUrl 길이: ${this.MONGO_URL ? this.MONGO_URL.length : "undefined"}`
     );
-    Logger.info(`  - mongoUrl 존재 여부: ${!!this.config.mongoUrl}`);
+    Logger.info(`  - mongoUrl 존재 여부: ${!!this.MONGO_URL}`);
 
     // ✅ 환경 변수도 직접 확인
     Logger.info("🔍 환경 변수 직접 확인:");
     Logger.info(`  - process.env.MONGO_URL: "${process.env.MONGO_URL}"`);
     Logger.info(`  - process.env.MONGODB_URI: "${process.env.MONGODB_URI}"`);
 
-    if (this.config.mongoUrl) {
+    if (this.MONGO_URL) {
       try {
         Logger.info("✅ MongoDB URL이 config에 있습니다. 연결 시도...");
 
         const { DatabaseManager } = require("../database/DatabaseManager");
 
-        this.dbManager = new DatabaseManager(this.config.mongoUrl);
+        this.dbManager = new DatabaseManager(this.MONGO_URL);
         await this.dbManager.connect();
 
         Logger.success("데이터베이스 연결 성공");
@@ -98,13 +98,13 @@ class BotController {
       }
     } else {
       Logger.warn(
-        "❌ MongoDB URL이 config에 없습니다. 일부 기능이 제한됩니다.",
+        "❌ MongoDB URL이 config에 없습니다. 일부 기능이 제한됩니다."
       );
 
       // ✅ 추가 디버깅 정보
       Logger.info("추가 디버깅 정보:");
       Logger.info(
-        `  - doomock_bot.js에서 전달된 config: ${JSON.stringify(this.config)}`,
+        `  - doomock_bot.js에서 전달된 config: ${JSON.stringify(this.config)}`
       );
     }
   }
@@ -122,10 +122,10 @@ class BotController {
     const loadedModules = this.moduleManager.getAllModules();
     Logger.info(
       "로드된 모듈 정보:",
-      loadedModules.map(m => ({
+      loadedModules.map((m) => ({
         name: m.name,
         status: m.status,
-      })),
+      }))
     );
 
     Logger.success("모듈 매니저 초기화 완료");
@@ -135,7 +135,7 @@ class BotController {
     // 먼저 로드된 모듈 확인
     Logger.info(
       "현재 로드된 모듈:",
-      this.moduleManager.getAllModules().map(m => m.name),
+      this.moduleManager.getAllModules().map((m) => m.name)
     );
 
     // 모듈들을 직접 전달하는 방식으로 변경
@@ -152,7 +152,7 @@ class BotController {
     };
 
     // 각 모듈 상태 확인
-    Object.keys(modules).forEach(key => {
+    Object.keys(modules).forEach((key) => {
       if (!modules[key]) {
         Logger.warn(`❌ 모듈 ${key}가 로드되지 않았습니다`);
         delete modules[key];
@@ -200,7 +200,7 @@ class BotController {
     this.bot.removeAllListeners("polling_error");
 
     // 메시지 이벤트
-    this.bot.on("message", async msg => {
+    this.bot.on("message", async (msg) => {
       try {
         console.log(`📨 메시지 이벤트 수신: ${msg.text}`);
         await this.handleMessage(msg);
@@ -211,7 +211,7 @@ class BotController {
     });
 
     // 🔧 콜백 쿼리 이벤트 (단일 처리)
-    this.bot.on("callback_query", async callbackQuery => {
+    this.bot.on("callback_query", async (callbackQuery) => {
       try {
         console.log(`📞 콜백 이벤트 수신: ${callbackQuery.data}`);
 
@@ -229,7 +229,7 @@ class BotController {
     });
 
     // 폴링 에러 이벤트
-    this.bot.on("polling_error", error => {
+    this.bot.on("polling_error", (error) => {
       Logger.error("폴링 오류:", error);
     });
 
@@ -308,7 +308,7 @@ class BotController {
     try {
       await this.bot.sendMessage(
         chatId,
-        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요.",
+        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요."
       );
     } catch (error) {
       Logger.error("오류 메시지 전송 실패:", error);
