@@ -45,7 +45,7 @@ class ModuleManager {
 
     // 우선순위별로 정렬
     const sortedConfigs = Object.entries(moduleConfigs).sort(
-      ([, a], [, b]) => (a.priority || 100) - (b.priority || 100),
+      ([, a], [, b]) => (a.priority || 100) - (b.priority || 100)
     );
 
     for (const [moduleName, config] of sortedConfigs) {
@@ -84,7 +84,7 @@ class ModuleManager {
         Logger.debug(`✅ 모듈 파일 로드 성공: ${config.path}`);
       } catch (requireError) {
         Logger.warn(
-          `⚠️ 모듈 파일 ${config.path}을 찾을 수 없습니다. 기본 모듈로 대체합니다.`,
+          `⚠️ 모듈 파일 ${config.path}을 찾을 수 없습니다. 기본 모듈로 대체합니다.`
         );
 
         // 기본 모듈 클래스 생성
@@ -136,7 +136,9 @@ class ModuleManager {
       });
 
       Logger.success(
-        `✅ 모듈 ${moduleName} 로드 완료 (실제 구현: ${!!require.cache[require.resolve(config.path)]})`,
+        `✅ 모듈 ${moduleName} 로드 완료 (실제 구현: ${!!require.cache[
+          require.resolve(config.path)
+        ]})`
       );
     } catch (error) {
       Logger.error(`❌ 모듈 ${moduleName} 로드 실패:`, error);
@@ -238,7 +240,7 @@ class ModuleManager {
     }
 
     Logger.debug(
-      `모듈 ${moduleName}은 사용할 수 없는 상태. 상태: ${moduleData.status}`,
+      `모듈 ${moduleName}은 사용할 수 없는 상태. 상태: ${moduleData.status}`
     );
     return null;
   }
@@ -276,7 +278,7 @@ class ModuleManager {
         const commands = moduleData.config.commands || [];
         if (commands.includes(command)) {
           Logger.debug(
-            `명령어 ${command}를 ${moduleName}에서 처리 (설정 기반)`,
+            `명령어 ${command}를 ${moduleName}에서 처리 (설정 기반)`
           );
           return instance;
         }
@@ -285,7 +287,7 @@ class ModuleManager {
         const moduleCommands = this.getModuleCommands(moduleName);
         if (moduleCommands.includes(command)) {
           Logger.debug(
-            `명령어 ${command}를 ${moduleName}에서 처리 (기본 명령어)`,
+            `명령어 ${command}를 ${moduleName}에서 처리 (기본 명령어)`
           );
           return instance;
         }
@@ -328,7 +330,7 @@ class ModuleManager {
         const moduleData = this.modules.get(moduleName);
         if (moduleData && moduleData.status === "initialized") {
           Logger.debug(
-            `콜백 ${callbackData}를 ${moduleName}에서 처리 (정확 매핑)`,
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (정확 매핑)`
           );
           return moduleData.instance;
         }
@@ -353,7 +355,7 @@ class ModuleManager {
         const moduleData = this.modules.get(moduleName);
         if (moduleData && moduleData.status === "initialized") {
           Logger.debug(
-            `콜백 ${callbackData}를 ${moduleName}에서 처리 (접두사 매핑)`,
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (접두사 매핑)`
           );
           return moduleData.instance;
         }
@@ -371,7 +373,7 @@ class ModuleManager {
           instance.canHandleCallback(callbackData)
         ) {
           Logger.debug(
-            `콜백 ${callbackData}를 ${moduleName}에서 처리 (canHandleCallback)`,
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (canHandleCallback)`
           );
           return instance;
         }
@@ -502,7 +504,7 @@ class ModuleManager {
       "✨",
     ];
 
-    return chatTriggers.some(trigger => normalizedText.includes(trigger));
+    return chatTriggers.some((trigger) => normalizedText.includes(trigger));
   }
 
   // 캐주얼한 대화 응답
@@ -660,7 +662,7 @@ class ModuleManager {
       "hello 두목",
     ];
 
-    return triggerWords.some(word => normalizedText.includes(word));
+    return triggerWords.some((word) => normalizedText.includes(word));
   }
 
   // 추가: 재미있는 응답들
@@ -779,7 +781,7 @@ class ModuleManager {
             chatId,
             command,
             error,
-            isGroupChat,
+            isGroupChat
           );
           return false;
         }
@@ -795,7 +797,7 @@ class ModuleManager {
         chatId,
         command,
         error,
-        isGroupChat,
+        isGroupChat
       );
       return false;
     }
@@ -828,19 +830,35 @@ class ModuleManager {
 
         // 모듈에 handleCallback 메서드가 있는지 확인
         if (typeof module.handleCallback === "function") {
-          const result = await module.handleCallback(bot, callbackQuery);
+          // ⭐ 표준화된 매개변수 구조로 전달!
+          const [prefix, ...parts] = data.split("_");
+          const subAction = parts.join("_"); // "toggle_0" -> "toggle_0", "clear_all" -> "clear_all"
+          const params = {}; // 추가 매개변수 (필요시)
+          const menuManager = this; // ModuleManager 자신을 전달
+
+          Logger.debug(
+            `콜백 파싱: ${data} → prefix: ${prefix}, subAction: ${subAction}`
+          );
+
+          const result = await module.handleCallback(
+            bot,
+            callbackQuery,
+            subAction,
+            params,
+            menuManager
+          );
           Logger.info(`✅ 콜백 ${data} 모듈에서 처리 완료`);
           return result;
         } else {
           Logger.warn(
-            `모듈 ${module.constructor.name}에 handleCallback 메서드가 없음, 기본 처리로 폴백`,
+            `모듈 ${module.constructor.name}에 handleCallback 메서드가 없음, 기본 처리로 폴백`
           );
           // 기본 메뉴 표시 처리
           return await this.handleBasicModuleCallback(
             bot,
             callbackQuery,
             module,
-            data,
+            data
           );
         }
       } catch (error) {
@@ -853,14 +871,14 @@ class ModuleManager {
             bot,
             callbackQuery,
             module,
-            data,
+            data
           );
         } catch (fallbackError) {
           Logger.error("기본 처리도 실패:", fallbackError);
           await this.sendErrorMessage(
             bot,
             callbackQuery.message.chat.id,
-            error,
+            fallbackError
           );
           return false;
         }
@@ -1059,9 +1077,11 @@ class ModuleManager {
 
     // 기본 응답 (해당 콜백에 대한 정의가 없는 경우)
     const moduleName = this.getModuleDisplayName(
-      module.constructor.name || "Unknown",
+      module.constructor.name || "Unknown"
     );
-    const defaultText = `${this.getModuleIcon(module.constructor.name)} **${moduleName}**\n\n이 기능은 곧 추가될 예정입니다! 🚧\n\n조금만 기다려주세요~ 😊`;
+    const defaultText = `${this.getModuleIcon(
+      module.constructor.name
+    )} **${moduleName}**\n\n이 기능은 곧 추가될 예정입니다! 🚧\n\n조금만 기다려주세요~ 😊`;
 
     try {
       await bot.editMessageText(defaultText, {
@@ -1163,8 +1183,12 @@ class ModuleManager {
 
       debugMessage += `${statusEmoji} **${moduleName}**\n`;
       debugMessage += `  • 상태: ${moduleData.status}\n`;
-      debugMessage += `  • 실제 구현: ${moduleData.hasRealImplementation ? "Yes" : "No"}\n`;
-      debugMessage += `  • handleCallback: ${typeof moduleData.instance?.handleCallback === "function" ? "Yes" : "No"}\n`;
+      debugMessage += `  • 실제 구현: ${
+        moduleData.hasRealImplementation ? "Yes" : "No"
+      }\n`;
+      debugMessage += `  • handleCallback: ${
+        typeof moduleData.instance?.handleCallback === "function" ? "Yes" : "No"
+      }\n`;
 
       if (moduleData.error) {
         debugMessage += `  • 에러: ${moduleData.error}\n`;
@@ -1397,7 +1421,7 @@ class ModuleManager {
             "메인 메뉴로 돌아갑니다.",
             {
               reply_markup: this.createMainMenuKeyboard(),
-            },
+            }
           );
         }
         return true;
@@ -1488,7 +1512,7 @@ class ModuleManager {
     // 환경변수에서 관리자 ID 목록 가져오기
     const adminIds = (process.env.ADMIN_IDS || "")
       .split(",")
-      .map(id => parseInt(id.trim()));
+      .map((id) => parseInt(id.trim()));
     return adminIds.includes(user.id);
   }
 
@@ -1618,7 +1642,7 @@ class ModuleManager {
 
   getInitializedModuleCount() {
     return Array.from(this.modules.values()).filter(
-      moduleData => moduleData.status === "initialized",
+      (moduleData) => moduleData.status === "initialized"
     ).length;
   }
 
