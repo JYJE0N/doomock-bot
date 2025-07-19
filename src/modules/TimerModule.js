@@ -305,8 +305,21 @@ class TimerModule extends BaseModule {
         return;
       }
 
-      // ⭐ 완료 예정 시간 계산
-      const completionTime = data.completionTime;
+      // ⭐ 정확한 완료 예정 시간 계산
+      const startTime = new Date(data.startTime); // ISO 문자열을 Date 객체로 변환
+      const completionTime = TimeHelper.addMinutes(startTime, data.duration);
+      const completionTimeStr = TimeHelper.formatTime(completionTime);
+
+      // ⭐ 디버깅 로그 (문제 해결용)
+      Logger.info("🕐 시간 계산 디버깅:", {
+        startTimeStr: data.startTime,
+        startTimeObj: startTime,
+        duration: data.duration,
+        completionTime: completionTime,
+        completionTimeStr: completionTimeStr,
+        nowTime: TimeHelper.formatTime(TimeHelper.getKoreaTime()),
+      });
+
       const progressBar = this.createProgressBar(0, data.duration);
       const sessionEmoji = this.getSessionEmoji(data.sessionCount);
 
@@ -315,7 +328,8 @@ class TimerModule extends BaseModule {
         `💼 **작업**: ${data.taskName}\n` +
         `⏱️ **시간**: ${data.duration}분 집중 시간\n` +
         `🎯 **세션**: ${data.sessionCount}번째\n` +
-        `⏰ **완료 예정**: ${completionTime}\n\n` +
+        `🕐 **시작 시간**: ${TimeHelper.formatTime(startTime)}\n` +
+        `⏰ **완료 예정**: ${completionTimeStr}\n\n` +
         `${progressBar} 0%\n\n` +
         `🔥 **집중해서 작업하세요!**\n` +
         `${

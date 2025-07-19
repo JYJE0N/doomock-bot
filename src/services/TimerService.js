@@ -180,9 +180,9 @@ class TimerService {
   }
 
   // ⭐ 강화된 포모도로 시작 (복원 지원)
-  startPomodoro(userId, taskName = "포모도로 작업") {
+  async startPomodoro(userId, taskName = "포모도로 작업") {
     try {
-      // 복원된 타이머가 있는지 확인
+      // 기존 타이머 확인
       const existingTimer = this.timers.get(userId);
       if (existingTimer && !existingTimer.restored) {
         return {
@@ -202,9 +202,10 @@ class TimerService {
       session.isWorking = true;
       session.currentTask = taskName;
 
+      const startTime = TimeHelper.getKoreaTime();
       const timer = {
         taskName,
-        startTime: TimeHelper.getKoreaTime(),
+        startTime: startTime, // ⭐ Date 객체로 저장
         type: "pomodoro",
         duration: this.config.workDuration,
         mode: "work",
@@ -230,10 +231,7 @@ class TimerService {
           duration: this.config.workDuration,
           mode: "work",
           sessionCount: session.count + 1,
-          startTime: TimeHelper.formatDateTime(timer.startTime),
-          completionTime: TimeHelper.formatTime(
-            TimeHelper.addMinutes(timer.startTime, this.config.workDuration)
-          ),
+          startTime: TimeHelper.formatDateTime(timer.startTime), // ⭐ 문자열로 반환
           isRestored: false,
         },
       };
@@ -246,75 +244,7 @@ class TimerService {
     }
   }
 
-  // ⭐ 복원된 타이머 처리
-  handleRestoredTimer(userId, existingTimer) {
-    const now = TimeHelper.getKoreaTime();
-    const elapsedMinutes = Math.floor((now - existingTimer.startTime) / 60000);
-    const downtime = existingTimer.downtime || 0;
-
-    Logger.info(
-      `🔄 복원된 타이머 발견: 사용자 ${userId}, 경과 ${elapsedMinutes}분, 다운타임 ${downtime}분`
-    );
-
-    // 타이머가 이미 완료되었는지 확인
-    if (elapsedMinutes >= existingTimer.duration) {
-      // 자동으로 다음 단계로 진행하거나 완료 처리
-      this.timers.delete(userId);
-
-      return {
-        success: true,
-        data: {
-          taskName: existingTimer.taskName,
-          mode: existingTimer.mode,
-          duration: existingTimer.duration,
-          completed: true,
-          elapsedTime: elapsedMinutes,
-          downtime: downtime,
-          message: `⏰ 복원된 타이머가 완료되었습니다! (다운타임: ${downtime}분)`,
-        },
-        restored: true,
-      };
-    }
-
-    // 타이머가 아직 진행 중인 경우 복원
-    existingTimer.restored = false; // 복원 플래그 제거
-
-    return {
-      success: true,
-      data: {
-        taskName: existingTimer.taskName,
-        mode: existingTimer.mode,
-        duration: existingTimer.duration,
-        elapsed: elapsedMinutes,
-        remaining: existingTimer.duration - elapsedMinutes,
-        downtime: downtime,
-        message: `🔄 타이머가 복원되었습니다! (다운타임: ${downtime}분)`,
-      },
-      restored: true,
-    };
-  }
-
-  // ⭐ 세션 생성 또는 가져오기
-  getOrCreateSession(userId) {
-    if (!this.pomodoroSessions.has(userId)) {
-      this.pomodoroSessions.set(userId, {
-        count: 0,
-        totalWorkTime: 0,
-        totalBreakTime: 0,
-        sessionId: this.generateSessionId(),
-        startDate: TimeHelper.formatDate(TimeHelper.getKoreaTime()),
-        isWorking: false,
-      });
-    }
-    return this.pomodoroSessions.get(userId);
-  }
-
-  // ⭐ 세션 ID 생성
-  generateSessionId() {
-    return `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  // ⭐ 향상된 포모도로 상태 확인
+  // ⭐ 포모도로 상태 확인에서도 정확한 시간 계산
   pomodoroStatus(userId) {
     try {
       const timer = this.timers.get(userId);
@@ -337,7 +267,7 @@ class TimerService {
         Math.round((elapsed / timer.duration) * 100)
       );
 
-      // ⭐ 완료 예정 시간 계산
+      // ⭐ 정확한 완료 예정 시간 계산
       const completionTime = TimeHelper.addMinutes(
         timer.startTime,
         timer.duration
@@ -365,7 +295,7 @@ class TimerService {
           overtimeMinutes: isOvertime ? elapsed - timer.duration : 0,
           currentTime: TimeHelper.formatDateTime(now),
           startTime: TimeHelper.formatDateTime(timer.startTime),
-          completionTime: TimeHelper.formatTime(completionTime),
+          completionTime: TimeHelper.formatTime(completionTime), // ⭐ 정확한 완료 시간
           elapsedTime: this.formatElapsedTime(elapsed),
           remainingTime: this.formatElapsedTime(remaining),
           progressBar: progressBar,
