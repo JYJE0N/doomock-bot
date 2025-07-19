@@ -1,4 +1,4 @@
-// src/modules/TodoModule.js - handleCallback 구조 통일
+// src/modules/TodoModule.js - 콜백 처리 안정화
 
 const BaseModule = require("./BaseModule");
 const { TodoService } = require("../services/TodoService");
@@ -14,6 +14,9 @@ class TodoModule extends BaseModule {
     });
     this.todoService = new TodoService();
     this.userStates = new Map();
+
+    // ⭐ 중복 처리 방지
+    this.processingUsers = new Set();
   }
 
   async handleMessage(bot, msg) {
@@ -46,7 +49,7 @@ class TodoModule extends BaseModule {
     return false;
   }
 
-  // ⭐ TimerModule과 동일한 구조로 수정
+  // ⭐ 표준화된 콜백 처리 - 중복 방지 로직 추가
   async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     const {
       message: {
@@ -57,41 +60,84 @@ class TodoModule extends BaseModule {
     } = callbackQuery;
     const userName = getUserName(callbackQuery.from);
 
-    // 동적 콜백 처리 (toggle_0, delete_1 등)
-    if (
-      subAction.includes("_") &&
-      (subAction.startsWith("toggle") || subAction.startsWith("delete"))
-    ) {
-      return await this.handleDynamicCallback(bot, callbackQuery, subAction);
+    // 중복 처리 방지
+    const userKey = `${userId}_${subAction}`;
+    if (this.processingUsers.has(userKey)) {
+      Logger.warn(`중복 할일 처리 무시: ${userKey}`);
+      return false;
     }
 
-    switch (subAction) {
-      case "menu":
-        await this.showTodoMenu(bot, chatId, messageId, userName);
-        break;
-      case "list":
-        await this.showTodoList(bot, chatId, messageId, userId);
-        break;
-      case "add":
-        await this.startTodoAdd(bot, chatId, messageId, userId);
-        break;
-      case "stats":
-        await this.showTodoStats(bot, chatId, messageId, userId);
-        break;
-      case "clear_completed":
-        await this.clearCompletedTodos(bot, chatId, messageId, userId);
-        break;
-      case "clear_all":
-        await this.clearAllTodos(bot, chatId, messageId, userId);
-        break;
-      case "help":
-        await this.showTodoHelp(bot, chatId, messageId);
-        break;
-      case "clear_all_confirm":
-        await this.confirmClearAllTodos(bot, chatId, messageId, userId);
-        break;
-      default:
-        await this.sendMessage(bot, chatId, "❌ 알 수 없는 할일 명령입니다.");
+    this.processingUsers.add(userKey);
+
+    try {
+      // 동적 콜백 처리 (toggle_0, delete_1 등)
+      if (
+        subAction.includes("_") &&
+        (subAction.startsWith("toggle") || subAction.startsWith("delete"))
+      ) {
+        return await this.handleDynamicCallback(bot, callbackQuery, subAction);
+      }
+
+      switch (subAction) {
+        case "menu":
+          await this.showTodoMenu(bot, chatId, messageId, userName);
+          break;
+        case "list":
+          await this.showTodoList(bot, chatId, messageId, userId);
+          break;
+        case "add":
+          await this.startTodoAdd(bot, chatId, messageId, userId);
+          break;
+        case "stats":
+          await this.showTodoStats(bot, chatId, messageId, userId);
+          break;
+        case "clear_completed":
+          await this.clearCompletedTodos(bot, chatId, messageId, userId);
+          break;
+        case "clear_all":
+          await this.clearAllTodos(bot, chatId, messageId, userId);
+          break;
+        case "help":
+          await this.showTodoHelp(bot, chatId, messageId);
+          break;
+        case "clear_all_confirm":
+          await this.confirmClearAllTodos(bot, chatId, messageId, userId);
+          break;
+        default:
+          Logger.warn(`알 수 없는 할일 콜백: ${subAction}`);
+          await this.showTodoMenu(bot, chatId, messageId, userName);
+          break;
+      }
+
+      return true;
+    } catch (error) {
+      Logger.error(`할일 콜백 처리 오류 (${subAction}):`, error);
+
+      // 에러 발생시 안전한 복구
+      try {
+        await this.editMessage(
+          bot,
+          chatId,
+          messageId,
+          "❌ 처리 중 오류가 발생했습니다.\n\n할일 메뉴로 돌아갑니다.",
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+              ],
+            },
+          }
+        );
+      } catch (recoveryError) {
+        Logger.error("할일 에러 복구 실패:", recoveryError);
+      }
+
+      return false;
+    } finally {
+      // 처리 완료 후 플래그 해제
+      setTimeout(() => {
+        this.processingUsers.delete(userKey);
+      }, 2000);
     }
   }
 
@@ -192,38 +238,21 @@ class TodoModule extends BaseModule {
         return;
       }
 
-      // 완료/미완료 분리
-      const pendingTodos = todos.filter((todo) => !todo.completed);
-      const completedTodos = todos.filter((todo) => todo.completed);
+      const completedCount = todos.filter((todo) => todo.completed).length;
+      const totalCount = todos.length;
+      const progressPercent = Math.round((completedCount / totalCount) * 100);
 
-      let listText = "📝 **할일 목록**\n\n";
+      let listText =
+        `📝 **할일 목록** (${completedCount}/${totalCount})\n\n` +
+        `📊 진행률: ${progressPercent}% ${"▓".repeat(
+          Math.floor(progressPercent / 10)
+        )}${"░".repeat(10 - Math.floor(progressPercent / 10))}\n\n`;
 
-      // 미완료 할일
-      if (pendingTodos.length > 0) {
-        listText += "**🔄 진행 중인 할일:**\n";
-        pendingTodos.forEach((todo, index) => {
-          const originalIndex = todos.indexOf(todo);
-          listText += `${index + 1}. ☐ ${todo.task}\n`;
-        });
-        listText += "\n";
-      }
-
-      // 완료된 할일
-      if (completedTodos.length > 0) {
-        listText += "**✅ 완료된 할일:**\n";
-        completedTodos.forEach((todo, index) => {
-          listText += `${index + 1}. ✅ ${todo.task}\n`;
-        });
-      }
-
-      // 버튼 생성
       const buttons = this.createTodoButtons(todos);
 
       await this.editMessage(bot, chatId, messageId, listText, {
         parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: buttons,
-        },
+        reply_markup: { inline_keyboard: buttons },
       });
     } catch (error) {
       Logger.error("할일 목록 표시 오류:", error);
@@ -247,9 +276,13 @@ class TodoModule extends BaseModule {
     const buttons = [];
 
     todos.forEach((todo, index) => {
+      const statusIcon = todo.completed ? "✅" : "☐";
+      const taskText =
+        todo.task.length > 25 ? todo.task.substring(0, 25) + "..." : todo.task;
+
       buttons.push([
         {
-          text: `${todo.completed ? "✅" : "☐"} ${todo.task}`,
+          text: `${statusIcon} ${taskText}`,
           callback_data: `todo_toggle_${index}`,
         },
         {
@@ -280,7 +313,8 @@ class TodoModule extends BaseModule {
       messageId,
       "📝 **할일 추가**\n\n" +
         "추가할 할일을 입력해주세요:\n\n" +
-        "💡 예시: 회의 자료 준비, 점심 약속 등",
+        "💡 **예시:** 회의 자료 준비, 점심 약속 등\n\n" +
+        "⚠️ **주의:** 100자 이내로 입력해주세요.",
       {
         parse_mode: "Markdown",
         reply_markup: {
@@ -295,17 +329,18 @@ class TodoModule extends BaseModule {
       const userState = this.userStates.get(userId);
       if (!userState) return false;
 
-      const todoText = ValidationHelper.validateTodoText(text);
-      const success = await this.todoService.addTodo(userId, todoText);
+      const result = await this.todoService.addTodo(userId, text);
 
-      if (success) {
+      if (result.success) {
         this.userStates.delete(userId);
 
         await this.sendMessage(
           bot,
           chatId,
           `✅ **할일 추가 완료!**\n\n` +
-            `📝 "${todoText}" 이(가) 추가되었습니다.\n\n` +
+            `📝 "${result.task}" 이(가) 추가되었습니다.\n\n` +
+            `📊 총 할일: ${result.totalCount}개\n` +
+            `💾 저장: ${result.saved ? "DB 저장됨" : "메모리만"}\n\n` +
             "계속해서 할일을 관리해보세요! 💪",
           {
             parse_mode: "Markdown",
@@ -324,7 +359,18 @@ class TodoModule extends BaseModule {
         await this.sendMessage(
           bot,
           chatId,
-          "❌ 할일 추가에 실패했습니다. 다시 시도해주세요."
+          `❌ **할일 추가 실패**\n\n${result.error}\n\n다시 시도해주세요.`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "🔄 다시 시도", callback_data: "todo_add" },
+                  { text: "🔙 할일 메뉴", callback_data: "todo_menu" },
+                ],
+              ],
+            },
+          }
         );
       }
 
@@ -336,7 +382,14 @@ class TodoModule extends BaseModule {
       await this.sendMessage(
         bot,
         chatId,
-        "❌ 할일 추가 중 오류가 발생했습니다."
+        "❌ 할일 추가 중 오류가 발생했습니다.\n\n다시 시도해주세요.",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+            ],
+          },
+        }
       );
       return true;
     }
@@ -347,24 +400,34 @@ class TodoModule extends BaseModule {
       const result = await this.todoService.toggleTodo(userId, todoIndex);
 
       if (result.success) {
-        const statusText = result.completed ? "완료" : "미완료";
+        const statusText = result.completed ? "완료 처리" : "미완료로 변경";
 
-        // 성공 메시지 표시 후 목록 새로고침
-        await this.sendMessage(
+        // 할일 목록을 다시 표시
+        await this.showTodoList(bot, chatId, messageId, userId);
+
+        // 상태 변경 알림 (임시 메시지)
+        const notificationMsg = await this.sendMessage(
           bot,
           chatId,
-          `✅ "${result.task}" 이(가) ${statusText}로 변경되었습니다!`
+          `${result.completed ? "✅" : "☐"} **${statusText}**\n\n"${
+            result.task
+          }"`,
+          { parse_mode: "Markdown" }
         );
 
-        // 할일 목록 새로고침
-        setTimeout(() => {
-          this.showTodoList(bot, chatId, messageId, userId);
-        }, 1500);
+        // 3초 후 알림 메시지 삭제
+        setTimeout(async () => {
+          try {
+            await bot.deleteMessage(chatId, notificationMsg.message_id);
+          } catch (error) {
+            Logger.debug("알림 메시지 삭제 실패 (무시)");
+          }
+        }, 3000);
       } else {
         await this.sendMessage(bot, chatId, `❌ ${result.error}`);
       }
     } catch (error) {
-      Logger.error("할일 토글 오류:", error);
+      Logger.error("할일 상태 변경 오류:", error);
       await this.sendMessage(bot, chatId, "❌ 처리 중 오류가 발생했습니다.");
     }
   }
@@ -374,17 +437,25 @@ class TodoModule extends BaseModule {
       const result = await this.todoService.deleteTodo(userId, todoIndex);
 
       if (result.success) {
-        // 성공 메시지 표시 후 목록 새로고침
-        await this.sendMessage(
+        // 할일 목록을 다시 표시
+        await this.showTodoList(bot, chatId, messageId, userId);
+
+        // 삭제 알림 (임시 메시지)
+        const notificationMsg = await this.sendMessage(
           bot,
           chatId,
-          `🗑️ "${result.task}" 이(가) 삭제되었습니다!`
+          `🗑️ **할일 삭제 완료**\n\n"${result.task}" 이(가) 삭제되었습니다.`,
+          { parse_mode: "Markdown" }
         );
 
-        // 할일 목록 새로고침
-        setTimeout(() => {
-          this.showTodoList(bot, chatId, messageId, userId);
-        }, 1500);
+        // 3초 후 알림 메시지 삭제
+        setTimeout(async () => {
+          try {
+            await bot.deleteMessage(chatId, notificationMsg.message_id);
+          } catch (error) {
+            Logger.debug("알림 메시지 삭제 실패 (무시)");
+          }
+        }, 3000);
       } else {
         await this.sendMessage(bot, chatId, `❌ ${result.error}`);
       }
@@ -394,57 +465,34 @@ class TodoModule extends BaseModule {
     }
   }
 
+  // 나머지 메서드들 (통계, 도움말, 삭제 등)은 기존과 동일...
   async showTodoStats(bot, chatId, messageId, userId) {
     try {
-      const stats = await this.todoService.getTodoStats(userId);
+      const stats = await this.todoService.getStats(userId);
 
-      if (stats) {
-        const completion =
-          stats.total > 0
-            ? Math.round((stats.completed / stats.total) * 100)
-            : 0;
+      const statsText =
+        "📊 **할일 통계**\n\n" +
+        `📝 전체 할일: ${stats.total}개\n` +
+        `✅ 완료: ${stats.completed}개\n` +
+        `☐ 미완료: ${stats.pending}개\n` +
+        `📈 완료율: ${stats.completionRate}%\n\n` +
+        `📅 오늘 추가: ${stats.todayAdded}개\n` +
+        `✨ 오늘 완료: ${stats.todayCompleted}개`;
 
-        const statsText =
-          "📊 **할일 통계**\n\n" +
-          `📝 전체 할일: ${stats.total}개\n` +
-          `✅ 완료된 할일: ${stats.completed}개\n` +
-          `🔄 진행 중인 할일: ${stats.pending}개\n\n` +
-          `💯 완료율: ${completion}%\n\n` +
-          this.createProgressBar(stats.completed, stats.total);
-
-        await this.editMessage(bot, chatId, messageId, statsText, {
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "📋 할일 목록", callback_data: "todo_list" },
-                { text: "➕ 할일 추가", callback_data: "todo_add" },
-              ],
-              [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+      await this.editMessage(bot, chatId, messageId, statsText, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "📋 할일 목록", callback_data: "todo_list" },
+              { text: "➕ 할일 추가", callback_data: "todo_add" },
             ],
-          },
-        });
-      } else {
-        await this.editMessage(
-          bot,
-          chatId,
-          messageId,
-          "📊 **할일 통계**\n\n아직 등록된 할일이 없습니다.",
-          {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: "➕ 할일 추가", callback_data: "todo_add" },
-                  { text: "🔙 할일 메뉴", callback_data: "todo_menu" },
-                ],
-              ],
-            },
-          }
-        );
-      }
+            [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+          ],
+        },
+      });
     } catch (error) {
-      Logger.error("통계 표시 오류:", error);
+      Logger.error("할일 통계 표시 오류:", error);
       await this.editMessage(
         bot,
         chatId,
@@ -461,57 +509,28 @@ class TodoModule extends BaseModule {
     }
   }
 
-  createProgressBar(current, total) {
-    if (total === 0) return "░░░░░░░░░░ 0%";
-
-    const percentage = Math.round((current / total) * 100);
-    const filled = Math.round((current / total) * 10);
-    const empty = 10 - filled;
-
-    return `${"▓".repeat(filled)}${"░".repeat(empty)} ${percentage}%`;
-  }
-
   async clearCompletedTodos(bot, chatId, messageId, userId) {
     try {
       const result = await this.todoService.clearCompleted(userId);
 
-      if (result.success && result.count > 0) {
-        await this.editMessage(
-          bot,
-          chatId,
-          messageId,
-          `🗑️ **완료된 할일 삭제**\n\n` +
-            `${result.count}개의 완료된 할일을 삭제했습니다! ✨`,
-          {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: "📋 할일 목록", callback_data: "todo_list" },
-                  { text: "🔙 할일 메뉴", callback_data: "todo_menu" },
-                ],
+      if (result.success) {
+        const resultText =
+          result.count > 0
+            ? `🗑️ **완료된 할일 삭제**\n\n${result.count}개의 완료된 할일을 삭제했습니다! ✨`
+            : "📝 **완료된 할일 없음**\n\n삭제할 완료된 할일이 없습니다.";
+
+        await this.editMessage(bot, chatId, messageId, resultText, {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "📋 할일 목록", callback_data: "todo_list" },
+                { text: "➕ 할일 추가", callback_data: "todo_add" },
               ],
-            },
-          }
-        );
-      } else if (result.success && result.count === 0) {
-        await this.editMessage(
-          bot,
-          chatId,
-          messageId,
-          "🗑️ **완료된 할일 삭제**\n\n삭제할 완료된 할일이 없습니다.",
-          {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: "📋 할일 목록", callback_data: "todo_list" },
-                  { text: "🔙 할일 메뉴", callback_data: "todo_menu" },
-                ],
-              ],
-            },
-          }
-        );
+              [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+            ],
+          },
+        });
       } else {
         await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
           reply_markup: {
@@ -560,69 +579,6 @@ class TodoModule extends BaseModule {
         },
       }
     );
-  }
-
-  async showTodoHelp(bot, chatId, messageId) {
-    const helpText =
-      "📝 **할일 관리 도움말**\n\n" +
-      "**🎯 주요 기능:**\n" +
-      "• 할일 추가/삭제\n" +
-      "• 완료 상태 토글\n" +
-      "• 통계 확인\n" +
-      "• 완료된 할일 정리\n\n" +
-      "**⌨️ 빠른 명령어:**\n" +
-      "/add [할일] - 할일 빠른 추가\n" +
-      "/todo - 할일 메뉴 열기\n" +
-      "/할일 - 할일 메뉴 열기\n\n" +
-      "효율적인 할일 관리로 생산성을 높여보세요! 💪";
-
-    await this.editMessage(bot, chatId, messageId, helpText, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [
-            { text: "📋 할일 목록", callback_data: "todo_list" },
-            { text: "➕ 할일 추가", callback_data: "todo_add" },
-          ],
-          [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
-        ],
-      },
-    });
-  }
-
-  async addTodoQuick(bot, chatId, userId, todoText) {
-    try {
-      const validatedText = ValidationHelper.validateTodoText(todoText);
-      const success = await this.todoService.addTodo(userId, validatedText);
-
-      if (success) {
-        await this.sendMessage(
-          bot,
-          chatId,
-          `✅ **할일 추가 완료!**\n\n` +
-            `📝 "${validatedText}" 이(가) 추가되었습니다.`,
-          {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: "📋 할일 목록", callback_data: "todo_list" },
-                  { text: "📝 할일 메뉴", callback_data: "todo_menu" },
-                ],
-              ],
-            },
-          }
-        );
-      } else {
-        await this.sendMessage(bot, chatId, "❌ 할일 추가에 실패했습니다.");
-      }
-
-      return true;
-    } catch (error) {
-      Logger.error("빠른 할일 추가 오류:", error);
-      await this.sendMessage(bot, chatId, `❌ ${error.message}`);
-      return true;
-    }
   }
 
   async confirmClearAllTodos(bot, chatId, messageId, userId) {
@@ -675,6 +631,86 @@ class TodoModule extends BaseModule {
       );
     }
   }
+
+  async showTodoHelp(bot, chatId, messageId) {
+    const helpText =
+      "📝 **할일 관리 도움말**\n\n" +
+      "**🎯 주요 기능:**\n" +
+      "• 할일 추가/삭제\n" +
+      "• 완료 상태 토글\n" +
+      "• 통계 확인\n" +
+      "• 완료된 할일 정리\n\n" +
+      "**⌨️ 빠른 명령어:**\n" +
+      "/add [할일] - 할일 빠른 추가\n" +
+      "/todo - 할일 메뉴 열기\n" +
+      "/할일 - 할일 메뉴 열기\n\n" +
+      "**💡 팁:**\n" +
+      "• 할일은 100자 이내로 작성\n" +
+      "• 중복된 할일은 추가되지 않음\n" +
+      "• 완료된 할일은 정기적으로 정리\n\n" +
+      "효율적인 할일 관리로 생산성을 높여보세요! 💪";
+
+    await this.editMessage(bot, chatId, messageId, helpText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "📋 할일 목록", callback_data: "todo_list" },
+            { text: "➕ 할일 추가", callback_data: "todo_add" },
+          ],
+          [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
+        ],
+      },
+    });
+  }
+
+  async addTodoQuick(bot, chatId, userId, todoText) {
+    try {
+      const result = await this.todoService.addTodo(userId, todoText);
+
+      if (result.success) {
+        await this.sendMessage(
+          bot,
+          chatId,
+          `✅ **할일 추가 완료!**\n\n` +
+            `📝 "${result.task}" 이(가) 추가되었습니다.\n\n` +
+            `📊 총 할일: ${result.totalCount}개`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "📋 할일 목록", callback_data: "todo_list" },
+                  { text: "📝 할일 메뉴", callback_data: "todo_menu" },
+                ],
+              ],
+            },
+          }
+        );
+      } else {
+        await this.sendMessage(
+          bot,
+          chatId,
+          `❌ **할일 추가 실패**\n\n${result.error}`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "📝 할일 메뉴", callback_data: "todo_menu" }],
+              ],
+            },
+          }
+        );
+      }
+
+      return true;
+    } catch (error) {
+      Logger.error("빠른 할일 추가 오류:", error);
+      await this.sendMessage(bot, chatId, `❌ ${error.message}`);
+      return true;
+    }
+  }
+
   async handleTodoCommand(bot, msg) {
     const chatId = msg.chat.id;
     const userName = getUserName(msg.from);
