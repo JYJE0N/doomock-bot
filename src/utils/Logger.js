@@ -93,18 +93,23 @@ class Logger {
     return maskedMessage;
   }
 
-  // 🔒 객체에서 민감정보 마스킹
-  maskSensitiveObject(obj) {
+  // 🔒 객체에서 민감정보 마스킹_무한 재귀 방지 버전
+  maskSensitiveObject(obj, visited = new Set()) {
     if (!obj || typeof obj !== "object") {
       return obj;
     }
+
+    // 🚨 무한 재귀 방지
+    if (visited.has(obj)) {
+      return "[CIRCULAR_REFERENCE]";
+    }
+    visited.add(obj);
 
     const masked = {};
 
     for (const [key, value] of Object.entries(obj)) {
       const keyUpper = key.toUpperCase();
 
-      // 민감한 키인지 확인
       const isSensitiveKey = this.sensitiveKeys.some((sensitiveKey) =>
         keyUpper.includes(sensitiveKey)
       );
@@ -116,7 +121,7 @@ class Logger {
           masked[key] = "[HIDDEN]";
         }
       } else if (typeof value === "object" && value !== null) {
-        masked[key] = this.maskSensitiveObject(value);
+        masked[key] = this.maskSensitiveObject(value, visited);
       } else if (typeof value === "string") {
         masked[key] = this.maskSensitiveData(value);
       } else {
@@ -124,6 +129,7 @@ class Logger {
       }
     }
 
+    visited.delete(obj);
     return masked;
   }
 
