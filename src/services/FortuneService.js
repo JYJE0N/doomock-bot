@@ -727,6 +727,7 @@ class FortuneService {
       ],
     };
   }
+
   initializeLuckyItems() {
     this.luckyColors = [
       "정열의 빨간색",
@@ -989,7 +990,51 @@ class FortuneService {
     const card = this.getRandomMessage(allCards, userId);
     return `${card.emoji} **${card.name}**\n\n✨ *의미: ${card.meaning}*\n\n💫 *조언: ${card.advice}*`;
   }
+  // 타로 3장 스프레드 메서드 추가
+  getTarotThreeSpread(userId) {
+    const allCards = [
+      ...this.majorArcana,
+      ...this.minorArcana.wands,
+      ...this.minorArcana.cups,
+      ...this.minorArcana.swords,
+      ...this.minorArcana.pentacles,
+    ];
 
+    const today = TimeHelper.formatDate(new Date());
+    const seed = parseInt(userId.toString() + today.replace(/\D/g, ""));
+
+    // 3개의 서로 다른 카드 선택을 위한 시드 생성
+    const selectedCards = [];
+    const usedIndices = new Set();
+
+    for (let i = 0; i < 3; i++) {
+      let cardSeed = (seed + i * 17 + i * i * 31) % allCards.length;
+
+      // 중복 방지
+      while (usedIndices.has(cardSeed)) {
+        cardSeed = (cardSeed + 7) % allCards.length;
+      }
+
+      usedIndices.add(cardSeed);
+      selectedCards.push(allCards[cardSeed]);
+    }
+
+    const [pastCard, presentCard, futureCard] = selectedCards;
+
+    return (
+      `🔮 **과거 - 현재 - 미래 스프레드**\n\n` +
+      `**📜 과거 (Past):**\n` +
+      `${pastCard.emoji} ${pastCard.name}\n` +
+      `*${pastCard.meaning}*\n\n` +
+      `**🌟 현재 (Present):**\n` +
+      `${presentCard.emoji} ${presentCard.name}\n` +
+      `*${presentCard.meaning}*\n\n` +
+      `**✨ 미래 (Future):**\n` +
+      `${futureCard.emoji} ${futureCard.name}\n` +
+      `*${futureCard.meaning}*\n\n` +
+      `💫 **종합 조언:** ${presentCard.advice}`
+    );
+  }
   getLucky(userId, userName) {
     const today = TimeHelper.formatDate(new Date());
     const seed = parseInt(userId.toString() + today.replace(/\D/g, ""));

@@ -223,44 +223,53 @@ class CallbackManager {
     }
   }
 
-  // 🔧 동적 콜백 처리
+  // 🔧 날씨 동적 콜백 처리
   async handleDynamicCallback(callbackQuery) {
     const data = callbackQuery.data;
-    console.log("🔄 동적 콜백 처리:", data);
 
     // todo_toggle_1, todo_delete_1 형식 처리
     if (data.startsWith("todo_toggle_") || data.startsWith("todo_delete_")) {
       if (this.modules.todo) {
-        console.log("📝 TODO 동적 콜백 처리");
         await this.modules.todo.handleDynamicCallback(callbackQuery);
         return true;
       }
     }
 
-    // weather_인천 등 동적 도시 처리
+    // tts_lang_ko 형식 처리
+    if (data.startsWith("tts_")) {
+      if (this.modules.utils) {
+        await this.modules.utils.handleTTSCallback(callbackQuery);
+        return true;
+      }
+    }
+
+    // weather_인천, weather_광주 등 동적 도시 처리 (한국어 도시명 포함)
     if (data.startsWith("weather_") && !this.routes.has(data)) {
       if (this.modules.weather) {
-        console.log("🌤️ 날씨 동적 도시 처리:", data);
-
-        // weather_인천 → 인천으로 파싱
+        // 'weather_' 접두사 제거하여 도시명 추출
         const city = data.replace("weather_", "");
-        console.log("🏙️ 요청된 도시:", city);
 
-        // WeatherModule의 handleCallback 호출
-        await this.modules.weather.handleCallback(
+        // WeatherModule의 showCurrentWeather 직접 호출
+        const {
+          message: {
+            chat: { id: chatId },
+            message_id: messageId,
+          },
+        } = callbackQuery;
+        await this.modules.weather.showCurrentWeather(
           this.bot,
-          callbackQuery,
-          city, // subAction으로 도시명 전달
-          [] // params 빈 배열
+          chatId,
+          messageId,
+          city
         );
         return true;
       }
     }
 
-    // 기타 동적 콜백들...
-    if (data.startsWith("tts_")) {
-      if (this.modules.utils) {
-        await this.modules.utils.handleTTSCallback(callbackQuery);
+    // insight 관련 동적 콜백
+    if (data.startsWith("insight_") && !this.routes.has(data)) {
+      if (this.modules.insight) {
+        await this.modules.insight.handleDynamicCallback(callbackQuery);
         return true;
       }
     }

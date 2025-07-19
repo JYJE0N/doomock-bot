@@ -1,4 +1,5 @@
-// src/controllers/BotController.js - 리팩토링된 ModuleManager와 호환
+// src/controllers/BotController.js - 중복 콜백 이벤트 해결
+
 const MenuManager = require("../managers/MenuManager");
 const CallbackManager = require("../managers/CallbackManager");
 const ModuleManager = require("../managers/ModuleManager");
@@ -25,6 +26,9 @@ class BotController {
 
     // 사용자 상태 관리
     this.userStates = new Map();
+
+    // 🔧 중복 처리 방지 플래그
+    this.eventListenersRegistered = false;
   }
 
   async initialize() {
@@ -37,22 +41,25 @@ class BotController {
       // 2. 모듈 매니저 초기화 (모듈 로드 + 초기화)
       await this.initializeModuleManager();
 
-      // 3. 메뉴 매니저 초기화 (ModuleManager 의존)
-      this.initializeMenuManager();
+      // 모듈 초기화 완료 확인
+      Logger.info(
+        "초기화된 모듈 수:",
+        this.moduleManager.getInitializedModuleCount()
+      );
 
-      // 4. 콜백 매니저 초기화
+      // 3. 콜백 매니저 초기화
       this.initializeCallbackManager();
 
-      // 5. 핸들러 초기화
+      // 4. 핸들러 초기화
       this.initializeHandlers();
 
-      // 6. 이벤트 리스너 등록
-      this.registerEventListeners();
+      // 5. 이벤트 리스너 등록 (한 번만!)
+      if (!this.eventListenersRegistered) {
+        this.registerEventListeners();
+        this.eventListenersRegistered = true;
+      }
 
       Logger.success("BotController 초기화 완료");
-      Logger.info(
-        `초기화된 모듈 수: ${this.moduleManager.getInitializedModuleCount()}`
-      );
     } catch (error) {
       Logger.error("BotController 초기화 실패:", error);
       throw error;
@@ -73,6 +80,7 @@ class BotController {
         Logger.success("데이터베이스 연결 성공");
       } catch (error) {
         Logger.error("데이터베이스 연결 실패:", error);
+        // DB 연결 실패해도 봇은 계속 실행
         Logger.warn("MongoDB 없이 봇을 실행합니다. 일부 기능이 제한됩니다.");
       }
     } else {
@@ -86,7 +94,7 @@ class BotController {
       userStates: this.userStates,
     });
 
-    // ModuleManager는 이제 내부적으로 모든 로드와 초기화를 처리
+    // initialize() 메서드가 loadModules()와 initializeModules()를 모두 처리
     await this.moduleManager.initialize();
 
     // 초기화 결과 확인
@@ -102,29 +110,43 @@ class BotController {
     Logger.success("모듈 매니저 초기화 완료");
   }
 
-  initializeMenuManager() {
-    this.menuManager = new MenuManager(this.moduleManager);
-    Logger.success("메뉴 매니저 초기화 완료");
-  }
-
   initializeCallbackManager() {
-    // 모듈들을 올바른 형식으로 전달
-    const modules = this.moduleManager.getModules();
+    // 먼저 로드된 모듈 확인
+    Logger.info(
+      "현재 로드된 모듈:",
+      this.moduleManager.getAllModules().map((m) => m.name)
+    );
 
-    Logger.info("현재 로드된 모듈:", Object.keys(modules));
+    // 모듈들을 직접 전달하는 방식으로 변경
+    const modules = {
+      todo: this.moduleManager.getModule("TodoModule"),
+      leave: this.moduleManager.getModule("LeaveModule"),
+      fortune: this.moduleManager.getModule("FortuneModule"),
+      timer: this.moduleManager.getModule("TimerModule"),
+      weather: this.moduleManager.getModule("WeatherModule"),
+      insight: this.moduleManager.getModule("InsightModule"),
+      utils: this.moduleManager.getModule("UtilsModule"),
+      reminder: this.moduleManager.getModule("ReminderModule"),
+      worktime: this.moduleManager.getModule("WorktimeModule"),
+    };
 
-    // 로드된 모듈이 없는 경우 경고
+    // 각 모듈 상태 확인
+    Object.keys(modules).forEach((key) => {
+      if (!modules[key]) {
+        Logger.warn(`❌ 모듈 ${key}가 로드되지 않았습니다`);
+        delete modules[key];
+      } else {
+        Logger.success(`✅ 모듈 ${key} 확인됨`);
+      }
+    });
+
     if (Object.keys(modules).length === 0) {
-      Logger.warn("⚠️ 로드된 모듈이 하나도 없습니다!");
+      Logger.error("⚠️ 로드된 모듈이 하나도 없습니다!");
     }
+
+    Logger.info("CallbackManager에 전달할 모듈들:", Object.keys(modules));
 
     this.callbackManager = new CallbackManager(this.bot, modules);
-
-    // MenuManager 참조 설정 (상호 의존성)
-    if (this.callbackManager.setMenuManager) {
-      this.callbackManager.setMenuManager(this.menuManager);
-    }
-
     Logger.success("콜백 매니저 초기화 완료");
   }
 
@@ -147,10 +169,19 @@ class BotController {
     Logger.success("핸들러 초기화 완료");
   }
 
+  // 🔧 이벤트 리스너 등록 (중복 방지)
   registerEventListeners() {
+    Logger.info("🎧 이벤트 리스너 등록 시작...");
+
+    // 기존 리스너들 제거 (중복 방지)
+    this.bot.removeAllListeners("message");
+    this.bot.removeAllListeners("callback_query");
+    this.bot.removeAllListeners("polling_error");
+
     // 메시지 이벤트
     this.bot.on("message", async (msg) => {
       try {
+        console.log(`📨 메시지 이벤트 수신: ${msg.text}`);
         await this.handleMessage(msg);
       } catch (error) {
         Logger.error("메시지 처리 오류:", error);
@@ -158,10 +189,18 @@ class BotController {
       }
     });
 
-    // 콜백 쿼리 이벤트
+    // 🔧 콜백 쿼리 이벤트 (단일 처리)
     this.bot.on("callback_query", async (callbackQuery) => {
       try {
-        await this.handleCallbackQuery(callbackQuery);
+        console.log(`📞 콜백 이벤트 수신: ${callbackQuery.data}`);
+
+        // 🚨 중요: CallbackManager만 사용! ModuleManager 사용 안함!
+        const handled =
+          await this.callbackManager.handleCallback(callbackQuery);
+
+        if (!handled) {
+          Logger.warn(`처리되지 않은 콜백: ${callbackQuery.data}`);
+        }
       } catch (error) {
         Logger.error("콜백 처리 오류:", error);
         await this.sendErrorMessage(callbackQuery.message.chat.id);
@@ -173,9 +212,10 @@ class BotController {
       Logger.error("폴링 오류:", error);
     });
 
-    Logger.success("이벤트 리스너 등록 완료");
+    Logger.success("✅ 이벤트 리스너 등록 완료 (중복 방지됨)");
   }
 
+  // 🔧 메시지 처리 (ModuleManager 사용)
   async handleMessage(msg) {
     const text = msg.text;
     if (!text) return;
@@ -183,127 +223,72 @@ class BotController {
     const chatId = msg.chat.id;
     const userId = msg.from.id;
     const userName = UserHelper.getUserName(msg.from);
-    const isGroupChat = UserHelper.isGroupChat(msg.chat);
 
-    Logger.info(
-      `💬 메시지: "${text}" (사용자: ${userName}, 그룹: ${isGroupChat})`
-    );
+    Logger.info(`💬 메시지: "${text}" (사용자: ${userName}, ID: ${userId})`);
 
-    // ModuleManager에서 처리하도록 위임
-    const handled = await this.moduleManager.handleMessage(this.bot, msg);
+    // /start 명령어 직접 처리
+    if (text === "/start") {
+      const welcomeText =
+        `🤖 **두목봇에 오신걸 환영합니다!**\n\n` +
+        `안녕하세요 ${userName}님! 👋\n\n` +
+        `두목봇은 직장인을 위한 종합 생산성 도구입니다.\n` +
+        `아래 메뉴에서 원하는 기능을 선택해주세요:`;
 
-    // 처리되지 않은 메시지 대응
-    if (!handled) {
-      // 일반 텍스트 메시지에 대한 기본 응답 (개인 채팅만)
-      if (!text.startsWith("/") && !isGroupChat) {
-        const helpMessage =
-          `안녕하세요 ${userName}님! 👋\n\n` +
-          `무엇을 도와드릴까요?\n` +
-          `/start 명령어로 메인 메뉴를 열어보세요!`;
-
-        await this.bot.sendMessage(chatId, helpMessage, {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-            ],
-          },
-        });
-      }
-      // 그룹에서는 명령어가 아닌 일반 메시지에는 반응하지 않음
-    }
-  }
-
-  async handleCallbackQuery(callbackQuery) {
-    const data = callbackQuery.data;
-
-    try {
-      // 1차: ModuleManager에서 콜백 처리 시도
-      const handled = await this.moduleManager.handleCallback(
-        this.bot,
-        callbackQuery
-      );
-
-      // 2차: 처리되지 않은 경우 CallbackManager로 폴백
-      if (!handled && this.callbackManager) {
-        Logger.debug(
-          `ModuleManager에서 처리되지 않은 콜백, CallbackManager로 폴백: ${data}`
-        );
-        await this.callbackManager.handleCallback(callbackQuery);
-      }
-    } catch (error) {
-      Logger.error("콜백 처리 중 오류:", error);
-      await this.sendUnknownCallbackError(callbackQuery);
-    }
-  }
-
-  async sendUnknownCallbackError(callbackQuery) {
-    try {
-      await this.bot.answerCallbackQuery(callbackQuery.id, {
-        text: "알 수 없는 요청입니다.",
-        show_alert: false,
-      });
-
-      await this.bot.editMessageText("❓ 알 수 없는 요청입니다.", {
-        chat_id: callbackQuery.message.chat.id,
-        message_id: callbackQuery.message.message_id,
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📝 할일 관리", callback_data: "todo_menu" },
+            { text: "📅 휴가 관리", callback_data: "leave_menu" },
           ],
-        },
+          [
+            { text: "⏰ 타이머", callback_data: "timer_menu" },
+            { text: "🔮 운세", callback_data: "fortune_menu" },
+          ],
+          [
+            { text: "🕐 근무시간", callback_data: "worktime_menu" },
+            { text: "🌤️ 날씨", callback_data: "weather_menu" },
+          ],
+          [
+            { text: "📊 인사이트", callback_data: "insight_menu" },
+            { text: "🔔 리마인더", callback_data: "reminder_menu" },
+          ],
+          [
+            { text: "🛠️ 유틸리티", callback_data: "utils_menu" },
+            { text: "❓ 도움말", callback_data: "help_menu" },
+          ],
+        ],
+      };
+
+      await this.bot.sendMessage(chatId, welcomeText, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
       });
+
+      return;
+    }
+
+    // 다른 메시지들은 ModuleManager로 전달
+    try {
+      const handled = await this.moduleManager.handleMessage(this.bot, msg);
+      if (!handled) {
+        Logger.debug(`처리되지 않은 메시지: ${text}`);
+      }
     } catch (error) {
-      Logger.error("알 수 없는 콜백 오류 처리 실패:", error);
+      Logger.error("ModuleManager 메시지 처리 실패:", error);
     }
   }
+
+  // 🚨 handleCallbackQuery 메서드 제거 (중복 방지)
+  // CallbackManager에서만 콜백 처리
 
   async sendErrorMessage(chatId) {
     try {
       await this.bot.sendMessage(
         chatId,
-        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요.",
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-            ],
-          },
-        }
+        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요."
       );
     } catch (error) {
       Logger.error("오류 메시지 전송 실패:", error);
-    }
-  }
-
-  // 봇 상태 조회
-  getStatus() {
-    return {
-      isInitialized: !!this.moduleManager?.isInitialized,
-      moduleCount: this.moduleManager?.getInitializedModuleCount() || 0,
-      dbConnected: !!this.dbManager?.isConnected(),
-      uptime: process.uptime(),
-    };
-  }
-
-  // 전체 시스템 재시작
-  async restart() {
-    Logger.info("🔄 시스템 재시작 시작...");
-
-    try {
-      // 모듈 재로드
-      if (this.moduleManager) {
-        await this.moduleManager.reloadModules();
-      }
-
-      // 메뉴 캐시 클리어
-      if (this.menuManager && this.menuManager.clearCache) {
-        this.menuManager.clearCache();
-      }
-
-      Logger.success("✅ 시스템 재시작 완료");
-    } catch (error) {
-      Logger.error("❌ 시스템 재시작 실패:", error);
-      throw error;
     }
   }
 
@@ -311,6 +296,11 @@ class BotController {
     Logger.info("BotController 종료 시작...");
 
     try {
+      // 이벤트 리스너 제거
+      if (this.bot) {
+        this.bot.removeAllListeners();
+      }
+
       // 모듈 종료
       if (this.moduleManager) {
         await this.moduleManager.shutdown();

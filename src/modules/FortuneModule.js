@@ -1,5 +1,3 @@
-// src/modules/FortuneModule.js - 수정된 버전
-
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
 const { FortuneService } = require("../services/FortuneService");
@@ -42,6 +40,7 @@ class FortuneModule extends BaseModule {
       from,
     } = callbackQuery;
     const userName = getUserName(from);
+
     switch (subAction) {
       case "menu":
         await this.showFortuneMenu(
@@ -109,6 +108,8 @@ class FortuneModule extends BaseModule {
       await this.showFortune(bot, chatId, null, from.id, "meeting");
     } else if (text === "/fortune tarot") {
       await this.showTarot(bot, chatId, null, from.id);
+    } else if (text === "/fortune tarot3") {
+      await this.showTarotThreeSpread(bot, chatId, null, from.id);
     } else if (text === "/fortune lucky") {
       await this.showLucky(bot, chatId, null, from.id);
     } else if (text === "/fortune all") {
@@ -136,12 +137,13 @@ class FortuneModule extends BaseModule {
         ],
         [
           { text: "🃏 타로카드", callback_data: "fortune_tarot" },
-          { text: "🍀 행운정보", callback_data: "fortune_lucky" },
+          { text: "🔮 타로 3장", callback_data: "fortune_tarot3" },
         ],
         [
-          { text: "🔮 종합운세", callback_data: "fortune_all" },
-          { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+          { text: "🍀 행운정보", callback_data: "fortune_lucky" },
+          { text: "🌟 종합운세", callback_data: "fortune_all" },
         ],
+        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
       ],
     };
 
@@ -193,10 +195,13 @@ class FortuneModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔮 다른 운세", callback_data: "fortune_menu" },
+          { text: "🔮 타로 3장", callback_data: "fortune_tarot3" },
           { text: "🍀 행운정보", callback_data: "fortune_lucky" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        [
+          { text: "🔮 다른 운세", callback_data: "fortune_menu" },
+          { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+        ],
       ],
     };
 
@@ -216,6 +221,47 @@ class FortuneModule extends BaseModule {
         bot,
         chatId,
         `🃏 **오늘의 타로카드**\n\n${tarot}`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        }
+      );
+    }
+  }
+
+  // 새로 추가: 타로 3장 스프레드 메서드
+  async showTarotThreeSpread(bot, chatId, messageId, userId) {
+    const tarotSpread = this.fortuneService.getTarotThreeSpread(userId);
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🃏 단일 타로", callback_data: "fortune_tarot" },
+          { text: "🍀 행운정보", callback_data: "fortune_lucky" },
+        ],
+        [
+          { text: "🔮 다른 운세", callback_data: "fortune_menu" },
+          { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+        ],
+      ],
+    };
+
+    if (messageId) {
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        `🔮 **타로 3장 스프레드**\n\n${tarotSpread}`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        }
+      );
+    } else {
+      await this.sendMessage(
+        bot,
+        chatId,
+        `🔮 **타로 3장 스프레드**\n\n${tarotSpread}`,
         {
           parse_mode: "Markdown",
           reply_markup: keyboard,
@@ -289,6 +335,7 @@ class FortuneModule extends BaseModule {
       `/fortune health - 오늘의 건강운\n` +
       `/fortune meeting - 오늘의 회식운\n` +
       `/fortune tarot - 오늘의 타로카드\n` +
+      `/fortune tarot3 - 타로 3장 스프레드\n` +
       `/fortune lucky - 오늘의 행운 정보\n` +
       `/fortune all - 종합 운세\n\n` +
       `✨ **특징:**\n` +

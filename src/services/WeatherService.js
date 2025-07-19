@@ -250,7 +250,7 @@ class WeatherService {
     if (!text) return "";
 
     // Markdown에서 특별한 의미를 가지는 문자들을 이스케이프
-    return text.replace(/([_*\[\]()~`>#+=|{}.!-])/g, "\\$1");
+    return text.replace(/([_*\]()~`>#+=|{}!-])/g, "\\$1");
   }
 
   // 날씨 아이콘 반환
