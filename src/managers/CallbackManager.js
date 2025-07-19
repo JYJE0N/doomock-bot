@@ -1,4 +1,4 @@
-// src/managers/CallbackManager.js - 구조적 명시적 라우팅
+// src/managers/CallbackManager.js - BaseModule 표준 패턴 완전 지원
 
 const Logger = require("../utils/Logger");
 
@@ -67,17 +67,17 @@ class CallbackManager {
     Logger.debug(`🏠 시스템 라우팅 ${systemRoutes.length}개 등록`);
   }
 
-  // 📝 할일 관리 라우팅 (심플한 구조)
+  // 📝 할일 관리 라우팅
   addTodoRoutes() {
     const todoActions = [
-      "menu", // 할일 메인 메뉴
-      "list", // 할일 목록
-      "add", // 할일 추가
-      "stats", // 할일 통계
-      "clear", // 할일 삭제 메뉴
-      "clear_completed", // 완료된 할일 삭제
-      "clear_all", // 모든 할일 삭제
-      "help", // 할일 도움말
+      "menu",
+      "list",
+      "add",
+      "stats",
+      "clear",
+      "clear_completed",
+      "clear_all",
+      "help",
     ];
 
     todoActions.forEach((action) => {
@@ -87,22 +87,22 @@ class CallbackManager {
     Logger.debug(`📝 할일 라우팅 ${todoActions.length}개 등록`);
   }
 
-  // 🔮 운세 라우팅 (복잡한 구조)
+  // 🔮 운세 라우팅
   addFortuneRoutes() {
     const fortuneActions = [
-      "menu", // 운세 메인 메뉴
-      "general", // 종합 운세
-      "today", // 오늘의 운세
-      "work", // 업무운
-      "love", // 연애운
-      "money", // 재물운
-      "health", // 건강운
-      "tarot", // 타로카드 1장
-      "tarot3", // 타로카드 3장 스프레드
-      "lucky", // 행운 정보
-      "meeting", // 회식운
-      "all", // 종합 운세 정보
-      "help", // 운세 도움말
+      "menu",
+      "general",
+      "today",
+      "work",
+      "love",
+      "money",
+      "health",
+      "tarot",
+      "tarot3",
+      "lucky",
+      "meeting",
+      "all",
+      "help",
     ];
 
     fortuneActions.forEach((action) => {
@@ -115,17 +115,17 @@ class CallbackManager {
     Logger.debug(`🔮 운세 라우팅 ${fortuneActions.length}개 등록`);
   }
 
-  // 🌤️ 날씨 라우팅 (중간 복잡도)
+  // 🌤️ 날씨 라우팅
   addWeatherRoutes() {
     const weatherActions = [
-      "menu", // 날씨 메인 메뉴
-      "current", // 현재 날씨
-      "forecast", // 날씨 예보
-      "seoul", // 서울 날씨
-      "busan", // 부산 날씨
-      "more_cities", // 더 많은 도시
-      "quick", // 빠른 날씨
-      "help", // 날씨 도움말
+      "menu",
+      "current",
+      "forecast",
+      "seoul",
+      "busan",
+      "more_cities",
+      "quick",
+      "help",
     ];
 
     weatherActions.forEach((action) => {
@@ -141,15 +141,15 @@ class CallbackManager {
   // ⏰ 타이머 라우팅
   addTimerRoutes() {
     const timerActions = [
-      "menu", // 타이머 메인 메뉴
-      "start", // 타이머 시작
-      "stop", // 타이머 정지
-      "pause", // 타이머 일시정지
-      "resume", // 타이머 재개
-      "pomodoro_start", // 포모도로 시작
-      "custom_start", // 커스텀 타이머 시작
-      "status", // 타이머 상태
-      "help", // 타이머 도움말
+      "menu",
+      "start",
+      "stop",
+      "pause",
+      "resume",
+      "pomodoro_start",
+      "custom_start",
+      "status",
+      "help",
     ];
 
     timerActions.forEach((action) => {
@@ -162,15 +162,15 @@ class CallbackManager {
   // 📅 휴가 관리 라우팅
   addLeaveRoutes() {
     const leaveActions = [
-      "menu", // 휴가 메인 메뉴
-      "status", // 휴가 현황
-      "use", // 휴가 사용
-      "history", // 휴가 히스토리
-      "setting", // 휴가 설정
-      "use_1", // 1일 휴가 사용
-      "use_0.5", // 반차 사용
-      "use_custom", // 커스텀 휴가 사용
-      "help", // 휴가 도움말
+      "menu",
+      "status",
+      "use",
+      "history",
+      "setting",
+      "use_1",
+      "use_0.5",
+      "use_custom",
+      "help",
     ];
 
     leaveActions.forEach((action) => {
@@ -183,13 +183,13 @@ class CallbackManager {
   // 📊 인사이트 라우팅
   addInsightRoutes() {
     const insightActions = [
-      "menu", // 인사이트 메인 메뉴
-      "dashboard", // 대시보드
-      "national", // 전국 인사이트
-      "refresh", // 데이터 새로고침
-      "quick", // 빠른 인사이트
-      "full", // 전체 인사이트
-      "help", // 인사이트 도움말
+      "menu",
+      "dashboard",
+      "national",
+      "refresh",
+      "quick",
+      "full",
+      "help",
     ];
 
     insightActions.forEach((action) => {
@@ -204,12 +204,7 @@ class CallbackManager {
 
   // 🛠️ 유틸리티 라우팅
   addUtilsRoutes() {
-    const utilsActions = [
-      "menu", // 유틸리티 메인 메뉴
-      "tts_menu", // TTS 메뉴
-      "tts_help", // TTS 도움말
-      "help", // 유틸리티 도움말
-    ];
+    const utilsActions = ["menu", "tts_menu", "tts_help", "help"];
 
     utilsActions.forEach((action) => {
       this.routes.set(`utils_${action}`, { module: "utils", method: action });
@@ -220,12 +215,7 @@ class CallbackManager {
 
   // 🔔 리마인더 라우팅
   addReminderRoutes() {
-    const reminderActions = [
-      "menu", // 리마인더 메인 메뉴
-      "minutes", // 분 단위 리마인더
-      "time", // 시간 리마인더
-      "help", // 리마인더 도움말
-    ];
+    const reminderActions = ["menu", "minutes", "time", "help"];
 
     reminderActions.forEach((action) => {
       this.routes.set(`reminder_${action}`, {
@@ -234,7 +224,7 @@ class CallbackManager {
       });
     });
 
-    // 별칭 라우팅 (remind_로 시작하는 것들)
+    // 별칭 라우팅
     this.routes.set("remind_minutes", {
       module: "reminder",
       method: "minutes",
@@ -248,12 +238,12 @@ class CallbackManager {
   // 🕐 근무시간 라우팅
   addWorktimeRoutes() {
     const worktimeActions = [
-      "menu", // 근무시간 메인 메뉴
-      "checkin", // 출근
-      "checkout", // 퇴근
-      "status", // 근무 상태
-      "history", // 근무 히스토리
-      "help", // 근무시간 도움말
+      "menu",
+      "checkin",
+      "checkout",
+      "status",
+      "history",
+      "help",
     ];
 
     worktimeActions.forEach((action) => {
@@ -266,7 +256,8 @@ class CallbackManager {
     Logger.debug(`🕐 근무시간 라우팅 ${worktimeActions.length}개 등록`);
   }
 
-  // 📞 콜백 처리
+  // ========== 📞 핵심 콜백 처리 ==========
+
   async handleCallback(callbackQuery) {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
@@ -280,8 +271,13 @@ class CallbackManager {
     }
 
     try {
-      const route = this.routes.get(data);
+      // 🎯 동적 콜백 먼저 처리 (toggle_1, delete_2 등)
+      if (await this.handleDynamicCallback(callbackQuery)) {
+        return;
+      }
 
+      // 📋 정적 라우팅 처리
+      const route = this.routes.get(data);
       if (route) {
         Logger.info(
           `✅ 라우팅 발견: ${data} → ${route.module}.${route.method}`
@@ -297,6 +293,48 @@ class CallbackManager {
     }
   }
 
+  // 🎯 동적 콜백 처리 (toggle_1, delete_2, weather_인천 등)
+  async handleDynamicCallback(callbackQuery) {
+    const data = callbackQuery.data;
+
+    // todo 동적 콜백 (toggle_1, delete_2 등)
+    if (
+      data.startsWith("todo_") &&
+      (data.includes("toggle_") || data.includes("delete_"))
+    ) {
+      const module = this.modules.todo;
+      if (module && typeof module.handleCallback === "function") {
+        const parts = data.split("_");
+        const subAction = parts.slice(1).join("_"); // "toggle_1" 또는 "delete_2"
+        await module.handleCallback(this.bot, callbackQuery, subAction, []);
+        return true;
+      }
+    }
+
+    // weather 동적 콜백 (weather_인천 등)
+    if (data.startsWith("weather_") && !this.routes.has(data)) {
+      const module = this.modules.weather;
+      if (module && typeof module.handleCallback === "function") {
+        const city = data.replace("weather_", "");
+        await module.handleCallback(this.bot, callbackQuery, "city", [city]);
+        return true;
+      }
+    }
+
+    // insight 동적 콜백
+    if (data.startsWith("insight_") && !this.routes.has(data)) {
+      const module = this.modules.insight;
+      if (module && typeof module.handleCallback === "function") {
+        const subAction = data.replace("insight_", "");
+        await module.handleCallback(this.bot, callbackQuery, subAction, []);
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  // ⚙️ 라우트 실행 - BaseModule 표준 패턴 지원
   async executeRoute(route, callbackQuery) {
     const { module: moduleName, method: methodName } = route;
 
@@ -313,9 +351,13 @@ class CallbackManager {
     }
 
     try {
-      Logger.info(`🔧 모듈 호출: ${moduleName}.handleCallback(${methodName})`);
+      Logger.info(
+        `🔧 모듈 호출: ${moduleName}.handleCallback("${methodName}")`
+      );
 
+      // ✅ BaseModule 표준 패턴 호출
       if (typeof module.handleCallback === "function") {
+        // BaseModule.handleCallback(bot, callbackQuery, subAction, params)
         await module.handleCallback(this.bot, callbackQuery, methodName, []);
       } else {
         Logger.error(`❌ ${moduleName}에 handleCallback 메서드 없음`);
@@ -326,6 +368,8 @@ class CallbackManager {
       await this.sendErrorMessage(callbackQuery.message.chat.id);
     }
   }
+
+  // ========== 🏠 시스템 콜백 처리 ==========
 
   async handleSystemCallback(callbackQuery, method) {
     switch (method) {
@@ -345,9 +389,10 @@ class CallbackManager {
 
   async showMainMenu(callbackQuery) {
     const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
     const userName = callbackQuery.from.first_name || "사용자";
 
-    const text = `🤖 두목봇 메인 메뉴\n\n안녕하세요 ${userName}님!\n\n원하는 기능을 선택해주세요:`;
+    const text = `🤖 **두목봇 메인 메뉴**\n\n안녕하세요 ${userName}님!\n\n원하는 기능을 선택해주세요:`;
 
     const keyboard = {
       inline_keyboard: [
@@ -377,36 +422,57 @@ class CallbackManager {
     try {
       await this.bot.editMessageText(text, {
         chat_id: chatId,
-        message_id: callbackQuery.message.message_id,
+        message_id: messageId,
+        parse_mode: "Markdown",
         reply_markup: keyboard,
       });
     } catch (error) {
-      await this.bot.sendMessage(chatId, text, { reply_markup: keyboard });
+      Logger.warn("메시지 수정 실패, 새 메시지 전송");
+      await this.bot.sendMessage(chatId, text, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
     }
   }
 
   async showHelpMenu(callbackQuery) {
     const chatId = callbackQuery.message.chat.id;
-    const text =
-      "❓ 두목봇 도움말\n\n🤖 주요 기능:\n- 📝 할일 관리\n- 📅 휴가 관리\n- 🔮 운세\n- ⏰ 타이머\n- 🌤️ 날씨\n- 📊 인사이트\n- 🛠️ 유틸리티\n- 🔔 리마인더\n- 🕐 근무시간\n\n🎯 /start로 메인 메뉴 이동";
+    const messageId = callbackQuery.message.message_id;
+
+    const helpText =
+      `❓ **두목봇 도움말**\n\n` +
+      `**📱 사용법:**\n` +
+      `• 버튼을 클릭해서 원하는 기능 사용\n` +
+      `• /start - 메인 메뉴로 돌아가기\n` +
+      `• /help - 이 도움말 보기\n\n` +
+      `**🔧 주요 기능:**\n` +
+      `• 📝 할일 관리 - 할일 추가/완료/삭제\n` +
+      `• 📅 휴가 관리 - 연차 사용/관리\n` +
+      `• 🔮 운세 - 오늘의 운세 확인\n` +
+      `• ⏰ 타이머 - 작업 시간 측정\n` +
+      `• 🌤️ 날씨 - 실시간 날씨 정보\n` +
+      `• 📊 인사이트 - 데이터 분석\n` +
+      `• 🛠️ 유틸리티 - TTS 등 편의 기능\n` +
+      `• 🔔 리마인더 - 알림 설정\n` +
+      `• 🕐 근무시간 - 출퇴근 관리\n\n` +
+      `문제가 있으면 /start로 다시 시작하세요! 🚀`;
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main_menu" }]],
+    };
 
     try {
-      await this.bot.editMessageText(text, {
+      await this.bot.editMessageText(helpText, {
         chat_id: chatId,
-        message_id: callbackQuery.message.message_id,
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
       });
     } catch (error) {
-      await this.bot.sendMessage(chatId, text, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
+      Logger.warn("메시지 수정 실패, 새 메시지 전송");
+      await this.bot.sendMessage(chatId, helpText, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
       });
     }
   }
@@ -415,65 +481,61 @@ class CallbackManager {
     const chatId = callbackQuery.message.chat.id;
     const userName = callbackQuery.from.first_name || "사용자";
 
-    const text = `❌ ${userName}님, 작업이 취소되었습니다.`;
-
-    try {
-      await this.bot.editMessageText(text, {
-        chat_id: chatId,
-        message_id: callbackQuery.message.message_id,
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
-      });
-    } catch (error) {
-      await this.bot.sendMessage(chatId, text, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
-      });
-    }
+    await this.bot.sendMessage(
+      chatId,
+      `❌ ${userName}님, 작업이 취소되었습니다.`
+    );
+    await this.showMainMenu(callbackQuery);
   }
+
+  // ========== ❌ 에러 처리 ==========
 
   async handleUnknownCallback(callbackQuery) {
     const chatId = callbackQuery.message.chat.id;
     const data = callbackQuery.data;
 
-    const text = `❓ 알 수 없는 요청: ${data}\n\n메인 메뉴로 돌아가서 다른 기능을 선택해주세요.`;
+    Logger.warn(`처리할 수 없는 콜백: ${data}`);
+
+    // 기본 응답 제공
+    let response = "❓ 알 수 없는 요청입니다.";
+
+    if (data.startsWith("timer")) {
+      response = "⏰ **타이머 기능**\n\n타이머 기능은 준비 중입니다! 🚧";
+    } else if (data.startsWith("weather")) {
+      response = "🌤️ **날씨 기능**\n\n날씨 기능은 준비 중입니다! 🚧";
+    } else if (data.startsWith("insight")) {
+      response = "📊 **인사이트 기능**\n\n인사이트 기능은 준비 중입니다! 🚧";
+    }
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main_menu" }]],
+    };
 
     try {
-      await this.bot.editMessageText(text, {
+      await this.bot.editMessageText(response, {
         chat_id: chatId,
         message_id: callbackQuery.message.message_id,
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
       });
     } catch (error) {
-      await this.bot.sendMessage(chatId, text, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
+      await this.bot.sendMessage(chatId, response, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
       });
     }
   }
 
   async sendErrorMessage(chatId) {
+    const errorText =
+      "❌ 처리 중 오류가 발생했습니다.\n\n/start를 입력해서 다시 시작해주세요.";
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main_menu" }]],
+    };
+
     try {
-      await this.bot.sendMessage(chatId, "❌ 처리 중 오류가 발생했습니다.", {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
-      });
+      await this.bot.sendMessage(chatId, errorText, { reply_markup: keyboard });
     } catch (error) {
       Logger.error("에러 메시지 전송 실패:", error);
     }
