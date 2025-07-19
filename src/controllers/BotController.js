@@ -67,11 +67,12 @@ class BotController {
 
   // 수정된 initializeDatabase 메서드 디버깅 추가
   async initializeDatabase() {
-    // ✅ 디버깅 로그 추가
+    // ✅ 안전한 로깅으로 교체
     Logger.info("🔍 데이터베이스 초기화 디버깅:");
-    Logger.info(`  - config 객체: ${JSON.stringify(this.config, null, 2)}`);
-    Logger.info(`  - MONGO_URL: "${this.MONGO_URL}"`);
-    Logger.info(`  - mongoUrl 타입: ${typeof this.MONGO_URL}`);
+    Logger.info(`- MONGO_URL 존재: ${!!this.config.MONGO_URL}`);
+    Logger.info(`- NODE_ENV: ${this.config.NODE_ENV}`);
+    Logger.info(`- PORT: ${this.config.PORT}`);
+    // 민감한 정보는 로깅하지 않음
     Logger.info(
       `  - mongoUrl 길이: ${this.MONGO_URL ? this.MONGO_URL.length : "undefined"}`
     );
