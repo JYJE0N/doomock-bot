@@ -40,7 +40,7 @@ class MenuManager {
     try {
       if (!this.moduleManager) {
         Logger.warn(
-          "MenuManager: ModuleManager가 설정되지 않음. 기본 메뉴 반환"
+          "MenuManager: ModuleManager가 설정되지 않음. 기본 메뉴 반환",
         );
         return this.getDefaultKeyboard();
       }
@@ -145,7 +145,7 @@ class MenuManager {
 
     // 🔧 item.emoji 제거 (text에 이미 포함됨)
     for (let i = 0; i < items.length; i += columns) {
-      const row = items.slice(i, i + columns).map((item) => ({
+      const row = items.slice(i, i + columns).map(item => ({
         text: item.text,
         callback_data: item.callback_data,
       }));
@@ -153,7 +153,7 @@ class MenuManager {
     }
 
     if (extraButtons.length > 0) {
-      extraButtons.forEach((buttonRow) => {
+      extraButtons.forEach(buttonRow => {
         keyboard.push(Array.isArray(buttonRow) ? buttonRow : [buttonRow]);
       });
     }

@@ -45,7 +45,7 @@ class ModuleManager {
 
     // 우선순위별로 정렬
     const sortedConfigs = Object.entries(moduleConfigs).sort(
-      ([, a], [, b]) => (a.priority || 100) - (b.priority || 100)
+      ([, a], [, b]) => (a.priority || 100) - (b.priority || 100),
     );
 
     for (const [moduleName, config] of sortedConfigs) {
@@ -84,7 +84,7 @@ class ModuleManager {
         Logger.debug(`✅ 모듈 파일 로드 성공: ${config.path}`);
       } catch (requireError) {
         Logger.warn(
-          `⚠️ 모듈 파일 ${config.path}을 찾을 수 없습니다. 기본 모듈로 대체합니다.`
+          `⚠️ 모듈 파일 ${config.path}을 찾을 수 없습니다. 기본 모듈로 대체합니다.`,
         );
 
         // 기본 모듈 클래스 생성
@@ -136,7 +136,7 @@ class ModuleManager {
       });
 
       Logger.success(
-        `✅ 모듈 ${moduleName} 로드 완료 (실제 구현: ${!!require.cache[require.resolve(config.path)]})`
+        `✅ 모듈 ${moduleName} 로드 완료 (실제 구현: ${!!require.cache[require.resolve(config.path)]})`,
       );
     } catch (error) {
       Logger.error(`❌ 모듈 ${moduleName} 로드 실패:`, error);
@@ -154,7 +154,9 @@ class ModuleManager {
     for (const moduleName of this.moduleOrder) {
       try {
         const moduleData = this.modules.get(moduleName);
-        if (!moduleData) continue;
+        if (!moduleData) {
+          continue;
+        }
 
         Logger.info(`🔧 모듈 ${moduleName} 초기화 중...`);
 
@@ -181,7 +183,9 @@ class ModuleManager {
 
   async validateDependencies() {
     for (const [moduleName, moduleData] of this.modules.entries()) {
-      if (moduleData.status !== "initialized") continue;
+      if (moduleData.status !== "initialized") {
+        continue;
+      }
 
       const dependencies = moduleData.config.dependencies || [];
 
@@ -234,7 +238,7 @@ class ModuleManager {
     }
 
     Logger.debug(
-      `모듈 ${moduleName}은 사용할 수 없는 상태. 상태: ${moduleData.status}`
+      `모듈 ${moduleName}은 사용할 수 없는 상태. 상태: ${moduleData.status}`,
     );
     return null;
   }
@@ -256,7 +260,9 @@ class ModuleManager {
   findModuleForCommand(command) {
     try {
       for (const [moduleName, moduleData] of this.modules.entries()) {
-        if (moduleData.status !== "initialized") continue;
+        if (moduleData.status !== "initialized") {
+          continue;
+        }
 
         const instance = moduleData.instance;
 
@@ -270,7 +276,7 @@ class ModuleManager {
         const commands = moduleData.config.commands || [];
         if (commands.includes(command)) {
           Logger.debug(
-            `명령어 ${command}를 ${moduleName}에서 처리 (설정 기반)`
+            `명령어 ${command}를 ${moduleName}에서 처리 (설정 기반)`,
           );
           return instance;
         }
@@ -279,7 +285,7 @@ class ModuleManager {
         const moduleCommands = this.getModuleCommands(moduleName);
         if (moduleCommands.includes(command)) {
           Logger.debug(
-            `명령어 ${command}를 ${moduleName}에서 처리 (기본 명령어)`
+            `명령어 ${command}를 ${moduleName}에서 처리 (기본 명령어)`,
           );
           return instance;
         }
@@ -322,7 +328,7 @@ class ModuleManager {
         const moduleData = this.modules.get(moduleName);
         if (moduleData && moduleData.status === "initialized") {
           Logger.debug(
-            `콜백 ${callbackData}를 ${moduleName}에서 처리 (정확 매핑)`
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (정확 매핑)`,
           );
           return moduleData.instance;
         }
@@ -347,7 +353,7 @@ class ModuleManager {
         const moduleData = this.modules.get(moduleName);
         if (moduleData && moduleData.status === "initialized") {
           Logger.debug(
-            `콜백 ${callbackData}를 ${moduleName}에서 처리 (접두사 매핑)`
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (접두사 매핑)`,
           );
           return moduleData.instance;
         }
@@ -355,7 +361,9 @@ class ModuleManager {
 
       // 기존 방식으로 폴백
       for (const [moduleName, moduleData] of this.modules.entries()) {
-        if (moduleData.status !== "initialized") continue;
+        if (moduleData.status !== "initialized") {
+          continue;
+        }
 
         const instance = moduleData.instance;
         if (
@@ -363,7 +371,7 @@ class ModuleManager {
           instance.canHandleCallback(callbackData)
         ) {
           Logger.debug(
-            `콜백 ${callbackData}를 ${moduleName}에서 처리 (canHandleCallback)`
+            `콜백 ${callbackData}를 ${moduleName}에서 처리 (canHandleCallback)`,
           );
           return instance;
         }
@@ -376,7 +384,9 @@ class ModuleManager {
 
   async handleMessage(bot, msg) {
     const text = msg.text;
-    if (!text) return false;
+    if (!text) {
+      return false;
+    }
 
     // 명령어 파싱
     if (text.startsWith("/")) {
@@ -400,7 +410,9 @@ class ModuleManager {
     // 일반 메시지 처리 (모든 모듈에 전달)
     let handled = false;
     for (const [moduleName, moduleData] of this.modules.entries()) {
-      if (moduleData.status !== "initialized") continue;
+      if (moduleData.status !== "initialized") {
+        continue;
+      }
 
       try {
         const instance = moduleData.instance;
@@ -422,7 +434,9 @@ class ModuleManager {
 
   // 캐주얼한 대화에 응답할지 판단
   shouldRespondToChat(text) {
-    if (!text) return false;
+    if (!text) {
+      return false;
+    }
 
     const normalizedText = text.toLowerCase().trim();
 
@@ -488,7 +502,7 @@ class ModuleManager {
       "✨",
     ];
 
-    return chatTriggers.some((trigger) => normalizedText.includes(trigger));
+    return chatTriggers.some(trigger => normalizedText.includes(trigger));
   }
 
   // 캐주얼한 대화 응답
@@ -524,10 +538,10 @@ class ModuleManager {
     ) {
       const thanks = [
         `${userName}님! 천만에요~ 😊`,
-        `도움이 되어서 기뻐요! 💖`,
+        "도움이 되어서 기뻐요! 💖",
         `${userName}님을 위해서라면! 🔥`,
-        `언제든지 말씀하세요! ✨`,
-        `저야말로 감사해요! 🥰`,
+        "언제든지 말씀하세요! ✨",
+        "저야말로 감사해요! 🥰",
       ];
       response = thanks[Math.floor(Math.random() * thanks.length)];
     } else if (
@@ -540,7 +554,7 @@ class ModuleManager {
       const compliments = [
         `${userName}님이 더 멋져요! 😎`,
         `${userName}님 덕분이에요! 🌟`,
-        `칭찬해주셔서 감사해요! 💪`,
+        "칭찬해주셔서 감사해요! 💪",
         `${userName}님이 진짜 최고! 🔥`,
         `${userName}님 센스 쩔어요! ✨`,
       ];
@@ -554,9 +568,9 @@ class ModuleManager {
       const activities = [
         `${userName}님을 기다리고 있었어요! 😄`,
         `${userName}님과 함께 일할 준비 중이에요! 💼`,
-        `날씨나 운세 궁금하지 않나요? 🌤️🔮`,
-        `할일 정리라도 해볼까요? 📝`,
-        `뭐든 도와드릴게요! 🛠️`,
+        "날씨나 운세 궁금하지 않나요? 🌤️🔮",
+        "할일 정리라도 해볼까요? 📝",
+        "뭐든 도와드릴게요! 🛠️",
       ];
       response = activities[Math.floor(Math.random() * activities.length)];
       includeMenu = true;
@@ -568,9 +582,9 @@ class ModuleManager {
     ) {
       const surprises = [
         `${userName}님도 놀라셨나요? 😲`,
-        `정말 대박이죠! 🔥`,
+        "정말 대박이죠! 🔥",
         `${userName}님 반응이 최고에요! 😄`,
-        `저도 깜짝 놀랐어요! ⚡`,
+        "저도 깜짝 놀랐어요! ⚡",
         `${userName}님과 같은 반응! 🤝`,
       ];
       response = surprises[Math.floor(Math.random() * surprises.length)];
@@ -605,7 +619,9 @@ class ModuleManager {
 
   // 자연어에서 메인 메뉴 트리거 여부 확인
   shouldTriggerMainMenu(text) {
-    if (!text) return false;
+    if (!text) {
+      return false;
+    }
 
     const normalizedText = text.toLowerCase().trim();
 
@@ -644,7 +660,7 @@ class ModuleManager {
       "hello 두목",
     ];
 
-    return triggerWords.some((word) => normalizedText.includes(word));
+    return triggerWords.some(word => normalizedText.includes(word));
   }
 
   // 추가: 재미있는 응답들
@@ -679,7 +695,7 @@ class ModuleManager {
     if (isGroupChat) {
       // 그룹에서도 인라인 키보드 제공
       const groupResponse =
-        `${greeting}\n\n` + `무엇을 도와드릴까요? 아래 메뉴를 선택해주세요:`;
+        `${greeting}\n\n` + "무엇을 도와드릴까요? 아래 메뉴를 선택해주세요:";
 
       await bot.sendMessage(chatId, groupResponse, {
         reply_to_message_id: msg.message_id,
@@ -689,8 +705,8 @@ class ModuleManager {
       // 개인 채팅에서는 풀 메뉴
       const welcomeMessage =
         `**${greeting}**\n\n` +
-        `무엇을 도와드릴까요? 👋\n\n` +
-        `아래 메뉴에서 원하는 기능을 선택해주세요:`;
+        "무엇을 도와드릴까요? 👋\n\n" +
+        "아래 메뉴에서 원하는 기능을 선택해주세요:";
 
       await bot.sendMessage(chatId, welcomeMessage, {
         parse_mode: "Markdown",
@@ -713,7 +729,9 @@ class ModuleManager {
       chatType: msg.chat.type,
     });
 
-    if (!text.startsWith("/")) return false;
+    if (!text.startsWith("/")) {
+      return false;
+    }
 
     // 명령어 파싱 (그룹에서 @봇이름 제거)
     let command, args;
@@ -761,7 +779,7 @@ class ModuleManager {
             chatId,
             command,
             error,
-            isGroupChat
+            isGroupChat,
           );
           return false;
         }
@@ -777,7 +795,7 @@ class ModuleManager {
         chatId,
         command,
         error,
-        isGroupChat
+        isGroupChat,
       );
       return false;
     }
@@ -815,14 +833,14 @@ class ModuleManager {
           return result;
         } else {
           Logger.warn(
-            `모듈 ${module.constructor.name}에 handleCallback 메서드가 없음, 기본 처리로 폴백`
+            `모듈 ${module.constructor.name}에 handleCallback 메서드가 없음, 기본 처리로 폴백`,
           );
           // 기본 메뉴 표시 처리
           return await this.handleBasicModuleCallback(
             bot,
             callbackQuery,
             module,
-            data
+            data,
           );
         }
       } catch (error) {
@@ -835,14 +853,14 @@ class ModuleManager {
             bot,
             callbackQuery,
             module,
-            data
+            data,
           );
         } catch (fallbackError) {
           Logger.error("기본 처리도 실패:", fallbackError);
           await this.sendErrorMessage(
             bot,
             callbackQuery.message.chat.id,
-            error
+            error,
           );
           return false;
         }
@@ -1041,7 +1059,7 @@ class ModuleManager {
 
     // 기본 응답 (해당 콜백에 대한 정의가 없는 경우)
     const moduleName = this.getModuleDisplayName(
-      module.constructor.name || "Unknown"
+      module.constructor.name || "Unknown",
     );
     const defaultText = `${this.getModuleIcon(module.constructor.name)} **${moduleName}**\n\n이 기능은 곧 추가될 예정입니다! 🚧\n\n조금만 기다려주세요~ 😊`;
 
@@ -1079,7 +1097,7 @@ class ModuleManager {
           // 랜덤 재미있는 인사말 사용
           const greeting = this.getRandomGreeting(userName);
           const groupWelcomeMessage =
-            `${greeting}\n\n` + `아래 메뉴를 선택해주세요:`;
+            `${greeting}\n\n` + "아래 메뉴를 선택해주세요:";
 
           await bot.sendMessage(chatId, groupWelcomeMessage, {
             reply_to_message_id: msg.message_id,
@@ -1128,13 +1146,13 @@ class ModuleManager {
 
   // 디버그 명령어 처리
   async handleDebugCommand(bot, msg) {
-    let debugMessage = `🐛 **디버그 정보**\n\n`;
+    let debugMessage = "🐛 **디버그 정보**\n\n";
 
-    debugMessage += `**📊 모듈 상태 요약**\n`;
+    debugMessage += "**📊 모듈 상태 요약**\n";
     debugMessage += `• 총 모듈 수: ${this.modules.size}\n`;
     debugMessage += `• 초기화된 모듈: ${this.getInitializedModuleCount()}\n\n`;
 
-    debugMessage += `**📋 모듈 상세 정보**\n`;
+    debugMessage += "**📋 모듈 상세 정보**\n";
     for (const [moduleName, moduleData] of this.modules.entries()) {
       const statusEmoji =
         {
@@ -1151,7 +1169,7 @@ class ModuleManager {
       if (moduleData.error) {
         debugMessage += `  • 에러: ${moduleData.error}\n`;
       }
-      debugMessage += `\n`;
+      debugMessage += "\n";
     }
 
     await bot.sendMessage(msg.chat.id, debugMessage, {
@@ -1168,8 +1186,8 @@ class ModuleManager {
 
     const welcomeMessage =
       `**${greeting}**\n\n` +
-      `무엇을 도와드릴까요? 👋\n\n` +
-      `아래 메뉴에서 원하는 기능을 선택해주세요:`;
+      "무엇을 도와드릴까요? 👋\n\n" +
+      "아래 메뉴에서 원하는 기능을 선택해주세요:";
 
     await bot.sendMessage(msg.chat.id, welcomeMessage, {
       parse_mode: "Markdown",
@@ -1184,11 +1202,11 @@ class ModuleManager {
     if (isGroupChat) {
       // 그룹에서는 간단한 도움말
       helpMessage =
-        `❓ **두목봇 명령어**\n\n` +
-        `• /fortune - 운세 보기\n` +
-        `• /weather - 날씨 정보\n` +
-        `• /help - 도움말\n\n` +
-        `더 많은 기능은 개인 메시지로 /start 를 보내주세요!`;
+        "❓ **두목봇 명령어**\n\n" +
+        "• /fortune - 운세 보기\n" +
+        "• /weather - 날씨 정보\n" +
+        "• /help - 도움말\n\n" +
+        "더 많은 기능은 개인 메시지로 /start 를 보내주세요!";
 
       await bot.sendMessage(chatId, helpMessage, {
         parse_mode: "Markdown",
@@ -1198,7 +1216,9 @@ class ModuleManager {
       // 개인 채팅에서는 상세한 도움말
       const moduleHelps = [];
       for (const [moduleName, moduleData] of this.modules.entries()) {
-        if (moduleData.status !== "initialized") continue;
+        if (moduleData.status !== "initialized") {
+          continue;
+        }
 
         const instance = moduleData.instance;
         if (instance.getHelpMessage) {
@@ -1211,7 +1231,7 @@ class ModuleManager {
         }
       }
 
-      helpMessage = `❓ **두목봇 도움말**\n\n`;
+      helpMessage = "❓ **두목봇 도움말**\n\n";
 
       if (moduleHelps.length > 0) {
         helpMessage += moduleHelps.join("\n\n");
@@ -1219,9 +1239,9 @@ class ModuleManager {
         helpMessage += "사용 가능한 모듈이 없습니다.";
       }
 
-      helpMessage += `\n\n**🔧 시스템 명령어**\n`;
-      helpMessage += `• /start - 메인 메뉴\n`;
-      helpMessage += `• /help - 도움말\n`;
+      helpMessage += "\n\n**🔧 시스템 명령어**\n";
+      helpMessage += "• /start - 메인 메뉴\n";
+      helpMessage += "• /help - 도움말\n";
 
       await bot.sendMessage(chatId, helpMessage, {
         parse_mode: "Markdown",
@@ -1237,7 +1257,7 @@ class ModuleManager {
   async handleStatusCommand(bot, msg) {
     const status = this.getModuleStatus();
 
-    let statusMessage = `📊 **모듈 상태**\n\n`;
+    let statusMessage = "📊 **모듈 상태**\n\n";
 
     for (const [moduleName, moduleStatus] of Object.entries(status)) {
       const statusEmoji = moduleStatus.status === "initialized" ? "✅" : "❌";
@@ -1248,7 +1268,7 @@ class ModuleManager {
         statusMessage += `• 오류: ${moduleStatus.error}\n`;
       }
 
-      statusMessage += `\n`;
+      statusMessage += "\n";
     }
 
     await bot.sendMessage(msg.chat.id, statusMessage, {
@@ -1257,7 +1277,7 @@ class ModuleManager {
   }
 
   async handleModulesCommand(bot, msg) {
-    let modulesMessage = `🔧 **로드된 모듈 목록**\n\n`;
+    let modulesMessage = "🔧 **로드된 모듈 목록**\n\n";
 
     const moduleCount = { total: this.modules.size, initialized: 0, error: 0 };
 
@@ -1282,7 +1302,7 @@ class ModuleManager {
       }
     }
 
-    modulesMessage += `\n**📈 통계**\n`;
+    modulesMessage += "\n**📈 통계**\n";
     modulesMessage += `• 전체: ${moduleCount.total}개\n`;
     modulesMessage += `• 정상: ${moduleCount.initialized}개\n`;
     modulesMessage += `• 오류: ${moduleCount.error}개\n`;
@@ -1326,11 +1346,11 @@ class ModuleManager {
 
       message =
         `${randomHelp}\n\n` +
-        `• 🔮 /fortune - 운세 보기\n` +
-        `• 🌤️ /weather - 날씨 정보\n` +
-        `• 📝 /todo - 할일 관리\n` +
-        `• ❓ /help - 전체 도움말\n\n` +
-        `또는 "두목"이라고 불러주세요! 😊`;
+        "• 🔮 /fortune - 운세 보기\n" +
+        "• 🌤️ /weather - 날씨 정보\n" +
+        "• 📝 /todo - 할일 관리\n" +
+        "• ❓ /help - 전체 도움말\n\n" +
+        '또는 "두목"이라고 불러주세요! 😊';
 
       replyMarkup = {
         inline_keyboard: [
@@ -1360,9 +1380,9 @@ class ModuleManager {
           const userName = getUserName(callbackQuery.from);
 
           const welcomeMessage =
-            `🤖 **두목봇 메인 메뉴**\n\n` +
+            "🤖 **두목봇 메인 메뉴**\n\n" +
             `안녕하세요 ${userName}님! 👋\n\n` +
-            `원하는 기능을 선택해주세요:`;
+            "원하는 기능을 선택해주세요:";
 
           await bot.editMessageText(welcomeMessage, {
             chat_id: callbackQuery.message.chat.id,
@@ -1377,7 +1397,7 @@ class ModuleManager {
             "메인 메뉴로 돌아갑니다.",
             {
               reply_markup: this.createMainMenuKeyboard(),
-            }
+            },
           );
         }
         return true;
@@ -1420,9 +1440,9 @@ class ModuleManager {
       } else {
         // 개인 채팅에서는 자세한 에러 메시지
         message =
-          `❌ **명령어 처리 오류**\n\n` +
+          "❌ **명령어 처리 오류**\n\n" +
           `/${command} 명령어 처리 중 오류가 발생했습니다.\n` +
-          `잠시 후 다시 시도해주세요.`;
+          "잠시 후 다시 시도해주세요.";
 
         options = {
           parse_mode: "Markdown",
@@ -1441,7 +1461,9 @@ class ModuleManager {
   }
 
   getUserName(user) {
-    if (!user) return "사용자";
+    if (!user) {
+      return "사용자";
+    }
 
     if (user.first_name && user.last_name) {
       return `${user.first_name} ${user.last_name}`;
@@ -1459,12 +1481,14 @@ class ModuleManager {
   }
 
   isAdmin(user) {
-    if (!user) return false;
+    if (!user) {
+      return false;
+    }
 
     // 환경변수에서 관리자 ID 목록 가져오기
     const adminIds = (process.env.ADMIN_IDS || "")
       .split(",")
-      .map((id) => parseInt(id.trim()));
+      .map(id => parseInt(id.trim()));
     return adminIds.includes(user.id);
   }
 
@@ -1550,7 +1574,7 @@ class ModuleManager {
   async sendErrorMessage(bot, chatId, error) {
     try {
       const errorMessage =
-        `❌ 처리 중 오류가 발생했습니다.\n\n` +
+        "❌ 처리 중 오류가 발생했습니다.\n\n" +
         `${error.message || "알 수 없는 오류"}`;
 
       await bot.sendMessage(chatId, errorMessage, {
@@ -1594,7 +1618,7 @@ class ModuleManager {
 
   getInitializedModuleCount() {
     return Array.from(this.modules.values()).filter(
-      (moduleData) => moduleData.status === "initialized"
+      moduleData => moduleData.status === "initialized",
     ).length;
   }
 
@@ -1737,7 +1761,7 @@ class ModuleManager {
       Logger.info(`사용자 ${userId}의 모듈 ${moduleId} 액션 취소`);
       return true;
     } catch (error) {
-      Logger.error(`모듈 액션 취소 실패:`, error);
+      Logger.error("모듈 액션 취소 실패:", error);
       return false;
     }
   }

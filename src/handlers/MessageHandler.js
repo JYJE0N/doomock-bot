@@ -25,7 +25,9 @@ class MessageHandler {
     } = msg;
     const userName = getUserName(msg.from);
 
-    if (!text) return;
+    if (!text) {
+      return;
+    }
 
     Logger.info(`💬 메시지 처리: "${text}" (사용자: ${userName})`);
 
@@ -35,7 +37,7 @@ class MessageHandler {
         this.userStates.delete(userId);
         await this.bot.sendMessage(
           chatId,
-          `❌ ${userName}님, 작업이 취소되었습니다.`
+          `❌ ${userName}님, 작업이 취소되었습니다.`,
         );
         return;
       }
@@ -43,7 +45,9 @@ class MessageHandler {
       // 사용자 상태 기반 처리
       if (this.userStates.has(userId)) {
         const handled = await this.handleUserState(msg);
-        if (handled) return;
+        if (handled) {
+          return;
+        }
       }
 
       // 명령어 처리
@@ -58,7 +62,7 @@ class MessageHandler {
       Logger.error("메시지 처리 오류:", error);
       await this.bot.sendMessage(
         chatId,
-        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요."
+        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요.",
       );
     }
   }
@@ -69,7 +73,9 @@ class MessageHandler {
     } = msg;
     const userState = this.userStates.get(userId);
 
-    if (!userState) return false;
+    if (!userState) {
+      return false;
+    }
 
     // 모듈별 상태 처리 위임
     const modules = this.moduleManager.getModules();
@@ -112,7 +118,7 @@ class MessageHandler {
         if (!handled) {
           await this.bot.sendMessage(
             chatId,
-            `😅 ${userName}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`
+            `😅 ${userName}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`,
           );
         }
         break;
@@ -177,7 +183,7 @@ class MessageHandler {
   getMainMenuText(userName) {
     const now = new Date();
     const koreaTime = new Date(
-      now.toLocaleString("en-US", { timeZone: "Asia/Seoul" })
+      now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
     );
     const hour = koreaTime.getHours();
 
@@ -193,32 +199,32 @@ class MessageHandler {
     }
 
     return (
-      `🤖 **두목봇 메인 메뉴**\n\n` +
+      "🤖 **두목봇 메인 메뉴**\n\n" +
       `${greeting} ${userName}님! 👋\n\n` +
-      `🏡 **동탄/화성 지역 특화 서비스**\n` +
-      `• 화성 날씨 정보 우선 제공\n` +
-      `• 동탄 근무시간 기반 기능\n\n` +
-      `원하는 기능을 선택해주세요:`
+      "🏡 **동탄/화성 지역 특화 서비스**\n" +
+      "• 화성 날씨 정보 우선 제공\n" +
+      "• 동탄 근무시간 기반 기능\n\n" +
+      "원하는 기능을 선택해주세요:"
     );
   }
 
   getHelpMenuText(userName) {
     return (
-      `❓ **두목봇 도움말**\n\n` +
-      `🤖 **주요 기능:**\n` +
-      `• 📝 할일 관리 - 할일 추가/완료/삭제\n` +
-      `• 📅 휴가 관리 - 연차 사용/관리\n` +
-      `• 🔮 운세 - 다양한 운세 정보\n` +
-      `• ⏰ 타이머 - 작업 시간 관리\n` +
-      `• 🔔 리마인더 - 알림 설정\n` +
-      `• 🌤️ 날씨 - 날씨 정보\n` +
-      `• 📊 인사이트 - 마케팅 인사이트\n` +
-      `• 🛠️ 유틸리티 - TTS 등\n\n` +
-      `🎯 **빠른 명령어:**\n` +
-      `• /start - 메인 메뉴\n` +
-      `• /add [할일] - 할일 빠른 추가\n` +
-      `• /help - 도움말\n\n` +
-      `🚀 **Railway 클라우드에서 24/7 운영 중!**`
+      "❓ **두목봇 도움말**\n\n" +
+      "🤖 **주요 기능:**\n" +
+      "• 📝 할일 관리 - 할일 추가/완료/삭제\n" +
+      "• 📅 휴가 관리 - 연차 사용/관리\n" +
+      "• 🔮 운세 - 다양한 운세 정보\n" +
+      "• ⏰ 타이머 - 작업 시간 관리\n" +
+      "• 🔔 리마인더 - 알림 설정\n" +
+      "• 🌤️ 날씨 - 날씨 정보\n" +
+      "• 📊 인사이트 - 마케팅 인사이트\n" +
+      "• 🛠️ 유틸리티 - TTS 등\n\n" +
+      "🎯 **빠른 명령어:**\n" +
+      "• /start - 메인 메뉴\n" +
+      "• /add [할일] - 할일 빠른 추가\n" +
+      "• /help - 도움말\n\n" +
+      "🚀 **Railway 클라우드에서 24/7 운영 중!**"
     );
   }
 
@@ -228,7 +234,9 @@ class MessageHandler {
       const utilsModule = this.moduleManager.getModule("utils");
       if (utilsModule && utilsModule.handleAutoTTS) {
         const handled = await utilsModule.handleAutoTTS(this.bot, msg);
-        if (handled) return;
+        if (handled) {
+          return;
+        }
       }
 
       // 다른 자동 기능들 추가 가능

@@ -37,7 +37,7 @@ class RateLimitMiddleware {
     if (userRecord.count > maxRequests) {
       const remainingTime = Math.ceil((userRecord.resetTime - now) / 1000 / 60);
       Logger.warn(
-        `사용자 ${userId} 요청 제한 초과: ${userRecord.count}/${maxRequests}`
+        `사용자 ${userId} 요청 제한 초과: ${userRecord.count}/${maxRequests}`,
       );
 
       return {
@@ -58,10 +58,10 @@ class RateLimitMiddleware {
 
   async handleRateLimit(bot, chatId, rateLimitInfo) {
     const message =
-      `⏳ 너무 많은 요청을 보내셨습니다.\n\n` +
+      "⏳ 너무 많은 요청을 보내셨습니다.\n\n" +
       `• 현재 요청: ${rateLimitInfo.currentCount}/${rateLimitInfo.maxRequests}\n` +
       `• 제한 해제: 약 ${rateLimitInfo.remainingTime}분 후\n\n` +
-      `잠시 후 다시 시도해주세요.`;
+      "잠시 후 다시 시도해주세요.";
 
     await bot.sendMessage(chatId, message);
   }
@@ -78,7 +78,7 @@ class RateLimitMiddleware {
     }
 
     Logger.info(
-      `요청 제한 기록 정리 완료: ${this.userRequests.size}개 사용자 활성`
+      `요청 제한 기록 정리 완료: ${this.userRequests.size}개 사용자 활성`,
     );
   }
 
@@ -87,7 +87,7 @@ class RateLimitMiddleware {
       activeUsers: this.userRequests.size,
       totalTrackedRequests: Array.from(this.userRequests.values()).reduce(
         (sum, record) => sum + record.count,
-        0
+        0,
       ),
     };
   }

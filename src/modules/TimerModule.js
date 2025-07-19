@@ -70,9 +70,9 @@ class TimerModule extends BaseModule {
   async showTimerMenu(bot, chatId, messageId, userName) {
     const menuText =
       `⏰ **${userName}님의 타이머**\n\n` +
-      `🍅 포모도로: 25분 집중 + 5분 휴식\n` +
-      `⏱️ 일반 타이머: 자유로운 시간 측정\n\n` +
-      `원하는 기능을 선택하세요!`;
+      "🍅 포모도로: 25분 집중 + 5분 휴식\n" +
+      "⏱️ 일반 타이머: 자유로운 시간 측정\n\n" +
+      "원하는 기능을 선택하세요!";
 
     const keyboard = {
       inline_keyboard: [
@@ -109,7 +109,7 @@ class TimerModule extends BaseModule {
             [{ text: "❌ 취소", callback_data: "cancel_action" }],
           ],
         },
-      }
+      },
     );
   }
 
@@ -122,11 +122,11 @@ class TimerModule extends BaseModule {
         bot,
         chatId,
         messageId,
-        `🍅 **포모도로 시작!**\n\n` +
+        "🍅 **포모도로 시작!**\n\n" +
           `📌 작업: ${result.data.taskName}\n` +
-          `⏱️ 시간: 25분\n` +
+          "⏱️ 시간: 25분\n" +
           `🎯 ${result.data.sessionCount}번째 세션\n\n` +
-          `집중해서 작업하세요! 💪`,
+          "집중해서 작업하세요! 💪",
         {
           parse_mode: "Markdown",
           reply_markup: {
@@ -138,7 +138,7 @@ class TimerModule extends BaseModule {
               [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
             ],
           },
-        }
+        },
       );
 
       // 25분 후 알림 설정
@@ -146,7 +146,7 @@ class TimerModule extends BaseModule {
         () => {
           this.notifyPomodoroComplete(bot, chatId, userId);
         },
-        25 * 60 * 1000
+        25 * 60 * 1000,
       );
     } else {
       await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
@@ -198,7 +198,7 @@ class TimerModule extends BaseModule {
           {
             parse_mode: "Markdown",
             reply_markup: keyboard,
-          }
+          },
         );
 
         // 휴식 시간도 타이머 설정
@@ -207,7 +207,7 @@ class TimerModule extends BaseModule {
             () => {
               this.notifyPomodoroComplete(bot, chatId, userId);
             },
-            5 * 60 * 1000
+            5 * 60 * 1000,
           );
         }
       }
@@ -222,10 +222,10 @@ class TimerModule extends BaseModule {
         bot,
         chatId,
         messageId,
-        `⏹️ **타이머 종료**\n\n` +
+        "⏹️ **타이머 종료**\n\n" +
           `📌 작업: ${result.data.taskName}\n` +
           `⏱️ 소요시간: ${result.data.duration}분\n\n` +
-          `수고하셨습니다! 🎉`,
+          "수고하셨습니다! 🎉",
         {
           parse_mode: "Markdown",
           reply_markup: {
@@ -240,7 +240,7 @@ class TimerModule extends BaseModule {
               [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
             ],
           },
-        }
+        },
       );
     } else {
       await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
@@ -265,7 +265,7 @@ class TimerModule extends BaseModule {
         if (pomodoroStatus.success) {
           const progressBar = this.createProgressBar(
             pomodoroStatus.data.elapsed,
-            pomodoroStatus.data.duration
+            pomodoroStatus.data.duration,
           );
           const modeEmoji = pomodoroStatus.data.mode === "work" ? "💼" : "☕";
           const modeText =
@@ -289,7 +289,7 @@ class TimerModule extends BaseModule {
         }
       } else {
         statusText =
-          `⏱️ **일반 타이머 진행 중**\n\n` +
+          "⏱️ **일반 타이머 진행 중**\n\n" +
           `📌 작업: ${status.data.taskName}\n` +
           `⏱️ 경과시간: ${status.data.duration}분`;
 
@@ -358,7 +358,7 @@ class TimerModule extends BaseModule {
                 [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
               ],
             },
-          }
+          },
         );
       } else {
         await this.sendMessage(bot, chatId, `❌ ${result.error}`);
@@ -383,15 +383,15 @@ class TimerModule extends BaseModule {
 
   async showTimerHelp(bot, chatId) {
     const helpText =
-      `⏰ **타이머 사용법**\n\n` +
-      `🍅 **포모도로 기법:**\n` +
-      `• 25분 집중 + 5분 휴식\n` +
-      `• 4세션마다 긴 휴식\n` +
-      `• 생산성 향상에 효과적\n\n` +
-      `⏱️ **일반 타이머:**\n` +
-      `• 자유로운 시간 측정\n` +
-      `• 작업별 소요 시간 기록\n\n` +
-      `📱 /start → ⏰ 타이머에서 시작하세요!`;
+      "⏰ **타이머 사용법**\n\n" +
+      "🍅 **포모도로 기법:**\n" +
+      "• 25분 집중 + 5분 휴식\n" +
+      "• 4세션마다 긴 휴식\n" +
+      "• 생산성 향상에 효과적\n\n" +
+      "⏱️ **일반 타이머:**\n" +
+      "• 자유로운 시간 측정\n" +
+      "• 작업별 소요 시간 기록\n\n" +
+      "📱 /start → ⏰ 타이머에서 시작하세요!";
 
     await this.sendMessage(bot, chatId, helpText, {
       parse_mode: "Markdown",

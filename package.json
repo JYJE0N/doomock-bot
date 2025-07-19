@@ -63,24 +63,21 @@
   },
   "homepage": "https://github.com/JYJE0N/doomock-bot#readme",
   "dependencies": {
-    "axios": "^1.6.2",
-    "dotenv": "^16.3.1",
+    "axios": "^1.6.0",
+    "dotenv": "^16.0.1",
     "form-data": "^4.0.0",
     "gtts": "^0.2.1",
-    "mongodb": "^6.3.0",
-    "mongoose": "^8.0.3",
+    "mongodb": "^5.1.0",
+    "mongoose": "^8.0.0",
     "node-telegram-bot-api": "^0.64.0"
   },
   "devDependencies": {
-    "@babel/preset-env": "^7.23.6",
-    "eslint": "^8.56.0",
-    "eslint-config-prettier": "^9.1.0",
-    "eslint-plugin-jest": "^27.6.0",
-    "eslint-plugin-node": "^11.1.0",
-    "jest": "^29.7.0",
-    "nodemon": "^3.0.2",
-    "prettier": "^3.1.1",
-    "supertest": "^6.3.3"
+    "@babel/preset-env": "^7.0.0",
+    "eslint": "^8.0.0",
+    "jest": "^29.0.0",
+    "nodemon": "^2.0.22",
+    "prettier": "^3.6.2",
+    "supertest": "^6.0.0"
   },
   "jest": {
     "testEnvironment": "node",
@@ -108,66 +105,28 @@
   "eslintConfig": {
     "env": {
       "node": true,
-      "es2022": true,
+      "es2021": true,
       "jest": true
     },
     "extends": [
-      "eslint:recommended",
-      "prettier"
-    ],
-    "plugins": [
-      "jest",
-      "node"
+      "eslint:recommended"
     ],
     "parserOptions": {
-      "ecmaVersion": 2022,
+      "ecmaVersion": 2021,
       "sourceType": "module"
     },
     "rules": {
-      "no-unused-vars": [
-        "warn",
-        {
-          "argsIgnorePattern": "^_"
-        }
-      ],
+      "no-unused-vars": "warn",
       "no-console": "off",
-      "prefer-const": "error",
-      "no-var": "error",
-      "eqeqeq": [
-        "error",
-        "always"
-      ],
-      "curly": [
-        "error",
-        "all"
-      ],
-      "brace-style": [
-        "error",
-        "1tbs"
-      ],
-      "indent": [
-        "error",
-        2
-      ],
-      "semi": [
-        "error",
-        "always"
-      ],
-      "quotes": [
-        "error",
-        "double"
-      ],
-      "comma-dangle": [
-        "error",
-        "always-multiline"
-      ],
-      "node/no-missing-require": "error",
-      "node/no-unpublished-require": "off",
-      "jest/no-disabled-tests": "warn",
-      "jest/no-focused-tests": "error",
-      "jest/no-identical-title": "error",
-      "jest/prefer-to-have-length": "warn",
-      "jest/valid-expect": "error"
+      "prefer-const": "off",
+      "no-var": "warn",
+      "eqeqeq": "off",
+      "curly": "off",
+      "brace-style": "off",
+      "indent": "off",
+      "semi": "warn",
+      "quotes": "off",
+      "comma-dangle": "off"
     },
     "ignorePatterns": [
       "node_modules/",

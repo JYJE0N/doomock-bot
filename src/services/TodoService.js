@@ -70,11 +70,11 @@ class TodoService {
             done: newDoneStatus,
             updatedAt: new Date(),
           },
-        }
+        },
       );
 
       Logger.info(
-        `할일 토글: 사용자 ${userId}, 인덱스 ${todoIndex}, 상태 ${newDoneStatus}`
+        `할일 토글: 사용자 ${userId}, 인덱스 ${todoIndex}, 상태 ${newDoneStatus}`,
       );
       return newDoneStatus;
     } catch (error) {
@@ -115,7 +115,7 @@ class TodoService {
       });
 
       Logger.info(
-        `완료된 할일 삭제: 사용자 ${userId}, 삭제된 개수 ${result.deletedCount}`
+        `완료된 할일 삭제: 사용자 ${userId}, 삭제된 개수 ${result.deletedCount}`,
       );
       return true;
     } catch (error) {
@@ -134,7 +134,7 @@ class TodoService {
       });
 
       Logger.info(
-        `모든 할일 삭제: 사용자 ${userId}, 삭제된 개수 ${result.deletedCount}`
+        `모든 할일 삭제: 사용자 ${userId}, 삭제된 개수 ${result.deletedCount}`,
       );
       return true;
     } catch (error) {
@@ -151,7 +151,7 @@ class TodoService {
   async getTodoStats(userId) {
     try {
       const todos = await this.getTodos(userId);
-      const completed = todos.filter((todo) => todo.done).length;
+      const completed = todos.filter(todo => todo.done).length;
       const pending = todos.length - completed;
       const completionRate =
         todos.length > 0 ? Math.round((completed / todos.length) * 100) : 0;

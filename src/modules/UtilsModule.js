@@ -50,7 +50,7 @@ class UtilsModule extends BaseModule {
           messageId,
           userId,
           userName,
-          menuManager
+          menuManager,
         );
         break;
       case "tts_menu":
@@ -66,7 +66,7 @@ class UtilsModule extends BaseModule {
         await this.sendMessage(
           bot,
           chatId,
-          "❌ 알 수 없는 유틸리티 명령입니다."
+          "❌ 알 수 없는 유틸리티 명령입니다.",
         );
     }
   }
@@ -75,12 +75,12 @@ class UtilsModule extends BaseModule {
     const ttsMode = this.ttsService.getTTSMode(userId);
     const menuText =
       `🛠️ **${userName}님의 유틸리티**\n\n` +
-      `**🔊 TTS (음성 변환)**\n` +
+      "**🔊 TTS (음성 변환)**\n" +
       `현재 모드: ${ttsMode}\n` +
-      `텍스트를 자연스러운 음성으로 변환해드려요!\n\n` +
-      `**📊 기타 유틸리티**\n` +
-      `다양한 편의 기능들을 제공합니다.\n\n` +
-      `원하는 기능을 선택하세요:`;
+      "텍스트를 자연스러운 음성으로 변환해드려요!\n\n" +
+      "**📊 기타 유틸리티**\n" +
+      "다양한 편의 기능들을 제공합니다.\n\n" +
+      "원하는 기능을 선택하세요:";
 
     const keyboard = {
       inline_keyboard: [
@@ -113,25 +113,25 @@ class UtilsModule extends BaseModule {
 
   async showTTSHelp(bot, chatId, messageId) {
     const helpText =
-      `🔊 **TTS (음성 변환) 도움말**\n\n` +
-      `**🎯 두 가지 사용 방법**\n\n` +
-      `**1️⃣ 자동 모드 (추천)**\n` +
-      `• 🛠️ 유틸리티 → 🔊 TTS 설정\n` +
-      `• TTS 모드를 ON으로 설정\n` +
-      `• 채팅창에 텍스트 입력\n` +
-      `• 자동으로 음성 변환! 🎵\n\n` +
-      `**2️⃣ 수동 모드**\n` +
-      `• /tts [텍스트] 명령어 사용\n` +
-      `• 예: /tts 안녕하세요\n\n` +
-      `**🌍 지원 언어**\n` +
-      `• 한국어, English, 日本語\n` +
-      `• 中文, Español, Français\n\n` +
-      `**💡 특징**\n` +
-      `• 최대 500자까지 지원\n` +
-      `• 이전 음성 파일 자동 삭제\n` +
-      `• 자연스러운 음성 합성\n` +
-      `• 실시간 언어 변경 가능\n\n` +
-      `지금 바로 TTS 설정을 해보세요! 🚀`;
+      "🔊 **TTS (음성 변환) 도움말**\n\n" +
+      "**🎯 두 가지 사용 방법**\n\n" +
+      "**1️⃣ 자동 모드 (추천)**\n" +
+      "• 🛠️ 유틸리티 → 🔊 TTS 설정\n" +
+      "• TTS 모드를 ON으로 설정\n" +
+      "• 채팅창에 텍스트 입력\n" +
+      "• 자동으로 음성 변환! 🎵\n\n" +
+      "**2️⃣ 수동 모드**\n" +
+      "• /tts [텍스트] 명령어 사용\n" +
+      "• 예: /tts 안녕하세요\n\n" +
+      "**🌍 지원 언어**\n" +
+      "• 한국어, English, 日本語\n" +
+      "• 中文, Español, Français\n\n" +
+      "**💡 특징**\n" +
+      "• 최대 500자까지 지원\n" +
+      "• 이전 음성 파일 자동 삭제\n" +
+      "• 자연스러운 음성 합성\n" +
+      "• 실시간 언어 변경 가능\n\n" +
+      "지금 바로 TTS 설정을 해보세요! 🚀";
 
     await this.editMessage(bot, chatId, messageId, helpText, {
       parse_mode: "Markdown",
@@ -148,23 +148,23 @@ class UtilsModule extends BaseModule {
 
   async showUtilsHelp(bot, chatId, messageId) {
     const helpText =
-      `🛠️ **유틸리티 도움말**\n\n` +
-      `**🔊 TTS (음성 변환)**\n` +
-      `• /tts [텍스트] - 텍스트를 음성으로 변환\n` +
-      `• /tts [언어] [텍스트] - 특정 언어로 음성 변환\n` +
-      `• 자동 모드: 유틸리티 메뉴에서 설정\n\n` +
-      `**⏰ 시간 유틸리티**\n` +
-      `• 한국 시간 기준 동작\n` +
-      `• 날짜/시간 포맷팅 지원\n\n` +
-      `**📊 데이터 유틸리티**\n` +
-      `• 숫자 포맷팅\n` +
-      `• 백분율 계산\n` +
-      `• 텍스트 처리\n\n` +
-      `**🌍 지원 언어**\n` +
-      `• 한국어 (ko) • English (en)\n` +
-      `• 日本語 (ja) • 中文 (zh)\n` +
-      `• Español (es) • Français (fr)\n\n` +
-      `모든 기능은 24시간 사용 가능합니다! 🚀`;
+      "🛠️ **유틸리티 도움말**\n\n" +
+      "**🔊 TTS (음성 변환)**\n" +
+      "• /tts [텍스트] - 텍스트를 음성으로 변환\n" +
+      "• /tts [언어] [텍스트] - 특정 언어로 음성 변환\n" +
+      "• 자동 모드: 유틸리티 메뉴에서 설정\n\n" +
+      "**⏰ 시간 유틸리티**\n" +
+      "• 한국 시간 기준 동작\n" +
+      "• 날짜/시간 포맷팅 지원\n\n" +
+      "**📊 데이터 유틸리티**\n" +
+      "• 숫자 포맷팅\n" +
+      "• 백분율 계산\n" +
+      "• 텍스트 처리\n\n" +
+      "**🌍 지원 언어**\n" +
+      "• 한국어 (ko) • English (en)\n" +
+      "• 日本語 (ja) • 中文 (zh)\n" +
+      "• Español (es) • Français (fr)\n\n" +
+      "모든 기능은 24시간 사용 가능합니다! 🚀";
 
     await this.editMessage(bot, chatId, messageId, helpText, {
       parse_mode: "Markdown",

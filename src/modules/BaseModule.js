@@ -177,7 +177,8 @@ class BaseModule {
 
   // ✅ 에러 처리
   async handleError(bot, chatId, error) {
-    const errorText = `❌ **오류 발생**\n\n처리 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.`;
+    const errorText =
+      "❌ **오류 발생**\n\n처리 중 문제가 발생했습니다. 잠시 후 다시 시도해주세요.";
 
     await this.sendMessage(bot, chatId, errorText, {
       parse_mode: "Markdown",
@@ -235,7 +236,7 @@ class BaseModule {
       // 메시지 수정 실패 시 새 메시지 전송
       Logger.warn(
         `메시지 수정 실패, 새 메시지 전송 [${this.name}]:`,
-        error.message
+        error.message,
       );
       return await this.sendMessage(bot, chatId, text, options);
     }

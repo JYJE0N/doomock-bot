@@ -55,13 +55,13 @@ class TTSService {
     const language = this.getUserLanguage(userId);
 
     return (
-      `🔊 **TTS 설정**\n\n` +
+      "🔊 **TTS 설정**\n\n" +
       `현재 모드: **${mode}**\n` +
       `현재 언어: **${this.supportedLanguages[language]}**\n\n` +
-      `**자동 모드**: 채팅 메시지를 자동으로 음성 변환\n` +
-      `**수동 모드**: /tts 명령어로만 음성 변환\n` +
-      `**OFF**: TTS 기능 비활성화\n\n` +
-      `원하는 모드를 선택하세요:`
+      "**자동 모드**: 채팅 메시지를 자동으로 음성 변환\n" +
+      "**수동 모드**: /tts 명령어로만 음성 변환\n" +
+      "**OFF**: TTS 기능 비활성화\n\n" +
+      "원하는 모드를 선택하세요:"
     );
   }
 
@@ -148,7 +148,7 @@ class TTSService {
             messageId,
             userId,
             language,
-            callbackQuery
+            callbackQuery,
           );
         }
         return;
@@ -186,7 +186,7 @@ class TTSService {
         message_id: messageId,
         parse_mode: "Markdown",
         reply_markup: keyboard,
-      }
+      },
     );
   }
 
@@ -199,7 +199,7 @@ class TTSService {
         message_id: messageId,
         parse_mode: "Markdown",
         reply_markup: this.createLanguageKeyboard(),
-      }
+      },
     );
   }
 
@@ -209,7 +209,7 @@ class TTSService {
     messageId,
     userId,
     language,
-    callbackQuery
+    callbackQuery,
   ) {
     if (!this.supportedLanguages[language]) {
       await bot.answerCallbackQuery(callbackQuery.id, {
@@ -230,7 +230,7 @@ class TTSService {
         message_id: messageId,
         parse_mode: "Markdown",
         reply_markup: keyboard,
-      }
+      },
     );
   }
 
@@ -243,7 +243,7 @@ class TTSService {
       if (!ttsText) {
         await bot.sendMessage(
           chatId,
-          "❌ 변환할 텍스트를 입력해주세요.\n예: /tts 안녕하세요"
+          "❌ 변환할 텍스트를 입력해주세요.\n예: /tts 안녕하세요",
         );
         return;
       }
@@ -312,13 +312,13 @@ class TTSService {
 
   // TTS 변환 실행
   async convertTextToSpeech(text, language = "ko") {
-    return new Promise((resolve) => {
+    return new Promise(resolve => {
       try {
         const fileName = `tts_${Date.now()}_${Math.random().toString(36).substr(2, 9)}.mp3`;
         const filePath = path.join(this.tempDir, fileName);
 
         const gttsInstance = new gtts(text, language);
-        gttsInstance.save(filePath, (err) => {
+        gttsInstance.save(filePath, err => {
           if (err) {
             resolve({
               success: false,

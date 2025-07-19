@@ -108,7 +108,7 @@ class TodoModule extends BaseModule {
                 [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
               ],
             },
-          }
+          },
         );
         return;
       }
@@ -139,7 +139,7 @@ class TodoModule extends BaseModule {
         reply_markup: {
           inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo_menu" }]],
         },
-      }
+      },
     );
   }
 
@@ -148,7 +148,7 @@ class TodoModule extends BaseModule {
       const stats = await this.todoService.getStats(userId);
 
       const statsText =
-        `📊 **할일 통계**\n\n` +
+        "📊 **할일 통계**\n\n" +
         `📝 전체 할일: ${stats.total}개\n` +
         `✅ 완료: ${stats.completed}개\n` +
         `⏳ 진행중: ${stats.pending}개\n` +
@@ -185,7 +185,7 @@ class TodoModule extends BaseModule {
           bot,
           chatId,
           messageId,
-          "✅ 완료된 할일이 모두 삭제되었습니다!"
+          "✅ 완료된 할일이 모두 삭제되었습니다!",
         );
       } else if (clearType === "all") {
         await this.todoService.clearAllTodos(userId);
@@ -193,7 +193,7 @@ class TodoModule extends BaseModule {
           bot,
           chatId,
           messageId,
-          "⚠️ 모든 할일이 삭제되었습니다!"
+          "⚠️ 모든 할일이 삭제되었습니다!",
         );
       }
     } catch (error) {
@@ -229,13 +229,13 @@ class TodoModule extends BaseModule {
                   [{ text: "🔙 할일 메뉴", callback_data: "todo_menu" }],
                 ],
               },
-            }
+            },
           );
         } else {
           await this.sendMessage(
             bot,
             chatId,
-            "❌ 할일 추가 중 오류가 발생했습니다."
+            "❌ 할일 추가 중 오류가 발생했습니다.",
           );
         }
 
@@ -264,14 +264,14 @@ class TodoModule extends BaseModule {
 
   // ✅ 유틸리티 메서드들
   formatTodoList(todos, userName) {
-    const pendingTodos = todos.filter((todo) => !todo.done);
-    const completedTodos = todos.filter((todo) => todo.done);
+    const pendingTodos = todos.filter(todo => !todo.done);
+    const completedTodos = todos.filter(todo => todo.done);
 
     let todoText = `📋 **${userName}님의 할일 관리**\n\n`;
 
     if (pendingTodos.length > 0) {
       todoText += `🟢 **진행 중** (${pendingTodos.length}개)\n`;
-      pendingTodos.forEach((todo) => {
+      pendingTodos.forEach(todo => {
         todoText += `☐ ${todo.task}\n`;
       });
       todoText += "\n";
@@ -279,7 +279,7 @@ class TodoModule extends BaseModule {
 
     if (completedTodos.length > 0) {
       todoText += `📌 **완료** (${completedTodos.length}개)\n`;
-      completedTodos.forEach((todo) => {
+      completedTodos.forEach(todo => {
         todoText += `📌 ~~${todo.task}~~\n`;
       });
     }
@@ -319,7 +319,7 @@ class TodoModule extends BaseModule {
         await this.sendMessage(
           bot,
           chatId,
-          `✅ 할일이 ${statusText}로 변경되었습니다!`
+          `✅ 할일이 ${statusText}로 변경되었습니다!`,
         );
       }
     } catch (error) {
@@ -331,7 +331,7 @@ class TodoModule extends BaseModule {
     try {
       const success = await this.todoService.deleteTodo(userId, todoIndex);
       if (success) {
-        await this.sendMessage(bot, chatId, `🗑️ 할일이 삭제되었습니다!`);
+        await this.sendMessage(bot, chatId, "🗑️ 할일이 삭제되었습니다!");
       }
     } catch (error) {
       Logger.error("할일 삭제 오류:", error);
@@ -341,15 +341,15 @@ class TodoModule extends BaseModule {
   // ✅ 도움말 메시지 오버라이드
   getHelpMessage() {
     return (
-      `📝 **할일 관리 도움말**\n\n` +
-      `**🎯 주요 기능:**\n` +
-      `• 할일 추가/삭제\n` +
-      `• 완료 상태 토글\n` +
-      `• 통계 확인\n` +
-      `• 완료된 할일 정리\n\n` +
-      `**⌨️ 빠른 명령어:**\n` +
-      `/add [할일] - 할일 빠른 추가\n\n` +
-      `효율적인 할일 관리로 생산성을 높여보세요! 💪`
+      "📝 **할일 관리 도움말**\n\n" +
+      "**🎯 주요 기능:**\n" +
+      "• 할일 추가/삭제\n" +
+      "• 완료 상태 토글\n" +
+      "• 통계 확인\n" +
+      "• 완료된 할일 정리\n\n" +
+      "**⌨️ 빠른 명령어:**\n" +
+      "/add [할일] - 할일 빠른 추가\n\n" +
+      "효율적인 할일 관리로 생산성을 높여보세요! 💪"
     );
   }
 }

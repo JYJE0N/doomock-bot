@@ -239,7 +239,9 @@ class BotController {
   // 🔧 메시지 처리 (ModuleManager 사용)
   async handleMessage(msg) {
     const text = msg.text;
-    if (!text) return;
+    if (!text) {
+      return;
+    }
 
     const chatId = msg.chat.id;
     const userId = msg.from.id;
@@ -250,10 +252,10 @@ class BotController {
     // /start 명령어 직접 처리
     if (text === "/start") {
       const welcomeText =
-        `🤖 **두목봇에 오신걸 환영합니다!**\n\n` +
+        "🤖 **두목봇에 오신걸 환영합니다!**\n\n" +
         `안녕하세요 ${userName}님! 👋\n\n` +
-        `두목봇은 직장인을 위한 종합 생산성 도구입니다.\n` +
-        `아래 메뉴에서 원하는 기능을 선택해주세요:`;
+        "두목봇은 직장인을 위한 종합 생산성 도구입니다.\n" +
+        "아래 메뉴에서 원하는 기능을 선택해주세요:";
 
       const keyboard = {
         inline_keyboard: [

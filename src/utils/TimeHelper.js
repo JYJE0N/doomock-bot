@@ -1,7 +1,7 @@
 class TimeHelper {
   static getKoreaTime() {
     return new Date(
-      new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" })
+      new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
     );
   }
 
@@ -92,9 +92,15 @@ class TimeHelper {
     const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
 
     let text = "";
-    if (days > 0) text += `${days}일 `;
-    if (hours > 0) text += `${hours}시간 `;
-    if (minutes > 0) text += `${minutes}분`;
+    if (days > 0) {
+      text += `${days}일 `;
+    }
+    if (hours > 0) {
+      text += `${hours}시간 `;
+    }
+    if (minutes > 0) {
+      text += `${minutes}분`;
+    }
 
     return { passed: false, text: text.trim() || "1분 미만" };
   }

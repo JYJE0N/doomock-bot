@@ -128,7 +128,7 @@ class TimerService {
         session.totalBreakTime += duration;
         nextMode = "work";
         nextDuration = 25;
-        message = `💪 휴식 완료! 다음 포모도로를 시작할 준비가 되셨나요?`;
+        message = "💪 휴식 완료! 다음 포모도로를 시작할 준비가 되셨나요?";
       }
 
       // 타이머 업데이트
@@ -169,12 +169,12 @@ class TimerService {
       }
 
       const duration = Math.floor(
-        (TimeHelper.getKoreaTime() - timer.startTime) / 60000
+        (TimeHelper.getKoreaTime() - timer.startTime) / 60000,
       );
       this.timers.delete(userId);
 
       Logger.info(
-        `🛑 포모도로 중지: 사용자 ${userId}, 세션 ${session.count}개 완료`
+        `🛑 포모도로 중지: 사용자 ${userId}, 세션 ${session.count}개 완료`,
       );
 
       return {

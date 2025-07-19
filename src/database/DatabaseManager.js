@@ -72,7 +72,9 @@ class DatabaseManager {
 
   // 데이터베이스 이름 정리 함수
   sanitizeDbName(dbName) {
-    if (!dbName) return null;
+    if (!dbName) {
+      return null;
+    }
 
     // MongoDB에서 허용하지 않는 문자들 제거/변경
     let sanitized = dbName
@@ -97,14 +99,16 @@ class DatabaseManager {
     }
 
     Logger.info(
-      `데이터베이스 이름 정리: ${dbName} → ${sanitized} (길이: ${sanitized.length})`
+      `데이터베이스 이름 정리: ${dbName} → ${sanitized} (길이: ${sanitized.length})`,
     );
     return sanitized;
   }
 
   // 이벤트 리스너 설정
   setupEventListeners() {
-    if (!this.client) return;
+    if (!this.client) {
+      return;
+    }
 
     this.client.on("serverClosed", () => {
       Logger.warn("MongoDB 연결이 끊어졌습니다");
@@ -112,7 +116,7 @@ class DatabaseManager {
       this.startReconnect();
     });
 
-    this.client.on("error", (error) => {
+    this.client.on("error", error => {
       Logger.error("MongoDB 에러:", error);
     });
 
@@ -125,7 +129,9 @@ class DatabaseManager {
 
   // 재연결 시작
   startReconnect() {
-    if (this.reconnectInterval) return;
+    if (this.reconnectInterval) {
+      return;
+    }
 
     this.reconnectInterval = setInterval(async () => {
       try {

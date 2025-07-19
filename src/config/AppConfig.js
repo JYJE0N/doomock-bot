@@ -47,25 +47,25 @@ class AppConfig {
       LEAVE_MODULE: this.parseBoolean(process.env.ENABLE_LEAVE_MODULE, true),
       WEATHER_MODULE: this.parseBoolean(
         process.env.ENABLE_WEATHER_MODULE,
-        true
+        true,
       ),
       FORTUNE_MODULE: this.parseBoolean(
         process.env.ENABLE_FORTUNE_MODULE,
-        true
+        true,
       ),
       TIMER_MODULE: this.parseBoolean(process.env.ENABLE_TIMER_MODULE, true),
       INSIGHT_MODULE: this.parseBoolean(
         process.env.ENABLE_INSIGHT_MODULE,
-        true
+        true,
       ),
       UTILS_MODULE: this.parseBoolean(process.env.ENABLE_UTILS_MODULE, true),
       REMINDER_MODULE: this.parseBoolean(
         process.env.ENABLE_REMINDER_MODULE,
-        true
+        true,
       ),
       WORKTIME_MODULE: this.parseBoolean(
         process.env.ENABLE_WORKTIME_MODULE,
-        true
+        true,
       ),
       TTS_FEATURE: this.parseBoolean(process.env.ENABLE_TTS_FEATURE, true),
       VOICE_FEATURE: this.parseBoolean(process.env.ENABLE_VOICE_FEATURE, true),
@@ -122,7 +122,7 @@ class AppConfig {
         parseInt(process.env.GRACEFUL_SHUTDOWN_TIMEOUT) || 30000,
       HEALTH_CHECK_ENABLED: this.parseBoolean(
         process.env.HEALTH_CHECK_ENABLED,
-        true
+        true,
       ),
       METRICS_ENABLED: this.parseBoolean(process.env.METRICS_ENABLED, false),
       AUTO_RESTART: this.parseBoolean(process.env.AUTO_RESTART, true),
@@ -184,7 +184,9 @@ class AppConfig {
   // 관리자 사용자 파싱
   parseAdminUsers() {
     const adminIds = process.env.ADMIN_USER_IDS || process.env.ADMIN_IDS || "";
-    if (!adminIds) return [];
+    if (!adminIds) {
+      return [];
+    }
 
     return this.parseUserIds(adminIds);
   }
@@ -193,7 +195,9 @@ class AppConfig {
   parseAllowedUsers() {
     const allowedIds =
       process.env.ALLOWED_USER_IDS || process.env.ALLOWED_IDS || "";
-    if (!allowedIds) return []; // 빈 배열이면 모든 사용자 허용
+    if (!allowedIds) {
+      return [];
+    } // 빈 배열이면 모든 사용자 허용
 
     return this.parseUserIds(allowedIds);
   }
@@ -202,16 +206,20 @@ class AppConfig {
   parseUserIds(idsString) {
     return idsString
       .split(",")
-      .map((id) => id.trim())
-      .filter((id) => id && !isNaN(id))
-      .map((id) => parseInt(id))
-      .filter((id) => id > 0); // 유효한 텔레그램 사용자 ID만
+      .map(id => id.trim())
+      .filter(id => id && !isNaN(id))
+      .map(id => parseInt(id))
+      .filter(id => id > 0); // 유효한 텔레그램 사용자 ID만
   }
 
   // 불린 값 파싱
   parseBoolean(value, defaultValue = false) {
-    if (value === undefined || value === null) return defaultValue;
-    if (typeof value === "boolean") return value;
+    if (value === undefined || value === null) {
+      return defaultValue;
+    }
+    if (typeof value === "boolean") {
+      return value;
+    }
 
     const str = value.toString().toLowerCase();
     return ["true", "1", "yes", "on", "enable", "enabled"].includes(str);
@@ -239,7 +247,7 @@ class AppConfig {
     }
 
     // 관리자 사용자 ID 검증
-    if (this.ADMIN_USER_IDS.some((id) => id <= 0)) {
+    if (this.ADMIN_USER_IDS.some(id => id <= 0)) {
       errors.push("관리자 사용자 ID가 유효하지 않습니다");
     }
 
@@ -255,7 +263,7 @@ class AppConfig {
     const validLogLevels = ["error", "warn", "info", "debug", "trace"];
     if (!validLogLevels.includes(this.LOGGING.LEVEL)) {
       errors.push(
-        `로그 레벨이 유효하지 않습니다. 사용 가능: ${validLogLevels.join(", ")}`
+        `로그 레벨이 유효하지 않습니다. 사용 가능: ${validLogLevels.join(", ")}`,
       );
     }
 
@@ -327,7 +335,9 @@ class AppConfig {
   // 허용된 사용자 여부 확인
   isAllowedUser(userId) {
     // 허용 목록이 비어있으면 모든 사용자 허용
-    if (this.ALLOWED_USER_IDS.length === 0) return true;
+    if (this.ALLOWED_USER_IDS.length === 0) {
+      return true;
+    }
 
     return this.ALLOWED_USER_IDS.includes(parseInt(userId));
   }
@@ -390,7 +400,7 @@ class AppConfig {
     if (config.MONGO_URL) {
       config.MONGO_URL = config.MONGO_URL.replace(
         /\/\/([^:]+):([^@]+)@/,
-        "//***:***@"
+        "//***:***@",
       );
     }
     if (config.WEATHER_API_KEY) {
@@ -405,7 +415,9 @@ class AppConfig {
 
   // Railway 배포 정보
   getDeploymentInfo() {
-    if (!this.isRailway) return null;
+    if (!this.isRailway) {
+      return null;
+    }
 
     return {
       deploymentId: this.RAILWAY.DEPLOYMENT_ID,

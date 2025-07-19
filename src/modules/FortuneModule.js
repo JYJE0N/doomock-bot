@@ -12,7 +12,7 @@ class FortuneModule extends BaseModule {
     this.fortuneService = new FortuneService();
     console.log(
       "🔮 FortuneService 초기화:",
-      this.fortuneService ? "성공" : "실패"
+      this.fortuneService ? "성공" : "실패",
     );
   }
 
@@ -48,7 +48,7 @@ class FortuneModule extends BaseModule {
           chatId,
           messageId,
           userName,
-          menuManager
+          menuManager,
         );
         break;
       case "general":
@@ -214,7 +214,7 @@ class FortuneModule extends BaseModule {
         {
           parse_mode: "Markdown",
           reply_markup: keyboard,
-        }
+        },
       );
     } else {
       await this.sendMessage(
@@ -224,7 +224,7 @@ class FortuneModule extends BaseModule {
         {
           parse_mode: "Markdown",
           reply_markup: keyboard,
-        }
+        },
       );
     }
   }
@@ -255,7 +255,7 @@ class FortuneModule extends BaseModule {
         {
           parse_mode: "Markdown",
           reply_markup: keyboard,
-        }
+        },
       );
     } else {
       await this.sendMessage(
@@ -265,7 +265,7 @@ class FortuneModule extends BaseModule {
         {
           parse_mode: "Markdown",
           reply_markup: keyboard,
-        }
+        },
       );
     }
   }
@@ -325,26 +325,26 @@ class FortuneModule extends BaseModule {
 
   async showFortuneHelp(bot, chatId) {
     const helpText =
-      `🔮 **운세 사용법**\n\n` +
-      `**📱 메뉴 방식:**\n` +
-      `/start → 🔮 운세 → 원하는 운세 선택\n\n` +
-      `**⌨️ 명령어 방식:**\n` +
-      `/fortune - 오늘의 일반 운세\n` +
-      `/fortune work - 오늘의 업무운\n` +
-      `/fortune love - 오늘의 연애운\n` +
-      `/fortune money - 오늘의 재물운\n` +
-      `/fortune health - 오늘의 건강운\n` +
-      `/fortune meeting - 오늘의 회식운\n` +
-      `/fortune tarot - 오늘의 타로카드\n` +
-      `/fortune tarot3 - 타로 3장 스프레드\n` +
-      `/fortune lucky - 오늘의 행운 정보\n` +
-      `/fortune all - 종합 운세\n\n` +
-      `✨ **특징:**\n` +
-      `• 개인별 맞춤 운세\n` +
-      `• 실제 이름으로 개인화\n` +
-      `• 한국 시간 기준\n` +
-      `• 매일 새로운 운세\n\n` +
-      `당신만의 특별한 운세를 확인해보세요! 🌟`;
+      "🔮 **운세 사용법**\n\n" +
+      "**📱 메뉴 방식:**\n" +
+      "/start → 🔮 운세 → 원하는 운세 선택\n\n" +
+      "**⌨️ 명령어 방식:**\n" +
+      "/fortune - 오늘의 일반 운세\n" +
+      "/fortune work - 오늘의 업무운\n" +
+      "/fortune love - 오늘의 연애운\n" +
+      "/fortune money - 오늘의 재물운\n" +
+      "/fortune health - 오늘의 건강운\n" +
+      "/fortune meeting - 오늘의 회식운\n" +
+      "/fortune tarot - 오늘의 타로카드\n" +
+      "/fortune tarot3 - 타로 3장 스프레드\n" +
+      "/fortune lucky - 오늘의 행운 정보\n" +
+      "/fortune all - 종합 운세\n\n" +
+      "✨ **특징:**\n" +
+      "• 개인별 맞춤 운세\n" +
+      "• 실제 이름으로 개인화\n" +
+      "• 한국 시간 기준\n" +
+      "• 매일 새로운 운세\n\n" +
+      "당신만의 특별한 운세를 확인해보세요! 🌟";
 
     await this.sendMessage(bot, chatId, helpText, { parse_mode: "Markdown" });
   }

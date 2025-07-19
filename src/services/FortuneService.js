@@ -1022,14 +1022,14 @@ class FortuneService {
     const [pastCard, presentCard, futureCard] = selectedCards;
 
     return (
-      `🔮 **과거 - 현재 - 미래 스프레드**\n\n` +
-      `**📜 과거 (Past):**\n` +
+      "🔮 **과거 - 현재 - 미래 스프레드**\n\n" +
+      "**📜 과거 (Past):**\n" +
       `${pastCard.emoji} ${pastCard.name}\n` +
       `*${pastCard.meaning}*\n\n` +
-      `**🌟 현재 (Present):**\n` +
+      "**🌟 현재 (Present):**\n" +
       `${presentCard.emoji} ${presentCard.name}\n` +
       `*${presentCard.meaning}*\n\n` +
-      `**✨ 미래 (Future):**\n` +
+      "**✨ 미래 (Future):**\n" +
       `${futureCard.emoji} ${futureCard.name}\n` +
       `*${futureCard.meaning}*\n\n` +
       `💫 **종합 조언:** ${presentCard.advice}`

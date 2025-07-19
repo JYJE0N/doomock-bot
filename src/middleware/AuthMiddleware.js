@@ -25,7 +25,7 @@ class AuthMiddleware {
       Logger.warn(
         `접근 거부: 사용자 ${userId} (${
           msg.from.username || msg.from.first_name
-        })`
+        })`,
       );
     }
 
@@ -43,7 +43,7 @@ class AuthMiddleware {
   async handleUnauthorized(bot, chatId, userName) {
     const message =
       `❌ ${userName}님, 이 봇을 사용할 권한이 없습니다.\n\n` +
-      `봇 사용 권한이 필요하시면 관리자에게 문의해주세요.`;
+      "봇 사용 권한이 필요하시면 관리자에게 문의해주세요.";
 
     await bot.sendMessage(chatId, message);
     Logger.warn(`무권한 접근 시도: 사용자 ${chatId}`);

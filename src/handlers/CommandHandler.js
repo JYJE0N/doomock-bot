@@ -78,7 +78,7 @@ class CommandHandler {
           const moduleCommand = await this.moduleManager.handleCommand(
             msg,
             cleanCommand,
-            args
+            args,
           );
           if (moduleCommand) {
             return;
@@ -142,7 +142,7 @@ class CommandHandler {
       if (msg && msg.chat && msg.chat.id) {
         await this.bot.sendMessage(
           msg.chat.id,
-          "봇을 시작하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+          "봇을 시작하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
         );
       }
     }
@@ -226,13 +226,13 @@ class CommandHandler {
     }
 
     const moduleList = modules
-      .map((m) => `• *${m.name}* - ${m.description}`)
+      .map(m => `• *${m.name}* - ${m.description}`)
       .join("\n");
 
     const text = `*사용 가능한 모듈:*\n\n${moduleList}`;
 
     const keyboard = {
-      inline_keyboard: modules.map((m) => [
+      inline_keyboard: modules.map(m => [
         {
           text: m.name,
           callback_data: `module_select:${m.id}`,
@@ -364,7 +364,7 @@ ${config.emoji.version} 버전: ${config.bot.version}
 
     await this.bot.sendMessage(
       chatId,
-      `'/${command}' 는 알 수 없는 명령어입니다.\n/help 를 입력하여 사용 가능한 명령어를 확인하세요.`
+      `'/${command}' 는 알 수 없는 명령어입니다.\n/help 를 입력하여 사용 가능한 명령어를 확인하세요.`,
     );
   }
 

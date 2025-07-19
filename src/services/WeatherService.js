@@ -49,7 +49,7 @@ class WeatherService {
       const response = await axios.get(url);
       const data = response.data;
 
-      const forecasts = data.list.slice(0, 8).map((item) => {
+      const forecasts = data.list.slice(0, 8).map(item => {
         // UTC 시간을 한국 시간으로 변환
         const forecastTime = new Date(item.dt * 1000);
         const koreaTime = new Date(forecastTime.getTime() + 9 * 60 * 60 * 1000); // UTC+9
@@ -121,7 +121,7 @@ class WeatherService {
         message += `**📅 ${date}**\n`;
       } else if (index > 0) {
         const prevDate = TimeHelper.formatDate(
-          forecastData.forecasts[index - 1].time
+          forecastData.forecasts[index - 1].time,
         );
         const currentDate = TimeHelper.formatDate(forecast.time);
         if (prevDate !== currentDate) {

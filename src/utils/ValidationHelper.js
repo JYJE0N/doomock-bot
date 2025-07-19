@@ -39,13 +39,17 @@ class ValidationHelper {
   }
 
   static isValidTextLength(text, minLength = 1, maxLength = 1000) {
-    if (typeof text !== "string") return false;
+    if (typeof text !== "string") {
+      return false;
+    }
     const length = text.trim().length;
     return length >= minLength && length <= maxLength;
   }
 
   static sanitizeText(text) {
-    if (typeof text !== "string") return "";
+    if (typeof text !== "string") {
+      return "";
+    }
     return text.trim().replace(/[<>&"']/g, "");
   }
 

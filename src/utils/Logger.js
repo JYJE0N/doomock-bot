@@ -26,7 +26,7 @@ class Logger {
   getTimestamp() {
     const now = new Date();
     const koreaTime = new Date(
-      now.toLocaleString("en-US", { timeZone: "Asia/Seoul" })
+      now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
     );
     return koreaTime.toISOString().replace("T", " ").substring(0, 19);
   }
@@ -52,7 +52,9 @@ class Logger {
 
   // ✅ 기본 로그 메서드들
   log(level, message, metadata = {}) {
-    if (this.logLevels[level] > this.currentLevel) return;
+    if (this.logLevels[level] > this.currentLevel) {
+      return;
+    }
 
     const formatted = this.formatLog(level, message, metadata);
     console.log(formatted);

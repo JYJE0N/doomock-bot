@@ -11,7 +11,7 @@ class CallbackManager {
     this.initializeRoutes();
 
     Logger.info(
-      `📞 CallbackManager 초기화됨. 모듈 수: ${Object.keys(this.modules).length}`
+      `📞 CallbackManager 초기화됨. 모듈 수: ${Object.keys(this.modules).length}`,
     );
   }
 
@@ -155,7 +155,9 @@ class CallbackManager {
       // 동적 콜백 처리 (todo_toggle_1, todo_delete_1, weather_인천 등)
       if (data.includes("_")) {
         const handled = await this.handleDynamicCallback(callbackQuery);
-        if (handled) return;
+        if (handled) {
+          return;
+        }
       }
 
       // 라우팅된 콜백 처리
@@ -197,7 +199,7 @@ class CallbackManager {
             chatId,
             messageId,
             userId,
-            index
+            index,
           );
         } else if (action === "delete") {
           await this.modules.todo.deleteTodo(
@@ -205,7 +207,7 @@ class CallbackManager {
             chatId,
             messageId,
             userId,
-            index
+            index,
           );
         }
         return true;
@@ -238,7 +240,7 @@ class CallbackManager {
           this.bot,
           chatId,
           messageId,
-          city
+          city,
         );
         return true;
       }
@@ -317,7 +319,7 @@ class CallbackManager {
             chatId,
             messageId,
             userId,
-            userName
+            userName,
           );
           break;
         case "startAdd":
@@ -333,7 +335,7 @@ class CallbackManager {
             chatId,
             messageId,
             userId,
-            userName
+            userName,
           );
           break;
       }
@@ -370,11 +372,11 @@ class CallbackManager {
           callbackQuery,
           subAction,
           params,
-          this.menuManager || null // menuManager가 null일 수 있음을 명시적으로 처리
+          this.menuManager || null, // menuManager가 null일 수 있음을 명시적으로 처리
         );
       } else {
         Logger.warn(
-          `모듈 ${module.constructor.name}에 handleCallback 메서드가 없습니다`
+          `모듈 ${module.constructor.name}에 handleCallback 메서드가 없습니다`,
         );
       }
     } catch (error) {
@@ -390,7 +392,7 @@ class CallbackManager {
     await this.bot.sendMessage(
       chatId,
       `🤖 안녕하세요 ${userName}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`,
-      { reply_markup: this.createMainMenuKeyboard() }
+      { reply_markup: this.createMainMenuKeyboard() },
     );
   }
 
@@ -444,7 +446,7 @@ class CallbackManager {
             [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
           ],
         },
-      }
+      },
     );
   }
 
@@ -453,14 +455,14 @@ class CallbackManager {
 
     await this.bot.sendMessage(
       chatId,
-      `❌ 알 수 없는 명령입니다. 메인 메뉴로 돌아갑니다.`,
+      "❌ 알 수 없는 명령입니다. 메인 메뉴로 돌아갑니다.",
       {
         reply_markup: {
           inline_keyboard: [
             [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
           ],
         },
-      }
+      },
     );
   }
 
@@ -477,36 +479,53 @@ class CallbackManager {
 
     // 동적으로 활성화된 모듈에 따라 메뉴 구성
     const firstRow = [];
-    if (this.modules.todo)
+    if (this.modules.todo) {
       firstRow.push({ text: "📝 할일 관리", callback_data: "todo_menu" });
-    if (this.modules.leave)
+    }
+    if (this.modules.leave) {
       firstRow.push({ text: "📅 휴가 관리", callback_data: "leave_menu" });
-    if (firstRow.length > 0) keyboard.push(firstRow);
+    }
+    if (firstRow.length > 0) {
+      keyboard.push(firstRow);
+    }
 
     const secondRow = [];
-    if (this.modules.timer)
+    if (this.modules.timer) {
       secondRow.push({ text: "⏰ 타이머", callback_data: "timer_menu" });
-    if (this.modules.fortune)
+    }
+    if (this.modules.fortune) {
       secondRow.push({ text: "🎯 운세", callback_data: "fortune_menu" });
-    if (secondRow.length > 0) keyboard.push(secondRow);
+    }
+    if (secondRow.length > 0) {
+      keyboard.push(secondRow);
+    }
 
     const thirdRow = [];
-    if (this.modules.worktime)
+    if (this.modules.worktime) {
       thirdRow.push({ text: "🕐 근무시간", callback_data: "worktime_menu" });
-    if (this.modules.weather)
+    }
+    if (this.modules.weather) {
       thirdRow.push({ text: "🌤️ 날씨", callback_data: "weather_menu" });
-    if (thirdRow.length > 0) keyboard.push(thirdRow);
+    }
+    if (thirdRow.length > 0) {
+      keyboard.push(thirdRow);
+    }
 
     const fourthRow = [];
-    if (this.modules.insight)
+    if (this.modules.insight) {
       fourthRow.push({ text: "📊 인사이트", callback_data: "insight_menu" });
-    if (this.modules.reminder)
+    }
+    if (this.modules.reminder) {
       fourthRow.push({ text: "🔔 리마인더", callback_data: "reminder_menu" });
-    if (fourthRow.length > 0) keyboard.push(fourthRow);
+    }
+    if (fourthRow.length > 0) {
+      keyboard.push(fourthRow);
+    }
 
     const lastRow = [];
-    if (this.modules.utils)
+    if (this.modules.utils) {
       lastRow.push({ text: "🛠️ 유틸리티", callback_data: "utils_menu" });
+    }
     lastRow.push({ text: "❓ 도움말", callback_data: "help_menu" });
     keyboard.push(lastRow);
 

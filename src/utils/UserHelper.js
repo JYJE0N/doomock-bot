@@ -10,7 +10,9 @@
  * @returns {string} 사용자 표시 이름
  */
 function getUserName(user) {
-  if (!user) return "사용자";
+  if (!user) {
+    return "사용자";
+  }
 
   // 우선순위: first_name > username > id
   if (user.first_name) {
@@ -30,7 +32,9 @@ function getUserName(user) {
  * @returns {string} 전체 이름
  */
 function getFullUserName(user) {
-  if (!user) return "사용자";
+  if (!user) {
+    return "사용자";
+  }
 
   let fullName = "";
 
@@ -51,7 +55,9 @@ function getFullUserName(user) {
  * @returns {string} 멘션 텍스트
  */
 function getUserMention(user) {
-  if (!user) return "사용자";
+  if (!user) {
+    return "사용자";
+  }
 
   const name = getUserName(user);
 
@@ -106,7 +112,9 @@ function isValidUserId(userId) {
  * @returns {boolean} 관리자 권한 여부
  */
 function isAdmin(user, adminIds = []) {
-  if (!user || !Array.isArray(adminIds)) return false;
+  if (!user || !Array.isArray(adminIds)) {
+    return false;
+  }
   return adminIds.includes(user.id);
 }
 
@@ -117,7 +125,9 @@ function isAdmin(user, adminIds = []) {
  * @returns {boolean} 차단된 사용자인지 여부
  */
 function isBlocked(user, blockedIds = []) {
-  if (!user || !Array.isArray(blockedIds)) return false;
+  if (!user || !Array.isArray(blockedIds)) {
+    return false;
+  }
   return blockedIds.includes(user.id);
 }
 
@@ -128,10 +138,14 @@ function isBlocked(user, blockedIds = []) {
  * @returns {boolean} 허용된 사용자인지 여부
  */
 function isAllowed(user, allowedIds = []) {
-  if (!user) return false;
+  if (!user) {
+    return false;
+  }
 
   // 빈 배열이면 모든 사용자 허용
-  if (allowedIds.length === 0) return true;
+  if (allowedIds.length === 0) {
+    return true;
+  }
 
   return allowedIds.includes(user.id);
 }
@@ -157,7 +171,9 @@ function normalizeLanguageCode(languageCode) {
     ru: "ru",
   };
 
-  if (!languageCode) return "ko";
+  if (!languageCode) {
+    return "ko";
+  }
 
   const normalized = languageCode.toLowerCase().substring(0, 2);
   return supportedLanguages[normalized] || "ko";
@@ -169,7 +185,9 @@ function normalizeLanguageCode(languageCode) {
  * @returns {string} 시간대 문자열
  */
 function estimateUserTimezone(user) {
-  if (!user) return "Asia/Seoul";
+  if (!user) {
+    return "Asia/Seoul";
+  }
 
   const timezoneMap = {
     ko: "Asia/Seoul",
@@ -193,7 +211,9 @@ function estimateUserTimezone(user) {
  * @returns {string} 형식에 맞는 사용자 표시 이름
  */
 function formatUserDisplay(user, format = "short") {
-  if (!user) return "사용자";
+  if (!user) {
+    return "사용자";
+  }
 
   switch (format) {
     case "short":
@@ -231,7 +251,9 @@ function createUserActivityLog(user, action, metadata = {}) {
  * @returns {Object} 익명화된 사용자 정보
  */
 function anonymizeUser(user) {
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   return {
     id: user.id,
