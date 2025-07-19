@@ -1,42 +1,19 @@
-// doomock_bot.js - 메인 엔트리 포인트 (버전 3 - 폴링 전용)
+// doomock_bot.js - 메인 엔트리 포인트 (수정된 버전)
 
 require("dotenv").config();
 
 const TelegramBot = require("node-telegram-bot-api");
 const BotController = require("./src/controllers/BotController");
 const Logger = require("./src/utils/Logger");
-const config = require("./src/config/config");
-
-// 환경 변수 검증
-function validateEnvironment() {
-  // 텔레그램 봇 토큰 확인 (여러 변수명 지원)
-  const token = process.env.BOT_TOKEN || process.env.BOT_TOKEN;
-  // MongoDB URI 확인 (여러 변수명 지원)
-  const mongoUri =
-    process.env.MONGODB_URI ||
-    process.env.MONGO_URL ||
-    process.env.DATABASE_URL;
-
-  if (!token) {
-    throw new Error(
-      "봇 토큰이 설정되지 않았습니다. TELEGRAM_BOT_TOKEN 또는 BOT_TOKEN을 설정하세요."
-    );
-  }
-
-  if (!mongoUri) {
-    throw new Error(
-      "MongoDB URI가 설정되지 않았습니다. MONGODB_URI, MONGO_URL, 또는 DATABASE_URL을 설정하세요."
-    );
-  }
-
-  // 환경변수를 global로 설정 (다른 곳에서 사용하기 위해)
-  process.env.BOT_TOKEN = token;
-  process.env.MONGODB_URI = mongoUri;
-}
+const AppConfig = require("./src/config/AppConfig"); // ✅ AppConfig 사용
 
 // 봇 인스턴스 생성 (폴링 전용)
 function createBot() {
-  const token = process.env.BOT_TOKEN;
+  const token = AppConfig.BOT_TOKEN; // ✅ AppConfig에서 토큰 가져오기
+
+  if (!token) {
+    throw new Error("봇 토큰이 설정되지 않았습니다. BOT_TOKEN을 설정하세요.");
+  }
 
   const bot = new TelegramBot(token, {
     polling: {
@@ -106,20 +83,17 @@ async function shutdown(bot, exitCode = 0) {
 // 메인 함수
 async function main() {
   try {
-    Logger.info(`${config.bot.name} v${config.bot.version} 시작 중...`);
+    Logger.info(`두목 봇 v${AppConfig.VERSION} 시작 중...`); // ✅ AppConfig 사용
 
-    // 환경 변수 검증
-    validateEnvironment();
+    // AppConfig 설정 요약 로그
+    const configSummary = AppConfig.getSummary();
+    Logger.info("설정 요약:", configSummary);
 
     // 봇 인스턴스 생성
     const bot = createBot();
 
-    // BotController 생성 및 초기화
-    const controller = new BotController(bot, {
-      mongoUri: process.env.MONGODB_URI,
-      adminIds: process.env.ADMIN_IDS?.split(",") || [],
-      environment: "development",
-    });
+    // BotController 생성 및 초기화 (AppConfig 전달)
+    const controller = new BotController(bot, AppConfig); // ✅ AppConfig 전체 전달
 
     // 컨트롤러를 봇에 연결 (종료 시 사용)
     bot.controller = controller;
@@ -130,7 +104,11 @@ async function main() {
     // 에러 핸들러 설정
     setupErrorHandlers(bot);
 
-    Logger.success(`${config.bot.name} v${config.bot.version} 시작 완료! 🚀`);
+    Logger.success(`두목 봇 v${AppConfig.VERSION} 시작 완료! 🚀`);
+    Logger.info(
+      `환경: ${AppConfig.NODE_ENV} | Railway: ${AppConfig.isRailway ? "YES" : "NO"}`
+    );
+    Logger.info(`MongoDB: ${AppConfig.MONGO_URL ? "CONFIGURED" : "NOT_SET"}`);
     Logger.info("폴링 모드로 실행 중...");
   } catch (error) {
     Logger.error("봇 시작 실패:", error);
