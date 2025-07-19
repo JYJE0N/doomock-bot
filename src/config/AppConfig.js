@@ -1,4 +1,5 @@
-// src/config/AppConfig.js - 완전히 개선된 앱 설정
+// src/config/AppConfig.js - 보안 강화 버전 (민감정보 로깅 방지)
+
 require("dotenv").config();
 
 class AppConfig {
@@ -11,8 +12,6 @@ class AppConfig {
     // 🤖 봇 설정
     this.BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
     this.BOT_USERNAME = process.env.BOT_USERNAME || "doomock-bot";
-    // 호환성을 위한 alias 추가
-    this.MONGO_URL = this.MONGO_URL;
 
     // 🌍 환경 설정
     this.NODE_ENV = process.env.NODE_ENV || "development";
@@ -34,10 +33,10 @@ class AppConfig {
 
     // ⚡ 성능 설정
     this.RATE_LIMIT_WINDOW_MS =
-      parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000; // 1분
+      parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 60000;
     this.RATE_LIMIT_MAX_REQUESTS =
       parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 30;
-    this.CACHE_TTL_MS = parseInt(process.env.CACHE_TTL_MS) || 600000; // 10분
+    this.CACHE_TTL_MS = parseInt(process.env.CACHE_TTL_MS) || 600000;
 
     // 📁 파일 시스템 설정
     this.TEMP_DIR = process.env.TEMP_DIR || "./temp";
@@ -149,7 +148,7 @@ class AppConfig {
     return null;
   }
 
-  // MongoDB URL 우선순위에 따라 결정
+  // 🔒 보안 강화: MongoDB URL 우선순위 결정
   getMONGO_URL() {
     const candidates = [
       process.env.MONGO_URL,
@@ -159,16 +158,17 @@ class AppConfig {
       process.env.DATABASE_URL,
     ];
 
-    // ✅ 환경 변수에서 직접 URL 찾기 (우선순위)
+    // ✅ 환경 변수에서 직접 URL 찾기 (민감정보 로깅 없이)
     for (const url of candidates) {
       if (url && this.isValidMONGO_URL(url)) {
-        console.log(`✅ MongoDB URL 발견: ${url.substring(0, 20)}...`);
+        // 🔒 민감정보 로깅 방지: URL 내용을 로깅하지 않음
+        console.log("✅ MongoDB URL 설정 완료");
         return url;
       }
     }
 
     console.log("❌ MongoDB URL을 환경변수에서 찾을 수 없음");
-    return null; // 개별 컴포넌트 구성 제거
+    return null;
   }
 
   // 관리자 사용자 파싱
@@ -177,7 +177,6 @@ class AppConfig {
     if (!adminIds) {
       return [];
     }
-
     return this.parseUserIds(adminIds);
   }
 
@@ -187,8 +186,7 @@ class AppConfig {
       process.env.ALLOWED_USER_IDS || process.env.ALLOWED_IDS || "";
     if (!allowedIds) {
       return [];
-    } // 빈 배열이면 모든 사용자 허용
-
+    }
     return this.parseUserIds(allowedIds);
   }
 
@@ -199,7 +197,7 @@ class AppConfig {
       .map((id) => id.trim())
       .filter((id) => id && !isNaN(id))
       .map((id) => parseInt(id))
-      .filter((id) => id > 0); // 유효한 텔레그램 사용자 ID만
+      .filter((id) => id > 0);
   }
 
   // 불린 값 파싱
@@ -324,28 +322,32 @@ class AppConfig {
 
   // 허용된 사용자 여부 확인
   isAllowedUser(userId) {
-    // 허용 목록이 비어있으면 모든 사용자 허용
     if (this.ALLOWED_USER_IDS.length === 0) {
       return true;
     }
-
     return this.ALLOWED_USER_IDS.includes(parseInt(userId));
   }
 
-  // 현재 설정 요약 반환
+  // 🔒 보안 강화: 현재 설정 요약 반환 (민감정보 제외)
   getSummary() {
     return {
       environment: this.NODE_ENV,
       version: this.VERSION,
       port: this.PORT,
       botUsername: this.BOT_USERNAME,
+
+      // 🔒 민감정보는 존재 여부만 표시
       mongoConfigured: !!this.MONGO_URL,
       weatherApiConfigured: !!this.WEATHER_API_KEY,
+      airKoreaApiConfigured: !!this.AIR_KOREA_API_KEY,
+
       adminUsers: this.ADMIN_USER_IDS.length,
       allowedUsers: this.ALLOWED_USER_IDS.length || "전체",
+
       enabledFeatures: Object.entries(this.FEATURES)
         .filter(([, enabled]) => enabled)
         .map(([feature]) => feature),
+
       railway: this.isRailway,
       webhookMode: this.isWebhookMode,
       defaultCity: this.DONGTAN.DEFAULT_CITY,
@@ -353,25 +355,28 @@ class AppConfig {
     };
   }
 
-  // 환경 변수 마스킹하여 로그 출력용 정보 생성
+  // 🔒 보안 강화: 로깅용 안전한 설정 정보
   getLoggableConfig() {
     return {
       NODE_ENV: this.NODE_ENV,
       VERSION: this.VERSION,
       PORT: this.PORT,
       BOT_USERNAME: this.BOT_USERNAME,
-      BOT_TOKEN: this.BOT_TOKEN
-        ? `${this.BOT_TOKEN.slice(0, 8)}***`
-        : "NOT_SET",
-      MONGO_URL: this.MONGO_URL ? "CONFIGURED" : "NOT_SET",
-      WEATHER_API_KEY: this.WEATHER_API_KEY ? "CONFIGURED" : "NOT_SET",
-      AIR_KOREA_API_KEY: this.AIR_KOREA_API_KEY ? "CONFIGURED" : "NOT_SET",
+
+      // 🔒 민감정보는 SET/NOT_SET으로만 표시
+      BOT_TOKEN: this.BOT_TOKEN ? "SET" : "NOT_SET",
+      MONGO_URL: this.MONGO_URL ? "SET" : "NOT_SET",
+      WEATHER_API_KEY: this.WEATHER_API_KEY ? "SET" : "NOT_SET",
+      AIR_KOREA_API_KEY: this.AIR_KOREA_API_KEY ? "SET" : "NOT_SET",
+
       ADMIN_USER_COUNT: this.ADMIN_USER_IDS.length,
       ALLOWED_USER_COUNT: this.ALLOWED_USER_IDS.length || "ALL",
+
       FEATURES_ENABLED: Object.entries(this.FEATURES)
         .filter(([, enabled]) => enabled)
         .map(([feature]) => feature)
         .join(", "),
+
       RAILWAY: this.isRailway ? "YES" : "NO",
       WEBHOOK_MODE: this.isWebhookMode ? "YES" : "NO",
       DEFAULT_CITY: this.DONGTAN.DEFAULT_CITY,
@@ -379,31 +384,31 @@ class AppConfig {
     };
   }
 
-  // 디버그용 전체 설정 덤프 (민감한 정보 마스킹)
+  // 🔒 완전히 안전한 디버그 설정 (민감정보 완전 제거)
   getDebugConfig() {
-    const config = { ...this };
+    return {
+      environment: this.NODE_ENV,
+      version: this.VERSION,
+      port: this.PORT,
+      railway: this.isRailway,
+      features: Object.keys(this.FEATURES).filter((key) => this.FEATURES[key]),
 
-    // 민감한 정보 마스킹
-    if (config.BOT_TOKEN) {
-      config.BOT_TOKEN = `${config.BOT_TOKEN.slice(0, 8)}***`;
-    }
-    if (config.MONGO_URL) {
-      config.MONGO_URL = config.MONGO_URL.replace(
-        /\/\/([^:]+):([^@]+)@/,
-        "//***:***@"
-      );
-    }
-    if (config.WEATHER_API_KEY) {
-      config.WEATHER_API_KEY = `${config.WEATHER_API_KEY.slice(0, 8)}***`;
-    }
-    if (config.AIR_KOREA_API_KEY) {
-      config.AIR_KOREA_API_KEY = `${config.AIR_KOREA_API_KEY.slice(0, 8)}***`;
-    }
+      // 🔒 모든 민감정보는 [HIDDEN]으로 표시
+      credentials: {
+        botToken: this.BOT_TOKEN ? "[HIDDEN]" : "NOT_SET",
+        mongoUrl: this.MONGO_URL ? "[HIDDEN]" : "NOT_SET",
+        weatherApiKey: this.WEATHER_API_KEY ? "[HIDDEN]" : "NOT_SET",
+        airKoreaApiKey: this.AIR_KOREA_API_KEY ? "[HIDDEN]" : "NOT_SET",
+      },
 
-    return config;
+      userCounts: {
+        admins: this.ADMIN_USER_IDS.length,
+        allowed: this.ALLOWED_USER_IDS.length || "ALL",
+      },
+    };
   }
 
-  // Railway 배포 정보
+  // Railway 배포 정보 (민감정보 없음)
   getDeploymentInfo() {
     if (!this.isRailway) {
       return null;
@@ -420,7 +425,7 @@ class AppConfig {
     };
   }
 
-  // 시스템 상태 정보
+  // 시스템 상태 정보 (민감정보 없음)
   getSystemStatus() {
     return {
       nodeVersion: process.version,
@@ -440,5 +445,4 @@ class AppConfig {
 
 // 싱글톤 인스턴스 생성 및 내보내기
 const appConfig = new AppConfig();
-
 module.exports = appConfig;
