@@ -311,7 +311,7 @@ class CallbackManager {
           callbackQuery,
           subAction,
           params,
-          this.menuManager // menuManager 전달
+          this.menuManager || null // menuManager가 null일 수 있음을 명시적으로 처리
         );
       } else {
         Logger.warn(
