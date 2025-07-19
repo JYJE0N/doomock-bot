@@ -1,54 +1,59 @@
 {
-  "name": "doomock_bot",
+  "name": "doomock-bot",
   "version": "3.0.1",
-  "description": "경기남부 직장인을 위한 텔레그램 봇",
-  "main": "app.js",
+  "description": "두목봇 - 경기 남부 직장인을 위한 텔레그램 어시스턴트",
+  "main": "doomock_bot.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "nodemon app.js",
-    "railway:start": "NODE_ENV=production node app.js",
+    "start": "node doomock_bot.js",
+    "dev": "NODE_ENV=development nodemon doomock_bot.js",
+    "railway:start": "NODE_ENV=production node doomock_bot.js",
     "railway:build": "echo 'Build complete'",
-    "cleanup": "pkill -f 'node app.js' || true",
-    "restart": "npm run cleanup && sleep 5 && npm start",
-    "health": "curl -f http://localhost:${PORT:-3000}/health || exit 1"
-  },
-  "engines": {
-    "node": ">=18.0.0",
-    "npm": ">=9.0.0"
+    "test": "echo 'Tests will be added later'",
+    "cleanup": "pkill -f 'node doomock_bot.js' || true",
+    "restart": "npm run cleanup && sleep 5 && npm start"
   },
   "keywords": [
     "telegram",
     "bot",
     "productivity",
-    "todo",
-    "pomodoro",
+    "korean",
     "railway"
   ],
   "author": "DoomockBro",
   "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JYJE0N/doomock-bot.git"
+  },
   "dependencies": {
-    "node-telegram-bot-api": "^0.66.0",
-    "mongodb": "^6.3.0",
     "axios": "^1.6.2",
-    "cheerio": "^1.0.0-rc.12",
-    "openweathermap-api-node": "^1.4.6",
+    "dotenv": "^16.3.1",
+    "form-data": "^4.0.0",
     "gtts": "^0.2.1",
-    "fluent-ffmpeg": "^2.1.2"
+    "mongodb": "^6.3.0",
+    "node-telegram-bot-api": "^0.66.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
   },
+  "optionalDependencies": {
+    "fluent-ffmpeg": "^2.1.2"
+  },
   "railway": {
+    "build": {
+      "command": "npm ci --only=production"
+    },
+    "start": {
+      "command": "npm run railway:start"
+    },
     "healthcheck": {
       "path": "/health",
       "interval": 30000,
       "timeout": 10000
-    },
-    "build": {
-      "command": "npm run railway:build"
-    },
-    "start": {
-      "command": "npm run railway:start"
     }
   }
 }
