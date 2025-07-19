@@ -1035,6 +1035,7 @@ class FortuneService {
       `💫 **종합 조언:** ${presentCard.advice}`
     );
   }
+
   getLucky(userId, userName) {
     const today = TimeHelper.formatDate(new Date());
     const seed = parseInt(userId.toString() + today.replace(/\D/g, ""));

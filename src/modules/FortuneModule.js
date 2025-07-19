@@ -271,7 +271,8 @@ class FortuneModule extends BaseModule {
   }
 
   async showLucky(bot, chatId, messageId, userId) {
-    const lucky = this.fortuneService.getLucky(userId);
+    const userName = require("../utils/UserHelper").getUserName({ id: userId });
+    const lucky = this.fortuneService.getLucky(userId, userName);
 
     const keyboard = {
       inline_keyboard: [
