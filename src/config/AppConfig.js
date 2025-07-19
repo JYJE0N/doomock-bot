@@ -22,7 +22,7 @@ class AppConfig {
 
     // 💾 데이터베이스 설정
     this.MONGO_URL = this.getMongoUrl();
-    this.DB_NAME = process.env.DB_NAME || "doomock_bot";
+    this.DB_NAME = process.env.DB_NAME || "doomock85";
 
     // 🌤️ 외부 API 설정
     this.WEATHER_API_KEY = process.env.WEATHER_API_KEY;
