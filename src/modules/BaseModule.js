@@ -1,4 +1,4 @@
-// src/modules/BaseModule.js - 마크다운 파싱 오류 해결
+// src/modules/BaseModule.js - 디버깅 강화 + 호환성 개선
 
 const Logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
@@ -46,7 +46,9 @@ class BaseModule {
     // 서브클래스에서 추가 액션 등록
     this.registerActions();
 
-    Logger.debug(`${this.name}: ${this.actionMap.size}개 액션 등록됨`);
+    Logger.debug(`${this.name}: ${this.actionMap.size}개 액션 등록됨`, {
+      actions: Array.from(this.actionMap.keys()),
+    });
   }
 
   // 🚀 기본 서브메뉴 액션들 등록
@@ -83,6 +85,10 @@ class BaseModule {
     this.actionMap.set("quick", this.showQuick.bind(this));
     this.actionMap.set("national", this.showNational.bind(this));
     this.actionMap.set("tarot", this.showTarot.bind(this));
+    this.actionMap.set("tarot3", this.showTarot3.bind(this));
+    this.actionMap.set("lucky", this.showLucky.bind(this));
+    this.actionMap.set("all", this.showAll.bind(this));
+    this.actionMap.set("meeting", this.showMeeting.bind(this));
   }
 
   // ✅ 서브클래스에서 액션 등록 (오버라이드)
@@ -106,9 +112,14 @@ class BaseModule {
       this.updateStats("callback");
 
       Logger.info(`🔧 ${this.name}: ${subAction} 액션 요청`);
+      Logger.debug(`🔍 ${this.name}: 사용 가능한 액션들`, {
+        availableActions: Array.from(this.actionMap.keys()),
+        requestedAction: subAction,
+      });
 
       // 🔧 동적 액션 먼저 확인 (toggle_1, delete_2 등)
       if (await this.handleDynamicAction(bot, callbackQuery, subAction)) {
+        Logger.info(`✅ ${this.name}: 동적 액션 ${subAction} 처리 완료`);
         return true;
       }
 
@@ -116,8 +127,9 @@ class BaseModule {
       const handler = this.actionMap.get(subAction);
 
       if (handler) {
-        Logger.info(`✅ ${this.name}: ${subAction} 액션 실행`);
+        Logger.info(`✅ ${this.name}: ${subAction} 액션 실행 시작`);
         await handler(bot, chatId, messageId, userId, userName, params);
+        Logger.info(`✅ ${this.name}: ${subAction} 액션 실행 완료`);
         return true;
       } else {
         // 등록되지 않은 액션 처리
@@ -126,7 +138,7 @@ class BaseModule {
         return false;
       }
     } catch (error) {
-      Logger.error(`${this.name} 콜백 처리 오류 (${subAction}):`, error);
+      Logger.error(`❌ ${this.name} 콜백 처리 오류 (${subAction}):`, error);
       await this.handleError(bot, chatId, error);
       return false;
     }
@@ -141,14 +153,27 @@ class BaseModule {
 
   // ✅ 필수 구현: 메뉴 표시
   async showMenu(bot, chatId, messageId, userId, userName) {
-    const menuData = this.getMenuData(userName);
+    try {
+      Logger.info(`🔧 ${this.name}: showMenu 호출됨`);
 
-    // 🔧 마크다운 제거하고 안전한 텍스트로 변환
-    const safeText = this.sanitizeText(menuData.text);
+      const menuData = this.getMenuData(userName);
+      Logger.debug(`🔧 ${this.name}: 메뉴 데이터 생성됨`, {
+        textLength: menuData.text?.length,
+        buttonCount: menuData.keyboard?.inline_keyboard?.length,
+      });
 
-    await this.editMessage(bot, chatId, messageId, safeText, {
-      reply_markup: menuData.keyboard,
-    });
+      // 🔧 안전한 텍스트로 변환 (마크다운 제거)
+      const safeText = this.sanitizeText(menuData.text);
+
+      await this.editMessage(bot, chatId, messageId, safeText, {
+        reply_markup: menuData.keyboard,
+      });
+
+      Logger.info(`✅ ${this.name}: showMenu 완료`);
+    } catch (error) {
+      Logger.error(`❌ ${this.name}: showMenu 오류`, error);
+      throw error;
+    }
   }
 
   // 🔧 텍스트 안전화 메서드 (마크다운 제거)
@@ -230,6 +255,78 @@ class BaseModule {
     });
   }
 
+  // 🚀 운세 모듈용 특화 메서드들
+  async showTarot(bot, chatId, messageId, userId, userName) {
+    const text = `🎴 타로카드\n\n🚧 타로카드 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showTarot3(bot, chatId, messageId, userId, userName) {
+    const text = `🎴 타로카드 3장 스프레드\n\n🚧 타로카드 3장 뽑기 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showLucky(bot, chatId, messageId, userId, userName) {
+    const text = `🍀 행운 정보\n\n🚧 행운 정보 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showAll(bot, chatId, messageId, userId, userName) {
+    const text = `🌟 종합 정보\n\n🚧 종합 정보 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showMeeting(bot, chatId, messageId, userId, userName) {
+    const text = `🍻 회식운\n\n🚧 회식운 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showGeneral(bot, chatId, messageId, userId, userName) {
+    const text = `🌟 종합 운세\n\n🚧 종합 운세 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showWork(bot, chatId, messageId, userId, userName) {
+    const text = `💼 업무운\n\n🚧 업무운 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showLove(bot, chatId, messageId, userId, userName) {
+    const text = `💖 연애운\n\n🚧 연애운 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showMoney(bot, chatId, messageId, userId, userName) {
+    const text = `💰 재물운\n\n🚧 재물운 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showHealth(bot, chatId, messageId, userId, userName) {
+    const text = `🏥 건강운\n\n🚧 건강운 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  // 더 많은 기본 메서드들...
   async handleClear(bot, chatId, messageId, userId, userName) {
     const text = `🗑️ ${this.getDisplayName()} 삭제\n\n🚧 삭제 기능을 준비 중입니다.`;
     await this.editMessage(bot, chatId, messageId, text, {
@@ -243,8 +340,6 @@ class BaseModule {
       reply_markup: this.getBackToMenuKeyboard(),
     });
   }
-
-  // 🚀 특정 모듈용 기본 메서드들
 
   async showCurrent(bot, chatId, messageId, userId, userName) {
     const text = `📍 현재 ${this.getDisplayName()}\n\n🚧 현재 상태 조회 기능을 준비 중입니다.`;
@@ -260,28 +355,12 @@ class BaseModule {
     });
   }
 
-  async showWork(bot, chatId, messageId, userId, userName) {
-    const text = `💼 업무 ${this.getDisplayName()}\n\n🚧 업무 관련 기능을 준비 중입니다.`;
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: this.getBackToMenuKeyboard(),
-    });
-  }
-
-  async showTarot(bot, chatId, messageId, userId, userName) {
-    const text = `🎴 타로카드\n\n🚧 타로카드 기능을 준비 중입니다.`;
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: this.getBackToMenuKeyboard(),
-    });
-  }
-
   async showDashboard(bot, chatId, messageId, userId, userName) {
     const text = `📊 ${this.getDisplayName()} 대시보드\n\n🚧 대시보드 기능을 준비 중입니다.`;
     await this.editMessage(bot, chatId, messageId, text, {
       reply_markup: this.getBackToMenuKeyboard(),
     });
   }
-
-  // 🚀 더 많은 기본 메서드들...
 
   async showHistory(bot, chatId, messageId, userId, userName) {
     const text = `📜 ${this.getDisplayName()} 히스토리\n\n🚧 히스토리 기능을 준비 중입니다.`;
@@ -292,34 +371,6 @@ class BaseModule {
 
   async showForecast(bot, chatId, messageId, userId, userName) {
     const text = `🔮 ${this.getDisplayName()} 예보\n\n🚧 예보 기능을 준비 중입니다.`;
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: this.getBackToMenuKeyboard(),
-    });
-  }
-
-  async showLove(bot, chatId, messageId, userId, userName) {
-    const text = `💖 연애 ${this.getDisplayName()}\n\n🚧 연애 관련 기능을 준비 중입니다.`;
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: this.getBackToMenuKeyboard(),
-    });
-  }
-
-  async showMoney(bot, chatId, messageId, userId, userName) {
-    const text = `💰 재물 ${this.getDisplayName()}\n\n🚧 재물 관련 기능을 준비 중입니다.`;
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: this.getBackToMenuKeyboard(),
-    });
-  }
-
-  async showHealth(bot, chatId, messageId, userId, userName) {
-    const text = `🏥 건강 ${this.getDisplayName()}\n\n🚧 건강 관련 기능을 준비 중입니다.`;
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: this.getBackToMenuKeyboard(),
-    });
-  }
-
-  async showGeneral(bot, chatId, messageId, userId, userName) {
-    const text = `🌟 종합 ${this.getDisplayName()}\n\n🚧 종합 정보를 준비 중입니다.`;
     await this.editMessage(bot, chatId, messageId, text, {
       reply_markup: this.getBackToMenuKeyboard(),
     });
@@ -401,8 +452,9 @@ class BaseModule {
   // ✅ 기본 도움말 표시
   async showHelp(bot, chatId, messageId) {
     const helpText = this.getHelpMessage();
+    const safeText = this.sanitizeText(helpText);
 
-    await this.editMessage(bot, chatId, messageId, helpText, {
+    await this.editMessage(bot, chatId, messageId, safeText, {
       reply_markup: {
         inline_keyboard: [
           [
@@ -432,7 +484,9 @@ class BaseModule {
     const text =
       `❌ 알 수 없는 액션: ${action}\n\n` +
       `${this.getDisplayName()}에서 처리할 수 없는 요청입니다.\n\n` +
-      `사용 가능한 액션: ${Array.from(this.actionMap.keys()).join(", ")}`;
+      `사용 가능한 액션: ${Array.from(this.actionMap.keys())
+        .slice(0, 10)
+        .join(", ")}${this.actionMap.size > 10 ? "..." : ""}`;
 
     await this.editMessage(bot, chatId, messageId, text, {
       reply_markup: this.getBackToMenuKeyboard(),
@@ -472,6 +526,12 @@ class BaseModule {
     return false;
   }
 
+  // ✅ 초기화 메서드 (서브클래스에서 오버라이드)
+  async initialize() {
+    this.isInitialized = true;
+    Logger.info(`✅ ${this.name} 초기화 완료`);
+  }
+
   // ✅ 유틸리티 메서드들
   updateStats(type) {
     switch (type) {
@@ -490,7 +550,8 @@ class BaseModule {
 
   async sendMessage(bot, chatId, text, options = {}) {
     try {
-      return await bot.sendMessage(chatId, text, options);
+      const safeText = this.sanitizeText(text);
+      return await bot.sendMessage(chatId, safeText, options);
     } catch (error) {
       Logger.error(`메시지 전송 실패 [${this.name}]:`, error);
     }
