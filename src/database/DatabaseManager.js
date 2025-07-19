@@ -11,8 +11,8 @@ class DatabaseManager {
   }
 
   // MongoDB URL 설정
-  setConnectionString(mongoUrl) {
-    this.mongoUrl = mongoUrl;
+  setConnectionString(MONGO_URL) {
+    this.MONGO_URL = MONGO_URL;
   }
 
   // 데이터베이스 연결
@@ -22,13 +22,13 @@ class DatabaseManager {
     }
 
     try {
-      if (!this.mongoUrl) {
+      if (!this.MONGO_URL) {
         throw new Error("MongoDB URL이 설정되지 않았습니다");
       }
 
       Logger.info("MongoDB 연결 시도...");
 
-      this.client = new MongoClient(this.mongoUrl, {
+      this.client = new MongoClient(this.MONGO_URL, {
         useNewUrlParser: true,
         useUnifiedTopology: true,
         serverSelectionTimeoutMS: 5000,
@@ -39,7 +39,7 @@ class DatabaseManager {
       await this.client.connect();
 
       // 데이터베이스 이름 추출 및 검증
-      let dbName = this.extractDbName(this.mongoUrl);
+      let dbName = this.extractDbName(this.MONGO_URL);
 
       // 🔧 데이터베이스 이름 검증 및 정리
       dbName = this.sanitizeDbName(dbName) || "doomock85";
@@ -61,9 +61,9 @@ class DatabaseManager {
   }
 
   // 데이터베이스 이름 추출
-  extractDbName(mongoUrl) {
+  extractDbName(MONGO_URL) {
     try {
-      const match = mongoUrl.match(/\/([^/?]+)(\?|$)/);
+      const match = MONGO_URL.match(/\/([^/?]+)(\?|$)/);
       return match ? match[1] : null;
     } catch {
       return null;
@@ -99,7 +99,7 @@ class DatabaseManager {
     }
 
     Logger.info(
-      `데이터베이스 이름 정리: ${dbName} → ${sanitized} (길이: ${sanitized.length})`,
+      `데이터베이스 이름 정리: ${dbName} → ${sanitized} (길이: ${sanitized.length})`
     );
     return sanitized;
   }
@@ -116,7 +116,7 @@ class DatabaseManager {
       this.startReconnect();
     });
 
-    this.client.on("error", error => {
+    this.client.on("error", (error) => {
       Logger.error("MongoDB 에러:", error);
     });
 
@@ -206,8 +206,8 @@ const instance = new DatabaseManager();
 
 // 싱글톤 래퍼 클래스 - BotController와의 호환성 유지
 class DatabaseManagerWrapper {
-  constructor(mongoUrl) {
-    instance.setConnectionString(mongoUrl);
+  constructor(MONGO_URL) {
+    instance.setConnectionString(MONGO_URL);
   }
 
   async connect() {

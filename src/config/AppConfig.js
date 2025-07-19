@@ -12,7 +12,7 @@ class AppConfig {
     this.BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
     this.BOT_USERNAME = process.env.BOT_USERNAME || "doomock-bot";
     // 호환성을 위한 alias 추가
-    this.mongoUrl = this.MONGO_URL;
+    this.MONGO_URL = this.MONGO_URL;
 
     // 🌍 환경 설정
     this.NODE_ENV = process.env.NODE_ENV || "development";
@@ -21,7 +21,7 @@ class AppConfig {
       process.env.npm_package_version || this.getPackageVersion() || "1.0.0";
 
     // 💾 데이터베이스 설정
-    this.MONGO_URL = this.getMongoUrl();
+    this.MONGO_URL = this.getMONGO_URL();
     this.DB_NAME = process.env.DB_NAME || "doomock85";
 
     // 🌤️ 외부 API 설정
@@ -150,7 +150,7 @@ class AppConfig {
   }
 
   // MongoDB URL 우선순위에 따라 결정
-  getMongoUrl() {
+  getMONGO_URL() {
     const candidates = [
       process.env.MONGO_URL,
       process.env.MONGO_PUBLIC_URL,
@@ -161,7 +161,7 @@ class AppConfig {
 
     // ✅ 환경 변수에서 직접 URL 찾기 (우선순위)
     for (const url of candidates) {
-      if (url && this.isValidMongoUrl(url)) {
+      if (url && this.isValidMONGO_URL(url)) {
         console.log(`✅ MongoDB URL 발견: ${url.substring(0, 20)}...`);
         return url;
       }
@@ -227,7 +227,7 @@ class AppConfig {
     }
 
     // MongoDB URL 검증 (선택사항이지만 형식은 확인)
-    if (this.MONGO_URL && !this.isValidMongoUrl(this.MONGO_URL)) {
+    if (this.MONGO_URL && !this.isValidMONGO_URL(this.MONGO_URL)) {
       errors.push("MONGO_URL 형식이 올바르지 않습니다");
     }
 
@@ -268,7 +268,7 @@ class AppConfig {
   }
 
   // MongoDB URL 유효성 검사
-  isValidMongoUrl(url) {
+  isValidMONGO_URL(url) {
     return (
       url && (url.startsWith("mongodb://") || url.startsWith("mongodb+srv://"))
     );
