@@ -239,12 +239,10 @@ function logSystemInfo() {
     railway: AppConfig.isRailway,
   };
 
-  Logger.info(
-    "봇 설정 요약:",
-    Object.entries(safeSummary)
-      .map(([key, value]) => `${key}=${value}`)
-      .join(", ")
-  );
+  Logger.info("봇 설정 요약:");
+  Object.entries(safeSummary).forEach(([key, value]) => {
+    Logger.info(`  ${key}: ${value}`);
+  });
 }
 
 /**

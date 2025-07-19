@@ -104,9 +104,6 @@ class BotController {
 
       // ✅ 추가 디버깅 정보
       Logger.info("추가 디버깅 정보:");
-      Logger.info(
-        `  - doomock_bot.js에서 전달된 config: ${JSON.stringify(this.config)}`
-      );
     }
   }
 
