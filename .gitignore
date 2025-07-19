@@ -37,3 +37,10 @@ Thumbs.db
 # Build output
 dist/
 build/
+
+# 환경 변수 파일들 (민감한 정보)
+.env
+.env.local
+.env.development
+.env.test
+.env.production
