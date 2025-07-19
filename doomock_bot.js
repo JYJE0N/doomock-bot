@@ -1,23 +1,99 @@
-// doomock_bot_enhanced.js - 강화된 409 해결이 적용된 봇 초기화
+// ultimate_409_fix.js - 웹훅 완전 제거 및 409 근본 해결
 
 const TelegramBot = require("node-telegram-bot-api");
 const BotController = require("./src/controllers/BotController");
 const AppConfig = require("./src/config/AppConfig");
 const Logger = require("./src/utils/Logger");
-const ConflictResolver = require("./src/utils/ConflictResolver");
 
 // ⭐ 전역 변수 (싱글톤 패턴)
 let bot = null;
 let controller = null;
-let conflictResolver = null;
 let isShuttingDown = false;
 let isInitialized = false;
+let forceWebhookCleared = false;
 
 // ⭐ Railway 환경 감지
 const isRailway = !!process.env.RAILWAY_ENVIRONMENT_NAME;
 const environment = process.env.NODE_ENV || "development";
 
-// ⭐ 강화된 봇 초기화 (409 해결사 포함)
+// 🚨 STEP 1: 웹훅 완전 제거 함수
+async function forceRemoveWebhook() {
+  if (forceWebhookCleared) {
+    Logger.info("웹훅이 이미 제거됨, 건너뛰기");
+    return true;
+  }
+
+  try {
+    Logger.info("🧹 웹훅 강제 완전 제거 시작...");
+
+    // 임시 봇 인스턴스로 웹훅 제거
+    const tempBot = new TelegramBot(AppConfig.BOT_TOKEN, { polling: false });
+
+    // 1. 현재 웹훅 정보 확인
+    try {
+      const webhookInfo = await tempBot.getWebHookInfo();
+      Logger.info("현재 웹훅 정보:", webhookInfo);
+
+      if (webhookInfo.url) {
+        Logger.warn(`활성 웹훅 발견: ${webhookInfo.url}`);
+      }
+    } catch (error) {
+      Logger.debug("웹훅 정보 조회 실패 (무시):", error.message);
+    }
+
+    // 2. 웹훅 삭제 (여러 번 시도)
+    const maxRetries = 5;
+    let success = false;
+
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        Logger.info(`웹훅 삭제 시도 ${i + 1}/${maxRetries}...`);
+
+        // dropPendingUpdates: true로 대기 중인 업데이트도 모두 삭제
+        await tempBot.deleteWebHook({ drop_pending_updates: true });
+
+        // 삭제 확인
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        const checkInfo = await tempBot.getWebHookInfo();
+        if (!checkInfo.url) {
+          success = true;
+          Logger.success("✅ 웹훅 완전 삭제 성공!");
+          break;
+        } else {
+          Logger.warn(`여전히 웹훅 존재: ${checkInfo.url}`);
+        }
+      } catch (error) {
+        Logger.warn(`웹훅 삭제 시도 ${i + 1} 실패:`, error.message);
+
+        if (i < maxRetries - 1) {
+          const waitTime = (i + 1) * 3000; // 3초, 6초, 9초...
+          Logger.info(`${waitTime / 1000}초 후 재시도...`);
+          await new Promise((resolve) => setTimeout(resolve, waitTime));
+        }
+      }
+    }
+
+    if (success) {
+      forceWebhookCleared = true;
+
+      // Railway 환경에서는 더 긴 대기
+      const finalWait = isRailway ? 15000 : 8000;
+      Logger.info(`✅ 웹훅 제거 완료! ${finalWait / 1000}초 추가 대기...`);
+      await new Promise((resolve) => setTimeout(resolve, finalWait));
+
+      return true;
+    } else {
+      Logger.error("❌ 웹훅 제거 최종 실패");
+      return false;
+    }
+  } catch (error) {
+    Logger.error("❌ 웹훅 제거 과정 오류:", error);
+    return false;
+  }
+}
+
+// 🚨 STEP 2: 안전한 봇 초기화
 async function initializeBot() {
   if (isInitialized) {
     Logger.warn("⚠️ 봇이 이미 초기화됨, 무시");
@@ -25,308 +101,220 @@ async function initializeBot() {
   }
 
   try {
-    Logger.info("🚀 두목봇 v3.0.1 초기화 시작...");
+    Logger.info("🚀 두목봇 궁극적 초기화 시작...");
     logSystemInfo();
 
-    // ⭐ 1단계: 기존 인스턴스 완전 정리
-    await performCleanupWithRetry();
+    // STEP 1: 웹훅 완전 제거
+    const webhookRemoved = await forceRemoveWebhook();
+    if (!webhookRemoved) {
+      throw new Error("웹훅 제거 실패로 초기화 중단");
+    }
 
-    // ⭐ 2단계: 봇 인스턴스 생성 (Railway 최적화)
-    bot = createOptimizedBot();
+    // STEP 2: 기존 인스턴스 완전 정리
+    if (bot) {
+      Logger.warn("🔄 기존 봇 인스턴스 정리 중...");
+      await cleanupBot();
+    }
 
-    // ⭐ 3단계: ConflictResolver 초기화
-    conflictResolver = new ConflictResolver(bot, {
-      maxRetries: isRailway ? 5 : 3,
-      baseDelay: isRailway ? 3000 : 2000,
-      maxDelay: isRailway ? 45000 : 30000,
-      healthCheckInterval: isRailway ? 30000 : 60000,
-      forceWebhookDelete: true,
-      exponentialBackoff: true,
+    // STEP 3: 새 봇 인스턴스 생성 (폴링 전용)
+    bot = new TelegramBot(AppConfig.BOT_TOKEN, {
+      polling: {
+        interval: isRailway ? 5000 : 2000, // 더 긴 간격
+        autoStart: false, // 수동 시작
+        params: {
+          timeout: isRailway ? 50 : 30, // 더 긴 타임아웃
+          limit: isRailway ? 20 : 30, // 더 적은 메시지 처리
+          allowed_updates: ["message", "callback_query"],
+          offset: -1, // 이전 업데이트 무시
+        },
+      },
+      filepath: false,
+      onlyFirstMatch: true,
+      request: {
+        agentOptions: {
+          keepAlive: false, // 연결 재사용 비활성화
+        },
+        timeout: isRailway ? 50000 : 30000,
+      },
     });
 
-    // ⭐ 4단계: 고급 에러 핸들러 등록
-    setupAdvancedErrorHandlers();
+    // STEP 4: 강화된 에러 핸들러
+    setupUltimateErrorHandlers();
 
-    // ⭐ 5단계: 컨트롤러 초기화
+    // STEP 5: 컨트롤러 초기화
     controller = new BotController(bot, AppConfig);
     await controller.initialize();
 
-    // ⭐ 6단계: 안전한 폴링 시작
-    await startPollingWithAdvancedResolution();
-
-    // ⭐ 7단계: Railway 전용 모니터링 설정
-    if (isRailway) {
-      setupRailwayOptimizations();
-    }
+    // STEP 6: 단계적 폴링 시작
+    await startPollingWithUltimateCheck();
 
     isInitialized = true;
-    Logger.success("✅ 두목봇 초기화 완료!");
-
-    // 초기화 성공 로그
-    logInitializationSuccess();
+    Logger.success("✅ 두목봇 궁극적 초기화 완료!");
   } catch (error) {
     Logger.error("❌ 봇 초기화 실패:", error);
 
-    // Railway 환경에서는 프로세스 재시작으로 자동 복구
+    // Railway 환경에서는 완전 재시작
     if (isRailway && !isShuttingDown) {
-      Logger.warn("🔄 Railway 자동 재시작 트리거...");
-      setTimeout(() => process.exit(1), 5000); // 5초 후 재시작
+      Logger.warn("🔄 Railway 완전 재시작...");
+      process.exit(1); // Railway가 새 인스턴스로 재시작
     }
 
     throw error;
   }
 }
 
-// ⭐ Railway 최적화 봇 생성
-function createOptimizedBot() {
-  const botOptions = {
-    polling: {
-      interval: isRailway ? 4000 : 1000, // Railway는 더 긴 간격
-      autoStart: false, // 수동 시작으로 제어
-      params: {
-        timeout: isRailway ? 45 : 30, // Railway는 더 긴 타임아웃
-        limit: isRailway ? 30 : 50, // Railway는 더 적은 메시지 처리
-        allowed_updates: ["message", "callback_query"],
-      },
-    },
-    filepath: false, // 파일 업로드 비활성화 (메모리 절약)
-    onlyFirstMatch: true,
-    request: {
-      agentOptions: {
-        keepAlive: true,
-        keepAliveMsecs: 10000,
-      },
-      timeout: isRailway ? 45000 : 30000,
-    },
-  };
+// 🚨 STEP 3: 궁극적 에러 핸들러
+function setupUltimateErrorHandlers() {
+  let conflictCount = 0;
+  let lastConflictTime = 0;
 
-  Logger.info("🔧 봇 인스턴스 생성 중...", {
-    polling_interval: botOptions.polling.interval,
-    timeout: botOptions.polling.params.timeout,
-    environment: isRailway ? "Railway" : "Local",
-  });
-
-  return new TelegramBot(AppConfig.BOT_TOKEN, botOptions);
-}
-
-// ⭐ 기존 인스턴스 정리 (재시도 포함)
-async function performCleanupWithRetry(maxRetries = 3) {
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      Logger.info(`🧹 정리 시도 ${attempt}/${maxRetries}...`);
-
-      if (bot) {
-        await cleanupBot();
-      }
-
-      // Railway 환경에서는 더 긴 대기
-      const waitTime = isRailway ? 8000 : 3000;
-      Logger.info(`⏳ ${waitTime / 1000}초 대기...`);
-      await sleep(waitTime);
-
-      Logger.info("✅ 정리 완료");
-      return;
-    } catch (error) {
-      Logger.warn(`⚠️ 정리 시도 ${attempt} 실패:`, error.message);
-
-      if (attempt === maxRetries) {
-        Logger.error("❌ 정리 최종 실패, 계속 진행...");
-      } else {
-        await sleep(2000 * attempt); // 백오프 대기
-      }
-    }
-  }
-}
-
-// ⭐ 고급 에러 핸들러 설정
-function setupAdvancedErrorHandlers() {
-  // 409 충돌 전용 핸들러
+  // 409 에러 특화 핸들러
   bot.on("polling_error", async (error) => {
     const errorCode = error.code;
     const statusCode = error.response?.body?.error_code;
+    const now = Date.now();
 
     if (errorCode === "ETELEGRAM" && statusCode === 409) {
-      Logger.error("🚨 409 충돌 감지! ConflictResolver 활성화...");
+      conflictCount++;
+      lastConflictTime = now;
 
-      try {
-        const result = await conflictResolver.resolveConflict(error, {
-          source: "polling_error",
-          timestamp: Date.now(),
-        });
+      Logger.error(`🚨 409 충돌 #${conflictCount} 감지!`);
 
-        if (!result.success) {
-          Logger.error("❌ ConflictResolver 실패:", result.reason);
-
-          // 최후의 수단: Railway 환경에서는 프로세스 재시작
-          if (isRailway && !isShuttingDown) {
-            Logger.warn("🔄 프로세스 재시작으로 복구 시도...");
-            setTimeout(() => process.exit(1), 10000);
-          }
-        }
-      } catch (resolverError) {
-        Logger.error("❌ ConflictResolver 예외:", resolverError);
+      // 연속 충돌 시 강력한 조치
+      if (conflictCount >= 3) {
+        Logger.error("🚨 연속 409 충돌! 강력한 복구 시작...");
+        await handleCriticalConflict();
+      } else {
+        await handleSingleConflict();
       }
     } else if (errorCode === "EFATAL") {
       Logger.error("💀 치명적 오류:", error.message);
       await gracefulShutdown(1);
-    } else if (errorCode === "ETIMEDOUT" || errorCode === "ECONNRESET") {
-      Logger.warn("🌐 네트워크 오류:", error.message);
-      // 네트워크 오류는 자동으로 재연결되므로 로그만 남김
     } else {
       Logger.error("⚠️ 폴링 오류:", {
         code: errorCode,
         message: error.message?.substring(0, 200),
-        response: error.response?.body,
       });
     }
   });
 
   // 일반 봇 오류
   bot.on("error", (error) => {
-    Logger.error("🔥 봇 일반 오류:", {
-      message: error.message,
-      code: error.code,
-      stack: error.stack?.substring(0, 500),
-    });
+    Logger.error("🔥 봇 일반 오류:", error.message);
   });
 
-  // 예상치 못한 예외 처리
-  process.on("uncaughtException", (error) => {
-    Logger.error("💥 처리되지 않은 예외:", error);
-
-    if (!isShuttingDown) {
-      Logger.error("🔄 5초 후 재시작...");
-      setTimeout(() => process.exit(1), 5000);
+  // 충돌 카운트 리셋 (5분마다)
+  setInterval(() => {
+    if (now - lastConflictTime > 300000) {
+      // 5분
+      conflictCount = 0;
     }
-  });
-
-  process.on("unhandledRejection", (reason, promise) => {
-    Logger.error("💥 처리되지 않은 Promise 거부:", reason);
-  });
-
-  Logger.info("🛡️ 고급 에러 핸들러 등록 완료");
+  }, 60000);
 }
 
-// ⭐ 고급 해결사를 사용한 폴링 시작
-async function startPollingWithAdvancedResolution() {
-  const maxAttempts = isRailway ? 5 : 3;
+// 🚨 STEP 4: 단일 충돌 처리
+async function handleSingleConflict() {
+  try {
+    Logger.info("🔧 단일 409 충돌 해결 시작...");
 
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      Logger.info(`🚀 폴링 시작 시도 ${attempt}/${maxAttempts}...`);
+    // 1. 폴링 중지
+    if (bot && bot.isPolling()) {
+      await bot.stopPolling();
+      Logger.info("⏹️ 폴링 중지 완료");
+    }
 
-      // ConflictResolver를 통한 안전한 시작
-      const preStartCheck = await conflictResolver.resolveConflict(
-        new Error("Pre-start conflict resolution"),
-        { preStart: true, attempt }
-      );
+    // 2. 대기 (Railway는 더 길게)
+    const waitTime = isRailway ? 20000 : 10000;
+    Logger.info(`⏳ ${waitTime / 1000}초 대기...`);
+    await new Promise((resolve) => setTimeout(resolve, waitTime));
 
-      if (!preStartCheck.success) {
-        throw new Error(`사전 충돌 해결 실패: ${preStartCheck.reason}`);
-      }
+    // 3. 웹훅 재삭제
+    await forceRemoveWebhook();
 
-      // 폴링 시작
-      if (!bot.isPolling()) {
-        await bot.startPolling();
+    // 4. 폴링 재시작
+    if (!bot.isPolling()) {
+      await bot.startPolling();
+      Logger.success("✅ 폴링 재시작 성공");
+    }
+  } catch (error) {
+    Logger.error("❌ 단일 충돌 해결 실패:", error);
+    throw error;
+  }
+}
 
-        // 시작 확인 (3초 후)
-        await sleep(3000);
+// 🚨 STEP 5: 치명적 충돌 처리
+async function handleCriticalConflict() {
+  try {
+    Logger.error("🚨 치명적 409 충돌 해결 시작...");
 
-        if (bot.isPolling()) {
-          Logger.success("📡 폴링 시작 성공!");
-          return true;
-        } else {
-          throw new Error("폴링 시작 확인 실패");
-        }
-      } else {
-        Logger.info("📡 폴링이 이미 실행 중");
-        return true;
-      }
-    } catch (error) {
-      Logger.error(`❌ 폴링 시작 시도 ${attempt} 실패:`, error.message);
+    // 1. 완전한 봇 정리
+    await cleanupBot();
 
-      // 409 에러인 경우 ConflictResolver 사용
-      if (error.response?.body?.error_code === 409) {
-        Logger.warn("🔧 409 에러로 인한 실패, ConflictResolver 실행...");
+    // 2. 웹훅 강제 제거
+    forceWebhookCleared = false; // 재설정
+    await forceRemoveWebhook();
 
-        try {
-          await conflictResolver.resolveConflict(error, {
-            source: "polling_start",
-            attempt,
-          });
-        } catch (resolverError) {
-          Logger.error("ConflictResolver 실행 실패:", resolverError);
-        }
-      }
+    // 3. Railway 환경에서는 프로세스 재시작
+    if (isRailway) {
+      Logger.error("🔄 Railway 프로세스 재시작 필요...");
+      setTimeout(() => {
+        process.exit(1); // Railway 재시작
+      }, 5000);
+      return;
+    }
 
-      // 마지막 시도가 아니면 백오프 대기
-      if (attempt < maxAttempts) {
-        const backoffTime = Math.min(5000 * attempt, 30000);
-        Logger.info(`⏳ ${backoffTime / 1000}초 후 재시도...`);
-        await sleep(backoffTime);
-      }
+    // 4. 로컬에서는 봇 재초기화
+    isInitialized = false;
+    await new Promise((resolve) => setTimeout(resolve, 30000)); // 30초 대기
+    await initializeBot();
+  } catch (error) {
+    Logger.error("❌ 치명적 충돌 해결 실패:", error);
+
+    if (isRailway) {
+      process.exit(1); // 최후의 수단
     }
   }
-
-  throw new Error(`폴링 시작 최종 실패 (${maxAttempts}회 시도)`);
 }
 
-// ⭐ Railway 전용 최적화 설정
-function setupRailwayOptimizations() {
-  // 메모리 모니터링 및 정리
-  setInterval(() => {
-    const usage = process.memoryUsage();
-    const totalMB = Math.round(usage.rss / 1024 / 1024);
+// 🚨 STEP 6: 단계적 폴링 시작
+async function startPollingWithUltimateCheck() {
+  try {
+    Logger.info("🚀 단계적 폴링 시작...");
 
-    if (totalMB > 400) {
-      // Railway 512MB 제한 고려
-      Logger.warn(`🐏 메모리 사용량 높음: ${totalMB}MB`);
+    // 1. 봇 상태 확인
+    const botInfo = await bot.getMe();
+    Logger.info(`🤖 봇 정보 확인: ${botInfo.username} (ID: ${botInfo.id})`);
 
-      // 가비지 컬렉션 강제 실행
-      if (global.gc) {
-        global.gc();
-        Logger.info("🧹 가비지 컬렉션 실행");
+    // 2. 웹훅 최종 확인
+    const webhookInfo = await bot.getWebHookInfo();
+    if (webhookInfo.url) {
+      Logger.error(`🚨 웹훅이 여전히 존재: ${webhookInfo.url}`);
+      throw new Error("웹훅 제거 불완전");
+    }
+    Logger.success("✅ 웹훅 없음 확인");
+
+    // 3. 폴링 시작
+    if (!bot.isPolling()) {
+      await bot.startPolling();
+
+      // 4. 폴링 상태 확인 (5초 후)
+      await new Promise((resolve) => setTimeout(resolve, 5000));
+
+      if (bot.isPolling()) {
+        Logger.success("📡 폴링 시작 및 안정성 확인 완료!");
+      } else {
+        throw new Error("폴링 시작 후 상태 불안정");
       }
+    } else {
+      Logger.info("📡 폴링이 이미 실행 중");
     }
-  }, 60000);
-
-  // ConflictResolver 상태 모니터링
-  setInterval(() => {
-    const status = conflictResolver.getStatus();
-
-    if (!status.isHealthy) {
-      Logger.warn("⚠️ ConflictResolver 상태 불량:", status);
-    }
-
-    // 통계 로깅 (5분마다)
-    if (Date.now() % 300000 < 60000) {
-      // 대략 5분마다
-      const stats = conflictResolver.getStats();
-      Logger.info("📊 ConflictResolver 통계:", {
-        conflicts: stats.conflictCount,
-        resolutions: stats.resolutionAttempts,
-        uptime: `${Math.round(stats.uptimeMs / 60000)}분`,
-      });
-    }
-  }, 60000);
-
-  Logger.info("🚀 Railway 최적화 설정 완료");
+  } catch (error) {
+    Logger.error("❌ 단계적 폴링 시작 실패:", error);
+    throw error;
+  }
 }
 
-// ⭐ 초기화 성공 로그
-function logInitializationSuccess() {
-  const status = conflictResolver.getStatus();
-
-  Logger.info("🎉 초기화 완료 요약:");
-  Logger.info(`  봇 상태: ${bot.isPolling() ? "폴링 중" : "대기 중"}`);
-  Logger.info(`  충돌 해결사: ${status.isHealthy ? "정상" : "비정상"}`);
-  Logger.info(`  환경: ${isRailway ? "Railway" : "로컬"}`);
-  Logger.info(
-    `  메모리: ${Math.round(process.memoryUsage().rss / 1024 / 1024)}MB`
-  );
-}
-
-// ⭐ 기존 함수들 (변경 없음)
+// 기존 함수들 (변경 없음)
 function logSystemInfo() {
   const nodeVersion = process.version;
   const platform = process.platform;
@@ -348,34 +336,16 @@ async function gracefulShutdown(exitCode = 0) {
   if (isShuttingDown) return;
   isShuttingDown = true;
 
-  const shutdownTimeout = isRailway ? 25000 : 10000;
   Logger.info("🛑 봇 종료 프로세스 시작...");
 
-  const shutdownTimer = setTimeout(() => {
-    Logger.error("⏰ 종료 타임아웃! 강제 종료");
-    process.exit(1);
-  }, shutdownTimeout);
-
   try {
-    // ConflictResolver 정리
-    if (conflictResolver) {
-      conflictResolver.cleanup();
-    }
-
-    // 컨트롤러 정리
     if (controller && typeof controller.cleanup === "function") {
       await controller.cleanup();
-      Logger.info("🧹 컨트롤러 정리 완료");
     }
-
-    // 봇 정리
     await cleanupBot();
-
-    clearTimeout(shutdownTimer);
     Logger.success("✅ 우아한 종료 완료");
     process.exit(exitCode);
   } catch (error) {
-    clearTimeout(shutdownTimer);
     Logger.error("❌ 종료 중 오류:", error);
     process.exit(1);
   }
@@ -388,7 +358,6 @@ async function cleanupBot() {
         await bot.stopPolling();
         Logger.info("⏹️ 폴링 중지 완료");
       }
-
       bot.removeAllListeners();
       Logger.info("🧹 이벤트 리스너 정리 완료");
     } catch (error) {
@@ -400,34 +369,29 @@ async function cleanupBot() {
   }
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-// ⭐ 신호 핸들러 설정
+// 신호 핸들러
 function setupSignalHandlers() {
-  process.on("SIGINT", () => {
-    Logger.info("📥 SIGINT 신호 수신");
-    gracefulShutdown(0);
+  process.on("SIGINT", () => gracefulShutdown(0));
+  process.on("SIGTERM", () => gracefulShutdown(0));
+
+  process.on("uncaughtException", (error) => {
+    Logger.error("💥 처리되지 않은 예외:", error);
+    if (!isShuttingDown) gracefulShutdown(1);
   });
 
-  process.on("SIGTERM", () => {
-    Logger.info("📥 SIGTERM 신호 수신");
-    gracefulShutdown(0);
+  process.on("unhandledRejection", (reason) => {
+    Logger.error("💥 처리되지 않은 Promise 거부:", reason);
   });
 }
 
-// ⭐ 메인 함수
+// 메인 함수
 async function main() {
   try {
     Logger.info("=".repeat(50));
-    Logger.info("🤖 두목봇 v3.0.1 시작 (409 해결사 포함)");
+    Logger.info("🚨 두목봇 궁극적 409 해결 버전 시작");
     Logger.info("=".repeat(50));
 
-    // 신호 핸들러 설정
     setupSignalHandlers();
-
-    // 봇 초기화 및 시작
     await initializeBot();
 
     Logger.success("🎉 두목봇이 성공적으로 시작되었습니다!");
@@ -436,32 +400,19 @@ async function main() {
     Logger.error("❌ 봇 시작 실패:", error);
 
     if (isRailway) {
-      Logger.warn("🔄 5초 후 Railway 자동 재시작...");
-      setTimeout(() => process.exit(1), 5000);
+      Logger.warn("🔄 10초 후 Railway 재시작...");
+      setTimeout(() => process.exit(1), 10000);
     } else {
       process.exit(1);
     }
   }
 }
 
-// Railway 환경에서는 즉시 시작, 로컬에서는 잠시 대기
-if (isRailway) {
-  main();
-} else {
-  setTimeout(main, 2000); // 로컬에서는 2초 대기
-}
-
-// 프로세스 예외 처리
-process.on("uncaughtException", (error) => {
-  Logger.error("💥 처리되지 않은 예외:", error);
-
-  if (!isShuttingDown) {
-    gracefulShutdown(1);
-  }
+// 즉시 시작
+main().catch((error) => {
+  console.error("❌ 메인 함수 실행 실패:", error);
+  process.exit(1);
 });
 
-process.on("unhandledRejection", (reason, promise) => {
-  Logger.error("💥 처리되지 않은 Promise 거부:", reason);
-});
-
-module.exports = { bot, controller, conflictResolver };
+module.exports = { bot: () => bot, controller: () => controller };
+// ⭐ 표준 액션 처리
