@@ -1,516 +1,20 @@
-// src/modules/TimerModule.js - 표준 패턴으로 완전 새로 구현
+// src/modules/TimerModule.js - 한국시간 + 시각적 진행률 표시
 
 const BaseModule = require("./BaseModule");
+const { TimerService } = require("../services/TimerService");
+const { TimeHelper } = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
-const Logger = require("../utils/Logger");
+const { ValidationHelper } = require("../utils/ValidationHelper");
 
 class TimerModule extends BaseModule {
   constructor() {
     super("TimerModule", {
-      commands: ["timer", "pomodoro"],
+      commands: ["timer"],
       callbacks: ["timer"],
-      features: [
-        "start",
-        "stop",
-        "pause",
-        "resume",
-        "pomodoro_start",
-        "custom_start",
-        "status",
-      ],
     });
-
-    // 타이머 상태 관리 (메모리 저장)
-    this.userTimers = new Map();
-
-    Logger.info("⏰ TimerModule 초기화 완료");
+    this.timerService = new TimerService();
+    this.userStates = new Map();
   }
-
-  // ✅ 표준 액션 등록 패턴 적용
-  registerActions() {
-    // 타이머 기능별 액션 등록
-    this.actionMap.set("start", this.showStartOptions.bind(this));
-    this.actionMap.set("stop", this.stopTimer.bind(this));
-    this.actionMap.set("pause", this.pauseTimer.bind(this));
-    this.actionMap.set("resume", this.resumeTimer.bind(this));
-    this.actionMap.set("pomodoro_start", this.startPomodoroTimer.bind(this));
-    this.actionMap.set("custom_start", this.showCustomTimerOptions.bind(this));
-    this.actionMap.set("status", this.showTimerStatus.bind(this));
-  }
-
-  // ✅ 메뉴 데이터 제공 (BaseModule 오버라이드)
-  getMenuData(userName) {
-    return {
-      text: `⏰ **${userName}님의 타이머**\n\n집중력을 높이고 시간을 효과적으로 관리하세요!`,
-      keyboard: {
-        inline_keyboard: [
-          [
-            { text: "🍅 포모도로 시작", callback_data: "timer_pomodoro_start" },
-            { text: "⏱️ 커스텀 타이머", callback_data: "timer_custom_start" },
-          ],
-          [
-            { text: "▶️ 타이머 시작", callback_data: "timer_start" },
-            { text: "⏹️ 타이머 정지", callback_data: "timer_stop" },
-          ],
-          [
-            { text: "⏸️ 일시정지", callback_data: "timer_pause" },
-            { text: "▶️ 재개", callback_data: "timer_resume" },
-          ],
-          [
-            { text: "📊 타이머 상태", callback_data: "timer_status" },
-            { text: "❓ 도움말", callback_data: "timer_help" },
-          ],
-          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-        ],
-      },
-    };
-  }
-
-  // ========== 타이머 기능 메서드들 ==========
-
-  async showStartOptions(bot, chatId, messageId, userId, userName) {
-    try {
-      const text = `⏰ **타이머 시작 옵션**\n\n어떤 타이머를 시작하시겠어요?`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text: "🍅 포모도로 (25분)",
-              callback_data: "timer_pomodoro_start",
-            },
-          ],
-          [
-            { text: "⏱️ 15분", callback_data: "timer_start_15" },
-            { text: "⏱️ 30분", callback_data: "timer_start_30" },
-          ],
-          [
-            { text: "⏱️ 45분", callback_data: "timer_start_45" },
-            { text: "⏱️ 60분", callback_data: "timer_start_60" },
-          ],
-          [{ text: "🔧 커스텀 설정", callback_data: "timer_custom_start" }],
-          [
-            { text: "🔙 타이머 메뉴", callback_data: "timer_menu" },
-            { text: "🏠 메인 메뉴", callback_data: "main_menu" },
-          ],
-        ],
-      };
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`TimerModule showStartOptions 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  async startPomodoroTimer(bot, chatId, messageId, userId, userName) {
-    try {
-      // 25분 포모도로 타이머 시작
-      const minutes = 25;
-      const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + minutes * 60 * 1000);
-
-      const timerData = {
-        type: "pomodoro",
-        duration: minutes,
-        startTime: startTime,
-        endTime: endTime,
-        status: "running",
-        paused: false,
-        pausedTime: 0,
-      };
-
-      this.userTimers.set(userId, timerData);
-
-      const text =
-        `🍅 **포모도로 타이머 시작!**\n\n` +
-        `⏰ 시간: ${minutes}분\n` +
-        `🎯 집중 모드 활성화\n` +
-        `⏰ 종료 예정: ${endTime.toLocaleTimeString("ko-KR")}\n\n` +
-        `💪 집중해서 작업해보세요!`;
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getRunningTimerKeyboard(),
-      });
-
-      // 타이머 완료 알림 설정 (실제로는 백그라운드 서비스나 스케줄러 필요)
-      this.scheduleTimerAlert(bot, chatId, userId, minutes);
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`TimerModule startPomodoroTimer 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  async showCustomTimerOptions(bot, chatId, messageId, userId, userName) {
-    try {
-      const text = `🔧 **커스텀 타이머**\n\n원하는 시간을 선택하세요:`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "⏱️ 5분", callback_data: "timer_start_5" },
-            { text: "⏱️ 10분", callback_data: "timer_start_10" },
-            { text: "⏱️ 15분", callback_data: "timer_start_15" },
-          ],
-          [
-            { text: "⏱️ 20분", callback_data: "timer_start_20" },
-            { text: "⏱️ 25분", callback_data: "timer_start_25" },
-            { text: "⏱️ 30분", callback_data: "timer_start_30" },
-          ],
-          [
-            { text: "⏱️ 45분", callback_data: "timer_start_45" },
-            { text: "⏱️ 60분", callback_data: "timer_start_60" },
-            { text: "⏱️ 90분", callback_data: "timer_start_90" },
-          ],
-          [
-            { text: "🔙 타이머 메뉴", callback_data: "timer_menu" },
-            { text: "🏠 메인 메뉴", callback_data: "main_menu" },
-          ],
-        ],
-      };
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`TimerModule showCustomTimerOptions 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  async stopTimer(bot, chatId, messageId, userId, userName) {
-    try {
-      const timerData = this.userTimers.get(userId);
-
-      if (!timerData) {
-        const text = `⏹️ **타이머 정지**\n\n현재 실행 중인 타이머가 없습니다.`;
-
-        await this.editMessage(bot, chatId, messageId, text, {
-          parse_mode: "Markdown",
-          reply_markup: this.getTimerMenuKeyboard(),
-        });
-        return;
-      }
-
-      // 타이머 정지
-      this.userTimers.delete(userId);
-
-      const elapsedMinutes = Math.floor(
-        (new Date() - timerData.startTime) / (1000 * 60)
-      );
-
-      const text =
-        `⏹️ **타이머 정지됨**\n\n` +
-        `📊 경과 시간: ${elapsedMinutes}분\n` +
-        `🎯 수고하셨습니다!`;
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getTimerMenuKeyboard(),
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`TimerModule stopTimer 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  async pauseTimer(bot, chatId, messageId, userId, userName) {
-    try {
-      const timerData = this.userTimers.get(userId);
-
-      if (!timerData || timerData.paused) {
-        const text = `⏸️ **일시정지**\n\n일시정지할 수 있는 타이머가 없습니다.`;
-
-        await this.editMessage(bot, chatId, messageId, text, {
-          parse_mode: "Markdown",
-          reply_markup: this.getTimerMenuKeyboard(),
-        });
-        return;
-      }
-
-      // 타이머 일시정지
-      timerData.paused = true;
-      timerData.pauseTime = new Date();
-      timerData.status = "paused";
-
-      this.userTimers.set(userId, timerData);
-
-      const text = `⏸️ **타이머 일시정지**\n\n타이머가 일시정지되었습니다.\n▶️ 재개 버튼을 눌러 계속하세요.`;
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getPausedTimerKeyboard(),
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`TimerModule pauseTimer 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  async resumeTimer(bot, chatId, messageId, userId, userName) {
-    try {
-      const timerData = this.userTimers.get(userId);
-
-      if (!timerData || !timerData.paused) {
-        const text = `▶️ **재개**\n\n재개할 수 있는 타이머가 없습니다.`;
-
-        await this.editMessage(bot, chatId, messageId, text, {
-          parse_mode: "Markdown",
-          reply_markup: this.getTimerMenuKeyboard(),
-        });
-        return;
-      }
-
-      // 타이머 재개
-      const pausedDuration = new Date() - timerData.pauseTime;
-      timerData.endTime = new Date(
-        timerData.endTime.getTime() + pausedDuration
-      );
-      timerData.paused = false;
-      timerData.status = "running";
-      delete timerData.pauseTime;
-
-      this.userTimers.set(userId, timerData);
-
-      const remainingMinutes = Math.ceil(
-        (timerData.endTime - new Date()) / (1000 * 60)
-      );
-
-      const text =
-        `▶️ **타이머 재개**\n\n` +
-        `⏰ 남은 시간: 약 ${remainingMinutes}분\n` +
-        `💪 다시 집중해보세요!`;
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getRunningTimerKeyboard(),
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`TimerModule resumeTimer 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  async showTimerStatus(bot, chatId, messageId, userId, userName) {
-    try {
-      const timerData = this.userTimers.get(userId);
-
-      if (!timerData) {
-        const text = `📊 **타이머 상태**\n\n현재 실행 중인 타이머가 없습니다.\n\n새로운 타이머를 시작해보세요!`;
-
-        await this.editMessage(bot, chatId, messageId, text, {
-          parse_mode: "Markdown",
-          reply_markup: this.getTimerMenuKeyboard(),
-        });
-        return;
-      }
-
-      const now = new Date();
-      const elapsedMinutes = Math.floor(
-        (now - timerData.startTime) / (1000 * 60)
-      );
-      const remainingMinutes = Math.ceil(
-        (timerData.endTime - now) / (1000 * 60)
-      );
-
-      const statusIcon = {
-        running: "▶️",
-        paused: "⏸️",
-        completed: "✅",
-      };
-
-      const text =
-        `📊 **타이머 상태**\n\n` +
-        `${statusIcon[timerData.status]} 상태: ${
-          timerData.status === "running"
-            ? "실행 중"
-            : timerData.status === "paused"
-            ? "일시정지"
-            : "완료"
-        }\n` +
-        `🎯 타입: ${timerData.type === "pomodoro" ? "포모도로" : "커스텀"}\n` +
-        `⏰ 설정 시간: ${timerData.duration}분\n` +
-        `📈 경과 시간: ${elapsedMinutes}분\n` +
-        `⏳ 남은 시간: ${
-          remainingMinutes > 0 ? remainingMinutes + "분" : "완료!"
-        }\n` +
-        `🕐 시작 시간: ${timerData.startTime.toLocaleTimeString("ko-KR")}`;
-
-      const keyboard =
-        timerData.status === "running"
-          ? this.getRunningTimerKeyboard()
-          : timerData.status === "paused"
-          ? this.getPausedTimerKeyboard()
-          : this.getTimerMenuKeyboard();
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`TimerModule showTimerStatus 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  // ========== 동적 콜백 처리 (시간별 타이머 시작) ==========
-
-  async handleCallback(bot, callbackQuery, subAction, params) {
-    // 동적 타이머 시작 처리 (timer_start_5, timer_start_10 등)
-    const startMatch = subAction.match(/^start_(\d+)$/);
-
-    if (startMatch) {
-      const minutes = parseInt(startMatch[1]);
-      return await this.startCustomTimer(bot, callbackQuery, minutes);
-    }
-
-    // 표준 액션은 부모 클래스에서 처리
-    return await super.handleCallback(bot, callbackQuery, subAction, params);
-  }
-
-  async startCustomTimer(bot, callbackQuery, minutes) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
-
-    try {
-      const startTime = new Date();
-      const endTime = new Date(startTime.getTime() + minutes * 60 * 1000);
-
-      const timerData = {
-        type: "custom",
-        duration: minutes,
-        startTime: startTime,
-        endTime: endTime,
-        status: "running",
-        paused: false,
-      };
-
-      this.userTimers.set(userId, timerData);
-
-      const text =
-        `⏰ **${minutes}분 타이머 시작!**\n\n` +
-        `🎯 집중 모드 활성화\n` +
-        `⏰ 종료 예정: ${endTime.toLocaleTimeString("ko-KR")}\n\n` +
-        `💪 열심히 해보세요!`;
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getRunningTimerKeyboard(),
-      });
-
-      // 타이머 완료 알림 설정
-      this.scheduleTimerAlert(bot, chatId, userId, minutes);
-
-      this.updateStats("callback");
-      return true;
-    } catch (error) {
-      Logger.error(`TimerModule startCustomTimer(${minutes}) 오류:`, error);
-      await this.handleError(bot, chatId, error);
-      return true;
-    }
-  }
-
-  // ========== 타이머 알림 시스템 ==========
-
-  scheduleTimerAlert(bot, chatId, userId, minutes) {
-    // 실제로는 cron job이나 스케줄러를 사용해야 하지만, 여기서는 setTimeout 사용
-    const alertTime = minutes * 60 * 1000; // 밀리초로 변환
-
-    setTimeout(async () => {
-      try {
-        const timerData = this.userTimers.get(userId);
-
-        // 타이머가 여전히 실행 중인지 확인
-        if (timerData && timerData.status === "running") {
-          await bot.sendMessage(
-            chatId,
-            `🔔 **타이머 완료!**\n\n` +
-              `⏰ ${minutes}분 타이머가 완료되었습니다!\n` +
-              `🎉 수고하셨습니다!`,
-            { parse_mode: "Markdown" }
-          );
-
-          // 타이머 데이터 정리
-          this.userTimers.delete(userId);
-        }
-      } catch (error) {
-        Logger.error(`타이머 알림 전송 오류:`, error);
-      }
-    }, alertTime);
-  }
-
-  // ========== 키보드 생성 ==========
-
-  getTimerMenuKeyboard() {
-    return {
-      inline_keyboard: [
-        [
-          { text: "🍅 포모도로", callback_data: "timer_pomodoro_start" },
-          { text: "⏱️ 커스텀", callback_data: "timer_custom_start" },
-        ],
-        [
-          { text: "⏰ 타이머 메뉴", callback_data: "timer_menu" },
-          { text: "🔙 메인 메뉴", callback_data: "main_menu" },
-        ],
-      ],
-    };
-  }
-
-  getRunningTimerKeyboard() {
-    return {
-      inline_keyboard: [
-        [
-          { text: "⏸️ 일시정지", callback_data: "timer_pause" },
-          { text: "⏹️ 정지", callback_data: "timer_stop" },
-        ],
-        [
-          { text: "📊 상태확인", callback_data: "timer_status" },
-          { text: "🔙 메인 메뉴", callback_data: "main_menu" },
-        ],
-      ],
-    };
-  }
-
-  getPausedTimerKeyboard() {
-    return {
-      inline_keyboard: [
-        [
-          { text: "▶️ 재개", callback_data: "timer_resume" },
-          { text: "⏹️ 정지", callback_data: "timer_stop" },
-        ],
-        [
-          { text: "📊 상태확인", callback_data: "timer_status" },
-          { text: "🔙 메인 메뉴", callback_data: "main_menu" },
-        ],
-      ],
-    };
-  }
-
-  // ========== 명령어 처리 ==========
 
   async handleMessage(bot, msg) {
     const {
@@ -518,96 +22,465 @@ class TimerModule extends BaseModule {
       from: { id: userId },
       text,
     } = msg;
+    const userState = this.userStates.get(userId);
 
-    if (text && (text.startsWith("/timer") || text.startsWith("/pomodoro"))) {
+    // 상태가 있을 때 처리
+    if (userState && userState.action === "waiting_timer_input") {
+      return await this.handleTimerInput(bot, chatId, userId, text);
+    }
+
+    // 명령어 처리
+    if (text && text.startsWith("/timer")) {
       await this.handleTimerCommand(bot, msg);
-      this.updateStats("command");
       return true;
     }
 
     return false;
   }
 
+  // 새로운 콜백 구조에 맞춘 handleCallback 메서드
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+    const userName = getUserName(callbackQuery.from);
+
+    switch (subAction) {
+      case "menu":
+        await this.showTimerMenu(bot, chatId, messageId, userName);
+        break;
+      case "start_prompt":
+        await this.startTimerPrompt(bot, chatId, messageId, userId);
+        break;
+      case "pomodoro_start":
+        await this.startPomodoro(bot, chatId, messageId, userId);
+        break;
+      case "stop":
+        await this.stopTimer(bot, chatId, messageId, userId);
+        break;
+      case "status":
+        await this.showTimerStatus(bot, chatId, messageId, userId);
+        break;
+      default:
+        await this.sendMessage(bot, chatId, "❌ 알 수 없는 타이머 명령입니다.");
+    }
+  }
+
+  async showTimerMenu(bot, chatId, messageId, userName) {
+    const currentTime = TimeHelper.formatDateTime();
+
+    const menuText =
+      `⏰ **${userName}님의 타이머** (${currentTime})\n\n` +
+      "🍅 **포모도로**: 25분 집중 + 5분 휴식\n" +
+      "⏱️ **일반 타이머**: 자유로운 시간 측정\n\n" +
+      "원하는 기능을 선택하세요!";
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🍅 포모도로 시작", callback_data: "timer_pomodoro_start" },
+          { text: "⏱️ 일반 타이머", callback_data: "timer_start_prompt" },
+        ],
+        [
+          { text: "⏹️ 타이머 정지", callback_data: "timer_stop" },
+          { text: "📊 현재 상태", callback_data: "timer_status" },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+      ],
+    };
+
+    await this.editMessage(bot, chatId, messageId, menuText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
+  async startTimerPrompt(bot, chatId, messageId, userId) {
+    this.userStates.set(userId, { action: "waiting_timer_input" });
+
+    await this.editMessage(
+      bot,
+      chatId,
+      messageId,
+      "⏰ **타이머 시작**\n\n작업명을 입력해주세요.\n\n" +
+        "💡 **예시**: 독서하기, 운동하기, 회의 준비",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [[{ text: "❌ 취소", callback_data: "timer_menu" }]],
+        },
+      }
+    );
+  }
+
+  // 포모도로 시작
+  async startPomodoro(bot, chatId, messageId, userId) {
+    const result = this.timerService.startPomodoro(userId);
+
+    if (result.success) {
+      // ⭐ 완료 예정 시간 계산 (한국시간)
+      const completionTime = TimeHelper.addMinutes(
+        TimeHelper.getKoreaTime(),
+        25
+      );
+      const completionTimeStr = TimeHelper.formatTime(completionTime);
+
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        "🍅 **포모도로 시작!**\n\n" +
+          `📌 **작업**: ${result.data.taskName}\n` +
+          `⏱️ **시간**: 25분\n` +
+          `🎯 **세션**: ${result.data.sessionCount}번째\n` +
+          `⏰ **완료 예정**: ${completionTimeStr}\n\n` +
+          `${this.createProgressBar(0, 25)} 0%\n\n` +
+          "집중해서 작업하세요! 💪",
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "📊 진행 상태", callback_data: "timer_status" },
+                { text: "⏹️ 중지", callback_data: "timer_stop" },
+              ],
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            ],
+          },
+        }
+      );
+
+      // 25분 후 알림 설정
+      setTimeout(() => {
+        this.notifyPomodoroComplete(bot, chatId, userId);
+      }, 25 * 60 * 1000);
+    } else {
+      await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+          ],
+        },
+      });
+    }
+  }
+
+  // 포모도로 완료 알림
+  async notifyPomodoroComplete(bot, chatId, userId) {
+    const status = this.timerService.pomodoroStatus(userId);
+
+    if (status.success && status.data.isComplete) {
+      const result = this.timerService.completePomodoro(userId);
+
+      if (result.success) {
+        const currentTime = TimeHelper.formatDateTime();
+
+        const keyboard =
+          result.data.nextMode === "break"
+            ? {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "✅ 휴식 시작",
+                      callback_data: "timer_pomodoro_start",
+                    },
+                    { text: "⏹️ 종료", callback_data: "timer_stop" },
+                  ],
+                ],
+              }
+            : {
+                inline_keyboard: [
+                  [
+                    {
+                      text: "🍅 다음 포모도로",
+                      callback_data: "timer_pomodoro_start",
+                    },
+                    { text: "⏹️ 종료", callback_data: "timer_stop" },
+                  ],
+                ],
+              };
+
+        await bot.sendMessage(
+          chatId,
+          `🔔 **포모도로 알림** (${currentTime})\n\n${result.data.message}`,
+          {
+            parse_mode: "Markdown",
+            reply_markup: keyboard,
+          }
+        );
+
+        // 휴식 시간도 타이머 설정
+        if (result.data.nextMode === "break") {
+          setTimeout(() => {
+            this.notifyPomodoroComplete(bot, chatId, userId);
+          }, 5 * 60 * 1000);
+        }
+      }
+    }
+  }
+
+  async stopTimer(bot, chatId, messageId, userId) {
+    const result = this.timerService.stop(userId);
+
+    if (result.success) {
+      const currentTime = TimeHelper.formatDateTime();
+
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        "⏹️ **타이머 종료** 🎉\n\n" +
+          `📌 **작업**: ${result.data.taskName}\n` +
+          `⏱️ **소요시간**: ${result.data.elapsedTime}\n` +
+          `🕐 **시작**: ${result.data.startTime}\n` +
+          `🕕 **종료**: ${result.data.endTime}\n\n` +
+          "수고하셨습니다! 💪",
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                {
+                  text: "🍅 포모도로 시작",
+                  callback_data: "timer_pomodoro_start",
+                },
+                { text: "⏱️ 일반 타이머", callback_data: "timer_start_prompt" },
+              ],
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            ],
+          },
+        }
+      );
+    } else {
+      await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+          ],
+        },
+      });
+    }
+  }
+
+  async showTimerStatus(bot, chatId, messageId, userId) {
+    const status = this.timerService.getStatus(userId);
+
+    if (status.success) {
+      let statusText;
+      let buttons;
+
+      if (status.data.type === "pomodoro") {
+        const pomodoroStatus = this.timerService.pomodoroStatus(userId);
+        if (pomodoroStatus.success) {
+          // ⭐ 시각적 진행률 바 생성
+          const progressBar = this.createProgressBar(
+            pomodoroStatus.data.elapsed,
+            pomodoroStatus.data.duration
+          );
+
+          // ⭐ 원형 진행률 표시
+          const circularProgress = this.createCircularProgress(
+            pomodoroStatus.data.elapsed,
+            pomodoroStatus.data.duration
+          );
+
+          const modeEmoji = pomodoroStatus.data.mode === "work" ? "💼" : "☕";
+          const modeText =
+            pomodoroStatus.data.mode === "work" ? "작업 중" : "휴식 중";
+
+          // ⭐ 완료 예정 시간 계산
+          const remainingMinutes = pomodoroStatus.data.remaining;
+          const completionTime = TimeHelper.addMinutes(
+            TimeHelper.getKoreaTime(),
+            remainingMinutes
+          );
+          const completionTimeStr = TimeHelper.formatTime(completionTime);
+
+          const percentage = Math.round(
+            (pomodoroStatus.data.elapsed / pomodoroStatus.data.duration) * 100
+          );
+
+          statusText =
+            `🍅 **포모도로 ${modeText}** ${circularProgress}\n\n` +
+            `${modeEmoji} **작업**: ${pomodoroStatus.data.taskName}\n` +
+            `⏱️ **진행**: ${pomodoroStatus.data.elapsed}분 / ${pomodoroStatus.data.duration}분\n` +
+            `${progressBar} ${percentage}%\n\n` +
+            `🎯 **세션**: ${pomodoroStatus.data.sessionCount}회\n` +
+            `⏳ **남은 시간**: ${pomodoroStatus.data.remaining}분\n` +
+            `🕐 **완료 예정**: ${completionTimeStr}\n` +
+            `📅 **현재 시간**: ${pomodoroStatus.data.currentTime}`;
+
+          buttons = [
+            [
+              { text: "🔄 새로고침", callback_data: "timer_status" },
+              { text: "⏹️ 중지", callback_data: "timer_stop" },
+            ],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+          ];
+        }
+      } else {
+        // 일반 타이머
+        statusText =
+          "⏱️ **일반 타이머 진행 중**\n\n" +
+          `📌 **작업**: ${status.data.taskName}\n` +
+          `⏱️ **경과시간**: ${status.data.elapsedTime}\n` +
+          `🕐 **시작 시간**: ${status.data.startTime}\n` +
+          `📅 **현재 시간**: ${status.data.currentTime}`;
+
+        buttons = [
+          [
+            { text: "⏹️ 타이머 정지", callback_data: "timer_stop" },
+            { text: "🔄 새로고침", callback_data: "timer_status" },
+          ],
+          [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+        ];
+      }
+
+      await this.editMessage(bot, chatId, messageId, statusText, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: buttons,
+        },
+      });
+    } else {
+      await this.editMessage(bot, chatId, messageId, `❌ ${status.error}`, {
+        reply_markup: {
+          inline_keyboard: [
+            [
+              {
+                text: "🍅 포모도로 시작",
+                callback_data: "timer_pomodoro_start",
+              },
+              { text: "⏱️ 일반 타이머", callback_data: "timer_start_prompt" },
+            ],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+          ],
+        },
+      });
+    }
+  }
+
+  // ⭐ 시각적 진행 상황 바 생성 (향상된 버전)
+  createProgressBar(current, total) {
+    const percentage = Math.round((current / total) * 100);
+    const filled = Math.round((current / total) * 10);
+    const empty = 10 - filled;
+
+    // 다양한 진행률 바 스타일
+    const styles = {
+      solid: { filled: "█", empty: "░" },
+      block: { filled: "▓", empty: "░" },
+      circle: { filled: "●", empty: "○" },
+      square: { filled: "■", empty: "□" },
+    };
+
+    const style = styles.block; // 기본 스타일
+    return `${style.filled.repeat(filled)}${style.empty.repeat(empty)}`;
+  }
+
+  // ⭐ 원형 진행률 표시
+  createCircularProgress(current, total) {
+    const percentage = Math.round((current / total) * 100);
+
+    if (percentage <= 12.5) return "🕐";
+    if (percentage <= 25) return "🕒";
+    if (percentage <= 37.5) return "🕓";
+    if (percentage <= 50) return "🕕";
+    if (percentage <= 62.5) return "🕖";
+    if (percentage <= 75) return "🕘";
+    if (percentage <= 87.5) return "🕚";
+    return "🕛";
+  }
+
+  // ⭐ 애니메이션 효과가 있는 진행률 (단계별)
+  createAnimatedProgress(current, total) {
+    const percentage = Math.round((current / total) * 100);
+
+    const phases = ["🌑", "🌒", "🌓", "🌔", "🌕", "🌖", "🌗", "🌘"];
+
+    const phaseIndex = Math.min(Math.floor(percentage / 12.5), 7);
+    return phases[phaseIndex];
+  }
+
+  async handleTimerInput(bot, chatId, userId, text) {
+    try {
+      const taskName = ValidationHelper.validateTimerName(text);
+      const result = this.timerService.start(userId, taskName);
+
+      if (result.success) {
+        this.userStates.delete(userId); // 상태 제거
+        const currentTime = TimeHelper.formatDateTime();
+
+        await this.sendMessage(
+          bot,
+          chatId,
+          `⏰ **"${taskName}" 타이머 시작!**\n\n` +
+            `🕐 **시작 시간**: ${result.data.startTime}\n` +
+            `📅 **현재 시간**: ${currentTime}\n\n` +
+            "집중하여 작업하세요! 💪",
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "⏹️ 타이머 정지", callback_data: "timer_stop" },
+                  { text: "📊 현재 상태", callback_data: "timer_status" },
+                ],
+                [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+              ],
+            },
+          }
+        );
+      } else {
+        await this.sendMessage(bot, chatId, `❌ ${result.error}`);
+      }
+    } catch (error) {
+      await this.sendMessage(bot, chatId, "❌ 유효하지 않은 작업명입니다.");
+    }
+
+    return true;
+  }
+
   async handleTimerCommand(bot, msg) {
     const {
       chat: { id: chatId },
-      from,
+      text,
     } = msg;
-    const userName = getUserName(from);
-    const text = msg.text;
 
-    try {
-      if (text.startsWith("/pomodoro")) {
-        // 포모도로 타이머 즉시 시작
-        await this.startPomodoroTimer(bot, chatId, null, from.id, userName);
-      } else {
-        // 타이머 메뉴 표시
-        const menuData = this.getMenuData(userName);
-        await this.sendMessage(bot, chatId, menuData.text, {
-          parse_mode: "Markdown",
-          reply_markup: menuData.keyboard,
-        });
-      }
-    } catch (error) {
-      Logger.error("TimerModule handleTimerCommand 오류:", error);
-      await this.sendMessage(bot, chatId, "❌ 타이머를 시작할 수 없습니다.");
+    if (text === "/timer") {
+      await this.showTimerHelp(bot, chatId);
     }
   }
 
-  // ✅ 도움말 메시지 오버라이드
-  getHelpMessage() {
-    return `⏰ **타이머 사용법**
+  async showTimerHelp(bot, chatId) {
+    const currentTime = TimeHelper.formatDateTime();
 
-**📱 메뉴 방식:**
-/start → ⏰ 타이머 → 원하는 타이머 선택
+    const helpText =
+      `⏰ **타이머 사용법** (${currentTime})\n\n` +
+      "🍅 **포모도로 기법:**\n" +
+      "• 25분 집중 + 5분 휴식\n" +
+      "• 4세션마다 긴 휴식(15분)\n" +
+      "• 생산성 향상에 효과적\n" +
+      "• 시각적 진행률 표시\n\n" +
+      "⏱️ **일반 타이머:**\n" +
+      "• 자유로운 시간 측정\n" +
+      "• 작업별 소요 시간 기록\n" +
+      "• 정확한 한국시간 표시\n\n" +
+      "📱 /start → ⏰ 타이머에서 시작하세요!";
 
-**⌨️ 명령어 방식:**
-/timer - 타이머 메뉴 열기
-/pomodoro - 포모도로 타이머 즉시 시작
-
-**🍅 포모도로 기법:**
-• 25분 집중 + 5분 휴식
-• 집중력 향상에 효과적
-• 생산성 증대
-
-**⏱️ 커스텀 타이머:**
-• 5분 ~ 90분 자유 설정
-• 개인 맞춤 시간 관리
-• 다양한 작업에 활용
-
-**🎯 기능:**
-• ⏸️ 일시정지/재개
-• 📊 실시간 상태 확인
-• 🔔 완료 알림
-
-시간 관리의 달인이 되어보세요! 📈`;
-  }
-
-  // ========== 초기화 ==========
-
-  async initialize() {
-    try {
-      // 타이머 데이터 초기화
-      this.userTimers.clear();
-
-      await super.initialize();
-      Logger.success("✅ TimerModule 초기화 완료");
-    } catch (error) {
-      Logger.error("❌ TimerModule 초기화 실패:", error);
-      throw error;
-    }
-  }
-
-  // ========== 정리 ==========
-
-  async cleanup() {
-    try {
-      // 모든 타이머 정리
-      this.userTimers.clear();
-      Logger.info("⏰ TimerModule 정리 완료");
-    } catch (error) {
-      Logger.error("TimerModule 정리 오류:", error);
-    }
+    await this.sendMessage(bot, chatId, helpText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "⏰ 타이머 메뉴", callback_data: "timer_menu" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      },
+    });
   }
 }
 
