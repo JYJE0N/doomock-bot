@@ -1,4 +1,4 @@
-// doomock_bot.js - 개선된 메인 엔트리 포인트
+// 두목봇 - 메인 엔트리 포인트
 require("dotenv").config();
 
 const TelegramBot = require("node-telegram-bot-api");
@@ -11,9 +11,7 @@ let bot = null;
 let controller = null;
 let isShuttingDown = false;
 
-/**
- * 봇 인스턴스 생성 (폴링 전용)
- */
+// 폴링방식 인스턴스 생성 함수
 function createBot() {
   const token = AppConfig.BOT_TOKEN;
 
@@ -161,9 +159,7 @@ function setupErrorHandlers() {
   Logger.info("에러 핸들러 설정 완료");
 }
 
-/**
- * 안전한 종료
- */
+// 안전한 종료
 async function shutdown(exitCode = 0) {
   if (isShuttingDown) {
     Logger.warn("이미 종료 중입니다...");
@@ -205,9 +201,7 @@ async function shutdown(exitCode = 0) {
   }
 }
 
-/**
- * 시스템 정보 로깅
- */
+// 시스템 정보 로깅
 function logSystemInfo() {
   Logger.info(`🤖 두목 봇 v${AppConfig.VERSION} 시작`);
   Logger.info("=".repeat(50));
@@ -245,9 +239,7 @@ function logSystemInfo() {
   });
 }
 
-/**
- * 헬스체크 엔드포인트 (Railway용)
- */
+// 헬스 체크 포인트
 function setupHealthCheck() {
   if (AppConfig.isRailway || AppConfig.SYSTEM.HEALTH_CHECK_ENABLED) {
     const http = require("http");
@@ -287,9 +279,7 @@ function setupHealthCheck() {
   return null;
 }
 
-/**
- * 메인 함수
- */
+// 메인함수
 async function main() {
   try {
     // 시스템 정보 로깅
