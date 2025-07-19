@@ -1,4 +1,4 @@
-# 🤖 두목봇 (Doomock Bot) v2.0
+# 🤖 두목봇 (Doomock Bot) v3.0
 
 직장인을 위한 올인원 텔레그램 봇 - 완전히 리팩토링된 모듈식 아키텍처
 
@@ -20,6 +20,7 @@
 - 행운 정보 (로또 번호 포함)
 
 ### ⏰ 타이머 & 리마인더
+- 뽀모도르 시간 관리
 - 작업 시간 추적
 - 분/시간 단위 리마인더
 - 음성 알림 지원
@@ -49,13 +50,7 @@
 
 ## 👨‍💻 개발자
 
-**JYJE0N**
+**두몫**
 - GitHub: [@JYJE0N](https://github.com/JYJE0N)
 
 ## 🙏 감사인사
-
-- [node-telegram-bot-api](https://github.com/yagop/node-telegram-bot-api)
-- [MongoDB](https://www.mongodb.com/)
-- [Railway](https://railway.app/)
-
----
