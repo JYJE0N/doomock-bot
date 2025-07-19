@@ -1,9 +1,9 @@
 // src/modules/TodoModule.js - processCallback 메서드 수정 버전
 const BaseModule = require("./BaseModule");
-const Logger = require("../utils/Logger");
 const { TodoService } = require("../services/TodoService");
 const { getUserName } = require("../utils/UserHelper");
 const { ValidationHelper } = require("../utils/ValidationHelper");
+const Logger = require("../utils/Logger"); // ✅ 중괄호 제거
 
 class TodoModule extends BaseModule {
   constructor() {
@@ -35,6 +35,31 @@ class TodoModule extends BaseModule {
     }
 
     return false;
+  }
+
+  // ✅ CallbackManager에서 호출하는 메서드들 추가
+  async showMenu(bot, chatId, messageId, userName) {
+    await this.showTodoMenu(bot, chatId, messageId, userName);
+  }
+
+  async showList(bot, chatId, messageId, userId, userName) {
+    await this.showTodoList(bot, chatId, messageId, userId, userName);
+  }
+
+  async startAdd(bot, chatId, messageId, userId) {
+    await this.startTodoAdd(bot, chatId, messageId, userId);
+  }
+
+  async showStats(bot, chatId, messageId, userId) {
+    await this.showTodoStats(bot, chatId, messageId, userId);
+  }
+
+  async clearCompleted(bot, chatId, messageId, userId) {
+    await this.clearCompletedTodos(bot, chatId, messageId, userId);
+  }
+
+  async clearAll(bot, chatId, messageId, userId) {
+    await this.clearAllTodos(bot, chatId, messageId, userId);
   }
 
   // ✅ processCallback 메서드를 handleCallback으로 수정

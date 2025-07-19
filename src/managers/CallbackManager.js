@@ -255,6 +255,7 @@ class CallbackManager {
     return false;
   }
 
+  // executeRoute 메서드 - 수정된 버전
   async executeRoute(route, callbackQuery) {
     const { module: moduleName, method: methodName } = route;
 
@@ -276,13 +277,71 @@ class CallbackManager {
       return;
     }
 
-    // 일반 모듈 처리 - menuManager 전달
+    // 일반 모듈 처리
     const module = this.modules[moduleName];
-    if (module) {
-      await this.handleModuleCallback(module, callbackQuery, methodName);
-    } else {
+    if (!module) {
       Logger.error(`모듈을 찾을 수 없음: ${moduleName}`);
       await this.handleUnknownCallback(callbackQuery);
+      return;
+    }
+
+    // ✅ TodoModule 등 모듈 메서드 직접 호출
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+    const userName =
+      callbackQuery.from.first_name || callbackQuery.from.username || "사용자";
+
+    try {
+      Logger.info(`🔧 모듈 ${moduleName}의 ${methodName} 메서드 호출`);
+
+      // 메서드가 존재하는지 확인
+      if (typeof module[methodName] !== "function") {
+        Logger.error(`모듈 ${moduleName}에 ${methodName} 메서드가 없습니다`);
+        await this.handleUnknownCallback(callbackQuery);
+        return;
+      }
+
+      // 메서드 호출 - 매개변수는 메서드에 따라 다름
+      switch (methodName) {
+        case "showMenu":
+          await module[methodName](this.bot, chatId, messageId, userName);
+          break;
+        case "showList":
+          await module[methodName](
+            this.bot,
+            chatId,
+            messageId,
+            userId,
+            userName
+          );
+          break;
+        case "startAdd":
+        case "showStats":
+        case "clearCompleted":
+        case "clearAll":
+          await module[methodName](this.bot, chatId, messageId, userId);
+          break;
+        default:
+          // 기본적으로 모든 파라미터 전달
+          await module[methodName](
+            this.bot,
+            chatId,
+            messageId,
+            userId,
+            userName
+          );
+          break;
+      }
+
+      Logger.success(`✅ 모듈 ${moduleName}의 ${methodName} 호출 완료`);
+    } catch (error) {
+      Logger.error(`❌ 모듈 ${moduleName}의 ${methodName} 호출 실패:`, error);
+      await this.sendErrorMessage(chatId);
     }
   }
 
