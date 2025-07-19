@@ -1,4 +1,4 @@
-// src/modules/BaseModule.js - 완전 표준화된 모듈 시스템
+// src/modules/BaseModule.js - 3뎁스 서브메뉴 지원 강화
 
 const Logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
@@ -35,19 +35,59 @@ class BaseModule {
 
   // ✅ 표준 액션 매핑 초기화
   initializeActionMap() {
-    // 기본 액션들
+    // 🔧 기본 액션들 (모든 모듈 공통)
     this.actionMap.set("menu", this.showMenu.bind(this));
     this.actionMap.set("help", this.showHelp.bind(this));
     this.actionMap.set("status", this.showStatus.bind(this));
 
+    // 🚀 기본 서브메뉴 액션들 추가
+    this.registerDefaultActions();
+
     // 서브클래스에서 추가 액션 등록
     this.registerActions();
+
+    Logger.debug(`${this.name}: ${this.actionMap.size}개 액션 등록됨`);
+  }
+
+  // 🚀 기본 서브메뉴 액션들 등록
+  registerDefaultActions() {
+    // 모든 모듈이 공통으로 가질 수 있는 기본 액션들
+    this.actionMap.set("list", this.showList.bind(this));
+    this.actionMap.set("add", this.startAdd.bind(this));
+    this.actionMap.set("setting", this.showSetting.bind(this));
+    this.actionMap.set("stats", this.showStats.bind(this));
+    this.actionMap.set("clear", this.handleClear.bind(this));
+    this.actionMap.set("refresh", this.handleRefresh.bind(this));
+
+    // 상태 관련
+    this.actionMap.set("start", this.handleStart.bind(this));
+    this.actionMap.set("stop", this.handleStop.bind(this));
+    this.actionMap.set("pause", this.handlePause.bind(this));
+    this.actionMap.set("resume", this.handleResume.bind(this));
+
+    // 데이터 관리
+    this.actionMap.set("history", this.showHistory.bind(this));
+    this.actionMap.set("export", this.handleExport.bind(this));
+    this.actionMap.set("import", this.handleImport.bind(this));
+
+    // 특정 모듈용 액션들
+    this.actionMap.set("current", this.showCurrent.bind(this));
+    this.actionMap.set("forecast", this.showForecast.bind(this));
+    this.actionMap.set("today", this.showToday.bind(this));
+    this.actionMap.set("work", this.showWork.bind(this));
+    this.actionMap.set("love", this.showLove.bind(this));
+    this.actionMap.set("money", this.showMoney.bind(this));
+    this.actionMap.set("health", this.showHealth.bind(this));
+    this.actionMap.set("general", this.showGeneral.bind(this));
+    this.actionMap.set("dashboard", this.showDashboard.bind(this));
+    this.actionMap.set("quick", this.showQuick.bind(this));
+    this.actionMap.set("national", this.showNational.bind(this));
   }
 
   // ✅ 서브클래스에서 액션 등록 (오버라이드)
   registerActions() {
     // 서브클래스에서 구현
-    // 예: this.actionMap.set('list', this.showList.bind(this));
+    // 예: this.actionMap.set('custom_action', this.customMethod.bind(this));
   }
 
   // ✅ 통합 콜백 처리기 (CallbackManager가 이것만 호출하면 됨)
@@ -64,15 +104,23 @@ class BaseModule {
     try {
       this.updateStats("callback");
 
+      Logger.info(`🔧 ${this.name}: ${subAction} 액션 요청`);
+
+      // 🔧 동적 액션 먼저 확인 (toggle_1, delete_2 등)
+      if (await this.handleDynamicAction(bot, callbackQuery, subAction)) {
+        return true;
+      }
+
       // 액션 맵에서 핸들러 찾기
       const handler = this.actionMap.get(subAction);
 
       if (handler) {
-        Logger.info(`🔧 ${this.name}: ${subAction} 액션 실행`);
+        Logger.info(`✅ ${this.name}: ${subAction} 액션 실행`);
         await handler(bot, chatId, messageId, userId, userName, params);
         return true;
       } else {
         // 등록되지 않은 액션 처리
+        Logger.warn(`⚠️ ${this.name}: 등록되지 않은 액션 ${subAction}`);
         await this.handleUnregisteredAction(bot, chatId, messageId, subAction);
         return false;
       }
@@ -81,6 +129,13 @@ class BaseModule {
       await this.handleError(bot, chatId, error);
       return false;
     }
+  }
+
+  // 🚀 동적 액션 처리 (서브클래스에서 오버라이드)
+  async handleDynamicAction(bot, callbackQuery, action) {
+    // 기본적으로 동적 액션은 처리하지 않음
+    // 서브클래스에서 toggle_1, delete_2 등을 처리
+    return false;
   }
 
   // ✅ 필수 구현: 메뉴 표시
@@ -98,13 +153,230 @@ class BaseModule {
     const displayName = this.getDisplayName();
 
     return {
-      text: `${displayName} **준비 중입니다** 🚧\n\n곧 업데이트될 예정이니 조금만 기다려주세요!`,
+      text: `${displayName}\n\n📋 **기능 목록:**`,
       keyboard: {
         inline_keyboard: [
-          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+          [
+            { text: "📋 목록", callback_data: `${this.moduleName}_list` },
+            { text: "➕ 추가", callback_data: `${this.moduleName}_add` },
+          ],
+          [
+            { text: "📊 통계", callback_data: `${this.moduleName}_stats` },
+            { text: "⚙️ 설정", callback_data: `${this.moduleName}_setting` },
+          ],
+          [
+            { text: "❓ 도움말", callback_data: `${this.moduleName}_help` },
+            { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+          ],
         ],
       },
     };
+  }
+
+  // 🚀 기본 서브메뉴 메서드들 (서브클래스에서 오버라이드 가능)
+
+  async showList(bot, chatId, messageId, userId, userName) {
+    const text = `📋 **${this.getDisplayName()} 목록**\n\n🚧 목록 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async startAdd(bot, chatId, messageId, userId, userName) {
+    const text = `➕ **${this.getDisplayName()} 추가**\n\n🚧 추가 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showStats(bot, chatId, messageId, userId, userName) {
+    const text =
+      `📊 **${this.getDisplayName()} 통계**\n\n` +
+      `🔧 모듈명: ${this.name}\n` +
+      `⚡ 상태: ${this.isInitialized ? "활성" : "비활성"}\n` +
+      `📈 사용 횟수: ${this.stats.callbackCount}회\n` +
+      `🕐 마지막 사용: ${
+        this.stats.lastUsed ? this.stats.lastUsed.toLocaleString() : "없음"
+      }`;
+
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showSetting(bot, chatId, messageId, userId, userName) {
+    const text = `⚙️ **${this.getDisplayName()} 설정**\n\n🚧 설정 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handleClear(bot, chatId, messageId, userId, userName) {
+    const text = `🗑️ **${this.getDisplayName()} 삭제**\n\n🚧 삭제 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handleRefresh(bot, chatId, messageId, userId, userName) {
+    const text = `🔄 **${this.getDisplayName()} 새로고침**\n\n🚧 새로고침 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  // 🚀 특정 모듈용 기본 메서드들
+
+  async showCurrent(bot, chatId, messageId, userId, userName) {
+    const text = `📍 **현재 ${this.getDisplayName()}**\n\n🚧 현재 상태 조회 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showToday(bot, chatId, messageId, userId, userName) {
+    const text = `📅 **오늘의 ${this.getDisplayName()}**\n\n🚧 오늘 정보를 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showWork(bot, chatId, messageId, userId, userName) {
+    const text = `💼 **업무 ${this.getDisplayName()}**\n\n🚧 업무 관련 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showDashboard(bot, chatId, messageId, userId, userName) {
+    const text = `📊 **${this.getDisplayName()} 대시보드**\n\n🚧 대시보드 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  // 🚀 더 많은 기본 메서드들... (필요에 따라 추가)
+
+  async showHistory(bot, chatId, messageId, userId, userName) {
+    const text = `📜 **${this.getDisplayName()} 히스토리**\n\n🚧 히스토리 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showForecast(bot, chatId, messageId, userId, userName) {
+    const text = `🔮 **${this.getDisplayName()} 예보**\n\n🚧 예보 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showLove(bot, chatId, messageId, userId, userName) {
+    const text = `💖 **연애 ${this.getDisplayName()}**\n\n🚧 연애 관련 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showMoney(bot, chatId, messageId, userId, userName) {
+    const text = `💰 **재물 ${this.getDisplayName()}**\n\n🚧 재물 관련 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showHealth(bot, chatId, messageId, userId, userName) {
+    const text = `🏥 **건강 ${this.getDisplayName()}**\n\n🚧 건강 관련 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showGeneral(bot, chatId, messageId, userId, userName) {
+    const text = `🌟 **종합 ${this.getDisplayName()}**\n\n🚧 종합 정보를 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showQuick(bot, chatId, messageId, userId, userName) {
+    const text = `⚡ **빠른 ${this.getDisplayName()}**\n\n🚧 빠른 조회 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async showNational(bot, chatId, messageId, userId, userName) {
+    const text = `🇰🇷 **전국 ${this.getDisplayName()}**\n\n🚧 전국 정보를 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handleStart(bot, chatId, messageId, userId, userName) {
+    const text = `▶️ **${this.getDisplayName()} 시작**\n\n🚧 시작 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handleStop(bot, chatId, messageId, userId, userName) {
+    const text = `⏹️ **${this.getDisplayName()} 정지**\n\n🚧 정지 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handlePause(bot, chatId, messageId, userId, userName) {
+    const text = `⏸️ **${this.getDisplayName()} 일시정지**\n\n🚧 일시정지 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handleResume(bot, chatId, messageId, userId, userName) {
+    const text = `▶️ **${this.getDisplayName()} 재개**\n\n🚧 재개 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handleExport(bot, chatId, messageId, userId, userName) {
+    const text = `📤 **${this.getDisplayName()} 내보내기**\n\n🚧 내보내기 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
+  }
+
+  async handleImport(bot, chatId, messageId, userId, userName) {
+    const text = `📥 **${this.getDisplayName()} 가져오기**\n\n🚧 가져오기 기능을 준비 중입니다.`;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getBackToMenuKeyboard(),
+    });
   }
 
   // ✅ 모듈 표시 이름 가져오기
@@ -151,11 +423,7 @@ class BaseModule {
 
     await this.editMessage(bot, chatId, messageId, statusText, {
       parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 메뉴로", callback_data: `${this.moduleName}_menu` }],
-        ],
-      },
+      reply_markup: this.getBackToMenuKeyboard(),
     });
   }
 
@@ -163,15 +431,12 @@ class BaseModule {
   async handleUnregisteredAction(bot, chatId, messageId, action) {
     const text =
       `❌ **알 수 없는 액션**: ${action}\n\n` +
-      `${this.getDisplayName()}에서 처리할 수 없는 요청입니다.`;
+      `${this.getDisplayName()}에서 처리할 수 없는 요청입니다.\n\n` +
+      `사용 가능한 액션: ${Array.from(this.actionMap.keys()).join(", ")}`;
 
     await this.editMessage(bot, chatId, messageId, text, {
       parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 메뉴로", callback_data: `${this.moduleName}_menu` }],
-        ],
-      },
+      reply_markup: this.getBackToMenuKeyboard(),
     });
   }
 
@@ -182,12 +447,20 @@ class BaseModule {
 
     await this.sendMessage(bot, chatId, errorText, {
       parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-        ],
-      },
+      reply_markup: this.getBackToMenuKeyboard(),
     });
+  }
+
+  // 🚀 편의 메서드: 뒤로가기 키보드
+  getBackToMenuKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: "🔙 메뉴로", callback_data: `${this.moduleName}_menu` },
+          { text: "🏠 메인 메뉴", callback_data: "main_menu" },
+        ],
+      ],
+    };
   }
 
   // ✅ 도움말 메시지 (서브클래스에서 오버라이드)
@@ -236,7 +509,7 @@ class BaseModule {
       // 메시지 수정 실패 시 새 메시지 전송
       Logger.warn(
         `메시지 수정 실패, 새 메시지 전송 [${this.name}]:`,
-        error.message,
+        error.message
       );
       return await this.sendMessage(bot, chatId, text, options);
     }
