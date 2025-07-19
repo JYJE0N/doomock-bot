@@ -217,7 +217,7 @@ class DatabaseManagerWrapper {
   }
 }
 
-// ✅ 수정: 더 간단하고 안전한 방식으로 export
+// ✅ 수정: 더 명확한 export 방식
 module.exports = {
   DatabaseManager: DatabaseManagerWrapper,
   ensureConnection: function () {

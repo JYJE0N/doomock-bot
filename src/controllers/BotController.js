@@ -1,11 +1,10 @@
 // src/controllers/BotController.js - 중복 콜백 이벤트 해결
 
-const MenuManager = require("../managers/MenuManager");
 const CallbackManager = require("../managers/CallbackManager");
 const ModuleManager = require("../managers/ModuleManager");
 const MessageHandler = require("../handlers/MessageHandler");
 const CommandHandler = require("../handlers/CommandHandler");
-const DatabaseManager = require("../database/DatabaseManager");
+const { DatabaseManager } = require("../database/DatabaseManager");
 const Logger = require("../utils/Logger");
 const UserHelper = require("../utils/UserHelper");
 
@@ -66,15 +65,35 @@ class BotController {
     }
   }
 
+  // ✅ 수정된 initializeDatabase 메서드
   async initializeDatabase() {
-    if (this.config.MONGO_URL) {
+    if (this.config.mongoUrl) {
       try {
-        this.dbManager = new DatabaseManager(); // ✅ 빈 생성자
-        await this.dbManager.connect(this.config.MONGO_URL); // ✅ connect()에 URL 전달
+        // ✅ import 방식 확인
+        const { DatabaseManager } = require("../database/DatabaseManager");
+
+        // ✅ 생성자 타입 확인
+        if (typeof DatabaseManager !== "function") {
+          throw new Error(
+            `DatabaseManager is not a constructor. Type: ${typeof DatabaseManager}`
+          );
+        }
+
+        Logger.info("DatabaseManager 생성자 확인 완료");
+
+        this.dbManager = new DatabaseManager(this.config.mongoUrl);
+        await this.dbManager.connect();
 
         Logger.success("데이터베이스 연결 성공");
       } catch (error) {
         Logger.error("데이터베이스 연결 실패:", error);
+        Logger.error("에러 상세:", {
+          message: error.message,
+          stack: error.stack,
+          mongoUrl: this.config.mongoUrl ? "설정됨" : "없음",
+        });
+
+        // DB 연결 실패해도 봇은 계속 실행
         Logger.warn("MongoDB 없이 봇을 실행합니다. 일부 기능이 제한됩니다.");
       }
     } else {
