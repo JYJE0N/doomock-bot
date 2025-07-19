@@ -31,18 +31,11 @@ class DatabaseManager {
 
       // ✅ MongoDB 5.x 호환 설정 (경고 제거)
       this.client = new MongoClient(this.MONGO_URL, {
-        // ❌ 완전히 제거: useNewUrlParser, useUnifiedTopology
-        // MongoDB 5.x에서는 이 옵션들이 기본값이 되어 더 이상 필요없음
-
-        // ✅ 유지할 옵션들 (MongoDB 5.x 호환)
-        serverSelectionTimeoutMS: 10000, // 서버 선택 타임아웃
-        connectTimeoutMS: 15000, // 연결 타임아웃
-        socketTimeoutMS: 0, // 소켓 타임아웃 (0 = 무제한)
-        retryWrites: true, // 쓰기 재시도
-        // Railway 최적화
-        maxPoolSize: 10, // 최대 연결 풀
-        minPoolSize: 1, // 최소 연결 풀
-        maxIdleTimeMS: 30000, // 최대 유휴 시간
+        serverSelectionTimeoutMS: 15000,
+        connectTimeoutMS: 20000,
+        authSource: "admin", // ⭐ MongoDB 7.x 서버 연결 필수!
+        retryWrites: true,
+        maxPoolSize: 10,
         // 압축 설정 (네트워크 최적화)
         compressors: ["zlib"],
       });
@@ -263,16 +256,3 @@ module.exports = {
 // =============================================================
 // 🔧 추가 팁: 환경변수 최적화
 // =============================================================
-
-// .env 파일에 추가할 MongoDB 최적화 설정
-/*
-# MongoDB 연결 최적화 (Railway 환경)
-MONGO_POOL_SIZE=10
-MONGO_CONNECT_TIMEOUT=15000
-MONGO_SERVER_TIMEOUT=10000
-MONGO_SOCKET_TIMEOUT=0
-MONGO_RETRY_WRITES=true
-
-# 압축 활성화 (네트워크 절약)
-MONGO_COMPRESSORS=zlib
-*/
