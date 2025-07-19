@@ -1,149 +1,309 @@
 class ValidationHelper {
-  static isValidNumber(value) {
-    return !isNaN(value) && isFinite(value);
-  }
-
-  static isValidPositiveNumber(value) {
-    return this.isValidNumber(value) && value > 0;
-  }
-
-  static isValidInteger(value) {
-    return Number.isInteger(value);
-  }
-
-  static isValidDate(date) {
-    return date instanceof Date && !isNaN(date.getTime());
-  }
-
-  static isValidEmail(email) {
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    return emailRegex.test(email);
-  }
-
-  static isValidPhoneNumber(phone) {
-    const phoneRegex = /^[0-9]{2,3}-[0-9]{3,4}-[0-9]{4}$/;
-    return phoneRegex.test(phone);
-  }
-
-  static isValidUrl(url) {
-    try {
-      new URL(url);
-      return true;
-    } catch {
-      return false;
+  // 할일 텍스트 검증
+  static validateTodoText(text) {
+    if (!text) {
+      throw new Error("할일 내용을 입력해주세요.");
     }
-  }
 
-  static isValidTelegramUserId(userId) {
-    return this.isValidPositiveNumber(userId) && userId < 2147483647; // 32비트 정수 최대값
-  }
+    const trimmed = text.trim();
 
-  static isValidTextLength(text, minLength = 1, maxLength = 1000) {
-    if (typeof text !== "string") {
-      return false;
+    if (trimmed.length === 0) {
+      throw new Error("할일 내용을 입력해주세요.");
     }
-    const length = text.trim().length;
-    return length >= minLength && length <= maxLength;
+
+    if (trimmed.length > 100) {
+      throw new Error("할일은 100자 이내로 입력해주세요.");
+    }
+
+    // 금지된 문자 체크
+    const forbiddenChars = /[<>\"'&]/g;
+    if (forbiddenChars.test(trimmed)) {
+      throw new Error("할일에는 특수문자 < > \" ' & 를 사용할 수 없습니다.");
+    }
+
+    return trimmed;
   }
 
-  static sanitizeText(text) {
-    if (typeof text !== "string") {
+  // 할일 인덱스 검증
+  static validateTodoIndex(index, maxIndex) {
+    const num = parseInt(index);
+
+    if (isNaN(num)) {
+      throw new Error("유효하지 않은 할일 번호입니다.");
+    }
+
+    if (num < 0 || num >= maxIndex) {
+      throw new Error(`할일 번호는 0부터 ${maxIndex - 1} 사이여야 합니다.`);
+    }
+
+    return num;
+  }
+
+  // 타이머 이름 검증 (기존)
+  static validateTimerName(name) {
+    if (!name) {
+      throw new Error("타이머 이름을 입력해주세요.");
+    }
+
+    const trimmed = name.trim();
+
+    if (trimmed.length === 0) {
+      throw new Error("타이머 이름을 입력해주세요.");
+    }
+
+    if (trimmed.length > 50) {
+      throw new Error("타이머 이름은 50자 이내로 입력해주세요.");
+    }
+
+    return trimmed;
+  }
+
+  // 타이머 시간 검증 (분)
+  static validateTimerDuration(duration) {
+    const num = parseInt(duration);
+
+    if (isNaN(num)) {
+      throw new Error("유효한 시간을 입력해주세요. (숫자만)");
+    }
+
+    if (num <= 0) {
+      throw new Error("시간은 1분 이상이어야 합니다.");
+    }
+
+    if (num > 480) {
+      throw new Error("시간은 8시간(480분) 이하여야 합니다.");
+    }
+
+    return num;
+  }
+
+  // 사용자 ID 검증
+  static validateUserId(userId) {
+    if (!userId) {
+      throw new Error("사용자 ID가 필요합니다.");
+    }
+
+    const num = parseInt(userId);
+
+    if (isNaN(num)) {
+      throw new Error("유효하지 않은 사용자 ID입니다.");
+    }
+
+    return num;
+  }
+
+  // 채팅 ID 검증
+  static validateChatId(chatId) {
+    if (!chatId) {
+      throw new Error("채팅 ID가 필요합니다.");
+    }
+
+    const num = parseInt(chatId);
+
+    if (isNaN(num)) {
+      throw new Error("유효하지 않은 채팅 ID입니다.");
+    }
+
+    return num;
+  }
+
+  // 메시지 텍스트 검증
+  static validateMessageText(text) {
+    if (!text) {
       return "";
     }
-    return text.trim().replace(/[<>&"']/g, "");
+
+    const trimmed = text.trim();
+
+    if (trimmed.length > 4096) {
+      throw new Error("메시지는 4096자 이내로 입력해주세요.");
+    }
+
+    return trimmed;
   }
 
-  static validateTodoTask(task) {
-    if (!this.isValidTextLength(task, 1, 200)) {
-      throw new Error("할일은 1자 이상 200자 이하로 입력해주세요.");
+  // 콜백 데이터 검증
+  static validateCallbackData(callbackData) {
+    if (!callbackData) {
+      throw new Error("콜백 데이터가 필요합니다.");
     }
-    return this.sanitizeText(task);
+
+    if (typeof callbackData !== "string") {
+      throw new Error("콜백 데이터는 문자열이어야 합니다.");
+    }
+
+    if (callbackData.length > 64) {
+      throw new Error("콜백 데이터는 64자 이내여야 합니다.");
+    }
+
+    return callbackData.trim();
   }
 
-  static validateLeaveAmount(amount) {
-    const numAmount = parseFloat(amount);
-    if (!this.isValidPositiveNumber(numAmount)) {
-      throw new Error("올바른 연차 일수를 입력해주세요.");
+  // 검색 키워드 검증
+  static validateSearchKeyword(keyword) {
+    if (!keyword) {
+      throw new Error("검색 키워드를 입력해주세요.");
     }
-    if (numAmount > 30) {
-      throw new Error("연차 일수는 30일을 초과할 수 없습니다.");
+
+    const trimmed = keyword.trim();
+
+    if (trimmed.length === 0) {
+      throw new Error("검색 키워드를 입력해주세요.");
     }
-    if (numAmount % 0.5 !== 0) {
-      throw new Error("연차는 0.5일 단위로만 사용할 수 있습니다.");
+
+    if (trimmed.length > 50) {
+      throw new Error("검색 키워드는 50자 이내로 입력해주세요.");
     }
-    return numAmount;
+
+    return trimmed;
   }
 
-  static validateTimerName(name) {
-    if (!this.isValidTextLength(name, 1, 50)) {
-      throw new Error("타이머 이름은 1자 이상 50자 이하로 입력해주세요.");
+  // 날짜 검증
+  static validateDate(date) {
+    if (!date) {
+      throw new Error("날짜가 필요합니다.");
     }
-    return this.sanitizeText(name);
+
+    const dateObj = new Date(date);
+
+    if (isNaN(dateObj.getTime())) {
+      throw new Error("유효하지 않은 날짜 형식입니다.");
+    }
+
+    return dateObj;
   }
 
-  static validateReminderTime(timeString) {
-    const timeRegex = /^(\d{1,2}):(\d{2})$/;
-    const match = timeString.match(timeRegex);
-
-    if (!match) {
-      throw new Error("올바른 시간 형식이 아닙니다. (예: 14:30)");
+  // 이메일 검증
+  static validateEmail(email) {
+    if (!email) {
+      throw new Error("이메일을 입력해주세요.");
     }
 
-    const hours = parseInt(match[1]);
-    const minutes = parseInt(match[2]);
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
-    if (hours < 0 || hours > 23) {
-      throw new Error("시간은 0-23 사이의 값이어야 합니다.");
+    if (!emailRegex.test(email)) {
+      throw new Error("유효하지 않은 이메일 형식입니다.");
     }
 
-    if (minutes < 0 || minutes > 59) {
-      throw new Error("분은 0-59 사이의 값이어야 합니다.");
-    }
-
-    return { hours, minutes };
+    return email.toLowerCase().trim();
   }
 
-  static validateReminderMinutes(minutes) {
-    const numMinutes = parseInt(minutes);
-    if (!this.isValidPositiveNumber(numMinutes)) {
-      throw new Error("올바른 분 수를 입력해주세요.");
+  // URL 검증
+  static validateUrl(url) {
+    if (!url) {
+      throw new Error("URL을 입력해주세요.");
     }
-    if (numMinutes > 1440) {
-      // 24시간
-      throw new Error("리마인더는 최대 24시간(1440분)까지 설정할 수 있습니다.");
+
+    try {
+      new URL(url);
+      return url;
+    } catch {
+      throw new Error("유효하지 않은 URL 형식입니다.");
     }
-    return numMinutes;
   }
 
-  static validateTTSText(text) {
-    if (!this.isValidTextLength(text, 1, 500)) {
-      throw new Error("TTS 텍스트는 1자 이상 500자 이하로 입력해주세요.");
+  // 파일명 검증
+  static validateFilename(filename) {
+    if (!filename) {
+      throw new Error("파일명을 입력해주세요.");
     }
-    return this.sanitizeText(text);
-  }
 
-  static validateLanguageCode(langCode) {
-    const supportedLanguages = ["ko", "en", "ja", "zh", "es", "fr", "de", "ru"];
-    if (!supportedLanguages.includes(langCode)) {
-      throw new Error(`지원하지 않는 언어코드입니다: ${langCode}`);
+    const trimmed = filename.trim();
+
+    if (trimmed.length === 0) {
+      throw new Error("파일명을 입력해주세요.");
     }
-    return langCode;
+
+    // 금지된 문자 체크
+    const forbiddenChars = /[<>:"/\\|?*]/g;
+    if (forbiddenChars.test(trimmed)) {
+      throw new Error(
+        '파일명에는 다음 문자를 사용할 수 없습니다: < > : " / \\ | ? *'
+      );
+    }
+
+    if (trimmed.length > 255) {
+      throw new Error("파일명은 255자 이내여야 합니다.");
+    }
+
+    return trimmed;
   }
 
-  static createErrorResponse(error) {
-    return {
-      success: false,
-      error: error.message || "알 수 없는 오류가 발생했습니다.",
-      timestamp: new Date().toISOString(),
-    };
+  // 포트 번호 검증
+  static validatePort(port) {
+    const num = parseInt(port);
+
+    if (isNaN(num)) {
+      throw new Error("유효한 포트 번호를 입력해주세요.");
+    }
+
+    if (num < 1 || num > 65535) {
+      throw new Error("포트 번호는 1부터 65535 사이여야 합니다.");
+    }
+
+    return num;
   }
 
-  static createSuccessResponse(data) {
-    return {
-      success: true,
-      data: data,
-      timestamp: new Date().toISOString(),
-    };
+  // 페이지 번호 검증
+  static validatePageNumber(page, maxPage = null) {
+    const num = parseInt(page);
+
+    if (isNaN(num)) {
+      throw new Error("유효한 페이지 번호를 입력해주세요.");
+    }
+
+    if (num < 1) {
+      throw new Error("페이지 번호는 1 이상이어야 합니다.");
+    }
+
+    if (maxPage !== null && num > maxPage) {
+      throw new Error(`페이지 번호는 ${maxPage} 이하여야 합니다.`);
+    }
+
+    return num;
+  }
+
+  // 색상 코드 검증 (HEX)
+  static validateHexColor(color) {
+    if (!color) {
+      throw new Error("색상 코드를 입력해주세요.");
+    }
+
+    const hexRegex = /^#([A-Fa-f0-9]{6}|[A-Fa-f0-9]{3})$/;
+
+    if (!hexRegex.test(color)) {
+      throw new Error("유효하지 않은 색상 코드입니다. (예: #FF0000)");
+    }
+
+    return color.toUpperCase();
+  }
+
+  // 범위 검증
+  static validateRange(value, min, max, fieldName = "값") {
+    const num = parseFloat(value);
+
+    if (isNaN(num)) {
+      throw new Error(`유효한 ${fieldName}을 입력해주세요.`);
+    }
+
+    if (num < min || num > max) {
+      throw new Error(`${fieldName}은 ${min}부터 ${max} 사이여야 합니다.`);
+    }
+
+    return num;
+  }
+
+  // 필수 필드 검증
+  static validateRequired(value, fieldName) {
+    if (
+      value === null ||
+      value === undefined ||
+      (typeof value === "string" && value.trim().length === 0)
+    ) {
+      throw new Error(`${fieldName}은 필수 입력 항목입니다.`);
+    }
+
+    return value;
   }
 }
 
