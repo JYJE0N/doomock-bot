@@ -1,300 +1,220 @@
-// src/services/WeatherService.js - 도시명 및 메시지 포맷팅 수정
-
-const {
-  ensureConnection,
-  getCollection,
-} = require("../database/DatabaseManager");
 const axios = require("axios");
+const { TimeHelper } = require("../utils/TimeHelper");
 
 class WeatherService {
   constructor(apiKey) {
-    // 🔧 Railway 환경변수에서 API 키 가져오기
     this.apiKey = apiKey || process.env.WEATHER_API_KEY;
-
-    // 🚨 디버그 로그 추가
-    console.log("🌤️ WeatherService 초기화");
-    console.log(
-      "🔑 API 키 상태:",
-      this.apiKey ? `설정됨 (${this.apiKey.slice(0, 8)}...)` : "❌ 없음"
-    );
-
-    // 🔧 도시 매핑 개선 (OpenWeatherMap 호환)
-    this.cityMapping = {
-      화성: "Suwon,KR", // 화성은 수원으로 대체 (근접 지역)
-      동탄: "Suwon,KR", // 동탄도 수원으로 대체
-      서울: "Seoul,KR",
-      부산: "Busan,KR",
-      인천: "Incheon,KR",
-      광주: "Gwangju,KR",
-      대전: "Daejeon,KR",
-      울산: "Ulsan,KR",
-      제주: "Jeju,KR",
-      수원: "Suwon,KR",
-      성남: "Seongnam,KR",
-    };
+    this.baseUrl = "https://api.openweathermap.org/data/2.5";
   }
 
-  // 도시명 유효성 검사 및 변환
-  validateCity(inputCity) {
-    if (!inputCity) return "화성";
-
-    const normalizedInput = inputCity.trim();
-
-    // 한글 도시명인 경우 영문으로 변환
-    if (this.cityMapping[normalizedInput]) {
-      console.log(
-        `🏙️ 도시 매핑: ${normalizedInput} → ${this.cityMapping[normalizedInput]}`
-      );
-      return this.cityMapping[normalizedInput];
-    }
-
-    // 영문 도시명인 경우 그대로 사용
-    return normalizedInput;
-  }
-
-  // 현재 날씨 정보 가져오기
+  // 현재 날씨 정보
   async getCurrentWeather(city = "화성") {
-    console.log(`🌤️ 날씨 요청: ${city}`);
-    console.log(`🔑 현재 API 키: ${this.apiKey ? "있음" : "없음"}`);
-
     try {
-      const validatedCity = this.validateCity(city);
-      console.log(`📍 최종 도시명: ${city} → ${validatedCity}`);
+      const url = `${this.baseUrl}/weather?q=${encodeURIComponent(city)}&appid=${this.apiKey}&units=metric&lang=kr`;
+      const response = await axios.get(url);
+      const data = response.data;
 
-      if (!this.apiKey) {
-        console.log("⚠️ API 키가 없어서 더미 데이터 반환");
-        return this.getDummyWeatherData(city);
-      }
+      // 한국 시간으로 변환
+      const currentTime = TimeHelper.getKoreaTime();
+      const sunrise = new Date((data.sys.sunrise + data.timezone) * 1000);
+      const sunset = new Date((data.sys.sunset + data.timezone) * 1000);
 
-      const url = `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(validatedCity)}&appid=${this.apiKey}&units=metric&lang=kr`;
-      console.log(
-        "🌐 API 호출 URL:",
-        url.replace(this.apiKey, "API_KEY_HIDDEN")
-      );
-
-      const response = await axios.get(url, { timeout: 10000 });
-      console.log("✅ API 응답 성공:", response.data.name);
-
-      return response.data;
+      return {
+        city: data.name,
+        country: data.sys.country,
+        currentTime: currentTime,
+        temperature: Math.round(data.main.temp),
+        feelsLike: Math.round(data.main.feels_like),
+        humidity: data.main.humidity,
+        pressure: data.main.pressure,
+        windSpeed: data.wind.speed,
+        windDirection: data.wind.deg,
+        visibility: data.visibility / 1000, // km 변환
+        cloudiness: data.clouds.all,
+        description: data.weather[0].description,
+        icon: data.weather[0].icon,
+        sunrise: sunrise,
+        sunset: sunset,
+        timezone: data.timezone,
+      };
     } catch (error) {
-      console.error("❌ Weather API 오류:", error.message);
-
-      if (error.response?.status === 404) {
-        console.error("🏙️ 도시를 찾을 수 없음, 수원으로 대체 시도");
-
-        try {
-          // 도시를 찾을 수 없으면 수원으로 재시도
-          const fallbackUrl = `https://api.openweathermap.org/data/2.5/weather?q=Suwon,KR&appid=${this.apiKey}&units=metric&lang=kr`;
-          const fallbackResponse = await axios.get(fallbackUrl, {
-            timeout: 10000,
-          });
-          console.log("✅ 대체 도시 응답 성공:", fallbackResponse.data.name);
-
-          // 원래 요청한 도시명으로 표시명 변경
-          fallbackResponse.data.displayName = city;
-          return fallbackResponse.data;
-        } catch (fallbackError) {
-          console.error("❌ 대체 도시도 실패:", fallbackError.message);
-        }
-      }
-
-      // 최종적으로 더미 데이터 반환
-      return this.getDummyWeatherData(city, error.message);
+      throw new Error(`날씨 정보를 가져올 수 없습니다: ${error.message}`);
     }
   }
 
-  // 더미 데이터 생성
-  getDummyWeatherData(city, errorMessage = null) {
-    return {
-      name: city,
-      displayName: city,
-      main: { temp: 15, feels_like: 13, humidity: 65 },
-      wind: { speed: 2.5 },
-      weather: [{ main: "Clouds", description: "구름많음" }],
-      sys: { country: "KR" },
-      coord: { lat: 37.2, lon: 127.0 },
-      isDummy: true,
-      errorMessage,
-    };
-  }
-
-  // 날씨 예보 가져오기
+  // 5일 날씨 예보
   async getWeatherForecast(city = "화성") {
     try {
-      const validatedCity = this.validateCity(city);
+      const url = `${this.baseUrl}/forecast?q=${encodeURIComponent(city)}&appid=${this.apiKey}&units=metric&lang=kr`;
+      const response = await axios.get(url);
+      const data = response.data;
 
-      if (!this.apiKey) {
-        console.log("⚠️ API 키가 없어서 더미 예보 반환");
-        return this.getDummyForecastData(city);
-      }
+      const forecasts = data.list.slice(0, 8).map((item) => {
+        // UTC 시간을 한국 시간으로 변환
+        const forecastTime = new Date(item.dt * 1000);
+        const koreaTime = new Date(forecastTime.getTime() + 9 * 60 * 60 * 1000); // UTC+9
 
-      const url = `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(validatedCity)}&appid=${this.apiKey}&units=metric&lang=kr`;
-      console.log("🌐 예보 API 호출");
-
-      const response = await axios.get(url, { timeout: 10000 });
-      console.log("✅ 예보 API 응답 성공");
-
-      return response.data;
-    } catch (error) {
-      console.error("❌ Weather Forecast API 오류:", error.message);
-      return this.getDummyForecastData(city, error.message);
-    }
-  }
-
-  // 더미 예보 데이터
-  getDummyForecastData(city, errorMessage = null) {
-    return {
-      city: { name: city },
-      list: [
-        {
-          dt_txt: new Date().toISOString(),
-          main: { temp: 16, humidity: 70 },
-          weather: [{ description: "맑음" }],
-        },
-        {
-          dt_txt: new Date(Date.now() + 3600000).toISOString(),
-          main: { temp: 18, humidity: 65 },
-          weather: [{ description: "구름조금" }],
-        },
-      ],
-      isDummy: true,
-      errorMessage,
-    };
-  }
-
-  // 🔧 안전한 날씨 메시지 포맷팅 (Markdown 오류 방지)
-  formatWeatherMessage(weatherData) {
-    try {
-      const { name, displayName, main, weather, wind, sys } = weatherData;
-
-      // 표시할 도시명 결정
-      const cityName = displayName || name || "알 수 없는 지역";
-
-      const temp = Math.round(main.temp);
-      const feelsLike = Math.round(main.feels_like);
-      const humidity = main.humidity;
-      const windSpeed = wind ? Math.round(wind.speed * 10) / 10 : 0;
-      const description = weather[0].description;
-
-      // 날씨 아이콘 선택
-      const weatherIcon = this.getWeatherIcon(weather[0].main);
-
-      // 옷차림 추천
-      const clothingAdvice = this.getClothingAdvice(temp);
-
-      // 🔧 Markdown 특수문자 이스케이프 처리
-      const safeCityName = this.escapeMarkdown(cityName);
-      const safeDescription = this.escapeMarkdown(description);
-      const safeClothingAdvice = this.escapeMarkdown(clothingAdvice);
-
-      let message = `${weatherIcon} *${safeCityName} 현재 날씨*\n\n`;
-      message += `🌡️ *온도*: ${temp}°C (체감 ${feelsLike}°C)\n`;
-      message += `💧 *습도*: ${humidity}%\n`;
-      message += `🌬️ *바람*: ${windSpeed}m/s\n`;
-      message += `☁️ *날씨*: ${safeDescription}\n\n`;
-      message += `👔 *추천 옷차림*: ${safeClothingAdvice}`;
-
-      // 🚨 더미 데이터 표시 개선
-      if (weatherData.isDummy) {
-        if (weatherData.errorMessage) {
-          message += `\n\n❌ _API 오류 발생_`;
-          message += `\n⚠️ _임시 데이터를 표시합니다_`;
-        } else {
-          message += `\n\n⚠️ _API 키가 설정되지 않아 샘플 데이터를 표시합니다_`;
-        }
-        message += `\n🔧 _실제 날씨 정보를 보려면 WEATHER_API_KEY를 확인해주세요_`;
-      }
-
-      return message;
-    } catch (error) {
-      console.error("❌ 날씨 메시지 포맷팅 오류:", error);
-      return `❌ 날씨 정보 표시 중 오류가 발생했습니다.`;
-    }
-  }
-
-  // 예보 메시지 포맷팅
-  formatForecastMessage(forecastData, city) {
-    try {
-      const cityName = forecastData.city ? forecastData.city.name : city;
-      const safeCityName = this.escapeMarkdown(cityName);
-
-      let message = `📅 *${safeCityName} 시간별 예보*\n\n`;
-
-      // 처음 8개 예보만 표시 (24시간)
-      const forecasts = forecastData.list.slice(0, 8);
-
-      forecasts.forEach((forecast, index) => {
-        const date = new Date(forecast.dt_txt);
-        const time = date.getHours();
-        const temp = Math.round(forecast.main.temp);
-        const desc = this.escapeMarkdown(forecast.weather[0].description);
-        const icon = this.getWeatherIcon(forecast.weather[0].main);
-
-        message += `${icon} *${time}시*: ${temp}°C, ${desc}\n`;
+        return {
+          time: koreaTime,
+          temperature: Math.round(item.main.temp),
+          feelsLike: Math.round(item.main.feels_like),
+          humidity: item.main.humidity,
+          description: item.weather[0].description,
+          icon: item.weather[0].icon,
+          windSpeed: item.wind.speed,
+          pop: Math.round(item.pop * 100), // 강수 확률
+        };
       });
 
-      if (forecastData.isDummy) {
-        message += `\n⚠️ _샘플 예보 데이터입니다_`;
-        message += `\n🔧 _실제 예보를 보려면 WEATHER_API_KEY를 확인해주세요_`;
+      return {
+        city: data.city.name,
+        forecasts: forecasts,
+      };
+    } catch (error) {
+      throw new Error(`날씨 예보를 가져올 수 없습니다: ${error.message}`);
+    }
+  }
+
+  // 현재 날씨 메시지 포맷팅
+  formatWeatherMessage(weatherData) {
+    const currentTime = TimeHelper.formatDateTime(weatherData.currentTime);
+    const sunrise = TimeHelper.formatTime(weatherData.sunrise);
+    const sunset = TimeHelper.formatTime(weatherData.sunset);
+
+    // 날씨 아이콘 이모지 매핑
+    const weatherEmoji = this.getWeatherEmoji(weatherData.icon);
+
+    // 바람 방향
+    const windDirection = this.getWindDirection(weatherData.windDirection);
+
+    // 옷차림 추천
+    const clothingAdvice = this.getClothingAdvice(weatherData.temperature);
+
+    return (
+      `${weatherEmoji} **${weatherData.city} 날씨**\n\n` +
+      `📅 **업데이트:** ${currentTime}\n\n` +
+      `🌡️ **기온:** ${weatherData.temperature}°C (체감 ${weatherData.feelsLike}°C)\n` +
+      `💧 **습도:** ${weatherData.humidity}%\n` +
+      `🌬️ **바람:** ${windDirection} ${weatherData.windSpeed}m/s\n` +
+      `👁️ **가시거리:** ${weatherData.visibility}km\n` +
+      `☁️ **구름량:** ${weatherData.cloudiness}%\n` +
+      `🌅 **일출:** ${sunrise} | **일몰:** ${sunset}\n\n` +
+      `📝 **현재:** ${weatherData.description}\n\n` +
+      `👕 **옷차림:** ${clothingAdvice}`
+    );
+  }
+
+  // 날씨 예보 메시지 포맷팅
+  formatForecastMessage(forecastData, city) {
+    const currentTime = TimeHelper.formatDateTime(TimeHelper.getKoreaTime());
+
+    let message = `🌤️ **${forecastData.city} 시간별 예보**\n\n`;
+    message += `📅 **업데이트:** ${currentTime}\n\n`;
+
+    forecastData.forecasts.forEach((forecast, index) => {
+      const time = TimeHelper.formatTime(forecast.time);
+      const date = TimeHelper.formatDate(forecast.time);
+      const weatherEmoji = this.getWeatherEmoji(forecast.icon);
+
+      // 첫 번째와 이후 날짜가 다를 때 날짜 구분선 추가
+      if (index === 0) {
+        message += `**📅 ${date}**\n`;
+      } else if (index > 0) {
+        const prevDate = TimeHelper.formatDate(
+          forecastData.forecasts[index - 1].time
+        );
+        const currentDate = TimeHelper.formatDate(forecast.time);
+        if (prevDate !== currentDate) {
+          message += `\n**📅 ${currentDate}**\n`;
+        }
       }
 
-      return message;
-    } catch (error) {
-      console.error("❌ 예보 메시지 포맷팅 오류:", error);
-      return `❌ 예보 정보 표시 중 오류가 발생했습니다.`;
+      message += `${weatherEmoji} **${time}** ${forecast.temperature}°C `;
+      message += `(체감 ${forecast.feelsLike}°C) `;
+      if (forecast.pop > 0) {
+        message += `🌧️ ${forecast.pop}% `;
+      }
+      message += `${forecast.description}\n`;
+    });
+
+    return message;
+  }
+
+  // 날씨 아이콘을 이모지로 변환
+  getWeatherEmoji(icon) {
+    const iconMap = {
+      "01d": "☀️",
+      "01n": "🌙", // 맑음
+      "02d": "⛅",
+      "02n": "☁️", // 구름 조금
+      "03d": "☁️",
+      "03n": "☁️", // 구름 많음
+      "04d": "☁️",
+      "04n": "☁️", // 흐림
+      "09d": "🌦️",
+      "09n": "🌧️", // 소나기
+      "10d": "🌦️",
+      "10n": "🌧️", // 비
+      "11d": "⛈️",
+      "11n": "⛈️", // 천둥번개
+      "13d": "🌨️",
+      "13n": "🌨️", // 눈
+      "50d": "🌫️",
+      "50n": "🌫️", // 안개
+    };
+    return iconMap[icon] || "🌤️";
+  }
+
+  // 바람 방향
+  getWindDirection(degree) {
+    const directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
+    const index = Math.round(degree / 45) % 8;
+    return directions[index];
+  }
+
+  // 옷차림 추천
+  getClothingAdvice(temperature) {
+    if (temperature >= 28) {
+      return "🩳 반팔, 반바지, 원피스 (매우 더움)";
+    } else if (temperature >= 23) {
+      return "👕 얇은 셔츠, 면바지 (더움)";
+    } else if (temperature >= 20) {
+      return "👔 긴팔 셔츠, 얇은 가디건 (따뜻함)";
+    } else if (temperature >= 17) {
+      return "🧥 얇은 니트, 자켓 (선선함)";
+    } else if (temperature >= 12) {
+      return "🧥 자켓, 가디건, 얇은 코트 (쌀쌀함)";
+    } else if (temperature >= 9) {
+      return "🧥 트렌치코트, 야상 (추움)";
+    } else if (temperature >= 5) {
+      return "🧥 울코트, 히트텍 (매우 추움)";
+    } else {
+      return "🧥 패딩, 두꺼운 코트, 목도리 (혹한)";
     }
   }
 
-  // 🔧 Markdown 특수문자 이스케이프
-  escapeMarkdown(text) {
-    if (!text) return "";
-
-    // Markdown에서 특별한 의미를 가지는 문자들을 이스케이프
-    return text.replace(/([_*\]()~`>#+=|{}!-])/g, "\\$1");
-  }
-
-  // 날씨 아이콘 반환
-  getWeatherIcon(weatherMain) {
-    const iconMap = {
-      Clear: "☀️",
-      Clouds: "☁️",
-      Rain: "🌧️",
-      Drizzle: "🌦️",
-      Thunderstorm: "⛈️",
-      Snow: "❄️",
-      Mist: "🌫️",
-      Fog: "🌫️",
-      Haze: "🌫️",
-      Dust: "🌪️",
-      Sand: "🌪️",
-      Ash: "🌋",
-      Squall: "💨",
-      Tornado: "🌪️",
+  // 도시명 검증
+  validateCity(city) {
+    const cityMap = {
+      화성: "화성",
+      동탄: "화성",
+      서울: "서울",
+      부산: "부산",
+      인천: "인천",
+      광주: "광주",
+      대전: "대전",
+      울산: "울산",
+      제주: "제주",
+      수원: "수원",
+      성남: "성남",
+      고양: "고양",
+      용인: "용인",
+      안양: "안양",
+      안산: "안산",
+      평택: "평택",
     };
 
-    return iconMap[weatherMain] || "🌤️";
-  }
-
-  // 온도별 옷차림 추천
-  getClothingAdvice(temp) {
-    if (temp >= 28) return "반팔, 반바지, 샌들";
-    if (temp >= 23) return "얇은 셔츠, 긴바지";
-    if (temp >= 20) return "긴팔, 얇은 가디건";
-    if (temp >= 17) return "자켓, 니트";
-    if (temp >= 12) return "트렌치코트, 스웨터";
-    if (temp >= 9) return "자켓, 가디건";
-    if (temp >= 5) return "코트, 히트텍";
-    return "패딩, 목도리, 장갑";
-  }
-
-  // 기존 getWeather 메서드 (호환성 유지)
-  async getWeather(city = "Seoul") {
-    try {
-      const weatherData = await this.getCurrentWeather(city);
-      return this.formatWeatherMessage(weatherData);
-    } catch (error) {
-      return `❌ 날씨 정보를 불러오지 못했습니다: ${error.message}`;
-    }
+    return cityMap[city] || city;
   }
 }
 

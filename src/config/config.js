@@ -11,7 +11,7 @@ const config = {
   },
 
   versionHistory: {
-    "3.0.0": {
+    "3.0.1": {
       date: "2025-07-18",
       changes: [
         "모듈 시스템 전면 리팩토링",

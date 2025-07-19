@@ -67,20 +67,15 @@ class BotController {
   }
 
   async initializeDatabase() {
-    if (this.config.mongoUrl) {
+    if (this.config.MONGO_URL) {
+      // ✅ MONGO_URL 확인
       try {
-        this.dbManager = new DatabaseManager(this.config.mongoUrl);
-        await this.dbManager.connect();
-
-        // 싱글톤 인스턴스 설정 (서비스들이 사용할 수 있도록)
-        if (DatabaseManager.setInstance) {
-          DatabaseManager.setInstance(this.dbManager);
-        }
+        this.dbManager = new DatabaseManager();
+        await this.dbManager.connect(this.config.MONGO_URL); // ✅ URL을 connect()에 전달
 
         Logger.success("데이터베이스 연결 성공");
       } catch (error) {
         Logger.error("데이터베이스 연결 실패:", error);
-        // DB 연결 실패해도 봇은 계속 실행
         Logger.warn("MongoDB 없이 봇을 실행합니다. 일부 기능이 제한됩니다.");
       }
     } else {
