@@ -62,7 +62,7 @@ class InsightModule extends BaseModule {
         return await this.sendMessage(
           bot,
           chatId,
-          "❌ 알 수 없는 인사이트 명령입니다.",
+          "❌ 알 수 없는 인사이트 명령입니다."
         );
     }
   }
@@ -151,7 +151,7 @@ class InsightModule extends BaseModule {
       await this.sendMessage(
         bot,
         chatId,
-        `❌ 인사이트 생성 실패: ${error.message}`,
+        `❌ 인사이트 생성 실패: ${error.message}`
       );
     }
   }
@@ -192,7 +192,7 @@ class InsightModule extends BaseModule {
 
   async showProductStrategy(bot, chatId, messageId, from) {
     const strategy = await this.insightService.generateProductStrategy(
-      getUserName(from),
+      getUserName(from)
     );
     await this.editMessage(bot, chatId, messageId, strategy, {
       parse_mode: "Markdown",
@@ -201,7 +201,7 @@ class InsightModule extends BaseModule {
 
   async showPricingStrategy(bot, chatId, messageId, from) {
     const strategy = await this.insightService.generatePricingStrategy(
-      getUserName(from),
+      getUserName(from)
     );
     await this.editMessage(bot, chatId, messageId, strategy, {
       parse_mode: "Markdown",
@@ -210,7 +210,7 @@ class InsightModule extends BaseModule {
 
   async showInventoryStrategy(bot, chatId, messageId, from) {
     const strategy = await this.insightService.generateInventoryStrategy(
-      getUserName(from),
+      getUserName(from)
     );
     await this.editMessage(bot, chatId, messageId, strategy, {
       parse_mode: "Markdown",
@@ -219,7 +219,7 @@ class InsightModule extends BaseModule {
 
   async showMarketingStrategy(bot, chatId, messageId, from) {
     const strategy = await this.insightService.generateMarketingStrategy(
-      getUserName(from),
+      getUserName(from)
     );
     await this.editMessage(bot, chatId, messageId, strategy, {
       parse_mode: "Markdown",
@@ -228,7 +228,7 @@ class InsightModule extends BaseModule {
 
   async showRegionalStrategy(bot, chatId, messageId, from) {
     const strategy = await this.insightService.generateRegionalStrategy(
-      getUserName(from),
+      getUserName(from)
     );
     await this.editMessage(bot, chatId, messageId, strategy, {
       parse_mode: "Markdown",
@@ -237,7 +237,7 @@ class InsightModule extends BaseModule {
 
   async showCompetitorStrategy(bot, chatId, messageId, from) {
     const strategy = await this.insightService.generateCompetitorStrategy(
-      getUserName(from),
+      getUserName(from)
     );
     await this.editMessage(bot, chatId, messageId, strategy, {
       parse_mode: "Markdown",
@@ -246,7 +246,7 @@ class InsightModule extends BaseModule {
 
   async showNationalStatus(bot, chatId, messageId, from) {
     const status = await this.insightService.generateNationalStatus(
-      getUserName(from),
+      getUserName(from)
     );
     await this.sendMessage(bot, chatId, status, {
       parse_mode: "Markdown",

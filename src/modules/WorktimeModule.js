@@ -91,7 +91,7 @@ class WorktimeModule extends BaseModule {
       await this.sendMessage(
         bot,
         chatId,
-        "❌ 근무시간 정보를 불러오는 중 오류가 발생했습니다.",
+        "❌ 근무시간 정보를 불러오는 중 오류가 발생했습니다."
       );
     }
   }

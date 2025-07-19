@@ -4,7 +4,7 @@ const BaseModule = require("./BaseModule");
 const { TodoService } = require("../services/TodoService");
 const { getUserName } = require("../utils/UserHelper");
 const { ValidationHelper } = require("../utils/ValidationHelper");
-const { Logger } = require("../utils/Logger");
+const Logger = require("../utils/Logger");
 
 class TodoModule extends BaseModule {
   constructor() {

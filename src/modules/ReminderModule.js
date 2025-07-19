@@ -40,7 +40,7 @@ class ReminderModule extends BaseModule {
           chatId,
           messageId,
           userName,
-          menuManager,
+          menuManager
         );
         break;
       case "minutes":
@@ -56,7 +56,7 @@ class ReminderModule extends BaseModule {
         await this.sendMessage(
           bot,
           chatId,
-          "❌ 알 수 없는 리마인더 명령입니다.",
+          "❌ 알 수 없는 리마인더 명령입니다."
         );
     }
   }
@@ -81,7 +81,7 @@ class ReminderModule extends BaseModule {
       await this.sendMessage(
         bot,
         chatId,
-        "❌ 리마인더 설정 중 오류가 발생했습니다.",
+        "❌ 리마인더 설정 중 오류가 발생했습니다."
       );
     }
   }
