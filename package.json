@@ -28,7 +28,7 @@
     "url": "https://github.com/JYJE0N/doomock-bot.git"
   },
   "dependencies": {
-    "axios": "^1.6.0",
+    "axios": "^1.10.0",
     "dotenv": "^16.0.1",
     "form-data": "^4.0.0",
     "gtts": "^0.2.1",
