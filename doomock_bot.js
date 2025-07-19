@@ -42,7 +42,7 @@ function createBot() {
   const botInstance = new TelegramBot(token, botOptions);
 
   // 봇 이벤트 핸들러 설정
-  botInstance.on("polling_error", error => {
+  botInstance.on("polling_error", (error) => {
     Logger.error("폴링 오류:", error);
 
     // 중요한 오류의 경우 재시작 시도
@@ -128,7 +128,7 @@ function setupErrorHandlers() {
   });
 
   // 처리되지 않은 예외
-  process.on("uncaughtException", error => {
+  process.on("uncaughtException", (error) => {
     Logger.error("처리되지 않은 예외:", {
       message: error.message,
       stack: error.stack,
@@ -209,7 +209,6 @@ async function shutdown(exitCode = 0) {
  * 시스템 정보 로깅
  */
 function logSystemInfo() {
-  Logger.info("=".repeat(50));
   Logger.info(`🤖 두목 봇 v${AppConfig.VERSION} 시작`);
   Logger.info("=".repeat(50));
 
@@ -225,15 +224,27 @@ function logSystemInfo() {
     Uptime: `${Math.round(process.uptime())}초`,
   };
 
-  Logger.info("시스템 환경:", envInfo);
+  // ✅ 안전한 봇 설정만 로깅 (민감한 정보 제외)
+  const safeSummary = {
+    environment: AppConfig.NODE_ENV,
+    version: AppConfig.VERSION,
+    port: AppConfig.PORT,
+    mongoConfigured: !!AppConfig.MONGO_URL,
+    weatherApiConfigured: !!AppConfig.WEATHER_API_KEY,
+    adminUsers: AppConfig.ADMIN_USER_IDS.length,
+    enabledModules: Object.entries(AppConfig.FEATURES)
+      .filter(([, enabled]) => enabled)
+      .map(([feature]) => feature)
+      .join(","),
+    railway: AppConfig.isRailway,
+  };
 
-  // AppConfig 설정 요약 (민감한 정보 제외)
-  try {
-    const configSummary = AppConfig.getSummary();
-    Logger.info("봇 설정 요약:", configSummary);
-  } catch (error) {
-    Logger.warn("설정 요약 로깅 실패:", error.message);
-  }
+  Logger.info(
+    "봇 설정 요약:",
+    Object.entries(safeSummary)
+      .map(([key, value]) => `${key}=${value}`)
+      .join(", ")
+  );
 }
 
 /**
@@ -249,7 +260,7 @@ function setupHealthCheck() {
 
     server.listen(AppConfig.PORT, () => {
       Logger.info(
-        `헬스체크 서버 시작: http://localhost:${AppConfig.PORT}/health`,
+        `헬스체크 서버 시작: http://localhost:${AppConfig.PORT}/health`
       );
       Logger.info("사용 가능한 엔드포인트:");
       Logger.info("  - GET /health (전체 상태)");
@@ -260,7 +271,7 @@ function setupHealthCheck() {
     });
 
     // 서버 에러 핸들링
-    server.on("error", error => {
+    server.on("error", (error) => {
       Logger.error("헬스체크 서버 오류:", error);
     });
 
@@ -299,7 +310,7 @@ async function main() {
     Logger.success("=".repeat(50));
     Logger.success(`🚀 두목 봇 v${AppConfig.VERSION} 시작 완료!`);
     Logger.success("=".repeat(50));
-    Logger.info("폴링 모드로 실행 중... (Ctrl+C로 종료)");
+    Logger.info("폴링 모드로 실행 중... (안전하게 로깅됨)");
 
     // 주기적 메모리 정리 (선택사항)
     if (AppConfig.NODE_ENV === "production") {

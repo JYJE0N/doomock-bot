@@ -74,9 +74,9 @@ class BotController {
     Logger.info(`- PORT: ${this.config.PORT}`);
     // 민감한 정보는 로깅하지 않음
     Logger.info(
-      `  - mongoUrl 길이: ${this.MONGO_URL ? this.MONGO_URL.length : "undefined"}`
+      `  - MONGO_URL 길이: ${this.MONGO_URL ? this.MONGO_URL.length : "undefined"}`
     );
-    Logger.info(`  - mongoUrl 존재 여부: ${!!this.MONGO_URL}`);
+    Logger.info(`  - MONGO_URL 존재 여부: ${!!this.MONGO_URL}`);
 
     // ✅ 환경 변수도 직접 확인
     Logger.info("🔍 환경 변수 직접 확인:");
