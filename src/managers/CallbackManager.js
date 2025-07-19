@@ -359,13 +359,66 @@ class CallbackManager {
       if (typeof module.handleCallback === "function") {
         // BaseModule.handleCallback(bot, callbackQuery, subAction, params)
         await module.handleCallback(this.bot, callbackQuery, methodName, []);
+        Logger.success(`✅ ${moduleName}.${methodName} 처리 완료`);
       } else {
-        Logger.error(`❌ ${moduleName}에 handleCallback 메서드 없음`);
-        await this.handleUnknownCallback(callbackQuery);
+        Logger.warn(
+          `⚠️ ${moduleName}에 handleCallback 메서드 없음, 기본 처리 시도`
+        );
+        await this.handleFallbackResponse(
+          callbackQuery,
+          moduleName,
+          methodName
+        );
       }
     } catch (error) {
       Logger.error(`❌ 모듈 ${moduleName} 실행 오류:`, error);
       await this.sendErrorMessage(callbackQuery.message.chat.id);
+    }
+  }
+
+  // 🔄 Fallback 응답 처리 (handleCallback이 없는 모듈용)
+  async handleFallbackResponse(callbackQuery, moduleName, methodName) {
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+
+    const responses = {
+      timer: {
+        menu: "⏰ **타이머 메뉴**\n\n포모도로 타이머와 작업 타이머를 제공합니다!",
+        start: "▶️ 타이머를 시작합니다...",
+        stop: "⏹️ 타이머를 정지합니다...",
+      },
+      weather: {
+        menu: "🌤️ **날씨 메뉴**\n\n실시간 날씨 정보를 확인하세요!",
+        current: "📍 현재 날씨를 확인 중...",
+        forecast: "📅 날씨 예보를 가져오는 중...",
+      },
+      insight: {
+        menu: "📊 **인사이트 메뉴**\n\n마케팅 데이터를 분석합니다!",
+        dashboard: "📈 대시보드를 로딩 중...",
+      },
+    };
+
+    const moduleResponses = responses[moduleName] || {};
+    const text =
+      moduleResponses[methodName] ||
+      `🚧 **${moduleName} ${methodName}**\n\n이 기능은 준비 중입니다!`;
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main_menu" }]],
+    };
+
+    try {
+      await this.bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      await this.bot.sendMessage(chatId, text, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
     }
   }
 

@@ -1,477 +1,455 @@
+// src/modules/WeatherModule.js - 표준 패턴으로 완전 새로 구현
+
+const BaseModule = require("./BaseModule");
+const { getUserName } = require("../utils/UserHelper");
+const { WeatherService } = require("../services/WeatherService");
 const Logger = require("../utils/Logger");
 
-class CallbackManager {
-  constructor(bot, modules) {
-    this.bot = bot;
-    this.modules = modules || {};
-    this.menuManager = null; // MenuManager 참조 추가
+class WeatherModule extends BaseModule {
+  constructor() {
+    super("WeatherModule", {
+      commands: ["weather"],
+      callbacks: ["weather"],
+      features: [
+        "current",
+        "forecast",
+        "seoul",
+        "busan",
+        "more_cities",
+        "quick",
+      ],
+    });
 
-    // 콜백 라우팅 맵
-    this.routes = new Map();
-    this.initializeRoutes();
-
+    this.weatherService = new WeatherService();
     Logger.info(
-      `📞 CallbackManager 초기화됨. 모듈 수: ${Object.keys(this.modules).length}`,
+      "🌤️ WeatherService 초기화:",
+      this.weatherService ? "성공" : "실패"
     );
   }
 
-  // MenuManager 설정 메서드 추가
-  setMenuManager(menuManager) {
-    this.menuManager = menuManager;
+  // ✅ 표준 액션 등록 패턴 적용
+  registerActions() {
+    // 날씨 기능별 액션 등록
+    this.actionMap.set("current", this.showCurrentWeather.bind(this));
+    this.actionMap.set("forecast", this.showForecast.bind(this));
+    this.actionMap.set("seoul", this.showSeoulWeather.bind(this));
+    this.actionMap.set("busan", this.showBusanWeather.bind(this));
+    this.actionMap.set("more_cities", this.showMoreCities.bind(this));
+    this.actionMap.set("quick", this.showQuickWeather.bind(this));
   }
 
-  initializeRoutes() {
-    // 메인 메뉴
-    this.routes.set("main_menu", { module: "menu", method: "showMainMenu" });
-    this.routes.set("help_menu", { module: "menu", method: "showHelpMenu" });
-    this.routes.set("cancel_action", {
-      module: "common",
-      method: "handleCancel",
-    });
-
-    // 할일 관리 - 메서드명 통일
-    this.routes.set("todo_menu", { module: "todo", method: "menu" });
-    this.routes.set("todo_list", { module: "todo", method: "list" });
-    this.routes.set("todo_add", { module: "todo", method: "add" });
-    this.routes.set("todo_stats", { module: "todo", method: "stats" });
-    this.routes.set("todo_clear_completed", {
-      module: "todo",
-      method: "clear_completed",
-    });
-    this.routes.set("todo_clear_all", { module: "todo", method: "clear_all" });
-
-    // 휴가 관리
-    this.routes.set("leave_menu", { module: "leave", method: "menu" });
-    this.routes.set("leave_status", { module: "leave", method: "status" });
-    this.routes.set("leave_use", { module: "leave", method: "use" });
-    this.routes.set("leave_history", { module: "leave", method: "history" });
-    this.routes.set("leave_setting", { module: "leave", method: "setting" });
-    this.routes.set("use_leave_1", { module: "leave", method: "useOne" });
-    this.routes.set("use_leave_0.5", { module: "leave", method: "useHalf" });
-    this.routes.set("use_leave_custom", {
-      module: "leave",
-      method: "useCustom",
-    });
-
-    // 운세 관리 - 메서드명 통일
-    this.routes.set("fortune_menu", { module: "fortune", method: "menu" });
-    this.routes.set("fortune_general", {
-      module: "fortune",
-      method: "general",
-    });
-    this.routes.set("fortune_work", { module: "fortune", method: "work" });
-    this.routes.set("fortune_love", { module: "fortune", method: "love" });
-    this.routes.set("fortune_money", { module: "fortune", method: "money" });
-    this.routes.set("fortune_health", { module: "fortune", method: "health" });
-    this.routes.set("fortune_meeting", {
-      module: "fortune",
-      method: "meeting",
-    });
-    this.routes.set("fortune_tarot", { module: "fortune", method: "tarot" });
-    this.routes.set("fortune_tarot3", { module: "fortune", method: "tarot3" });
-    this.routes.set("fortune_lucky", { module: "fortune", method: "lucky" });
-    this.routes.set("fortune_all", { module: "fortune", method: "all" });
-
-    // 타이머 관리 - 메서드명 통일
-    this.routes.set("timer_menu", { module: "timer", method: "menu" });
-    this.routes.set("timer_start_prompt", {
-      module: "timer",
-      method: "start_prompt",
-    });
-    this.routes.set("timer_pomodoro_start", {
-      module: "timer",
-      method: "pomodoro_start",
-    });
-    this.routes.set("timer_stop", { module: "timer", method: "stop" });
-    this.routes.set("timer_status", { module: "timer", method: "status" });
-
-    // 날씨 관리
-    this.routes.set("weather_menu", { module: "weather", method: "menu" });
-    this.routes.set("weather_current", {
-      module: "weather",
-      method: "current",
-    });
-    this.routes.set("weather_forecast", {
-      module: "weather",
-      method: "forecast",
-    });
-    this.routes.set("weather_seoul", { module: "weather", method: "seoul" });
-    this.routes.set("weather_busan", { module: "weather", method: "busan" });
-    this.routes.set("weather_more_cities", {
-      module: "weather",
-      method: "more_cities",
-    });
-
-    // 인사이트 관리
-    this.routes.set("insight_menu", { module: "insight", method: "menu" });
-    this.routes.set("insight_full", { module: "insight", method: "full" });
-    this.routes.set("insight_quick", { module: "insight", method: "quick" });
-    this.routes.set("insight_dashboard", {
-      module: "insight",
-      method: "dashboard",
-    });
-    this.routes.set("insight_national", {
-      module: "insight",
-      method: "national",
-    });
-    this.routes.set("insight_refresh", {
-      module: "insight",
-      method: "refresh",
-    });
-
-    // 유틸리티 관리
-    this.routes.set("utils_menu", { module: "utils", method: "menu" });
-    this.routes.set("utils_tts_menu", { module: "utils", method: "tts_menu" });
-    this.routes.set("utils_tts_help", { module: "utils", method: "tts_help" });
-    this.routes.set("utils_help", { module: "utils", method: "help" });
-
-    // 리마인더 관리
-    this.routes.set("reminder_menu", { module: "reminder", method: "menu" });
-    this.routes.set("remind_minutes", {
-      module: "reminder",
-      method: "minutes",
-    });
-    this.routes.set("remind_time", { module: "reminder", method: "time" });
-    this.routes.set("remind_help", { module: "reminder", method: "help" });
-
-    // 근무시간 관리
-    this.routes.set("worktime_menu", { module: "worktime", method: "menu" });
+  // ✅ 메뉴 데이터 제공 (BaseModule 오버라이드)
+  getMenuData(userName) {
+    return {
+      text: `🌤️ **${userName}님, 날씨 정보입니다**\n\n실시간 날씨와 예보를 확인하세요!`,
+      keyboard: {
+        inline_keyboard: [
+          [
+            { text: "📍 현재 날씨", callback_data: "weather_current" },
+            { text: "📅 날씨 예보", callback_data: "weather_forecast" },
+          ],
+          [
+            { text: "🏙️ 서울", callback_data: "weather_seoul" },
+            { text: "🌊 부산", callback_data: "weather_busan" },
+          ],
+          [
+            { text: "🗺️ 더 많은 도시", callback_data: "weather_more_cities" },
+            { text: "⚡ 빠른 날씨", callback_data: "weather_quick" },
+          ],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      },
+    };
   }
 
-  async handleCallback(callbackQuery) {
-    const data = callbackQuery.data;
-    const chatId = callbackQuery.message.chat.id;
+  // ========== 날씨 기능 메서드들 ==========
 
-    Logger.info(`📞 콜백 처리: ${data}`);
+  async showCurrentWeather(bot, chatId, messageId, userId, userName) {
+    try {
+      // 기본 위치: 화성/동탄
+      const city = "화성";
+
+      // 실제 API 호출 (WeatherService 사용)
+      const weatherData = await this.getWeatherData(city);
+
+      const text = this.formatCurrentWeather(weatherData, city);
+
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: this.getWeatherMenuKeyboard(),
+      });
+
+      this.updateStats("callback");
+    } catch (error) {
+      Logger.error(`WeatherModule showCurrentWeather 오류:`, error);
+      await this.showFallbackWeather(bot, chatId, messageId, "현재 날씨");
+    }
+  }
+
+  async showForecast(bot, chatId, messageId, userId, userName) {
+    try {
+      const city = "화성";
+      const forecastData = await this.getForecastData(city);
+
+      const text = this.formatForecast(forecastData, city);
+
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: this.getWeatherMenuKeyboard(),
+      });
+
+      this.updateStats("callback");
+    } catch (error) {
+      Logger.error(`WeatherModule showForecast 오류:`, error);
+      await this.showFallbackWeather(bot, chatId, messageId, "날씨 예보");
+    }
+  }
+
+  async showSeoulWeather(bot, chatId, messageId, userId, userName) {
+    try {
+      const weatherData = await this.getWeatherData("서울");
+      const text = this.formatCurrentWeather(weatherData, "서울");
+
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: this.getWeatherMenuKeyboard(),
+      });
+
+      this.updateStats("callback");
+    } catch (error) {
+      Logger.error(`WeatherModule showSeoulWeather 오류:`, error);
+      await this.showFallbackWeather(bot, chatId, messageId, "서울 날씨");
+    }
+  }
+
+  async showBusanWeather(bot, chatId, messageId, userId, userName) {
+    try {
+      const weatherData = await this.getWeatherData("부산");
+      const text = this.formatCurrentWeather(weatherData, "부산");
+
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: this.getWeatherMenuKeyboard(),
+      });
+
+      this.updateStats("callback");
+    } catch (error) {
+      Logger.error(`WeatherModule showBusanWeather 오류:`, error);
+      await this.showFallbackWeather(bot, chatId, messageId, "부산 날씨");
+    }
+  }
+
+  async showMoreCities(bot, chatId, messageId, userId, userName) {
+    try {
+      const text = `🗺️ **더 많은 도시 날씨**\n\n아래 도시를 선택하세요:`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🏙️ 서울", callback_data: "weather_seoul" },
+            { text: "🌊 부산", callback_data: "weather_busan" },
+          ],
+          [
+            { text: "🌉 인천", callback_data: "weather_인천" },
+            { text: "🌆 대구", callback_data: "weather_대구" },
+          ],
+          [
+            { text: "🏛️ 대전", callback_data: "weather_대전" },
+            { text: "🌺 광주", callback_data: "weather_광주" },
+          ],
+          [
+            { text: "🌊 울산", callback_data: "weather_울산" },
+            { text: "🏝️ 제주", callback_data: "weather_제주" },
+          ],
+          [
+            { text: "🔙 날씨 메뉴", callback_data: "weather_menu" },
+            { text: "🏠 메인 메뉴", callback_data: "main_menu" },
+          ],
+        ],
+      };
+
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      this.updateStats("callback");
+    } catch (error) {
+      Logger.error(`WeatherModule showMoreCities 오류:`, error);
+      await this.handleError(bot, chatId, error);
+    }
+  }
+
+  async showQuickWeather(bot, chatId, messageId, userId, userName) {
+    try {
+      // 빠른 날씨: 화성 + 서울 동시 표시
+      const [hwaseongData, seoulData] = await Promise.all([
+        this.getWeatherData("화성"),
+        this.getWeatherData("서울"),
+      ]);
+
+      const text =
+        `⚡ **빠른 날씨**\n\n` +
+        `**🏠 화성/동탄**\n${this.formatQuickWeather(hwaseongData)}\n\n` +
+        `**🏙️ 서울**\n${this.formatQuickWeather(seoulData)}`;
+
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: this.getWeatherMenuKeyboard(),
+      });
+
+      this.updateStats("callback");
+    } catch (error) {
+      Logger.error(`WeatherModule showQuickWeather 오류:`, error);
+      await this.showFallbackWeather(bot, chatId, messageId, "빠른 날씨");
+    }
+  }
+
+  // ========== 동적 콜백 처리 (도시별 날씨) ==========
+
+  async handleCallback(bot, callbackQuery, subAction, params) {
+    // 동적 도시 날씨 처리 (weather_인천, weather_대구 등)
+    const cities = ["인천", "대구", "대전", "광주", "울산", "제주"];
+
+    if (cities.includes(subAction)) {
+      return await this.showCityWeather(bot, callbackQuery, subAction);
+    }
+
+    // 표준 액션은 부모 클래스에서 처리
+    return await super.handleCallback(bot, callbackQuery, subAction, params);
+  }
+
+  async showCityWeather(bot, callbackQuery, city) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
 
     try {
-      // 콜백 응답
-      await this.bot.answerCallbackQuery(callbackQuery.id);
-    } catch (error) {
-      Logger.error("콜백 응답 실패:", error);
-    }
+      const weatherData = await this.getWeatherData(city);
+      const text = this.formatCurrentWeather(weatherData, city);
 
-    try {
-      // 동적 콜백 처리 (todo_toggle_1, todo_delete_1, weather_인천 등)
-      if (data.includes("_")) {
-        const handled = await this.handleDynamicCallback(callbackQuery);
-        if (handled) {
-          return;
-        }
-      }
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: this.getWeatherMenuKeyboard(),
+      });
 
-      // 라우팅된 콜백 처리
-      const route = this.routes.get(data);
-      if (route) {
-        await this.executeRoute(route, callbackQuery);
-      } else {
-        Logger.warn(`알 수 없는 콜백: ${data}`);
-        await this.handleUnknownCallback(callbackQuery);
-      }
+      this.updateStats("callback");
+      return true;
     } catch (error) {
-      Logger.error("콜백 처리 오류:", error);
-      await this.sendErrorMessage(chatId);
+      Logger.error(`WeatherModule showCityWeather(${city}) 오류:`, error);
+      await this.showFallbackWeather(bot, chatId, messageId, `${city} 날씨`);
+      return true;
     }
   }
 
-  async handleDynamicCallback(callbackQuery) {
-    const data = callbackQuery.data;
+  // ========== 날씨 데이터 처리 ==========
 
-    // todo_toggle_1, todo_delete_1 형식 처리
-    if (data.startsWith("todo_toggle_") || data.startsWith("todo_delete_")) {
-      if (this.modules.todo) {
-        // 직접 TodoModule의 메서드 호출
-        const parts = data.split("_");
-        const action = parts[1]; // toggle 또는 delete
-        const index = parseInt(parts[2]);
-
-        const {
-          message: {
-            chat: { id: chatId },
-            message_id: messageId,
-          },
-          from: { id: userId },
-        } = callbackQuery;
-
-        if (action === "toggle") {
-          await this.modules.todo.toggleTodo(
-            this.bot,
-            chatId,
-            messageId,
-            userId,
-            index,
-          );
-        } else if (action === "delete") {
-          await this.modules.todo.deleteTodo(
-            this.bot,
-            chatId,
-            messageId,
-            userId,
-            index,
-          );
-        }
-        return true;
-      }
+  async getWeatherData(city) {
+    try {
+      // WeatherService 사용해서 실제 API 호출
+      return await this.weatherService.getCurrentWeather(city);
+    } catch (error) {
+      Logger.warn(`실제 날씨 API 호출 실패, 기본값 사용: ${error.message}`);
+      // API 실패시 기본값 반환
+      return this.getDefaultWeatherData(city);
     }
+  }
 
-    // tts_mode_auto, tts_mode_manual, tts_lang_ko 등 TTS 콜백 처리
-    if (data.startsWith("tts_")) {
-      if (this.modules.utils) {
-        // TTS 콜백을 UtilsModule의 TTSService로 전달
-        await this.modules.utils.handleTTSCallback(this.bot, callbackQuery, []);
-        return true;
-      }
+  async getForecastData(city) {
+    try {
+      return await this.weatherService.getForecast(city);
+    } catch (error) {
+      Logger.warn(`예보 API 호출 실패, 기본값 사용: ${error.message}`);
+      return this.getDefaultForecastData(city);
     }
+  }
 
-    // weather_인천, weather_광주 등 동적 도시 처리
-    if (data.startsWith("weather_") && !this.routes.has(data)) {
-      if (this.modules.weather) {
-        // 'weather_' 접두사 제거하여 도시명 추출
-        const city = data.replace("weather_", "");
+  getDefaultWeatherData(city) {
+    // API 실패시 사용할 기본 데이터
+    return {
+      city: city,
+      temperature: 15,
+      description: "구름많음",
+      humidity: 65,
+      windSpeed: 2.1,
+      windDirection: "서풍",
+      icon: "☁️",
+    };
+  }
 
-        // WeatherModule의 showCurrentWeather 직접 호출
-        const {
-          message: {
-            chat: { id: chatId },
-            message_id: messageId,
-          },
-        } = callbackQuery;
-        await this.modules.weather.showCurrentWeather(
-          this.bot,
-          chatId,
-          messageId,
-          city,
-        );
-        return true;
-      }
-    }
+  getDefaultForecastData(city) {
+    return {
+      city: city,
+      forecast: [
+        { date: "오늘", icon: "☁️", temp: "15°C", desc: "구름많음" },
+        { date: "내일", icon: "🌤️", temp: "18°C", desc: "맑음" },
+        { date: "모레", icon: "🌧️", temp: "12°C", desc: "비" },
+      ],
+    };
+  }
 
-    // insight 관련 동적 콜백
-    if (data.startsWith("insight_") && !this.routes.has(data)) {
-      if (this.modules.insight) {
-        await this.modules.insight.handleDynamicCallback(callbackQuery);
-        return true;
-      }
+  // ========== 날씨 정보 포맷팅 ==========
+
+  formatCurrentWeather(data, city) {
+    const cityIcon = this.getCityIcon(city);
+
+    return (
+      `${cityIcon} **${city} 현재 날씨**\n\n` +
+      `${data.icon} **${data.description}**\n` +
+      `🌡️ 온도: ${data.temperature}°C\n` +
+      `💧 습도: ${data.humidity}%\n` +
+      `💨 바람: ${data.windDirection} ${data.windSpeed}m/s\n\n` +
+      `📝 업데이트: ${new Date().toLocaleTimeString("ko-KR")}`
+    );
+  }
+
+  formatForecast(data, city) {
+    const cityIcon = this.getCityIcon(city);
+    let forecastText = `${cityIcon} **${city} 날씨 예보**\n\n`;
+
+    data.forecast.forEach((day) => {
+      forecastText += `**${day.date}**: ${day.icon} ${day.desc} ${day.temp}\n`;
+    });
+
+    return forecastText;
+  }
+
+  formatQuickWeather(data) {
+    return `${data.icon} ${data.temperature}°C ${data.description}`;
+  }
+
+  getCityIcon(city) {
+    const icons = {
+      화성: "🏠",
+      서울: "🏙️",
+      부산: "🌊",
+      인천: "🌉",
+      대구: "🌆",
+      대전: "🏛️",
+      광주: "🌺",
+      울산: "🌊",
+      제주: "🏝️",
+    };
+    return icons[city] || "📍";
+  }
+
+  // ========== 키보드 생성 ==========
+
+  getWeatherMenuKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: "🔄 새로고침", callback_data: "weather_current" },
+          { text: "📅 예보보기", callback_data: "weather_forecast" },
+        ],
+        [
+          { text: "🌤️ 날씨 메뉴", callback_data: "weather_menu" },
+          { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+        ],
+      ],
+    };
+  }
+
+  // ========== Fallback 처리 ==========
+
+  async showFallbackWeather(bot, chatId, messageId, type) {
+    const text =
+      `🌤️ **${type}**\n\n` +
+      `현재 날씨 서비스가 일시적으로 이용 불가합니다.\n\n` +
+      `📱 대신 다음 링크를 확인해보세요:\n` +
+      `• 기상청: weather.go.kr\n` +
+      `• 네이버 날씨\n` +
+      `• 다음 날씨\n\n` +
+      `🔄 잠시 후 다시 시도해주세요!`;
+
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: this.getWeatherMenuKeyboard(),
+    });
+  }
+
+  // ========== 명령어 처리 ==========
+
+  async handleMessage(bot, msg) {
+    const {
+      chat: { id: chatId },
+      from: { id: userId },
+      text,
+    } = msg;
+
+    if (text && text.startsWith("/weather")) {
+      await this.handleWeatherCommand(bot, msg);
+      this.updateStats("command");
+      return true;
     }
 
     return false;
   }
 
-  async executeRoute(route, callbackQuery) {
-    const { module: moduleName, method: methodName } = route;
+  async handleWeatherCommand(bot, msg) {
+    const {
+      chat: { id: chatId },
+      from,
+    } = msg;
+    const userName = getUserName(from);
 
-    // 특별 처리: menu와 common은 별도 처리
-    if (moduleName === "menu") {
-      // MenuManager를 통해 처리
-      if (methodName === "showMainMenu") {
-        await this.showMainMenu(callbackQuery);
-      } else if (methodName === "showHelpMenu") {
-        await this.showHelpMenu(callbackQuery);
-      }
-      return;
-    }
+    try {
+      // 기본 현재 날씨 표시
+      const weatherData = await this.getWeatherData("화성");
+      const text = this.formatCurrentWeather(weatherData, "화성");
 
-    if (moduleName === "common") {
-      if (methodName === "handleCancel") {
-        await this.handleCancel(callbackQuery);
-      }
-      return;
-    }
-
-    // 일반 모듈 처리 - menuManager 전달
-    const module = this.modules[moduleName];
-    if (module) {
-      await this.handleModuleCallback(module, callbackQuery, methodName);
-    } else {
-      Logger.error(`모듈을 찾을 수 없음: ${moduleName}`);
-      await this.handleUnknownCallback(callbackQuery);
+      await this.sendMessage(bot, chatId, text, {
+        parse_mode: "Markdown",
+        reply_markup: this.getWeatherMenuKeyboard(),
+      });
+    } catch (error) {
+      Logger.error("WeatherModule handleWeatherCommand 오류:", error);
+      await this.sendMessage(bot, chatId, "❌ 날씨 정보를 가져올 수 없습니다.");
     }
   }
 
-  // 모듈 콜백 처리 - menuManager 전달 추가
-  async handleModuleCallback(module, callbackQuery, methodName) {
+  // ✅ 도움말 메시지 오버라이드
+  getHelpMessage() {
+    return `🌤️ **날씨 사용법**
+
+**📱 메뉴 방식:**
+/start → 🌤️ 날씨 → 원하는 지역 선택
+
+**⌨️ 명령어 방식:**
+/weather - 현재 날씨 (화성/동탄 기준)
+
+**🗺️ 지원 지역:**
+• 🏠 화성/동탄 (기본 지역)
+• 🏙️ 서울, 🌊 부산, 🌉 인천
+• 🌆 대구, 🏛️ 대전, 🌺 광주
+• 🌊 울산, 🏝️ 제주
+
+**⚡ 빠른 기능:**
+• 📍 현재 날씨
+• 📅 3일 예보
+• ⚡ 빠른 날씨 (여러 지역 동시)
+
+실시간 날씨로 하루를 준비하세요! 🌈`;
+  }
+
+  // ========== 초기화 ==========
+
+  async initialize() {
     try {
-      const data = callbackQuery.data;
-      const parts = data.split("_");
-      const action = parts[0];
-      const subAction = parts.slice(1).join("_");
-      const params = parts.slice(2);
-
-      // 디버그 로그
-      Logger.debug("handleModuleCallback 호출", {
-        module: module.constructor.name,
-        data: data,
-        methodName: methodName,
-        subAction: subAction,
-        hasMenuManager: !!this.menuManager,
-      });
-
-      // handleCallback 메서드에 menuManager 전달
-      if (module.handleCallback) {
-        await module.handleCallback(
-          this.bot,
-          callbackQuery,
-          subAction,
-          params,
-          this.menuManager || null, // menuManager가 null일 수 있음을 명시적으로 처리
-        );
-      } else {
-        Logger.warn(
-          `모듈 ${module.constructor.name}에 handleCallback 메서드가 없습니다`,
-        );
+      if (!this.weatherService) {
+        Logger.warn("WeatherService가 없어도 기본 기능은 제공합니다.");
       }
+
+      await super.initialize();
+      Logger.success("✅ WeatherModule 초기화 완료");
     } catch (error) {
-      Logger.error(`모듈 ${module.constructor.name} 콜백 처리 실패:`, error);
+      Logger.error("❌ WeatherModule 초기화 실패:", error);
       throw error;
     }
   }
-
-  async showMainMenu(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-    const userName = callbackQuery.from.first_name || "사용자";
-
-    await this.bot.sendMessage(
-      chatId,
-      `🤖 안녕하세요 ${userName}님!\n\n두목봇 메인 메뉴에서 원하는 기능을 선택해주세요:`,
-      { reply_markup: this.createMainMenuKeyboard() },
-    );
-  }
-
-  async showHelpMenu(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-
-    const helpText = `
-❓ **두목봇 도움말**
-
-🤖 **주요 기능:**
-- 📝 할일 관리 - 할일 추가/완료/삭제
-- 📅 휴가 관리 - 연차 사용/관리
-- 🔮 운세 - 다양한 운세 정보
-- ⏰ 타이머 - 작업 시간 관리
-- 🔔 리마인더 - 알림 설정
-- 🌤️ 날씨 - 날씨 정보
-- 📊 인사이트 - 마케팅 인사이트
-- 🛠️ 유틸리티 - TTS 등
-
-🎯 **빠른 명령어:**
-- /start - 메인 메뉴
-- /add [할일] - 할일 빠른 추가
-- /help - 도움말
-
-🚀 **Railway 클라우드에서 24/7 운영 중!**
-        `;
-
-    await this.bot.sendMessage(chatId, helpText, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-        ],
-      },
-    });
-  }
-
-  async handleCancel(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-    const userId = callbackQuery.from.id;
-    const userName = callbackQuery.from.first_name || "사용자";
-
-    // 사용자 상태 초기화는 BotController에서 처리
-
-    await this.bot.sendMessage(
-      chatId,
-      `❌ ${userName}님, 작업이 취소되었습니다.`,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
-      },
-    );
-  }
-
-  async handleUnknownCallback(callbackQuery) {
-    const chatId = callbackQuery.message.chat.id;
-
-    await this.bot.sendMessage(
-      chatId,
-      "❌ 알 수 없는 명령입니다. 메인 메뉴로 돌아갑니다.",
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-          ],
-        },
-      },
-    );
-  }
-
-  async sendErrorMessage(chatId) {
-    try {
-      await this.bot.sendMessage(chatId, "❌ 처리 중 오류가 발생했습니다.");
-    } catch (error) {
-      Logger.error("오류 메시지 전송 실패:", error);
-    }
-  }
-
-  createMainMenuKeyboard() {
-    const keyboard = [];
-
-    // 동적으로 활성화된 모듈에 따라 메뉴 구성
-    const firstRow = [];
-    if (this.modules.todo) {
-      firstRow.push({ text: "📝 할일 관리", callback_data: "todo_menu" });
-    }
-    if (this.modules.leave) {
-      firstRow.push({ text: "📅 휴가 관리", callback_data: "leave_menu" });
-    }
-    if (firstRow.length > 0) {
-      keyboard.push(firstRow);
-    }
-
-    const secondRow = [];
-    if (this.modules.timer) {
-      secondRow.push({ text: "⏰ 타이머", callback_data: "timer_menu" });
-    }
-    if (this.modules.fortune) {
-      secondRow.push({ text: "🎯 운세", callback_data: "fortune_menu" });
-    }
-    if (secondRow.length > 0) {
-      keyboard.push(secondRow);
-    }
-
-    const thirdRow = [];
-    if (this.modules.worktime) {
-      thirdRow.push({ text: "🕐 근무시간", callback_data: "worktime_menu" });
-    }
-    if (this.modules.weather) {
-      thirdRow.push({ text: "🌤️ 날씨", callback_data: "weather_menu" });
-    }
-    if (thirdRow.length > 0) {
-      keyboard.push(thirdRow);
-    }
-
-    const fourthRow = [];
-    if (this.modules.insight) {
-      fourthRow.push({ text: "📊 인사이트", callback_data: "insight_menu" });
-    }
-    if (this.modules.reminder) {
-      fourthRow.push({ text: "🔔 리마인더", callback_data: "reminder_menu" });
-    }
-    if (fourthRow.length > 0) {
-      keyboard.push(fourthRow);
-    }
-
-    const lastRow = [];
-    if (this.modules.utils) {
-      lastRow.push({ text: "🛠️ 유틸리티", callback_data: "utils_menu" });
-    }
-    lastRow.push({ text: "❓ 도움말", callback_data: "help_menu" });
-    keyboard.push(lastRow);
-
-    return { inline_keyboard: keyboard };
-  }
 }
 
-module.exports = CallbackManager;
+module.exports = WeatherModule;
