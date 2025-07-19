@@ -1,41 +1,54 @@
 {
-  "name": "doomock-bot",
+  "name": "doomock_bot",
   "version": "3.0.1",
-  "description": "두목봇 - 직장인을 위한 텔레그램 어시스턴트",
-  "main": "doomock_bot.js",
+  "description": "경기남부 직장인을 위한 텔레그램 봇",
+  "main": "app.js",
   "scripts": {
-    "start": "node doomock_bot.js",
-    "dev": "NODE_ENV=development nodemon doomock_bot.js",
-    "test": "echo 'Tests will be added later'",
-    "lint": "echo 'Linting temporarily disabled'",
-    "lint:fix": "echo 'Lint fix temporarily disabled'",
-    "format": "echo 'Formatting temporarily disabled'",
-    "validate": "echo 'Validation passed'"
+    "start": "node app.js",
+    "dev": "nodemon app.js",
+    "railway:start": "NODE_ENV=production node app.js",
+    "railway:build": "echo 'Build complete'",
+    "cleanup": "pkill -f 'node app.js' || true",
+    "restart": "npm run cleanup && sleep 5 && npm start",
+    "health": "curl -f http://localhost:${PORT:-3000}/health || exit 1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
   },
   "keywords": [
     "telegram",
     "bot",
     "productivity",
-    "korean"
+    "todo",
+    "pomodoro",
+    "railway"
   ],
-  "author": "Doo-mockBro",
+  "author": "DoomockBro",
   "license": "MIT",
-  "engines": {
-    "node": ">=18.0.0"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/JYJE0N/doomock-bot.git"
-  },
   "dependencies": {
-    "axios": "^1.10.0",
-    "dotenv": "^16.0.1",
-    "form-data": "^4.0.0",
+    "node-telegram-bot-api": "^0.66.0",
+    "mongodb": "^6.3.0",
+    "axios": "^1.6.2",
+    "cheerio": "^1.0.0-rc.12",
+    "openweathermap-api-node": "^1.4.6",
     "gtts": "^0.2.1",
-    "mongodb": "^6.17.0",
-    "node-telegram-bot-api": "^0.64.0"
+    "fluent-ffmpeg": "^2.1.2"
   },
   "devDependencies": {
-    "nodemon": "^2.0.22"
+    "nodemon": "^3.0.2"
+  },
+  "railway": {
+    "healthcheck": {
+      "path": "/health",
+      "interval": 30000,
+      "timeout": 10000
+    },
+    "build": {
+      "command": "npm run railway:build"
+    },
+    "start": {
+      "command": "npm run railway:start"
+    }
   }
 }
