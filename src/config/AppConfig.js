@@ -10,7 +10,7 @@ class AppConfig {
   loadConfiguration() {
     // 🤖 봇 설정
     this.BOT_TOKEN = process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN;
-    this.BOT_USERNAME = process.env.BOT_USERNAME || "doomock_bot";
+    this.BOT_USERNAME = process.env.BOT_USERNAME || "doomock-bot";
     // 호환성을 위한 alias 추가
     this.mongoUrl = this.MONGO_URL;
 
@@ -159,28 +159,16 @@ class AppConfig {
       process.env.DATABASE_URL,
     ];
 
-    // 환경 변수에서 직접 URL 찾기
+    // ✅ 환경 변수에서 직접 URL 찾기 (우선순위)
     for (const url of candidates) {
       if (url && this.isValidMongoUrl(url)) {
+        console.log(`✅ MongoDB URL 발견: ${url.substring(0, 20)}...`);
         return url;
       }
     }
 
-    // 개별 컴포넌트로 URL 구성
-    const mongoUser = process.env.MONGOUSER || process.env.MONGO_USER;
-    const mongoPassword =
-      process.env.MONGOPASSWORD || process.env.MONGO_PASSWORD;
-    const mongoHost =
-      process.env.MONGOHOST || process.env.MONGO_HOST || "localhost";
-    const mongoPort =
-      process.env.MONGOPORT || process.env.MONGO_PORT || "27017";
-    const mongoDb = process.env.MONGODB || process.env.MONGO_DB || this.DB_NAME;
-
-    if (mongoUser && mongoPassword && mongoHost) {
-      return `mongodb://${mongoUser}:${mongoPassword}@${mongoHost}:${mongoPort}/${mongoDb}`;
-    }
-
-    return null; // MongoDB 설정 없음
+    console.log("❌ MongoDB URL을 환경변수에서 찾을 수 없음");
+    return null; // 개별 컴포넌트 구성 제거
   }
 
   // 관리자 사용자 파싱
