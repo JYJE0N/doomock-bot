@@ -5,7 +5,7 @@ const CallbackManager = require("../managers/CallbackManager");
 const ModuleManager = require("../managers/ModuleManager");
 const MessageHandler = require("../handlers/MessageHandler");
 const CommandHandler = require("../handlers/CommandHandler");
-const { DatabaseManager } = require("../database/DatabaseManager");
+const DatabaseManager = require("../database/DatabaseManager");
 const Logger = require("../utils/Logger");
 const UserHelper = require("../utils/UserHelper");
 
@@ -68,10 +68,9 @@ class BotController {
 
   async initializeDatabase() {
     if (this.config.MONGO_URL) {
-      // ✅ MONGO_URL 확인
       try {
-        this.dbManager = new DatabaseManager();
-        await this.dbManager.connect(this.config.MONGO_URL); // ✅ URL을 connect()에 전달
+        this.dbManager = new DatabaseManager(); // ✅ 빈 생성자
+        await this.dbManager.connect(this.config.MONGO_URL); // ✅ connect()에 URL 전달
 
         Logger.success("데이터베이스 연결 성공");
       } catch (error) {
