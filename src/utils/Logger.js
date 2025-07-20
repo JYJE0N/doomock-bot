@@ -1,8 +1,6 @@
-// src/utils/Logger.js - 완전 새로운 간단한 Logger
-
+// src/utils/Logger.js
 class Logger {
   constructor() {
-    // 싱글톤 체크
     if (Logger.instance) {
       return Logger.instance;
     }
@@ -58,10 +56,10 @@ class Logger {
     this.currentLevel = this.levels[level] || this.levels.info;
   }
 
-  // 기존 코드 호환성을 위한 추가 메서드들
+  // 기존 코드 호환성
   trace(...args) {
     this._log("debug", ...args);
-  } // trace를 debug로 매핑
+  }
   logTimeInfo() {
     this.info("🕐 시간 정보 로딩 완료");
   }
@@ -73,6 +71,5 @@ class Logger {
   }
 }
 
-// 인스턴스 생성 및 내보내기
 const logger = new Logger();
 module.exports = logger;
