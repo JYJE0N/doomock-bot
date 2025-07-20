@@ -1,6 +1,7 @@
-// src/managers/ModuleManager.js - 완전 리팩토링 (깔끔하고 단순하게)
+// src/managers/ModuleManager.js - main_menu 콜백 특별 처리 추가
 
 const logger = require("../utils/Logger");
+const { getUserName } = require("../utils/UserHelper");
 
 class ModuleManager {
   constructor(bot, options = {}) {
@@ -85,6 +86,15 @@ class ModuleManager {
     this.processingCallbacks.add(callbackKey);
 
     try {
+      // ✅ main_menu 특별 처리 (ModuleManager가 직접 처리)
+      if (callbackQuery.data === "main_menu") {
+        const handled = await this.showMainMenu(bot, callbackQuery);
+        if (handled) {
+          logger.debug("✅ 메인메뉴 표시 완료");
+          return;
+        }
+      }
+
       // 콜백 데이터 파싱 (system:status → system, status)
       const [targetModule, action] = callbackQuery.data.split(":");
 
@@ -123,6 +133,52 @@ class ModuleManager {
     }
   }
 
+  // ✅ 메인메뉴 표시 메서드 추가
+  async showMainMenu(bot, callbackQuery) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+        from,
+      } = callbackQuery;
+
+      const userName = getUserName(from);
+
+      // 동적으로 활성화된 모듈들의 메뉴 생성
+      const menuKeyboard = this.createMainMenuKeyboard();
+
+      const mainMenuText = `🏠 **${userName}님, 환영합니다!**\n\n원하는 기능을 선택해주세요:`;
+
+      await bot.editMessageText(mainMenuText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: menuKeyboard,
+      });
+
+      logger.debug("✅ 메인메뉴 표시 완료");
+      return true;
+    } catch (error) {
+      logger.error("❌ 메인메뉴 표시 실패:", error);
+
+      // 폴백: 기본 메뉴
+      try {
+        await bot.editMessageText("🏠 **메인 메뉴**\n\n기본 메뉴입니다.", {
+          chat_id: callbackQuery.message.chat.id,
+          message_id: callbackQuery.message.message_id,
+          parse_mode: "Markdown",
+          reply_markup: this.createMainMenuKeyboard(),
+        });
+        return true;
+      } catch (fallbackError) {
+        logger.error("❌ 폴백 메뉴도 실패:", fallbackError);
+        return false;
+      }
+    }
+  }
+
   // 모듈명 매핑 (system → SystemModule)
   findModuleName(target) {
     const mapping = {
@@ -139,24 +195,58 @@ class ModuleManager {
     );
   }
 
-  // 메인 메뉴 키보드
+  // ✅ 동적 메인 메뉴 키보드 (활성화된 모듈만 표시)
   createMainMenuKeyboard() {
-    return {
-      inline_keyboard: [
-        [
-          { text: "📝 할일 관리", callback_data: "todo:main" },
-          { text: "🔮 운세 확인", callback_data: "fortune:today" },
-        ],
-        [
-          { text: "🌤️ 날씨 조회", callback_data: "weather:current" },
-          { text: "🛠️ 유틸리티", callback_data: "utils:main" },
-        ],
-        [
-          { text: "📊 시스템 상태", callback_data: "system:status" },
-          { text: "❓ 도움말", callback_data: "system:help" },
-        ],
-      ],
-    };
+    const menuButtons = [];
+
+    // 모듈별 버튼 정의
+    const moduleButtons = [
+      {
+        text: "📝 할일 관리",
+        callback_data: "todo:menu",
+        module: "TodoModule",
+      },
+      {
+        text: "🔮 운세 확인",
+        callback_data: "fortune:menu",
+        module: "FortuneModule",
+      },
+      {
+        text: "🌤️ 날씨 조회",
+        callback_data: "weather:menu",
+        module: "WeatherModule",
+      },
+      {
+        text: "🛠️ 유틸리티",
+        callback_data: "utils:menu",
+        module: "UtilsModule",
+      },
+    ];
+
+    // 활성화된 모듈만 메뉴에 추가
+    for (const button of moduleButtons) {
+      if (this.moduleInstances.has(button.module)) {
+        menuButtons.push({
+          text: button.text,
+          callback_data: button.callback_data,
+        });
+      }
+    }
+
+    // 2열 배치로 키보드 생성
+    const keyboard = [];
+    for (let i = 0; i < menuButtons.length; i += 2) {
+      const row = menuButtons.slice(i, i + 2);
+      keyboard.push(row);
+    }
+
+    // 시스템 기능 추가 (항상 표시)
+    keyboard.push([
+      { text: "📊 시스템 상태", callback_data: "system:status" },
+      { text: "❓ 도움말", callback_data: "system:help" },
+    ]);
+
+    return { inline_keyboard: keyboard };
   }
 
   // 상태 조회
