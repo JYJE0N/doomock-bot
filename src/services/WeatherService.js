@@ -5,7 +5,6 @@ const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 // ✅ 올바른 서비스 Export 방식
-const { getLogTimeString } = require("../utils/KoreaTimeManager");
 
 class WeatherService {
   constructor() {
@@ -195,7 +194,7 @@ class WeatherService {
       windSpeed: data.wind.split(" ")[1],
       windDirection: data.wind.split(" ")[0],
       icon: data.icon,
-      timestamp: getLogTimeString(),
+      timestamp: TimeHelper.getLogTimeString(),
     };
   }
 
@@ -210,7 +209,7 @@ class WeatherService {
         { date: "글피", icon: "☀️", temp: "20°C", desc: "맑음" },
         { date: "그후", icon: "⛅", temp: "16°C", desc: "구름조금" },
       ],
-      timestamp: getLogTimeString(),
+      timestamp: TimeHelper.getLogTimeString(),
     };
   }
 
@@ -224,7 +223,7 @@ class WeatherService {
       windSpeed: apiData.wind?.speed || 0,
       windDirection: this.getWindDirection(apiData.wind?.deg || 0),
       icon: this.getWeatherIcon(apiData.weather[0].icon),
-      timestamp: getLogTimeString(),
+      timestamp: TimeHelper.getLogTimeString(),
     };
   }
 
@@ -254,7 +253,7 @@ class WeatherService {
     return {
       city: apiData.city.name,
       forecast: dailyForecasts,
-      timestamp: getLogTimeString(),
+      timestamp: TimeHelper.getLogTimeString(),
     };
   }
 

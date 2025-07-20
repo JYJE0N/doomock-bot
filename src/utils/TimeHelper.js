@@ -9,8 +9,6 @@ const logger = require("./Logger.js");
 // 이 클래스는 날짜와 시간을 포맷팅하고, 상대적 시간을 계산하며, 예약된 시간 생성 등을 지원합니다.
 // 이 클래스는 한국시간을 기준으로 날짜와 시간을 처리하는 데 유용합니다.
 
-const { koreaTimeManager } = require("./KoreaTimeManager");
-
 class TimeHelper {
   // ==================== 🇰🇷 핵심 한국시간 메서드 ====================
 
