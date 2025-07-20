@@ -9,17 +9,23 @@ const { TimeHelper } = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
 class TodoModule extends BaseModule {
-  constructor() {
+  constructor(bot, options = {}) {
+    // ✅ 매개변수 추가!
     super("TodoModule", {
       commands: ["todo", "할일", "add"],
       callbacks: ["todo"],
       description: "📝 할일 관리",
       emoji: "📝",
       features: ["할일 추가", "완료 처리", "통계", "삭제", "검색"],
-      priority: 1, // 높은 우선순위
+      priority: 1,
       maxConcurrentUsers: 50,
-      timeout: 60000, // 1분
+      timeout: 60000,
     });
+
+    // ✅ dbManager 받기
+    this.bot = bot;
+    this.dbManager = options.dbManager || null;
+    this.db = this.dbManager; // this.db로 참조 설정
 
     // 📊 Todo 전용 통계
     this.todoStats = {
