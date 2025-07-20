@@ -1,4 +1,4 @@
-// src/services/WeatherService.js - 올바른 서비스 Export 방식
+// src/services/WeatherService.js
 
 const axios = require("axios");
 const logger = require("../utils/Logger");
@@ -26,6 +26,24 @@ class WeatherService {
   // 현재 날씨 조회
   async getCurrentWeather(city = this.defaultCity) {
     try {
+      // 🎯 한국 도시명 → 영어명 매핑
+      const cityMap = {
+        서울: "Seoul,KR",
+        부산: "Busan,KR",
+        대구: "Daegu,KR",
+        인천: "Incheon,KR",
+        광주: "Gwangju,KR",
+        대전: "Daejeon,KR",
+        울산: "Ulsan,KR",
+        제주: "Jeju,KR",
+        화성: "Hwaseong,KR",
+        Seoul: "Seoul,KR",
+        Busan: "Busan,KR",
+      };
+
+      // 매핑된 도시명 사용
+      const mappedCity = cityMap[city] || city;
+
       const cacheKey = `current_${city}`;
       const cached = this.getFromCache(cacheKey);
       if (cached) {
@@ -44,13 +62,13 @@ class WeatherService {
 
       const url = `${this.baseUrl}/weather`;
       const params = {
-        q: city,
+        q: mappedCity, // ✅ 매핑된 도시명 사용
         appid: this.apiKey,
         lang: this.language,
         units: this.units,
       };
 
-      logger.debug(`날씨 API 요청: ${city}`);
+      logger.debug(`날씨 API 요청: ${city} → ${mappedCity}`);
       const response = await axios.get(url, {
         params,
         timeout: 10000,
@@ -63,6 +81,13 @@ class WeatherService {
       return { success: true, data: weatherData, cached: false };
     } catch (error) {
       logger.error("현재 날씨 조회 실패:", error.message);
+      logger.error(
+        "요청 URL:",
+        `${this.baseUrl}/weather?q=${mappedCity}&appid=${this.apiKey?.slice(
+          0,
+          8
+        )}...`
+      );
       return {
         success: false,
         error: this.formatError(error),
