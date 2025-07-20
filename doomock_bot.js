@@ -192,7 +192,8 @@ class DoomockBot {
     try {
       logger.info("⚙️ 설정 로드 중...");
 
-      this.config = new AppConfig();
+      // ✅ AppConfig는 이미 인스턴스로 export되므로 new 없이 직접 사용
+      this.config = AppConfig;
 
       // 필수 환경변수 검증
       if (!this.config.BOT_TOKEN) {

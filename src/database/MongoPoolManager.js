@@ -2,23 +2,23 @@
 
 const { MongoClient } = require("mongodb");
 
-// ✅ 안전한 Logger import (무한재귀 방지)
-let Logger;
+// ✅ 안전한 logger import (무한재귀 방지) - 변수명 수정
+let logger;
 try {
-  Logger = require("../utils/Logger");
+  logger = require("../utils/Logger");
 
-  // Logger가 제대로 로드되었는지 확인
-  if (!Logger || typeof logger.info !== "function") {
-    throw new Error("Logger 함수가 올바르지 않음");
+  // logger가 제대로 로드되었는지 확인
+  if (!logger || typeof logger.info !== "function") {
+    throw new Error("logger 함수가 올바르지 않음");
   }
 
   // 테스트 로그 (순환참조 체크)
-  logger.debug("🔍 Logger 테스트 - MongoPoolManager에서 정상 로드됨");
+  logger.debug("🔍 logger 테스트 - MongoPoolManager에서 정상 로드됨");
 } catch (loggerError) {
   // 폴백: 안전한 console 래퍼
-  console.warn("⚠️ Logger 로드 실패, console 폴백 사용:", loggerError.message);
+  console.warn("⚠️ logger 로드 실패, console 폴백 사용:", loggerError.message);
 
-  Logger = {
+  logger = {
     info: (...args) =>
       console.log("[INFO]", new Date().toLocaleString("ko-KR"), ...args),
     error: (...args) =>
