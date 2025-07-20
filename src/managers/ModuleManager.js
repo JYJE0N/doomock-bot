@@ -242,13 +242,6 @@ class ModuleManager {
 
     try {
       this.globalStats.totalCallbacks++;
-      // ✅ 여기도 로그 추가
-      logger.info(
-        `🎯 콜백 파싱: module=${module}, action=${action}, params=${params.join(
-          ","
-        )}`
-      );
-      const [module, action, ...params] = callbackQuery.data.split("_");
 
       for (const [name, instance] of this.moduleInstances) {
         try {
