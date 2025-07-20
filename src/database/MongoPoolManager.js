@@ -1,10 +1,47 @@
-// src/database/MongoPoolManager.js - Railway MongoDB 플러그인 전용 버전
+// src/database/MongoPoolManager.js - Railway MongoDB 최적화 + 안전한 Logger 사용
 
 const { MongoClient } = require("mongodb");
-const Logger = require("../utils/Logger");
+
+// ✅ 안전한 Logger import (무한재귀 방지)
+let Logger;
+try {
+  Logger = require("../utils/Logger");
+
+  // Logger가 제대로 로드되었는지 확인
+  if (!Logger || typeof Logger.info !== "function") {
+    throw new Error("Logger 함수가 올바르지 않음");
+  }
+
+  // 테스트 로그 (순환참조 체크)
+  Logger.debug("🔍 Logger 테스트 - MongoPoolManager에서 정상 로드됨");
+} catch (loggerError) {
+  // 폴백: 안전한 console 래퍼
+  console.warn("⚠️ Logger 로드 실패, console 폴백 사용:", loggerError.message);
+
+  Logger = {
+    info: (...args) =>
+      console.log("[INFO]", new Date().toLocaleString("ko-KR"), ...args),
+    error: (...args) =>
+      console.error("[ERROR]", new Date().toLocaleString("ko-KR"), ...args),
+    warn: (...args) =>
+      console.warn("[WARN]", new Date().toLocaleString("ko-KR"), ...args),
+    debug: (...args) =>
+      console.log("[DEBUG]", new Date().toLocaleString("ko-KR"), ...args),
+    success: (...args) =>
+      console.log("[SUCCESS]", new Date().toLocaleString("ko-KR"), ...args),
+    trace: (...args) =>
+      console.log("[TRACE]", new Date().toLocaleString("ko-KR"), ...args),
+  };
+}
 
 class MongoPoolManager {
   constructor() {
+    // 🚫 중복 생성 방지
+    if (MongoPoolManager._instance) {
+      Logger.warn("⚠️ MongoPoolManager 이미 생성됨, 기존 인스턴스 반환");
+      return MongoPoolManager._instance;
+    }
+
     this.client = null;
     this.db = null;
     this.isConnected = false;
@@ -26,6 +63,10 @@ class MongoPoolManager {
     this.queryTimes = [];
     this.maxQueryTimeHistory = 100;
 
+    // 싱글톤 저장
+    MongoPoolManager._instance = this;
+
+    // ✅ 안전한 Logger 사용
     Logger.info("🗄️ MongoPoolManager 생성됨 (Railway MongoDB 플러그인 최적화)");
   }
 
@@ -56,7 +97,7 @@ class MongoPoolManager {
         authSource: "admin", // Railway MongoDB 기본 인증
         readPreference: "primary", // 기본 읽기 설정
 
-        // 🚫 제거된 구식 옵션들
+        // 🚫 제거된 구식 옵션들 (mongoose 아님!)
         // bufferMaxEntries: 제거됨
         // useUnifiedTopology: 기본값
         // useNewUrlParser: 기본값
@@ -73,272 +114,140 @@ class MongoPoolManager {
         socketTimeoutMS: 45000,
         connectTimeoutMS: 10000,
         heartbeatFrequencyMS: 10000,
+
         retryWrites: true,
         retryReads: true,
+
         authSource: "admin",
-        family: 4, // IPv4 강제
+        readPreference: "primary",
       };
     }
   }
 
-  // 🔗 Railway 환경에 최적화된 연결 메서드
+  // ✅ 연결 메서드
   async connect() {
-    if (this.isConnected && this.client) {
-      Logger.debug("✅ MongoDB 이미 연결되어 있음");
-      return this.db;
+    if (this.isConnected) {
+      Logger.debug("📋 이미 MongoDB에 연결됨");
+      return true;
     }
 
     if (!this.connectionString) {
-      throw new Error(
-        "MongoDB 연결 문자열이 없습니다 (MONGO_URL 또는 MONGODB_URI 필요)"
-      );
+      Logger.error("❌ MongoDB 연결 문자열이 없음");
+      return false;
     }
 
     try {
-      Logger.info("🔗 Railway MongoDB 연결 시작...");
-      Logger.debug(
-        `🔌 연결 대상: ${this.maskConnectionString(this.connectionString)}`
-      );
+      Logger.info("🔌 MongoDB 연결 시도 중... (네이티브 드라이버)");
 
-      // 기존 연결이 있다면 정리
-      if (this.client) {
-        await this.disconnect();
-      }
-
-      // Railway MongoDB 플러그인 연결 생성
+      // ✅ MongoDB 네이티브 클라이언트 생성 (mongoose 아님!)
       this.client = new MongoClient(this.connectionString, this.poolOptions);
 
-      // 연결 시도 (Railway 환경 최적화된 타임아웃)
-      const connectionTimeout = this.connectionString.includes(
-        "caboose.proxy.rlwy.net"
-      )
-        ? 15000
-        : 10000;
+      await this.client.connect();
 
-      await Promise.race([
-        this.client.connect(),
-        new Promise((_, reject) =>
-          setTimeout(
-            () =>
-              reject(
-                new Error(
-                  `MongoDB 연결 타임아웃 (${connectionTimeout / 1000}초)`
-                )
-              ),
-            connectionTimeout
-          )
-        ),
-      ]);
+      // Railway MongoDB는 일반적으로 'test' 데이터베이스 사용
+      const dbName = this.connectionString.includes("caboose.proxy.rlwy.net")
+        ? "test"
+        : this.connectionString.split("/").pop()?.split("?")[0] || "doomock";
 
-      // 연결 테스트
-      await this.client.db("admin").command({ ping: 1 });
-
-      // 데이터베이스 선택 (Railway는 보통 기본 DB 사용)
-      this.db = this.client.db(); // 기본 데이터베이스 사용
+      this.db = this.client.db(dbName);
       this.isConnected = true;
       this.stats.lastConnected = new Date();
 
-      Logger.success(`✅ Railway MongoDB 연결 완료!`);
-      Logger.info(`📊 DB 이름: ${this.db.databaseName}`);
-      Logger.info(`🔗 풀 크기: ${this.poolOptions.maxPoolSize}`);
-
-      // 연결 이벤트 리스너 등록
-      this.setupEventListeners();
-
-      return this.db;
-    } catch (error) {
-      this.isConnected = false;
-      Logger.error("❌ Railway MongoDB 연결 실패:", error.message);
-
-      // Railway 환경별 구체적인 오류 메시지
-      if (error.message.includes("ENOTFOUND")) {
-        throw new Error(
-          "Railway MongoDB 호스트를 찾을 수 없습니다. Railway MongoDB 플러그인이 활성화되어 있는지 확인하세요."
-        );
-      } else if (error.message.includes("ECONNREFUSED")) {
-        throw new Error(
-          "Railway MongoDB 서버에 연결할 수 없습니다. 서비스가 실행 중인지 확인하세요."
-        );
-      } else if (error.message.includes("Authentication failed")) {
-        throw new Error(
-          "Railway MongoDB 인증에 실패했습니다. 환경변수 MONGO_URL을 확인하세요."
-        );
-      } else if (error.message.includes("timeout")) {
-        throw new Error(
-          "Railway MongoDB 연결 시간이 초과되었습니다. 네트워크 상태를 확인하세요."
-        );
-      } else {
-        throw error;
-      }
-    }
-  }
-
-  // 🔒 연결 문자열 마스킹 (보안)
-  maskConnectionString(connectionString) {
-    if (!connectionString) return "N/A";
-
-    try {
-      // mongodb://username:password@host:port/database 형식에서 패스워드 마스킹
-      return connectionString.replace(/:([^:@]+)@/, ":****@");
-    } catch (error) {
-      return "[MASKED]";
-    }
-  }
-
-  // 📡 Railway 환경 최적화된 이벤트 리스너
-  setupEventListeners() {
-    if (!this.client) return;
-
-    this.client.on("serverOpening", () => {
-      Logger.debug("🔓 Railway MongoDB 서버 연결 열림");
-    });
-
-    this.client.on("serverClosed", () => {
-      Logger.warn("🔒 Railway MongoDB 서버 연결 닫힘");
-      this.isConnected = false;
-    });
-
-    this.client.on("error", (error) => {
-      Logger.error("🚨 Railway MongoDB 연결 오류:", error.message);
-      this.isConnected = false;
-    });
-
-    this.client.on("timeout", () => {
-      Logger.warn("⏰ Railway MongoDB 연결 타임아웃");
-    });
-
-    this.client.on("close", () => {
-      Logger.info("🔌 Railway MongoDB 연결 닫힘");
-      this.isConnected = false;
-    });
-
-    // Railway 환경에서 연결 풀 모니터링
-    this.client.on("connectionPoolCreated", () => {
-      Logger.debug("🏊‍♂️ Railway MongoDB 연결 풀 생성됨");
-    });
-
-    this.client.on("connectionPoolClosed", () => {
-      Logger.debug("🏊‍♂️ Railway MongoDB 연결 풀 닫힘");
-    });
-  }
-
-  // 📊 Railway 환경 최적화된 연결 상태 확인
-  async isHealthy() {
-    try {
-      if (!this.isConnected || !this.client) {
-        return false;
-      }
-
-      // Railway 내부 네트워크는 빠르므로 짧은 타임아웃
-      const pingTimeout = this.connectionString.includes(
-        "caboose.proxy.rlwy.net"
-      )
-        ? 5000
-        : 3000;
-
-      const start = Date.now();
-      await Promise.race([
-        this.client.db("admin").command({ ping: 1 }),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error("핑 타임아웃")), pingTimeout)
-        ),
-      ]);
-
-      const responseTime = Date.now() - start;
-      Logger.debug(`💓 Railway MongoDB 핑: ${responseTime}ms`);
-
-      // Railway 내부망은 더 관대한 기준 적용
-      const healthyThreshold = this.connectionString.includes(
-        "caboose.proxy.rlwy.net"
-      )
-        ? 3000
-        : 2000;
-      return responseTime < healthyThreshold;
-    } catch (error) {
-      Logger.warn("⚠️ Railway MongoDB 상태 확인 실패:", error.message);
-      this.isConnected = false;
-      return false;
-    }
-  }
-
-  // 🔄 Railway 환경 최적화된 재연결
-  async reconnect() {
-    Logger.info("🔄 Railway MongoDB 재연결 시도...");
-    this.stats.reconnectCount++;
-
-    try {
-      await this.disconnect();
-
-      // Railway 환경에서는 짧은 대기 후 재연결
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-
-      await this.connect();
-      Logger.success("✅ Railway MongoDB 재연결 성공");
+      Logger.success(`✅ MongoDB 연결 성공 (${dbName}) - 네이티브 드라이버`);
       return true;
     } catch (error) {
-      Logger.error("❌ Railway MongoDB 재연결 실패:", error.message);
+      Logger.error(`❌ MongoDB 연결 실패: ${error.message}`);
+      this.isConnected = false;
       return false;
     }
   }
 
-  // 나머지 메서드들은 기존과 동일하게 유지...
-  async getCollection(name) {
+  // ✅ 연결 해제
+  async disconnect() {
+    if (!this.isConnected || !this.client) {
+      return;
+    }
+
     try {
-      if (!this.isConnected || !this.db) {
-        await this.connect();
-      }
-      return this.db.collection(name);
+      await this.client.close();
+      this.isConnected = false;
+      this.client = null;
+      this.db = null;
+      Logger.success("🔌 MongoDB 연결 해제됨");
     } catch (error) {
-      Logger.error(`❌ 컬렉션 '${name}' 접근 실패:`, error.message);
-      throw new Error(`컬렉션 접근 실패: ${error.message}`);
+      Logger.error(`❌ MongoDB 연결 해제 실패: ${error.message}`);
     }
   }
 
-  async executeQuery(collectionName, operation, ...args) {
-    const startTime = Date.now();
-    this.stats.totalQueries++;
+  // ✅ 상태 확인
+  async isHealthy() {
+    if (!this.isConnected || !this.client) {
+      return false;
+    }
 
     try {
-      const collection = await this.getCollection(collectionName);
-      const result = await collection[operation](...args);
-
-      const queryTime = Date.now() - startTime;
-      this.updateQueryStats(queryTime, true);
-
-      Logger.debug(
-        `✅ Query ${operation} on ${collectionName}: ${queryTime}ms`
-      );
-      return result;
+      await this.client.db("admin").command({ ismaster: 1 });
+      return true;
     } catch (error) {
-      const queryTime = Date.now() - startTime;
-      this.updateQueryStats(queryTime, false);
+      Logger.warn(`❌ MongoDB 상태 확인 실패: ${error.message}`);
+      return false;
+    }
+  }
 
-      Logger.error(
-        `❌ Query ${operation} on ${collectionName} 실패:`,
-        error.message
-      );
+  // ✅ 재연결
+  async reconnect() {
+    Logger.info("🔄 MongoDB 재연결 시도...");
 
-      // 연결 문제라면 재연결 시도
-      if (this.isConnectionError(error)) {
-        Logger.warn("🔄 연결 문제 감지, 재연결 시도...");
-        try {
-          await this.reconnect();
-          const collection = await this.getCollection(collectionName);
-          const result = await collection[operation](...args);
-          this.stats.successfulQueries++;
-          return result;
-        } catch (retryError) {
-          this.stats.failedQueries++;
-          throw retryError;
+    if (this.isConnected) {
+      await this.disconnect();
+    }
+
+    this.stats.reconnectCount++;
+    return await this.connect();
+  }
+
+  // ✅ 컬렉션 가져오기
+  async getCollection(collectionName) {
+    if (!this.isConnected || !this.db) {
+      throw new Error("MongoDB가 연결되지 않았습니다");
+    }
+    return this.db.collection(collectionName);
+  }
+
+  // ✅ 쿼리 실행
+  async executeQuery(collectionName, operation, ...args) {
+    const startTime = Date.now();
+
+    try {
+      if (!this.isConnected) {
+        const reconnected = await this.reconnect();
+        if (!reconnected) {
+          throw new Error("데이터베이스 재연결 실패");
         }
       }
 
-      this.stats.failedQueries++;
+      const collection = await this.getCollection(collectionName);
+      const result = await collection[operation](...args);
+
+      // 통계 업데이트
+      const queryTime = Date.now() - startTime;
+      this.updateStats(queryTime, true);
+
+      return result;
+    } catch (error) {
+      const queryTime = Date.now() - startTime;
+      this.updateStats(queryTime, false);
+
+      Logger.error(
+        `❌ 쿼리 실행 실패 (${collectionName}.${operation}): ${error.message}`
+      );
       throw error;
     }
   }
 
-  updateQueryStats(queryTime, success) {
+  // 통계 업데이트
+  updateStats(queryTime, success) {
+    this.stats.totalQueries++;
     if (success) {
       this.stats.successfulQueries++;
     } else {
@@ -350,48 +259,23 @@ class MongoPoolManager {
       this.queryTimes.shift();
     }
 
-    this.stats.averageResponseTime =
-      this.queryTimes.reduce((a, b) => a + b, 0) / this.queryTimes.length;
-  }
-
-  isConnectionError(error) {
-    const connectionErrors = [
-      "ENOTFOUND",
-      "ECONNREFUSED",
-      "ETIMEDOUT",
-      "MongoNetworkError",
-      "MongoTimeoutError",
-      "topology was destroyed",
-      "connection closed",
-      "server closed",
-    ];
-
-    return connectionErrors.some(
-      (errorType) =>
-        error.message?.includes(errorType) || error.name?.includes(errorType)
-    );
-  }
-
-  async disconnect() {
-    try {
-      if (this.client && this.isConnected) {
-        Logger.info("🔌 Railway MongoDB 연결 종료 중...");
-        await this.client.close();
-        this.isConnected = false;
-        this.client = null;
-        this.db = null;
-        Logger.success("✅ Railway MongoDB 연결 종료 완료");
-      }
-    } catch (error) {
-      Logger.error("❌ Railway MongoDB 연결 종료 실패:", error.message);
+    if (this.queryTimes.length > 0) {
+      this.stats.averageResponseTime =
+        this.queryTimes.reduce((a, b) => a + b, 0) / this.queryTimes.length;
     }
   }
 
-  getStats() {
+  // 연결 문자열 마스킹
+  maskConnectionString(connectionString) {
+    if (!connectionString) return "N/A";
+    return connectionString.replace(/\/\/[^:]+:[^@]+@/, "//***:***@");
+  }
+
+  // 상태 정보
+  getConnectionInfo() {
     return {
-      ...this.stats,
       isConnected: this.isConnected,
-      connectionType: this.connectionString?.includes("caboose.proxy.rlwy.net")
+      dbType: this.connectionString?.includes("caboose.proxy.rlwy.net")
         ? "Railway Plugin"
         : "External",
       databaseName: this.db?.databaseName || "N/A",
@@ -403,10 +287,12 @@ class MongoPoolManager {
               100
             ).toFixed(2) + "%"
           : "0%",
+      mongooseUsed: false, // ✅ mongoose 사용 안함 명시!
+      nativeDriver: true, // ✅ 네이티브 드라이버 사용 명시!
     };
   }
 
-  // 편의 메서드들...
+  // ✅ 편의 메서드들 (mongoose 없이 순수 MongoDB)
   async findOne(collectionName, query, options = {}) {
     return this.executeQuery(collectionName, "findOne", query, options);
   }
@@ -449,6 +335,7 @@ class MongoPoolManager {
     return this.executeQuery(collectionName, "countDocuments", query);
   }
 
+  // ✅ 인덱스 관리
   async ensureIndexes(collectionName, indexes) {
     try {
       const collection = await this.getCollection(collectionName);
@@ -460,14 +347,72 @@ class MongoPoolManager {
         );
       }
     } catch (error) {
-      Logger.error(`❌ 인덱스 생성 실패 (${collectionName}):`, error.message);
+      Logger.error(`❌ 인덱스 생성 실패 (${collectionName}): ${error.message}`);
+    }
+  }
+
+  // ✅ 집계 파이프라인 (mongoose 없이)
+  async aggregate(collectionName, pipeline) {
+    const cursor = await this.executeQuery(
+      collectionName,
+      "aggregate",
+      pipeline
+    );
+    return cursor.toArray();
+  }
+
+  // ✅ 벌크 작업
+  async bulkWrite(collectionName, operations) {
+    return this.executeQuery(collectionName, "bulkWrite", operations);
+  }
+
+  // ✅ 트랜잭션 지원 (mongoose 없이)
+  async withTransaction(callback) {
+    if (!this.isConnected) {
+      throw new Error("MongoDB가 연결되지 않았습니다");
+    }
+
+    const session = this.client.startSession();
+
+    try {
+      return await session.withTransaction(async () => {
+        return await callback(session);
+      });
+    } finally {
+      await session.endSession();
+    }
+  }
+
+  // 🧹 정리 작업
+  async cleanup() {
+    try {
+      Logger.info("🧹 MongoPoolManager 정리 작업 시작...");
+
+      await this.disconnect();
+
+      // 통계 초기화
+      this.stats = {
+        totalQueries: 0,
+        successfulQueries: 0,
+        failedQueries: 0,
+        averageResponseTime: 0,
+        lastConnected: null,
+        reconnectCount: 0,
+      };
+
+      this.queryTimes = [];
+
+      Logger.success("✅ MongoPoolManager 정리 완료");
+    } catch (error) {
+      Logger.error("❌ MongoPoolManager 정리 중 오류:", error);
     }
   }
 }
 
-// 싱글톤 인스턴스 생성
+// ✅ 싱글톤 인스턴스 생성
 const mongoPoolManager = new MongoPoolManager();
 
+// ✅ 모듈 내보내기 (mongoose 없음!)
 module.exports = {
   MongoPoolManager,
   mongoPoolManager,
