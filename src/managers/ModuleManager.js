@@ -76,6 +76,24 @@ class ModuleManager {
     }
   }
 
+  // 📍 src/managers/ModuleManager.js 파일에서 찾아서 수정할 부분
+
+  // ❌ 현재 코드 (약 95-110줄 근처) - 이 부분을 찾으세요
+  async handleCallback(bot, callbackQuery) {
+    // ... 기존 코드 ...
+
+    // 콜백 데이터 파싱 (system:status → system, status)
+    const [targetModule, action] = callbackQuery.data.split(":");
+
+    if (!targetModule || !action) {
+      logger.warn(`잘못된 콜백 형식: ${callbackQuery.data}`);
+      return;
+    }
+
+    // ... 나머지 코드 ...
+  }
+
+  // ✅ 수정 후 코드 - 위 부분을 이렇게 바꾸세요
   async handleCallback(bot, callbackQuery) {
     const callbackKey = `${callbackQuery.from.id}_${callbackQuery.data}`;
 
@@ -86,7 +104,7 @@ class ModuleManager {
     this.processingCallbacks.add(callbackKey);
 
     try {
-      // ✅ main_menu 특별 처리 (ModuleManager가 직접 처리)
+      // ✅ main_menu 특별 처리
       if (callbackQuery.data === "main_menu") {
         const handled = await this.showMainMenu(bot, callbackQuery);
         if (handled) {
@@ -95,8 +113,21 @@ class ModuleManager {
         }
       }
 
-      // 콜백 데이터 파싱 (system:status → system, status)
-      const [targetModule, action] = callbackQuery.data.split(":");
+      // 🎯 유연한 콜백 파싱 - 두 가지 형식 지원
+      let targetModule, action;
+
+      if (callbackQuery.data.includes(":")) {
+        // 모듈 간 라우팅: "todo:menu" 형식
+        [targetModule, action] = callbackQuery.data.split(":");
+      } else if (callbackQuery.data.includes("_")) {
+        // 모듈 내 액션: "todo_list" 형식
+        const parts = callbackQuery.data.split("_");
+        targetModule = parts[0];
+        action = parts.slice(1).join("_");
+      } else {
+        logger.warn(`지원하지 않는 콜백 형식: ${callbackQuery.data}`);
+        return;
+      }
 
       if (!targetModule || !action) {
         logger.warn(`잘못된 콜백 형식: ${callbackQuery.data}`);
@@ -180,18 +211,20 @@ class ModuleManager {
   }
 
   // 모듈명 매핑 (system → SystemModule)
-  findModuleName(target) {
-    const mapping = {
+  findModuleName(targetModule) {
+    const moduleMap = {
       system: "SystemModule",
       todo: "TodoModule",
       fortune: "FortuneModule",
       weather: "WeatherModule",
       utils: "UtilsModule",
+      timer: "TimerModule",
+      worktime: "WorktimeModule",
     };
 
     return (
-      mapping[target] ||
-      `${target.charAt(0).toUpperCase() + target.slice(1)}Module`
+      moduleMap[targetModule.toLowerCase()] ||
+      targetModule.charAt(0).toUpperCase() + targetModule.slice(1) + "Module"
     );
   }
 

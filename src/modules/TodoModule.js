@@ -108,8 +108,8 @@ class TodoModule extends BaseModule {
     const actions = [
       ["list", this.showTodoList],
       ["add", this.startTodoAdd],
-      ["complete", this.completeTodo],
-      ["delete", this.deleteTodo],
+      // ["complete", this.completeTodo],
+      // ["delete", this.deleteTodo],
       ["clear_completed", this.clearCompletedTodos],
       ["clear_all", this.clearAllTodos],
       ["search", this.startTodoSearch],
