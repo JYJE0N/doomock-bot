@@ -404,7 +404,7 @@ class ModuleManager {
         constructor(bot, options = {}) {
           this.name = "SystemModule";
           this.bot = bot;
-          this.moduleManager = options.moduleManager;
+          //this.moduleManager = options.moduleManager; // 순환참조 방지
           this.actionMap = new Map();
           this.isInitialized = false;
         }
@@ -462,7 +462,7 @@ class ModuleManager {
 
         // ✅ 안전한 모듈 인스턴스 생성
         const moduleInstance = new moduleData.class(this.bot, {
-          moduleManager: this,
+          //moduleManager: this, // 순환참조 방지
         });
 
         // 초기화 호출
