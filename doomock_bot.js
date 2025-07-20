@@ -390,4 +390,4 @@ if (require.main === module) {
   });
 }
 
-module.exports = doomockBot;
+module.exports = DoomockBot;
