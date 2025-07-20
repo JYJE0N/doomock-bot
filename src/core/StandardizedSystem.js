@@ -1,10 +1,9 @@
-// src/core/StandardizedSystem.js - 매개변수 통일 + 중복 방지 핵심 시스템
+// src/core/StandardizedSystem.js - 중복 선언 해결 + 한국시간 통합
+// Railway 환경 v3.0.1 리팩토링 표준
 
 const logger = require("../utils/Logger");
-const { TimeHelper } = require("../utils/TimeHelper");
 
-/*
- *
+/**
  * 🎯 표준 매개변수 정의 (절대 변경 금지!)
  * 모든 모듈의 handleMessage, handleCallback에서 이 순서를 지켜야 함
  */
@@ -188,17 +187,52 @@ class ParameterValidator {
 }
 
 /**
- * 🇰🇷 한국시간 전용 타임스탬프 생성기
+ * 🇰🇷 한국시간 전용 타임스탬프 생성기 (간소화)
+ * 주의: 이제 KoreaTimeManager.js를 사용하는 것을 권장하지만
+ * 하위 호환성을 위해 최소한의 기능만 유지
  */
-const { koreaTimeManager } = require("../utils/KoreaTimeManager");
-class StandardizedBaseModule {
-  constructor(moduleName, options = {}) {
-    // 새로 생성
+class KoreanTimeManager {
+  constructor() {
+    this.lastTimestamp = 0;
+    this.timestampCache = new Map();
+    this.cacheTimeout = 1000; // 1초 캐시
+
+    // 새로운 통합 시스템 사용 권장 경고
+    logger.debug(
+      "⚠️ 구 KoreanTimeManager 사용 중. KoreaTimeManager.js 사용을 권장합니다."
+    );
+  }
+
+  // 정확한 한국시간 (UTC+9)
+  getKoreanTime() {
+    // 새로운 방식 사용 (Intl API 활용)
+    const now = new Date();
+    return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+  }
+
+  // 한국시간 문자열 (로깅용)
+  getKoreanTimeString() {
+    const cacheKey = "timestring";
+    const now = Date.now();
+
+    // 캐시 확인
+    if (this.timestampCache.has(cacheKey)) {
+      const cached = this.timestampCache.get(cacheKey);
+      if (now - cached.timestamp < this.cacheTimeout) {
+        return cached.value;
+      }
+    }
+
+    // 새로 생성 (Intl API 사용)
     const koreaTime = this.getKoreanTime();
-    const timeString = koreaTime
-      .toISOString()
-      .replace("T", " ")
-      .substring(0, 19);
+    const timeString = koreaTime.toLocaleString("ko-KR", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    });
 
     // 캐시 저장
     this.timestampCache.set(cacheKey, {
@@ -229,10 +263,16 @@ class StandardizedBaseModule {
       offset: systemTime.getTimezoneOffset(),
     };
   }
+
+  // 정리 작업
+  cleanup() {
+    this.timestampCache.clear();
+  }
 }
 
 /**
  * 🎯 표준화된 베이스 모듈 (모든 모듈이 상속해야 함)
+ * ⚠️ 주의: 파일 내에서 단 한 번만 선언!
  */
 class StandardizedBaseModule {
   constructor(moduleName, options = {}) {
@@ -242,8 +282,8 @@ class StandardizedBaseModule {
     // 🚫 중복 방지 시스템
     this.duplicationPreventer = new DuplicationPreventer();
 
-    // 🇰🇷 한국시간 관리자
-    this.timeManager = koreaTimeManager;
+    // 🇰🇷 한국시간 관리자 (기본)
+    this.timeManager = new KoreanTimeManager();
 
     // 📊 통계
     this.stats = {
@@ -270,7 +310,7 @@ class StandardizedBaseModule {
     }
 
     try {
-      // 시간 정보 로깅
+      // 시간 정보 로깅 (개발 환경에서만)
       if (process.env.NODE_ENV === "development") {
         logger.debug(
           `${this.moduleName} 시간 정보:`,
@@ -413,6 +453,7 @@ class StandardizedBaseModule {
   async cleanup() {
     try {
       this.duplicationPreventer.cleanup();
+      this.timeManager.cleanup();
       logger.info(`🧹 ${this.moduleName} 정리 완료`);
     } catch (error) {
       logger.error(`❌ ${this.moduleName} 정리 중 오류:`, error);
@@ -420,13 +461,11 @@ class StandardizedBaseModule {
   }
 }
 
-// 🌍 전역 표준화 시스템
-const GlobalStandardSystem = {
+// 🌍 전역 표준화 시스템 (깔끔한 export)
+module.exports = {
   STANDARD_PARAMS,
   DuplicationPreventer,
   ParameterValidator,
   KoreanTimeManager,
   StandardizedBaseModule,
 };
-
-module.exports = GlobalStandardSystem;
