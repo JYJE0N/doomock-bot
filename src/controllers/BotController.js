@@ -38,7 +38,7 @@ class BotController {
       await this.initializeDatabase();
 
       // 2. 모듈 매니저 초기화
-      await this.initializeModuleManager();
+      // await this.initializeModuleManager();
 
       // 3. 이벤트 리스너 등록
       if (!this.eventListenersRegistered) {
@@ -76,23 +76,23 @@ class BotController {
     }
   }
 
-  // ⭐ 모듈 매니저 초기화
-  async initializeModuleManager() {
-    logger.info("📦 모듈 매니저 초기화 중...");
+  // // ⭐ 모듈 매니저 초기화
+  // async initializeModuleManager() {
+  //   logger.info("📦 모듈 매니저 초기화 중...");
 
-    try {
-      this.moduleManager = new ModuleManager(this.bot, {
-        dbManager: this.dbManager,
-        userStates: this.userStates,
-      });
+  //   try {
+  //     this.moduleManager = new ModuleManager(this.bot, {
+  //       dbManager: this.dbManager,
+  //       userStates: this.userStates,
+  //     });
 
-      await this.moduleManager.initialize();
-      logger.success("✅ 모듈 매니저 초기화 완료");
-    } catch (error) {
-      logger.error("❌ 모듈 매니저 초기화 실패:", error);
-      throw error;
-    }
-  }
+  //     await this.moduleManager.initialize();
+  //     logger.success("✅ 모듈 매니저 초기화 완료");
+  //   } catch (error) {
+  //     logger.error("❌ 모듈 매니저 초기화 실패:", error);
+  //     throw error;
+  //   }
+  // }
 
   // ⭐ 이벤트 리스너 등록
   registerEventListeners() {
@@ -181,6 +181,12 @@ class BotController {
   }
 
   // ⭐ 메시지 처리
+
+  setModuleManager(moduleManager) {
+    this.moduleManager = moduleManager;
+    logger.info("📦 ModuleManager 참조 설정됨");
+  }
+  // 메시지 핸들러
   async handleMessage(msg) {
     const text = msg.text;
     if (!text) return;
@@ -201,7 +207,11 @@ class BotController {
       try {
         await this.bot.sendMessage(chatId, welcomeText, {
           parse_mode: "Markdown",
-          reply_markup: this.moduleManager.createMainMenuKeyboard(),
+          reply_markup: this.moduleManager?.createMainMenuKeyboard() || {
+            inline_keyboard: [
+              [{ text: "🔄 재시작", callback_data: "restart" }],
+            ],
+          }, // ✅ 안전장치 추가
         });
       } catch (error) {
         logger.error("/start 처리 오류:", error);
