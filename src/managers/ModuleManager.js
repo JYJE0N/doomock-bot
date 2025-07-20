@@ -451,7 +451,8 @@ class ModuleManager {
   }
 
   _parseModuleCallback(callbackData) {
-    const moduleMatch = callbackData.match(/^(\w+)_(.+)$/);
+    // 🔧 콜론(:)과 언더스코어(_) 둘 다 지원하도록 개선
+    const moduleMatch = callbackData.match(/^(\w+)[_:](.+)$/);
 
     if (moduleMatch) {
       const [, moduleName, action] = moduleMatch;
@@ -466,20 +467,35 @@ class ModuleManager {
         insight: "InsightModule",
         utils: "UtilsModule",
         reminder: "ReminderModule",
+        // 🎯 시스템 콜백도 추가 지원
+        settings: "SettingsModule",
+        help: "HelpModule",
+        admin: "AdminModule",
       };
 
       const fullModuleName = moduleNameMapping[moduleName];
 
       if (fullModuleName) {
         Logger.debug(
-          `콜백 파싱: ${callbackData} → ${fullModuleName}.${action}`
+          `🔧 콜백 파싱 성공: ${callbackData} → ${fullModuleName}.${action} (구분자: ${
+            callbackData.includes(":") ? "콜론" : "언더스코어"
+          })`
         );
         return {
           moduleName: fullModuleName,
           action: action,
           originalData: callbackData,
+          separator: callbackData.includes(":") ? ":" : "_", // 디버깅용
         };
+      } else {
+        Logger.debug(
+          `⚠️ 알 수 없는 모듈명: ${moduleName} (in ${callbackData})`
+        );
       }
+    } else {
+      Logger.debug(
+        `⚠️ 콜백 형식 불일치: ${callbackData} (예상: module:action 또는 module_action)`
+      );
     }
 
     return null;
