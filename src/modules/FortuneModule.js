@@ -1,10 +1,10 @@
-// src/modules/FortuneModule.js - 최신 표준 패턴으로 완전히 리팩토링
+// src/modules/FortuneModule.js - BaseModule 표준 완전 호환
 
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
 const { FortuneService } = require("../services/FortuneService");
 
-// ✅ 새로운 해결책 (logger를 함수로 가져오기)
+// ✅ BaseModule과 동일한 logger 방식 사용 (getLogger 함수 삭제됨)
 const logger = require("../utils/Logger");
 
 class FortuneModule extends BaseModule {
@@ -26,16 +26,22 @@ class FortuneModule extends BaseModule {
       ],
     });
 
-    this.fortuneService = new FortuneService();
-    logger.info(
-      "🔮 FortuneService 초기화:",
-      this.fortuneService ? "성공" : "실패"
-    );
+    // FortuneService 초기화
+    try {
+      this.fortuneService = new FortuneService();
+      logger.info("🔮 FortuneService 초기화 성공");
+    } catch (error) {
+      logger.error("❌ FortuneService 초기화 실패:", error);
+      this.fortuneService = null;
+    }
   }
 
-  // ✅ 표준 액션 등록 패턴 적용
+  // ✅ BaseModule 표준 액션 등록 (이게 핵심!)
   registerActions() {
-    // 🔮 운세 타입별 액션 등록 (BaseModule의 기본 액션들과 별도)
+    // BaseModule의 기본 액션 유지 (menu, help)
+    super.registerActions();
+
+    // 🔮 운세 타입별 액션 등록
     this.actionMap.set("general", this.showGeneralFortune.bind(this));
     this.actionMap.set("work", this.showWorkFortune.bind(this));
     this.actionMap.set("love", this.showLoveFortune.bind(this));
@@ -51,11 +57,13 @@ class FortuneModule extends BaseModule {
     this.actionMap.set("lucky", this.showLucky.bind(this));
     this.actionMap.set("all", this.showAllFortune.bind(this));
 
-    // 📋 추가 액션들 (기존 구조 호환)
-    this.actionMap.set("today", this.showGeneralFortune.bind(this)); // today는 general과 동일
+    // 📋 호환성을 위한 별칭
+    this.actionMap.set("today", this.showGeneralFortune.bind(this));
+
+    logger.debug(`🎯 FortuneModule 액션 등록 완료: ${this.actionMap.size}개`);
   }
 
-  // ✅ 메뉴 데이터 제공 (BaseModule 오버라이드)
+  // ✅ BaseModule의 getMenuData 오버라이드
   getMenuData(userName) {
     return {
       text: `🔮 **${userName}님의 오늘 운세**\n\n어떤 운세를 확인하시겠어요?`,
@@ -87,237 +95,340 @@ class FortuneModule extends BaseModule {
     };
   }
 
-  // ========== 개별 운세 메서드들 - 표준 패턴 ==========
+  // ========== 개별 운세 메서드들 - BaseModule 표준 패턴 ==========
 
   async showGeneralFortune(bot, chatId, messageId, userId, userName) {
     try {
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
+
       const fortune = this.fortuneService.getFortune(userId, "general");
       const text = `🌟 **${userName}님의 오늘 일반운**\n\n${fortune}`;
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 일반운 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showGeneralFortune 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showGeneralFortune 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 일반운을 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
   async showWorkFortune(bot, chatId, messageId, userId, userName) {
     try {
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
+
       const fortune = this.fortuneService.getFortune(userId, "work");
       const text = `💼 **${userName}님의 오늘 업무운**\n\n${fortune}`;
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 업무운 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showWorkFortune 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showWorkFortune 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 업무운을 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
   async showLoveFortune(bot, chatId, messageId, userId, userName) {
     try {
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
+
       const fortune = this.fortuneService.getFortune(userId, "love");
       const text = `💕 **${userName}님의 오늘 연애운**\n\n${fortune}`;
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 연애운 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showLoveFortune 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showLoveFortune 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 연애운을 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
   async showMoneyFortune(bot, chatId, messageId, userId, userName) {
     try {
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
+
       const fortune = this.fortuneService.getFortune(userId, "money");
       const text = `💰 **${userName}님의 오늘 재물운**\n\n${fortune}`;
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 재물운 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showMoneyFortune 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showMoneyFortune 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 재물운을 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
   async showHealthFortune(bot, chatId, messageId, userId, userName) {
     try {
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
+
       const fortune = this.fortuneService.getFortune(userId, "health");
       const text = `🌿 **${userName}님의 오늘 건강운**\n\n${fortune}`;
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 건강운 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showHealthFortune 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showHealthFortune 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 건강운을 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
   async showMeetingFortune(bot, chatId, messageId, userId, userName) {
     try {
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
+
       const fortune = this.fortuneService.getFortune(userId, "meeting");
       const text = `🍻 **${userName}님의 오늘 회식운**\n\n${fortune}`;
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 회식운 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showMeetingFortune 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showMeetingFortune 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 회식운을 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
-  // ========== 타로카드 메서드들 ==========
-
   async showTarot(bot, chatId, messageId, userId, userName) {
     try {
-      const tarot = this.fortuneService.getTarot(userId);
-      const text = `🃏 **${userName}님의 오늘 타로카드**\n\n${tarot}`;
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const tarot = this.fortuneService.getTarot(userId);
+      const text = `🃏 **${userName}님의 타로카드**\n\n${tarot}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getTarotMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 타로카드 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showTarot 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showTarot 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 타로카드를 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
   async showTarotThreeSpread(bot, chatId, messageId, userId, userName) {
     try {
-      const tarot3 = this.fortuneService.getTarotThreeSpread(userId);
-      const text = `🔮 **${userName}님의 타로 3장 스프레드**\n\n${tarot3}`;
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      const tarotSpread = this.fortuneService.getTarotThreeSpread(userId);
+      const text = `🔮 **${userName}님의 타로 3장 스프레드**\n\n${tarotSpread}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getTarotMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 타로 3장 스프레드 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showTarotThreeSpread 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showTarotThreeSpread 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 타로 3장 스프레드를 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
-  // ========== 기타 운세 메서드들 ==========
-
   async showLucky(bot, chatId, messageId, userId, userName) {
     try {
-      const lucky = this.fortuneService.getLucky(userId, userName);
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
 
-      await this.editMessage(bot, chatId, messageId, lucky, {
+      const lucky = this.fortuneService.getLucky(userId, userName);
+      const text = `🍀 **${userName}님의 행운 정보**\n\n${lucky}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, text, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 행운 정보 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showLucky 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showLucky 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 행운 정보를 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
   async showAllFortune(bot, chatId, messageId, userId, userName) {
     try {
+      if (!this.fortuneService) {
+        throw new Error("FortuneService가 초기화되지 않았습니다.");
+      }
+
       const allFortune = this.fortuneService.getAllFortune(userId, userName);
 
-      await this.editMessage(bot, chatId, messageId, allFortune, {
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        ],
+      };
+
+      await this.editOrSendMessage(bot, chatId, messageId, allFortune, {
         parse_mode: "Markdown",
-        reply_markup: this.getFortuneMenuKeyboard(),
+        reply_markup: keyboard,
       });
 
-      this.updateStats("callback");
+      logger.debug(`✅ ${userName} 종합운세 표시 완료`);
     } catch (error) {
-      logger.error(`FortuneModule showAllFortune 오류:`, error);
-      await this.handleError(bot, chatId, error);
+      logger.error("showAllFortune 오류:", error);
+      await this.editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 종합운세를 가져오는 중 오류가 발생했습니다."
+      );
     }
   }
 
-  // ========== 키보드 생성 메서드들 ==========
+  // ========== 메시지 처리 (BaseModule onHandleMessage 구현) ==========
 
-  getFortuneMenuKeyboard() {
-    return {
-      inline_keyboard: [
-        [
-          { text: "🔮 운세 메뉴", callback_data: "fortune_menu" },
-          { text: "🃏 타로카드", callback_data: "fortune_tarot" },
-        ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-      ],
-    };
-  }
-
-  getTarotMenuKeyboard() {
-    return {
-      inline_keyboard: [
-        [
-          { text: "🔮 운세 메뉴", callback_data: "fortune_menu" },
-          { text: "🍀 행운정보", callback_data: "fortune_lucky" },
-        ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-      ],
-    };
-  }
-
-  // ✅ 도움말 메시지 오버라이드
-  getHelpMessage() {
-    return `🔮 **운세 사용법**
-
-**📱 메뉴 방식:**
-/start → 🔮 운세 → 원하는 운세 선택
-
-**⌨️ 명령어 방식:**
-/fortune - 오늘의 일반 운세
-/fortune work - 오늘의 업무운
-/fortune love - 오늘의 연애운
-/fortune money - 오늘의 재물운
-/fortune health - 오늘의 건강운
-/fortune meeting - 오늘의 회식운
-/fortune tarot - 오늘의 타로카드
-/fortune tarot3 - 타로 3장 스프레드
-/fortune lucky - 오늘의 행운 정보
-/fortune all - 종합 운세
-
-✨ **특징:**
-• 개인별 맞춤 운세
-• 실제 이름으로 개인화
-• 한국 시간 기준
-• 매일 새로운 운세
-
-당신만의 특별한 운세를 확인해보세요! 🌟`;
-  }
-
-  // ========== 명령어 처리 (기존 호환성 유지) ==========
-
-  async handleMessage(bot, msg) {
+  async onHandleMessage(bot, msg) {
     const {
       chat: { id: chatId },
       from: { id: userId },
@@ -326,7 +437,6 @@ class FortuneModule extends BaseModule {
 
     if (text && text.startsWith("/fortune")) {
       await this.handleFortuneCommand(bot, msg);
-      this.updateStats("command");
       return true;
     }
 
@@ -345,15 +455,18 @@ class FortuneModule extends BaseModule {
       const subCommand = args[1];
 
       if (!subCommand) {
-        // 기본 일반운세
-        const fortune = this.fortuneService.getFortune(from.id, "general");
-        const text = `🌟 **${userName}님의 오늘 일반운**\n\n${fortune}`;
-        await this.sendMessage(bot, chatId, text, { parse_mode: "Markdown" });
+        // 기본: 운세 메뉴 표시
+        const menuData = this.getMenuData(userName);
+        await bot.sendMessage(chatId, menuData.text, {
+          parse_mode: "Markdown",
+          reply_markup: menuData.keyboard,
+        });
         return;
       }
 
-      // 서브 명령어 처리
+      // 서브 명령어 직접 처리 (기존 호환성)
       const commandMap = {
+        general: () => this.fortuneService.getFortune(from.id, "general"),
         work: () => this.fortuneService.getFortune(from.id, "work"),
         love: () => this.fortuneService.getFortune(from.id, "love"),
         money: () => this.fortuneService.getFortune(from.id, "money"),
@@ -366,6 +479,7 @@ class FortuneModule extends BaseModule {
       };
 
       const typeIcons = {
+        general: "🌟",
         work: "💼",
         love: "💕",
         money: "💰",
@@ -378,6 +492,7 @@ class FortuneModule extends BaseModule {
       };
 
       const typeNames = {
+        general: "일반운",
         work: "업무운",
         love: "연애운",
         money: "재물운",
@@ -401,122 +516,34 @@ class FortuneModule extends BaseModule {
           responseText = `${icon} **${userName}님의 오늘 ${typeName}**\n\n${result}`;
         }
 
-        await this.sendMessage(bot, chatId, responseText, {
+        await bot.sendMessage(chatId, responseText, {
           parse_mode: "Markdown",
         });
       } else {
-        // 알 수 없는 명령어면 도움말 표시
-        await this.sendMessage(bot, chatId, this.getHelpMessage(), {
+        // 알 수 없는 명령어 - 운세 메뉴 표시
+        const menuData = this.getMenuData(userName);
+        await bot.sendMessage(chatId, menuData.text, {
           parse_mode: "Markdown",
+          reply_markup: menuData.keyboard,
         });
       }
     } catch (error) {
-      logger.error("FortuneModule handleFortuneCommand 오류:", error);
-      await this.sendMessage(
-        bot,
-        chatId,
+      logger.error("handleFortuneCommand 오류:", error);
+      await bot.sendMessage(
+        msg.chat.id,
         "❌ 운세를 가져오는 중 오류가 발생했습니다."
       );
     }
   }
 
-  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
-    const userName = getUserName(callbackQuery.from);
+  // ========== 초기화 (BaseModule onInitialize 구현) ==========
 
-    try {
-      switch (subAction) {
-        case "menu":
-          const menuText = `🔮 **${userName}님의 오늘 운세**\n\n어떤 운세를 확인하시겠어요?`;
-          const keyboard = {
-            inline_keyboard: [
-              [
-                { text: "🌟 일반운", callback_data: "fortune_general" },
-                { text: "💼 업무운", callback_data: "fortune_work" },
-              ],
-              [
-                { text: "💕 연애운", callback_data: "fortune_love" },
-                { text: "💰 재물운", callback_data: "fortune_money" },
-              ],
-              [
-                { text: "🌿 건강운", callback_data: "fortune_health" },
-                { text: "🍻 회식운", callback_data: "fortune_meeting" },
-              ],
-              [
-                { text: "🃏 타로카드", callback_data: "fortune_tarot" },
-                { text: "🔮 타로 3장", callback_data: "fortune_tarot3" },
-              ],
-              [
-                { text: "🍀 행운정보", callback_data: "fortune_lucky" },
-                { text: "📋 종합운세", callback_data: "fortune_all" },
-              ],
-              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-            ],
-          };
-          await this.editMessage(bot, chatId, messageId, menuText, {
-            parse_mode: "Markdown",
-            reply_markup: keyboard,
-          });
-          break;
-
-        case "general":
-          const fortune = this.fortuneService.getFortune(userId, "general");
-          const text = `🌟 **${userName}님의 오늘 일반운**\n\n${fortune}`;
-          await this.editMessage(bot, chatId, messageId, text, {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
-              ],
-            },
-          });
-          break;
-
-        case "work":
-          const workFortune = this.fortuneService.getFortune(userId, "work");
-          const workText = `💼 **${userName}님의 오늘 업무운**\n\n${workFortune}`;
-          await this.editMessage(bot, chatId, messageId, workText, {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
-              ],
-            },
-          });
-          break;
-
-        default:
-          return false;
-      }
-
-      this.updateStats("callback");
-      return true;
-    } catch (error) {
-      logger.error(`FortuneModule 콜백 오류 (${subAction}):`, error);
-      return false;
+  async onInitialize() {
+    if (!this.fortuneService) {
+      throw new Error("FortuneService가 초기화되지 않았습니다.");
     }
-  }
 
-  // ========== 초기화 ==========
-
-  async initialize() {
-    try {
-      if (!this.fortuneService) {
-        throw new Error("FortuneService가 초기화되지 않았습니다.");
-      }
-
-      await super.initialize();
-      logger.success("✅ FortuneModule 초기화 완료");
-    } catch (error) {
-      logger.error("❌ FortuneModule 초기화 실패:", error);
-      throw error;
-    }
+    logger.success("✅ FortuneModule 초기화 완료");
   }
 }
 
