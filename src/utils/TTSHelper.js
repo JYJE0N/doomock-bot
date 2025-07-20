@@ -1,6 +1,6 @@
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
-const logger = require("./utils/Logger");
+const logger = require("./Logger");
 // TTS 관련 기능을 제공하는 클래스
 
 class TTSService {

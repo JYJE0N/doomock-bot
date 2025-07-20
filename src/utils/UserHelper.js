@@ -1,5 +1,5 @@
 // src/utils/UserHelper.js - 완전히 개선된 버전
-const logger = require("./utils/Logger");
+const logger = require("./Logger");
 // 사용자 관련 기능을 제공하는 유틸리티 클래스
 
 /**
