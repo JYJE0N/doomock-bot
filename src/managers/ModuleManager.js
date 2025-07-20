@@ -224,9 +224,17 @@ class ModuleManager {
   }
 
   async handleCallback(bot, callbackQuery) {
+    // ✅ 이 로그들 추가!
+    logger.info(`🔍 콜백 처리 시작: ${callbackQuery.data}`);
+    logger.info(`📊 활성 모듈 인스턴스 수: ${this.moduleInstances.size}`);
+    logger.info(
+      `📋 활성 모듈들: ${Array.from(this.moduleInstances.keys()).join(", ")}`
+    );
+
     const callbackKey = `${callbackQuery.from.id}_${callbackQuery.data}`;
 
     if (this.processingCallbacks.has(callbackKey)) {
+      logger.debug(`중복 콜백 무시: ${callbackKey}`);
       return;
     }
 
@@ -234,7 +242,12 @@ class ModuleManager {
 
     try {
       this.globalStats.totalCallbacks++;
-
+      // ✅ 여기도 로그 추가
+      logger.info(
+        `🎯 콜백 파싱: module=${module}, action=${action}, params=${params.join(
+          ","
+        )}`
+      );
       const [module, action, ...params] = callbackQuery.data.split("_");
 
       for (const [name, instance] of this.moduleInstances) {
