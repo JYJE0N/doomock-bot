@@ -151,7 +151,7 @@ class SystemModule extends StandardizedBaseModule {
   async handleStart(bot, msg) {
     const userName = getUserName(msg.from);
 
-    const welcomeMessage = `🤖 *DoomockBot v${
+    const welcomeMessage = `🤖 *두목봇 v${
       this.config.version
     }에 오신 것을 환영합니다!*
 
