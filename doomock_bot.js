@@ -4,7 +4,7 @@
 require("dotenv").config();
 
 // ✅ 2. Logger 인스턴스로 로드 (변수명 변경!)
-const logger = require("./utilss/Logger");
+const logger = require("./utils/Logger");
 
 // ✅ 3. 표준화 시스템 (🎯 핵심!)
 const {
