@@ -189,9 +189,9 @@ class CommandHandler {
 버전: ${config.bot.version}
 
 *✨ 기본 명령어:*
-• /start - 봇 시작 및 메인 메뉴
+• /start - 두목 시작
 • /help - 도움말 보기  
-• /modules - 사용 가능한 모듈 목록
+• /modules - 기능 목록
 • /status - 현재 상태 확인
 • /cancel - 현재 작업 취소
 
