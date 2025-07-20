@@ -187,90 +187,6 @@ class ParameterValidator {
 }
 
 /**
- * 🇰🇷 한국시간 전용 타임스탬프 생성기 (간소화)
- * 주의: 이제 KoreaTimeManager.js를 사용하는 것을 권장하지만
- * 하위 호환성을 위해 최소한의 기능만 유지
- */
-class KoreanTimeManager {
-  constructor() {
-    this.lastTimestamp = 0;
-    this.timestampCache = new Map();
-    this.cacheTimeout = 1000; // 1초 캐시
-
-    // 새로운 통합 시스템 사용 권장 경고
-    logger.debug(
-      "⚠️ 구 KoreanTimeManager 사용 중. KoreaTimeManager.js 사용을 권장합니다."
-    );
-  }
-
-  // 정확한 한국시간 (UTC+9)
-  getKoreanTime() {
-    // 새로운 방식 사용 (Intl API 활용)
-    const now = new Date();
-    return new Date(now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
-  }
-
-  // 한국시간 문자열 (로깅용)
-  getKoreanTimeString() {
-    const cacheKey = "timestring";
-    const now = Date.now();
-
-    // 캐시 확인
-    if (this.timestampCache.has(cacheKey)) {
-      const cached = this.timestampCache.get(cacheKey);
-      if (now - cached.timestamp < this.cacheTimeout) {
-        return cached.value;
-      }
-    }
-
-    // 새로 생성 (Intl API 사용)
-    const koreaTime = this.getKoreanTime();
-    const timeString = koreaTime.toLocaleString("ko-KR", {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-
-    // 캐시 저장
-    this.timestampCache.set(cacheKey, {
-      value: timeString,
-      timestamp: now,
-    });
-
-    return timeString;
-  }
-
-  // 작업 ID 생성 (중복 방지용)
-  generateOperationId(type, userId, additionalData = "") {
-    const timestamp = Date.now();
-    const random = Math.random().toString(36).substring(2, 8);
-    return `${type}_${userId}_${timestamp}_${random}${additionalData}`;
-  }
-
-  // 디버깅용 시간 정보
-  getDebugTimeInfo() {
-    const systemTime = new Date();
-    const koreaTime = this.getKoreanTime();
-
-    return {
-      systemTime: systemTime.toISOString(),
-      koreaTime: koreaTime.toISOString(),
-      koreaString: this.getKoreanTimeString(),
-      timezone: "Asia/Seoul (UTC+9)",
-      offset: systemTime.getTimezoneOffset(),
-    };
-  }
-
-  // 정리 작업
-  cleanup() {
-    this.timestampCache.clear();
-  }
-}
-
-/**
  * 🎯 표준화된 베이스 모듈 (모든 모듈이 상속해야 함)
  * ⚠️ 주의: 파일 내에서 단 한 번만 선언!
  */
@@ -281,9 +197,6 @@ class StandardizedBaseModule {
 
     // 🚫 중복 방지 시스템
     this.duplicationPreventer = new DuplicationPreventer();
-
-    // 🇰🇷 한국시간 관리자 (기본)
-    this.timeManager = new KoreanTimeManager();
 
     // 📊 통계
     this.stats = {
@@ -466,6 +379,5 @@ module.exports = {
   STANDARD_PARAMS,
   DuplicationPreventer,
   ParameterValidator,
-  KoreanTimeManager,
   StandardizedBaseModule,
 };

@@ -70,27 +70,6 @@ class DatabaseManager extends StandardizedBaseModule {
     this.queryTimes = [];
     this.maxQueryTimeHistory = 100;
 
-    // TimeManager 통합
-    this.timeManager = {
-      getKoreanTimeString: () => {
-        return new Date().toLocaleString("ko-KR", {
-          timeZone: "Asia/Seoul",
-          year: "numeric",
-          month: "2-digit",
-          day: "2-digit",
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        });
-      },
-      formatKoreanTime: (date) => {
-        if (!date) return null;
-        return new Date(date).toLocaleString("ko-KR", {
-          timeZone: "Asia/Seoul",
-        });
-      },
-    };
-
     // 연결 옵션 설정
     this.connectionOptions = {
       maxPoolSize: 10,
@@ -392,9 +371,7 @@ class DatabaseManager extends StandardizedBaseModule {
       poolStats: {
         ...this.poolStats,
         successRate: `${successRate}%`,
-        lastConnectedString: this.poolStats.lastConnected
-          ? this.timeManager.formatKoreanTime(this.poolStats.lastConnected)
-          : null,
+        lastConnectedString: this.poolStats.lastConnected,
         performanceMetrics: {
           averageResponseTime: `${this.poolStats.averageResponseTime}ms`,
           queryHistory: this.queryTimes.length,
@@ -481,9 +458,7 @@ class DatabaseManager extends StandardizedBaseModule {
         mongooseDisabled: true,
         nativeDriverOnly: true,
       },
-      lastActivity: this.poolStats.lastConnected
-        ? this.timeManager.formatKoreanTime(this.poolStats.lastConnected)
-        : "없음",
+      lastActivity: this.poolStats.lastConnected,
     };
   }
 }
