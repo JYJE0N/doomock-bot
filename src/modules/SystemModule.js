@@ -253,7 +253,7 @@ ${
   async showHelpMenu(bot, callbackQueryOrMsg) {
     const helpMessage = `❓ *도움말*
 
-🤖 **DoomockBot 사용법**
+🤖 **두목봇 사용법**
 
 **📱 기본 명령어:**
 • \`/start\` - 봇 시작 및 환영 메시지
