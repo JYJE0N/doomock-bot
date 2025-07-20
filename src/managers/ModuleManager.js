@@ -317,9 +317,65 @@ class ModuleManager {
     );
   }
 
-  // ✅ 메시지 처리 (표준화된 매개변수)
-  async handleMessage(bot, msg) {
-    return await this.routeMessage(bot, msg);
+  async routeMessage(bot, msg) {
+    const startTime = Date.now();
+    const userId = msg.from.id;
+    const messageKey = `${userId}_${msg.message_id}`;
+
+    // 중복 처리 방지
+    if (this.processingMessages.has(messageKey)) {
+      this.globalStats.duplicateMessages++;
+      Logger.debug(`중복 메시지 무시: ${messageKey}`);
+      return false;
+    }
+
+    this.processingMessages.add(messageKey);
+    this.globalStats.totalMessages++;
+    this.globalStats.uniqueUsers.add(userId);
+
+    try {
+      // 각 모듈에게 순서대로 처리 기회 제공
+      for (const [moduleName, moduleData] of this.modules.entries()) {
+        if (!moduleData.isInitialized || !moduleData.instance) continue;
+
+        try {
+          // ✅ 표준 메서드 handleMessage 호출 (processMessage 대신)
+          const handled = await moduleData.instance.handleMessage?.(bot, msg);
+          if (handled) {
+            this.globalStats.successfulMessages++;
+            Logger.debug(`📨 메시지 처리 완료: ${moduleName}`);
+            return true;
+          }
+        } catch (error) {
+          Logger.error(`❌ ${moduleName} 메시지 처리 오류:`, error);
+          this.globalStats.moduleErrors.set(
+            moduleName,
+            (this.globalStats.moduleErrors.get(moduleName) || 0) + 1
+          );
+        }
+      }
+
+      this.globalStats.unhandledMessages++;
+      Logger.debug("📨 처리되지 않은 메시지");
+      return false;
+    } catch (error) {
+      this.globalStats.errorMessages++;
+      Logger.error("❌ 메시지 라우팅 오류:", error);
+      await this.errorHandler.handleError(error, {
+        type: "message_routing",
+        userId: userId,
+        module: "ModuleManager",
+      });
+      return false;
+    } finally {
+      // 처리 완료 후 정리
+      setTimeout(() => {
+        this.processingMessages.delete(messageKey);
+      }, 5000);
+
+      // 응답 시간 업데이트
+      this._updateResponseTime(startTime);
+    }
   }
 
   // ✅ 콜백 처리 (표준화된 매개변수)
@@ -414,7 +470,7 @@ class ModuleManager {
         const moduleData = this.modules.get(routeInfo.module + "Module");
         if (moduleData?.isInitialized && moduleData.instance) {
           try {
-            // 표준화된 매개변수로 호출
+            // ✅ 표준화된 매개변수로 handleCallback 호출 (processCallback 대신)
             const handled = await moduleData.instance.handleCallback?.(
               bot,
               callbackQuery,
@@ -443,6 +499,7 @@ class ModuleManager {
         if (!moduleData.isInitialized || !moduleData.instance) continue;
 
         try {
+          // ✅ 표준화된 매개변수로 handleCallback 호출
           const handled = await moduleData.instance.handleCallback?.(
             bot,
             callbackQuery,
