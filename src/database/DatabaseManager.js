@@ -4,16 +4,38 @@ const { MongoClient } = require("mongodb");
 const logger = require("../utils/Logger");
 
 class DatabaseManager {
-  constructor() {
+  constructor(MONGO_URL = null) {
+    this.MONGO_URL =
+      MONGO_URL || process.env.MONGO_URL || process.env.MONGODB_URI;
     this.client = null;
     this.db = null;
     this.isConnected = false;
-    this.reconnectInterval = null;
     this.isShuttingDown = false;
     this.connectionAttempts = 0;
-    this.maxConnectionAttempts = 3;
-  }
+    this.maxRetries = 5;
+    this.reconnectInterval = null;
 
+    const logger = this.getLogger();
+    if (this.MONGO_URL) {
+      logger.info("🗄️ DatabaseManager 초기화됨");
+    } else {
+      logger.warn("⚠️ MongoDB URL이 설정되지 않음");
+    }
+  }
+  // 안전한 logger 획득
+  getLogger() {
+    try {
+      return require("../utils/Logger");
+    } catch (error) {
+      return {
+        info: (...args) => console.log("[INFO]", ...args),
+        error: (...args) => console.error("[ERROR]", ...args),
+        warn: (...args) => console.warn("[WARN]", ...args),
+        debug: (...args) => console.log("[DEBUG]", ...args),
+        success: (...args) => console.log("[SUCCESS]", ...args),
+      };
+    }
+  }
   setConnectionString(MONGO_URL) {
     this.MONGO_URL = MONGO_URL;
   }
@@ -349,9 +371,4 @@ function getStatus() {
   }
 }
 
-module.exports = {
-  DatabaseManager: DatabaseManagerWrapper,
-  ensureConnection,
-  getCollection,
-  getStatus,
-};
+module.exports = DatabaseManager;

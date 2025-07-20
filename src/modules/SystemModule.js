@@ -3,7 +3,7 @@
 const { StandardizedBaseModule } = require("../core/StandardizedSystem");
 const { getUserName } = require("../utils/UserHelper");
 
-// ✅ 새로운 해결책 (logger를 함수로 가져오기)
+// ✅ 안전한 logger 획득 함수
 const getLogger = () => {
   try {
     return require("../utils/Logger");
@@ -14,7 +14,6 @@ const getLogger = () => {
       warn: (...args) => console.warn("[WARN]", ...args),
       debug: (...args) => console.log("[DEBUG]", ...args),
       success: (...args) => console.log("[SUCCESS]", ...args),
-      trace: (...args) => console.log("[TRACE]", ...args),
     };
   }
 };
@@ -31,6 +30,9 @@ class SystemModule extends StandardizedBaseModule {
     this.bot = bot;
     this.moduleManager = options.moduleManager;
 
+    // 안전한 logger 사용
+    const logger = getLogger();
+
     // 시스템 설정
     this.config = {
       version: process.env.npm_package_version || "3.0.1",
@@ -41,14 +43,20 @@ class SystemModule extends StandardizedBaseModule {
     logger.info("🏠 SystemModule 생성됨 (표준화 적용)");
   }
 
-  // ✅ 표준 초기화
   async initialize() {
-    await super.initialize();
+    const logger = getLogger();
 
-    // 시스템 액션 등록
-    this.registerSystemActions();
+    try {
+      await super.initialize();
 
-    logger.success("✅ SystemModule 초기화 완료");
+      // 시스템 액션 등록
+      this.registerSystemActions();
+
+      logger.success("✅ SystemModule 초기화 완료");
+    } catch (error) {
+      logger.error("❌ SystemModule 초기화 실패:", error);
+      throw error;
+    }
   }
 
   // 🎯 시스템 액션 등록 (중복 없음)

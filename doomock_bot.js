@@ -221,8 +221,9 @@ class DoomockBot {
         return;
       }
 
-      // DatabaseManager 초기화
-      this.databaseManager = new DatabaseManager();
+      // ✅ 올바른 DatabaseManager 사용
+      const DatabaseManager = require("./src/database/DatabaseManager");
+      this.databaseManager = new DatabaseManager(this.config.MONGO_URL);
 
       // 연결 시도 (최대 3번)
       let attempts = 0;
