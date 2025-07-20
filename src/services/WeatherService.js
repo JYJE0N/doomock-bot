@@ -99,6 +99,20 @@ class WeatherService {
   // 날씨 예보 조회
   async getForecast(city = this.defaultCity) {
     try {
+      // 🎯 한국 도시명 → 영어명 매핑
+      const cityMap = {
+        서울: "Seoul,KR",
+        부산: "Busan,KR",
+        대구: "Daegu,KR",
+        인천: "Incheon,KR",
+        광주: "Gwangju,KR",
+        대전: "Daejeon,KR",
+        울산: "Ulsan,KR",
+        제주: "Jeju,KR",
+        화성: "Hwaseong,KR",
+        Seoul: "Seoul,KR",
+        Busan: "Busan,KR",
+      };
       const cacheKey = `forecast_${city}`;
       const cached = this.getFromCache(cacheKey);
       if (cached) {
@@ -117,7 +131,7 @@ class WeatherService {
 
       const url = `${this.baseUrl}/forecast`;
       const params = {
-        q: city,
+        q: mappedCity, // ✅ 매핑된 도시명 사용
         appid: this.apiKey,
         lang: this.language,
         units: this.units,
