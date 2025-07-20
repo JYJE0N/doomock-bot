@@ -3,7 +3,18 @@
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
 const WeatherService = require("../services/WeatherService"); // ✅ 수정: 구조 분해 할당 제거
-const logger = require("../utils/Logger");
+let logger;
+try {
+  logger = require("../utils/Logger");
+} catch (error) {
+  logger = {
+    info: (...args) => console.log("[INFO]", ...args),
+    error: (...args) => console.error("[ERROR]", ...args),
+    warn: (...args) => console.warn("[WARN]", ...args),
+    debug: (...args) => console.log("[DEBUG]", ...args),
+    success: (...args) => console.log("[SUCCESS]", ...args),
+  };
+}
 
 class WeatherModule extends BaseModule {
   constructor() {

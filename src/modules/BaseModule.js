@@ -1,7 +1,18 @@
 // ===== 1. BaseModule.js - 단순하고 안전한 기본 구조 =====
 
 // src/modules/BaseModule.js
-const logger = require("../utils/Logger");
+let logger;
+try {
+  logger = require("../utils/Logger");
+} catch (error) {
+  logger = {
+    info: (...args) => console.log("[INFO]", ...args),
+    error: (...args) => console.error("[ERROR]", ...args),
+    warn: (...args) => console.warn("[WARN]", ...args),
+    debug: (...args) => console.log("[DEBUG]", ...args),
+    success: (...args) => console.log("[SUCCESS]", ...args),
+  };
+}
 const { getUserName } = require("../utils/UserHelper");
 
 class BaseModule {

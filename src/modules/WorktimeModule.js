@@ -1,6 +1,18 @@
 const BaseModule = require("./BaseModule");
 const { WorktimeService } = require("../services/WorktimeService");
 const { getUserName } = require("../utils/UserHelper");
+let logger;
+try {
+  logger = require("../utils/Logger");
+} catch (error) {
+  logger = {
+    info: (...args) => console.log("[INFO]", ...args),
+    error: (...args) => console.error("[ERROR]", ...args),
+    warn: (...args) => console.warn("[WARN]", ...args),
+    debug: (...args) => console.log("[DEBUG]", ...args),
+    success: (...args) => console.log("[SUCCESS]", ...args),
+  };
+}
 
 class WorktimeModule extends BaseModule {
   constructor() {

@@ -2,7 +2,18 @@
 
 const { StandardizedBaseModule } = require("../core/StandardizedSystem");
 const { getUserName } = require("../utils/UserHelper");
-const logger = require("../utils/Logger");
+let logger;
+try {
+  logger = require("../utils/Logger");
+} catch (error) {
+  logger = {
+    info: (...args) => console.log("[INFO]", ...args),
+    error: (...args) => console.error("[ERROR]", ...args),
+    warn: (...args) => console.warn("[WARN]", ...args),
+    debug: (...args) => console.log("[DEBUG]", ...args),
+    success: (...args) => console.log("[SUCCESS]", ...args),
+  };
+}
 
 class SystemModule extends StandardizedBaseModule {
   constructor(bot, options = {}) {
