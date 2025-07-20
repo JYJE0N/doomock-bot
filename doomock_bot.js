@@ -268,7 +268,7 @@ class DoomockBot {
       });
 
       await this.moduleManager.initialize();
-
+      this.botController.setModuleManager(this.moduleManager); // 모듈 매니저 참조 설정
       logger.success("✅ 모듈 매니저 초기화 완료");
     } catch (error) {
       logger.error("❌ 모듈 매니저 초기화 실패:", error);

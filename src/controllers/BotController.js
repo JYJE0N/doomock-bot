@@ -140,7 +140,12 @@ class BotController {
 
       try {
         logger.info(`📞 콜백 수신: ${callbackQuery.data}`);
-        await this.moduleManager.handleCallback(this.bot, callbackQuery);
+        if (this.moduleManager) {
+          await this.moduleManager.handleCallback(this.bot, callbackQuery);
+        } else {
+          logger.warn("⚠️ ModuleManager가 설정되지 않음");
+          throw new Error("ModuleManager not initialized");
+        }
       } catch (error) {
         logger.error("콜백 처리 오류:", error);
 
