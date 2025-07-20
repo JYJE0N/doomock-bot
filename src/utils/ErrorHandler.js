@@ -107,8 +107,8 @@ class ErrorHandler {
     logger.error("🔌 데이터베이스 연결 오류:", error.message);
 
     try {
-      const { mongoPoolManager } = require("../database/MongoPoolManager");
-      await mongoPoolManager.reconnect();
+      const { DatabaseManager } = require("../database/DatabaseManager");
+      await DatabaseManager.reconnect();
       return { resolved: true, message: "데이터베이스 연결이 복구되었습니다." };
     } catch (reconnectError) {
       logger.error("❌ 데이터베이스 재연결 실패:", reconnectError);

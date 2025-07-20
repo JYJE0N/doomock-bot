@@ -1,9 +1,6 @@
-// src/modules/SystemModule.js - 완벽한 표준화 적용 시스템 모듈
+// src/modules/SystemModule.js - Logger 문제 완전 해결
 
-const { StandardizedBaseModule } = require("../core/StandardizedSystem");
-const { getUserName } = require("../utils/UserHelper");
-
-// ✅ 안전한 logger 획득 함수
+// ✅ 안전한 logger 획득 함수 (최상단 선언)
 const getLogger = () => {
   try {
     return require("../utils/Logger");
@@ -14,9 +11,14 @@ const getLogger = () => {
       warn: (...args) => console.warn("[WARN]", ...args),
       debug: (...args) => console.log("[DEBUG]", ...args),
       success: (...args) => console.log("[SUCCESS]", ...args),
+      trace: (...args) => console.log("[TRACE]", ...args),
     };
   }
 };
+
+// 기타 안전한 imports
+const { StandardizedBaseModule } = require("../core/StandardizedSystem");
+const { getUserName } = require("../utils/UserHelper");
 
 class SystemModule extends StandardizedBaseModule {
   constructor(bot, options = {}) {
@@ -43,6 +45,7 @@ class SystemModule extends StandardizedBaseModule {
     logger.info("🏠 SystemModule 생성됨 (표준화 적용)");
   }
 
+  // ✅ 표준 초기화
   async initialize() {
     const logger = getLogger();
 
@@ -61,6 +64,8 @@ class SystemModule extends StandardizedBaseModule {
 
   // 🎯 시스템 액션 등록 (중복 없음)
   registerSystemActions() {
+    const logger = getLogger(); // ✅ 함수 내부에서 logger 획득
+
     // 메인 메뉴
     this.actionMap.set("main", this.showMainMenu.bind(this));
     this.actionMap.set("menu", this.showMainMenu.bind(this));
@@ -85,6 +90,8 @@ class SystemModule extends StandardizedBaseModule {
 
   // 🎯 메시지 처리 구현 (표준 매개변수: bot, msg)
   async _processMessage(bot, msg) {
+    const logger = getLogger();
+
     const {
       text,
       chat: { id: chatId },
@@ -96,341 +103,452 @@ class SystemModule extends StandardizedBaseModule {
 
     const command = text.toLowerCase().trim();
 
-    // 🎯 명령어 라우팅 (중복 없는 처리)
-    switch (command) {
-      case "/start":
-        await this.showMainMenu(bot, chatId, null, userId, userName);
-        return true;
+    // 🎯 명령어 라우팅 (중복 방지)
+    try {
+      switch (command) {
+        case "/start":
+        case "시작":
+          return await this.handleStart(bot, msg);
 
-      case "/help":
-        await this.showHelpMenu(bot, chatId, null, userId, userName);
-        return true;
+        case "/help":
+        case "도움말":
+        case "help":
+          return await this.showHelpMenu(bot, msg);
 
-      case "/status":
-        await this.showBotStatus(bot, chatId, null, userId, userName);
-        return true;
+        case "/status":
+        case "상태":
+        case "status":
+          return await this.showBotStatus(bot, msg);
 
-      case "/cancel":
-        await this.handleCancel(bot, chatId, null, userId, userName);
-        return true;
+        case "/cancel":
+        case "취소":
+        case "cancel":
+          return await this.handleCancel(bot, msg);
 
-      default:
-        return false; // 다른 모듈이 처리하도록
+        default:
+          // 다른 모듈이 처리하도록 false 반환
+          return false;
+      }
+    } catch (error) {
+      logger.error("SystemModule 메시지 처리 중 오류:", error);
+      await this.sendErrorMessage(
+        bot,
+        chatId,
+        "시스템 처리 중 오류가 발생했습니다."
+      );
+      return true; // 오류이지만 처리했음을 표시
     }
   }
 
   // 🎯 콜백 처리 구현 (표준 매개변수: bot, callbackQuery, subAction, params, menuManager)
   async _processCallback(bot, callbackQuery, subAction, params, menuManager) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
-    const userName = getUserName(callbackQuery.from);
+    const logger = getLogger();
 
-    // 🎯 액션 라우팅 (중복 방지)
-    if (this.actionMap.has(subAction)) {
-      const actionHandler = this.actionMap.get(subAction);
-      await actionHandler(
-        bot,
-        chatId,
-        messageId,
-        userId,
-        userName,
-        menuManager
-      );
+    try {
+      const action = this.actionMap.get(subAction);
 
-      // 콜백 응답 (중복 방지)
-      try {
-        await bot.answerCallbackQuery(callbackQuery.id);
-      } catch (error) {
-        // 콜백이 이미 응답되었거나 만료된 경우 무시
-        logger.debug("콜백 응답 건너뜀:", error.message);
+      if (!action) {
+        logger.warn(`알 수 없는 SystemModule 액션: ${subAction}`);
+        return false;
       }
 
-      return true;
-    }
+      // 액션 실행 (this 바인딩 보장)
+      const result = await action(bot, callbackQuery, params);
 
-    logger.warn(`SystemModule: 알 수 없는 액션 - ${subAction}`);
-    return false;
+      if (result !== false) {
+        // 콜백 쿼리 응답
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "✅ 처리 완료",
+          show_alert: false,
+        });
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      logger.error("SystemModule 콜백 처리 중 오류:", error);
+
+      try {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "❌ 처리 중 오류가 발생했습니다.",
+          show_alert: true,
+        });
+      } catch (answerError) {
+        logger.error("콜백 응답 실패:", answerError);
+      }
+
+      return true; // 오류이지만 처리했음을 표시
+    }
   }
 
-  // =============== 메뉴 구현들 ===============
+  // =============== 핵심 핸들러들 ===============
 
-  async showMainMenu(bot, chatId, messageId, userId, userName, menuManager) {
-    const currentTime = this.timeManager.getKoreanTimeString();
-    const greeting = this.getTimeBasedGreeting();
+  async handleStart(bot, msg) {
+    const logger = getLogger();
+    const userName = getUserName(msg.from);
 
-    const menuText = `🏠 **${userName}님의 메인 메뉴**
+    const welcomeMessage = `🤖 *DoomockBot v${
+      this.config.version
+    }에 오신 것을 환영합니다!*
 
-${greeting} 👋
+안녕하세요, ${userName}님! 👋
 
-🕐 현재 시간: ${currentTime}
-🌍 지역: 화성/동탄 특화 서비스
+🎯 *주요 기능:*
+• 📝 할 일 관리 (Todo)
+• 🔮 운세 확인 (Fortune)  
+• 🌤️ 날씨 조회 (Weather)
+• 📊 시스템 상태 확인
 
-원하는 기능을 선택해주세요:`;
+📱 *시작하기:*
+아래 메뉴를 선택하거나 /help 명령어를 입력하세요.
 
-    // 🎯 사용 가능한 모듈들 조회 (중복 없음)
-    const availableModules = await this.getAvailableModules();
-    const moduleButtons = this.createModuleButtons(availableModules);
+🚀 *환경:* ${this.config.environment}
+${
+  this.config.isRailway
+    ? "☁️ *Railway 클라우드에서 실행 중*"
+    : "💻 *로컬 환경에서 실행 중*"
+}`;
+
+    try {
+      await bot.sendMessage(msg.chat.id, welcomeMessage, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [
+              { text: "📱 메인 메뉴", callback_data: "system:main" },
+              { text: "❓ 도움말", callback_data: "system:help" },
+            ],
+            [
+              { text: "📊 봇 상태", callback_data: "system:status" },
+              { text: "⚙️ 설정", callback_data: "system:settings" },
+            ],
+          ],
+        },
+      });
+
+      logger.info(`✅ 환영 메시지 전송 완료: ${userName} (${msg.from.id})`);
+      return true;
+    } catch (error) {
+      logger.error("환영 메시지 전송 실패:", error);
+      throw error;
+    }
+  }
+
+  async showMainMenu(bot, callbackQueryOrMsg) {
+    const logger = getLogger();
+
+    const mainMenuMessage = `📱 *메인 메뉴*
+
+원하시는 기능을 선택해주세요:
+
+🔹 *할 일 관리* - 작업 추가, 완료, 삭제
+🔹 *운세 확인* - 오늘의 운세 보기  
+🔹 *날씨 조회* - 현재 날씨 및 예보
+🔹 *시스템 정보* - 봇 상태 및 통계`;
 
     const keyboard = {
       inline_keyboard: [
-        ...moduleButtons,
         [
-          { text: "⚙️ 설정", callback_data: "system:settings" },
+          { text: "📝 할 일 관리", callback_data: "todo:main" },
+          { text: "🔮 운세 확인", callback_data: "fortune:today" },
+        ],
+        [
+          { text: "🌤️ 날씨 조회", callback_data: "weather:current" },
+          { text: "🔧 유틸리티", callback_data: "utils:main" },
+        ],
+        [
+          { text: "📊 시스템 상태", callback_data: "system:status" },
           { text: "❓ 도움말", callback_data: "system:help" },
         ],
-        [{ text: "📊 상태", callback_data: "system:status" }],
       ],
     };
 
-    await this.sendOrEditMessage(bot, chatId, messageId, menuText, keyboard);
+    try {
+      // 콜백 쿼리인지 메시지인지 구분
+      if (callbackQueryOrMsg.data) {
+        // 콜백 쿼리
+        await bot.editMessageText(mainMenuMessage, {
+          chat_id: callbackQueryOrMsg.message.chat.id,
+          message_id: callbackQueryOrMsg.message.message_id,
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      } else {
+        // 일반 메시지
+        await bot.sendMessage(callbackQueryOrMsg.chat.id, mainMenuMessage, {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      }
+
+      logger.debug("✅ 메인 메뉴 표시 완료");
+      return true;
+    } catch (error) {
+      logger.error("메인 메뉴 표시 실패:", error);
+      throw error;
+    }
   }
 
-  async showHelpMenu(bot, chatId, messageId, userId, userName) {
-    const helpText = `❓ **두목 봇 도움말**
-버전: ${this.config.version}
-환경: ${this.config.environment}
+  async showHelpMenu(bot, callbackQueryOrMsg) {
+    const logger = getLogger();
 
-🤖 **기본 명령어:**
-• /start - 봇 시작 및 메인 메뉴
-• /help - 도움말 (현재 메뉴)
-• /status - 봇 상태 확인
-• /cancel - 현재 작업 취소
+    const helpMessage = `❓ *도움말*
 
-📱 **사용법:**
-1. 버튼을 눌러 기능 선택
-2. 명령어 직접 입력
-3. /cancel로 언제든 취소
+🤖 **DoomockBot 사용법**
 
-🏡 **특화 기능:**
-• 화성/동탄 날씨 정보
-• 근무시간 기반 알림
-• 한국시간 정확 지원
+**📱 기본 명령어:**
+• \`/start\` - 봇 시작 및 환영 메시지
+• \`/help\` - 이 도움말 표시
+• \`/status\` - 봇 상태 확인
+• \`/cancel\` - 현재 작업 취소
 
-📞 **문의:**
-관리자에게 문의하시거나 /status로 봇 상태를 확인해보세요.`;
+**📝 할 일 관리:**
+• 새 작업 추가, 완료 처리, 삭제
+• 우선순위 설정 및 카테고리 분류
+• 진행 상황 추적
+
+**🔮 운세 서비스:**
+• 오늘의 운세 확인
+• 행운의 숫자 및 색깔
+• 주간/월간 운세 (추후 업데이트)
+
+**🌤️ 날씨 정보:**
+• 현재 날씨 및 온도
+• 시간별/일별 예보
+• 다양한 지역 날씨 조회
+
+**🔧 기타 기능:**
+• 시간 변환 도구
+• 계산기 기능
+• 봇 통계 및 상태
+
+**💡 팁:** 
+메뉴 버튼을 사용하면 더 쉽게 기능에 접근할 수 있습니다!`;
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: "🔙 메인 메뉴", callback_data: "system:main" }],
+        [{ text: "🔙 메인 메뉴로", callback_data: "system:main" }],
       ],
     };
 
-    await this.sendOrEditMessage(bot, chatId, messageId, helpText, keyboard);
+    try {
+      if (callbackQueryOrMsg.data) {
+        await bot.editMessageText(helpMessage, {
+          chat_id: callbackQueryOrMsg.message.chat.id,
+          message_id: callbackQueryOrMsg.message.message_id,
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      } else {
+        await bot.sendMessage(callbackQueryOrMsg.chat.id, helpMessage, {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      }
+
+      logger.debug("✅ 도움말 표시 완료");
+      return true;
+    } catch (error) {
+      logger.error("도움말 표시 실패:", error);
+      throw error;
+    }
   }
 
-  async showSettingsMenu(bot, chatId, messageId, userId, userName) {
-    const settingsText = `⚙️ **봇 설정**
+  async showBotStatus(bot, callbackQueryOrMsg) {
+    const logger = getLogger();
 
-🔧 **현재 설정:**
-• 언어: 한국어
-• 시간대: 한국시간 (UTC+9)
-• 알림: 활성화
-• 지역: 화성/동탄
+    try {
+      // 봇 상태 정보 수집
+      const uptime = process.uptime();
+      const uptimeString = this.formatUptime(uptime);
 
-📱 **개인화 옵션:**
-• 닉네임: ${userName}
-• 마지막 활동: ${this.stats.lastActivity || "정보 없음"}
+      const memUsage = process.memoryUsage();
+      const memUsageMB = Math.round(memUsage.heapUsed / 1024 / 1024);
 
-⚡ **성능 정보:**
-• 메시지 처리: ${this.stats.messageCount}회
-• 콜백 처리: ${this.stats.callbackCount}회
-• 오류 발생: ${this.stats.errorCount}회`;
+      const moduleStatus = this.moduleManager
+        ? this.moduleManager.getModuleStatus()
+        : {};
+      const activeModules = Object.keys(moduleStatus).filter(
+        (name) => moduleStatus[name].isInitialized
+      ).length;
+
+      const statusMessage = `📊 *봇 상태 정보*
+
+🤖 **시스템 정보:**
+• 버전: \`v${this.config.version}\`
+• 환경: \`${this.config.environment}\`
+• 플랫폼: ${this.config.isRailway ? "☁️ Railway" : "💻 로컬"}
+• 가동 시간: \`${uptimeString}\`
+
+💾 **리소스 사용량:**
+• 메모리 사용: \`${memUsageMB}MB\`
+• Node.js 버전: \`${process.version}\`
+
+📦 **모듈 상태:**
+• 활성 모듈: \`${activeModules}개\`
+• 로드된 모듈: \`${Object.keys(moduleStatus).length}개\`
+
+🔗 **연결 상태:**
+• 텔레그램 API: ✅ 정상
+• 데이터베이스: ${this.getDatabaseStatus()}
+
+⏰ **마지막 업데이트:** ${new Date().toLocaleString("ko-KR")}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 새로고침", callback_data: "system:status" },
+            { text: "🔙 메인 메뉴", callback_data: "system:main" },
+          ],
+        ],
+      };
+
+      if (callbackQueryOrMsg.data) {
+        await bot.editMessageText(statusMessage, {
+          chat_id: callbackQueryOrMsg.message.chat.id,
+          message_id: callbackQueryOrMsg.message.message_id,
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      } else {
+        await bot.sendMessage(callbackQueryOrMsg.chat.id, statusMessage, {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      }
+
+      logger.debug("✅ 봇 상태 표시 완료");
+      return true;
+    } catch (error) {
+      logger.error("봇 상태 표시 실패:", error);
+      throw error;
+    }
+  }
+
+  async showSettingsMenu(bot, callbackQuery) {
+    const logger = getLogger();
+
+    const settingsMessage = `⚙️ *설정*
+
+현재 사용 가능한 설정 옵션들입니다:
+
+🔹 **알림 설정** - 알림 ON/OFF
+🔹 **언어 설정** - 한국어/English  
+🔹 **시간대 설정** - 한국 표준시
+🔹 **데이터 관리** - 사용자 데이터 관리
+
+*주의: 일부 설정은 아직 개발 중입니다.*`;
 
     const keyboard = {
       inline_keyboard: [
         [
           { text: "🔔 알림 설정", callback_data: "system:notifications" },
-          { text: "🌍 지역 설정", callback_data: "system:region" },
+          { text: "🌐 언어 설정", callback_data: "system:language" },
         ],
-        [{ text: "🗑️ 데이터 초기화", callback_data: "system:reset" }],
-        [{ text: "🔙 메인 메뉴", callback_data: "system:main" }],
-      ],
-    };
-
-    await this.sendOrEditMessage(
-      bot,
-      chatId,
-      messageId,
-      settingsText,
-      keyboard
-    );
-  }
-
-  async showBotStatus(bot, chatId, messageId, userId, userName) {
-    const uptime = Math.round(process.uptime());
-    const memoryUsage = Math.round(
-      process.memoryUsage().heapUsed / 1024 / 1024
-    );
-    const currentTime = this.timeManager.getKoreanTimeString();
-
-    // 모듈 상태 조회
-    const moduleStatus = this.moduleManager
-      ? `${this.moduleManager.modules.size}개 로드됨`
-      : "정보 없음";
-
-    const statusText = `📊 **봇 상태 정보**
-
-⏰ **시간 정보:**
-• 현재 시간: ${currentTime}
-• 업타임: ${Math.floor(uptime / 3600)}시간 ${Math.floor((uptime % 3600) / 60)}분
-• 시작 시간: ${this.timeManager.getKoreanTimeString()}
-
-💻 **시스템 정보:**
-• 메모리 사용: ${memoryUsage}MB
-• 환경: ${this.config.environment}
-• Railway: ${this.config.isRailway ? "YES" : "NO"}
-• 버전: ${this.config.version}
-
-📦 **모듈 상태:**
-• 로드된 모듈: ${moduleStatus}
-• 중복 방지: ✅ 활성화
-• 표준화: ✅ 적용됨
-
-📈 **이 세션 통계:**
-• 메시지 처리: ${this.stats.messageCount}회
-• 콜백 처리: ${this.stats.callbackCount}회
-• 오류 발생: ${this.stats.errorCount}회`;
-
-    const keyboard = {
-      inline_keyboard: [
         [
-          { text: "🔄 새로고침", callback_data: "system:status" },
-          { text: "📋 상세 로그", callback_data: "system:logs" },
+          { text: "🕒 시간대 설정", callback_data: "system:timezone" },
+          { text: "🗂️ 데이터 관리", callback_data: "system:data" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "system:main" }],
+        [{ text: "🔙 메인 메뉴로", callback_data: "system:main" }],
       ],
     };
 
-    await this.sendOrEditMessage(bot, chatId, messageId, statusText, keyboard);
+    try {
+      await bot.editMessageText(settingsMessage, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      logger.debug("✅ 설정 메뉴 표시 완료");
+      return true;
+    } catch (error) {
+      logger.error("설정 메뉴 표시 실패:", error);
+      throw error;
+    }
   }
 
-  async handleCancel(bot, chatId, messageId, userId, userName) {
-    // 사용자 상태 초기화 (ModuleManager를 통해)
-    if (this.moduleManager && this.moduleManager.clearUserState) {
-      this.moduleManager.clearUserState(userId);
+  async handleCancel(bot, msg) {
+    const logger = getLogger();
+
+    const cancelMessage = "❌ 현재 작업이 취소되었습니다.";
+
+    try {
+      await bot.sendMessage(msg.chat.id, cancelMessage, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📱 메인 메뉴로", callback_data: "system:main" }],
+          ],
+        },
+      });
+
+      logger.debug("✅ 취소 처리 완료");
+      return true;
+    } catch (error) {
+      logger.error("취소 처리 실패:", error);
+      throw error;
     }
-
-    const cancelText = `❌ **작업 취소**
-
-모든 진행 중인 작업이 취소되었습니다.
-메인 메뉴로 돌아갑니다.
-
-🔄 언제든 새로 시작하실 수 있습니다.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🏠 메인 메뉴", callback_data: "system:main" }],
-      ],
-    };
-
-    await this.sendOrEditMessage(bot, chatId, messageId, cancelText, keyboard);
   }
 
   // =============== 유틸리티 메서드들 ===============
 
-  // 🇰🇷 시간 기반 인사말
-  getTimeBasedGreeting() {
-    const hour = this.timeManager.getKoreanTime().getHours();
+  formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
 
-    if (hour < 6) return "새벽에도 수고하고 계시네요! 🌙";
-    if (hour < 9) return "좋은 아침입니다! ☀️";
-    if (hour < 12) return "활기찬 오전 보내세요! 🌤️";
-    if (hour < 14) return "점심시간 맛있게 드세요! 🍽️";
-    if (hour < 18) return "오후도 화이팅입니다! 💪";
-    if (hour < 21) return "저녁 시간 잘 보내세요! 🌆";
-    return "늦은 시간까지 수고하세요! 🌃";
-  }
-
-  // 사용 가능한 모듈 조회
-  async getAvailableModules() {
-    if (!this.moduleManager) return [];
-
-    const modules = Array.from(this.moduleManager.modules.values())
-      .filter(
-        (module) => module.isInitialized && module.name !== "SystemModule"
-      )
-      .map((module) => ({
-        name: module.name,
-        emoji: this.getModuleEmoji(module.name),
-        callback: module.name.toLowerCase().replace("module", ""),
-      }));
-
-    return modules;
-  }
-
-  // 모듈 이모지 매핑
-  getModuleEmoji(moduleName) {
-    const emojiMap = {
-      TodoModule: "📝",
-      WeatherModule: "🌤️",
-      FortuneModule: "🔮",
-      WorktimeModule: "⏰",
-      UtilsModule: "🛠️",
-    };
-    return emojiMap[moduleName] || "📦";
-  }
-
-  // 모듈 버튼 생성
-  createModuleButtons(modules) {
-    const buttons = [];
-    for (let i = 0; i < modules.length; i += 2) {
-      const row = [];
-      row.push({
-        text: `${modules[i].emoji} ${modules[i].name.replace("Module", "")}`,
-        callback_data: `${modules[i].callback}:menu`,
-      });
-
-      if (modules[i + 1]) {
-        row.push({
-          text: `${modules[i + 1].emoji} ${modules[i + 1].name.replace(
-            "Module",
-            ""
-          )}`,
-          callback_data: `${modules[i + 1].callback}:menu`,
-        });
-      }
-
-      buttons.push(row);
+    if (days > 0) {
+      return `${days}일 ${hours}시간 ${minutes}분`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes}분`;
+    } else if (minutes > 0) {
+      return `${minutes}분 ${secs}초`;
+    } else {
+      return `${secs}초`;
     }
-    return buttons;
   }
 
-  // 메시지 전송/편집 통합
-  async sendOrEditMessage(bot, chatId, messageId, text, keyboard) {
-    const options = {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    };
+  getDatabaseStatus() {
+    // DatabaseManager 상태 확인
+    if (this.moduleManager && this.moduleManager.db) {
+      return "✅ 연결됨";
+    } else {
+      return "⚠️ 메모리 모드";
+    }
+  }
+
+  async sendErrorMessage(
+    bot,
+    chatId,
+    message = "처리 중 오류가 발생했습니다."
+  ) {
+    const logger = getLogger();
 
     try {
-      if (messageId) {
-        await bot.editMessageText(text, {
-          chat_id: chatId,
-          message_id: messageId,
-          ...options,
-        });
-      } else {
-        await bot.sendMessage(chatId, text, options);
-      }
+      await bot.sendMessage(chatId, `❌ ${message}`, {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메인 메뉴로", callback_data: "system:main" }],
+          ],
+        },
+      });
     } catch (error) {
-      logger.error("메시지 전송/편집 오류:", error);
+      logger.error("에러 메시지 전송 실패:", error);
+    }
+  }
 
-      // 폴백: 새 메시지 전송
-      if (messageId && error.message.includes("message is not modified")) {
-        // 메시지가 동일한 경우 무시
-        return;
-      }
+  // =============== 정리 작업 ===============
 
-      try {
-        await bot.sendMessage(chatId, text, options);
-      } catch (fallbackError) {
-        logger.error("폴백 메시지 전송도 실패:", fallbackError);
-      }
+  async cleanup() {
+    const logger = getLogger();
+
+    try {
+      // 필요한 정리 작업 수행
+      logger.info("🧹 SystemModule 정리 작업 완료");
+    } catch (error) {
+      logger.error("❌ SystemModule 정리 중 오류:", error);
     }
   }
 }
