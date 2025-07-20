@@ -3,7 +3,7 @@
 const BaseModule = require("./BaseModule");
 const { ValidationHelper } = require("../utils/ValidationHelper");
 const { getUserName } = require("../utils/UserHelper");
-const { TimeHelper } = require("../utils/TimeHelper").default;
+const { TimeHelper } = require("../utils/TimeHelper");
 
 // ✅ 직접 logger 가져오기 (표준 방식)
 const logger = require("../utils/Logger");
