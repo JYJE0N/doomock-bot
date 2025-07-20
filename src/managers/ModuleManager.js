@@ -268,6 +268,26 @@ class ModuleManager {
     }
   }
 
+  // =============== 모듈 관리 ===============
+  createMainMenuKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: "📝 할일 관리", callback_data: "todo:main" },
+          { text: "🔮 운세 확인", callback_data: "fortune:today" },
+        ],
+        [
+          { text: "🌤️ 날씨 조회", callback_data: "weather:current" },
+          { text: "🛠️ 유틸리티", callback_data: "utils:main" },
+        ],
+        [
+          { text: "📊 시스템 상태", callback_data: "system:status" },
+          { text: "❓ 도움말", callback_data: "system:help" },
+        ],
+      ],
+    };
+  }
+
   // =============== 상태 및 정리 ===============
 
   getStatus() {
