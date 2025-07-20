@@ -1,26 +1,28 @@
-// src/services/WeatherService.js - axios 직접 사용 (Railway 호환)
+// src/services/WeatherService.js - 올바른 서비스 Export 방식
 
 const axios = require("axios");
 const Logger = require("../utils/Logger");
-const AppConfig = require("../config/AppConfig");
 
 class WeatherService {
   constructor() {
-    this.apiKey = AppConfig.WEATHER_API_KEY;
+    this.apiKey = process.env.WEATHER_API_KEY;
     this.baseUrl = "https://api.openweathermap.org/data/2.5";
     this.defaultCity = "Seoul";
-    this.language = "kr"; // 한국어
-    this.units = "metric"; // 섭씨
+    this.language = "kr";
+    this.units = "metric";
 
     // 캐시 설정
     this.cache = new Map();
     this.cacheTimeout = 10 * 60 * 1000; // 10분
+
+    Logger.debug(
+      `🌤️ WeatherService 초기화 (API 키: ${this.apiKey ? "설정됨" : "없음"})`
+    );
   }
 
-  // ⭐ 현재 날씨 조회
+  // 현재 날씨 조회
   async getCurrentWeather(city = this.defaultCity) {
     try {
-      // 캐시 확인
       const cacheKey = `current_${city}`;
       const cached = this.getFromCache(cacheKey);
       if (cached) {
@@ -29,9 +31,11 @@ class WeatherService {
       }
 
       if (!this.apiKey) {
+        Logger.warn("날씨 API 키가 설정되지 않음, 기본값 반환");
         return {
           success: false,
           error: "날씨 API 키가 설정되지 않았습니다.",
+          data: this.getDefaultWeatherData(city),
         };
       }
 
@@ -46,12 +50,10 @@ class WeatherService {
       Logger.debug(`날씨 API 요청: ${city}`);
       const response = await axios.get(url, {
         params,
-        timeout: 10000, // 10초 타임아웃
+        timeout: 10000,
       });
 
       const weatherData = this.formatCurrentWeather(response.data);
-
-      // 캐시 저장
       this.setCache(cacheKey, weatherData);
 
       Logger.info(`현재 날씨 조회 성공: ${city}`);
@@ -61,14 +63,14 @@ class WeatherService {
       return {
         success: false,
         error: this.formatError(error),
+        data: this.getDefaultWeatherData(city),
       };
     }
   }
 
-  // ⭐ 날씨 예보 조회 (5일)
-  async getWeatherForecast(city = this.defaultCity) {
+  // 날씨 예보 조회
+  async getForecast(city = this.defaultCity) {
     try {
-      // 캐시 확인
       const cacheKey = `forecast_${city}`;
       const cached = this.getFromCache(cacheKey);
       if (cached) {
@@ -77,9 +79,11 @@ class WeatherService {
       }
 
       if (!this.apiKey) {
+        Logger.warn("날씨 API 키가 설정되지 않음, 기본 예보 반환");
         return {
           success: false,
           error: "날씨 API 키가 설정되지 않았습니다.",
+          data: this.getDefaultForecastData(city),
         };
       }
 
@@ -89,19 +93,16 @@ class WeatherService {
         appid: this.apiKey,
         lang: this.language,
         units: this.units,
-        cnt: 40, // 5일 x 8회 (3시간 간격)
       };
 
       Logger.debug(`예보 API 요청: ${city}`);
       const response = await axios.get(url, {
         params,
-        timeout: 15000, // 15초 타임아웃
+        timeout: 10000,
       });
 
       const forecastData = this.formatForecast(response.data);
-
-      // 캐시 저장 (예보는 30분 캐시)
-      this.setCache(cacheKey, forecastData, 30 * 60 * 1000);
+      this.setCache(cacheKey, forecastData);
 
       Logger.info(`날씨 예보 조회 성공: ${city}`);
       return { success: true, data: forecastData, cached: false };
@@ -110,89 +111,118 @@ class WeatherService {
       return {
         success: false,
         error: this.formatError(error),
+        data: this.getDefaultForecastData(city),
       };
     }
   }
 
-  // ⭐ 현재 날씨 데이터 포맷팅
-  formatCurrentWeather(data) {
-    return {
-      city: data.name,
-      country: data.sys.country,
-      temperature: Math.round(data.main.temp),
-      feelsLike: Math.round(data.main.feels_like),
-      humidity: data.main.humidity,
-      pressure: data.main.pressure,
-      visibility: data.visibility ? Math.round(data.visibility / 1000) : null,
-      windSpeed: data.wind?.speed ? Math.round(data.wind.speed * 3.6) : 0, // m/s → km/h
-      windDirection: data.wind?.deg || 0,
-      cloudiness: data.clouds?.all || 0,
-      weather: {
-        main: data.weather[0].main,
-        description: data.weather[0].description,
-        icon: data.weather[0].icon,
+  // 기본 날씨 데이터 (API 실패시)
+  getDefaultWeatherData(city) {
+    const defaultData = {
+      화성: {
+        temp: 15,
+        desc: "구름많음",
+        icon: "☁️",
+        humidity: 65,
+        wind: "서풍 2.1m/s",
       },
-      sunrise: new Date(data.sys.sunrise * 1000),
-      sunset: new Date(data.sys.sunset * 1000),
-      timestamp: new Date(),
+      서울: {
+        temp: 16,
+        desc: "맑음",
+        icon: "☀️",
+        humidity: 60,
+        wind: "남풍 1.8m/s",
+      },
+      부산: {
+        temp: 18,
+        desc: "구름조금",
+        icon: "🌤️",
+        humidity: 70,
+        wind: "남동풍 3.2m/s",
+      },
     };
-  }
 
-  // ⭐ 예보 데이터 포맷팅
-  formatForecast(data) {
-    const dailyForecasts = {};
-
-    data.list.forEach((item) => {
-      const date = new Date(item.dt * 1000);
-      const dateKey = date.toISOString().split("T")[0]; // YYYY-MM-DD
-
-      if (!dailyForecasts[dateKey]) {
-        dailyForecasts[dateKey] = {
-          date: dateKey,
-          temps: [],
-          weather: [],
-          details: [],
-        };
-      }
-
-      dailyForecasts[dateKey].temps.push(Math.round(item.main.temp));
-      dailyForecasts[dateKey].weather.push({
-        time: date.getHours(),
-        temp: Math.round(item.main.temp),
-        description: item.weather[0].description,
-        icon: item.weather[0].icon,
-        humidity: item.main.humidity,
-        windSpeed: Math.round((item.wind?.speed || 0) * 3.6),
-      });
-    });
-
-    // 일별 최고/최저 온도 계산
-    const forecast = Object.values(dailyForecasts)
-      .slice(0, 5)
-      .map((day) => ({
-        date: day.date,
-        minTemp: Math.min(...day.temps),
-        maxTemp: Math.max(...day.temps),
-        weather: day.weather[0], // 첫 번째 시간대 날씨
-        hourly: day.weather,
-      }));
+    const data = defaultData[city] || defaultData["화성"];
 
     return {
-      city: data.city.name,
-      country: data.city.country,
-      forecast,
-      timestamp: new Date(),
+      city: city,
+      temperature: data.temp,
+      description: data.desc,
+      humidity: data.humidity,
+      windSpeed: data.wind.split(" ")[1],
+      windDirection: data.wind.split(" ")[0],
+      icon: data.icon,
+      timestamp: new Date().toLocaleString("ko-KR"),
     };
   }
 
-  // ⭐ 날씨 아이콘 이모지 변환
-  getWeatherEmoji(iconCode) {
-    const emojiMap = {
+  // 기본 예보 데이터 (API 실패시)
+  getDefaultForecastData(city) {
+    return {
+      city: city,
+      forecast: [
+        { date: "오늘", icon: "☁️", temp: "15°C", desc: "구름많음" },
+        { date: "내일", icon: "🌤️", temp: "18°C", desc: "맑음" },
+        { date: "모레", icon: "🌧️", temp: "12°C", desc: "비" },
+        { date: "글피", icon: "☀️", temp: "20°C", desc: "맑음" },
+        { date: "그후", icon: "⛅", temp: "16°C", desc: "구름조금" },
+      ],
+      timestamp: new Date().toLocaleString("ko-KR"),
+    };
+  }
+
+  // 현재 날씨 데이터 포맷팅
+  formatCurrentWeather(apiData) {
+    return {
+      city: apiData.name,
+      temperature: Math.round(apiData.main.temp),
+      description: apiData.weather[0].description,
+      humidity: apiData.main.humidity,
+      windSpeed: apiData.wind?.speed || 0,
+      windDirection: this.getWindDirection(apiData.wind?.deg || 0),
+      icon: this.getWeatherIcon(apiData.weather[0].icon),
+      timestamp: new Date().toLocaleString("ko-KR"),
+    };
+  }
+
+  // 예보 데이터 포맷팅
+  formatForecast(apiData) {
+    const dailyForecasts = [];
+    const processedDates = new Set();
+
+    for (const item of apiData.list.slice(0, 15)) {
+      const date = new Date(item.dt * 1000);
+      const dateStr = date.toLocaleDateString("ko-KR", {
+        month: "short",
+        day: "numeric",
+      });
+
+      if (!processedDates.has(dateStr) && dailyForecasts.length < 5) {
+        dailyForecasts.push({
+          date: dateStr,
+          icon: this.getWeatherIcon(item.weather[0].icon),
+          temp: `${Math.round(item.main.temp)}°C`,
+          desc: item.weather[0].description,
+        });
+        processedDates.add(dateStr);
+      }
+    }
+
+    return {
+      city: apiData.city.name,
+      forecast: dailyForecasts,
+      timestamp: new Date().toLocaleString("ko-KR"),
+    };
+  }
+
+  // 날씨 아이콘 매핑
+  getWeatherIcon(iconCode) {
+    const iconMap = {
       "01d": "☀️",
       "01n": "🌙",
-      "02d": "⛅",
-      "02n": "☁️",
-      "03d": "☁️",
+      "02d": "🌤️",
+      "02n": "🌙",
+      "03d": "⛅",
       "03n": "☁️",
       "04d": "☁️",
       "04n": "☁️",
@@ -207,71 +237,26 @@ class WeatherService {
       "50d": "🌫️",
       "50n": "🌫️",
     };
-
-    return emojiMap[iconCode] || "🌤️";
+    return iconMap[iconCode] || "🌤️";
   }
 
-  // ⭐ 의상 추천
-  getClothingRecommendation(temp, weather) {
-    let recommendation = "";
-
-    if (temp >= 28) {
-      recommendation = "👕 민소매, 반팔, 반바지, 원피스";
-    } else if (temp >= 23) {
-      recommendation = "👔 반팔, 얇은 셔츠, 반바지, 면바지";
-    } else if (temp >= 20) {
-      recommendation = "👕 얇은 가디건, 긴팔, 면바지, 청바지";
-    } else if (temp >= 17) {
-      recommendation = "🧥 얇은 니트, 자켓, 가디건, 청바지";
-    } else if (temp >= 12) {
-      recommendation = "🧥 자켓, 트렌치코트, 니트, 청바지, 스타킹";
-    } else if (temp >= 9) {
-      recommendation = "🧥 울 코트, 히트텍, 니트, 청바지";
-    } else if (temp >= 5) {
-      recommendation = "🧥 코트, 가죽자켓, 히트텍, 니트, 레깅스";
-    } else {
-      recommendation = "🧥 패딩, 두꺼운 코트, 목도리, 장갑, 기모제품";
-    }
-
-    // 날씨별 추가 추천
-    if (weather.includes("rain") || weather.includes("비")) {
-      recommendation += "\n☂️ 우산, 방수 외투 필수!";
-    }
-    if (weather.includes("snow") || weather.includes("눈")) {
-      recommendation += "\n❄️ 미끄럼 방지 신발, 장갑, 목도리 추천!";
-    }
-    if (weather.includes("wind") || weather.includes("바람")) {
-      recommendation += "\n💨 바람막이 추천!";
-    }
-
-    return recommendation;
+  // 풍향 계산
+  getWindDirection(degrees) {
+    const directions = [
+      "북풍",
+      "북동풍",
+      "동풍",
+      "남동풍",
+      "남풍",
+      "남서풍",
+      "서풍",
+      "북서풍",
+    ];
+    const index = Math.round(degrees / 45) % 8;
+    return directions[index];
   }
 
-  // ⭐ 자외선 지수 계산 (간단한 추정)
-  getUVIndex(weather, hour) {
-    if (hour < 6 || hour > 18) return 0;
-
-    let baseUV = 5; // 기본값
-
-    if (weather.includes("clear") || weather.includes("맑음")) {
-      baseUV = 8;
-    } else if (weather.includes("cloud") || weather.includes("구름")) {
-      baseUV = 5;
-    } else if (weather.includes("rain") || weather.includes("비")) {
-      baseUV = 2;
-    }
-
-    // 시간대별 조정
-    if (hour >= 11 && hour <= 15) {
-      baseUV += 2;
-    } else if (hour >= 9 && hour <= 17) {
-      baseUV += 1;
-    }
-
-    return Math.min(baseUV, 11);
-  }
-
-  // ⭐ 캐시 관리
+  // 캐시 관리
   setCache(key, data, timeout = this.cacheTimeout) {
     this.cache.set(key, {
       data,
@@ -297,7 +282,7 @@ class WeatherService {
     Logger.info("날씨 캐시 초기화");
   }
 
-  // ⭐ 에러 포맷팅
+  // 에러 포맷팅
   formatError(error) {
     if (error.response) {
       const status = error.response.status;
@@ -322,14 +307,13 @@ class WeatherService {
     }
   }
 
-  // ⭐ 서비스 상태 확인
+  // 서비스 상태 확인
   async checkStatus() {
     try {
       if (!this.apiKey) {
         return { status: "error", message: "API 키 없음" };
       }
 
-      // 간단한 API 테스트
       const result = await this.getCurrentWeather("Seoul");
 
       return {
@@ -348,4 +332,5 @@ class WeatherService {
   }
 }
 
-module.exports = WeatherService;
+// ✅ 올바른 서비스 Export 방식 (중괄호 사용)
+module.exports = { WeatherService };

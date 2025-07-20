@@ -1,8 +1,8 @@
-// src/modules/WeatherModule.js - 표준 패턴으로 완전 새로 구현
+// src/modules/WeatherModule.js - Import 방식 수정
 
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
-const { WeatherService } = require("../services/WeatherService");
+const WeatherService = require("../services/WeatherService"); // ✅ 수정: 구조 분해 할당 제거
 const Logger = require("../utils/Logger");
 
 class WeatherModule extends BaseModule {
@@ -20,11 +20,14 @@ class WeatherModule extends BaseModule {
       ],
     });
 
-    this.weatherService = new WeatherService();
-    Logger.info(
-      "🌤️ WeatherService 초기화:",
-      this.weatherService ? "성공" : "실패"
-    );
+    // ✅ 수정: WeatherService 클래스로 직접 인스턴스화
+    try {
+      this.weatherService = new WeatherService();
+      Logger.info("🌤️ WeatherService 초기화 성공");
+    } catch (error) {
+      Logger.error("❌ WeatherService 초기화 실패:", error);
+      this.weatherService = null;
+    }
   }
 
   // ✅ 표준 액션 등록 패턴 적용
@@ -69,7 +72,7 @@ class WeatherModule extends BaseModule {
       // 기본 위치: 화성/동탄
       const city = "화성";
 
-      // 실제 API 호출 (WeatherService 사용)
+      // WeatherService 사용 (안전하게)
       const weatherData = await this.getWeatherData(city);
 
       const text = this.formatCurrentWeather(weatherData, city);
@@ -105,178 +108,88 @@ class WeatherModule extends BaseModule {
     }
   }
 
-  async showSeoulWeather(bot, chatId, messageId, userId, userName) {
-    try {
-      const weatherData = await this.getWeatherData("서울");
-      const text = this.formatCurrentWeather(weatherData, "서울");
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getWeatherMenuKeyboard(),
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`WeatherModule showSeoulWeather 오류:`, error);
-      await this.showFallbackWeather(bot, chatId, messageId, "서울 날씨");
-    }
-  }
-
-  async showBusanWeather(bot, chatId, messageId, userId, userName) {
-    try {
-      const weatherData = await this.getWeatherData("부산");
-      const text = this.formatCurrentWeather(weatherData, "부산");
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getWeatherMenuKeyboard(),
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`WeatherModule showBusanWeather 오류:`, error);
-      await this.showFallbackWeather(bot, chatId, messageId, "부산 날씨");
-    }
-  }
-
-  async showMoreCities(bot, chatId, messageId, userId, userName) {
-    try {
-      const text = `🗺️ **더 많은 도시 날씨**\n\n아래 도시를 선택하세요:`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "🏙️ 서울", callback_data: "weather_seoul" },
-            { text: "🌊 부산", callback_data: "weather_busan" },
-          ],
-          [
-            { text: "🌉 인천", callback_data: "weather_인천" },
-            { text: "🌆 대구", callback_data: "weather_대구" },
-          ],
-          [
-            { text: "🏛️ 대전", callback_data: "weather_대전" },
-            { text: "🌺 광주", callback_data: "weather_광주" },
-          ],
-          [
-            { text: "🌊 울산", callback_data: "weather_울산" },
-            { text: "🏝️ 제주", callback_data: "weather_제주" },
-          ],
-          [
-            { text: "🔙 날씨 메뉴", callback_data: "weather_menu" },
-            { text: "🏠 메인 메뉴", callback_data: "main_menu" },
-          ],
-        ],
-      };
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`WeatherModule showMoreCities 오류:`, error);
-      await this.handleError(bot, chatId, error);
-    }
-  }
-
-  async showQuickWeather(bot, chatId, messageId, userId, userName) {
-    try {
-      // 빠른 날씨: 화성 + 서울 동시 표시
-      const [hwaseongData, seoulData] = await Promise.all([
-        this.getWeatherData("화성"),
-        this.getWeatherData("서울"),
-      ]);
-
-      const text =
-        `⚡ **빠른 날씨**\n\n` +
-        `**🏠 화성/동탄**\n${this.formatQuickWeather(hwaseongData)}\n\n` +
-        `**🏙️ 서울**\n${this.formatQuickWeather(seoulData)}`;
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getWeatherMenuKeyboard(),
-      });
-
-      this.updateStats("callback");
-    } catch (error) {
-      Logger.error(`WeatherModule showQuickWeather 오류:`, error);
-      await this.showFallbackWeather(bot, chatId, messageId, "빠른 날씨");
-    }
-  }
-
-  // ========== 동적 콜백 처리 (도시별 날씨) ==========
-
-  async handleCallback(bot, callbackQuery, subAction, params) {
-    // 동적 도시 날씨 처리 (weather_인천, weather_대구 등)
-    const cities = ["인천", "대구", "대전", "광주", "울산", "제주"];
-
-    if (cities.includes(subAction)) {
-      return await this.showCityWeather(bot, callbackQuery, subAction);
-    }
-
-    // 표준 액션은 부모 클래스에서 처리
-    return await super.handleCallback(bot, callbackQuery, subAction, params);
-  }
-
-  async showCityWeather(bot, callbackQuery, city) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = callbackQuery;
-
-    try {
-      const weatherData = await this.getWeatherData(city);
-      const text = this.formatCurrentWeather(weatherData, city);
-
-      await this.editMessage(bot, chatId, messageId, text, {
-        parse_mode: "Markdown",
-        reply_markup: this.getWeatherMenuKeyboard(),
-      });
-
-      this.updateStats("callback");
-      return true;
-    } catch (error) {
-      Logger.error(`WeatherModule showCityWeather(${city}) 오류:`, error);
-      await this.showFallbackWeather(bot, chatId, messageId, `${city} 날씨`);
-      return true;
-    }
-  }
-
-  // ========== 날씨 데이터 처리 ==========
+  // ========== 안전한 날씨 데이터 처리 ==========
 
   async getWeatherData(city) {
     try {
+      if (!this.weatherService) {
+        Logger.warn("WeatherService가 없어서 기본값 사용");
+        return this.getDefaultWeatherData(city);
+      }
+
       // WeatherService 사용해서 실제 API 호출
-      return await this.weatherService.getCurrentWeather(city);
+      const result = await this.weatherService.getCurrentWeather(city);
+
+      if (result.success) {
+        return result.data;
+      } else {
+        Logger.warn(`실제 날씨 API 호출 실패: ${result.error}`);
+        return result.data || this.getDefaultWeatherData(city);
+      }
     } catch (error) {
-      Logger.warn(`실제 날씨 API 호출 실패, 기본값 사용: ${error.message}`);
-      // API 실패시 기본값 반환
+      Logger.warn(`날씨 데이터 조회 실패, 기본값 사용: ${error.message}`);
       return this.getDefaultWeatherData(city);
     }
   }
 
   async getForecastData(city) {
     try {
-      return await this.weatherService.getForecast(city);
+      if (!this.weatherService) {
+        Logger.warn("WeatherService가 없어서 기본 예보 사용");
+        return this.getDefaultForecastData(city);
+      }
+
+      const result = await this.weatherService.getForecast(city);
+
+      if (result.success) {
+        return result.data;
+      } else {
+        Logger.warn(`예보 API 호출 실패: ${result.error}`);
+        return result.data || this.getDefaultForecastData(city);
+      }
     } catch (error) {
-      Logger.warn(`예보 API 호출 실패, 기본값 사용: ${error.message}`);
+      Logger.warn(`예보 데이터 조회 실패, 기본값 사용: ${error.message}`);
       return this.getDefaultForecastData(city);
     }
   }
 
   getDefaultWeatherData(city) {
     // API 실패시 사용할 기본 데이터
+    const defaultData = {
+      화성: {
+        temp: 15,
+        desc: "구름많음",
+        icon: "☁️",
+        humidity: 65,
+        wind: "서풍 2.1m/s",
+      },
+      서울: {
+        temp: 16,
+        desc: "맑음",
+        icon: "☀️",
+        humidity: 60,
+        wind: "남풍 1.8m/s",
+      },
+      부산: {
+        temp: 18,
+        desc: "구름조금",
+        icon: "🌤️",
+        humidity: 70,
+        wind: "남동풍 3.2m/s",
+      },
+    };
+
+    const data = defaultData[city] || defaultData["화성"];
+
     return {
       city: city,
-      temperature: 15,
-      description: "구름많음",
-      humidity: 65,
-      windSpeed: 2.1,
-      windDirection: "서풍",
-      icon: "☁️",
+      temperature: data.temp,
+      description: data.desc,
+      humidity: data.humidity,
+      windSpeed: data.wind.split(" ")[1],
+      windDirection: data.wind.split(" ")[0],
+      icon: data.icon,
+      timestamp: new Date().toLocaleString("ko-KR"),
     };
   }
 
@@ -288,6 +201,7 @@ class WeatherModule extends BaseModule {
         { date: "내일", icon: "🌤️", temp: "18°C", desc: "맑음" },
         { date: "모레", icon: "🌧️", temp: "12°C", desc: "비" },
       ],
+      timestamp: new Date().toLocaleString("ko-KR"),
     };
   }
 
@@ -301,8 +215,8 @@ class WeatherModule extends BaseModule {
       `${data.icon} **${data.description}**\n` +
       `🌡️ 온도: ${data.temperature}°C\n` +
       `💧 습도: ${data.humidity}%\n` +
-      `💨 바람: ${data.windDirection} ${data.windSpeed}m/s\n\n` +
-      `📝 업데이트: ${new Date().toLocaleTimeString("ko-KR")}`
+      `💨 바람: ${data.windDirection} ${data.windSpeed}\n\n` +
+      `📝 업데이트: ${data.timestamp || new Date().toLocaleTimeString("ko-KR")}`
     );
   }
 
@@ -310,9 +224,17 @@ class WeatherModule extends BaseModule {
     const cityIcon = this.getCityIcon(city);
     let forecastText = `${cityIcon} **${city} 날씨 예보**\n\n`;
 
-    data.forecast.forEach((day) => {
-      forecastText += `**${day.date}**: ${day.icon} ${day.desc} ${day.temp}\n`;
-    });
+    if (data.forecast && data.forecast.length > 0) {
+      data.forecast.forEach((day) => {
+        forecastText += `**${day.date}**: ${day.icon} ${day.desc} ${day.temp}\n`;
+      });
+    } else {
+      forecastText += "예보 데이터를 불러올 수 없습니다.";
+    }
+
+    forecastText += `\n📝 업데이트: ${
+      data.timestamp || new Date().toLocaleTimeString("ko-KR")
+    }`;
 
     return forecastText;
   }
@@ -439,8 +361,9 @@ class WeatherModule extends BaseModule {
 
   async initialize() {
     try {
+      // WeatherService가 없어도 기본 기능은 제공
       if (!this.weatherService) {
-        Logger.warn("WeatherService가 없어도 기본 기능은 제공합니다.");
+        Logger.warn("⚠️ WeatherService가 없지만 기본 날씨 기능은 제공합니다.");
       }
 
       await super.initialize();
