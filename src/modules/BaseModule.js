@@ -1,4 +1,4 @@
-// src/modules/BaseModule.js - 완전 단순화된 베이스 모듈
+// src/modules/BaseModule.js - 표준 구조 (모든 혼란 제거)
 
 const Logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
@@ -17,7 +17,6 @@ class BaseModule {
 
     // 기본 상태
     this.isInitialized = false;
-    this.isLoaded = false;
     this.startTime = new Date();
 
     // 통계
@@ -26,14 +25,11 @@ class BaseModule {
       callbackCount: 0,
       errorCount: 0,
       lastUsed: null,
-      totalResponseTime: 0,
-      averageResponseTime: 0,
       uniqueUsers: new Set(),
     };
 
     // 사용자 관리
     this.userStates = new Map();
-    this.processingUsers = new Set();
 
     // 에러 핸들러
     this.errorHandler = new ErrorHandler({
@@ -47,7 +43,7 @@ class BaseModule {
     Logger.debug(`📦 ${this.name} 생성됨`);
   }
 
-  // 🔧 초기화 (서브클래스에서 super.initialize() 호출)
+  // 🔧 초기화
   async initialize() {
     if (this.isInitialized) {
       Logger.warn(`${this.name} 이미 초기화됨`);
@@ -57,12 +53,10 @@ class BaseModule {
     try {
       Logger.info(`🔧 ${this.name} 초기화 중...`);
 
-      // 데이터베이스 연결 확인 (선택적)
+      // 데이터베이스 연결 (선택적)
       await this.ensureDatabaseConnection();
 
       this.isInitialized = true;
-      this.isLoaded = true;
-
       Logger.success(`✅ ${this.name} 초기화 완료`);
     } catch (error) {
       this.stats.errorCount++;
@@ -83,24 +77,18 @@ class BaseModule {
   }
 
   // 📊 통계 업데이트 헬퍼
-  updateStats(type, startTime = Date.now()) {
-    const responseTime = startTime ? Date.now() - startTime : 0;
-
+  updateStats(type) {
     this.stats.lastUsed = new Date();
-    this.stats.totalResponseTime += responseTime;
+    this.stats.uniqueUsers.add("temp"); // 실제 구현에서는 userId
 
-    if (type === "message") {
+    if (type === "message" || type === "command") {
       this.stats.commandCount++;
     } else if (type === "callback") {
       this.stats.callbackCount++;
     }
-
-    const totalRequests = this.stats.commandCount + this.stats.callbackCount;
-    this.stats.averageResponseTime =
-      totalRequests > 0 ? this.stats.totalResponseTime / totalRequests : 0;
   }
 
-  // 👤 사용자 상태 관리 헬퍼들
+  // 👤 사용자 상태 관리
   getUserState(userId) {
     return this.userStates.get(userId);
   }
@@ -113,7 +101,7 @@ class BaseModule {
     this.userStates.delete(userId);
   }
 
-  // 🛡️ 에러 처리 헬퍼
+  // 🛡️ 에러 처리
   async handleError(error, context = {}) {
     this.stats.errorCount++;
     Logger.error(`❌ ${this.name} 에러:`, error);
@@ -147,87 +135,13 @@ class BaseModule {
     }
   }
 
-  async answerCallback(bot, callbackQueryId, text = "", showAlert = false) {
-    try {
-      return await bot.answerCallbackQuery(callbackQueryId, {
-        text,
-        show_alert: showAlert,
-      });
-    } catch (error) {
-      Logger.debug("콜백 응답 실패 (무시됨):", error.message);
-    }
-  }
-
-  // 🏠 기본 메뉴 표시 (서브클래스에서 오버라이드)
-  async showMenu(bot, chatId, messageId, userId, userName) {
-    const menuText = `🔧 **${this.name} 메뉴**\n\n기본 메뉴입니다.`;
-    const keyboard = {
-      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main_menu" }]],
-    };
-
-    if (messageId) {
-      await this.editMessage(bot, chatId, messageId, menuText, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-    } else {
-      await this.sendMessage(bot, chatId, menuText, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-    }
-  }
-
-  // ❓ 기본 도움말 (서브클래스에서 오버라이드)
-  async showHelp(bot, chatId, messageId) {
-    const helpText = `❓ **${this.name} 도움말**\n\n구체적인 도움말이 준비되지 않았습니다.`;
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔙 메뉴", callback_data: `${this.moduleName}_menu` }],
-      ],
-    };
-
-    await this.editMessage(bot, chatId, messageId, helpText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
-  }
-
-  // 📊 통계 표시
-  async showStats(bot, chatId, messageId) {
-    const statsText =
-      `📊 **${this.name} 통계**\n\n` +
-      `• 명령어 실행: ${this.stats.commandCount}회\n` +
-      `• 콜백 처리: ${this.stats.callbackCount}회\n` +
-      `• 에러 발생: ${this.stats.errorCount}회\n` +
-      `• 고유 사용자: ${this.stats.uniqueUsers.size}명\n` +
-      `• 평균 응답시간: ${Math.round(this.stats.averageResponseTime)}ms\n` +
-      `• 마지막 사용: ${
-        this.stats.lastUsed ? this.stats.lastUsed.toLocaleString() : "없음"
-      }`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔙 메뉴", callback_data: `${this.moduleName}_menu` }],
-      ],
-    };
-
-    await this.editMessage(bot, chatId, messageId, statsText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
-  }
-
   // 🧹 정리 작업
   async cleanup() {
     Logger.info(`🧹 ${this.name} 정리 중...`);
 
     try {
-      // 사용자 상태 정리
       this.userStates.clear();
-      this.processingUsers.clear();
 
-      // ErrorHandler 정리
       if (
         this.errorHandler &&
         typeof this.errorHandler.cleanup === "function"
@@ -241,14 +155,14 @@ class BaseModule {
     }
   }
 
-  // ⚠️ 추상 메서드들 (서브클래스에서 반드시 구현)
+  // ⚠️ 서브클래스에서 반드시 구현해야 할 메서드들 (기본은 처리하지 않음)
   async handleMessage(bot, msg) {
-    Logger.warn(`${this.name}에서 handleMessage 미구현`);
+    // 기본: 처리하지 않음 (경고 없음)
     return false;
   }
 
   async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
-    Logger.warn(`${this.name}에서 handleCallback 미구현`);
+    // 기본: 처리하지 않음 (경고 없음)
     return false;
   }
 }

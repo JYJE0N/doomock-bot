@@ -418,6 +418,89 @@ class FortuneModule extends BaseModule {
     }
   }
 
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+    const userName = getUserName(callbackQuery.from);
+
+    try {
+      switch (subAction) {
+        case "menu":
+          const menuText = `🔮 **${userName}님의 오늘 운세**\n\n어떤 운세를 확인하시겠어요?`;
+          const keyboard = {
+            inline_keyboard: [
+              [
+                { text: "🌟 일반운", callback_data: "fortune_general" },
+                { text: "💼 업무운", callback_data: "fortune_work" },
+              ],
+              [
+                { text: "💕 연애운", callback_data: "fortune_love" },
+                { text: "💰 재물운", callback_data: "fortune_money" },
+              ],
+              [
+                { text: "🌿 건강운", callback_data: "fortune_health" },
+                { text: "🍻 회식운", callback_data: "fortune_meeting" },
+              ],
+              [
+                { text: "🃏 타로카드", callback_data: "fortune_tarot" },
+                { text: "🔮 타로 3장", callback_data: "fortune_tarot3" },
+              ],
+              [
+                { text: "🍀 행운정보", callback_data: "fortune_lucky" },
+                { text: "📋 종합운세", callback_data: "fortune_all" },
+              ],
+              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+            ],
+          };
+          await this.editMessage(bot, chatId, messageId, menuText, {
+            parse_mode: "Markdown",
+            reply_markup: keyboard,
+          });
+          break;
+
+        case "general":
+          const fortune = this.fortuneService.getFortune(userId, "general");
+          const text = `🌟 **${userName}님의 오늘 일반운**\n\n${fortune}`;
+          await this.editMessage(bot, chatId, messageId, text, {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+              ],
+            },
+          });
+          break;
+
+        case "work":
+          const workFortune = this.fortuneService.getFortune(userId, "work");
+          const workText = `💼 **${userName}님의 오늘 업무운**\n\n${workFortune}`;
+          await this.editMessage(bot, chatId, messageId, workText, {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+              ],
+            },
+          });
+          break;
+
+        default:
+          return false;
+      }
+
+      this.updateStats("callback");
+      return true;
+    } catch (error) {
+      Logger.error(`FortuneModule 콜백 오류 (${subAction}):`, error);
+      return false;
+    }
+  }
+
   // ========== 초기화 ==========
 
   async initialize() {

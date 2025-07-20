@@ -36,10 +36,10 @@ class TodoModule extends BaseModule {
     try {
       // Todo 컬렉션 확인 및 생성
       await this._ensureTodoCollection();
-      
+
       // 기존 Todo 통계 로드
       await this._loadTodoStats();
-      
+
       Logger.success("📝 TodoModule 초기화 완료");
     } catch (error) {
       throw new Error(`TodoModule 초기화 실패: ${error.message}`);
@@ -62,12 +62,16 @@ class TodoModule extends BaseModule {
   async _loadTodoStats() {
     try {
       const totalCount = await this.db.countDocuments("todos", {});
-      const completedCount = await this.db.countDocuments("todos", { completed: true });
-      
+      const completedCount = await this.db.countDocuments("todos", {
+        completed: true,
+      });
+
       this.todoStats.totalTodos = totalCount;
       this.todoStats.completedTodos = completedCount;
-      
-      Logger.debug(`📊 Todo 통계 로드됨: 전체 ${totalCount}, 완료 ${completedCount}`);
+
+      Logger.debug(
+        `📊 Todo 통계 로드됨: 전체 ${totalCount}, 완료 ${completedCount}`
+      );
     } catch (error) {
       Logger.warn("⚠️ Todo 통계 로드 실패:", error.message);
     }
@@ -90,14 +94,18 @@ class TodoModule extends BaseModule {
   }
 
   // 📨 메시지 처리 (표준 매개변수)
-  async onHandleMessage(bot, msg) {
-    const { chat: { id: chatId }, from: { id: userId }, text } = msg;
+  async handleMessage(bot, msg) {
+    const {
+      chat: { id: chatId },
+      from: { id: userId },
+      text,
+    } = msg;
     const userName = getUserName(msg.from);
 
     try {
       // 사용자 상태 확인
       const userState = this.getUserState(userId);
-      
+
       if (userState) {
         return await this._handleUserStateMessage(bot, msg, userState);
       }
@@ -114,7 +122,13 @@ class TodoModule extends BaseModule {
         const addMatch = text.match(/^\/?(add|할일)\s+(.+)$/i);
         if (addMatch) {
           const todoText = addMatch[2].trim();
-          return await this._addTodoQuick(bot, chatId, userId, todoText, userName);
+          return await this._addTodoQuick(
+            bot,
+            chatId,
+            userId,
+            todoText,
+            userName
+          );
         }
 
         // 빠른 검색: "/todo 검색 키워드"
@@ -134,19 +148,35 @@ class TodoModule extends BaseModule {
 
   // 👤 사용자 상태별 메시지 처리
   async _handleUserStateMessage(bot, msg, userState) {
-    const { chat: { id: chatId }, from: { id: userId }, text } = msg;
+    const {
+      chat: { id: chatId },
+      from: { id: userId },
+      text,
+    } = msg;
     const userName = getUserName(msg.from);
 
     switch (userState.action) {
       case "waiting_todo_input":
-        return await this._processTodoInput(bot, chatId, userId, text, userName);
-      
+        return await this._processTodoInput(
+          bot,
+          chatId,
+          userId,
+          text,
+          userName
+        );
+
       case "waiting_search_input":
         return await this._processSearchInput(bot, chatId, userId, text);
-      
+
       case "waiting_import_data":
-        return await this._processImportData(bot, chatId, userId, text, userName);
-      
+        return await this._processImportData(
+          bot,
+          chatId,
+          userId,
+          text,
+          userName
+        );
+
       default:
         this.clearUserState(userId);
         return false;
@@ -156,7 +186,10 @@ class TodoModule extends BaseModule {
   // 📞 콜백 처리 (🎯 표준 매개변수)
   async onHandleCallback(bot, callbackQuery, subAction, params, menuManager) {
     const {
-      message: { chat: { id: chatId }, message_id: messageId },
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
       from: { id: userId },
     } = callbackQuery;
     const userName = getUserName(callbackQuery.from);
@@ -165,19 +198,39 @@ class TodoModule extends BaseModule {
       // 액션 매핑에서 처리
       const action = this.actionMap.get(subAction);
       if (action) {
-        await action(bot, chatId, messageId, userId, userName, params, menuManager);
+        await action(
+          bot,
+          chatId,
+          messageId,
+          userId,
+          userName,
+          params,
+          menuManager
+        );
         return true;
       }
 
       // 동적 액션 처리 (complete_ID, delete_ID 등)
       if (subAction.startsWith("complete_")) {
         const todoId = subAction.substring(9);
-        return await this._completeTodoById(bot, chatId, messageId, userId, todoId);
+        return await this._completeTodoById(
+          bot,
+          chatId,
+          messageId,
+          userId,
+          todoId
+        );
       }
 
       if (subAction.startsWith("delete_")) {
         const todoId = subAction.substring(7);
-        return await this._deleteTodoById(bot, chatId, messageId, userId, todoId);
+        return await this._deleteTodoById(
+          bot,
+          chatId,
+          messageId,
+          userId,
+          todoId
+        );
       }
 
       if (subAction.startsWith("page_")) {
@@ -188,7 +241,6 @@ class TodoModule extends BaseModule {
       // 알 수 없는 액션
       Logger.warn(`⚠️ 알 수 없는 Todo 액션: ${subAction}`);
       return false;
-
     } catch (error) {
       await this.handleError(error, { userId, chatId, messageId, subAction });
       return false;
@@ -210,7 +262,10 @@ class TodoModule extends BaseModule {
             { text: "📊 할일 통계", callback_data: "todo_stats" },
           ],
           [
-            { text: "✅ 완료된 할일 정리", callback_data: "todo_clear_completed" },
+            {
+              text: "✅ 완료된 할일 정리",
+              callback_data: "todo_clear_completed",
+            },
             { text: "🗑️ 모든 할일 삭제", callback_data: "todo_clear_all" },
           ],
           [
@@ -259,7 +314,7 @@ class TodoModule extends BaseModule {
 
       if (todos.length === 0) {
         const emptyMessage = `📝 **${userName}님의 할일 목록이 비어있습니다.**\n\n새로운 할일을 추가해보세요!`;
-        
+
         const keyboard = {
           inline_keyboard: [
             [{ text: "➕ 할일 추가하기", callback_data: "todo_add" }],
@@ -267,23 +322,47 @@ class TodoModule extends BaseModule {
           ],
         };
 
-        return await this._editOrSendMessage(bot, chatId, messageId, emptyMessage, keyboard);
+        return await this._editOrSendMessage(
+          bot,
+          chatId,
+          messageId,
+          emptyMessage,
+          keyboard
+        );
       }
 
-      return await this._displayTodoList(bot, chatId, messageId, userId, todos, 1, userName);
+      return await this._displayTodoList(
+        bot,
+        chatId,
+        messageId,
+        userId,
+        todos,
+        1,
+        userName
+      );
     } catch (error) {
       throw new Error(`할일 목록 조회 실패: ${error.message}`);
     }
   }
 
   // 📋 할일 목록 표시 (페이지네이션 포함)
-  async _displayTodoList(bot, chatId, messageId, userId, todos, page = 1, userName) {
+  async _displayTodoList(
+    bot,
+    chatId,
+    messageId,
+    userId,
+    todos,
+    page = 1,
+    userName
+  ) {
     const itemsPerPage = 5;
     const startIndex = (page - 1) * itemsPerPage;
     const endIndex = startIndex + itemsPerPage;
     const pageTodos = todos.slice(startIndex, endIndex);
 
-    let todoText = `📝 **${userName}님의 할일 목록** (${page}/${Math.ceil(todos.length / itemsPerPage)}페이지)\n\n`;
+    let todoText = `📝 **${userName}님의 할일 목록** (${page}/${Math.ceil(
+      todos.length / itemsPerPage
+    )}페이지)\n\n`;
 
     const keyboard = { inline_keyboard: [] };
 
@@ -292,27 +371,27 @@ class TodoModule extends BaseModule {
       const actualIndex = startIndex + index + 1;
       const status = todo.completed ? "✅" : "⭕";
       const date = TimeHelper.formatDate(todo.createdAt, "MM/DD");
-      
+
       todoText += `${status} **${actualIndex}.** ${todo.text}\n`;
       todoText += `   📅 ${date}`;
-      
+
       if (todo.completed && todo.completedAt) {
         const completedDate = TimeHelper.formatDate(todo.completedAt, "MM/DD");
         todoText += ` → ✅ ${completedDate}`;
       }
-      
+
       todoText += "\n\n";
 
       // 각 할일에 대한 액션 버튼
       const todoButtons = [];
-      
+
       if (!todo.completed) {
         todoButtons.push({
           text: `✅ ${actualIndex}번 완료`,
           callback_data: `todo_complete_${todo._id}`,
         });
       }
-      
+
       todoButtons.push({
         text: `🗑️ ${actualIndex}번 삭제`,
         callback_data: `todo_delete_${todo._id}`,
@@ -350,7 +429,13 @@ class TodoModule extends BaseModule {
       { text: "🔙 할일 메뉴", callback_data: "todo_menu" },
     ]);
 
-    return await this._editOrSendMessage(bot, chatId, messageId, todoText, keyboard);
+    return await this._editOrSendMessage(
+      bot,
+      chatId,
+      messageId,
+      todoText,
+      keyboard
+    );
   }
 
   // ➕ 할일 추가 시작
@@ -358,9 +443,7 @@ class TodoModule extends BaseModule {
     const message = `📝 **새로운 할일 추가**\n\n${userName}님, 추가하실 할일을 입력해주세요.\n\n예시: "프레젠테이션 자료 준비"`;
 
     const keyboard = {
-      inline_keyboard: [
-        [{ text: "❌ 취소", callback_data: "todo_cancel" }],
-      ],
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo_cancel" }]],
     };
 
     // 사용자 상태 설정
@@ -369,7 +452,13 @@ class TodoModule extends BaseModule {
       step: "add",
     });
 
-    return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+    return await this._editOrSendMessage(
+      bot,
+      chatId,
+      messageId,
+      message,
+      keyboard
+    );
   }
 
   // ✏️ 할일 입력 처리
@@ -387,7 +476,7 @@ class TodoModule extends BaseModule {
       };
 
       const result = await this.db.insertOne("todos", newTodo);
-      
+
       // 통계 업데이트
       this.todoStats.totalTodos++;
 
@@ -416,7 +505,7 @@ class TodoModule extends BaseModule {
     } catch (error) {
       // 입력 오류 처리
       const errorMessage = `❌ **입력 오류**\n\n${error.message}\n\n다시 할일을 입력해주세요.`;
-      
+
       await bot.sendMessage(chatId, errorMessage, {
         parse_mode: "Markdown",
       });
@@ -467,9 +556,9 @@ class TodoModule extends BaseModule {
   // ✅ 할일 완료 처리
   async _completeTodoById(bot, chatId, messageId, userId, todoId) {
     try {
-      const todo = await this.db.findOne("todos", { 
-        _id: this.db.ObjectId(todoId), 
-        userId 
+      const todo = await this.db.findOne("todos", {
+        _id: this.db.ObjectId(todoId),
+        userId,
       });
 
       if (!todo) {
@@ -484,8 +573,8 @@ class TodoModule extends BaseModule {
       await this.db.updateOne(
         "todos",
         { _id: this.db.ObjectId(todoId), userId },
-        { 
-          completed: true, 
+        {
+          completed: true,
           completedAt: new Date(),
         }
       );
@@ -505,7 +594,13 @@ class TodoModule extends BaseModule {
         ],
       };
 
-      return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+      return await this._editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        message,
+        keyboard
+      );
     } catch (error) {
       throw new Error(`할일 완료 처리 실패: ${error.message}`);
     }
@@ -514,18 +609,18 @@ class TodoModule extends BaseModule {
   // 🗑️ 할일 삭제
   async _deleteTodoById(bot, chatId, messageId, userId, todoId) {
     try {
-      const todo = await this.db.findOne("todos", { 
-        _id: this.db.ObjectId(todoId), 
-        userId 
+      const todo = await this.db.findOne("todos", {
+        _id: this.db.ObjectId(todoId),
+        userId,
       });
 
       if (!todo) {
         throw new Error("할일을 찾을 수 없습니다.");
       }
 
-      await this.db.deleteOne("todos", { 
-        _id: this.db.ObjectId(todoId), 
-        userId 
+      await this.db.deleteOne("todos", {
+        _id: this.db.ObjectId(todoId),
+        userId,
       });
 
       // 통계 업데이트
@@ -547,7 +642,13 @@ class TodoModule extends BaseModule {
         ],
       };
 
-      return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+      return await this._editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        message,
+        keyboard
+      );
     } catch (error) {
       throw new Error(`할일 삭제 실패: ${error.message}`);
     }
@@ -556,14 +657,14 @@ class TodoModule extends BaseModule {
   // 🧹 완료된 할일 모두 삭제
   async clearCompletedTodos(bot, chatId, messageId, userId, userName) {
     try {
-      const completedCount = await this.db.countDocuments("todos", { 
-        userId, 
-        completed: true 
+      const completedCount = await this.db.countDocuments("todos", {
+        userId,
+        completed: true,
       });
 
       if (completedCount === 0) {
         const message = `📝 **${userName}님, 완료된 할일이 없습니다.**\n\n정리할 할일이 없어요!`;
-        
+
         const keyboard = {
           inline_keyboard: [
             [{ text: "📋 목록 보기", callback_data: "todo_list" }],
@@ -571,7 +672,13 @@ class TodoModule extends BaseModule {
           ],
         };
 
-        return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+        return await this._editOrSendMessage(
+          bot,
+          chatId,
+          messageId,
+          message,
+          keyboard
+        );
       }
 
       await this.db.deleteMany("todos", { userId, completed: true });
@@ -593,7 +700,13 @@ class TodoModule extends BaseModule {
         ],
       };
 
-      return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+      return await this._editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        message,
+        keyboard
+      );
     } catch (error) {
       throw new Error(`완료된 할일 정리 실패: ${error.message}`);
     }
@@ -606,7 +719,7 @@ class TodoModule extends BaseModule {
 
       if (totalCount === 0) {
         const message = `📝 **${userName}님, 삭제할 할일이 없습니다.**`;
-        
+
         const keyboard = {
           inline_keyboard: [
             [{ text: "➕ 할일 추가", callback_data: "todo_add" }],
@@ -614,7 +727,13 @@ class TodoModule extends BaseModule {
           ],
         };
 
-        return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+        return await this._editOrSendMessage(
+          bot,
+          chatId,
+          messageId,
+          message,
+          keyboard
+        );
       }
 
       const confirmMessage = `⚠️ **정말로 모든 할일을 삭제하시겠습니까?**\n\n${userName}님의 할일 ${totalCount}개가 모두 삭제됩니다.\n\n**이 작업은 되돌릴 수 없습니다.**`;
@@ -622,13 +741,22 @@ class TodoModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "✅ 네, 모두 삭제", callback_data: "todo_confirm_clear_all" },
+            {
+              text: "✅ 네, 모두 삭제",
+              callback_data: "todo_confirm_clear_all",
+            },
             { text: "❌ 취소", callback_data: "todo_menu" },
           ],
         ],
       };
 
-      return await this._editOrSendMessage(bot, chatId, messageId, confirmMessage, keyboard);
+      return await this._editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        confirmMessage,
+        keyboard
+      );
     } catch (error) {
       throw new Error(`할일 삭제 확인 실패: ${error.message}`);
     }
@@ -638,20 +766,36 @@ class TodoModule extends BaseModule {
   async showStats(bot, chatId, messageId, userId, userName) {
     try {
       const userTodos = await this.db.find("todos", { userId });
-      const completed = userTodos.filter(t => t.completed).length;
+      const completed = userTodos.filter((t) => t.completed).length;
       const pending = userTodos.length - completed;
-      const completionRate = userTodos.length > 0 ? ((completed / userTodos.length) * 100).toFixed(1) : 0;
+      const completionRate =
+        userTodos.length > 0
+          ? ((completed / userTodos.length) * 100).toFixed(1)
+          : 0;
 
       // 최근 활동 분석
       const today = new Date();
-      const todayStart = new Date(today.getFullYear(), today.getMonth(), today.getDate());
-      const weekStart = new Date(todayStart.getTime() - 7 * 24 * 60 * 60 * 1000);
+      const todayStart = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate()
+      );
+      const weekStart = new Date(
+        todayStart.getTime() - 7 * 24 * 60 * 60 * 1000
+      );
 
-      const todayTodos = userTodos.filter(t => t.createdAt >= todayStart).length;
-      const weekTodos = userTodos.filter(t => t.createdAt >= weekStart).length;
-      const todayCompleted = userTodos.filter(t => t.completedAt && t.completedAt >= todayStart).length;
+      const todayTodos = userTodos.filter(
+        (t) => t.createdAt >= todayStart
+      ).length;
+      const weekTodos = userTodos.filter(
+        (t) => t.createdAt >= weekStart
+      ).length;
+      const todayCompleted = userTodos.filter(
+        (t) => t.completedAt && t.completedAt >= todayStart
+      ).length;
 
-      const statsText = `📊 **${userName}님의 할일 통계**\n\n` +
+      const statsText =
+        `📊 **${userName}님의 할일 통계**\n\n` +
         `📝 **전체 할일:** ${userTodos.length}개\n` +
         `✅ **완료:** ${completed}개\n` +
         `⭕ **미완료:** ${pending}개\n` +
@@ -672,7 +816,13 @@ class TodoModule extends BaseModule {
         ],
       };
 
-      return await this._editOrSendMessage(bot, chatId, messageId, statsText, keyboard);
+      return await this._editOrSendMessage(
+        bot,
+        chatId,
+        messageId,
+        statsText,
+        keyboard
+      );
     } catch (error) {
       throw new Error(`통계 조회 실패: ${error.message}`);
     }
@@ -683,35 +833,43 @@ class TodoModule extends BaseModule {
     const message = `🔍 **할일 검색**\n\n${userName}님, 검색하실 키워드를 입력해주세요.\n\n예시: "회의", "프로젝트", "보고서"`;
 
     const keyboard = {
-      inline_keyboard: [
-        [{ text: "❌ 취소", callback_data: "todo_cancel" }],
-      ],
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo_cancel" }]],
     };
 
     this.setUserState(userId, {
       action: "waiting_search_input",
     });
 
-    return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+    return await this._editOrSendMessage(
+      bot,
+      chatId,
+      messageId,
+      message,
+      keyboard
+    );
   }
 
   // 🔍 검색 입력 처리
   async _processSearchInput(bot, chatId, userId, text) {
     try {
       const keyword = ValidationHelper.validateSearchKeyword(text);
-      
-      const searchResults = await this.db.find("todos", {
-        userId,
-        text: { $regex: keyword, $options: 'i' }
-      }, {
-        sort: { createdAt: -1 }
-      });
+
+      const searchResults = await this.db.find(
+        "todos",
+        {
+          userId,
+          text: { $regex: keyword, $options: "i" },
+        },
+        {
+          sort: { createdAt: -1 },
+        }
+      );
 
       this.clearUserState(userId);
 
       if (searchResults.length === 0) {
         const message = `🔍 **검색 결과 없음**\n\n"${keyword}"에 대한 할일을 찾을 수 없습니다.`;
-        
+
         const keyboard = {
           inline_keyboard: [
             [
@@ -736,7 +894,9 @@ class TodoModule extends BaseModule {
       searchResults.slice(0, 10).forEach((todo, index) => {
         const status = todo.completed ? "✅" : "⭕";
         const date = TimeHelper.formatDate(todo.createdAt, "MM/DD");
-        resultText += `${status} **${index + 1}.** ${todo.text}\n📅 ${date}\n\n`;
+        resultText += `${status} **${index + 1}.** ${
+          todo.text
+        }\n📅 ${date}\n\n`;
       });
 
       if (searchResults.length > 10) {
@@ -761,7 +921,7 @@ class TodoModule extends BaseModule {
       return true;
     } catch (error) {
       const errorMessage = `❌ **검색 오류**\n\n${error.message}\n\n다시 키워드를 입력해주세요.`;
-      
+
       await bot.sendMessage(chatId, errorMessage, {
         parse_mode: "Markdown",
       });
@@ -774,14 +934,18 @@ class TodoModule extends BaseModule {
   async _searchTodosQuick(bot, chatId, userId, keyword) {
     try {
       const validatedKeyword = ValidationHelper.validateSearchKeyword(keyword);
-      
-      const searchResults = await this.db.find("todos", {
-        userId,
-        text: { $regex: validatedKeyword, $options: 'i' }
-      }, {
-        sort: { createdAt: -1 },
-        limit: 10
-      });
+
+      const searchResults = await this.db.find(
+        "todos",
+        {
+          userId,
+          text: { $regex: validatedKeyword, $options: "i" },
+        },
+        {
+          sort: { createdAt: -1 },
+          limit: 10,
+        }
+      );
 
       let message;
       const keyboard = { inline_keyboard: [] };
@@ -790,7 +954,7 @@ class TodoModule extends BaseModule {
         message = `🔍 **검색 결과 없음**\n\n"${validatedKeyword}"에 대한 할일을 찾을 수 없습니다.`;
       } else {
         message = `🔍 **검색 결과: "${validatedKeyword}"** (${searchResults.length}개)\n\n`;
-        
+
         searchResults.forEach((todo, index) => {
           const status = todo.completed ? "✅" : "⭕";
           const date = TimeHelper.formatDate(todo.createdAt, "MM/DD");
@@ -819,11 +983,15 @@ class TodoModule extends BaseModule {
   // 📤 할일 내보내기
   async exportTodos(bot, chatId, messageId, userId, userName) {
     try {
-      const todos = await this.db.find("todos", { userId }, { sort: { createdAt: -1 } });
+      const todos = await this.db.find(
+        "todos",
+        { userId },
+        { sort: { createdAt: -1 } }
+      );
 
       if (todos.length === 0) {
         const message = `📤 **내보낼 할일이 없습니다.**\n\n${userName}님의 할일 목록이 비어있어요.`;
-        
+
         const keyboard = {
           inline_keyboard: [
             [{ text: "➕ 할일 추가", callback_data: "todo_add" }],
@@ -831,24 +999,34 @@ class TodoModule extends BaseModule {
           ],
         };
 
-        return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+        return await this._editOrSendMessage(
+          bot,
+          chatId,
+          messageId,
+          message,
+          keyboard
+        );
       }
 
       // 텍스트 형식으로 내보내기
       let exportText = `📝 ${userName}님의 할일 목록 (${new Date().toLocaleDateString()})\n\n`;
-      
+
       todos.forEach((todo, index) => {
         const status = todo.completed ? "[완료]" : "[미완료]";
         const date = TimeHelper.formatDate(todo.createdAt, "YYYY-MM-DD");
         exportText += `${index + 1}. ${status} ${todo.text} (${date})\n`;
       });
 
-      exportText += `\n총 ${todos.length}개의 할일 (완료: ${todos.filter(t => t.completed).length}개)`;
+      exportText += `\n총 ${todos.length}개의 할일 (완료: ${
+        todos.filter((t) => t.completed).length
+      }개)`;
 
       // 파일로 전송
-      await bot.sendDocument(chatId, Buffer.from(exportText, 'utf8'), {
-        filename: `할일목록_${userName}_${new Date().toISOString().split('T')[0]}.txt`,
-        caption: `📤 **할일 목록이 내보내졌습니다!**\n\n총 ${todos.length}개의 할일이 포함되어 있습니다.`
+      await bot.sendDocument(chatId, Buffer.from(exportText, "utf8"), {
+        filename: `할일목록_${userName}_${
+          new Date().toISOString().split("T")[0]
+        }.txt`,
+        caption: `📤 **할일 목록이 내보내졌습니다!**\n\n총 ${todos.length}개의 할일이 포함되어 있습니다.`,
       });
 
       return true;
@@ -859,7 +1037,8 @@ class TodoModule extends BaseModule {
 
   // 📥 할일 가져오기 시작
   async startTodoImport(bot, chatId, messageId, userId, userName) {
-    const message = `📥 **할일 가져오기**\n\n${userName}님, 가져오실 할일 데이터를 다음 형식으로 입력해주세요:\n\n` +
+    const message =
+      `📥 **할일 가져오기**\n\n${userName}님, 가져오실 할일 데이터를 다음 형식으로 입력해주세요:\n\n` +
       `**형식:**\n` +
       `할일 1\n` +
       `할일 2\n` +
@@ -870,23 +1049,30 @@ class TodoModule extends BaseModule {
       `프로젝트 계획서 작성`;
 
     const keyboard = {
-      inline_keyboard: [
-        [{ text: "❌ 취소", callback_data: "todo_cancel" }],
-      ],
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo_cancel" }]],
     };
 
     this.setUserState(userId, {
       action: "waiting_import_data",
     });
 
-    return await this._editOrSendMessage(bot, chatId, messageId, message, keyboard);
+    return await this._editOrSendMessage(
+      bot,
+      chatId,
+      messageId,
+      message,
+      keyboard
+    );
   }
 
   // 📥 가져오기 데이터 처리
   async _processImportData(bot, chatId, userId, text, userName) {
     try {
-      const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-      
+      const lines = text
+        .split("\n")
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0);
+
       if (lines.length === 0) {
         throw new Error("가져올 할일이 없습니다.");
       }
@@ -896,7 +1082,7 @@ class TodoModule extends BaseModule {
       }
 
       // 할일 일괄 추가
-      const todos = lines.map(line => ({
+      const todos = lines.map((line) => ({
         userId,
         text: ValidationHelper.validateText(line, 1, 200),
         completed: false,
@@ -904,7 +1090,7 @@ class TodoModule extends BaseModule {
       }));
 
       await this.db.insertMany("todos", todos);
-      
+
       // 통계 업데이트
       this.todoStats.totalTodos += todos.length;
 
@@ -930,7 +1116,7 @@ class TodoModule extends BaseModule {
       return true;
     } catch (error) {
       const errorMessage = `❌ **가져오기 실패**\n\n${error.message}\n\n다시 올바른 형식으로 입력해주세요.`;
-      
+
       await bot.sendMessage(chatId, errorMessage, {
         parse_mode: "Markdown",
       });
@@ -959,10 +1145,10 @@ class TodoModule extends BaseModule {
       }
     } catch (error) {
       // 편집 실패 시 새 메시지 전송
-      if (error.message?.includes('message is not modified')) {
+      if (error.message?.includes("message is not modified")) {
         return; // 내용이 같아서 편집되지 않음 (정상)
       }
-      
+
       Logger.warn("메시지 편집 실패, 새 메시지 전송:", error.message);
       return await bot.sendMessage(chatId, text, {
         reply_markup: keyboard,
