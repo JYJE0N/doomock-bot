@@ -402,18 +402,18 @@ try {
 }
 
 // ✅ 정적 메서드도 안전하게
-try {
-  Logger.info = (...args) => loggerInstance.info(...args);
-  Logger.error = (...args) => loggerInstance.error(...args);
-  Logger.warn = (...args) => loggerInstance.warn(...args);
-  Logger.debug = (...args) => loggerInstance.debug(...args);
-  Logger.trace = (...args) => loggerInstance.trace(...args);
-  Logger.success = (...args) => loggerInstance.success(...args);
-  Logger.setLevel = (level) => loggerInstance.setLevel(level);
-  Logger.logTimeInfo = () => loggerInstance.logTimeInfo();
-  Logger.getStatus = () => loggerInstance.getStatus();
-} catch (error) {
-  console.error("🚨 Logger 정적 메서드 설정 실패:", error.message);
-}
+// try {
+//   Logger.info = (...args) => loggerInstance.info(...args);
+//   Logger.error = (...args) => loggerInstance.error(...args);
+//   Logger.warn = (...args) => loggerInstance.warn(...args);
+//   Logger.debug = (...args) => loggerInstance.debug(...args);
+//   Logger.trace = (...args) => loggerInstance.trace(...args);
+//   Logger.success = (...args) => loggerInstance.success(...args);
+//   Logger.setLevel = (level) => loggerInstance.setLevel(level);
+//   Logger.logTimeInfo = () => loggerInstance.logTimeInfo();
+//   Logger.getStatus = () => loggerInstance.getStatus();
+// } catch (error) {
+//   console.error("🚨 Logger 정적 메서드 설정 실패:", error.message);
+// }
 
-module.exports.Logger = loggerInstance;
+module.exports = loggerInstance;
