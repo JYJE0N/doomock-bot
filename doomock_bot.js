@@ -22,7 +22,6 @@ const TelegramBot = require("node-telegram-bot-api");
 
 // ✅ 5. 설정 및 유틸리티 (logger 다음)
 const AppConfig = require("./src/config/AppConfig");
-const { TimeHelper } = require("./src/utils/TimeHelper");
 const ErrorHandler = require("./src/utils/ErrorHandler");
 
 // ✅ 6. 데이터베이스 관련 (수정됨)
