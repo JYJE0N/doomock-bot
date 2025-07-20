@@ -36,7 +36,7 @@ class RateLimitMiddleware {
     // 제한 확인
     if (userRecord.count > maxRequests) {
       const remainingTime = Math.ceil((userRecord.resetTime - now) / 1000 / 60);
-      Logger.warn(
+      logger.warn(
         `사용자 ${userId} 요청 제한 초과: ${userRecord.count}/${maxRequests}`,
       );
 
@@ -77,7 +77,7 @@ class RateLimitMiddleware {
       }
     }
 
-    Logger.info(
+    logger.info(
       `요청 제한 기록 정리 완료: ${this.userRequests.size}개 사용자 활성`,
     );
   }

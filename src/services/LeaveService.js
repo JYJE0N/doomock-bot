@@ -4,7 +4,7 @@ const {
   getCollection,
 } = require("../database/DatabaseManager");
 const { TimeHelper } = require("../utils/TimeHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class LeaveService {
   constructor() {
@@ -38,10 +38,10 @@ class LeaveService {
         };
 
         await collection.insertOne(newUser);
-        Logger.info(`사용자 ${userId} 연차 정보 초기화 완료`);
+        logger.info(`사용자 ${userId} 연차 정보 초기화 완료`);
       }
     } catch (error) {
-      Logger.error(`사용자 ${userId} 초기화 실패:`, error);
+      logger.error(`사용자 ${userId} 초기화 실패:`, error);
       throw error;
     }
   }
@@ -69,7 +69,7 @@ class LeaveService {
 
       return user;
     } catch (error) {
-      Logger.error(`사용자 ${userId} 연차 정보 조회 실패:`, error);
+      logger.error(`사용자 ${userId} 연차 정보 조회 실패:`, error);
       throw error;
     }
   }
@@ -98,10 +98,10 @@ class LeaveService {
         },
       );
 
-      Logger.info(`사용자 ${userId} 총 연차 ${totalLeaves}일로 설정`);
+      logger.info(`사용자 ${userId} 총 연차 ${totalLeaves}일로 설정`);
       return { totalLeaves, remainingLeaves: newRemaining };
     } catch (error) {
-      Logger.error(`사용자 ${userId} 연차 설정 실패:`, error);
+      logger.error(`사용자 ${userId} 연차 설정 실패:`, error);
       throw error;
     }
   }
@@ -144,14 +144,14 @@ class LeaveService {
         },
       );
 
-      Logger.info(`사용자 ${userId} 연차 ${days}일 사용 기록`);
+      logger.info(`사용자 ${userId} 연차 ${days}일 사용 기록`);
       return {
         usedLeaves: newUsed,
         remainingLeaves: newRemaining,
         leaveRecord,
       };
     } catch (error) {
-      Logger.error(`사용자 ${userId} 연차 사용 실패:`, error);
+      logger.error(`사용자 ${userId} 연차 사용 실패:`, error);
       throw error;
     }
   }
@@ -161,7 +161,7 @@ class LeaveService {
       const user = await this.getUserLeaves(userId);
       return user.leaveHistory || [];
     } catch (error) {
-      Logger.error(`사용자 ${userId} 연차 내역 조회 실패:`, error);
+      logger.error(`사용자 ${userId} 연차 내역 조회 실패:`, error);
       throw error;
     }
   }

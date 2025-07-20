@@ -1,7 +1,7 @@
 // src/controllers/BotController.js - 최종 수정 (핸들러 의존성 제거)
 
 const ModuleManager = require("../managers/ModuleManager");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const UserHelper = require("../utils/UserHelper");
 
 class BotController {
@@ -22,17 +22,17 @@ class BotController {
     this.processingMessages = new Set();
     this.processingCallbacks = new Set();
 
-    Logger.info("🔧 BotController 생성됨");
+    logger.info("🔧 BotController 생성됨");
   }
 
   async initialize() {
     if (this.isInitialized) {
-      Logger.warn("BotController 이미 초기화됨, 무시");
+      logger.warn("BotController 이미 초기화됨, 무시");
       return;
     }
 
     try {
-      Logger.info("🚀 BotController 초기화 시작...");
+      logger.info("🚀 BotController 초기화 시작...");
 
       // 1. 데이터베이스 초기화 (안전하게)
       await this.initializeDatabase();
@@ -47,20 +47,20 @@ class BotController {
       }
 
       this.isInitialized = true;
-      Logger.success("✅ BotController 초기화 완료!");
+      logger.success("✅ BotController 초기화 완료!");
     } catch (error) {
-      Logger.error("❌ BotController 초기화 실패:", error);
-      Logger.error("에러 스택:", error.stack);
+      logger.error("❌ BotController 초기화 실패:", error);
+      logger.error("에러 스택:", error.stack);
       throw error;
     }
   }
 
   // ⭐ 안전한 데이터베이스 초기화
   async initializeDatabase() {
-    Logger.info("💾 데이터베이스 초기화 시도...");
+    logger.info("💾 데이터베이스 초기화 시도...");
 
     if (!this.config.MONGO_URL) {
-      Logger.warn("⚠️ MONGO_URL이 설정되지 않음, MongoDB 없이 실행");
+      logger.warn("⚠️ MONGO_URL이 설정되지 않음, MongoDB 없이 실행");
       return;
     }
 
@@ -69,16 +69,16 @@ class BotController {
       const { DatabaseManager } = require("../database/DatabaseManager");
       this.dbManager = new DatabaseManager(this.config.MONGO_URL);
       await this.dbManager.connect();
-      Logger.success("✅ 데이터베이스 연결 성공");
+      logger.success("✅ 데이터베이스 연결 성공");
     } catch (requireError) {
-      Logger.warn("⚠️ DatabaseManager를 찾을 수 없음:", requireError.message);
-      Logger.warn("⚠️ MongoDB 없이 실행합니다");
+      logger.warn("⚠️ DatabaseManager를 찾을 수 없음:", requireError.message);
+      logger.warn("⚠️ MongoDB 없이 실행합니다");
     }
   }
 
   // ⭐ 모듈 매니저 초기화
   async initializeModuleManager() {
-    Logger.info("📦 모듈 매니저 초기화 중...");
+    logger.info("📦 모듈 매니저 초기화 중...");
 
     try {
       this.moduleManager = new ModuleManager(this.bot, {
@@ -87,16 +87,16 @@ class BotController {
       });
 
       await this.moduleManager.initialize();
-      Logger.success("✅ 모듈 매니저 초기화 완료");
+      logger.success("✅ 모듈 매니저 초기화 완료");
     } catch (error) {
-      Logger.error("❌ 모듈 매니저 초기화 실패:", error);
+      logger.error("❌ 모듈 매니저 초기화 실패:", error);
       throw error;
     }
   }
 
   // ⭐ 이벤트 리스너 등록
   registerEventListeners() {
-    Logger.info("🎧 이벤트 리스너 등록 중...");
+    logger.info("🎧 이벤트 리스너 등록 중...");
 
     // 기존 리스너 제거
     this.bot.removeAllListeners("message");
@@ -109,7 +109,7 @@ class BotController {
       const messageKey = `${msg.chat.id}_${msg.message_id}`;
 
       if (this.processingMessages.has(messageKey)) {
-        Logger.debug(`중복 메시지 무시: ${messageKey}`);
+        logger.debug(`중복 메시지 무시: ${messageKey}`);
         return;
       }
 
@@ -118,7 +118,7 @@ class BotController {
       try {
         await this.handleMessage(msg);
       } catch (error) {
-        Logger.error("메시지 처리 오류:", error);
+        logger.error("메시지 처리 오류:", error);
         await this.sendErrorMessage(msg.chat.id);
       } finally {
         setTimeout(() => {
@@ -132,17 +132,17 @@ class BotController {
       const callbackKey = `${callbackQuery.from.id}_${callbackQuery.data}`;
 
       if (this.processingCallbacks.has(callbackKey)) {
-        Logger.debug(`중복 콜백 무시: ${callbackKey}`);
+        logger.debug(`중복 콜백 무시: ${callbackKey}`);
         return;
       }
 
       this.processingCallbacks.add(callbackKey);
 
       try {
-        Logger.info(`📞 콜백 수신: ${callbackQuery.data}`);
+        logger.info(`📞 콜백 수신: ${callbackQuery.data}`);
         await this.moduleManager.handleCallback(this.bot, callbackQuery);
       } catch (error) {
-        Logger.error("콜백 처리 오류:", error);
+        logger.error("콜백 처리 오류:", error);
 
         try {
           await this.bot.answerCallbackQuery(callbackQuery.id, {
@@ -150,7 +150,7 @@ class BotController {
             show_alert: true,
           });
         } catch (answerError) {
-          Logger.debug("콜백 응답 실패");
+          logger.debug("콜백 응답 실패");
         }
 
         await this.sendErrorMessage(callbackQuery.message.chat.id);
@@ -167,17 +167,17 @@ class BotController {
         error.code === "ETELEGRAM" &&
         error.response?.body?.error_code === 409
       ) {
-        Logger.error("🚨 409 충돌 감지!");
+        logger.error("🚨 409 충돌 감지!");
       } else {
-        Logger.error("폴링 오류:", error.message);
+        logger.error("폴링 오류:", error.message);
       }
     });
 
     this.bot.on("error", (error) => {
-      Logger.error("봇 에러:", error.message);
+      logger.error("봇 에러:", error.message);
     });
 
-    Logger.success("✅ 이벤트 리스너 등록 완료!");
+    logger.success("✅ 이벤트 리스너 등록 완료!");
   }
 
   // ⭐ 메시지 처리
@@ -189,7 +189,7 @@ class BotController {
     const userId = msg.from.id;
     const userName = UserHelper.getUserName(msg.from);
 
-    Logger.debug(`💬 메시지: "${text}" (${userName})`);
+    logger.debug(`💬 메시지: "${text}" (${userName})`);
 
     // /start 명령어 처리
     if (text === "/start") {
@@ -204,7 +204,7 @@ class BotController {
           reply_markup: this.moduleManager.createMainMenuKeyboard(),
         });
       } catch (error) {
-        Logger.error("/start 처리 오류:", error);
+        logger.error("/start 처리 오류:", error);
         await this.sendErrorMessage(chatId);
       }
       return;
@@ -214,10 +214,10 @@ class BotController {
     try {
       const handled = await this.moduleManager.handleMessage(this.bot, msg);
       if (!handled) {
-        Logger.debug(`처리되지 않은 메시지: ${text}`);
+        logger.debug(`처리되지 않은 메시지: ${text}`);
       }
     } catch (error) {
-      Logger.error("ModuleManager 메시지 처리 오류:", error);
+      logger.error("ModuleManager 메시지 처리 오류:", error);
       await this.sendErrorMessage(chatId);
     }
   }
@@ -237,13 +237,13 @@ class BotController {
         }
       );
     } catch (error) {
-      Logger.error("에러 메시지 전송 실패:", error);
+      logger.error("에러 메시지 전송 실패:", error);
     }
   }
 
   // ⭐ 정리 함수
   async cleanup() {
-    Logger.info("🧹 BotController 정리 시작...");
+    logger.info("🧹 BotController 정리 시작...");
 
     try {
       // 이벤트 리스너 제거
@@ -260,12 +260,12 @@ class BotController {
       // 데이터베이스 연결 종료
       if (this.dbManager && typeof this.dbManager.disconnect === "function") {
         await this.dbManager.disconnect();
-        Logger.info("✅ 데이터베이스 연결 종료");
+        logger.info("✅ 데이터베이스 연결 종료");
       }
 
-      Logger.success("✅ BotController 정리 완료");
+      logger.success("✅ BotController 정리 완료");
     } catch (error) {
-      Logger.error("❌ BotController 정리 실패:", error);
+      logger.error("❌ BotController 정리 실패:", error);
     }
   }
 

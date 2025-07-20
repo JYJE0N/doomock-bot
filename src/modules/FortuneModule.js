@@ -3,7 +3,7 @@
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
 const { FortuneService } = require("../services/FortuneService");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class FortuneModule extends BaseModule {
   constructor() {
@@ -25,7 +25,7 @@ class FortuneModule extends BaseModule {
     });
 
     this.fortuneService = new FortuneService();
-    Logger.info(
+    logger.info(
       "🔮 FortuneService 초기화:",
       this.fortuneService ? "성공" : "실패"
     );
@@ -99,7 +99,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showGeneralFortune 오류:`, error);
+      logger.error(`FortuneModule showGeneralFortune 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -116,7 +116,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showWorkFortune 오류:`, error);
+      logger.error(`FortuneModule showWorkFortune 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -133,7 +133,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showLoveFortune 오류:`, error);
+      logger.error(`FortuneModule showLoveFortune 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -150,7 +150,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showMoneyFortune 오류:`, error);
+      logger.error(`FortuneModule showMoneyFortune 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -167,7 +167,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showHealthFortune 오류:`, error);
+      logger.error(`FortuneModule showHealthFortune 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -184,7 +184,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showMeetingFortune 오류:`, error);
+      logger.error(`FortuneModule showMeetingFortune 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -203,7 +203,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showTarot 오류:`, error);
+      logger.error(`FortuneModule showTarot 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -220,7 +220,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showTarotThreeSpread 오류:`, error);
+      logger.error(`FortuneModule showTarotThreeSpread 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -238,7 +238,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showLucky 오류:`, error);
+      logger.error(`FortuneModule showLucky 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -254,7 +254,7 @@ class FortuneModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`FortuneModule showAllFortune 오류:`, error);
+      logger.error(`FortuneModule showAllFortune 오류:`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -409,7 +409,7 @@ class FortuneModule extends BaseModule {
         });
       }
     } catch (error) {
-      Logger.error("FortuneModule handleFortuneCommand 오류:", error);
+      logger.error("FortuneModule handleFortuneCommand 오류:", error);
       await this.sendMessage(
         bot,
         chatId,
@@ -496,7 +496,7 @@ class FortuneModule extends BaseModule {
       this.updateStats("callback");
       return true;
     } catch (error) {
-      Logger.error(`FortuneModule 콜백 오류 (${subAction}):`, error);
+      logger.error(`FortuneModule 콜백 오류 (${subAction}):`, error);
       return false;
     }
   }
@@ -510,9 +510,9 @@ class FortuneModule extends BaseModule {
       }
 
       await super.initialize();
-      Logger.success("✅ FortuneModule 초기화 완료");
+      logger.success("✅ FortuneModule 초기화 완료");
     } catch (error) {
-      Logger.error("❌ FortuneModule 초기화 실패:", error);
+      logger.error("❌ FortuneModule 초기화 실패:", error);
       throw error;
     }
   }

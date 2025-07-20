@@ -4,7 +4,7 @@ const BaseModule = require("./BaseModule");
 const { ValidationHelper } = require("../utils/ValidationHelper");
 const { getUserName } = require("../utils/UserHelper");
 const { TimeHelper } = require("../utils/TimeHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class TodoModule extends BaseModule {
   constructor() {
@@ -40,7 +40,7 @@ class TodoModule extends BaseModule {
       // 기존 Todo 통계 로드
       await this._loadTodoStats();
 
-      Logger.success("📝 TodoModule 초기화 완료");
+      logger.success("📝 TodoModule 초기화 완료");
     } catch (error) {
       throw new Error(`TodoModule 초기화 실패: ${error.message}`);
     }
@@ -69,11 +69,11 @@ class TodoModule extends BaseModule {
       this.todoStats.totalTodos = totalCount;
       this.todoStats.completedTodos = completedCount;
 
-      Logger.debug(
+      logger.debug(
         `📊 Todo 통계 로드됨: 전체 ${totalCount}, 완료 ${completedCount}`
       );
     } catch (error) {
-      Logger.warn("⚠️ Todo 통계 로드 실패:", error.message);
+      logger.warn("⚠️ Todo 통계 로드 실패:", error.message);
     }
   }
 
@@ -239,7 +239,7 @@ class TodoModule extends BaseModule {
       }
 
       // 알 수 없는 액션
-      Logger.warn(`⚠️ 알 수 없는 Todo 액션: ${subAction}`);
+      logger.warn(`⚠️ 알 수 없는 Todo 액션: ${subAction}`);
       return false;
     } catch (error) {
       await this.handleError(error, { userId, chatId, messageId, subAction });
@@ -1149,7 +1149,7 @@ class TodoModule extends BaseModule {
         return; // 내용이 같아서 편집되지 않음 (정상)
       }
 
-      Logger.warn("메시지 편집 실패, 새 메시지 전송:", error.message);
+      logger.warn("메시지 편집 실패, 새 메시지 전송:", error.message);
       return await bot.sendMessage(chatId, text, {
         reply_markup: keyboard,
         parse_mode: "Markdown",
@@ -1169,7 +1169,7 @@ class TodoModule extends BaseModule {
   // 🧹 정리 작업 (BaseModule 확장)
   async onCleanup() {
     this.searchStates.clear();
-    Logger.debug("📝 TodoModule 정리 완료");
+    logger.debug("📝 TodoModule 정리 완료");
   }
 }
 

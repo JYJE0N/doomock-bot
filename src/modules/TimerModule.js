@@ -4,7 +4,7 @@ const BaseModule = require("./BaseModule");
 const { TimerService } = require("../services/TimerService");
 const { TimeHelper } = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class TimerModule extends BaseModule {
   constructor() {
@@ -120,7 +120,7 @@ class TimerModule extends BaseModule {
           );
       }
     } catch (error) {
-      Logger.error(`TimerModule 콜백 오류 (${subAction}):`, error);
+      logger.error(`TimerModule 콜백 오류 (${subAction}):`, error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -279,7 +279,7 @@ class TimerModule extends BaseModule {
       );
       return true;
     } catch (error) {
-      Logger.error("포모도로 작업명 입력 처리 오류:", error);
+      logger.error("포모도로 작업명 입력 처리 오류:", error);
       await bot.sendMessage(chatId, "❌ 처리 중 오류가 발생했습니다.");
       return true;
     }
@@ -311,7 +311,7 @@ class TimerModule extends BaseModule {
       const completionTimeStr = TimeHelper.formatTime(completionTime);
 
       // ⭐ 디버깅 로그 (문제 해결용)
-      Logger.info("🕐 시간 계산 디버깅:", {
+      logger.info("🕐 시간 계산 디버깅:", {
         startTimeStr: data.startTime,
         startTimeObj: startTime,
         duration: data.duration,
@@ -697,13 +697,13 @@ class TimerModule extends BaseModule {
           this.stopAutoRefresh(userId);
         }
       } catch (error) {
-        Logger.debug("자동 새로고침 오류 (무시):", error.message);
+        logger.debug("자동 새로고침 오류 (무시):", error.message);
         this.stopAutoRefresh(userId);
       }
     }, this.config.refreshInterval);
 
     this.activeRefreshes.set(userId, intervalId);
-    Logger.debug(`자동 새로고침 시작: 사용자 ${userId}`);
+    logger.debug(`자동 새로고침 시작: 사용자 ${userId}`);
   }
 
   // ⭐ 자동 새로고침 중지
@@ -712,7 +712,7 @@ class TimerModule extends BaseModule {
     if (intervalId) {
       clearInterval(intervalId);
       this.activeRefreshes.delete(userId);
-      Logger.debug(`자동 새로고침 중지: 사용자 ${userId}`);
+      logger.debug(`자동 새로고침 중지: 사용자 ${userId}`);
     }
   }
 
@@ -894,7 +894,7 @@ class TimerModule extends BaseModule {
       }
       return true;
     } catch (error) {
-      Logger.error("일반 타이머 입력 처리 오류:", error);
+      logger.error("일반 타이머 입력 처리 오류:", error);
       await bot.sendMessage(chatId, "❌ 처리 중 오류가 발생했습니다.");
       return true;
     }
@@ -1008,7 +1008,7 @@ class TimerModule extends BaseModule {
       this.stopAutoRefresh(userId);
     }
 
-    Logger.info("🛑 TimerModule 정리 완료");
+    logger.info("🛑 TimerModule 정리 완료");
   }
 }
 

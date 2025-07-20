@@ -4,7 +4,7 @@ const gtts = require("gtts");
 const fs = require("fs").promises;
 const path = require("path");
 const { TimeHelper } = require("../utils/TimeHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class TTSService {
   constructor() {
@@ -51,9 +51,9 @@ class TTSService {
   async ensureTempDir() {
     try {
       await fs.mkdir(this.tempDir, { recursive: true });
-      Logger.info(`✅ TTS 임시 디렉토리 생성: ${this.tempDir}`);
+      logger.info(`✅ TTS 임시 디렉토리 생성: ${this.tempDir}`);
     } catch (error) {
-      Logger.error("❌ TTS 임시 디렉토리 생성 실패:", error);
+      logger.error("❌ TTS 임시 디렉토리 생성 실패:", error);
       // Railway 환경에서는 시스템 임시 디렉토리 사용
       this.tempDir = require("os").tmpdir();
     }
@@ -130,7 +130,7 @@ class TTSService {
           });
         }
 
-        Logger.info(
+        logger.info(
           `🔄 TTS 변환 시작 (시도 ${retries + 1}/${this.MAX_RETRIES}):`,
           {
             userId,
@@ -159,7 +159,7 @@ class TTSService {
               request.completedAt = new Date();
             }
 
-            Logger.success("✅ TTS 변환 성공:", {
+            logger.success("✅ TTS 변환 성공:", {
               userId,
               language,
               filePath,
@@ -184,7 +184,7 @@ class TTSService {
       } catch (error) {
         retries++;
 
-        Logger.warn(`⚠️ TTS 변환 실패 (시도 ${retries}/${this.MAX_RETRIES}):`, {
+        logger.warn(`⚠️ TTS 변환 실패 (시도 ${retries}/${this.MAX_RETRIES}):`, {
           userId,
           error: error.message,
           willRetry: retries < this.MAX_RETRIES,
@@ -203,7 +203,7 @@ class TTSService {
           this.activeRequests.delete(userId);
         }
 
-        Logger.error("❌ TTS 변환 최종 실패:", {
+        logger.error("❌ TTS 변환 최종 실패:", {
           userId,
           error: error.message,
           totalRetries: retries,
@@ -294,7 +294,7 @@ class TTSService {
       // 활성 요청 제거
       this.activeRequests.delete(userId);
 
-      Logger.info("🛑 TTS 작업 정지:", { userId });
+      logger.info("🛑 TTS 작업 정지:", { userId });
 
       return {
         success: true,
@@ -306,7 +306,7 @@ class TTSService {
         },
       };
     } catch (error) {
-      Logger.error("TTS 정지 오류:", error);
+      logger.error("TTS 정지 오류:", error);
       return { success: false, message: "TTS 정지 중 오류가 발생했습니다." };
     }
   }
@@ -325,10 +325,10 @@ class TTSService {
   async cleanupFile(filePath) {
     try {
       await fs.unlink(filePath);
-      Logger.debug(`🗑️ TTS 임시 파일 삭제: ${path.basename(filePath)}`);
+      logger.debug(`🗑️ TTS 임시 파일 삭제: ${path.basename(filePath)}`);
     } catch (error) {
       // Railway 환경에서는 파일 삭제 실패가 치명적이지 않음
-      Logger.debug(`파일 삭제 무시: ${error.message}`);
+      logger.debug(`파일 삭제 무시: ${error.message}`);
     }
   }
 
@@ -378,14 +378,14 @@ class TTSService {
         return true;
       } else {
         // 자동 모드에서는 에러를 사용자에게 표시하지 않음
-        Logger.warn("자동 TTS 실패 (사용자에게 숨김):", {
+        logger.warn("자동 TTS 실패 (사용자에게 숨김):", {
           userId,
           error: result.message,
         });
         return false;
       }
     } catch (error) {
-      Logger.error("자동 TTS 처리 오류:", error);
+      logger.error("자동 TTS 처리 오류:", error);
       return false;
     }
   }
@@ -413,7 +413,7 @@ class TTSService {
       await fs.unlink(testFile);
       diagnostics.tempDirWritable = true;
     } catch (error) {
-      Logger.warn("임시 디렉토리 진단 실패:", error.message);
+      logger.warn("임시 디렉토리 진단 실패:", error.message);
     }
 
     try {
@@ -425,10 +425,10 @@ class TTSService {
         await this.cleanupFile(testResult.filePath);
       }
     } catch (error) {
-      Logger.warn("TTS 네트워크 테스트 실패:", error.message);
+      logger.warn("TTS 네트워크 테스트 실패:", error.message);
     }
 
-    Logger.info("🔍 TTS 서비스 진단 결과:", diagnostics);
+    logger.info("🔍 TTS 서비스 진단 결과:", diagnostics);
     return diagnostics;
   }
 
@@ -445,9 +445,9 @@ class TTSService {
       );
 
       await Promise.all(cleanupPromises);
-      Logger.info(`🧹 TTS 임시 파일 ${ttsFiles.length}개 정리 완료`);
+      logger.info(`🧹 TTS 임시 파일 ${ttsFiles.length}개 정리 완료`);
     } catch (error) {
-      Logger.error("TTS 임시 파일 정리 오류:", error);
+      logger.error("TTS 임시 파일 정리 오류:", error);
     }
   }
 
@@ -474,7 +474,7 @@ class TTSService {
     // 모든 임시 파일 정리
     await this.cleanupAllFiles();
 
-    Logger.info("🛑 TTS 서비스 정리 완료");
+    logger.info("🛑 TTS 서비스 정리 완료");
   }
 }
 

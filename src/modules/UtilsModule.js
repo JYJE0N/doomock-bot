@@ -2,7 +2,7 @@
 
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class UtilsModule extends BaseModule {
   constructor() {
@@ -16,9 +16,9 @@ class UtilsModule extends BaseModule {
     try {
       const { TTSService } = require("../services/TTSService");
       this.ttsService = new TTSService();
-      Logger.info("✅ TTSService 초기화 성공");
+      logger.info("✅ TTSService 초기화 성공");
     } catch (error) {
-      Logger.warn("⚠️ TTSService 초기화 실패:", error.message);
+      logger.warn("⚠️ TTSService 초기화 실패:", error.message);
       this.ttsService = null;
     }
 
@@ -101,7 +101,7 @@ class UtilsModule extends BaseModule {
   async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     // null 체크 추가
     if (!subAction) {
-      Logger.warn("UtilsModule: subAction이 null입니다");
+      logger.warn("UtilsModule: subAction이 null입니다");
       return false;
     }
 
@@ -142,10 +142,10 @@ class UtilsModule extends BaseModule {
         return true;
       }
 
-      Logger.warn(`UtilsModule: 알 수 없는 액션: ${subAction}`);
+      logger.warn(`UtilsModule: 알 수 없는 액션: ${subAction}`);
       return false;
     } catch (error) {
-      Logger.error(`UtilsModule 콜백 오류 (${subAction}):`, error);
+      logger.error(`UtilsModule 콜백 오류 (${subAction}):`, error);
       await this.handleError(bot, chatId, error);
       return false;
     }
@@ -178,7 +178,7 @@ class UtilsModule extends BaseModule {
         await bot.sendMessage(chatId, `❌ TTS 생성 실패: ${result.error}`);
       }
     } catch (error) {
-      Logger.error("TTS 명령어 처리 오류:", error);
+      logger.error("TTS 명령어 처리 오류:", error);
       await bot.sendMessage(chatId, "❌ TTS 처리 중 오류가 발생했습니다.");
     }
   }
@@ -201,7 +201,7 @@ class UtilsModule extends BaseModule {
         });
       }
     } catch (error) {
-      Logger.error("유틸리티 메뉴 표시 오류:", error);
+      logger.error("유틸리티 메뉴 표시 오류:", error);
       await this.handleError(bot, chatId, error);
     }
   }
@@ -234,7 +234,7 @@ class UtilsModule extends BaseModule {
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("TTS 메뉴 표시 오류:", error);
+      logger.error("TTS 메뉴 표시 오류:", error);
     }
   }
 
@@ -269,7 +269,7 @@ class UtilsModule extends BaseModule {
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("TTS 도움말 표시 오류:", error);
+      logger.error("TTS 도움말 표시 오류:", error);
     }
   }
 
@@ -299,7 +299,7 @@ class UtilsModule extends BaseModule {
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("유틸리티 도움말 표시 오류:", error);
+      logger.error("유틸리티 도움말 표시 오류:", error);
     }
   }
 
@@ -345,7 +345,7 @@ class UtilsModule extends BaseModule {
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("TTS 진단 표시 오류:", error);
+      logger.error("TTS 진단 표시 오류:", error);
     }
   }
 
@@ -407,7 +407,7 @@ class UtilsModule extends BaseModule {
         },
       });
     } catch (sendError) {
-      Logger.error("에러 메시지 전송 실패:", sendError);
+      logger.error("에러 메시지 전송 실패:", sendError);
     }
   }
 
@@ -418,16 +418,16 @@ class UtilsModule extends BaseModule {
         try {
           this.diagnosticsCache = await this.ttsService.runDiagnostics();
           this.lastDiagnostics = new Date();
-          Logger.info("✅ TTS 진단 완료");
+          logger.info("✅ TTS 진단 완료");
         } catch (diagError) {
-          Logger.warn("⚠️ TTS 진단 실패:", diagError.message);
+          logger.warn("⚠️ TTS 진단 실패:", diagError.message);
         }
       }
 
       await super.initialize();
-      Logger.success("✅ UtilsModule 초기화 완료");
+      logger.success("✅ UtilsModule 초기화 완료");
     } catch (error) {
-      Logger.error("❌ UtilsModule 초기화 실패:", error);
+      logger.error("❌ UtilsModule 초기화 실패:", error);
       throw error;
     }
   }

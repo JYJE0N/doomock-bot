@@ -1,7 +1,7 @@
 // src/database/DatabaseManager.js - 안정화된 MongoDB 연결
 
 const { MongoClient } = require("mongodb");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class DatabaseManager {
   constructor() {
@@ -25,18 +25,18 @@ class DatabaseManager {
     }
 
     if (this.isShuttingDown) {
-      Logger.info("🛑 종료 중이므로 연결하지 않습니다");
+      logger.info("🛑 종료 중이므로 연결하지 않습니다");
       return false;
     }
 
     try {
       if (!this.MONGO_URL) {
-        Logger.warn("⚠️ MongoDB URL이 설정되지 않음, 메모리 모드로 실행");
+        logger.warn("⚠️ MongoDB URL이 설정되지 않음, 메모리 모드로 실행");
         return false;
       }
 
       this.connectionAttempts++;
-      Logger.info(
+      logger.info(
         `📊 MongoDB 연결 시도 ${this.connectionAttempts}/${this.maxConnectionAttempts}...`
       );
 
@@ -82,10 +82,10 @@ class DatabaseManager {
       // 이벤트 리스너 설정
       this.setupEventListeners();
 
-      Logger.success(`✅ MongoDB 연결 성공: ${dbName}`);
+      logger.success(`✅ MongoDB 연결 성공: ${dbName}`);
       return true;
     } catch (error) {
-      Logger.error(
+      logger.error(
         `❌ MongoDB 연결 실패 (${this.connectionAttempts}/${this.maxConnectionAttempts}):`,
         error.message
       );
@@ -94,13 +94,13 @@ class DatabaseManager {
 
       // 최대 시도 횟수 초과 시 포기
       if (this.connectionAttempts >= this.maxConnectionAttempts) {
-        Logger.warn("⚠️ MongoDB 연결을 포기하고 메모리 모드로 실행합니다");
+        logger.warn("⚠️ MongoDB 연결을 포기하고 메모리 모드로 실행합니다");
         return false;
       }
 
       // 재시도 전 대기
       const waitTime = this.connectionAttempts * 3000; // 3초, 6초, 9초
-      Logger.info(`⏳ ${waitTime / 1000}초 후 재시도...`);
+      logger.info(`⏳ ${waitTime / 1000}초 후 재시도...`);
       await new Promise((resolve) => setTimeout(resolve, waitTime));
 
       return await this.connect(); // 재귀 호출
@@ -112,7 +112,7 @@ class DatabaseManager {
     try {
       const admin = this.client.db().admin();
       const result = await admin.ping();
-      Logger.debug("🏓 MongoDB ping 성공:", result);
+      logger.debug("🏓 MongoDB ping 성공:", result);
       return true;
     } catch (error) {
       throw new Error(`연결 테스트 실패: ${error.message}`);
@@ -126,7 +126,7 @@ class DatabaseManager {
     // 연결 해제 감지
     this.client.on("close", () => {
       if (!this.isShuttingDown) {
-        Logger.warn("⚠️ MongoDB 연결이 닫혔습니다");
+        logger.warn("⚠️ MongoDB 연결이 닫혔습니다");
         this.isConnected = false;
         this.startReconnect();
       }
@@ -134,7 +134,7 @@ class DatabaseManager {
 
     // 에러 이벤트
     this.client.on("error", (error) => {
-      Logger.error("❌ MongoDB 클라이언트 에러:", error.message);
+      logger.error("❌ MongoDB 클라이언트 에러:", error.message);
       this.isConnected = false;
     });
 
@@ -143,23 +143,23 @@ class DatabaseManager {
       const { newDescription } = event;
 
       if (newDescription.type === "Unknown") {
-        Logger.warn("⚠️ MongoDB 서버 상태 불명");
+        logger.warn("⚠️ MongoDB 서버 상태 불명");
         this.isConnected = false;
       } else if (newDescription.type !== "Unknown" && !this.isConnected) {
-        Logger.success("✅ MongoDB 서버 연결 복구됨");
+        logger.success("✅ MongoDB 서버 연결 복구됨");
         this.isConnected = true;
         this.stopReconnect();
       }
     });
 
-    Logger.debug("🎧 MongoDB 이벤트 리스너 설정 완료");
+    logger.debug("🎧 MongoDB 이벤트 리스너 설정 완료");
   }
 
   // 🔄 재연결 로직
   startReconnect() {
     if (this.reconnectInterval || this.isShuttingDown) return;
 
-    Logger.info("🔄 MongoDB 재연결 시작");
+    logger.info("🔄 MongoDB 재연결 시작");
 
     this.reconnectInterval = setInterval(async () => {
       if (this.isShuttingDown) {
@@ -168,15 +168,15 @@ class DatabaseManager {
       }
 
       try {
-        Logger.debug("⚡ 재연결 시도 중...");
+        logger.debug("⚡ 재연결 시도 중...");
         await this.connect();
 
         if (this.isConnected) {
-          Logger.success("✅ MongoDB 재연결 성공");
+          logger.success("✅ MongoDB 재연결 성공");
           this.stopReconnect();
         }
       } catch (error) {
-        Logger.debug("⚠️ 재연결 실패, 계속 시도 중...");
+        logger.debug("⚠️ 재연결 실패, 계속 시도 중...");
       }
     }, 15000); // 15초마다 재연결 시도
   }
@@ -185,7 +185,7 @@ class DatabaseManager {
     if (this.reconnectInterval) {
       clearInterval(this.reconnectInterval);
       this.reconnectInterval = null;
-      Logger.info("⏹️ 재연결 중지");
+      logger.info("⏹️ 재연결 중지");
     }
   }
 
@@ -196,7 +196,7 @@ class DatabaseManager {
     }
 
     if (!this.isConnected || !this.client) {
-      Logger.info("🔄 연결이 끊어져 재연결 시도");
+      logger.info("🔄 연결이 끊어져 재연결 시도");
       return await this.connect();
     }
 
@@ -205,7 +205,7 @@ class DatabaseManager {
       await this.client.db().admin().ping();
       return true;
     } catch (error) {
-      Logger.warn("⚠️ 연결 확인 실패, 재연결:", error.message);
+      logger.warn("⚠️ 연결 확인 실패, 재연결:", error.message);
       this.isConnected = false;
       return await this.connect();
     }
@@ -227,16 +227,16 @@ class DatabaseManager {
       this.stopReconnect();
 
       if (this.client) {
-        Logger.info("🔌 MongoDB 연결 종료 중...");
+        logger.info("🔌 MongoDB 연결 종료 중...");
         await this.client.close(false); // 강제 종료 비활성화
-        Logger.info("✅ 데이터베이스 연결 종료");
+        logger.info("✅ 데이터베이스 연결 종료");
       }
 
       this.client = null;
       this.db = null;
       this.isConnected = false;
     } catch (error) {
-      Logger.error("❌ 연결 종료 중 오류:", error.message);
+      logger.error("❌ 연결 종료 중 오류:", error.message);
     }
   }
 
@@ -272,7 +272,7 @@ class DatabaseManager {
       return "doomock_bot";
     }
 
-    Logger.debug(`데이터베이스 이름 정리: ${dbName} → ${sanitized}`);
+    logger.debug(`데이터베이스 이름 정리: ${dbName} → ${sanitized}`);
     return sanitized;
   }
 
@@ -319,7 +319,7 @@ async function ensureConnection() {
   try {
     return await instance.ensureConnection();
   } catch (error) {
-    Logger.warn(
+    logger.warn(
       "⚠️ 데이터베이스 연결 실패, 메모리 모드로 계속:",
       error.message
     );
@@ -332,7 +332,7 @@ function getCollection(name) {
   try {
     return instance.getCollection(name);
   } catch (error) {
-    Logger.warn(`⚠️ 컬렉션 ${name} 조회 실패:`, error.message);
+    logger.warn(`⚠️ 컬렉션 ${name} 조회 실패:`, error.message);
     throw error;
   }
 }

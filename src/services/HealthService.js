@@ -1,6 +1,6 @@
 // src/services/HealthService.js - 핵심 헬스체크 서비스
 const AppConfig = require("../config/AppConfig");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class HealthService {
   constructor() {
@@ -38,7 +38,7 @@ class HealthService {
 
       return health;
     } catch (error) {
-      Logger.error("헬스체크 실행 오류:", error);
+      logger.error("헬스체크 실행 오류:", error);
       return {
         status: "error",
         timestamp,
@@ -122,7 +122,7 @@ class HealthService {
         url: AppConfig.MONGO_URL.replace(/\/\/([^:]+):([^@]+)@/, "//***:***@"), // 패스워드 마스킹
       };
     } catch (error) {
-      Logger.error("데이터베이스 헬스체크 실패:", error);
+      logger.error("데이터베이스 헬스체크 실패:", error);
       return {
         status: "unhealthy",
         error: error.message,

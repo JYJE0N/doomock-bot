@@ -1,5 +1,5 @@
 // src/handlers/CommandHandler.js - 예쁘고 간결한 v3.0.1
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const config = require("../config/config");
 
 class CommandHandler {
@@ -13,7 +13,7 @@ class CommandHandler {
     this.commandRouter = new Map();
     this._setupRoutes();
 
-    Logger.debug(
+    logger.debug(
       `🎯 CommandHandler 초기화: ${this.commandRouter.size}개 명령어 등록`
     );
   }
@@ -54,14 +54,14 @@ class CommandHandler {
       const { command, args, userId } = this._parseMessage(msg);
       if (!command) return;
 
-      Logger.info(
+      logger.info(
         `🎯 명령어 처리: /${command} | userId=${userId}, userName=${msg.from.first_name}, args=${args.length}, fullCommand=${msg.text}`
       );
 
       // 🎯 라우팅 처리
       await this._routeCommand(msg, command, args);
     } catch (error) {
-      Logger.error("CommandHandler 오류:", error);
+      logger.error("CommandHandler 오류:", error);
       await this._sendErrorMessage(msg.chat?.id, error);
     }
   }
@@ -71,7 +71,7 @@ class CommandHandler {
   _isValidMessage(msg) {
     if (!msg?.text?.startsWith("/")) return false;
     if (!msg.text) {
-      Logger.warn("텍스트가 없는 메시지");
+      logger.warn("텍스트가 없는 메시지");
       return false;
     }
     return true;
@@ -113,7 +113,7 @@ class CommandHandler {
       // 3️⃣ 알 수 없는 명령어
       await this._handleUnknownCommand(msg, command);
     } catch (error) {
-      Logger.error(`명령어 처리 실패 [${command}]:`, error);
+      logger.error(`명령어 처리 실패 [${command}]:`, error);
       await this._sendErrorMessage(chatId, error);
     }
   }
@@ -157,9 +157,9 @@ class CommandHandler {
         parse_mode: "Markdown",
       });
 
-      Logger.info(`Start 명령어 처리 완료: ${userName} (${userId})`);
+      logger.info(`Start 명령어 처리 완료: ${userName} (${userId})`);
     } catch (error) {
-      Logger.error("Start 명령어 처리 오류:", error);
+      logger.error("Start 명령어 처리 오류:", error);
       await this.bot.sendMessage(
         chatId,
         "봇을 시작하는 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
@@ -207,7 +207,7 @@ class CommandHandler {
         disable_web_page_preview: true,
       });
     } catch (error) {
-      Logger.error("Help 명령어 처리 오류:", error);
+      logger.error("Help 명령어 처리 오류:", error);
       // 마크다운 실패 시 기본 텍스트
       await this.bot.sendMessage(
         chatId,
@@ -251,7 +251,7 @@ ${moduleList}`;
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("Modules 명령어 처리 오류:", error);
+      logger.error("Modules 명령어 처리 오류:", error);
       await this.bot.sendMessage(
         chatId,
         "모듈 목록을 가져오는 중 오류가 발생했습니다."
@@ -294,7 +294,7 @@ ${config.emoji.version} 버전: ${config.bot.version}
         parse_mode: "Markdown",
       });
     } catch (error) {
-      Logger.error("Status 명령어 처리 오류:", error);
+      logger.error("Status 명령어 처리 오류:", error);
       await this.bot.sendMessage(
         chatId,
         "상태 정보를 가져오는 중 오류가 발생했습니다."
@@ -331,7 +331,7 @@ ${config.emoji.version} 버전: ${config.bot.version}
         reply_markup: { remove_keyboard: true },
       });
     } catch (error) {
-      Logger.error("Cancel 명령어 처리 오류:", error);
+      logger.error("Cancel 명령어 처리 오류:", error);
       await this.bot.sendMessage(chatId, "작업 취소 중 오류가 발생했습니다.");
     }
   }
@@ -364,7 +364,7 @@ ${config.emoji.version} 버전: ${config.bot.version}
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("Admin 명령어 처리 오류:", error);
+      logger.error("Admin 명령어 처리 오류:", error);
       await this.bot.sendMessage(
         chatId,
         "관리자 메뉴를 여는 중 오류가 발생했습니다."
@@ -389,10 +389,10 @@ ${config.emoji.version} 버전: ${config.bot.version}
           await this._handleShareLink(msg, data);
           break;
         default:
-          Logger.warn(`알 수 없는 딥링크: ${param}`);
+          logger.warn(`알 수 없는 딥링크: ${param}`);
       }
     } catch (error) {
-      Logger.error("딥링크 처리 오류:", error);
+      logger.error("딥링크 처리 오류:", error);
     }
   }
 

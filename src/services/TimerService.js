@@ -1,7 +1,7 @@
 // src/services/TimerService.js - Railway 환경변수를 활용한 지속성 있는 포모도로
 
 const { TimeHelper } = require("../utils/TimeHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class TimerService {
   constructor() {
@@ -68,7 +68,7 @@ class TimerService {
           });
         });
 
-        Logger.success(
+        logger.success(
           `🔄 타이머 복원 완료: ${this.timers.size}개 타이머, ${this.pomodoroSessions.size}개 세션`
         );
       }
@@ -77,7 +77,7 @@ class TimerService {
       const historyBackup = process.env[this.sessionHistoryKey];
       if (historyBackup) {
         this.sessionHistory = JSON.parse(historyBackup);
-        Logger.info(
+        logger.info(
           `📊 세션 히스토리 복원: ${
             Object.keys(this.sessionHistory).length
           }명의 기록`
@@ -86,7 +86,7 @@ class TimerService {
         this.sessionHistory = {};
       }
     } catch (error) {
-      Logger.warn("백업 복원 실패 (신규 시작):", error.message);
+      logger.warn("백업 복원 실패 (신규 시작):", error.message);
       this.sessionHistory = {};
     }
   }
@@ -122,7 +122,7 @@ class TimerService {
       this.lastBackup = backupData;
 
       // Railway 로그를 통한 백업 (개발자가 수동으로 복원 가능)
-      Logger.info("📦 타이머 백업 생성:", {
+      logger.info("📦 타이머 백업 생성:", {
         activeTimers: Object.keys(backupData.timers).length,
         activeSessions: Object.keys(backupData.sessions).length,
         timestamp: backupData.timestamp,
@@ -130,7 +130,7 @@ class TimerService {
 
       // 세션 히스토리도 백업
       if (Object.keys(this.sessionHistory).length > 0) {
-        Logger.info("📊 세션 히스토리 백업:", {
+        logger.info("📊 세션 히스토리 백업:", {
           users: Object.keys(this.sessionHistory).length,
           totalSessions: Object.values(this.sessionHistory).reduce(
             (sum, user) => sum + user.sessions.length,
@@ -141,7 +141,7 @@ class TimerService {
 
       return true;
     } catch (error) {
-      Logger.error("백업 저장 실패:", error);
+      logger.error("백업 저장 실패:", error);
       return false;
     }
   }
@@ -154,7 +154,7 @@ class TimerService {
       }
     }, this.config.autoSaveInterval);
 
-    Logger.info(
+    logger.info(
       `⚙️ 자동 백업 설정: ${this.config.autoSaveInterval / 1000}초마다`
     );
   }
@@ -162,12 +162,12 @@ class TimerService {
   // ⭐ 안전한 종료 처리
   setupGracefulShutdown() {
     const shutdown = () => {
-      Logger.info("🛑 타이머 서비스 종료 중...");
+      logger.info("🛑 타이머 서비스 종료 중...");
       this.saveToBackup();
 
       // 활성 사용자들에게 알림 메시지 준비 (로그로 기록)
       if (this.timers.size > 0) {
-        Logger.warn("⚠️ 서버 재시작으로 인한 타이머 중단:", {
+        logger.warn("⚠️ 서버 재시작으로 인한 타이머 중단:", {
           affectedUsers: Array.from(this.timers.keys()),
           message: "서버가 재시작됩니다. 타이머가 자동으로 복원됩니다.",
         });
@@ -222,7 +222,7 @@ class TimerService {
         sessionId: timer.sessionId,
       });
 
-      Logger.info(`🍅 포모도로 시작: 사용자 ${userId}, 작업 "${taskName}"`);
+      logger.info(`🍅 포모도로 시작: 사용자 ${userId}, 작업 "${taskName}"`);
 
       return {
         success: true,
@@ -236,7 +236,7 @@ class TimerService {
         },
       };
     } catch (error) {
-      Logger.error("포모도로 시작 오류:", error);
+      logger.error("포모도로 시작 오류:", error);
       return {
         success: false,
         error: "포모도로 시작 중 오류가 발생했습니다.",
@@ -304,7 +304,7 @@ class TimerService {
         },
       };
     } catch (error) {
-      Logger.error("포모도로 상태 확인 오류:", error);
+      logger.error("포모도로 상태 확인 오류:", error);
       return {
         success: false,
         error: "포모도로 상태 확인 중 오류가 발생했습니다.",
@@ -414,7 +414,7 @@ class TimerService {
         this.timers.delete(userId);
       }
 
-      Logger.info(
+      logger.info(
         `🎯 포모도로 완료: 사용자 ${userId}, ${timer.mode} → ${nextMode}`
       );
 
@@ -423,7 +423,7 @@ class TimerService {
         data: completionData,
       };
     } catch (error) {
-      Logger.error("포모도로 완료 처리 오류:", error);
+      logger.error("포모도로 완료 처리 오류:", error);
       return {
         success: false,
         error: "포모도로 완료 처리 중 오류가 발생했습니다.",
@@ -560,7 +560,7 @@ class TimerService {
         }
       }
 
-      Logger.info(`🛑 타이머 중지: 사용자 ${userId}, ${duration}분 경과`);
+      logger.info(`🛑 타이머 중지: 사용자 ${userId}, ${duration}분 경과`);
 
       return {
         success: true,
@@ -575,7 +575,7 @@ class TimerService {
         },
       };
     } catch (error) {
-      Logger.error("타이머 중지 오류:", error);
+      logger.error("타이머 중지 오류:", error);
       return {
         success: false,
         error: "타이머 중지 중 오류가 발생했습니다.",
@@ -610,7 +610,7 @@ class TimerService {
         sessionId: timer.sessionId,
       });
 
-      Logger.info(`⏰ 일반 타이머 시작: 사용자 ${userId}, 작업 "${taskName}"`);
+      logger.info(`⏰ 일반 타이머 시작: 사용자 ${userId}, 작업 "${taskName}"`);
 
       return {
         success: true,
@@ -620,7 +620,7 @@ class TimerService {
         },
       };
     } catch (error) {
-      Logger.error("타이머 시작 오류:", error);
+      logger.error("타이머 시작 오류:", error);
       return {
         success: false,
         error: "타이머 시작 중 오류가 발생했습니다.",
@@ -658,7 +658,7 @@ class TimerService {
         },
       };
     } catch (error) {
-      Logger.error("타이머 상태 확인 오류:", error);
+      logger.error("타이머 상태 확인 오류:", error);
       return {
         success: false,
         error: "타이머 상태 확인 중 오류가 발생했습니다.",

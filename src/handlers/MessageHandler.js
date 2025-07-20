@@ -1,6 +1,6 @@
 // src/handlers/MessageHandler.js - 수정된 버전
 const { getUserName } = require("../utils/UserHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class MessageHandler {
   constructor(bot, options) {
@@ -10,7 +10,7 @@ class MessageHandler {
     this.callbackManager = options.callbackManager;
     this.userStates = options.userStates;
 
-    Logger.info("MessageHandler 초기화됨");
+    logger.info("MessageHandler 초기화됨");
   }
 
   setDependencies(dependencies) {
@@ -29,7 +29,7 @@ class MessageHandler {
       return;
     }
 
-    Logger.info(`💬 메시지 처리: "${text}" (사용자: ${userName})`);
+    logger.info(`💬 메시지 처리: "${text}" (사용자: ${userName})`);
 
     try {
       // 취소 명령어 처리
@@ -59,7 +59,7 @@ class MessageHandler {
       // 자동 기능 처리 (TTS 등)
       await this.handleAutoFeatures(msg);
     } catch (error) {
-      Logger.error("메시지 처리 오류:", error);
+      logger.error("메시지 처리 오류:", error);
       await this.bot.sendMessage(
         chatId,
         "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요.",
@@ -89,7 +89,7 @@ class MessageHandler {
           }
         }
       } catch (error) {
-        Logger.error(`모듈 ${moduleName} 사용자 상태 처리 오류:`, error);
+        logger.error(`모듈 ${moduleName} 사용자 상태 처리 오류:`, error);
       }
     }
 
@@ -134,12 +134,12 @@ class MessageHandler {
         if (moduleInstance && moduleInstance.handleMessage) {
           const handled = await moduleInstance.handleMessage(this.bot, msg);
           if (handled) {
-            Logger.debug(`명령어가 ${moduleName} 모듈에서 처리됨`);
+            logger.debug(`명령어가 ${moduleName} 모듈에서 처리됨`);
             return true;
           }
         }
       } catch (error) {
-        Logger.error(`모듈 ${moduleName} 명령어 처리 오류:`, error);
+        logger.error(`모듈 ${moduleName} 명령어 처리 오류:`, error);
       }
     }
 
@@ -156,7 +156,7 @@ class MessageHandler {
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("메인 메뉴 표시 오류:", error);
+      logger.error("메인 메뉴 표시 오류:", error);
       await this.bot.sendMessage(chatId, "❌ 메뉴를 불러올 수 없습니다.");
     }
   }
@@ -175,7 +175,7 @@ class MessageHandler {
         reply_markup: keyboard,
       });
     } catch (error) {
-      Logger.error("도움말 메뉴 표시 오류:", error);
+      logger.error("도움말 메뉴 표시 오류:", error);
       await this.bot.sendMessage(chatId, "❌ 도움말을 불러올 수 없습니다.");
     }
   }
@@ -241,7 +241,7 @@ class MessageHandler {
 
       // 다른 자동 기능들 추가 가능
     } catch (error) {
-      Logger.error("자동 기능 처리 오류:", error);
+      logger.error("자동 기능 처리 오류:", error);
     }
   }
 

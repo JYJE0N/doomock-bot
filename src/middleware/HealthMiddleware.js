@@ -1,6 +1,6 @@
 // src/middleware/HealthMiddleware.js - HTTP 엔드포인트 처리
 const HealthService = require("../services/HealthService");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class HealthMiddleware {
   constructor() {
@@ -97,10 +97,10 @@ class HealthMiddleware {
 
         // 로깅 (에러가 아닌 경우만)
         if (statusCode < 400) {
-          Logger.debug(`헬스체크 요청: ${path} - ${result.status || "ok"}`);
+          logger.debug(`헬스체크 요청: ${path} - ${result.status || "ok"}`);
         }
       } catch (error) {
-        Logger.error("헬스체크 핸들러 오류:", error);
+        logger.error("헬스체크 핸들러 오류:", error);
 
         res.writeHead(500, { "Content-Type": "application/json" });
         res.end(

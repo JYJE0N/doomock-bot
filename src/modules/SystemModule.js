@@ -2,7 +2,7 @@
 
 const { StandardizedBaseModule } = require("../core/StandardizedSystem");
 const { getUserName } = require("../utils/UserHelper");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class SystemModule extends StandardizedBaseModule {
   constructor(bot, options = {}) {
@@ -23,7 +23,7 @@ class SystemModule extends StandardizedBaseModule {
       isRailway: !!process.env.RAILWAY_ENVIRONMENT,
     };
 
-    Logger.info("🏠 SystemModule 생성됨 (표준화 적용)");
+    logger.info("🏠 SystemModule 생성됨 (표준화 적용)");
   }
 
   // ✅ 표준 초기화
@@ -33,7 +33,7 @@ class SystemModule extends StandardizedBaseModule {
     // 시스템 액션 등록
     this.registerSystemActions();
 
-    Logger.success("✅ SystemModule 초기화 완료");
+    logger.success("✅ SystemModule 초기화 완료");
   }
 
   // 🎯 시스템 액션 등록 (중복 없음)
@@ -57,7 +57,7 @@ class SystemModule extends StandardizedBaseModule {
     // 취소
     this.actionMap.set("cancel", this.handleCancel.bind(this));
 
-    Logger.debug("🎯 SystemModule 액션 등록 완료 (중복 방지)");
+    logger.debug("🎯 SystemModule 액션 등록 완료 (중복 방지)");
   }
 
   // 🎯 메시지 처리 구현 (표준 매개변수: bot, msg)
@@ -124,13 +124,13 @@ class SystemModule extends StandardizedBaseModule {
         await bot.answerCallbackQuery(callbackQuery.id);
       } catch (error) {
         // 콜백이 이미 응답되었거나 만료된 경우 무시
-        Logger.debug("콜백 응답 건너뜀:", error.message);
+        logger.debug("콜백 응답 건너뜀:", error.message);
       }
 
       return true;
     }
 
-    Logger.warn(`SystemModule: 알 수 없는 액션 - ${subAction}`);
+    logger.warn(`SystemModule: 알 수 없는 액션 - ${subAction}`);
     return false;
   }
 
@@ -395,7 +395,7 @@ ${greeting} 👋
         await bot.sendMessage(chatId, text, options);
       }
     } catch (error) {
-      Logger.error("메시지 전송/편집 오류:", error);
+      logger.error("메시지 전송/편집 오류:", error);
 
       // 폴백: 새 메시지 전송
       if (messageId && error.message.includes("message is not modified")) {
@@ -406,7 +406,7 @@ ${greeting} 👋
       try {
         await bot.sendMessage(chatId, text, options);
       } catch (fallbackError) {
-        Logger.error("폴백 메시지 전송도 실패:", fallbackError);
+        logger.error("폴백 메시지 전송도 실패:", fallbackError);
       }
     }
   }

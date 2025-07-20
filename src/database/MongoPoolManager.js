@@ -8,12 +8,12 @@ try {
   Logger = require("../utils/Logger");
 
   // Logger가 제대로 로드되었는지 확인
-  if (!Logger || typeof Logger.info !== "function") {
+  if (!Logger || typeof logger.info !== "function") {
     throw new Error("Logger 함수가 올바르지 않음");
   }
 
   // 테스트 로그 (순환참조 체크)
-  Logger.debug("🔍 Logger 테스트 - MongoPoolManager에서 정상 로드됨");
+  logger.debug("🔍 Logger 테스트 - MongoPoolManager에서 정상 로드됨");
 } catch (loggerError) {
   // 폴백: 안전한 console 래퍼
   console.warn("⚠️ Logger 로드 실패, console 폴백 사용:", loggerError.message);
@@ -38,7 +38,7 @@ class MongoPoolManager {
   constructor() {
     // 🚫 중복 생성 방지
     if (MongoPoolManager._instance) {
-      Logger.warn("⚠️ MongoPoolManager 이미 생성됨, 기존 인스턴스 반환");
+      logger.warn("⚠️ MongoPoolManager 이미 생성됨, 기존 인스턴스 반환");
       return MongoPoolManager._instance;
     }
 
@@ -67,7 +67,7 @@ class MongoPoolManager {
     MongoPoolManager._instance = this;
 
     // ✅ 안전한 Logger 사용
-    Logger.info("🗄️ MongoPoolManager 생성됨 (Railway MongoDB 플러그인 최적화)");
+    logger.info("🗄️ MongoPoolManager 생성됨 (Railway MongoDB 플러그인 최적화)");
   }
 
   // 🚂 Railway MongoDB 플러그인에 최적화된 연결 옵션
@@ -77,7 +77,7 @@ class MongoPoolManager {
     );
 
     if (isRailwayMongo) {
-      Logger.info("🚂 Railway MongoDB 플러그인 감지, 최적화된 설정 적용");
+      logger.info("🚂 Railway MongoDB 플러그인 감지, 최적화된 설정 적용");
 
       return {
         // Railway 내부 네트워크 최적화
@@ -103,7 +103,7 @@ class MongoPoolManager {
         // useNewUrlParser: 기본값
       };
     } else {
-      Logger.info("🌐 외부 MongoDB 서비스 감지, 표준 설정 적용");
+      logger.info("🌐 외부 MongoDB 서비스 감지, 표준 설정 적용");
 
       return {
         // 외부 MongoDB Atlas 등을 위한 설정
@@ -127,17 +127,17 @@ class MongoPoolManager {
   // ✅ 연결 메서드
   async connect() {
     if (this.isConnected) {
-      Logger.debug("📋 이미 MongoDB에 연결됨");
+      logger.debug("📋 이미 MongoDB에 연결됨");
       return true;
     }
 
     if (!this.connectionString) {
-      Logger.error("❌ MongoDB 연결 문자열이 없음");
+      logger.error("❌ MongoDB 연결 문자열이 없음");
       return false;
     }
 
     try {
-      Logger.info("🔌 MongoDB 연결 시도 중... (네이티브 드라이버)");
+      logger.info("🔌 MongoDB 연결 시도 중... (네이티브 드라이버)");
 
       // ✅ MongoDB 네이티브 클라이언트 생성 (mongoose 아님!)
       this.client = new MongoClient(this.connectionString, this.poolOptions);
@@ -153,10 +153,10 @@ class MongoPoolManager {
       this.isConnected = true;
       this.stats.lastConnected = new Date();
 
-      Logger.success(`✅ MongoDB 연결 성공 (${dbName}) - 네이티브 드라이버`);
+      logger.success(`✅ MongoDB 연결 성공 (${dbName}) - 네이티브 드라이버`);
       return true;
     } catch (error) {
-      Logger.error(`❌ MongoDB 연결 실패: ${error.message}`);
+      logger.error(`❌ MongoDB 연결 실패: ${error.message}`);
       this.isConnected = false;
       return false;
     }
@@ -173,9 +173,9 @@ class MongoPoolManager {
       this.isConnected = false;
       this.client = null;
       this.db = null;
-      Logger.success("🔌 MongoDB 연결 해제됨");
+      logger.success("🔌 MongoDB 연결 해제됨");
     } catch (error) {
-      Logger.error(`❌ MongoDB 연결 해제 실패: ${error.message}`);
+      logger.error(`❌ MongoDB 연결 해제 실패: ${error.message}`);
     }
   }
 
@@ -189,14 +189,14 @@ class MongoPoolManager {
       await this.client.db("admin").command({ ismaster: 1 });
       return true;
     } catch (error) {
-      Logger.warn(`❌ MongoDB 상태 확인 실패: ${error.message}`);
+      logger.warn(`❌ MongoDB 상태 확인 실패: ${error.message}`);
       return false;
     }
   }
 
   // ✅ 재연결
   async reconnect() {
-    Logger.info("🔄 MongoDB 재연결 시도...");
+    logger.info("🔄 MongoDB 재연결 시도...");
 
     if (this.isConnected) {
       await this.disconnect();
@@ -238,7 +238,7 @@ class MongoPoolManager {
       const queryTime = Date.now() - startTime;
       this.updateStats(queryTime, false);
 
-      Logger.error(
+      logger.error(
         `❌ 쿼리 실행 실패 (${collectionName}.${operation}): ${error.message}`
       );
       throw error;
@@ -342,12 +342,12 @@ class MongoPoolManager {
 
       for (const index of indexes) {
         await collection.createIndex(index.key, index.options || {});
-        Logger.debug(
+        logger.debug(
           `📑 인덱스 생성됨: ${collectionName}.${JSON.stringify(index.key)}`
         );
       }
     } catch (error) {
-      Logger.error(`❌ 인덱스 생성 실패 (${collectionName}): ${error.message}`);
+      logger.error(`❌ 인덱스 생성 실패 (${collectionName}): ${error.message}`);
     }
   }
 
@@ -386,7 +386,7 @@ class MongoPoolManager {
   // 🧹 정리 작업
   async cleanup() {
     try {
-      Logger.info("🧹 MongoPoolManager 정리 작업 시작...");
+      logger.info("🧹 MongoPoolManager 정리 작업 시작...");
 
       await this.disconnect();
 
@@ -402,9 +402,9 @@ class MongoPoolManager {
 
       this.queryTimes = [];
 
-      Logger.success("✅ MongoPoolManager 정리 완료");
+      logger.success("✅ MongoPoolManager 정리 완료");
     } catch (error) {
-      Logger.error("❌ MongoPoolManager 정리 중 오류:", error);
+      logger.error("❌ MongoPoolManager 정리 중 오류:", error);
     }
   }
 }

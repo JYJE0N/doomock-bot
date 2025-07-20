@@ -1,7 +1,7 @@
 // src/services/WeatherService.js - 올바른 서비스 Export 방식
 
 const axios = require("axios");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class WeatherService {
   constructor() {
@@ -15,7 +15,7 @@ class WeatherService {
     this.cache = new Map();
     this.cacheTimeout = 10 * 60 * 1000; // 10분
 
-    Logger.debug(
+    logger.debug(
       `🌤️ WeatherService 초기화 (API 키: ${this.apiKey ? "설정됨" : "없음"})`
     );
   }
@@ -26,12 +26,12 @@ class WeatherService {
       const cacheKey = `current_${city}`;
       const cached = this.getFromCache(cacheKey);
       if (cached) {
-        Logger.debug(`날씨 캐시 사용: ${city}`);
+        logger.debug(`날씨 캐시 사용: ${city}`);
         return { success: true, data: cached, cached: true };
       }
 
       if (!this.apiKey) {
-        Logger.warn("날씨 API 키가 설정되지 않음, 기본값 반환");
+        logger.warn("날씨 API 키가 설정되지 않음, 기본값 반환");
         return {
           success: false,
           error: "날씨 API 키가 설정되지 않았습니다.",
@@ -47,7 +47,7 @@ class WeatherService {
         units: this.units,
       };
 
-      Logger.debug(`날씨 API 요청: ${city}`);
+      logger.debug(`날씨 API 요청: ${city}`);
       const response = await axios.get(url, {
         params,
         timeout: 10000,
@@ -56,10 +56,10 @@ class WeatherService {
       const weatherData = this.formatCurrentWeather(response.data);
       this.setCache(cacheKey, weatherData);
 
-      Logger.info(`현재 날씨 조회 성공: ${city}`);
+      logger.info(`현재 날씨 조회 성공: ${city}`);
       return { success: true, data: weatherData, cached: false };
     } catch (error) {
-      Logger.error("현재 날씨 조회 실패:", error.message);
+      logger.error("현재 날씨 조회 실패:", error.message);
       return {
         success: false,
         error: this.formatError(error),
@@ -74,12 +74,12 @@ class WeatherService {
       const cacheKey = `forecast_${city}`;
       const cached = this.getFromCache(cacheKey);
       if (cached) {
-        Logger.debug(`예보 캐시 사용: ${city}`);
+        logger.debug(`예보 캐시 사용: ${city}`);
         return { success: true, data: cached, cached: true };
       }
 
       if (!this.apiKey) {
-        Logger.warn("날씨 API 키가 설정되지 않음, 기본 예보 반환");
+        logger.warn("날씨 API 키가 설정되지 않음, 기본 예보 반환");
         return {
           success: false,
           error: "날씨 API 키가 설정되지 않았습니다.",
@@ -95,7 +95,7 @@ class WeatherService {
         units: this.units,
       };
 
-      Logger.debug(`예보 API 요청: ${city}`);
+      logger.debug(`예보 API 요청: ${city}`);
       const response = await axios.get(url, {
         params,
         timeout: 10000,
@@ -104,10 +104,10 @@ class WeatherService {
       const forecastData = this.formatForecast(response.data);
       this.setCache(cacheKey, forecastData);
 
-      Logger.info(`날씨 예보 조회 성공: ${city}`);
+      logger.info(`날씨 예보 조회 성공: ${city}`);
       return { success: true, data: forecastData, cached: false };
     } catch (error) {
-      Logger.error("날씨 예보 조회 실패:", error.message);
+      logger.error("날씨 예보 조회 실패:", error.message);
       return {
         success: false,
         error: this.formatError(error),
@@ -279,7 +279,7 @@ class WeatherService {
 
   clearCache() {
     this.cache.clear();
-    Logger.info("날씨 캐시 초기화");
+    logger.info("날씨 캐시 초기화");
   }
 
   // 에러 포맷팅

@@ -1,7 +1,7 @@
 // ===== 1. BaseModule.js - 단순하고 안전한 기본 구조 =====
 
 // src/modules/BaseModule.js
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 
 class BaseModule {
@@ -31,18 +31,18 @@ class BaseModule {
 
     this.userStates = new Map();
 
-    Logger.debug(`📦 ${this.name} 생성됨`);
+    logger.debug(`📦 ${this.name} 생성됨`);
   }
 
   // 🔧 초기화
   async initialize() {
     if (this.isInitialized) {
-      Logger.debug(`${this.name} 이미 초기화됨, 스킵`);
+      logger.debug(`${this.name} 이미 초기화됨, 스킵`);
       return;
     }
 
     try {
-      Logger.info(`🔧 ${this.name} 초기화 중...`);
+      logger.info(`🔧 ${this.name} 초기화 중...`);
 
       // 1. 모듈별 초기화 (하위 클래스)
       if (typeof this.onInitialize === "function") {
@@ -53,10 +53,10 @@ class BaseModule {
       this.registerActions();
 
       this.isInitialized = true;
-      Logger.success(`✅ ${this.name} 초기화 완료`);
+      logger.success(`✅ ${this.name} 초기화 완료`);
     } catch (error) {
       this.stats.errorCount++;
-      Logger.error(`❌ ${this.name} 초기화 실패:`, error);
+      logger.error(`❌ ${this.name} 초기화 실패:`, error);
       throw error;
     }
   }
@@ -67,7 +67,7 @@ class BaseModule {
     this.actionMap.set("menu", this.showMenu.bind(this));
     this.actionMap.set("help", this.showHelp.bind(this));
 
-    Logger.debug(`🎯 ${this.name} 기본 액션 등록 완료`);
+    logger.debug(`🎯 ${this.name} 기본 액션 등록 완료`);
   }
 
   // ✅ 메시지 처리
@@ -120,7 +120,7 @@ class BaseModule {
       );
     } catch (error) {
       this.stats.errorCount++;
-      Logger.error(`❌ ${this.name} 콜백 처리 오류:`, error);
+      logger.error(`❌ ${this.name} 콜백 처리 오류:`, error);
       return false;
     }
   }
@@ -192,13 +192,13 @@ class BaseModule {
         await bot.sendMessage(chatId, text, options);
       }
     } catch (error) {
-      Logger.error(`${this.name} 메시지 전송 실패:`, error);
+      logger.error(`${this.name} 메시지 전송 실패:`, error);
       // 폴백: 새 메시지 전송
       if (messageId) {
         try {
           await bot.sendMessage(chatId, text, options);
         } catch (fallbackError) {
-          Logger.error(`${this.name} 폴백 메시지도 실패:`, fallbackError);
+          logger.error(`${this.name} 폴백 메시지도 실패:`, fallbackError);
         }
       }
     }
@@ -210,9 +210,9 @@ class BaseModule {
       this.userStates.clear();
       this.actionMap.clear();
       this.isInitialized = false;
-      Logger.success(`✅ ${this.name} 정리 완료`);
+      logger.success(`✅ ${this.name} 정리 완료`);
     } catch (error) {
-      Logger.error(`❌ ${this.name} 정리 실패:`, error);
+      logger.error(`❌ ${this.name} 정리 실패:`, error);
     }
   }
 }
@@ -222,7 +222,7 @@ module.exports = BaseModule;
 // ===== 2. ModuleManager.js - 안전한 모듈 로딩 =====
 
 // src/managers/ModuleManager.js
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const path = require("path");
 const fs = require("fs");
 
@@ -246,37 +246,37 @@ class ModuleManager {
       uniqueUsers: new Set(),
     };
 
-    Logger.info("🔧 ModuleManager 생성됨");
+    logger.info("🔧 ModuleManager 생성됨");
   }
 
   // =============== 초기화 ===============
 
   async initialize() {
     if (this.isInitialized) {
-      Logger.warn("ModuleManager 이미 초기화됨");
+      logger.warn("ModuleManager 이미 초기화됨");
       return;
     }
 
     try {
-      Logger.info("⚙️ ModuleManager 초기화 시작...");
+      logger.info("⚙️ ModuleManager 초기화 시작...");
 
       // 모듈 로드 및 초기화
       await this._loadModulesSafely();
       await this._initializeModules();
 
       this.isInitialized = true;
-      Logger.success(
+      logger.success(
         `✅ ModuleManager 초기화 완료 (${this.modules.size}개 모듈)`
       );
     } catch (error) {
-      Logger.error("❌ ModuleManager 초기화 실패:", error);
+      logger.error("❌ ModuleManager 초기화 실패:", error);
       throw error;
     }
   }
 
   // ✅ 안전한 모듈 로딩
   async _loadModulesSafely() {
-    Logger.info("📦 안전한 모듈 로드 시작...");
+    logger.info("📦 안전한 모듈 로드 시작...");
 
     // ✅ 하드코딩된 모듈 설정 (ModuleConfig 의존성 제거)
     const moduleConfigs = {
@@ -318,7 +318,7 @@ class ModuleManager {
     for (const [moduleName, config] of Object.entries(moduleConfigs)) {
       try {
         if (!config.enabled) {
-          Logger.debug(`⏭️ ${moduleName} 비활성화됨, 건너뛰기`);
+          logger.debug(`⏭️ ${moduleName} 비활성화됨, 건너뛰기`);
           continue;
         }
 
@@ -331,11 +331,11 @@ class ModuleManager {
         }
       } catch (error) {
         failedCount++;
-        Logger.error(`❌ ${moduleName} 로드 중 예외:`, error.message);
+        logger.error(`❌ ${moduleName} 로드 중 예외:`, error.message);
       }
     }
 
-    Logger.success(
+    logger.success(
       `📦 모듈 로드 완료: ${loadedCount}개 성공, ${failedCount}개 실패`
     );
 
@@ -352,7 +352,7 @@ class ModuleManager {
 
       // 파일 존재 확인
       if (!fs.existsSync(modulePath + ".js")) {
-        Logger.warn(`⚠️ ${moduleName} 파일이 존재하지 않음: ${modulePath}.js`);
+        logger.warn(`⚠️ ${moduleName} 파일이 존재하지 않음: ${modulePath}.js`);
         return false;
       }
 
@@ -360,7 +360,7 @@ class ModuleManager {
       const fullPath = require.resolve(modulePath);
       if (require.cache[fullPath]) {
         delete require.cache[fullPath];
-        Logger.debug(`🗑️ ${moduleName} 캐시 정리됨`);
+        logger.debug(`🗑️ ${moduleName} 캐시 정리됨`);
       }
 
       // 모듈 로드
@@ -381,10 +381,10 @@ class ModuleManager {
         loadTime: new Date(),
       });
 
-      Logger.debug(`✅ ${moduleName} 로드 완료`);
+      logger.debug(`✅ ${moduleName} 로드 완료`);
       return true;
     } catch (error) {
-      Logger.error(`❌ ${moduleName} 로드 실패:`, error.message);
+      logger.error(`❌ ${moduleName} 로드 실패:`, error.message);
 
       if (config.required) {
         throw new Error(`필수 모듈 ${moduleName} 로드 실패: ${error.message}`);
@@ -396,7 +396,7 @@ class ModuleManager {
 
   // ✅ 폴백 모듈 생성
   async _createFallbackModule() {
-    Logger.info("🆘 폴백 SystemModule 생성...");
+    logger.info("🆘 폴백 SystemModule 생성...");
 
     try {
       const FallbackSystemModule = class SystemModule {
@@ -410,7 +410,7 @@ class ModuleManager {
 
         async initialize() {
           this.isInitialized = true;
-          Logger.info("✅ 폴백 SystemModule 초기화 완료");
+          logger.info("✅ 폴백 SystemModule 초기화 완료");
         }
 
         async handleMessage() {
@@ -432,15 +432,15 @@ class ModuleManager {
         loadTime: new Date(),
       });
 
-      Logger.success("✅ 폴백 SystemModule 생성 완료");
+      logger.success("✅ 폴백 SystemModule 생성 완료");
     } catch (error) {
-      Logger.error("❌ 폴백 모듈 생성도 실패:", error);
+      logger.error("❌ 폴백 모듈 생성도 실패:", error);
     }
   }
 
   // ✅ 모듈 초기화
   async _initializeModules() {
-    Logger.info("🔧 모듈 초기화 시작...");
+    logger.info("🔧 모듈 초기화 시작...");
 
     let initializedCount = 0;
     let failedCount = 0;
@@ -453,11 +453,11 @@ class ModuleManager {
     for (const [moduleName, moduleData] of sortedModules) {
       try {
         if (!moduleData.isLoaded) {
-          Logger.debug(`⏭️ ${moduleName} 로드되지 않음, 건너뛰기`);
+          logger.debug(`⏭️ ${moduleName} 로드되지 않음, 건너뛰기`);
           continue;
         }
 
-        Logger.debug(`🔧 ${moduleName} 초기화 중...`);
+        logger.debug(`🔧 ${moduleName} 초기화 중...`);
 
         // ✅ 안전한 모듈 인스턴스 생성
         const moduleInstance = new moduleData.class(this.bot, {
@@ -475,10 +475,10 @@ class ModuleManager {
         this.moduleInstances.set(moduleName, moduleInstance);
 
         initializedCount++;
-        Logger.success(`✅ ${moduleName} 초기화 완료`);
+        logger.success(`✅ ${moduleName} 초기화 완료`);
       } catch (error) {
         failedCount++;
-        Logger.error(`❌ ${moduleName} 초기화 실패:`, error.message);
+        logger.error(`❌ ${moduleName} 초기화 실패:`, error.message);
 
         if (moduleData.config.required) {
           throw new Error(
@@ -488,7 +488,7 @@ class ModuleManager {
       }
     }
 
-    Logger.success(
+    logger.success(
       `🔧 모듈 초기화 완료: ${initializedCount}개 성공, ${failedCount}개 실패`
     );
   }
@@ -507,11 +507,11 @@ class ModuleManager {
           const handled = await moduleData.instance.handleMessage?.(bot, msg);
           if (handled) {
             this.globalStats.successfulMessages++;
-            Logger.debug(`📨 메시지 처리 완료: ${moduleName}`);
+            logger.debug(`📨 메시지 처리 완료: ${moduleName}`);
             return true;
           }
         } catch (error) {
-          Logger.error(`❌ ${moduleName} 메시지 처리 오류:`, error);
+          logger.error(`❌ ${moduleName} 메시지 처리 오류:`, error);
           this.globalStats.moduleErrors.set(
             moduleName,
             (this.globalStats.moduleErrors.get(moduleName) || 0) + 1
@@ -519,10 +519,10 @@ class ModuleManager {
         }
       }
 
-      Logger.debug("📨 처리되지 않은 메시지");
+      logger.debug("📨 처리되지 않은 메시지");
       return false;
     } catch (error) {
-      Logger.error("❌ 메시지 라우팅 오류:", error);
+      logger.error("❌ 메시지 라우팅 오류:", error);
       return false;
     }
   }
@@ -536,20 +536,20 @@ class ModuleManager {
       try {
         await bot.answerCallbackQuery(callbackQuery.id);
       } catch (answerError) {
-        Logger.debug("콜백 응답 실패 (무시됨):", answerError.message);
+        logger.debug("콜백 응답 실패 (무시됨):", answerError.message);
       }
 
       // 콜백 데이터 파싱
       const routeInfo = this._parseCallbackData(callbackQuery.data);
       if (!routeInfo) {
-        Logger.debug("콜백 파싱 실패:", callbackQuery.data);
+        logger.debug("콜백 파싱 실패:", callbackQuery.data);
         return false;
       }
 
       // 모듈로 라우팅
       return await this._routeToModule(bot, callbackQuery, routeInfo);
     } catch (error) {
-      Logger.error("❌ 콜백 라우팅 오류:", error);
+      logger.error("❌ 콜백 라우팅 오류:", error);
       return false;
     }
   }
@@ -593,14 +593,14 @@ class ModuleManager {
     const { moduleName, action } = routeInfo;
 
     if (!this.modules.has(moduleName)) {
-      Logger.warn(`모듈을 찾을 수 없음: ${moduleName}`);
+      logger.warn(`모듈을 찾을 수 없음: ${moduleName}`);
       return false;
     }
 
     const moduleData = this.modules.get(moduleName);
 
     if (!moduleData.isInitialized || !moduleData.instance) {
-      Logger.warn(`모듈이 초기화되지 않음: ${moduleName}`);
+      logger.warn(`모듈이 초기화되지 않음: ${moduleName}`);
       return false;
     }
 
@@ -616,15 +616,15 @@ class ModuleManager {
 
         if (handled) {
           this.globalStats.successfulCallbacks++;
-          Logger.debug(`✅ 콜백 처리 성공: ${moduleName}.${action}`);
+          logger.debug(`✅ 콜백 처리 성공: ${moduleName}.${action}`);
           return true;
         }
       }
 
-      Logger.debug(`⚠️ 콜백 처리 거부: ${moduleName}.${action}`);
+      logger.debug(`⚠️ 콜백 처리 거부: ${moduleName}.${action}`);
       return false;
     } catch (error) {
-      Logger.error(`❌ ${moduleName} 콜백 처리 오류:`, error);
+      logger.error(`❌ ${moduleName} 콜백 처리 오류:`, error);
       this.globalStats.moduleErrors.set(
         moduleName,
         (this.globalStats.moduleErrors.get(moduleName) || 0) + 1
@@ -636,7 +636,7 @@ class ModuleManager {
   // =============== 정리 작업 ===============
 
   async cleanup() {
-    Logger.info("🧹 ModuleManager 정리 작업 시작");
+    logger.info("🧹 ModuleManager 정리 작업 시작");
 
     try {
       for (const [moduleName, moduleData] of this.modules.entries()) {
@@ -648,13 +648,13 @@ class ModuleManager {
             await moduleData.instance.cleanup();
           }
         } catch (error) {
-          Logger.error(`❌ 모듈 ${moduleName} 정리 오류:`, error);
+          logger.error(`❌ 모듈 ${moduleName} 정리 오류:`, error);
         }
       }
 
-      Logger.success("✅ ModuleManager 정리 완료");
+      logger.success("✅ ModuleManager 정리 완료");
     } catch (error) {
-      Logger.error("❌ ModuleManager 정리 중 오류:", error);
+      logger.error("❌ ModuleManager 정리 중 오류:", error);
     }
   }
 }

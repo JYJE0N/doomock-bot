@@ -1,6 +1,6 @@
 // src/utils/ErrorHandler.js - 표준화된 클래스 기반 에러 핸들러 (v3 리팩토링)
 
-const Logger = require("./Logger");
+const logger = require("./Logger");
 
 class ErrorHandler {
   constructor(config = {}) {
@@ -31,7 +31,7 @@ class ErrorHandler {
       ...config,
     };
 
-    Logger.info(`🛡️ ErrorHandler 인스턴스 초기화됨 (${this.instanceId})`);
+    logger.info(`🛡️ ErrorHandler 인스턴스 초기화됨 (${this.instanceId})`);
   }
 
   // 🚨 메인 에러 처리
@@ -48,7 +48,7 @@ class ErrorHandler {
           (this.errorStats.byModule[context.module] || 0) + 1;
       }
 
-      Logger.error(`🚨 에러 발생 (${errorType}):`, error.message);
+      logger.error(`🚨 에러 발생 (${errorType}):`, error.message);
 
       // 에러 유형별 처리
       const result = await this.processErrorByType(error, context);
@@ -62,7 +62,7 @@ class ErrorHandler {
 
       return result;
     } catch (handlerError) {
-      Logger.error("❌ ErrorHandler 내부 오류:", handlerError);
+      logger.error("❌ ErrorHandler 내부 오류:", handlerError);
       return { resolved: false, message: "에러 처리 중 문제가 발생했습니다." };
     }
   }
@@ -89,12 +89,12 @@ class ErrorHandler {
   // 📱 텔레그램 에러 처리
   async handleTelegramError(error, context) {
     if (error.response?.body?.error_code === 409) {
-      Logger.warn("🔄 409 충돌 감지 - 폴링 재시작 시도");
+      logger.warn("🔄 409 충돌 감지 - 폴링 재시작 시도");
       return { resolved: true, message: "텔레그램 충돌이 해결되었습니다." };
     }
 
     if (error.response?.body?.error_code === 429) {
-      Logger.warn("⏳ 429 Rate Limit - 잠시 대기");
+      logger.warn("⏳ 429 Rate Limit - 잠시 대기");
       await this.sleep(5000);
       return { resolved: true, message: "요청 제한으로 잠시 대기했습니다." };
     }
@@ -104,14 +104,14 @@ class ErrorHandler {
 
   // 🗄️ 데이터베이스 에러 처리
   async handleDatabaseError(error, context) {
-    Logger.error("🔌 데이터베이스 연결 오류:", error.message);
+    logger.error("🔌 데이터베이스 연결 오류:", error.message);
 
     try {
       const { mongoPoolManager } = require("../database/MongoPoolManager");
       await mongoPoolManager.reconnect();
       return { resolved: true, message: "데이터베이스 연결이 복구되었습니다." };
     } catch (reconnectError) {
-      Logger.error("❌ 데이터베이스 재연결 실패:", reconnectError);
+      logger.error("❌ 데이터베이스 재연결 실패:", reconnectError);
       return {
         resolved: false,
         message: "데이터베이스 연결에 문제가 있습니다.",
@@ -121,7 +121,7 @@ class ErrorHandler {
 
   // 📝 검증 에러 처리
   async handleValidationError(error, context) {
-    Logger.warn("📝 입력 검증 오료:", error.message);
+    logger.warn("📝 입력 검증 오료:", error.message);
     return {
       resolved: true,
       message: `입력 오류: ${error.message}`,
@@ -130,7 +130,7 @@ class ErrorHandler {
 
   // ⏰ 타임아웃 에러 처리
   async handleTimeoutError(error, context) {
-    Logger.warn("⏰ 요청 타임아웃:", error.message);
+    logger.warn("⏰ 요청 타임아웃:", error.message);
     return {
       resolved: true,
       message: "요청 시간이 초과되었습니다. 다시 시도해주세요.",
@@ -139,7 +139,7 @@ class ErrorHandler {
 
   // 🔧 일반 에러 처리
   async handleGenericError(error, context) {
-    Logger.error("🚨 일반 에러:", error);
+    logger.error("🚨 일반 에러:", error);
     return {
       resolved: false,
       message: "예상치 못한 오류가 발생했습니다.",
@@ -152,7 +152,7 @@ class ErrorHandler {
     this.healthStatus.issues.push(`크리티컬 에러: ${error.message}`);
     this.healthStatus.lastUpdate = new Date();
 
-    Logger.error("🚨 크리티컬 에러 감지:", error);
+    logger.error("🚨 크리티컬 에러 감지:", error);
 
     // Railway 관리자에게 알림
     await this.triggerAlert("critical_error", {
@@ -169,9 +169,9 @@ class ErrorHandler {
 
     try {
       const alertMessage = this.formatAlertMessage(type, data);
-      Logger.info("📢 관리자 알림:", alertMessage);
+      logger.info("📢 관리자 알림:", alertMessage);
     } catch (error) {
-      Logger.error("📢 알림 전송 실패:", error);
+      logger.error("📢 알림 전송 실패:", error);
     }
   }
 
@@ -235,7 +235,7 @@ class ErrorHandler {
 
   // 🧹 정리 작업
   cleanup() {
-    Logger.info(`🧹 ErrorHandler 정리 작업 (${this.instanceId})`);
+    logger.info(`🧹 ErrorHandler 정리 작업 (${this.instanceId})`);
     // 통계 초기화 등 필요한 정리 작업
     this.errorStats = {
       total: 0,

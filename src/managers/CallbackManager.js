@@ -1,6 +1,6 @@
 // src/managers/CallbackManager.js - 완전한 라우팅 시스템 (참고용)
 
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class CallbackManager {
   constructor(bot, modules) {
@@ -10,12 +10,12 @@ class CallbackManager {
 
     this.initializeRoutes();
 
-    Logger.info(
+    logger.info(
       `📞 CallbackManager 초기화됨. 모듈 수: ${
         Object.keys(this.modules).length
       }`
     );
-    Logger.info(`📋 등록된 라우팅 수: ${this.routes.size}개`);
+    logger.info(`📋 등록된 라우팅 수: ${this.routes.size}개`);
   }
 
   initializeRoutes() {
@@ -49,7 +49,7 @@ class CallbackManager {
     // 🕐 근무시간 라우팅
     this.addWorktimeRoutes();
 
-    Logger.info(`✅ 모든 라우팅 등록 완료: ${this.routes.size}개`);
+    logger.info(`✅ 모든 라우팅 등록 완료: ${this.routes.size}개`);
   }
 
   // 🏠 시스템 라우팅
@@ -64,7 +64,7 @@ class CallbackManager {
       this.routes.set(route, { module, method });
     });
 
-    Logger.debug(`🏠 시스템 라우팅 ${systemRoutes.length}개 등록`);
+    logger.debug(`🏠 시스템 라우팅 ${systemRoutes.length}개 등록`);
   }
 
   // 📝 할일 관리 라우팅 - 완전한 버전
@@ -85,7 +85,7 @@ class CallbackManager {
       this.routes.set(`todo_${action}`, { module: "todo", method: action });
     });
 
-    Logger.debug(`📝 할일 라우팅 ${todoActions.length}개 등록`);
+    logger.debug(`📝 할일 라우팅 ${todoActions.length}개 등록`);
   }
 
   // 🔮 운세 라우팅
@@ -113,7 +113,7 @@ class CallbackManager {
       });
     });
 
-    Logger.debug(`🔮 운세 라우팅 ${fortuneActions.length}개 등록`);
+    logger.debug(`🔮 운세 라우팅 ${fortuneActions.length}개 등록`);
   }
 
   // 🌤️ 날씨 라우팅
@@ -135,7 +135,7 @@ class CallbackManager {
       });
     });
 
-    Logger.debug(`🌤️ 날씨 라우팅 ${weatherActions.length}개 등록`);
+    logger.debug(`🌤️ 날씨 라우팅 ${weatherActions.length}개 등록`);
   }
 
   // ⏰ 타이머 라우팅
@@ -156,7 +156,7 @@ class CallbackManager {
       });
     });
 
-    Logger.debug(`⏰ 타이머 라우팅 ${timerActions.length}개 등록`);
+    logger.debug(`⏰ 타이머 라우팅 ${timerActions.length}개 등록`);
   }
 
   // 📅 휴가 관리 라우팅
@@ -176,7 +176,7 @@ class CallbackManager {
       });
     });
 
-    Logger.debug(`📅 휴가 라우팅 ${leaveActions.length}개 등록`);
+    logger.debug(`📅 휴가 라우팅 ${leaveActions.length}개 등록`);
   }
 
   // 📊 인사이트 라우팅
@@ -195,7 +195,7 @@ class CallbackManager {
       });
     });
 
-    Logger.debug(`📊 인사이트 라우팅 ${insightActions.length}개 등록`);
+    logger.debug(`📊 인사이트 라우팅 ${insightActions.length}개 등록`);
   }
 
   // 🛠️ 유틸리티 라우팅
@@ -214,7 +214,7 @@ class CallbackManager {
       });
     });
 
-    Logger.debug(`🛠️ 유틸리티 라우팅 ${utilsActions.length}개 등록`);
+    logger.debug(`🛠️ 유틸리티 라우팅 ${utilsActions.length}개 등록`);
   }
 
   // 🔔 리마인더 라우팅
@@ -241,7 +241,7 @@ class CallbackManager {
     this.routes.set("remind_time", { module: "reminder", method: "time" });
     this.routes.set("remind_help", { module: "reminder", method: "help" });
 
-    Logger.debug(`🔔 리마인더 라우팅 ${reminderActions.length + 3}개 등록`);
+    logger.debug(`🔔 리마인더 라우팅 ${reminderActions.length + 3}개 등록`);
   }
 
   // 🕐 근무시간 라우팅
@@ -262,7 +262,7 @@ class CallbackManager {
       });
     });
 
-    Logger.debug(`🕐 근무시간 라우팅 ${worktimeActions.length}개 등록`);
+    logger.debug(`🕐 근무시간 라우팅 ${worktimeActions.length}개 등록`);
   }
 
   // 📞 콜백 처리 (현재는 ModuleManager가 직접 처리하므로 참고용)
@@ -270,28 +270,28 @@ class CallbackManager {
     const data = callbackQuery.data;
     const chatId = callbackQuery.message.chat.id;
 
-    Logger.info(`📞 콜백 수신: ${data}`);
+    logger.info(`📞 콜백 수신: ${data}`);
 
     try {
       await this.bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
-      Logger.error("콜백 응답 실패:", error);
+      logger.error("콜백 응답 실패:", error);
     }
 
     try {
       const route = this.routes.get(data);
 
       if (route) {
-        Logger.info(
+        logger.info(
           `✅ 라우팅 발견: ${data} → ${route.module}.${route.method}`
         );
         await this.executeRoute(route, callbackQuery);
       } else {
-        Logger.warn(`❌ 라우팅 없음: ${data}`);
+        logger.warn(`❌ 라우팅 없음: ${data}`);
         await this.handleUnknownCallback(callbackQuery);
       }
     } catch (error) {
-      Logger.error("콜백 처리 오류:", error);
+      logger.error("콜백 처리 오류:", error);
       await this.sendErrorMessage(chatId);
     }
   }
@@ -307,7 +307,7 @@ class CallbackManager {
     // 모듈 처리
     const module = this.modules[moduleName];
     if (!module) {
-      Logger.error(`❌ 모듈 없음: ${moduleName}`);
+      logger.error(`❌ 모듈 없음: ${moduleName}`);
       return await this.handleUnknownCallback(callbackQuery);
     }
 
@@ -327,11 +327,11 @@ class CallbackManager {
           menuManager
         );
       } else {
-        Logger.error(`❌ 모듈 ${moduleName}에 handleCallback 메서드 없음`);
+        logger.error(`❌ 모듈 ${moduleName}에 handleCallback 메서드 없음`);
         await this.handleUnknownCallback(callbackQuery);
       }
     } catch (error) {
-      Logger.error(`❌ 모듈 ${moduleName} 실행 오류:`, error);
+      logger.error(`❌ 모듈 ${moduleName} 실행 오류:`, error);
       await this.sendErrorMessage(callbackQuery.message.chat.id);
     }
   }
@@ -423,7 +423,7 @@ class CallbackManager {
         }
       );
     } catch (error) {
-      Logger.error("알 수 없는 콜백 처리 실패:", error);
+      logger.error("알 수 없는 콜백 처리 실패:", error);
     }
   }
 
@@ -441,7 +441,7 @@ class CallbackManager {
         }
       );
     } catch (error) {
-      Logger.error("에러 메시지 전송 실패:", error);
+      logger.error("에러 메시지 전송 실패:", error);
     }
   }
 }

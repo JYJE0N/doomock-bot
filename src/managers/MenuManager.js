@@ -1,4 +1,4 @@
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const MenuConfig = require("../config/MenuConfig");
 const AppConfig = require("../config/AppConfig");
 const { getUserName } = require("../utils/UserHelper");
@@ -8,7 +8,7 @@ class MenuManager {
     this.moduleManager = null;
     this.menuCache = new Map();
     this.cacheTimeout = 5 * 60 * 1000;
-    Logger.info("📋 MenuManager 초기화됨");
+    logger.info("📋 MenuManager 초기화됨");
 
     // 🔧 static 대신 인스턴스 프로퍼티로 변경
     this.moduleMapping = {
@@ -26,7 +26,7 @@ class MenuManager {
 
   setModuleManager(moduleManager) {
     this.moduleManager = moduleManager;
-    Logger.info("📋 MenuManager에 ModuleManager 연결됨");
+    logger.info("📋 MenuManager에 ModuleManager 연결됨");
   }
 
   setDependencies(dependencies) {
@@ -39,7 +39,7 @@ class MenuManager {
   async getMainMenuKeyboard() {
     try {
       if (!this.moduleManager) {
-        Logger.warn(
+        logger.warn(
           "MenuManager: ModuleManager가 설정되지 않음. 기본 메뉴 반환"
         );
         return this.getDefaultKeyboard();
@@ -47,7 +47,7 @@ class MenuManager {
       const menuItems = this.buildMainMenuItemsSync();
       return this.createKeyboardLayout(menuItems, { columns: 2 });
     } catch (error) {
-      Logger.error("메인 메뉴 키보드 생성 실패:", error);
+      logger.error("메인 메뉴 키보드 생성 실패:", error);
       return this.getDefaultKeyboard();
     }
   }

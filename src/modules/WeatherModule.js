@@ -3,7 +3,7 @@
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
 const WeatherService = require("../services/WeatherService"); // ✅ 수정: 구조 분해 할당 제거
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class WeatherModule extends BaseModule {
   constructor() {
@@ -23,9 +23,9 @@ class WeatherModule extends BaseModule {
     // ✅ 수정: WeatherService 클래스로 직접 인스턴스화
     try {
       this.weatherService = new WeatherService();
-      Logger.info("🌤️ WeatherService 초기화 성공");
+      logger.info("🌤️ WeatherService 초기화 성공");
     } catch (error) {
-      Logger.error("❌ WeatherService 초기화 실패:", error);
+      logger.error("❌ WeatherService 초기화 실패:", error);
       this.weatherService = null;
     }
   }
@@ -84,7 +84,7 @@ class WeatherModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`WeatherModule showCurrentWeather 오류:`, error);
+      logger.error(`WeatherModule showCurrentWeather 오류:`, error);
       await this.showFallbackWeather(bot, chatId, messageId, "현재 날씨");
     }
   }
@@ -103,7 +103,7 @@ class WeatherModule extends BaseModule {
 
       this.updateStats("callback");
     } catch (error) {
-      Logger.error(`WeatherModule showForecast 오류:`, error);
+      logger.error(`WeatherModule showForecast 오류:`, error);
       await this.showFallbackWeather(bot, chatId, messageId, "날씨 예보");
     }
   }
@@ -113,7 +113,7 @@ class WeatherModule extends BaseModule {
   async getWeatherData(city) {
     try {
       if (!this.weatherService) {
-        Logger.warn("WeatherService가 없어서 기본값 사용");
+        logger.warn("WeatherService가 없어서 기본값 사용");
         return this.getDefaultWeatherData(city);
       }
 
@@ -123,11 +123,11 @@ class WeatherModule extends BaseModule {
       if (result.success) {
         return result.data;
       } else {
-        Logger.warn(`실제 날씨 API 호출 실패: ${result.error}`);
+        logger.warn(`실제 날씨 API 호출 실패: ${result.error}`);
         return result.data || this.getDefaultWeatherData(city);
       }
     } catch (error) {
-      Logger.warn(`날씨 데이터 조회 실패, 기본값 사용: ${error.message}`);
+      logger.warn(`날씨 데이터 조회 실패, 기본값 사용: ${error.message}`);
       return this.getDefaultWeatherData(city);
     }
   }
@@ -135,7 +135,7 @@ class WeatherModule extends BaseModule {
   async getForecastData(city) {
     try {
       if (!this.weatherService) {
-        Logger.warn("WeatherService가 없어서 기본 예보 사용");
+        logger.warn("WeatherService가 없어서 기본 예보 사용");
         return this.getDefaultForecastData(city);
       }
 
@@ -144,11 +144,11 @@ class WeatherModule extends BaseModule {
       if (result.success) {
         return result.data;
       } else {
-        Logger.warn(`예보 API 호출 실패: ${result.error}`);
+        logger.warn(`예보 API 호출 실패: ${result.error}`);
         return result.data || this.getDefaultForecastData(city);
       }
     } catch (error) {
-      Logger.warn(`예보 데이터 조회 실패, 기본값 사용: ${error.message}`);
+      logger.warn(`예보 데이터 조회 실패, 기본값 사용: ${error.message}`);
       return this.getDefaultForecastData(city);
     }
   }
@@ -204,7 +204,7 @@ class WeatherModule extends BaseModule {
   async getWeatherData(city) {
     try {
       if (!this.weatherService) {
-        Logger.warn("WeatherService가 없어서 기본값 사용");
+        logger.warn("WeatherService가 없어서 기본값 사용");
         return this.getDefaultWeatherData(city);
       }
 
@@ -213,11 +213,11 @@ class WeatherModule extends BaseModule {
       if (result.success) {
         return result.data;
       } else {
-        Logger.warn(`실제 날씨 API 호출 실패: ${result.error}`);
+        logger.warn(`실제 날씨 API 호출 실패: ${result.error}`);
         return result.data || this.getDefaultWeatherData(city);
       }
     } catch (error) {
-      Logger.warn(`날씨 데이터 조회 실패, 기본값 사용: ${error.message}`);
+      logger.warn(`날씨 데이터 조회 실패, 기본값 사용: ${error.message}`);
       return this.getDefaultWeatherData(city);
     }
   }
@@ -236,7 +236,7 @@ class WeatherModule extends BaseModule {
         return result.data || this.getDefaultForecastData(city);
       }
     } catch (error) {
-      Logger.warn(`예보 데이터 조회 실패, 기본값 사용: ${error.message}`);
+      logger.warn(`예보 데이터 조회 실패, 기본값 사용: ${error.message}`);
       return this.getDefaultForecastData(city);
     }
   }
@@ -363,7 +363,7 @@ class WeatherModule extends BaseModule {
         reply_markup: this.getWeatherMenuKeyboard(),
       });
     } catch (error) {
-      Logger.error("현재 날씨 표시 오류:", error);
+      logger.error("현재 날씨 표시 오류:", error);
       await this.showFallbackWeather(bot, chatId, messageId, "현재 날씨");
     }
   }
@@ -379,7 +379,7 @@ class WeatherModule extends BaseModule {
         reply_markup: this.getWeatherMenuKeyboard(),
       });
     } catch (error) {
-      Logger.error("날씨 예보 표시 오류:", error);
+      logger.error("날씨 예보 표시 오류:", error);
       await this.showFallbackWeather(bot, chatId, messageId, "날씨 예보");
     }
   }
@@ -405,7 +405,7 @@ class WeatherModule extends BaseModule {
         },
       });
     } catch (error) {
-      Logger.error("서울 날씨 표시 오류:", error);
+      logger.error("서울 날씨 표시 오류:", error);
       await this.showFallbackWeather(bot, chatId, messageId, "서울 날씨");
     }
   }
@@ -431,7 +431,7 @@ class WeatherModule extends BaseModule {
         },
       });
     } catch (error) {
-      Logger.error("부산 날씨 표시 오류:", error);
+      logger.error("부산 날씨 표시 오류:", error);
       await this.showFallbackWeather(bot, chatId, messageId, "부산 날씨");
     }
   }
@@ -477,7 +477,7 @@ class WeatherModule extends BaseModule {
           const icon = this.getCityIcon(city);
           quickText += `${icon} **${city}**: ${data.icon} ${data.temp}°C ${data.desc}\n`;
         } catch (error) {
-          Logger.warn(`${city} 날씨 조회 실패:`, error.message);
+          logger.warn(`${city} 날씨 조회 실패:`, error.message);
           quickText += `${this.getCityIcon(city)} **${city}**: 정보 없음\n`;
         }
       }
@@ -496,7 +496,7 @@ class WeatherModule extends BaseModule {
         },
       });
     } catch (error) {
-      Logger.error("빠른 날씨 표시 오류:", error);
+      logger.error("빠른 날씨 표시 오류:", error);
       await this.showFallbackWeather(bot, chatId, messageId, "빠른 날씨");
     }
   }
@@ -591,7 +591,7 @@ class WeatherModule extends BaseModule {
       this.updateStats("callback");
       return true;
     } catch (error) {
-      Logger.error(`WeatherModule 콜백 오류 (${subAction}):`, error);
+      logger.error(`WeatherModule 콜백 오류 (${subAction}):`, error);
       await this.showFallbackWeather(bot, chatId, messageId, "날씨 정보");
       return false;
     }
@@ -627,13 +627,13 @@ class WeatherModule extends BaseModule {
     try {
       // WeatherService가 없어도 기본 기능은 제공
       if (!this.weatherService) {
-        Logger.warn("⚠️ WeatherService가 없지만 기본 날씨 기능은 제공합니다.");
+        logger.warn("⚠️ WeatherService가 없지만 기본 날씨 기능은 제공합니다.");
       }
 
       await super.initialize();
-      Logger.success("✅ WeatherModule 초기화 완료");
+      logger.success("✅ WeatherModule 초기화 완료");
     } catch (error) {
-      Logger.error("❌ WeatherModule 초기화 실패:", error);
+      logger.error("❌ WeatherModule 초기화 실패:", error);
       throw error;
     }
   }

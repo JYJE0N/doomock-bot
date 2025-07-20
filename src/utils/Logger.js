@@ -1,4 +1,4 @@
-// src/utils/Logger.js - 무한 재귀 완전 방지 + 안전한 싱글톤
+// src/utils/logger.js - 무한 재귀 완전 방지 + 안전한 싱글톤
 
 // 🚨 최우선: 순환참조 방지를 위한 전역 플래그
 if (global._LOGGER_INITIALIZING) {
@@ -22,9 +22,9 @@ global._LOGGER_INITIALIZING = true;
 class Logger {
   constructor() {
     // ✅ 중복 초기화 완전 차단
-    if (Logger._instance) {
+    if (logger._instance) {
       global._LOGGER_INITIALIZING = false;
-      return Logger._instance;
+      return logger._instance;
     }
 
     // ✅ 초기화 상태 추적
@@ -88,7 +88,7 @@ class Logger {
     ];
 
     // ✅ 싱글톤 저장
-    Logger._instance = this;
+    logger._instance = this;
     this._isInitializing = false;
     this._isFullyInitialized = true;
 
@@ -403,15 +403,15 @@ try {
 
 // ✅ 정적 메서드도 안전하게 주석처리
 // try {
-//   Logger.info = (...args) => loggerInstance.info(...args);
-//   Logger.error = (...args) => loggerInstance.error(...args);
-//   Logger.warn = (...args) => loggerInstance.warn(...args);
-//   Logger.debug = (...args) => loggerInstance.debug(...args);
-//   Logger.trace = (...args) => loggerInstance.trace(...args);
-//   Logger.success = (...args) => loggerInstance.success(...args);
-//   Logger.setLevel = (level) => loggerInstance.setLevel(level);
-//   Logger.logTimeInfo = () => loggerInstance.logTimeInfo();
-//   Logger.getStatus = () => loggerInstance.getStatus();
+//   logger.info = (...args) => loggerInstance.info(...args);
+//   logger.error = (...args) => loggerInstance.error(...args);
+//   logger.warn = (...args) => loggerInstance.warn(...args);
+//   logger.debug = (...args) => loggerInstance.debug(...args);
+//   logger.trace = (...args) => loggerInstance.trace(...args);
+//   logger.success = (...args) => loggerInstance.success(...args);
+//   logger.setLevel = (level) => loggerInstance.setLevel(level);
+//   logger.logTimeInfo = () => loggerInstance.logTimeInfo();
+//   logger.getStatus = () => loggerInstance.getStatus();
 // } catch (error) {
 //   console.error("🚨 Logger 정적 메서드 설정 실패:", error.message);
 // }

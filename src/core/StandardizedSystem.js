@@ -1,6 +1,6 @@
 // src/core/StandardizedSystem.js - 매개변수 통일 + 중복 방지 핵심 시스템
 
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const { TimeHelper } = require("../utils/TimeHelper");
 
 /**
@@ -43,7 +43,7 @@ class DuplicationPreventer {
 
       if (elapsed < this.maxTimeout) {
         if (this.debugMode) {
-          Logger.warn(
+          logger.warn(
             `🚫 중복 호출 차단: ${operationId} (${elapsed}ms 진행 중)`,
             context
           );
@@ -51,7 +51,7 @@ class DuplicationPreventer {
         return false; // 중복 호출 차단
       } else {
         // 타임아웃된 작업 정리
-        Logger.warn(`⏰ 타임아웃된 작업 정리: ${operationId} (${elapsed}ms)`);
+        logger.warn(`⏰ 타임아웃된 작업 정리: ${operationId} (${elapsed}ms)`);
         this.endOperation(operationId);
       }
     }
@@ -61,14 +61,14 @@ class DuplicationPreventer {
 
     // 자동 타임아웃 설정
     const timeoutId = setTimeout(() => {
-      Logger.warn(`⏰ 작업 타임아웃: ${operationId}`);
+      logger.warn(`⏰ 작업 타임아웃: ${operationId}`);
       this.endOperation(operationId);
     }, this.maxTimeout);
 
     this.operationTimeouts.set(operationId, timeoutId);
 
     if (this.debugMode) {
-      Logger.debug(`✅ 작업 시작: ${operationId}`, context);
+      logger.debug(`✅ 작업 시작: ${operationId}`, context);
     }
 
     return true; // 진행 허가
@@ -90,7 +90,7 @@ class DuplicationPreventer {
       }
 
       if (this.debugMode) {
-        Logger.debug(`✅ 작업 완료: ${operationId} (${duration}ms)`);
+        logger.debug(`✅ 작업 완료: ${operationId} (${duration}ms)`);
       }
     }
   }
@@ -123,7 +123,7 @@ class DuplicationPreventer {
     this.activeOperations.clear();
     this.operationTimeouts.clear();
 
-    Logger.info("🧹 DuplicationPreventer 정리 완료");
+    logger.info("🧹 DuplicationPreventer 정리 완료");
   }
 }
 
@@ -282,20 +282,20 @@ class StandardizedBaseModule {
     // 🔄 초기화 상태
     this.isInitialized = false;
 
-    Logger.info(`🎯 ${moduleName} 표준화 모듈 생성됨`);
+    logger.info(`🎯 ${moduleName} 표준화 모듈 생성됨`);
   }
 
   // ✅ 표준 초기화
   async initialize() {
     if (this.isInitialized) {
-      Logger.warn(`${this.moduleName} 이미 초기화됨`);
+      logger.warn(`${this.moduleName} 이미 초기화됨`);
       return;
     }
 
     try {
       // 시간 정보 로깅
       if (process.env.NODE_ENV === "development") {
-        Logger.debug(
+        logger.debug(
           `${this.moduleName} 시간 정보:`,
           this.timeManager.getDebugTimeInfo()
         );
@@ -304,9 +304,9 @@ class StandardizedBaseModule {
       this.isInitialized = true;
       this.stats.lastActivity = this.timeManager.getKoreanTimeString();
 
-      Logger.success(`✅ ${this.moduleName} 표준 초기화 완료`);
+      logger.success(`✅ ${this.moduleName} 표준 초기화 완료`);
     } catch (error) {
-      Logger.error(`❌ ${this.moduleName} 초기화 실패:`, error);
+      logger.error(`❌ ${this.moduleName} 초기화 실패:`, error);
       throw error;
     }
   }
@@ -344,7 +344,7 @@ class StandardizedBaseModule {
       return result;
     } catch (error) {
       this.stats.errorCount++;
-      Logger.error(`❌ ${this.moduleName} 메시지 처리 오류:`, error);
+      logger.error(`❌ ${this.moduleName} 메시지 처리 오류:`, error);
       throw error;
     } finally {
       // 🔓 작업 완료
@@ -397,7 +397,7 @@ class StandardizedBaseModule {
       return result;
     } catch (error) {
       this.stats.errorCount++;
-      Logger.error(`❌ ${this.moduleName} 콜백 처리 오류:`, error);
+      logger.error(`❌ ${this.moduleName} 콜백 처리 오류:`, error);
       throw error;
     } finally {
       // 🔓 작업 완료
@@ -436,9 +436,9 @@ class StandardizedBaseModule {
   async cleanup() {
     try {
       this.duplicationPreventer.cleanup();
-      Logger.info(`🧹 ${this.moduleName} 정리 완료`);
+      logger.info(`🧹 ${this.moduleName} 정리 완료`);
     } catch (error) {
-      Logger.error(`❌ ${this.moduleName} 정리 중 오류:`, error);
+      logger.error(`❌ ${this.moduleName} 정리 중 오류:`, error);
     }
   }
 }

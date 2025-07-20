@@ -1,7 +1,7 @@
 // src/config/BotCommandsRegistry.js - BotFather 명령어 표준 레지스트리
 // Railway 환경 v3.0.1 리팩토링 표준
 
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class BotCommandsRegistry {
   constructor() {
@@ -10,7 +10,7 @@ class BotCommandsRegistry {
     this.adminCommands = new Map();
 
     this.setupStandardCommands();
-    Logger.info("📋 BotCommandsRegistry 초기화 완료");
+    logger.info("📋 BotCommandsRegistry 초기화 완료");
   }
 
   // 🏛️ 표준 명령어 설정 (BotFather setCommands용)
@@ -283,14 +283,14 @@ class BotCommandsRegistry {
 
       await bot.setMyCommands(commands);
 
-      Logger.success(`✅ BotFather 명령어 ${commands.length}개 등록 완료:`);
+      logger.success(`✅ BotFather 명령어 ${commands.length}개 등록 완료:`);
       commands.forEach((cmd) => {
-        Logger.info(`   /${cmd.command} - ${cmd.description}`);
+        logger.info(`   /${cmd.command} - ${cmd.description}`);
       });
 
       return true;
     } catch (error) {
-      Logger.error("❌ BotFather 명령어 등록 실패:", error);
+      logger.error("❌ BotFather 명령어 등록 실패:", error);
       return false;
     }
   }
@@ -298,7 +298,7 @@ class BotCommandsRegistry {
   // 🔄 명령어 동적 추가 (런타임 확장용)
   addModuleCommand(commandName, config) {
     if (this.moduleCommands.has(commandName)) {
-      Logger.warn(`⚠️ 명령어 ${commandName} 이미 존재함, 덮어쓰기`);
+      logger.warn(`⚠️ 명령어 ${commandName} 이미 존재함, 덮어쓰기`);
     }
 
     // 표준 매개변수 강제 적용
@@ -309,14 +309,14 @@ class BotCommandsRegistry {
     };
 
     this.moduleCommands.set(commandName, standardizedConfig);
-    Logger.info(`✅ 모듈 명령어 /${commandName} 추가됨`);
+    logger.info(`✅ 모듈 명령어 /${commandName} 추가됨`);
   }
 
   // 🗑️ 명령어 제거
   removeModuleCommand(commandName) {
     if (this.moduleCommands.has(commandName)) {
       this.moduleCommands.delete(commandName);
-      Logger.info(`🗑️ 모듈 명령어 /${commandName} 제거됨`);
+      logger.info(`🗑️ 모듈 명령어 /${commandName} 제거됨`);
       return true;
     }
     return false;

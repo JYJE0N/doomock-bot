@@ -4,7 +4,7 @@ const {
   ensureConnection,
   getCollection,
 } = require("../database/DatabaseManager");
-const Logger = require("../utils/Logger");
+const logger = require("../utils/Logger");
 
 class TodoService {
   constructor() {
@@ -26,7 +26,7 @@ class TodoService {
 
   async initialize() {
     try {
-      Logger.info("📋 TodoService 초기화 시작...");
+      logger.info("📋 TodoService 초기화 시작...");
 
       // ⭐ 데이터베이스 연결 시도
       if (this.config.enableDatabase) {
@@ -34,11 +34,11 @@ class TodoService {
           await this.connectDatabase();
           await this.loadFromDatabase();
           this.setupPeriodicSync();
-          Logger.success(
+          logger.success(
             "✅ TodoService: 데이터베이스 연결 및 데이터 로드 완료"
           );
         } catch (error) {
-          Logger.warn(
+          logger.warn(
             "⚠️ 데이터베이스 연결 실패, 메모리 모드로 실행:",
             error.message
           );
@@ -52,9 +52,9 @@ class TodoService {
       }
 
       this.initialized = true;
-      Logger.success("✅ TodoService 초기화 완료");
+      logger.success("✅ TodoService 초기화 완료");
     } catch (error) {
-      Logger.error("❌ TodoService 초기화 실패:", error);
+      logger.error("❌ TodoService 초기화 실패:", error);
       this.initialized = true; // 에러가 있어도 서비스는 동작하도록
     }
   }
@@ -64,7 +64,7 @@ class TodoService {
     await ensureConnection();
     this.collection = getCollection("todos");
     this.dbEnabled = true;
-    Logger.info("📊 MongoDB todos 컬렉션 연결됨");
+    logger.info("📊 MongoDB todos 컬렉션 연결됨");
   }
 
   // ⭐ 데이터베이스에서 모든 할일 로드
@@ -97,11 +97,11 @@ class TodoService {
 
       const totalUsers = Object.keys(userGroups).length;
       const totalTodos = allTodos.length;
-      Logger.success(
+      logger.success(
         `📥 데이터베이스에서 로드 완료: ${totalUsers}명, ${totalTodos}개 할일`
       );
     } catch (error) {
-      Logger.error("데이터베이스 로드 실패:", error);
+      logger.error("데이터베이스 로드 실패:", error);
       throw error;
     }
   }
@@ -124,12 +124,12 @@ class TodoService {
           );
         }
 
-        Logger.success(
+        logger.success(
           `📥 백업에서 복원 완료: ${Object.keys(parsed).length}명의 할일`
         );
       }
     } catch (error) {
-      Logger.warn("백업 로드 실패 (무시):", error.message);
+      logger.warn("백업 로드 실패 (무시):", error.message);
     }
   }
 
@@ -141,11 +141,11 @@ class TodoService {
       try {
         await this.syncToDatabase();
       } catch (error) {
-        Logger.debug("주기적 동기화 실패 (무시):", error.message);
+        logger.debug("주기적 동기화 실패 (무시):", error.message);
       }
     }, this.config.syncInterval);
 
-    Logger.info(
+    logger.info(
       `⚙️ 주기적 동기화 설정: ${this.config.syncInterval / 1000}초마다`
     );
   }
@@ -189,12 +189,12 @@ class TodoService {
 
       if (operations.length > 0) {
         await this.collection.bulkWrite(operations);
-        Logger.debug(
+        logger.debug(
           `💾 데이터베이스 동기화 완료: ${operations.length}개 작업`
         );
       }
     } catch (error) {
-      Logger.error("데이터베이스 동기화 실패:", error);
+      logger.error("데이터베이스 동기화 실패:", error);
     }
   }
 
@@ -202,10 +202,10 @@ class TodoService {
   async getTodos(userId) {
     try {
       const userTodos = this.todos.get(userId.toString()) || [];
-      Logger.info(`📋 할일 목록 조회: 사용자 ${userId}, ${userTodos.length}개`);
+      logger.info(`📋 할일 목록 조회: 사용자 ${userId}, ${userTodos.length}개`);
       return userTodos;
     } catch (error) {
-      Logger.error("할일 목록 조회 오류:", error);
+      logger.error("할일 목록 조회 오류:", error);
       return [];
     }
   }
@@ -264,9 +264,9 @@ class TodoService {
             createdAt: newTodo.createdAt,
           });
           newTodo.id = result.insertedId.toString();
-          Logger.debug(`💾 DB 저장 성공: ${newTodo.task} (ID: ${newTodo.id})`);
+          logger.debug(`💾 DB 저장 성공: ${newTodo.task} (ID: ${newTodo.id})`);
         } catch (error) {
-          Logger.warn("DB 저장 실패, 메모리만 사용:", error.message);
+          logger.warn("DB 저장 실패, 메모리만 사용:", error.message);
           newTodo.id = Date.now().toString(); // 임시 ID
         }
       } else {
@@ -277,7 +277,7 @@ class TodoService {
       userTodos.push(newTodo);
       this.todos.set(userIdStr, userTodos);
 
-      Logger.success(`➕ 할일 추가: 사용자 ${userId}, "${todoText}"`);
+      logger.success(`➕ 할일 추가: 사용자 ${userId}, "${todoText}"`);
 
       return {
         success: true,
@@ -286,7 +286,7 @@ class TodoService {
         saved: this.dbEnabled,
       };
     } catch (error) {
-      Logger.error("할일 추가 오류:", error);
+      logger.error("할일 추가 오류:", error);
       return {
         success: false,
         error: "할일 추가 중 오류가 발생했습니다.",
@@ -323,19 +323,19 @@ class TodoService {
               },
             }
           );
-          Logger.debug(
+          logger.debug(
             `💾 DB 업데이트: ${todo.task} -> ${
               todo.completed ? "완료" : "미완료"
             }`
           );
         } catch (error) {
-          Logger.warn("DB 업데이트 실패 (무시):", error.message);
+          logger.warn("DB 업데이트 실패 (무시):", error.message);
         }
       }
 
       this.todos.set(userIdStr, userTodos);
 
-      Logger.success(
+      logger.success(
         `🔄 할일 토글: 사용자 ${userId}, "${todo.task}" -> ${
           todo.completed ? "완료" : "미완료"
         }`
@@ -348,7 +348,7 @@ class TodoService {
         index: todoIndex,
       };
     } catch (error) {
-      Logger.error("할일 토글 오류:", error);
+      logger.error("할일 토글 오류:", error);
       return {
         success: false,
         error: "할일 상태 변경 중 오류가 발생했습니다.",
@@ -377,15 +377,15 @@ class TodoService {
           await this.collection.deleteOne({
             _id: require("mongodb").ObjectId(deletedTodo.id),
           });
-          Logger.debug(`💾 DB 삭제: ${deletedTodo.task}`);
+          logger.debug(`💾 DB 삭제: ${deletedTodo.task}`);
         } catch (error) {
-          Logger.warn("DB 삭제 실패 (무시):", error.message);
+          logger.warn("DB 삭제 실패 (무시):", error.message);
         }
       }
 
       this.todos.set(userIdStr, userTodos);
 
-      Logger.success(`🗑️ 할일 삭제: 사용자 ${userId}, "${deletedTodo.task}"`);
+      logger.success(`🗑️ 할일 삭제: 사용자 ${userId}, "${deletedTodo.task}"`);
 
       return {
         success: true,
@@ -393,7 +393,7 @@ class TodoService {
         remainingCount: userTodos.length,
       };
     } catch (error) {
-      Logger.error("할일 삭제 오류:", error);
+      logger.error("할일 삭제 오류:", error);
       return {
         success: false,
         error: "할일 삭제 중 오류가 발생했습니다.",
@@ -412,15 +412,15 @@ class TodoService {
       if (this.dbEnabled) {
         try {
           await this.collection.deleteMany({ userId: userIdStr });
-          Logger.debug(`💾 DB 일괄 삭제: 사용자 ${userId}, ${deletedCount}개`);
+          logger.debug(`💾 DB 일괄 삭제: 사용자 ${userId}, ${deletedCount}개`);
         } catch (error) {
-          Logger.warn("DB 일괄 삭제 실패 (무시):", error.message);
+          logger.warn("DB 일괄 삭제 실패 (무시):", error.message);
         }
       }
 
       this.todos.set(userIdStr, []);
 
-      Logger.success(
+      logger.success(
         `🗑️ 모든 할일 삭제: 사용자 ${userId}, ${deletedCount}개 삭제`
       );
 
@@ -429,7 +429,7 @@ class TodoService {
         count: deletedCount,
       };
     } catch (error) {
-      Logger.error("모든 할일 삭제 오류:", error);
+      logger.error("모든 할일 삭제 오류:", error);
       return {
         success: false,
         error: "할일 삭제 중 오류가 발생했습니다.",
@@ -458,16 +458,16 @@ class TodoService {
             await this.collection.deleteMany({
               _id: { $in: completedIds },
             });
-            Logger.debug(`💾 DB 완료된 할일 삭제: ${completedIds.length}개`);
+            logger.debug(`💾 DB 완료된 할일 삭제: ${completedIds.length}개`);
           }
         } catch (error) {
-          Logger.warn("DB 완료된 할일 삭제 실패 (무시):", error.message);
+          logger.warn("DB 완료된 할일 삭제 실패 (무시):", error.message);
         }
       }
 
       this.todos.set(userIdStr, filteredTodos);
 
-      Logger.success(
+      logger.success(
         `🗑️ 완료된 할일 삭제: 사용자 ${userId}, ${deletedCount}개 삭제`
       );
 
@@ -477,7 +477,7 @@ class TodoService {
         remainingCount: filteredTodos.length,
       };
     } catch (error) {
-      Logger.error("완료된 할일 삭제 오류:", error);
+      logger.error("완료된 할일 삭제 오류:", error);
       return {
         success: false,
         error: "완료된 할일 삭제 중 오류가 발생했습니다.",
@@ -494,7 +494,7 @@ class TodoService {
       const completed = userTodos.filter((todo) => todo.completed).length;
       const pending = total - completed;
 
-      Logger.info(
+      logger.info(
         `📊 할일 통계: 사용자 ${userId}, 전체 ${total}, 완료 ${completed}, 진행중 ${pending}`
       );
 
@@ -505,7 +505,7 @@ class TodoService {
         completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
       };
     } catch (error) {
-      Logger.error("할일 통계 조회 오류:", error);
+      logger.error("할일 통계 조회 오류:", error);
       return null;
     }
   }
@@ -518,7 +518,7 @@ class TodoService {
         todo.task.toLowerCase().includes(keyword.toLowerCase())
       );
 
-      Logger.info(
+      logger.info(
         `🔍 할일 검색: 사용자 ${userId}, 키워드 "${keyword}", ${results.length}개 발견`
       );
 
@@ -529,7 +529,7 @@ class TodoService {
         count: results.length,
       };
     } catch (error) {
-      Logger.error("할일 검색 오류:", error);
+      logger.error("할일 검색 오류:", error);
       return {
         success: false,
         error: "할일 검색 중 오류가 발생했습니다.",
@@ -546,7 +546,7 @@ class TodoService {
       }
 
       const backupStr = JSON.stringify(backup);
-      Logger.info(
+      logger.info(
         `💾 데이터 백업: ${Object.keys(backup).length}명, ${
           backupStr.length
         } bytes`
@@ -554,7 +554,7 @@ class TodoService {
 
       return backupStr;
     } catch (error) {
-      Logger.error("데이터 백업 오류:", error);
+      logger.error("데이터 백업 오류:", error);
       return null;
     }
   }
@@ -581,7 +581,7 @@ class TodoService {
         await this.syncToDatabase();
       }
 
-      Logger.success(
+      logger.success(
         `📥 데이터 복원: ${Object.keys(parsed).length}명의 할일 데이터`
       );
 
@@ -590,7 +590,7 @@ class TodoService {
         userCount: Object.keys(parsed).length,
       };
     } catch (error) {
-      Logger.error("데이터 복원 오류:", error);
+      logger.error("데이터 복원 오류:", error);
       return {
         success: false,
         error: "데이터 복원 중 오류가 발생했습니다.",
@@ -627,16 +627,16 @@ class TodoService {
       // 마지막 동기화
       if (this.dbEnabled) {
         await this.syncToDatabase();
-        Logger.info("💾 종료 전 최종 동기화 완료");
+        logger.info("💾 종료 전 최종 동기화 완료");
       }
 
       // 백업 데이터 생성 (환경변수용)
       const backup = await this.backupData();
       if (backup) {
-        Logger.info("💾 종료 전 백업 완료");
+        logger.info("💾 종료 전 백업 완료");
       }
     } catch (error) {
-      Logger.error("TodoService 종료 중 오류:", error);
+      logger.error("TodoService 종료 중 오류:", error);
     }
   }
 }
