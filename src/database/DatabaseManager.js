@@ -51,7 +51,7 @@ class DatabaseManager extends StandardizedBaseModule {
     this.mongoUrl =
       mongoUrl || process.env.MONGO_URL || process.env.MONGODB_URL;
     this.databaseName =
-      options.databaseName || process.env.DB_NAME || "doomock85";
+      options.databaseName || process.env.DB_NAME || "doomock_bot";
 
     // 연결 상태
     this.client = null;
