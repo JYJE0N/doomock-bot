@@ -1,10 +1,10 @@
-// bot.js - 두목봇 메인 통합 파일 (v3 리팩토링 완료)
+// doomock_bot.js - 두목봇 메인 통합 파일 (v3 완전 리팩토링)
 
 const TelegramBot = require("node-telegram-bot-api");
 const Logger = require("./src/utils/Logger");
 const { mongoPoolManager } = require("./src/database/MongoPoolManager");
 const ModuleManager = require("./src/managers/ModuleManager");
-const { errorHandler } = require("./src/utils/ErrorHandler"); // ✅ 수정: 중괄호 추가
+const ErrorHandler = require("./src/utils/ErrorHandler"); // ✅ 클래스 import
 const { getUserName } = require("./src/utils/UserHelper");
 const config = require("./src/config/config");
 
@@ -14,7 +14,14 @@ class DoomockBot {
     this.moduleManager = null;
     this.isInitialized = false;
     this.startTime = new Date();
-    this.isDatabaseEnabled = false; // ✅ 추가: DB 상태 추적
+    this.isDatabaseEnabled = false;
+
+    // ✅ ErrorHandler 인스턴스 생성 (표준화된 방식)
+    this.errorHandler = new ErrorHandler({
+      maxRetries: 5,
+      retryDelay: 2000,
+      alertThreshold: 10,
+    });
 
     // 📊 봇 전체 통계
     this.botStats = {
@@ -33,7 +40,7 @@ class DoomockBot {
     try {
       Logger.info("⚙️ 봇 시스템 초기화 시작...");
 
-      // 1. 환경변수 확인 (수정됨)
+      // 1. 환경변수 확인
       await this.validateEnvironment();
 
       // 2. 데이터베이스 연결 (선택적)
@@ -45,7 +52,7 @@ class DoomockBot {
       // 4. 모듈 매니저 초기화
       await this.initializeModuleManager();
 
-      // 5. 에러 핸들러 시작
+      // 5. 에러 핸들러 시작 (이미 생성됨)
       await this.initializeErrorHandler();
 
       // 6. 이벤트 리스너 등록
@@ -65,11 +72,10 @@ class DoomockBot {
     }
   }
 
-  // 🔍 환경변수 검증 (수정됨)
+  // 🔍 환경변수 검증
   async validateEnvironment() {
     Logger.info("🔍 환경변수 검증 중...");
 
-    // ✅ 수정: MONGO_URL을 필수에서 제외
     const requiredEnvVars = ["BOT_TOKEN"];
 
     const missingVars = requiredEnvVars.filter(
@@ -89,11 +95,10 @@ class DoomockBot {
     );
   }
 
-  // 🗄️ 데이터베이스 초기화 (수정됨)
+  // 🗄️ 데이터베이스 초기화
   async initializeDatabase() {
     Logger.info("🗄️ 데이터베이스 연결 중...");
 
-    // ✅ MONGO_URL이 없으면 메모리 모드로 실행
     if (!process.env.MONGO_URL) {
       Logger.warn("⚠️ MONGO_URL이 설정되지 않음, 메모리 모드로 실행");
       this.isDatabaseEnabled = false;
@@ -109,12 +114,10 @@ class DoomockBot {
 
       Logger.success("✅ 데이터베이스 연결 완료");
     } catch (error) {
-      // ✅ 수정: DB 연결 실패해도 계속 진행
       Logger.warn(
         `⚠️ 데이터베이스 연결 실패, 메모리 모드로 실행: ${error.message}`
       );
       this.isDatabaseEnabled = false;
-      // throw 제거하여 봇이 계속 실행되도록 함
     }
   }
 
@@ -178,7 +181,7 @@ class DoomockBot {
 
     try {
       this.moduleManager = new ModuleManager(this.bot, {
-        database: this.isDatabaseEnabled ? mongoPoolManager : null, // ✅ 수정
+        database: this.isDatabaseEnabled ? mongoPoolManager : null,
       });
 
       await this.moduleManager.initialize();
@@ -193,14 +196,14 @@ class DoomockBot {
     Logger.info("🛡️ 에러 핸들러 초기화 중...");
 
     try {
-      // errorHandler는 이미 인스턴스화됨
+      // ErrorHandler는 이미 constructor에서 초기화됨
       Logger.success("✅ 에러 핸들러 초기화 완료");
     } catch (error) {
       Logger.warn("⚠️ 에러 핸들러 초기화 실패:", error.message);
     }
   }
 
-  // 🎧 이벤트 리스너 설정
+  // 🎧 이벤트 리스너 설정 (수정됨)
   async setupEventListeners() {
     Logger.info("🎧 이벤트 리스너 등록 중...");
 
@@ -214,9 +217,11 @@ class DoomockBot {
       } catch (error) {
         this.botStats.errors++;
         Logger.error("메시지 처리 오류:", error);
-        await errorHandler.handleError(error, {
+        await this.errorHandler.handleError(error, {
+          // ✅ this.errorHandler 사용
           type: "message",
           userId: msg.from.id,
+          module: "BotController",
         });
       }
     });
@@ -230,9 +235,11 @@ class DoomockBot {
       } catch (error) {
         this.botStats.errors++;
         Logger.error("콜백 처리 오류:", error);
-        await errorHandler.handleError(error, {
+        await this.errorHandler.handleError(error, {
+          // ✅ this.errorHandler 사용
           type: "callback",
           userId: callbackQuery.from.id,
+          module: "BotController",
         });
       }
     });
@@ -240,7 +247,20 @@ class DoomockBot {
     // 에러 이벤트
     this.bot.on("polling_error", async (error) => {
       Logger.error("🚨 폴링 에러:", error);
-      await errorHandler.handleError(error, { type: "polling" });
+      await this.errorHandler.handleError(error, {
+        // ✅ this.errorHandler 사용
+        type: "polling",
+        module: "TelegramBot",
+      });
+    });
+
+    this.bot.on("error", async (error) => {
+      Logger.error("🚨 봇 에러:", error);
+      await this.errorHandler.handleError(error, {
+        // ✅ this.errorHandler 사용
+        type: "bot_error",
+        module: "TelegramBot",
+      });
     });
 
     Logger.success("✅ 이벤트 리스너 등록 완료");
@@ -262,7 +282,6 @@ class DoomockBot {
         const memUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
 
         if (memUsedMB > 512) {
-          // 512MB 초과 시 경고
           Logger.warn(`⚠️ 높은 메모리 사용량: ${memUsedMB}MB`);
         }
 
@@ -276,12 +295,13 @@ class DoomockBot {
     Logger.success("✅ 헬스 모니터링 시작됨");
   }
 
-  // 🚨 크리티컬 에러 처리
+  // 🚨 크리티컬 에러 처리 (수정됨)
   async handleCriticalError(error) {
     Logger.error("🚨 크리티컬 에러:", error);
 
     try {
-      await errorHandler.triggerAlert("critical_error", {
+      await this.errorHandler.triggerAlert("critical_error", {
+        // ✅ this.errorHandler 사용
         error: error.message,
         stack: error.stack,
         timestamp: new Date(),
@@ -318,7 +338,7 @@ class DoomockBot {
     }
   }
 
-  // 🔄 정리 작업 및 종료
+  // 🔄 정리 작업 및 종료 (수정됨)
   async gracefulShutdown(signal) {
     Logger.info(`🔄 정리 작업 시작... (신호: ${signal})`);
 
@@ -342,8 +362,9 @@ class DoomockBot {
       }
 
       // 5. 에러 핸들러 정리
-      if (errorHandler) {
-        errorHandler.cleanup();
+      if (this.errorHandler) {
+        // ✅ this.errorHandler 사용
+        this.errorHandler.cleanup();
       }
 
       // 6. 데이터베이스 연결 종료 (있는 경우에만)

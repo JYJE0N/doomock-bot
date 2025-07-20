@@ -1,10 +1,12 @@
-// src/utils/ErrorHandler.js - Railway 환경 최적화 에러 핸들러
+// src/utils/ErrorHandler.js - 표준화된 클래스 기반 에러 핸들러 (v3 리팩토링)
 
 const Logger = require("./Logger");
 
 class ErrorHandler {
-  constructor() {
+  constructor(config = {}) {
     this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+    this.instanceId = Date.now() + Math.random(); // 인스턴스 구분용
+
     this.errorStats = {
       total: 0,
       resolved: 0,
@@ -26,9 +28,10 @@ class ErrorHandler {
       retryDelay: this.isRailway ? 2000 : 1000,
       alertThreshold: 10,
       healthCheckInterval: 30000,
+      ...config,
     };
 
-    Logger.info("🛡️ ErrorHandler 초기화됨");
+    Logger.info(`🛡️ ErrorHandler 인스턴스 초기화됨 (${this.instanceId})`);
   }
 
   // 🚨 메인 에러 처리
@@ -71,17 +74,13 @@ class ErrorHandler {
     switch (errorType) {
       case "TelegramError":
         return await this.handleTelegramError(error, context);
-
       case "MongoNetworkError":
       case "MongoServerError":
         return await this.handleDatabaseError(error, context);
-
       case "ValidationError":
         return await this.handleValidationError(error, context);
-
       case "TimeoutError":
         return await this.handleTimeoutError(error, context);
-
       default:
         return await this.handleGenericError(error, context);
     }
@@ -91,7 +90,6 @@ class ErrorHandler {
   async handleTelegramError(error, context) {
     if (error.response?.body?.error_code === 409) {
       Logger.warn("🔄 409 충돌 감지 - 폴링 재시작 시도");
-      // ConflictResolver가 있다면 사용
       return { resolved: true, message: "텔레그램 충돌이 해결되었습니다." };
     }
 
@@ -108,7 +106,6 @@ class ErrorHandler {
   async handleDatabaseError(error, context) {
     Logger.error("🔌 데이터베이스 연결 오류:", error.message);
 
-    // MongoDB 재연결 시도
     try {
       const { mongoPoolManager } = require("../database/MongoPoolManager");
       await mongoPoolManager.reconnect();
@@ -124,7 +121,7 @@ class ErrorHandler {
 
   // 📝 검증 에러 처리
   async handleValidationError(error, context) {
-    Logger.warn("📝 입력 검증 오류:", error.message);
+    Logger.warn("📝 입력 검증 오료:", error.message);
     return {
       resolved: true,
       message: `입력 오류: ${error.message}`,
@@ -157,7 +154,7 @@ class ErrorHandler {
 
     Logger.error("🚨 크리티컬 에러 감지:", error);
 
-    // Railway 관리자에게 알림 (환경변수가 있다면)
+    // Railway 관리자에게 알림
     await this.triggerAlert("critical_error", {
       error: error.message,
       context,
@@ -172,8 +169,6 @@ class ErrorHandler {
 
     try {
       const alertMessage = this.formatAlertMessage(type, data);
-      // 텔레그램 봇 인스턴스가 있다면 사용
-      // 실제 구현에서는 봇 인스턴스를 주입받아 사용
       Logger.info("📢 관리자 알림:", alertMessage);
     } catch (error) {
       Logger.error("📢 알림 전송 실패:", error);
@@ -187,7 +182,6 @@ class ErrorHandler {
     switch (type) {
       case "critical_error":
         return `🚨 크리티컬 에러 발생\n\n⏰ 시간: ${timestamp}\n❌ 오류: ${data.error}`;
-
       default:
         return `⚠️ 시스템 알림\n\n⏰ 시간: ${timestamp}\n📝 내용: ${JSON.stringify(
           data
@@ -205,6 +199,7 @@ class ErrorHandler {
         : "100%";
 
     return {
+      instanceId: this.instanceId,
       status: this.healthStatus.status,
       lastUpdate: this.healthStatus.lastUpdate,
       issues: this.healthStatus.issues,
@@ -227,6 +222,7 @@ class ErrorHandler {
         : "100%";
 
     return {
+      instanceId: this.instanceId,
       total: this.errorStats.total,
       resolved: this.errorStats.resolved,
       unresolved: this.errorStats.unresolved,
@@ -239,8 +235,16 @@ class ErrorHandler {
 
   // 🧹 정리 작업
   cleanup() {
-    Logger.info("🧹 ErrorHandler 정리 작업");
-    // 필요한 정리 작업 수행
+    Logger.info(`🧹 ErrorHandler 정리 작업 (${this.instanceId})`);
+    // 통계 초기화 등 필요한 정리 작업
+    this.errorStats = {
+      total: 0,
+      resolved: 0,
+      unresolved: 0,
+      byType: {},
+      byModule: {},
+      lastReset: new Date(),
+    };
   }
 
   // ⏳ 대기 유틸리티
@@ -249,7 +253,5 @@ class ErrorHandler {
   }
 }
 
-// 싱글톤 인스턴스 생성
-const errorHandler = new ErrorHandler();
-
-module.exports = errorHandler; // 직접 export
+// ✅ 클래스만 export (표준화된 방식)
+module.exports = ErrorHandler;

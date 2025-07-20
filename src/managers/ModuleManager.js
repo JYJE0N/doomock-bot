@@ -4,25 +4,26 @@ const Logger = require("../utils/Logger");
 const ModuleConfig = require("../config/ModuleConfig");
 const { mongoPoolManager } = require("../database/MongoPoolManager");
 const { ValidationHelper } = require("../utils/ValidationHelper");
+const ErrorHandler = require("../utils/ErrorHandler");
 
 class ModuleManager {
   constructor(bot = null, options = {}) {
     this.bot = bot;
     this.modules = new Map();
     this.moduleInstances = new Map();
-    
+
     // 🗄️ 데이터베이스 연결
     this.db = mongoPoolManager;
-    
+
     // 👥 전역 사용자 상태 (모든 모듈 공유)
     this.globalUserStates = new Map();
-    
+
     // 🛡️ 중복 처리 방지 시스템 (강화)
     this.processingCallbacks = new Set();
     this.processingMessages = new Set();
     this.callbackTimeout = 5000;
     this.messageTimeout = 3000;
-    
+
     // 📊 전역 통계
     this.globalStats = {
       totalRequests: 0,
@@ -35,15 +36,21 @@ class ModuleManager {
       averageResponseTime: 0,
       startTime: new Date(),
     };
-    
+
+    // ✅ ErrorHandler 인스턴스 생성
+    this.errorHandler = new ErrorHandler({
+      maxRetries: 3,
+      retryDelay: 1500,
+    });
+
     // ⚙️ 초기화 상태
     this.isInitialized = false;
     this.initializationPromise = null;
-    
+
     // 🔄 라우팅 규칙 (표준화)
     this.routingRules = new Map();
     this.setupRoutingRules();
-    
+
     Logger.info("🔧 ModuleManager 생성됨 (강화된 중복 방지 시스템)");
   }
 
@@ -52,26 +59,26 @@ class ModuleManager {
     // 콜백 데이터 형식: "module_action" 또는 "module_action_param"
     this.routingRules.set(/^(\w+)_(.+)$/, (match, callbackData) => {
       const [, moduleName, actionPart] = match;
-      
+
       // 액션과 파라미터 분리
-      const actionParts = actionPart.split('_');
+      const actionParts = actionPart.split("_");
       const subAction = actionParts[0];
       const params = actionParts.slice(1);
-      
+
       return { moduleName, subAction, params };
     });
 
     // 메인 메뉴 라우팅
     this.routingRules.set(/^main_menu$/, () => ({
-      moduleName: 'main',
-      subAction: 'menu',
-      params: []
+      moduleName: "main",
+      subAction: "menu",
+      params: [],
     }));
 
     // 직접 모듈 호출
     this.routingRules.set(/^module_(\w+)$/, (match) => {
       const [, moduleName] = match;
-      return { moduleName, subAction: 'menu', params: [] };
+      return { moduleName, subAction: "menu", params: [] };
     });
   }
 
@@ -104,8 +111,9 @@ class ModuleManager {
       await this._setupGlobalIndexes();
 
       this.isInitialized = true;
-      Logger.success(`✅ ModuleManager 초기화 완료 (${this.modules.size}개 모듈)`);
-      
+      Logger.success(
+        `✅ ModuleManager 초기화 완료 (${this.modules.size}개 모듈)`
+      );
     } catch (error) {
       this.globalStats.errors++;
       Logger.error("❌ ModuleManager 초기화 실패:", error);
@@ -116,7 +124,7 @@ class ModuleManager {
   // 🗄️ 데이터베이스 연결 확인
   async _ensureDatabaseConnection() {
     try {
-      if (!await this.db.isHealthy()) {
+      if (!(await this.db.isHealthy())) {
         await this.db.connect();
       }
       Logger.success("✅ MongoDB 연결 확인 완료");
@@ -161,7 +169,7 @@ class ModuleManager {
 
       // 모듈 인스턴스 생성
       const moduleInstance = new ModuleClass();
-      
+
       // 봇 인스턴스 주입 (에러 처리용)
       if (this.bot) {
         moduleInstance.bot = this.bot;
@@ -178,13 +186,12 @@ class ModuleManager {
       });
 
       this.moduleInstances.set(moduleName.toLowerCase(), moduleInstance);
-      
+
       Logger.success(`✅ 모듈 ${moduleName} 로드 완료`);
       return { moduleName, success: true };
-      
     } catch (error) {
       const errorInfo = { moduleName, success: false, error };
-      
+
       if (config.required) {
         throw error;
       } else {
@@ -196,17 +203,24 @@ class ModuleManager {
 
   // 📊 로드 결과 처리
   _processLoadResults(results) {
-    const successful = results.filter(r => r.status === 'fulfilled' && r.value?.success).length;
-    const failed = results.filter(r => r.status === 'rejected' || !r.value?.success).length;
+    const successful = results.filter(
+      (r) => r.status === "fulfilled" && r.value?.success
+    ).length;
+    const failed = results.filter(
+      (r) => r.status === "rejected" || !r.value?.success
+    ).length;
 
     Logger.info(`📊 모듈 로드 완료: 성공 ${successful}개, 실패 ${failed}개`);
 
     if (failed > 0) {
       const failedModules = results
-        .filter(r => r.status === 'rejected' || !r.value?.success)
-        .map(r => r.reason?.message || r.value?.error?.message || '알 수 없는 오류');
-      
-      Logger.warn(`⚠️ 실패한 모듈들: ${failedModules.join(', ')}`);
+        .filter((r) => r.status === "rejected" || !r.value?.success)
+        .map(
+          (r) =>
+            r.reason?.message || r.value?.error?.message || "알 수 없는 오류"
+        );
+
+      Logger.warn(`⚠️ 실패한 모듈들: ${failedModules.join(", ")}`);
     }
   }
 
@@ -228,27 +242,40 @@ class ModuleManager {
       Logger.info(`🔧 모듈 ${moduleName} 초기화 중...`);
 
       const instance = moduleData.instance;
-      
+
       if (instance.initialize) {
         await instance.initialize();
       }
 
       moduleData.status = "initialized";
       Logger.success(`✅ 모듈 ${moduleName} 초기화 완료`);
-      
+
       return { moduleName, success: true };
     } catch (error) {
       moduleData.status = "error";
       moduleData.lastError = error;
       moduleData.errorCount++;
-      
-      this.globalStats.moduleErrors.set(moduleName, 
-        (this.globalStats.moduleErrors.get(moduleName) || 0) + 1);
+
+      this.globalStats.moduleErrors.set(
+        moduleName,
+        (this.globalStats.moduleErrors.get(moduleName) || 0) + 1
+      );
+
+      // ✅ ErrorHandler를 통한 에러 처리
+      await this.errorHandler.handleError(error, {
+        type: "module_initialization",
+        module: moduleName,
+      });
 
       if (moduleData.config.required) {
-        throw new Error(`필수 모듈 ${moduleName} 초기화 실패: ${error.message}`);
+        throw new Error(
+          `필수 모듈 ${moduleName} 초기화 실패: ${error.message}`
+        );
       } else {
-        Logger.error(`❌ 선택적 모듈 ${moduleName} 초기화 실패:`, error.message);
+        Logger.error(
+          `❌ 선택적 모듈 ${moduleName} 초기화 실패:`,
+          error.message
+        );
         return { moduleName, success: false, error };
       }
     }
@@ -256,8 +283,12 @@ class ModuleManager {
 
   // 📊 초기화 결과 처리
   _processInitResults(results) {
-    const successful = results.filter(r => r.status === 'fulfilled' && r.value?.success).length;
-    const failed = results.filter(r => r.status === 'rejected' || !r.value?.success).length;
+    const successful = results.filter(
+      (r) => r.status === "fulfilled" && r.value?.success
+    ).length;
+    const failed = results.filter(
+      (r) => r.status === "rejected" || !r.value?.success
+    ).length;
 
     Logger.info(`📊 모듈 초기화 완료: 성공 ${successful}개, 실패 ${failed}개`);
   }
@@ -272,16 +303,16 @@ class ModuleManager {
         { key: { createdAt: 1 }, options: { expireAfterSeconds: 3600 } }, // 1시간 후 자동 삭제
       ];
 
-      await this.db.ensureIndexes('global_userStates', globalStateIndexes);
-      
+      await this.db.ensureIndexes("global_userStates", globalStateIndexes);
+
       // 전역 통계 인덱스
       const statsIndexes = [
         { key: { date: 1, moduleName: 1 }, options: { unique: true } },
         { key: { createdAt: 1 }, options: { expireAfterSeconds: 2592000 } }, // 30일 후 삭제
       ];
 
-      await this.db.ensureIndexes('global_stats', statsIndexes);
-      
+      await this.db.ensureIndexes("global_stats", statsIndexes);
+
       Logger.debug("📑 전역 인덱스 설정 완료");
     } catch (error) {
       Logger.warn("⚠️ 전역 인덱스 설정 실패:", error.message);
@@ -291,7 +322,10 @@ class ModuleManager {
   // 📨 메시지 라우팅 (표준화된 매개변수)
   async routeMessage(bot, msg) {
     const startTime = Date.now();
-    const { from: { id: userId }, text } = msg;
+    const {
+      from: { id: userId },
+      text,
+    } = msg;
 
     try {
       // 중복 처리 방지
@@ -303,120 +337,152 @@ class ModuleManager {
       }
 
       this.processingMessages.add(messageKey);
-      this._setProcessingTimeout(this.processingMessages, messageKey, this.messageTimeout);
+      this._setProcessingTimeout(this.processingMessages, messageKey, 10000);
 
-      // 통계 업데이트
       this.globalStats.totalMessages++;
-      this.globalStats.totalRequests++;
+      this.globalStats.uniqueUsers.add(userId);
 
-      // 모든 모듈에 메시지 전달 (우선순위 순)
-      const sortedModules = this._getSortedModules();
-      
-      for (const [moduleName, moduleData] of sortedModules) {
-        if (moduleData.status !== 'initialized') continue;
+      // 모듈별 처리 시도
+      for (const [moduleName, moduleData] of this.modules.entries()) {
+        if (moduleData.status !== "initialized") continue;
 
         try {
           const handled = await moduleData.instance.handleMessage(bot, msg);
           if (handled) {
-            Logger.debug(`📨 메시지가 ${moduleName}에서 처리됨`);
+            this.globalStats.successfulMessages++;
+            this._updateResponseTime(startTime);
             return true;
           }
-        } catch (error) {
-          await this._handleModuleError(moduleName, error, 'message', { userId });
+        } catch (moduleError) {
+          Logger.error(`❌ 모듈 ${moduleName} 메시지 처리 오류:`, moduleError);
+
+          // ✅ 각 모듈의 ErrorHandler를 통한 에러 처리
+          if (moduleData.instance.errorHandler) {
+            await moduleData.instance.errorHandler.handleError(moduleError, {
+              type: "message_processing",
+              module: moduleName,
+              userId: userId,
+            });
+          }
+
+          moduleData.errorCount++;
+          this.globalStats.moduleErrors.set(
+            moduleName,
+            (this.globalStats.moduleErrors.get(moduleName) || 0) + 1
+          );
         }
       }
 
-      // 어떤 모듈도 처리하지 못한 경우
-      Logger.debug(`📨 처리되지 않은 메시지: ${text?.substring(0, 50)}...`);
+      this.globalStats.unhandledMessages++;
       return false;
-
     } catch (error) {
-      this.globalStats.errors++;
       Logger.error("❌ 메시지 라우팅 오류:", error);
+
+      // ✅ ModuleManager의 ErrorHandler를 통한 에러 처리
+      await this.errorHandler.handleError(error, {
+        type: "message_routing",
+        module: "ModuleManager",
+        userId: userId,
+      });
+
+      this.globalStats.errorMessages++;
       return false;
     } finally {
-      this._updateResponseTime(startTime);
+      this.processingMessages.delete(`${userId}_${Date.now()}`);
     }
   }
 
   // 📞 콜백 라우팅 (🎯 완전 표준화된 매개변수)
-  async routeCallback(bot, callbackQuery, menuManager) {
+  async routeCallback(bot, callbackQuery) {
     const startTime = Date.now();
-    const { data: callbackData, from: { id: userId } } = callbackQuery;
+    const {
+      from: { id: userId },
+      data,
+    } = callbackQuery;
 
     try {
-      // 콜백 데이터 검증
-      const validatedData = ValidationHelper.validateCallbackData(callbackData);
-      
       // 중복 처리 방지
-      const callbackKey = `${userId}_${validatedData}`;
+      const callbackKey = `${userId}_${data}_${Date.now()}`;
       if (this.processingCallbacks.has(callbackKey)) {
         this.globalStats.duplicateCallbacks++;
         Logger.debug(`⏭️ 중복 콜백 무시: ${callbackKey}`);
-        await bot.answerCallbackQuery(callbackQuery.id, { text: "처리 중입니다..." });
         return false;
       }
 
       this.processingCallbacks.add(callbackKey);
-      this._setProcessingTimeout(this.processingCallbacks, callbackKey, this.callbackTimeout);
+      this._setProcessingTimeout(this.processingCallbacks, callbackKey, 10000);
 
-      // 통계 업데이트
       this.globalStats.totalCallbacks++;
-      this.globalStats.totalRequests++;
+      this.globalStats.uniqueUsers.add(userId);
 
-      // 라우팅 규칙 적용
-      const routeInfo = this._parseCallbackData(validatedData);
-      if (!routeInfo) {
-        Logger.warn(`⚠️ 알 수 없는 콜백 형식: ${validatedData}`);
-        await bot.answerCallbackQuery(callbackQuery.id, { text: "❌ 알 수 없는 명령입니다." });
-        return false;
+      // 콜백 데이터 파싱
+      const {
+        module: targetModule,
+        action,
+        subAction,
+        params,
+      } = this._parseCallbackData(data);
+
+      if (targetModule && this.modules.has(targetModule)) {
+        const moduleData = this.modules.get(targetModule);
+
+        if (moduleData.status === "initialized") {
+          try {
+            const handled = await moduleData.instance.handleCallback(
+              bot,
+              callbackQuery,
+              subAction,
+              params,
+              this
+            );
+
+            if (handled) {
+              this.globalStats.successfulCallbacks++;
+              this._updateResponseTime(startTime);
+              return true;
+            }
+          } catch (moduleError) {
+            Logger.error(
+              `❌ 모듈 ${targetModule} 콜백 처리 오류:`,
+              moduleError
+            );
+
+            // ✅ 각 모듈의 ErrorHandler를 통한 에러 처리
+            if (moduleData.instance.errorHandler) {
+              await moduleData.instance.errorHandler.handleError(moduleError, {
+                type: "callback_processing",
+                module: targetModule,
+                userId: userId,
+                data: data,
+              });
+            }
+
+            moduleData.errorCount++;
+            this.globalStats.moduleErrors.set(
+              targetModule,
+              (this.globalStats.moduleErrors.get(targetModule) || 0) + 1
+            );
+          }
+        }
       }
 
-      const { moduleName, subAction, params } = routeInfo;
-
-      // 메인 메뉴 처리
-      if (moduleName === 'main') {
-        return await this._handleMainMenu(bot, callbackQuery, menuManager);
-      }
-
-      // 모듈 찾기
-      const moduleInstance = this._findModule(moduleName);
-      if (!moduleInstance) {
-        Logger.warn(`⚠️ 모듈을 찾을 수 없음: ${moduleName}`);
-        await bot.answerCallbackQuery(callbackQuery.id, { text: "❌ 기능을 사용할 수 없습니다." });
-        return false;
-      }
-
-      // 🎯 표준화된 매개변수로 모듈 콜백 처리
-      const result = await moduleInstance.handleCallback(
-        bot,           // bot
-        callbackQuery, // callbackQuery  
-        subAction,     // subAction
-        params,        // params
-        menuManager    // menuManager
-      );
-
-      // 콜백 쿼리 응답
-      await bot.answerCallbackQuery(callbackQuery.id);
-      
-      Logger.debug(`📞 콜백이 ${moduleName}.${subAction}에서 처리됨`);
-      return result;
-
+      this.globalStats.unhandledCallbacks++;
+      return false;
     } catch (error) {
-      this.globalStats.errors++;
       Logger.error("❌ 콜백 라우팅 오류:", error);
-      
-      try {
-        await bot.answerCallbackQuery(callbackQuery.id, { 
-          text: "❌ 처리 중 오류가 발생했습니다." 
-        });
-      } catch (answerError) {
-        Logger.error("❌ 콜백 쿼리 응답 실패:", answerError);
-      }
-      
+
+      // ✅ ModuleManager의 ErrorHandler를 통한 에러 처리
+      await this.errorHandler.handleError(error, {
+        type: "callback_routing",
+        module: "ModuleManager",
+        userId: userId,
+        data: data,
+      });
+
+      this.globalStats.errorCallbacks++;
       return false;
     } finally {
-      this._updateResponseTime(startTime);
+      this.processingCallbacks.delete(callbackKey);
     }
   }
 
@@ -439,21 +505,24 @@ class ModuleManager {
         return true;
       } else {
         // 기본 메인 메뉴
-        const mainMenuText = "🏠 **메인 메뉴**\n\n사용하실 기능을 선택해주세요.";
+        const mainMenuText =
+          "🏠 **메인 메뉴**\n\n사용하실 기능을 선택해주세요.";
         const modules = this._getAvailableModules();
-        
+
         const keyboard = {
-          inline_keyboard: modules.map(module => ([{
-            text: `${module.emoji || '🔧'} ${module.displayName}`,
-            callback_data: `module_${module.name}`
-          }]))
+          inline_keyboard: modules.map((module) => [
+            {
+              text: `${module.emoji || "🔧"} ${module.displayName}`,
+              callback_data: `module_${module.name}`,
+            },
+          ]),
         };
 
         await bot.editMessageText(mainMenuText, {
           chat_id: callbackQuery.message.chat.id,
           message_id: callbackQuery.message.message_id,
           reply_markup: keyboard,
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown",
         });
 
         return true;
@@ -468,7 +537,7 @@ class ModuleManager {
   _findModule(moduleName) {
     // 정확한 이름으로 찾기
     const moduleData = this.modules.get(moduleName);
-    if (moduleData?.status === 'initialized') {
+    if (moduleData?.status === "initialized") {
       return moduleData.instance;
     }
 
@@ -480,8 +549,10 @@ class ModuleManager {
 
     // 부분 매칭
     for (const [name, data] of this.modules.entries()) {
-      if (name.toLowerCase().includes(moduleName.toLowerCase()) && 
-          data.status === 'initialized') {
+      if (
+        name.toLowerCase().includes(moduleName.toLowerCase()) &&
+        data.status === "initialized"
+      ) {
         return data.instance;
       }
     }
@@ -491,20 +562,21 @@ class ModuleManager {
 
   // 📊 모듈 우선순위 정렬
   _getSortedModules() {
-    return Array.from(this.modules.entries())
-      .sort(([, a], [, b]) => (a.config.priority || 100) - (b.config.priority || 100));
+    return Array.from(this.modules.entries()).sort(
+      ([, a], [, b]) => (a.config.priority || 100) - (b.config.priority || 100)
+    );
   }
 
   // 📋 사용 가능한 모듈 목록
   _getAvailableModules() {
     return Array.from(this.modules.entries())
-      .filter(([, data]) => data.status === 'initialized')
+      .filter(([, data]) => data.status === "initialized")
       .map(([name, data]) => ({
-        name: name.replace('Module', '').toLowerCase(),
+        name: name.replace("Module", "").toLowerCase(),
         displayName: data.config.description || name,
         description: data.config.description,
         emoji: data.config.emoji,
-        features: data.config.features
+        features: data.config.features,
       }))
       .sort((a, b) => a.displayName.localeCompare(b.displayName));
   }
@@ -520,9 +592,11 @@ class ModuleManager {
   _updateResponseTime(startTime) {
     const responseTime = Date.now() - startTime;
     const totalRequests = this.globalStats.totalRequests;
-    
-    this.globalStats.averageResponseTime = 
-      ((this.globalStats.averageResponseTime * (totalRequests - 1)) + responseTime) / totalRequests;
+
+    this.globalStats.averageResponseTime =
+      (this.globalStats.averageResponseTime * (totalRequests - 1) +
+        responseTime) /
+      totalRequests;
   }
 
   // 🛡️ 모듈 에러 처리
@@ -533,14 +607,18 @@ class ModuleManager {
       moduleData.lastError = error;
     }
 
-    this.globalStats.moduleErrors.set(moduleName, 
-      (this.globalStats.moduleErrors.get(moduleName) || 0) + 1);
+    this.globalStats.moduleErrors.set(
+      moduleName,
+      (this.globalStats.moduleErrors.get(moduleName) || 0) + 1
+    );
 
     Logger.error(`❌ 모듈 ${moduleName} ${type} 처리 오류:`, error);
 
     // 심각한 오류인 경우 모듈 비활성화 고려
     if (moduleData && moduleData.errorCount > 10) {
-      Logger.warn(`⚠️ 모듈 ${moduleName} 오류 횟수 초과 (${moduleData.errorCount}회)`);
+      Logger.warn(
+        `⚠️ 모듈 ${moduleName} 오류 횟수 초과 (${moduleData.errorCount}회)`
+      );
     }
   }
 
@@ -550,14 +628,12 @@ class ModuleManager {
       const stateData = {
         userId,
         ...state,
-        updatedAt: new Date()
+        updatedAt: new Date(),
       };
 
-      await this.db.updateOne('global_userStates', 
-        { userId }, 
-        stateData, 
-        { upsert: true }
-      );
+      await this.db.updateOne("global_userStates", { userId }, stateData, {
+        upsert: true,
+      });
 
       this.globalUserStates.set(userId, stateData);
     } catch (error) {
@@ -572,7 +648,7 @@ class ModuleManager {
       if (memoryState) return memoryState;
 
       // 데이터베이스에서 조회
-      const dbState = await this.db.findOne('global_userStates', { userId });
+      const dbState = await this.db.findOne("global_userStates", { userId });
       if (dbState) {
         this.globalUserStates.set(userId, dbState);
         return dbState;
@@ -587,7 +663,7 @@ class ModuleManager {
 
   async clearGlobalUserState(userId) {
     try {
-      await this.db.deleteOne('global_userStates', { userId });
+      await this.db.deleteOne("global_userStates", { userId });
       this.globalUserStates.delete(userId);
     } catch (error) {
       Logger.error("❌ 전역 사용자 상태 삭제 실패:", error);
@@ -597,7 +673,7 @@ class ModuleManager {
   // 📊 전역 통계 조회
   getGlobalStats() {
     const uptime = Date.now() - this.globalStats.startTime.getTime();
-    
+
     return {
       ...this.globalStats,
       moduleErrors: Object.fromEntries(this.globalStats.moduleErrors),
@@ -605,16 +681,24 @@ class ModuleManager {
       uptimeFormatted: this._formatUptime(uptime),
       modules: {
         total: this.modules.size,
-        initialized: Array.from(this.modules.values()).filter(m => m.status === 'initialized').length,
-        failed: Array.from(this.modules.values()).filter(m => m.status === 'error').length
+        initialized: Array.from(this.modules.values()).filter(
+          (m) => m.status === "initialized"
+        ).length,
+        failed: Array.from(this.modules.values()).filter(
+          (m) => m.status === "error"
+        ).length,
       },
       performance: {
         averageResponseTime: Math.round(this.globalStats.averageResponseTime),
         requestsPerSecond: this.globalStats.totalRequests / (uptime / 1000),
-        errorRate: this.globalStats.totalRequests > 0 
-          ? ((this.globalStats.errors / this.globalStats.totalRequests) * 100).toFixed(2) + '%'
-          : '0%'
-      }
+        errorRate:
+          this.globalStats.totalRequests > 0
+            ? (
+                (this.globalStats.errors / this.globalStats.totalRequests) *
+                100
+              ).toFixed(2) + "%"
+            : "0%",
+      },
     };
   }
 
@@ -641,7 +725,7 @@ class ModuleManager {
         path: "../modules/TodoModule",
         description: "📝 할일 관리",
         emoji: "📝",
-        features: ["할일 추가", "완료 처리", "통계", "삭제", "검색"]
+        features: ["할일 추가", "완료 처리", "통계", "삭제", "검색"],
       },
       FortuneModule: {
         enabled: true,
@@ -650,7 +734,7 @@ class ModuleManager {
         path: "../modules/FortuneModule",
         description: "🔮 운세",
         emoji: "🔮",
-        features: ["일반운", "업무운", "연애운", "재물운", "타로카드"]
+        features: ["일반운", "업무운", "연애운", "재물운", "타로카드"],
       },
       WeatherModule: {
         enabled: true,
@@ -659,7 +743,7 @@ class ModuleManager {
         path: "../modules/WeatherModule",
         description: "🌤️ 날씨",
         emoji: "🌤️",
-        features: ["현재 날씨", "예보", "지역별 날씨"]
+        features: ["현재 날씨", "예보", "지역별 날씨"],
       },
       TimerModule: {
         enabled: true,
@@ -668,7 +752,7 @@ class ModuleManager {
         path: "../modules/TimerModule",
         description: "⏰ 타이머",
         emoji: "⏰",
-        features: ["뽀모도로", "타이머", "스톱워치"]
+        features: ["뽀모도로", "타이머", "스톱워치"],
       },
       LeaveModule: {
         enabled: true,
@@ -677,7 +761,7 @@ class ModuleManager {
         path: "../modules/LeaveModule",
         description: "📅 휴가 관리",
         emoji: "📅",
-        features: ["휴가 신청", "잔여 일수", "히스토리"]
+        features: ["휴가 신청", "잔여 일수", "히스토리"],
       },
       WorktimeModule: {
         enabled: true,
@@ -686,7 +770,7 @@ class ModuleManager {
         path: "../modules/WorktimeModule",
         description: "🕐 근무시간",
         emoji: "🕐",
-        features: ["출퇴근", "근무 시간", "통계"]
+        features: ["출퇴근", "근무 시간", "통계"],
       },
       UtilsModule: {
         enabled: true,
@@ -695,7 +779,7 @@ class ModuleManager {
         path: "../modules/UtilsModule",
         description: "🛠️ 유틸리티",
         emoji: "🛠️",
-        features: ["TTS", "도구", "변환기"]
+        features: ["TTS", "도구", "변환기"],
       },
       ReminderModule: {
         enabled: true,
@@ -704,7 +788,7 @@ class ModuleManager {
         path: "../modules/ReminderModule",
         description: "🔔 리마인더",
         emoji: "🔔",
-        features: ["알림 설정", "반복 알림", "스케줄링"]
+        features: ["알림 설정", "반복 알림", "스케줄링"],
       },
       InsightModule: {
         enabled: true,
@@ -713,8 +797,8 @@ class ModuleManager {
         path: "../modules/InsightModule",
         description: "📊 인사이트",
         emoji: "📊",
-        features: ["데이터 분석", "리포트", "통계"]
-      }
+        features: ["데이터 분석", "리포트", "통계"],
+      },
     };
   }
 
@@ -730,19 +814,21 @@ class ModuleManager {
       loadTime: moduleData.loadTime,
       errorCount: moduleData.errorCount,
       lastError: moduleData.lastError?.message,
-      instance: moduleData.instance?.getStatus?.() || null
+      instance: moduleData.instance?.getStatus?.() || null,
     };
   }
 
   // 📋 모든 모듈 상태 조회
   getAllModuleStatus() {
     const statuses = [];
-    
+
     for (const [moduleName] of this.modules.entries()) {
       statuses.push(this.getModuleStatus(moduleName));
     }
 
-    return statuses.sort((a, b) => (a.config?.priority || 100) - (b.config?.priority || 100));
+    return statuses.sort(
+      (a, b) => (a.config?.priority || 100) - (b.config?.priority || 100)
+    );
   }
 
   // 🔄 모듈 재시작
@@ -763,7 +849,7 @@ class ModuleManager {
       // 새 인스턴스 생성 및 초기화
       const ModuleClass = require(moduleData.config.path);
       const newInstance = new ModuleClass();
-      
+
       if (this.bot) {
         newInstance.bot = this.bot;
       }
@@ -772,7 +858,7 @@ class ModuleManager {
 
       // 데이터 업데이트
       moduleData.instance = newInstance;
-      moduleData.status = 'initialized';
+      moduleData.status = "initialized";
       moduleData.errorCount = 0;
       moduleData.lastError = null;
       moduleData.loadTime = new Date();
@@ -781,7 +867,6 @@ class ModuleManager {
 
       Logger.success(`✅ 모듈 ${moduleName} 재시작 완료`);
       return true;
-
     } catch (error) {
       Logger.error(`❌ 모듈 ${moduleName} 재시작 실패:`, error);
       return false;
@@ -790,8 +875,8 @@ class ModuleManager {
 
   // 🔧 모듈 핫 리로드 (개발용)
   async hotReloadModule(moduleName) {
-    if (process.env.NODE_ENV === 'production') {
-      throw new Error('프로덕션 환경에서는 핫 리로드를 사용할 수 없습니다');
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("프로덕션 환경에서는 핫 리로드를 사용할 수 없습니다");
     }
 
     try {
@@ -808,7 +893,6 @@ class ModuleManager {
 
       // 모듈 재시작
       return await this.restartModule(moduleName);
-
     } catch (error) {
       Logger.error(`❌ 모듈 ${moduleName} 핫 리로드 실패:`, error);
       return false;
@@ -818,14 +902,14 @@ class ModuleManager {
   // 🧪 헬스 체크
   async healthCheck() {
     const health = {
-      status: 'healthy',
+      status: "healthy",
       timestamp: new Date(),
       checks: {
         database: false,
         modules: {},
         memory: process.memoryUsage(),
-        uptime: Date.now() - this.globalStats.startTime.getTime()
-      }
+        uptime: Date.now() - this.globalStats.startTime.getTime(),
+      },
     };
 
     try {
@@ -836,42 +920,45 @@ class ModuleManager {
       for (const [moduleName, moduleData] of this.modules.entries()) {
         health.checks.modules[moduleName] = {
           status: moduleData.status,
-          healthy: moduleData.status === 'initialized' && moduleData.errorCount < 5,
-          errorCount: moduleData.errorCount
+          healthy:
+            moduleData.status === "initialized" && moduleData.errorCount < 5,
+          errorCount: moduleData.errorCount,
         };
 
         if (!health.checks.modules[moduleName].healthy) {
-          health.status = 'degraded';
+          health.status = "degraded";
         }
       }
 
       // 메모리 사용량 확인
       const memoryUsage = process.memoryUsage();
-      if (memoryUsage.heapUsed > 512 * 1024 * 1024) { // 512MB 초과
-        health.status = 'warning';
+      if (memoryUsage.heapUsed > 512 * 1024 * 1024) {
+        // 512MB 초과
+        health.status = "warning";
         health.warnings = health.warnings || [];
-        health.warnings.push('높은 메모리 사용량');
+        health.warnings.push("높은 메모리 사용량");
       }
 
       // 에러율 확인
-      const errorRate = this.globalStats.totalRequests > 0 
-        ? (this.globalStats.errors / this.globalStats.totalRequests) * 100 
-        : 0;
+      const errorRate =
+        this.globalStats.totalRequests > 0
+          ? (this.globalStats.errors / this.globalStats.totalRequests) * 100
+          : 0;
 
-      if (errorRate > 5) { // 5% 초과
-        health.status = 'warning';
+      if (errorRate > 5) {
+        // 5% 초과
+        health.status = "warning";
         health.warnings = health.warnings || [];
         health.warnings.push(`높은 에러율: ${errorRate.toFixed(2)}%`);
       }
 
       return health;
-
     } catch (error) {
-      Logger.error('❌ 헬스 체크 실패:', error);
+      Logger.error("❌ 헬스 체크 실패:", error);
       return {
-        status: 'unhealthy',
+        status: "unhealthy",
         timestamp: new Date(),
-        error: error.message
+        error: error.message,
       };
     }
   }
@@ -885,9 +972,9 @@ class ModuleManager {
       system: {
         memory: process.memoryUsage(),
         cpu: process.cpuUsage(),
-        uptime: process.uptime()
+        uptime: process.uptime(),
       },
-      database: this.db.getStats()
+      database: this.db.getStats(),
     };
 
     // 각 모듈 메트릭 수집
@@ -899,9 +986,9 @@ class ModuleManager {
 
     // 데이터베이스에 저장 (선택적)
     try {
-      await this.db.insertOne('performance_metrics', metrics);
+      await this.db.insertOne("performance_metrics", metrics);
     } catch (error) {
-      Logger.debug('📊 메트릭 저장 실패 (무시됨):', error.message);
+      Logger.debug("📊 메트릭 저장 실패 (무시됨):", error.message);
     }
 
     return metrics;
@@ -909,34 +996,32 @@ class ModuleManager {
 
   // 🧹 정리 작업
   async cleanup() {
+    Logger.info("🧹 ModuleManager 정리 작업 시작");
+
     try {
-      Logger.info("🧹 ModuleManager 정리 작업 시작...");
+      // 진행 중인 처리 중단
+      this.processingMessages.clear();
+      this.processingCallbacks.clear();
 
       // 모든 모듈 정리
-      const cleanupPromises = [];
       for (const [moduleName, moduleData] of this.modules.entries()) {
-        if (moduleData.instance?.cleanup) {
-          cleanupPromises.push(
-            moduleData.instance.cleanup().catch(error => 
-              Logger.error(`❌ 모듈 ${moduleName} 정리 실패:`, error)
-            )
-          );
+        try {
+          if (moduleData.instance?.cleanup) {
+            await moduleData.instance.cleanup();
+          }
+        } catch (error) {
+          Logger.error(`❌ 모듈 ${moduleName} 정리 오류:`, error);
         }
       }
 
-      await Promise.all(cleanupPromises);
+      // ErrorHandler 정리
+      if (this.errorHandler) {
+        this.errorHandler.cleanup();
+      }
 
-      // 전역 상태 정리
-      this.globalUserStates.clear();
-      this.processingCallbacks.clear();
-      this.processingMessages.clear();
-
-      // 데이터베이스 연결 종료
-      await this.db.disconnect();
-
-      Logger.success("✅ ModuleManager 정리 작업 완료");
+      Logger.success("✅ ModuleManager 정리 완료");
     } catch (error) {
-      Logger.error("❌ ModuleManager 정리 작업 실패:", error);
+      Logger.error("❌ ModuleManager 정리 중 오류:", error);
     }
   }
 
@@ -950,19 +1035,19 @@ class ModuleManager {
       globalUserStates: this.globalUserStates.size,
       stats: this.getGlobalStats(),
       modules: this.getAllModuleStatus(),
-      database: this.db.getStats()
+      database: this.db.getStats(),
     };
   }
 
   // 🔍 모듈 확인 메서드들 (MenuManager 호환)
   hasModule(moduleName) {
     const moduleData = this.modules.get(moduleName);
-    return moduleData && moduleData.status === 'initialized';
+    return moduleData && moduleData.status === "initialized";
   }
 
   getModule(moduleName) {
     const moduleData = this.modules.get(moduleName);
-    return moduleData?.status === 'initialized' ? moduleData.instance : null;
+    return moduleData?.status === "initialized" ? moduleData.instance : null;
   }
 
   isModuleEnabled(moduleName) {
@@ -976,10 +1061,13 @@ class ModuleManager {
       message,
       details,
       timestamp: new Date(),
-      module: 'ModuleManager'
+      module: "ModuleManager",
     };
 
-    Logger[level === 'critical' ? 'error' : level](`🚨 알림 [${level.toUpperCase()}]: ${message}`, details);
+    Logger[level === "critical" ? "error" : level](
+      `🚨 알림 [${level.toUpperCase()}]: ${message}`,
+      details
+    );
 
     // 필요시 외부 알림 서비스 연동 (Discord, Slack 등)
     // await this.notificationService.send(alert);

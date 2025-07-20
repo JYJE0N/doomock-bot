@@ -1,9 +1,10 @@
-// src/modules/BaseModule.js - 완전 표준화된 베이스 모듈 (v3 리팩토링)
+// src/modules/BaseModule.js - 완전 표준화된 베이스 모듈 (v3 완전 리팩토링)
 
 const Logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const { ValidationHelper } = require("../utils/ValidationHelper");
 const { mongoPoolManager } = require("../database/MongoPoolManager");
+const ErrorHandler = require("../utils/ErrorHandler"); // ✅ 클래스 import
 
 class BaseModule {
   constructor(name, config = {}) {
@@ -46,14 +47,18 @@ class BaseModule {
     this.actionMap = new Map();
     this.registerBaseActions();
 
-    // 🛡️ 에러 처리 (근본 원인 해결)
-    this.errorHandlers = new Map();
-    this.setupErrorHandlers();
+    // ✅ ErrorHandler 인스턴스 생성 (모듈별 독립적)
+    this.errorHandler = new ErrorHandler({
+      maxRetries: 3,
+      retryDelay: 1000,
+    });
 
     // 🗄️ 데이터베이스 접근
     this.db = mongoPoolManager;
 
-    Logger.debug(`📦 ${this.name} 모듈 생성됨 (우선순위: ${this.config.priority})`);
+    Logger.debug(
+      `📦 ${this.name} 모듈 생성됨 (우선순위: ${this.config.priority})`
+    );
   }
 
   // ⚙️ 기본 액션 등록
@@ -62,42 +67,6 @@ class BaseModule {
     this.actionMap.set("help", this.showHelp.bind(this));
     this.actionMap.set("stats", this.showStats.bind(this));
     this.actionMap.set("cancel", this.cancelUserAction.bind(this));
-  }
-
-  // 🛡️ 에러 핸들러 설정 (근본 원인 해결)
-  setupErrorHandlers() {
-    // MongoDB 연결 오류
-    this.errorHandlers.set('MongoNetworkError', async (error, context) => {
-      Logger.error(`🔌 MongoDB 연결 오류 (${this.name}):`, error.message);
-      await this.db.reconnect();
-      return "⚡ 데이터베이스 연결을 복구하고 있습니다. 잠시 후 다시 시도해주세요.";
-    });
-
-    // 텔레그램 API 오류
-    this.errorHandlers.set('TelegramError', async (error, context) => {
-      Logger.error(`📱 텔레그램 API 오류 (${this.name}):`, error.message);
-      return "📱 텔레그램 서비스 일시 오류입니다. 잠시 후 다시 시도해주세요.";
-    });
-
-    // 사용자 입력 검증 오류
-    this.errorHandlers.set('ValidationError', async (error, context) => {
-      Logger.warn(`📝 입력 검증 오류 (${this.name}):`, error.message);
-      return `❌ ${error.message}`;
-    });
-
-    // 시간 초과 오류
-    this.errorHandlers.set('TimeoutError', async (error, context) => {
-      Logger.warn(`⏰ 시간 초과 (${this.name}):`, error.message);
-      this.cleanupUserTimeout(context.userId);
-      return "⏰ 요청 시간이 초과되었습니다. 다시 시도해주세요.";
-    });
-
-    // 일반 오류
-    this.errorHandlers.set('default', async (error, context) => {
-      Logger.error(`🚨 일반 오류 (${this.name}):`, error);
-      this.stats.errorCount++;
-      return "❌ 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.";
-    });
   }
 
   // 🔧 모듈 초기화 (표준)
@@ -121,11 +90,18 @@ class BaseModule {
 
       this.isInitialized = true;
       this.isLoaded = true;
-      
+
       Logger.success(`✅ ${this.name} 초기화 완료`);
     } catch (error) {
       this.stats.errorCount++;
       Logger.error(`❌ ${this.name} 초기화 실패:`, error);
+
+      // ✅ ErrorHandler를 통한 에러 처리
+      await this.errorHandler.handleError(error, {
+        type: "initialization",
+        module: this.name,
+      });
+
       throw error;
     }
   }
@@ -133,7 +109,7 @@ class BaseModule {
   // 🗄️ 데이터베이스 연결 확인
   async ensureDatabaseConnection() {
     try {
-      if (!await this.db.isHealthy()) {
+      if (!(await this.db.isHealthy())) {
         await this.db.connect();
       }
     } catch (error) {
@@ -146,11 +122,14 @@ class BaseModule {
     // 기본 사용자 상태 인덱스
     const userStateIndexes = [
       { key: { userId: 1, moduleName: 1 }, options: { unique: true } },
-      { key: { createdAt: 1 }, options: { expireAfterSeconds: 86400 } } // 24시간 후 자동 삭제
+      { key: { createdAt: 1 }, options: { expireAfterSeconds: 86400 } }, // 24시간 후 자동 삭제
     ];
 
     try {
-      await this.db.ensureIndexes(`${this.moduleName}_userStates`, userStateIndexes);
+      await this.db.ensureIndexes(
+        `${this.moduleName}_userStates`,
+        userStateIndexes
+      );
       Logger.debug(`📑 ${this.name} 기본 인덱스 설정 완료`);
     } catch (error) {
       Logger.warn(`⚠️ ${this.name} 인덱스 설정 실패:`, error.message);
@@ -165,12 +144,17 @@ class BaseModule {
   // 📨 표준 메시지 처리 (표준 매개변수)
   async handleMessage(bot, msg) {
     const startTime = Date.now();
-    const { chat: { id: chatId }, from: { id: userId }, text } = msg;
+    const {
+      from: { id: userId },
+      text,
+      chat: { id: chatId },
+    } = msg;
+    const userName = getUserName(msg.from);
 
     try {
-      // 처리 중복 방지
+      // 중복 처리 방지
       if (this.processingUsers.has(userId)) {
-        Logger.debug(`⏭️ 사용자 ${userId} 처리 중 - 무시`);
+        Logger.debug(`⏭️ 사용자 ${userId} 처리 중, 무시`);
         return false;
       }
 
@@ -178,35 +162,50 @@ class BaseModule {
       this.setUserTimeout(userId);
 
       // 통계 업데이트
-      this.updateStats('command', userId, startTime);
+      this.updateStats("message", startTime);
+      this.stats.uniqueUsers.add(userId);
 
-      // 서브클래스 처리
-      const result = await this.onHandleMessage(bot, msg);
+      Logger.debug(`📨 ${this.name} 메시지 처리: "${text}" (${userName})`);
 
-      return result;
+      // 실제 메시지 처리 (서브클래스에서 구현)
+      const handled = await this.processMessage(bot, msg);
+
+      return handled;
     } catch (error) {
-      await this.handleError(error, { userId, chatId, type: 'message' });
+      Logger.error(`❌ ${this.name} 메시지 처리 오류:`, error);
+
+      // ✅ ErrorHandler를 통한 에러 처리
+      await this.errorHandler.handleError(error, {
+        type: "message",
+        module: this.name,
+        userId: userId,
+      });
+
       return false;
     } finally {
       this.processingUsers.delete(userId);
-      this.clearUserTimeout(userId);
-      this.updateResponseTime(startTime);
+      this.cleanupUserTimeout(userId);
     }
   }
 
-  // 📞 표준 콜백 처리 (🎯 매개변수 완전 표준화)
+  // 📞 표준 콜백 처리 (표준 매개변수)
   async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     const startTime = Date.now();
     const {
-      message: { chat: { id: chatId }, message_id: messageId },
       from: { id: userId },
+      data,
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
     } = callbackQuery;
+    const userName = getUserName(callbackQuery.from);
 
     try {
-      // 처리 중복 방지
-      const callbackKey = `${userId}_${subAction}`;
+      // 중복 처리 방지
+      const callbackKey = `${userId}_${data}`;
       if (this.processingUsers.has(callbackKey)) {
-        Logger.debug(`⏭️ 콜백 ${callbackKey} 처리 중 - 무시`);
+        Logger.debug(`⏭️ 콜백 ${callbackKey} 처리 중, 무시`);
         return false;
       }
 
@@ -214,305 +213,298 @@ class BaseModule {
       this.setUserTimeout(userId);
 
       // 통계 업데이트
-      this.updateStats('callback', userId, startTime);
+      this.updateStats("callback", startTime);
+      this.stats.uniqueUsers.add(userId);
 
-      // 액션 매핑 처리
-      const action = this.actionMap.get(subAction);
-      if (action) {
-        const userName = getUserName(callbackQuery.from);
-        await action(bot, chatId, messageId, userId, userName, params, menuManager);
-        return true;
+      Logger.debug(`📞 ${this.name} 콜백 처리: "${data}" (${userName})`);
+
+      // 콜백 응답 (텔레그램 요구사항)
+      try {
+        await bot.answerCallbackQuery(callbackQuery.id);
+      } catch (answerError) {
+        Logger.debug("콜백 응답 실패 (무시됨):", answerError.message);
       }
 
-      // 서브클래스 처리
-      const result = await this.onHandleCallback(bot, callbackQuery, subAction, params, menuManager);
-      return result;
+      // 실제 콜백 처리 (서브클래스에서 구현)
+      const handled = await this.processCallback(
+        bot,
+        callbackQuery,
+        subAction,
+        params,
+        menuManager
+      );
 
+      return handled;
     } catch (error) {
-      await this.handleError(error, { userId, chatId, messageId, type: 'callback', subAction });
+      Logger.error(`❌ ${this.name} 콜백 처리 오류:`, error);
+
+      // ✅ ErrorHandler를 통한 에러 처리
+      await this.errorHandler.handleError(error, {
+        type: "callback",
+        module: this.name,
+        userId: userId,
+        data: data,
+      });
+
+      // 사용자에게 에러 메시지 전송
+      try {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "❌ 처리 중 오류가 발생했습니다.",
+          show_alert: true,
+        });
+      } catch (answerError) {
+        Logger.debug("에러 콜백 응답 실패:", answerError.message);
+      }
+
       return false;
     } finally {
-      this.processingUsers.delete(`${userId}_${subAction}`);
-      this.clearUserTimeout(userId);
-      this.updateResponseTime(startTime);
-    }
-  }
-
-  // 🎯 서브클래스 메시지 처리 (오버라이드 필요)
-  async onHandleMessage(bot, msg) {
-    return false;
-  }
-
-  // 🎯 서브클래스 콜백 처리 (오버라이드 필요)
-  async onHandleCallback(bot, callbackQuery, subAction, params, menuManager) {
-    return false;
-  }
-
-  // 📋 메뉴 표시 (표준)
-  async showMenu(bot, chatId, messageId, userId, userName, params, menuManager) {
-    try {
-      const menuData = this.getMenuData(userName);
-      
-      if (messageId) {
-        await bot.editMessageText(menuData.text, {
-          chat_id: chatId,
-          message_id: messageId,
-          reply_markup: menuData.keyboard,
-          parse_mode: 'Markdown',
-        });
-      } else {
-        await bot.sendMessage(chatId, menuData.text, {
-          reply_markup: menuData.keyboard,
-          parse_mode: 'Markdown',
-        });
-      }
-    } catch (error) {
-      await this.handleError(error, { userId, chatId, messageId, type: 'menu' });
-    }
-  }
-
-  // 📋 메뉴 데이터 제공 (서브클래스에서 오버라이드)
-  getMenuData(userName) {
-    return {
-      text: `🔧 **${userName}님, ${this.name}에 오신 것을 환영합니다!**\n\n사용 가능한 기능을 선택해주세요.`,
-      keyboard: {
-        inline_keyboard: [
-          [{ text: "📊 통계", callback_data: `${this.moduleName}_stats` }],
-          [{ text: "❓ 도움말", callback_data: `${this.moduleName}_help` }],
-          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
-        ],
-      },
-    };
-  }
-
-  // ❓ 도움말 표시
-  async showHelp(bot, chatId, messageId, userId, userName) {
-    const helpText = this.getHelpText();
-    
-    try {
-      if (messageId) {
-        await bot.editMessageText(helpText, {
-          chat_id: chatId,
-          message_id: messageId,
-          parse_mode: 'Markdown',
-        });
-      } else {
-        await bot.sendMessage(chatId, helpText, {
-          parse_mode: 'Markdown',
-        });
-      }
-    } catch (error) {
-      await this.handleError(error, { userId, chatId, messageId, type: 'help' });
-    }
-  }
-
-  // ❓ 도움말 텍스트 (서브클래스에서 오버라이드)
-  getHelpText() {
-    return `**${this.name} 도움말** 📖\n\n기본 기능들을 제공합니다.\n\n더 자세한 도움말은 각 기능에서 확인하세요.`;
-  }
-
-  // 📊 통계 표시
-  async showStats(bot, chatId, messageId, userId, userName) {
-    const uptime = Date.now() - this.startTime.getTime();
-    const hours = Math.floor(uptime / (1000 * 60 * 60));
-    const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
-
-    const statsText = `**${this.name} 통계** 📊\n\n` +
-      `📈 명령어 실행: ${this.stats.commandCount}회\n` +
-      `📞 콜백 처리: ${this.stats.callbackCount}회\n` +
-      `❌ 오류 발생: ${this.stats.errorCount}회\n` +
-      `👥 고유 사용자: ${this.stats.uniqueUsers.size}명\n` +
-      `⚡ 평균 응답: ${this.stats.averageResponseTime.toFixed(0)}ms\n` +
-      `⏰ 가동 시간: ${hours}시간 ${minutes}분\n` +
-      `🔧 상태: ${this.isInitialized ? '정상' : '초기화 중'}`;
-
-    try {
-      if (messageId) {
-        await bot.editMessageText(statsText, {
-          chat_id: chatId,
-          message_id: messageId,
-          parse_mode: 'Markdown',
-        });
-      } else {
-        await bot.sendMessage(chatId, statsText, {
-          parse_mode: 'Markdown',
-        });
-      }
-    } catch (error) {
-      await this.handleError(error, { userId, chatId, messageId, type: 'stats' });
-    }
-  }
-
-  // ❌ 사용자 작업 취소
-  async cancelUserAction(bot, chatId, messageId, userId, userName) {
-    try {
-      // 사용자 상태 정리
-      this.clearUserState(userId);
-      this.clearUserTimeout(userId);
-      this.processingUsers.delete(userId);
-
-      const message = "✅ 현재 작업이 취소되었습니다.";
-      
-      if (messageId) {
-        await bot.editMessageText(message, {
-          chat_id: chatId,
-          message_id: messageId,
-        });
-      } else {
-        await bot.sendMessage(chatId, message);
-      }
-    } catch (error) {
-      await this.handleError(error, { userId, chatId, messageId, type: 'cancel' });
-    }
-  }
-
-  // 👥 사용자 상태 관리 (표준화)
-  setUserState(userId, state) {
-    this.userStates.set(userId, {
-      ...state,
-      moduleName: this.moduleName,
-      timestamp: Date.now(),
-      timeout: Date.now() + this.config.timeout,
-    });
-  }
-
-  getUserState(userId) {
-    const state = this.userStates.get(userId);
-    if (state && state.timeout < Date.now()) {
-      this.clearUserState(userId);
-      return null;
-    }
-    return state;
-  }
-
-  clearUserState(userId) {
-    this.userStates.delete(userId);
-  }
-
-  // ⏰ 사용자 타임아웃 관리
-  setUserTimeout(userId) {
-    this.clearUserTimeout(userId);
-    
-    const timeoutId = setTimeout(() => {
+      this.processingUsers.delete(`${userId}_${data}`);
       this.cleanupUserTimeout(userId);
+    }
+  }
+
+  // 🎯 실제 메시지 처리 (서브클래스에서 구현)
+  async processMessage(bot, msg) {
+    // 서브클래스에서 오버라이드
+    Logger.warn(`${this.name}에서 processMessage가 구현되지 않음`);
+    return false;
+  }
+
+  // 🎯 실제 콜백 처리 (서브클래스에서 구현)
+  async processCallback(bot, callbackQuery, subAction, params, menuManager) {
+    // 서브클래스에서 오버라이드
+    Logger.warn(`${this.name}에서 processCallback가 구현되지 않음`);
+    return false;
+  }
+
+  // 📊 통계 업데이트
+  updateStats(type, startTime) {
+    const responseTime = Date.now() - startTime;
+
+    this.stats.lastUsed = new Date();
+    this.stats.totalResponseTime += responseTime;
+
+    if (type === "message") {
+      this.stats.commandCount++;
+    } else if (type === "callback") {
+      this.stats.callbackCount++;
+    }
+
+    const totalRequests = this.stats.commandCount + this.stats.callbackCount;
+    this.stats.averageResponseTime =
+      totalRequests > 0
+        ? Math.round(this.stats.totalResponseTime / totalRequests)
+        : 0;
+
+    Logger.debug(`📊 ${this.name} 응답시간: ${responseTime}ms`);
+  }
+
+  // ⏰ 사용자 타임아웃 설정
+  setUserTimeout(userId) {
+    this.cleanupUserTimeout(userId);
+
+    const timeout = setTimeout(() => {
+      this.processingUsers.delete(userId);
+      Logger.debug(`⏰ ${this.name} 사용자 ${userId} 타임아웃`);
     }, this.config.timeout);
 
-    this.userTimeouts.set(userId, timeoutId);
+    this.userTimeouts.set(userId, timeout);
   }
 
-  clearUserTimeout(userId) {
-    const timeoutId = this.userTimeouts.get(userId);
-    if (timeoutId) {
-      clearTimeout(timeoutId);
+  // 🧹 사용자 타임아웃 정리
+  cleanupUserTimeout(userId) {
+    const timeout = this.userTimeouts.get(userId);
+    if (timeout) {
+      clearTimeout(timeout);
       this.userTimeouts.delete(userId);
     }
   }
 
-  cleanupUserTimeout(userId) {
-    this.clearUserState(userId);
-    this.clearUserTimeout(userId);
-    this.processingUsers.delete(userId);
-    Logger.debug(`⏰ 사용자 ${userId} 타임아웃으로 정리됨`);
-  }
+  // 📋 메뉴 표시 (기본 구현)
+  async showMenu(bot, chatId, messageId, userId, userName) {
+    const menuText = `🔧 **${this.name} 메뉴**\n\n사용 가능한 기능을 선택하세요:`;
 
-  // 📊 통계 업데이트
-  updateStats(type, userId, startTime) {
-    if (type === 'command') {
-      this.stats.commandCount++;
-    } else if (type === 'callback') {
-      this.stats.callbackCount++;
-    }
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "📊 통계", callback_data: `${this.moduleName}_stats` },
+          { text: "❓ 도움말", callback_data: `${this.moduleName}_help` },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+      ],
+    };
 
-    this.stats.uniqueUsers.add(userId);
-    this.stats.lastUsed = new Date();
-  }
-
-  updateResponseTime(startTime) {
-    const responseTime = Date.now() - startTime;
-    this.stats.totalResponseTime += responseTime;
-    const totalRequests = this.stats.commandCount + this.stats.callbackCount;
-    this.stats.averageResponseTime = this.stats.totalResponseTime / totalRequests;
-  }
-
-  // 🛡️ 통합 에러 처리 (근본 원인 해결)
-  async handleError(error, context) {
-    this.stats.errorCount++;
-    
-    // 에러 타입별 처리
-    let errorType = 'default';
-    
-    if (error.name?.includes('Mongo')) {
-      errorType = 'MongoNetworkError';
-    } else if (error.name?.includes('Telegram')) {
-      errorType = 'TelegramError';
-    } else if (error.name?.includes('Validation')) {
-      errorType = 'ValidationError';
-    } else if (error.name?.includes('Timeout')) {
-      errorType = 'TimeoutError';
-    }
-
-    const handler = this.errorHandlers.get(errorType) || this.errorHandlers.get('default');
-    const userMessage = await handler(error, context);
-
-    // 사용자에게 알림
-    if (context.chatId && userMessage) {
-      try {
-        await this.sendErrorMessage(context, userMessage);
-      } catch (sendError) {
-        Logger.error(`📱 에러 메시지 전송 실패:`, sendError);
-      }
-    }
-  }
-
-  // 📱 에러 메시지 전송
-  async sendErrorMessage(context, message) {
-    // 기본 봇 인스턴스가 있다면 사용 (ModuleManager에서 주입)
-    if (this.bot) {
-      await this.bot.sendMessage(context.chatId, message);
-    }
-  }
-
-  // 🧹 정리 작업
-  async cleanup() {
     try {
-      Logger.info(`🧹 ${this.name} 정리 작업 시작...`);
-
-      // 모든 사용자 상태 정리
-      for (const userId of this.userStates.keys()) {
-        this.clearUserState(userId);
-        this.clearUserTimeout(userId);
+      if (messageId) {
+        await bot.editMessageText(menuText, {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      } else {
+        await bot.sendMessage(chatId, menuText, {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
       }
+    } catch (error) {
+      Logger.error(`${this.name} 메뉴 표시 오류:`, error);
+      await this.errorHandler.handleError(error, {
+        type: "menu_display",
+        module: this.name,
+        userId: userId,
+      });
+    }
+  }
 
-      // 처리 중 사용자 정리
+  // 📊 통계 표시
+  async showStats(bot, chatId, messageId, userId, userName) {
+    const stats = this.getModuleStats();
+    const statsText = `📊 **${this.name} 통계**\n\n${stats}`;
+
+    try {
+      await this.editMessage(bot, chatId, messageId, statsText, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메뉴", callback_data: `${this.moduleName}_menu` }],
+          ],
+        },
+      });
+    } catch (error) {
+      Logger.error(`${this.name} 통계 표시 오류:`, error);
+    }
+  }
+
+  // 📈 모듈 통계 조회
+  getModuleStats() {
+    const uptime = Math.round((Date.now() - this.startTime.getTime()) / 1000);
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+
+    return `
+• 📨 처리된 명령: ${this.stats.commandCount}개
+• 📞 처리된 콜백: ${this.stats.callbackCount}개
+• 👥 고유 사용자: ${this.stats.uniqueUsers.size}명
+• ❌ 오류 횟수: ${this.stats.errorCount}개
+• ⚡ 평균 응답시간: ${this.stats.averageResponseTime}ms
+• ⏰ 가동시간: ${hours}시간 ${minutes}분
+• 📅 마지막 사용: ${
+      this.stats.lastUsed ? this.stats.lastUsed.toLocaleString() : "없음"
+    }
+    `.trim();
+  }
+
+  // ❓ 도움말 표시 (서브클래스에서 오버라이드)
+  async showHelp(bot, chatId, messageId, userId, userName) {
+    const helpText = `❓ **${this.name} 도움말**\n\n이 모듈의 도움말이 아직 구현되지 않았습니다.`;
+
+    try {
+      await this.editMessage(bot, chatId, messageId, helpText, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메뉴", callback_data: `${this.moduleName}_menu` }],
+          ],
+        },
+      });
+    } catch (error) {
+      Logger.error(`${this.name} 도움말 표시 오류:`, error);
+    }
+  }
+
+  // ❌ 사용자 액션 취소
+  async cancelUserAction(bot, chatId, messageId, userId, userName) {
+    // 사용자 상태 초기화
+    this.userStates.delete(userId);
+    this.processingUsers.delete(userId);
+    this.cleanupUserTimeout(userId);
+
+    const cancelText = `❌ **작업 취소됨**\n\n${userName}님의 작업이 취소되었습니다.`;
+
+    try {
+      await this.editMessage(bot, chatId, messageId, cancelText, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 메뉴", callback_data: `${this.moduleName}_menu` }],
+          ],
+        },
+      });
+    } catch (error) {
+      Logger.error(`${this.name} 작업 취소 오류:`, error);
+    }
+  }
+
+  // 🔧 유틸리티: 메시지 전송
+  async sendMessage(bot, chatId, text, options = {}) {
+    try {
+      return await bot.sendMessage(chatId, text, options);
+    } catch (error) {
+      Logger.error(`${this.name} 메시지 전송 오류:`, error);
+      await this.errorHandler.handleError(error, {
+        type: "send_message",
+        module: this.name,
+      });
+      throw error;
+    }
+  }
+
+  // 🔧 유틸리티: 메시지 수정
+  async editMessage(bot, chatId, messageId, text, options = {}) {
+    try {
+      return await bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: messageId,
+        ...options,
+      });
+    } catch (error) {
+      Logger.error(`${this.name} 메시지 수정 오류:`, error);
+      await this.errorHandler.handleError(error, {
+        type: "edit_message",
+        module: this.name,
+      });
+      throw error;
+    }
+  }
+
+  // 🧹 모듈 정리
+  async cleanup() {
+    Logger.info(`🧹 ${this.name} 정리 작업 시작`);
+
+    try {
+      // 진행 중인 모든 작업 중단
       this.processingUsers.clear();
 
-      // 서브클래스 정리 작업
-      await this.onCleanup();
+      // 모든 타임아웃 정리
+      for (const timeout of this.userTimeouts.values()) {
+        clearTimeout(timeout);
+      }
+      this.userTimeouts.clear();
 
-      Logger.success(`✅ ${this.name} 정리 작업 완료`);
+      // 사용자 상태 정리
+      this.userStates.clear();
+
+      // ErrorHandler 정리
+      if (this.errorHandler) {
+        this.errorHandler.cleanup();
+      }
+
+      // 서브클래스별 정리 (있다면)
+      if (this.onCleanup) {
+        await this.onCleanup();
+      }
+
+      Logger.success(`✅ ${this.name} 정리 완료`);
     } catch (error) {
-      Logger.error(`❌ ${this.name} 정리 작업 실패:`, error);
+      Logger.error(`❌ ${this.name} 정리 중 오류:`, error);
     }
   }
 
-  // 🎯 서브클래스 정리 작업 (오버라이드 가능)
+  // 🎯 서브클래스 정리 (오버라이드 가능)
   async onCleanup() {
     // 서브클래스에서 구현
-  }
-
-  // 📊 모듈 상태 반환
-  getStatus() {
-    return {
-      name: this.name,
-      moduleName: this.moduleName,
-      isInitialized: this.isInitialized,
-      isLoaded: this.isLoaded,
-      stats: { ...this.stats, uniqueUsers: this.stats.uniqueUsers.size },
-      activeUsers: this.processingUsers.size,
-      userStates: this.userStates.size,
-      uptime: Date.now() - this.startTime.getTime(),
-      config: this.config,
-    };
   }
 }
 
