@@ -1,7 +1,7 @@
 // src/core/StandardizedSystem.js - 매개변수 통일 + 중복 방지 핵심 시스템
 
 const logger = require("../utils/Logger");
-const { TimeHelper } = require("../utils/TimeHelper");
+const { TimeHelper } = require("../utils/TimeHelper").default;
 
 /**
  * 🎯 표준 매개변수 정의 (절대 변경 금지!)

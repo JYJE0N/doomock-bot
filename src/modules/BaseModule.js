@@ -7,6 +7,9 @@ class BaseModule {
   constructor(name, config = {}) {
     this.name = name;
     this.moduleName = name.replace("Module", "").toLowerCase();
+    // ✅ 생성자에서 dbManager 받기
+    this.dbManager = config.dbManager || null;
+    this.db = this.dbManager; // ✅ this.db로 참조 설정
     this.config = {
       enabled: true,
       priority: 100,

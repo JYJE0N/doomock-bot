@@ -1,5 +1,5 @@
 // src/utils/TimeHelper.js - 정확한 한국시간 처리
-const logger = require("../utils/Logger");
+const logger = require("./Logger.js");
 // 정확한 한국시간을 다루는 유틸리티 클래스
 // 이 클래스는 한국시간(KST) 관련 기능을 제공합니다.
 // 한국시간은 UTC+9로 설정되어 있습니다.

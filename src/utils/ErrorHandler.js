@@ -1,6 +1,6 @@
 // src/utils/ErrorHandler.js - 표준화된 클래스 기반 에러 핸들러 (v3 리팩토링)
 
-const logger = require("../utils/Logger");
+const logger = require("./utils/Logger");
 // 표준화된 에러 핸들러 클래스
 
 class ErrorHandler {

@@ -3,10 +3,10 @@ const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 const { generateId } = require("../utils/IdGenerator");
 const { formatDate, formatTime } = require("../utils/DateFormatter");
-const { addMinutes } = require("../utils/TimeHelper");
+const { addMinutes } = require("../utils/TimeHelper").default;
 const { getRailwayInfo } = require("../utils/RailwayUtils");
 const { generateSessionId } = require("../utils/SessionUtils");
-const { TimeHelper } = require("../utils/TimeHelper");
+const { TimeHelper } = require("../utils/TimeHelper").default;
 const logger = require("../utils/Logger");
 
 class TimerService {
