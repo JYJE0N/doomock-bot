@@ -416,4 +416,4 @@ try {
   console.error("🚨 Logger 정적 메서드 설정 실패:", error.message);
 }
 
-module.exports.Logger = Logger;
+module.exports.Logger = loggerInstance;
