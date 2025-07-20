@@ -3,7 +3,8 @@
 const logger = require("../utils/Logger");
 const { TimeHelper } = require("../utils/TimeHelper");
 
-/**
+/*
+ *
  * 🎯 표준 매개변수 정의 (절대 변경 금지!)
  * 모든 모듈의 handleMessage, handleCallback에서 이 순서를 지켜야 함
  */
@@ -189,33 +190,9 @@ class ParameterValidator {
 /**
  * 🇰🇷 한국시간 전용 타임스탬프 생성기
  */
-class KoreanTimeManager {
-  constructor() {
-    this.lastTimestamp = 0;
-    this.timestampCache = new Map();
-    this.cacheTimeout = 1000; // 1초 캐시
-  }
-
-  // 정확한 한국시간 (UTC+9)
-  getKoreanTime() {
-    const now = new Date();
-    const utcTime = now.getTime() + now.getTimezoneOffset() * 60000;
-    return new Date(utcTime + 9 * 3600000);
-  }
-
-  // 한국시간 문자열 (로깅용)
-  getKoreanTimeString() {
-    const cacheKey = "timestring";
-    const now = Date.now();
-
-    // 캐시 확인
-    if (this.timestampCache.has(cacheKey)) {
-      const cached = this.timestampCache.get(cacheKey);
-      if (now - cached.timestamp < this.cacheTimeout) {
-        return cached.value;
-      }
-    }
-
+const { koreaTimeManager } = require("../utils/KoreaTimeManager");
+class StandardizedBaseModule {
+  constructor(moduleName, options = {}) {
     // 새로 생성
     const koreaTime = this.getKoreanTime();
     const timeString = koreaTime
@@ -266,7 +243,7 @@ class StandardizedBaseModule {
     this.duplicationPreventer = new DuplicationPreventer();
 
     // 🇰🇷 한국시간 관리자
-    this.timeManager = new KoreanTimeManager();
+    this.timeManager = koreaTimeManager;
 
     // 📊 통계
     this.stats = {

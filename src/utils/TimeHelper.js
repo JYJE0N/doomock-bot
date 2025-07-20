@@ -9,15 +9,15 @@ const logger = require("./Logger.js");
 // 이 클래스는 날짜와 시간을 포맷팅하고, 상대적 시간을 계산하며, 예약된 시간 생성 등을 지원합니다.
 // 이 클래스는 한국시간을 기준으로 날짜와 시간을 처리하는 데 유용합니다.
 
-class TimeHelper {
-  // ⭐ 정확한 한국시간 반환
-  static getKoreaTime() {
-    // 현재 UTC 시간에 9시간을 더해서 KST 생성
-    const now = new Date();
-    const utc = now.getTime() + now.getTimezoneOffset() * 60000;
-    const koreaTime = new Date(utc + 9 * 3600000); // UTC+9
+const { koreaTimeManager } = require("./KoreaTimeManager");
 
-    return koreaTime;
+class TimeHelper {
+  static getKoreaTime() {
+    return koreaTimeManager.now();
+  }
+
+  static formatDateTime(date = null, options = {}) {
+    return koreaTimeManager.getLogTimeString(date);
   }
 
   // 한국시간 기준 현재 연도
@@ -308,22 +308,15 @@ class TimeHelper {
 
   // 한국시간 기준 포맷팅된 현재 시간 문자열
   static getNowString(format = "full") {
-    const now = this.getKoreaTime();
-
     switch (format) {
       case "date":
-        return this.formatDate(now);
+        return koreaTimeManager.getDateString();
       case "time":
-        return this.formatTime(now);
+        return koreaTimeManager.getTimeString();
       case "short":
-        return this.formatDateTime(now, {
-          month: "short",
-          day: "numeric",
-          hour: "2-digit",
-          minute: "2-digit",
-        });
+        return koreaTimeManager.getShortTimeString();
       default:
-        return this.formatDateTime(now);
+        return koreaTimeManager.getLogTimeString();
     }
   }
 
