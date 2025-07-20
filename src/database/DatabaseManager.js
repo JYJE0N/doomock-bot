@@ -51,7 +51,7 @@ class DatabaseManager extends StandardizedBaseModule {
     this.mongoUrl =
       mongoUrl || process.env.MONGO_URL || process.env.MONGODB_URL;
     this.databaseName =
-      options.databaseName || process.env.DB_NAME || "doomock_bot";
+      options.databaseName || process.env.DB_NAME || "doomock85";
 
     // 연결 상태
     this.client = null;
@@ -510,10 +510,14 @@ const createDatabaseManager = (mongoUrl = null, options = {}) => {
   return new DatabaseManager(mongoUrl, options);
 };
 
-// ✅ 수정된 export 구조 (중복 선언 제거)
+// ✅ 수정된 export 구조 (new DatabaseManager() 패턴 지원)
 module.exports = {
-  DatabaseManager,
-  createDatabaseManager,
-  // 기본 export를 위한 기본 인스턴스 팩토리
+  DatabaseManager, // 클래스 자체
+  createDatabaseManager, // 팩토리 함수
   getInstance: () => globalDatabaseInstance || createDatabaseManager(),
+  // 기본 export도 지원 (하위 호환성)
+  default: DatabaseManager,
 };
+
+// 하위 호환성을 위한 기본 export
+module.exports.default = DatabaseManager;
