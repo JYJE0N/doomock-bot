@@ -1,3 +1,6 @@
+const logger = require("../utils/Logger");
+// TTS 관련 기능을 제공하는 클래스
+
 class TTSService {
   constructor() {
     this.modes = new Map(); // 예시 상태 저장소

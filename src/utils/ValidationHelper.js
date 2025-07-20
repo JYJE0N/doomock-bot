@@ -1,3 +1,6 @@
+const logger = require("../utils/Logger");
+// 사용자 관련 기능을 제공하는 유틸리티 클래스
+
 class ValidationHelper {
   // 할일 텍스트 검증
   static validateTodoText(text) {

@@ -1,4 +1,7 @@
 // src/services/ReminderService.js - 리마인더 관리 서비스
+const logger = require("../utils/Logger");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
 
 class ReminderService {
   constructor() {
@@ -91,7 +94,9 @@ class ReminderService {
         time: timeParam,
         delay: delay,
         targetTime: targetTime,
-        confirmMessage: `⏰ {text} 리마인더가 ${minutes}분 후(${this.formatTime(targetTime)})에 설정되었습니다.`,
+        confirmMessage: `⏰ {text} 리마인더가 ${minutes}분 후(${this.formatTime(
+          targetTime
+        )})에 설정되었습니다.`,
       };
     }
 
@@ -123,7 +128,9 @@ class ReminderService {
         time: timeParam,
         delay: delay,
         targetTime: targetTime,
-        confirmMessage: `🕐 {text} 리마인더가 ${this.formatTime(targetTime)}에 설정되었습니다.`,
+        confirmMessage: `🕐 {text} 리마인더가 ${this.formatTime(
+          targetTime
+        )}에 설정되었습니다.`,
       };
     }
 
@@ -215,7 +222,7 @@ class ReminderService {
     const reminders = Array.from(this.reminders.values());
 
     if (chatId) {
-      return reminders.filter(r => r.chatId === chatId);
+      return reminders.filter((r) => r.chatId === chatId);
     }
 
     return reminders;

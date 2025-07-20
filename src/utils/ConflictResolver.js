@@ -1,6 +1,8 @@
 // src/utils/ConflictResolver.js - 고급 409 충돌 해결 시스템
 
-const logger = require("./Logger");
+const logger = require("../utils/Logger");
+const { Bot } = require("node-telegram-bot-api");
+// 충돌 해결을 위한 고급 시스템
 
 class ConflictResolver {
   constructor(bot, options = {}) {

@@ -1,4 +1,4 @@
-const { Logger } = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const { AppConfig } = require("../config/AppConfig");
 
 class RateLimitMiddleware {
@@ -37,7 +37,7 @@ class RateLimitMiddleware {
     if (userRecord.count > maxRequests) {
       const remainingTime = Math.ceil((userRecord.resetTime - now) / 1000 / 60);
       logger.warn(
-        `사용자 ${userId} 요청 제한 초과: ${userRecord.count}/${maxRequests}`,
+        `사용자 ${userId} 요청 제한 초과: ${userRecord.count}/${maxRequests}`
       );
 
       return {
@@ -78,7 +78,7 @@ class RateLimitMiddleware {
     }
 
     logger.info(
-      `요청 제한 기록 정리 완료: ${this.userRequests.size}개 사용자 활성`,
+      `요청 제한 기록 정리 완료: ${this.userRequests.size}개 사용자 활성`
     );
   }
 
@@ -87,7 +87,7 @@ class RateLimitMiddleware {
       activeUsers: this.userRequests.size,
       totalTrackedRequests: Array.from(this.userRequests.values()).reduce(
         (sum, record) => sum + record.count,
-        0,
+        0
       ),
     };
   }

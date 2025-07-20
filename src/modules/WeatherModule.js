@@ -5,20 +5,7 @@ const { getUserName } = require("../utils/UserHelper");
 const WeatherService = require("../services/WeatherService"); // ✅ 수정: 구조 분해 할당 제거
 
 // ✅ 새로운 해결책 (logger를 함수로 가져오기)
-const getLogger = () => {
-  try {
-    return require("../utils/Logger");
-  } catch (error) {
-    return {
-      info: (...args) => console.log("[INFO]", ...args),
-      error: (...args) => console.error("[ERROR]", ...args),
-      warn: (...args) => console.warn("[WARN]", ...args),
-      debug: (...args) => console.log("[DEBUG]", ...args),
-      success: (...args) => console.log("[SUCCESS]", ...args),
-      trace: (...args) => console.log("[TRACE]", ...args),
-    };
-  }
-};
+const logger = require("../utils/Logger");
 
 class WeatherModule extends BaseModule {
   constructor() {

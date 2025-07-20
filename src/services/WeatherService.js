@@ -2,6 +2,9 @@
 
 const axios = require("axios");
 const logger = require("../utils/Logger");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
+// ✅ 올바른 서비스 Export 방식
 
 class WeatherService {
   constructor() {

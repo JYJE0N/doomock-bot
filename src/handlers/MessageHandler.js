@@ -37,7 +37,7 @@ class MessageHandler {
         this.userStates.delete(userId);
         await this.bot.sendMessage(
           chatId,
-          `❌ ${userName}님, 작업이 취소되었습니다.`,
+          `❌ ${userName}님, 작업이 취소되었습니다.`
         );
         return;
       }
@@ -62,7 +62,7 @@ class MessageHandler {
       logger.error("메시지 처리 오류:", error);
       await this.bot.sendMessage(
         chatId,
-        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요.",
+        "❌ 처리 중 오류가 발생했습니다. /start 를 입력해서 다시 시작해주세요."
       );
     }
   }
@@ -118,7 +118,7 @@ class MessageHandler {
         if (!handled) {
           await this.bot.sendMessage(
             chatId,
-            `😅 ${userName}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`,
+            `😅 ${userName}님, 알 수 없는 명령어입니다. /start 를 입력해서 메뉴를 확인하세요.`
           );
         }
         break;
@@ -183,7 +183,7 @@ class MessageHandler {
   getMainMenuText(userName) {
     const now = new Date();
     const koreaTime = new Date(
-      now.toLocaleString("en-US", { timeZone: "Asia/Seoul" }),
+      now.toLocaleString("en-US", { timeZone: "Asia/Seoul" })
     );
     const hour = koreaTime.getHours();
 

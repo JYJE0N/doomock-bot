@@ -1,22 +1,6 @@
-// src/modules/SystemModule.js - Logger 문제 완전 해결
+// src/modules/SystemModule.js - 완전 리팩토링 (Logger 통일 + 단순화)
 
-// ✅ 안전한 logger 획득 함수 (최상단 선언)
-const getLogger = () => {
-  try {
-    return require("../utils/Logger");
-  } catch (error) {
-    return {
-      info: (...args) => console.log("[INFO]", ...args),
-      error: (...args) => console.error("[ERROR]", ...args),
-      warn: (...args) => console.warn("[WARN]", ...args),
-      debug: (...args) => console.log("[DEBUG]", ...args),
-      success: (...args) => console.log("[SUCCESS]", ...args),
-      trace: (...args) => console.log("[TRACE]", ...args),
-    };
-  }
-};
-
-// 기타 안전한 imports
+const logger = require("../utils/Logger");
 const { StandardizedBaseModule } = require("../core/StandardizedSystem");
 const { getUserName } = require("../utils/UserHelper");
 
@@ -32,9 +16,6 @@ class SystemModule extends StandardizedBaseModule {
     this.bot = bot;
     this.moduleManager = options.moduleManager;
 
-    // 안전한 logger 사용
-    const logger = getLogger();
-
     // 시스템 설정
     this.config = {
       version: process.env.npm_package_version || "3.0.1",
@@ -45,16 +26,11 @@ class SystemModule extends StandardizedBaseModule {
     logger.info("🏠 SystemModule 생성됨 (표준화 적용)");
   }
 
-  // ✅ 표준 초기화
+  // 표준 초기화
   async initialize() {
-    const logger = getLogger();
-
     try {
       await super.initialize();
-
-      // 시스템 액션 등록
       this.registerSystemActions();
-
       logger.success("✅ SystemModule 초기화 완료");
     } catch (error) {
       logger.error("❌ SystemModule 초기화 실패:", error);
@@ -62,10 +38,8 @@ class SystemModule extends StandardizedBaseModule {
     }
   }
 
-  // 🎯 시스템 액션 등록 (중복 없음)
+  // 시스템 액션 등록
   registerSystemActions() {
-    const logger = getLogger(); // ✅ 함수 내부에서 logger 획득
-
     // 메인 메뉴
     this.actionMap.set("main", this.showMainMenu.bind(this));
     this.actionMap.set("menu", this.showMainMenu.bind(this));
@@ -85,17 +59,14 @@ class SystemModule extends StandardizedBaseModule {
     // 취소
     this.actionMap.set("cancel", this.handleCancel.bind(this));
 
-    logger.debug("🎯 SystemModule 액션 등록 완료 (중복 방지)");
+    logger.debug("🎯 SystemModule 액션 등록 완료");
   }
 
-  // 🎯 메시지 처리 구현 (표준 매개변수: bot, msg)
+  // 메시지 처리 (표준 매개변수: bot, msg)
   async _processMessage(bot, msg) {
-    const logger = getLogger();
-
     const {
       text,
       chat: { id: chatId },
-      from: { id: userId },
     } = msg;
     const userName = getUserName(msg.from);
 
@@ -103,7 +74,6 @@ class SystemModule extends StandardizedBaseModule {
 
     const command = text.toLowerCase().trim();
 
-    // 🎯 명령어 라우팅 (중복 방지)
     try {
       switch (command) {
         case "/start":
@@ -126,7 +96,6 @@ class SystemModule extends StandardizedBaseModule {
           return await this.handleCancel(bot, msg);
 
         default:
-          // 다른 모듈이 처리하도록 false 반환
           return false;
       }
     } catch (error) {
@@ -136,14 +105,12 @@ class SystemModule extends StandardizedBaseModule {
         chatId,
         "시스템 처리 중 오류가 발생했습니다."
       );
-      return true; // 오류이지만 처리했음을 표시
+      return true;
     }
   }
 
-  // 🎯 콜백 처리 구현 (표준 매개변수: bot, callbackQuery, subAction, params, menuManager)
+  // 콜백 처리 (표준 매개변수: bot, callbackQuery, subAction, params, menuManager)
   async _processCallback(bot, callbackQuery, subAction, params, menuManager) {
-    const logger = getLogger();
-
     try {
       const action = this.actionMap.get(subAction);
 
@@ -152,11 +119,9 @@ class SystemModule extends StandardizedBaseModule {
         return false;
       }
 
-      // 액션 실행 (this 바인딩 보장)
       const result = await action(bot, callbackQuery, params);
 
       if (result !== false) {
-        // 콜백 쿼리 응답
         await bot.answerCallbackQuery(callbackQuery.id, {
           text: "✅ 처리 완료",
           show_alert: false,
@@ -177,14 +142,13 @@ class SystemModule extends StandardizedBaseModule {
         logger.error("콜백 응답 실패:", answerError);
       }
 
-      return true; // 오류이지만 처리했음을 표시
+      return true;
     }
   }
 
   // =============== 핵심 핸들러들 ===============
 
   async handleStart(bot, msg) {
-    const logger = getLogger();
     const userName = getUserName(msg.from);
 
     const welcomeMessage = `🤖 *DoomockBot v${
@@ -235,8 +199,6 @@ ${
   }
 
   async showMainMenu(bot, callbackQueryOrMsg) {
-    const logger = getLogger();
-
     const mainMenuMessage = `📱 *메인 메뉴*
 
 원하시는 기능을 선택해주세요:
@@ -264,7 +226,6 @@ ${
     };
 
     try {
-      // 콜백 쿼리인지 메시지인지 구분
       if (callbackQueryOrMsg.data) {
         // 콜백 쿼리
         await bot.editMessageText(mainMenuMessage, {
@@ -290,8 +251,6 @@ ${
   }
 
   async showHelpMenu(bot, callbackQueryOrMsg) {
-    const logger = getLogger();
-
     const helpMessage = `❓ *도움말*
 
 🤖 **DoomockBot 사용법**
@@ -305,22 +264,14 @@ ${
 **📝 할 일 관리:**
 • 새 작업 추가, 완료 처리, 삭제
 • 우선순위 설정 및 카테고리 분류
-• 진행 상황 추적
 
 **🔮 운세 서비스:**
 • 오늘의 운세 확인
 • 행운의 숫자 및 색깔
-• 주간/월간 운세 (추후 업데이트)
 
 **🌤️ 날씨 정보:**
 • 현재 날씨 및 온도
 • 시간별/일별 예보
-• 다양한 지역 날씨 조회
-
-**🔧 기타 기능:**
-• 시간 변환 도구
-• 계산기 기능
-• 봇 통계 및 상태
 
 **💡 팁:** 
 메뉴 버튼을 사용하면 더 쉽게 기능에 접근할 수 있습니다!`;
@@ -355,22 +306,11 @@ ${
   }
 
   async showBotStatus(bot, callbackQueryOrMsg) {
-    const logger = getLogger();
-
     try {
-      // 봇 상태 정보 수집
       const uptime = process.uptime();
       const uptimeString = this.formatUptime(uptime);
-
       const memUsage = process.memoryUsage();
       const memUsageMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-
-      const moduleStatus = this.moduleManager
-        ? this.moduleManager.getModuleStatus()
-        : {};
-      const activeModules = Object.keys(moduleStatus).filter(
-        (name) => moduleStatus[name].isInitialized
-      ).length;
 
       const statusMessage = `📊 *봇 상태 정보*
 
@@ -383,10 +323,6 @@ ${
 💾 **리소스 사용량:**
 • 메모리 사용: \`${memUsageMB}MB\`
 • Node.js 버전: \`${process.version}\`
-
-📦 **모듈 상태:**
-• 활성 모듈: \`${activeModules}개\`
-• 로드된 모듈: \`${Object.keys(moduleStatus).length}개\`
 
 🔗 **연결 상태:**
 • 텔레그램 API: ✅ 정상
@@ -426,8 +362,6 @@ ${
   }
 
   async showSettingsMenu(bot, callbackQuery) {
-    const logger = getLogger();
-
     const settingsMessage = `⚙️ *설정*
 
 현재 사용 가능한 설정 옵션들입니다:
@@ -470,8 +404,6 @@ ${
   }
 
   async handleCancel(bot, msg) {
-    const logger = getLogger();
-
     const cancelMessage = "❌ 현재 작업이 취소되었습니다.";
 
     try {
@@ -511,7 +443,6 @@ ${
   }
 
   getDatabaseStatus() {
-    // DatabaseManager 상태 확인
     if (this.moduleManager && this.moduleManager.db) {
       return "✅ 연결됨";
     } else {
@@ -524,8 +455,6 @@ ${
     chatId,
     message = "처리 중 오류가 발생했습니다."
   ) {
-    const logger = getLogger();
-
     try {
       await bot.sendMessage(chatId, `❌ ${message}`, {
         reply_markup: {
@@ -539,13 +468,9 @@ ${
     }
   }
 
-  // =============== 정리 작업 ===============
-
+  // 정리 작업
   async cleanup() {
-    const logger = getLogger();
-
     try {
-      // 필요한 정리 작업 수행
       logger.info("🧹 SystemModule 정리 작업 완료");
     } catch (error) {
       logger.error("❌ SystemModule 정리 중 오류:", error);

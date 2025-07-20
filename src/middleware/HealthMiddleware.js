@@ -108,7 +108,7 @@ class HealthMiddleware {
             status: "error",
             timestamp: new Date().toISOString(),
             error: error.message,
-          }),
+          })
         );
       }
     };

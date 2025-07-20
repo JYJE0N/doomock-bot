@@ -2,21 +2,7 @@
 // 표준 매개변수: (bot, callbackQuery, subAction, params, menuManager)
 
 // ✅ 안전한 로거 획득
-const getLogger = () => {
-  try {
-    return require("../utils/Logger");
-  } catch {
-    return {
-      info: (...args) => console.log("[DB-INFO]", ...args),
-      error: (...args) => console.error("[DB-ERROR]", ...args),
-      warn: (...args) => console.warn("[DB-WARN]", ...args),
-      debug: (...args) => console.log("[DB-DEBUG]", ...args),
-      success: (...args) => console.log("[DB-SUCCESS]", ...args),
-    };
-  }
-};
-
-const logger = getLogger();
+const logger = require("../utils/Logger");
 
 // 기타 안전한 imports
 const { MongoClient } = require("mongodb");

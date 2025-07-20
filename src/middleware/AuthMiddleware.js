@@ -1,4 +1,4 @@
-const { Logger } = require("../utils/Logger");
+const logger = require("../utils/Logger");
 const { AppConfig } = require("../config/AppConfig");
 
 class AuthMiddleware {
@@ -25,7 +25,7 @@ class AuthMiddleware {
       logger.warn(
         `접근 거부: 사용자 ${userId} (${
           msg.from.username || msg.from.first_name
-        })`,
+        })`
       );
     }
 
