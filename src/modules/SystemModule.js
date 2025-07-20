@@ -1,24 +1,29 @@
-// src/modules/SystemModule.js - 완전한 시스템 모듈 구현
+// src/modules/SystemModule.js - 완벽한 표준화 적용 시스템 모듈
 
-const BaseModule = require("./BaseModule");
+const { StandardizedBaseModule } = require("../core/StandardizedSystem");
 const { getUserName } = require("../utils/UserHelper");
 const Logger = require("../utils/Logger");
-const config = require("../config/config");
 
-class SystemModule extends BaseModule {
+class SystemModule extends StandardizedBaseModule {
   constructor(bot, options = {}) {
     super("SystemModule", {
       commands: ["start", "help", "status", "cancel"],
-      callbacks: ["system", "main", "help", "settings", "module"],
-      features: ["menu", "help", "settings", "status"],
-      priority: 0, // 최우선
-      required: true, // 필수 모듈
+      callbacks: ["system", "main", "help", "settings"],
+      priority: 0,
+      required: true,
     });
 
     this.bot = bot;
     this.moduleManager = options.moduleManager;
 
-    Logger.info("🏠 SystemModule 생성됨");
+    // 시스템 설정
+    this.config = {
+      version: process.env.npm_package_version || "3.0.1",
+      environment: process.env.NODE_ENV || "development",
+      isRailway: !!process.env.RAILWAY_ENVIRONMENT,
+    };
+
+    Logger.info("🏠 SystemModule 생성됨 (표준화 적용)");
   }
 
   // ✅ 표준 초기화
@@ -26,37 +31,37 @@ class SystemModule extends BaseModule {
     await super.initialize();
 
     // 시스템 액션 등록
-    this.registerActions();
+    this.registerSystemActions();
 
-    Logger.success("🏠 SystemModule 초기화 완료");
+    Logger.success("✅ SystemModule 초기화 완료");
   }
 
-  // 🎯 액션 등록
-  registerActions() {
-    // 메인 메뉴 관련
+  // 🎯 시스템 액션 등록 (중복 없음)
+  registerSystemActions() {
+    // 메인 메뉴
     this.actionMap.set("main", this.showMainMenu.bind(this));
     this.actionMap.set("menu", this.showMainMenu.bind(this));
+    this.actionMap.set("main_menu", this.showMainMenu.bind(this));
 
-    // 도움말 관련
+    // 도움말
     this.actionMap.set("help", this.showHelpMenu.bind(this));
-    this.actionMap.set("help:main", this.showHelpMenu.bind(this));
+    this.actionMap.set("help_menu", this.showHelpMenu.bind(this));
 
-    // 설정 관련
+    // 설정
     this.actionMap.set("settings", this.showSettingsMenu.bind(this));
-    this.actionMap.set("settings:main", this.showSettingsMenu.bind(this));
+    this.actionMap.set("settings_menu", this.showSettingsMenu.bind(this));
 
-    // 모듈 관련
-    this.actionMap.set("module", this.showModuleList.bind(this));
-    this.actionMap.set("module:list", this.showModuleList.bind(this));
-
-    // 상태 관련
+    // 상태
     this.actionMap.set("status", this.showBotStatus.bind(this));
 
-    Logger.debug("🎯 SystemModule 액션 등록 완료");
+    // 취소
+    this.actionMap.set("cancel", this.handleCancel.bind(this));
+
+    Logger.debug("🎯 SystemModule 액션 등록 완료 (중복 방지)");
   }
 
-  // ✅ 메시지 처리 (표준 매개변수)
-  async handleMessage(bot, msg) {
+  // 🎯 메시지 처리 구현 (표준 매개변수: bot, msg)
+  async _processMessage(bot, msg) {
     const {
       text,
       chat: { id: chatId },
@@ -66,8 +71,10 @@ class SystemModule extends BaseModule {
 
     if (!text) return false;
 
-    // 시스템 명령어들
-    switch (text.toLowerCase()) {
+    const command = text.toLowerCase().trim();
+
+    // 🎯 명령어 라우팅 (중복 없는 처리)
+    switch (command) {
       case "/start":
         await this.showMainMenu(bot, chatId, null, userId, userName);
         return true;
@@ -85,12 +92,12 @@ class SystemModule extends BaseModule {
         return true;
 
       default:
-        return false;
+        return false; // 다른 모듈이 처리하도록
     }
   }
 
-  // ✅ 콜백 처리 (표준 매개변수)
-  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
+  // 🎯 콜백 처리 구현 (표준 매개변수: bot, callbackQuery, subAction, params, menuManager)
+  async _processCallback(bot, callbackQuery, subAction, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -100,130 +107,89 @@ class SystemModule extends BaseModule {
     } = callbackQuery;
     const userName = getUserName(callbackQuery.from);
 
-    try {
-      // 액션 매핑에서 찾기
-      if (this.actionMap.has(subAction)) {
-        const actionHandler = this.actionMap.get(subAction);
-        await actionHandler(
-          bot,
-          chatId,
-          messageId,
-          userId,
-          userName,
-          menuManager
-        );
-        return true;
-      }
-
-      // 직접 처리
-      switch (subAction) {
-        case "main":
-        case "main_menu":
-          await this.showMainMenu(bot, chatId, messageId, userId, userName);
-          return true;
-
-        case "help":
-        case "help_menu":
-        case "help:main":
-          await this.showHelpMenu(bot, chatId, messageId, userId, userName);
-          return true;
-
-        case "settings":
-        case "settings:main":
-          await this.showSettingsMenu(bot, chatId, messageId, userId, userName);
-          return true;
-
-        case "module":
-        case "module:list":
-          await this.showModuleList(bot, chatId, messageId, userId, userName);
-          return true;
-
-        case "cancel":
-          await this.handleCancel(bot, chatId, messageId, userId, userName);
-          return true;
-
-        default:
-          Logger.warn(`SystemModule: 알 수 없는 액션 - ${subAction}`);
-          return false;
-      }
-    } catch (error) {
-      Logger.error(`SystemModule 콜백 오류 (${subAction}):`, error);
-      await this.sendErrorMessage(
+    // 🎯 액션 라우팅 (중복 방지)
+    if (this.actionMap.has(subAction)) {
+      const actionHandler = this.actionMap.get(subAction);
+      await actionHandler(
         bot,
         chatId,
-        "시스템 메뉴 처리 중 오류가 발생했습니다."
+        messageId,
+        userId,
+        userName,
+        menuManager
       );
-      return false;
+
+      // 콜백 응답 (중복 방지)
+      try {
+        await bot.answerCallbackQuery(callbackQuery.id);
+      } catch (error) {
+        // 콜백이 이미 응답되었거나 만료된 경우 무시
+        Logger.debug("콜백 응답 건너뜀:", error.message);
+      }
+
+      return true;
     }
+
+    Logger.warn(`SystemModule: 알 수 없는 액션 - ${subAction}`);
+    return false;
   }
 
   // =============== 메뉴 구현들 ===============
 
   async showMainMenu(bot, chatId, messageId, userId, userName, menuManager) {
+    const currentTime = this.timeManager.getKoreanTimeString();
+    const greeting = this.getTimeBasedGreeting();
+
     const menuText = `🏠 **${userName}님의 메인 메뉴**
 
-${this.getGreeting()} 👋
+${greeting} 👋
 
-🏡 **동탄/화성 지역 특화 서비스**
-• 화성 날씨 정보 우선 제공
-• 동탄 근무시간 기반 기능
+🕐 현재 시간: ${currentTime}
+🌍 지역: 화성/동탄 특화 서비스
 
 원하는 기능을 선택해주세요:`;
 
-    // 실제 로드된 모듈들만 표시
+    // 🎯 사용 가능한 모듈들 조회 (중복 없음)
     const availableModules = await this.getAvailableModules();
+    const moduleButtons = this.createModuleButtons(availableModules);
 
     const keyboard = {
       inline_keyboard: [
-        // 첫 번째 줄 - 주요 모듈들
-        ...this.createModuleButtons(availableModules.slice(0, 4)),
-
-        // 마지막 줄 - 시스템 메뉴들
+        ...moduleButtons,
         [
           { text: "⚙️ 설정", callback_data: "system:settings" },
           { text: "❓ 도움말", callback_data: "system:help" },
         ],
+        [{ text: "📊 상태", callback_data: "system:status" }],
       ],
     };
 
-    if (messageId) {
-      await bot.editMessageText(menuText, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-    } else {
-      await bot.sendMessage(chatId, menuText, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-    }
+    await this.sendOrEditMessage(bot, chatId, messageId, menuText, keyboard);
   }
 
   async showHelpMenu(bot, chatId, messageId, userId, userName) {
     const helpText = `❓ **두목 봇 도움말**
-버전: ${config.bot.version}
+버전: ${this.config.version}
+환경: ${this.config.environment}
 
 🤖 **기본 명령어:**
 • /start - 봇 시작 및 메인 메뉴
-• /help - 도움말 보기  
-• /status - 상태 확인
-• /cancel - 작업 취소
+• /help - 도움말 (현재 메뉴)
+• /status - 봇 상태 확인
+• /cancel - 현재 작업 취소
 
-📱 **모듈 기능:**
-• 📝 할일 관리 - 할일 추가/완료/삭제
-• 🔮 운세 - 다양한 운세 정보
-• 🌤️ 날씨 - 실시간 날씨 예보
-• ⏰ 타이머 - 작업 시간 관리
-• 🛠️ 유틸리티 - TTS 등 편의 기능
+📱 **사용법:**
+1. 버튼을 눌러 기능 선택
+2. 명령어 직접 입력
+3. /cancel로 언제든 취소
 
-💡 **사용 팁:**
-• 버튼으로 쉽게 탐색 가능
-• 각 모듈별 상세 도움말 제공
-• 언제든 /cancel로 작업 취소
+🏡 **특화 기능:**
+• 화성/동탄 날씨 정보
+• 근무시간 기반 알림
+• 한국시간 정확 지원
 
-🆘 **문의:** @doomock_support`;
+📞 **문의:**
+관리자에게 문의하시거나 /status로 봇 상태를 확인해보세요.`;
 
     const keyboard = {
       inline_keyboard: [
@@ -231,103 +197,107 @@ ${this.getGreeting()} 👋
       ],
     };
 
-    await this.editOrSendMessage(bot, chatId, messageId, helpText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
+    await this.sendOrEditMessage(bot, chatId, messageId, helpText, keyboard);
   }
 
   async showSettingsMenu(bot, chatId, messageId, userId, userName) {
-    const settingsText = `⚙️ **${userName}님의 설정**
+    const settingsText = `⚙️ **봇 설정**
 
-봇 설정을 관리하세요.`;
+🔧 **현재 설정:**
+• 언어: 한국어
+• 시간대: 한국시간 (UTC+9)
+• 알림: 활성화
+• 지역: 화성/동탄
+
+📱 **개인화 옵션:**
+• 닉네임: ${userName}
+• 마지막 활동: ${this.stats.lastActivity || "정보 없음"}
+
+⚡ **성능 정보:**
+• 메시지 처리: ${this.stats.messageCount}회
+• 콜백 처리: ${this.stats.callbackCount}회
+• 오류 발생: ${this.stats.errorCount}회`;
 
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔔 알림 설정", callback_data: "settings:notifications" },
-          { text: "🌐 언어 설정", callback_data: "settings:language" },
+          { text: "🔔 알림 설정", callback_data: "system:notifications" },
+          { text: "🌍 지역 설정", callback_data: "system:region" },
         ],
-        [
-          { text: "🎨 테마 설정", callback_data: "settings:theme" },
-          { text: "⏰ 시간대 설정", callback_data: "settings:timezone" },
-        ],
+        [{ text: "🗑️ 데이터 초기화", callback_data: "system:reset" }],
         [{ text: "🔙 메인 메뉴", callback_data: "system:main" }],
       ],
     };
 
-    await this.editOrSendMessage(bot, chatId, messageId, settingsText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
-  }
-
-  async showModuleList(bot, chatId, messageId, userId, userName) {
-    const availableModules = await this.getAvailableModules();
-
-    const moduleText = `📱 **사용 가능한 모듈**
-
-🔧 현재 로드된 모듈들:
-${availableModules
-  .map(
-    (m) => `• ${m.emoji || "📦"} ${m.name} - ${m.description || "설명 없음"}`
-  )
-  .join("\n")}
-
-총 ${availableModules.length}개 모듈이 활성화되어 있습니다.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        ...this.createModuleButtons(availableModules, true),
-        [{ text: "🔙 메인 메뉴", callback_data: "system:main" }],
-      ],
-    };
-
-    await this.editOrSendMessage(bot, chatId, messageId, moduleText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
+    await this.sendOrEditMessage(
+      bot,
+      chatId,
+      messageId,
+      settingsText,
+      keyboard
+    );
   }
 
   async showBotStatus(bot, chatId, messageId, userId, userName) {
-    const uptime = process.uptime();
-    const hours = Math.floor(uptime / 3600);
-    const minutes = Math.floor((uptime % 3600) / 60);
-    const memory = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    const uptime = Math.round(process.uptime());
+    const memoryUsage = Math.round(
+      process.memoryUsage().heapUsed / 1024 / 1024
+    );
+    const currentTime = this.timeManager.getKoreanTimeString();
 
-    const statusText = `📊 **${config.bot.name} 상태 정보**
+    // 모듈 상태 조회
+    const moduleStatus = this.moduleManager
+      ? `${this.moduleManager.modules.size}개 로드됨`
+      : "정보 없음";
 
-${config.emoji.version} 버전: ${config.bot.version}
-⏱️ 업타임: ${hours}시간 ${minutes}분  
-🌐 환경: ${process.env.NODE_ENV || "development"}
-💾 메모리: ${memory}MB
-🔧 서버 상태: 정상
+    const statusText = `📊 **봇 상태 정보**
 
-📦 로드된 모듈: ${this.moduleManager ? this.moduleManager.modules.size : 0}개
-👥 활성 사용자: ${this.stats.uniqueUsers.size}명`;
+⏰ **시간 정보:**
+• 현재 시간: ${currentTime}
+• 업타임: ${Math.floor(uptime / 3600)}시간 ${Math.floor((uptime % 3600) / 60)}분
+• 시작 시간: ${this.timeManager.getKoreanTimeString()}
+
+💻 **시스템 정보:**
+• 메모리 사용: ${memoryUsage}MB
+• 환경: ${this.config.environment}
+• Railway: ${this.config.isRailway ? "YES" : "NO"}
+• 버전: ${this.config.version}
+
+📦 **모듈 상태:**
+• 로드된 모듈: ${moduleStatus}
+• 중복 방지: ✅ 활성화
+• 표준화: ✅ 적용됨
+
+📈 **이 세션 통계:**
+• 메시지 처리: ${this.stats.messageCount}회
+• 콜백 처리: ${this.stats.callbackCount}회
+• 오류 발생: ${this.stats.errorCount}회`;
 
     const keyboard = {
       inline_keyboard: [
+        [
+          { text: "🔄 새로고침", callback_data: "system:status" },
+          { text: "📋 상세 로그", callback_data: "system:logs" },
+        ],
         [{ text: "🔙 메인 메뉴", callback_data: "system:main" }],
       ],
     };
 
-    await this.editOrSendMessage(bot, chatId, messageId, statusText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
+    await this.sendOrEditMessage(bot, chatId, messageId, statusText, keyboard);
   }
 
   async handleCancel(bot, chatId, messageId, userId, userName) {
-    // 사용자 상태 초기화
-    if (this.moduleManager && this.moduleManager.userStates) {
-      this.moduleManager.userStates.delete(userId);
+    // 사용자 상태 초기화 (ModuleManager를 통해)
+    if (this.moduleManager && this.moduleManager.clearUserState) {
+      this.moduleManager.clearUserState(userId);
     }
 
-    const cancelText = `✅ **작업이 취소되었습니다**
+    const cancelText = `❌ **작업 취소**
 
-${userName}님, 진행 중이던 작업을 취소했습니다.
-메인 메뉴로 돌아가시겠어요?`;
+모든 진행 중인 작업이 취소되었습니다.
+메인 메뉴로 돌아갑니다.
+
+🔄 언제든 새로 시작하실 수 있습니다.`;
 
     const keyboard = {
       inline_keyboard: [
@@ -335,73 +305,85 @@ ${userName}님, 진행 중이던 작업을 취소했습니다.
       ],
     };
 
-    await this.editOrSendMessage(bot, chatId, messageId, cancelText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
+    await this.sendOrEditMessage(bot, chatId, messageId, cancelText, keyboard);
   }
 
-  // =============== 헬퍼 메서드들 ===============
+  // =============== 유틸리티 메서드들 ===============
 
+  // 🇰🇷 시간 기반 인사말
+  getTimeBasedGreeting() {
+    const hour = this.timeManager.getKoreanTime().getHours();
+
+    if (hour < 6) return "새벽에도 수고하고 계시네요! 🌙";
+    if (hour < 9) return "좋은 아침입니다! ☀️";
+    if (hour < 12) return "활기찬 오전 보내세요! 🌤️";
+    if (hour < 14) return "점심시간 맛있게 드세요! 🍽️";
+    if (hour < 18) return "오후도 화이팅입니다! 💪";
+    if (hour < 21) return "저녁 시간 잘 보내세요! 🌆";
+    return "늦은 시간까지 수고하세요! 🌃";
+  }
+
+  // 사용 가능한 모듈 조회
   async getAvailableModules() {
     if (!this.moduleManager) return [];
 
-    const modules = [];
-    for (const [name, moduleData] of this.moduleManager.modules.entries()) {
-      if (moduleData.isInitialized && name !== "SystemModule") {
-        modules.push({
-          name: name.replace("Module", ""),
-          description: moduleData.config?.description || "",
-          emoji: this.getModuleEmoji(name),
-          callback_data: `${name.toLowerCase().replace("module", "")}:menu`,
-        });
-      }
-    }
+    const modules = Array.from(this.moduleManager.modules.values())
+      .filter(
+        (module) => module.isInitialized && module.name !== "SystemModule"
+      )
+      .map((module) => ({
+        name: module.name,
+        emoji: this.getModuleEmoji(module.name),
+        callback: module.name.toLowerCase().replace("module", ""),
+      }));
 
     return modules;
   }
 
-  createModuleButtons(modules, fullList = false) {
-    const buttons = [];
-    const itemsPerRow = fullList ? 1 : 2;
-
-    for (let i = 0; i < modules.length; i += itemsPerRow) {
-      const row = modules.slice(i, i + itemsPerRow).map((module) => ({
-        text: `${module.emoji} ${module.name}`,
-        callback_data: module.callback_data,
-      }));
-      buttons.push(row);
-    }
-
-    return buttons;
-  }
-
+  // 모듈 이모지 매핑
   getModuleEmoji(moduleName) {
     const emojiMap = {
       TodoModule: "📝",
-      FortuneModule: "🔮",
       WeatherModule: "🌤️",
-      TimerModule: "⏰",
-      LeaveModule: "📅",
-      WorktimeModule: "🕐",
+      FortuneModule: "🔮",
+      WorktimeModule: "⏰",
       UtilsModule: "🛠️",
-      ReminderModule: "🔔",
-      InsightModule: "📊",
     };
-
     return emojiMap[moduleName] || "📦";
   }
 
-  getGreeting() {
-    const hour = new Date().getHours();
+  // 모듈 버튼 생성
+  createModuleButtons(modules) {
+    const buttons = [];
+    for (let i = 0; i < modules.length; i += 2) {
+      const row = [];
+      row.push({
+        text: `${modules[i].emoji} ${modules[i].name.replace("Module", "")}`,
+        callback_data: `${modules[i].callback}:menu`,
+      });
 
-    if (hour >= 5 && hour < 12) return "좋은 아침이에요";
-    if (hour >= 12 && hour < 18) return "좋은 오후에요";
-    if (hour >= 18 && hour < 22) return "좋은 저녁이에요";
-    return "늦은 시간이네요";
+      if (modules[i + 1]) {
+        row.push({
+          text: `${modules[i + 1].emoji} ${modules[i + 1].name.replace(
+            "Module",
+            ""
+          )}`,
+          callback_data: `${modules[i + 1].callback}:menu`,
+        });
+      }
+
+      buttons.push(row);
+    }
+    return buttons;
   }
 
-  async editOrSendMessage(bot, chatId, messageId, text, options = {}) {
+  // 메시지 전송/편집 통합
+  async sendOrEditMessage(bot, chatId, messageId, text, keyboard) {
+    const options = {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    };
+
     try {
       if (messageId) {
         await bot.editMessageText(text, {
@@ -413,16 +395,20 @@ ${userName}님, 진행 중이던 작업을 취소했습니다.
         await bot.sendMessage(chatId, text, options);
       }
     } catch (error) {
-      Logger.error("메시지 전송 실패:", error);
+      Logger.error("메시지 전송/편집 오류:", error);
+
       // 폴백: 새 메시지 전송
-      if (messageId) {
+      if (messageId && error.message.includes("message is not modified")) {
+        // 메시지가 동일한 경우 무시
+        return;
+      }
+
+      try {
         await bot.sendMessage(chatId, text, options);
+      } catch (fallbackError) {
+        Logger.error("폴백 메시지 전송도 실패:", fallbackError);
       }
     }
-  }
-
-  async sendErrorMessage(bot, chatId, message) {
-    await bot.sendMessage(chatId, `❌ ${message}`);
   }
 }
 

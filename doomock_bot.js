@@ -1,106 +1,349 @@
-// doomock_bot.js - BotFather 명령어 자동 등록이 포함된 메인 초기화
-// Railway 환경 v3.0.1 완전 리팩토링
+// doomock_bot.js - 완전한 메인 엔트리 포인트 (표준화 시스템 적용)
 
+// ✅ 1. 환경변수 최우선 로드
+require("dotenv").config();
+
+// ✅ 2. 핵심 의존성 로드
 const TelegramBot = require("node-telegram-bot-api");
 const Logger = require("./src/utils/Logger");
-const CommandHandler = require("./src/handlers/CommandHandler");
-const ModuleManager = require("./src/managers/ModuleManager");
-const ErrorHandler = require("./src/utils/ErrorHandler");
-const { mongoPoolManager } = require("./src/database/MongoPoolManager");
-const botCommandsRegistry = require("./src/config/BotCommandsRegistry");
-const config = require("./src/config/config");
 
+// ✅ 3. 표준화 시스템 (🎯 핵심!)
+const {
+  DuplicationPreventer,
+  KoreanTimeManager,
+  ParameterValidator,
+} = require("./src/core/StandardizedSystem");
+
+// ✅ 4. 설정 및 유틸리티
+const AppConfig = require("./src/config/AppConfig");
+const { TimeHelper } = require("./src/utils/TimeHelper");
+
+// ✅ 5. 데이터베이스 관련
+const { mongoPoolManager } = require("./src/database/MongoPoolManager");
+const DatabaseManager = require("./src/database/DatabaseManager");
+
+// ✅ 6. 핵심 매니저들
+const ModuleManager = require("./src/managers/ModuleManager");
+const BotController = require("./src/controllers/BotController");
+
+// ✅ 7. 서비스들
+const { TodoService } = require("./src/services/TodoService");
+const { WeatherService } = require("./src/services/WeatherService");
+const { WorktimeService } = require("./src/services/WorktimeService");
+
+// ✅ 8. 에러 핸들링
+const ErrorHandler = require("./src/utils/ErrorHandler");
+
+// ✅ 전역 에러 핸들러 (최우선)
+process.on("unhandledRejection", (reason, promise) => {
+  Logger.error("🚨 처리되지 않은 Promise 거부:", {
+    reason: reason?.message || reason,
+    stack: reason?.stack,
+  });
+});
+
+process.on("uncaughtException", (error) => {
+  Logger.error("🚨 처리되지 않은 예외:", {
+    message: error.message,
+    stack: error.stack,
+  });
+
+  // 안전한 종료
+  process.exit(1);
+});
+
+// ✅ 메인 봇 클래스 (표준화 시스템 적용)
 class DoomockBot {
   constructor() {
     this.bot = null;
-    this.commandHandler = null;
+    this.botController = null;
     this.moduleManager = null;
+    this.databaseManager = null;
     this.errorHandler = null;
-    this.isInitialized = false;
-    this.startTime = new Date();
+    this.config = null;
 
-    // 🔗 의존성 매니저
-    this.dependencies = {
-      userStates: new Map(),
-      menuManager: null, // ModuleManager에서 생성될 예정
+    // 🎯 표준화 시스템 (중복 방지 + 한국시간)
+    this.duplicationPreventer = new DuplicationPreventer();
+    this.timeManager = new KoreanTimeManager();
+
+    // 서비스들
+    this.services = {
+      todo: null,
+      weather: null,
+      worktime: null,
     };
 
-    Logger.info(`🚀 ${config.bot.name} v${config.bot.version} 시작 중...`);
+    // 상태 관리 (중복 방지)
+    this.isRunning = false;
+    this.isInitialized = false;
+    this.initializationInProgress = false; // 초기화 중복 방지
+    this.shutdownPromise = null;
+    this.startTime = this.timeManager.getKoreanTime();
+    this.healthCheckInterval = null;
+
+    Logger.info("🤖 DoomockBot 인스턴스 생성됨 (표준화 적용)");
+    Logger.logTimeInfo(); // 한국시간 정보 출력
   }
 
-  // 🚀 봇 전체 초기화 프로세스
-  async initialize() {
+  async start() {
+    // 🚫 중복 시작 방지
+    const operationId = this.timeManager.generateOperationId(
+      "bot_start",
+      "system"
+    );
+
+    if (!(await this.duplicationPreventer.startOperation(operationId))) {
+      Logger.warn("🚫 봇 시작 중복 호출 차단됨");
+      return;
+    }
+
+    if (this.isRunning || this.initializationInProgress) {
+      Logger.warn("봇이 이미 실행 중이거나 초기화 중입니다");
+      this.duplicationPreventer.endOperation(operationId);
+      return;
+    }
+
     try {
-      Logger.info("⚙️ 봇 시스템 초기화 시작...");
+      this.initializationInProgress = true;
+      Logger.info("🚀 Doomock 봇 시작... (표준화 시스템)");
 
-      // 1️⃣ 환경변수 검증
-      await this.validateEnvironment();
+      // 🇰🇷 시작 시간 기록
+      const startTimeString = this.timeManager.getKoreanTimeString();
+      Logger.info(`📅 시작 시간: ${startTimeString}`);
 
-      // 2️⃣ 텔레그램 봇 생성
-      await this.initializeTelegramBot();
+      // 표준화된 9단계 초기화
+      await this.executeStandardizedInitialization();
 
-      // 3️⃣ 에러 핸들러 초기화
-      await this.initializeErrorHandler();
-
-      // 4️⃣ 데이터베이스 연결 (선택적)
-      await this.initializeDatabase();
-
-      // 5️⃣ 모듈 매니저 초기화
-      await this.initializeModuleManager();
-
-      // 6️⃣ 명령어 핸들러 초기화
-      await this.initializeCommandHandler();
-
-      // 🎯 7️⃣ BotFather 명령어 자동 등록 (핵심!)
-      await this.registerBotFatherCommands();
-
-      // 8️⃣ 이벤트 리스너 등록
-      await this.setupEventListeners();
-
-      // 9️⃣ 헬스 모니터링 시작
-      await this.startHealthMonitoring();
-
+      this.isRunning = true;
       this.isInitialized = true;
-      Logger.success(`✅ ${config.bot.name} 초기화 완료!`);
 
-      // 🎉 시작 알림
+      const bootTime = Date.now() - this.startTime.getTime();
+      Logger.success(`✅ Doomock 봇 완전 시작! (부팅시간: ${bootTime}ms)`);
+
       await this.sendStartupNotification();
     } catch (error) {
-      Logger.error("❌ 봇 초기화 실패:", error);
-      await this.handleCriticalError(error);
+      Logger.error("❌ 봇 시작 실패:", error);
+      await this.cleanup();
+      throw error;
+    } finally {
+      this.initializationInProgress = false;
+      this.duplicationPreventer.endOperation(operationId);
+    }
+  }
+
+  // 🎯 표준화된 초기화 프로세스 (9단계)
+  async executeStandardizedInitialization() {
+    const steps = [
+      { name: "설정 로드", method: this.loadConfiguration },
+      { name: "데이터베이스", method: this.initializeDatabase },
+      { name: "에러 핸들러", method: this.initializeErrorHandler },
+      { name: "서비스들", method: this.initializeServices },
+      { name: "텔레그램 봇", method: this.createTelegramBot },
+      { name: "봇 컨트롤러", method: this.initializeBotController },
+      { name: "모듈 매니저", method: this.initializeModuleManager },
+      { name: "폴링 시작", method: this.startPolling },
+      { name: "헬스 모니터링", method: this.startHealthMonitoring },
+    ];
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const stepId = this.timeManager.generateOperationId(
+        "init_step",
+        i,
+        `_${step.name}`
+      );
+
+      try {
+        Logger.info(`📋 ${i + 1}/9 단계: ${step.name} 시작...`);
+
+        // 중복 방지 체크
+        if (!(await this.duplicationPreventer.startOperation(stepId))) {
+          throw new Error(`${step.name} 단계 중복 실행 감지됨`);
+        }
+
+        await step.method.call(this);
+
+        Logger.success(`✅ ${i + 1}/9 단계: ${step.name} 완료`);
+      } catch (error) {
+        Logger.error(`❌ ${i + 1}/9 단계: ${step.name} 실패:`, error);
+        throw error;
+      } finally {
+        this.duplicationPreventer.endOperation(stepId);
+      }
+    }
+  }
+
+  // 1. 설정 로드 및 검증
+  async loadConfiguration() {
+    try {
+      Logger.info("⚙️ 설정 로드 중...");
+
+      this.config = new AppConfig();
+
+      // 필수 환경변수 검증
+      if (!this.config.BOT_TOKEN) {
+        throw new Error("BOT_TOKEN이 설정되지 않았습니다");
+      }
+
+      Logger.success("✅ 설정 로드 완료");
+      Logger.info(`🌐 환경: ${this.config.NODE_ENV}`);
+      Logger.info(`🔧 버전: ${this.config.VERSION}`);
+      Logger.info(`🚀 Railway: ${this.config.isRailway ? "배포됨" : "로컬"}`);
+    } catch (error) {
+      Logger.error("❌ 설정 로드 실패:", error);
       throw error;
     }
   }
 
-  // 🔍 환경변수 검증
-  async validateEnvironment() {
-    Logger.info("🔍 환경변수 검증 중...");
+  // 2. 데이터베이스 초기화
+  async initializeDatabase() {
+    try {
+      Logger.info("🗄️ 데이터베이스 초기화 중...");
 
-    const requiredVars = ["BOT_TOKEN"];
-    const missingVars = requiredVars.filter((varName) => !process.env[varName]);
+      if (!this.config.MONGO_URL) {
+        Logger.warn("⚠️ MongoDB URL이 없음, 메모리 모드로 실행");
+        return;
+      }
 
-    if (missingVars.length > 0) {
-      throw new Error(`필수 환경변수가 누락됨: ${missingVars.join(", ")}`);
+      // DatabaseManager 초기화
+      this.databaseManager = new DatabaseManager();
+
+      // 연결 시도 (최대 3번)
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts) {
+        try {
+          const connected = await this.databaseManager.connect();
+          if (connected) {
+            Logger.success("✅ MongoDB 연결 성공");
+
+            // 인덱스 설정
+            await this.setupDatabaseIndexes();
+            break;
+          }
+        } catch (error) {
+          attempts++;
+          Logger.warn(
+            `MongoDB 연결 실패 (시도 ${attempts}/${maxAttempts}):`,
+            error.message
+          );
+
+          if (attempts >= maxAttempts) {
+            Logger.warn("MongoDB 연결을 포기하고 메모리 모드로 실행");
+            this.databaseManager = null;
+            break;
+          }
+
+          // 재시도 전 대기
+          await new Promise((resolve) => setTimeout(resolve, 2000 * attempts));
+        }
+      }
+
+      // mongoPoolManager도 초기화
+      if (this.databaseManager && this.databaseManager.isConnected) {
+        try {
+          await mongoPoolManager.connect();
+          Logger.debug("✅ mongoPoolManager 연결 완료");
+        } catch (poolError) {
+          Logger.warn("mongoPoolManager 연결 실패:", poolError.message);
+        }
+      }
+    } catch (error) {
+      Logger.error("❌ 데이터베이스 초기화 중 오류:", error);
+      this.databaseManager = null;
+      Logger.warn("⚠️ 메모리 모드로 계속 진행");
     }
-
-    Logger.success("✅ 환경변수 검증 완료");
-    Logger.info(`🌐 환경: ${process.env.NODE_ENV || "development"}`);
-    Logger.info(`🔑 BOT_TOKEN: ${process.env.BOT_TOKEN ? "설정됨" : "누락"}`);
-    Logger.info(
-      `🗄️ MONGO_URL: ${process.env.MONGO_URL ? "설정됨" : "없음 (메모리 모드)"}`
-    );
-    Logger.info(
-      `🚀 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "배포됨" : "로컬"}`
-    );
   }
 
-  // 🤖 텔레그램 봇 초기화
-  async initializeTelegramBot() {
-    Logger.info("🤖 텔레그램 봇 생성 중...");
+  // 데이터베이스 인덱스 설정
+  async setupDatabaseIndexes() {
+    if (!this.databaseManager) return;
 
     try {
-      this.bot = new TelegramBot(process.env.BOT_TOKEN, {
-        polling: true,
+      Logger.info("📑 데이터베이스 인덱스 설정 중...");
+
+      // 사용자 인덱스
+      const usersCollection = this.databaseManager.getCollection("users");
+      await usersCollection.createIndex({ userId: 1 }, { unique: true });
+      await usersCollection.createIndex({ username: 1 });
+      await usersCollection.createIndex({ lastActive: 1 });
+
+      // Todo 인덱스
+      const todosCollection = this.databaseManager.getCollection("todos");
+      await todosCollection.createIndex({ userId: 1 });
+      await todosCollection.createIndex({ createdAt: 1 });
+      await todosCollection.createIndex({ completed: 1 });
+
+      // 통계 인덱스
+      const statsCollection = this.databaseManager.getCollection("bot_stats");
+      await statsCollection.createIndex({ date: 1 }, { unique: true });
+      await statsCollection.createIndex({ timestamp: 1 });
+
+      Logger.success("✅ 데이터베이스 인덱스 설정 완료");
+    } catch (error) {
+      Logger.warn("⚠️ 인덱스 설정 실패:", error.message);
+    }
+  }
+
+  // 3. 에러 핸들러 초기화
+  async initializeErrorHandler() {
+    try {
+      Logger.info("🛡️ 에러 핸들러 초기화 중...");
+
+      this.errorHandler = new ErrorHandler({
+        maxRetries: 3,
+        retryDelay: 1500,
+        enableAlert: true,
+        alertThreshold: 5,
+      });
+
+      Logger.success("✅ 에러 핸들러 초기화 완료");
+    } catch (error) {
+      Logger.warn("⚠️ 에러 핸들러 초기화 실패:", error.message);
+      // 에러 핸들러 실패는 치명적이지 않음
+    }
+  }
+
+  // 4. 서비스들 초기화
+  async initializeServices() {
+    try {
+      Logger.info("🔧 서비스들 초기화 중...");
+
+      // Todo 서비스
+      this.services.todo = new TodoService();
+
+      // Weather 서비스
+      if (this.config.WEATHER_API_KEY) {
+        this.services.weather = new WeatherService();
+        Logger.debug("✅ Weather 서비스 초기화됨");
+      } else {
+        Logger.warn("⚠️ WEATHER_API_KEY 없음, 날씨 서비스 비활성화");
+      }
+
+      // Worktime 서비스
+      this.services.worktime = new WorktimeService();
+
+      Logger.success("✅ 서비스들 초기화 완료");
+    } catch (error) {
+      Logger.error("❌ 서비스 초기화 실패:", error);
+      throw error;
+    }
+  }
+
+  // 5. 텔레그램 봇 생성
+  async createTelegramBot() {
+    try {
+      Logger.info("🤖 텔레그램 봇 생성 중...");
+
+      this.bot = new TelegramBot(this.config.BOT_TOKEN, {
+        polling: {
+          interval: 1000,
+          autoStart: false,
+          params: {
+            timeout: 30,
+          },
+        },
         request: {
           agentOptions: {
             keepAlive: true,
@@ -112,285 +355,162 @@ class DoomockBot {
       // 봇 정보 확인
       const botInfo = await this.bot.getMe();
       Logger.success(
-        `✅ 봇 연결 완료: @${botInfo.username} (${botInfo.first_name})`
+        `✅ 봇 연결 성공: @${botInfo.username} (${botInfo.first_name})`
       );
 
-      // 웹훅 정리 (polling 사용)
+      // 웹훅 정리 (폴링 사용)
       await this.bot.deleteWebHook();
     } catch (error) {
-      throw new Error(`텔레그램 봇 초기화 실패: ${error.message}`);
+      Logger.error("❌ 텔레그램 봇 생성 실패:", error);
+      throw error;
     }
   }
 
-  // 🛡️ 에러 핸들러 초기화
-  async initializeErrorHandler() {
-    Logger.info("🛡️ 에러 핸들러 초기화 중...");
-
+  // 6. 봇 컨트롤러 초기화
+  async initializeBotController() {
     try {
-      this.errorHandler = new ErrorHandler({
-        maxRetries: 5,
-        retryDelay: 2000,
-        alertThreshold: 10,
-      });
+      Logger.info("🎮 봇 컨트롤러 초기화 중...");
 
-      this.dependencies.errorHandler = this.errorHandler;
-      Logger.success("✅ 에러 핸들러 초기화 완료");
+      this.botController = new BotController(this.bot, this.config);
+
+      // 최대 3번 재시도
+      let attempts = 0;
+      const maxAttempts = 3;
+
+      while (attempts < maxAttempts) {
+        try {
+          await this.botController.initialize();
+          Logger.success("✅ 봇 컨트롤러 초기화 완료");
+          return;
+        } catch (error) {
+          attempts++;
+          Logger.error(
+            `❌ 봇 컨트롤러 초기화 실패 (시도 ${attempts}/${maxAttempts}):`,
+            error
+          );
+
+          if (attempts >= maxAttempts) {
+            throw new Error(`봇 컨트롤러 초기화 최종 실패: ${error.message}`);
+          }
+
+          // 재시도 전 대기
+          Logger.info(`⏳ ${2 * attempts}초 후 재시도...`);
+          await new Promise((resolve) => setTimeout(resolve, 2000 * attempts));
+        }
+      }
     } catch (error) {
-      Logger.warn("⚠️ 에러 핸들러 초기화 실패:", error.message);
-      // 에러 핸들러 실패는 치명적이지 않음
+      Logger.error("❌ 봇 컨트롤러 초기화 중 치명적 오류:", error);
+      throw error;
     }
   }
 
-  // 🗄️ 데이터베이스 초기화 (선택적)
-  async initializeDatabase() {
-    Logger.info("🗄️ 데이터베이스 연결 중...");
-
-    if (!process.env.MONGO_URL) {
-      Logger.warn("⚠️ MONGO_URL이 설정되지 않음, 메모리 모드로 실행");
-      return;
-    }
-
-    try {
-      await mongoPoolManager.connect();
-      await this.setupDatabaseIndexes();
-      Logger.success("✅ 데이터베이스 연결 완료");
-    } catch (error) {
-      Logger.warn(
-        `⚠️ 데이터베이스 연결 실패, 메모리 모드로 실행: ${error.message}`
-      );
-      // 데이터베이스 실패는 치명적이지 않음 (메모리 모드로 동작)
-    }
-  }
-
-  // 📑 데이터베이스 인덱스 설정
-  async setupDatabaseIndexes() {
-    try {
-      // 사용자 정보 인덱스
-      const userIndexes = [
-        { key: { userId: 1 }, options: { unique: true } },
-        { key: { username: 1 }, options: {} },
-        { key: { lastActive: 1 }, options: {} },
-      ];
-      await mongoPoolManager.ensureIndexes("users", userIndexes);
-
-      // 봇 통계 인덱스
-      const statsIndexes = [
-        { key: { date: 1 }, options: { unique: true } },
-        { key: { timestamp: 1 }, options: {} },
-      ];
-      await mongoPoolManager.ensureIndexes("bot_stats", statsIndexes);
-
-      Logger.debug("📑 데이터베이스 인덱스 설정 완료");
-    } catch (error) {
-      Logger.warn("⚠️ 인덱스 설정 실패:", error.message);
-    }
-  }
-
-  // 📦 모듈 매니저 초기화
+  // 7. 모듈 매니저 초기화
   async initializeModuleManager() {
-    Logger.info("📦 모듈 매니저 초기화 중...");
-
     try {
+      Logger.info("📦 모듈 매니저 초기화 중...");
+
       this.moduleManager = new ModuleManager(this.bot, {
-        database: process.env.MONGO_URL ? mongoPoolManager : null,
-        userStates: this.dependencies.userStates,
+        database: this.databaseManager,
+        services: this.services,
         errorHandler: this.errorHandler,
       });
 
       await this.moduleManager.initialize();
 
-      // 의존성에 추가
-      this.dependencies.moduleManager = this.moduleManager;
-      this.dependencies.menuManager = this.moduleManager; // ModuleManager가 MenuManager 역할도 수행
-
       Logger.success("✅ 모듈 매니저 초기화 완료");
     } catch (error) {
-      throw new Error(`모듈 매니저 초기화 실패: ${error.message}`);
+      Logger.error("❌ 모듈 매니저 초기화 실패:", error);
+      throw error;
     }
   }
 
-  // 🎯 명령어 핸들러 초기화 (표준화된 매개변수)
-  async initializeCommandHandler() {
-    Logger.info("🎯 명령어 핸들러 초기화 중...");
-
+  // 8. 폴링 시작
+  async startPolling() {
     try {
-      // ✅ 표준화된 의존성 주입
-      this.commandHandler = new CommandHandler(this.bot, {
-        moduleManager: this.dependencies.moduleManager,
-        menuManager: this.dependencies.menuManager,
-        userStates: this.dependencies.userStates,
-        errorHandler: this.dependencies.errorHandler,
+      Logger.info("📡 텔레그램 폴링 시작...");
+
+      // 봇 에러 핸들러 설정
+      this.bot.on("error", (error) => {
+        Logger.error("🤖 텔레그램 봇 오류:", error);
+        if (this.errorHandler) {
+          this.errorHandler.handleError(error, { type: "telegram_bot_error" });
+        }
       });
 
-      Logger.success("✅ 명령어 핸들러 초기화 완료");
+      this.bot.on("polling_error", (error) => {
+        Logger.error("📡 폴링 오류:", error);
+        if (this.errorHandler) {
+          this.errorHandler.handleError(error, { type: "polling_error" });
+        }
+      });
+
+      // 폴링 시작
+      await this.bot.startPolling({
+        restart: true,
+      });
+
+      Logger.success("✅ 텔레그램 폴링 시작됨");
     } catch (error) {
-      throw new Error(`명령어 핸들러 초기화 실패: ${error.message}`);
+      Logger.error("❌ 폴링 시작 실패:", error);
+      throw error;
     }
   }
 
-  // 🎯 BotFather 명령어 자동 등록 (핵심 기능!)
-  async registerBotFatherCommands() {
-    Logger.info("🎯 BotFather 명령어 등록 중...");
-
-    try {
-      if (!this.commandHandler) {
-        throw new Error("CommandHandler가 초기화되지 않음");
-      }
-
-      // 🚀 자동 등록 실행
-      const success = await this.commandHandler.initializeBotCommands();
-
-      if (success) {
-        Logger.success("🎉 BotFather 명령어 등록 성공!");
-
-        // 등록된 명령어 통계 로깅
-        const stats = botCommandsRegistry.getCommandStats();
-        Logger.info(`📊 등록된 명령어 통계:`);
-        Logger.info(`   • 총 명령어: ${stats.totalCommands}개`);
-        Logger.info(`   • 공개 명령어: ${stats.publicCommands}개`);
-        Logger.info(`   • 시스템 명령어: ${stats.systemCommands}개`);
-        Logger.info(`   • 모듈 명령어: ${stats.moduleCommands}개`);
-        Logger.info(`   • 관리자 명령어: ${stats.adminCommands}개`);
-      } else {
-        Logger.error("❌ BotFather 명령어 등록 실패");
-        // 치명적이지 않으므로 봇은 계속 실행
-      }
-    } catch (error) {
-      Logger.error("❌ BotFather 명령어 등록 중 오류:", error);
-      // 치명적이지 않으므로 봇은 계속 실행
-    }
-  }
-
-  // 🎧 이벤트 리스너 설정 (표준화된 처리)
-  async setupEventListeners() {
-    Logger.info("🎧 이벤트 리스너 등록 중...");
-
-    // 메시지 이벤트 (명령어 우선 처리)
-    this.bot.on("message", async (msg) => {
-      try {
-        // 1️⃣ 명령어 먼저 처리 (최우선)
-        if (msg.text && msg.text.startsWith("/")) {
-          const handled = await this.commandHandler.handle(msg);
-          if (handled) return; // 명령어로 처리됨
-        }
-
-        // 2️⃣ 모듈에서 일반 메시지 처리
-        if (this.moduleManager) {
-          await this.moduleManager.handleMessage(this.bot, msg);
-        }
-      } catch (error) {
-        Logger.error("메시지 처리 오류:", error);
-        if (this.errorHandler) {
-          await this.errorHandler.handleError(error, {
-            type: "message",
-            userId: msg.from?.id,
-            module: "EventListener",
-          });
-        }
-      }
-    });
-
-    // 콜백 쿼리 이벤트 (표준화된 매개변수)
-    this.bot.on("callback_query", async (callbackQuery) => {
-      try {
-        // 콜백 응답 (즉시)
-        await this.bot.answerCallbackQuery(callbackQuery.id);
-
-        // ✅ 표준화된 매개변수로 모듈 매니저에 전달
-        if (this.moduleManager) {
-          await this.moduleManager.handleCallback(
-            this.bot, // bot
-            callbackQuery, // callbackQuery
-            null, // subAction (모듈에서 파싱)
-            null, // params (모듈에서 파싱)
-            this.moduleManager // menuManager
-          );
-        }
-      } catch (error) {
-        Logger.error("콜백 처리 오류:", error);
-        if (this.errorHandler) {
-          await this.errorHandler.handleError(error, {
-            type: "callback",
-            userId: callbackQuery.from?.id,
-            module: "EventListener",
-          });
-        }
-      }
-    });
-
-    // 에러 이벤트
-    this.bot.on("polling_error", async (error) => {
-      Logger.error("🚨 폴링 에러:", error.message);
-      if (this.errorHandler) {
-        await this.errorHandler.handleError(error, {
-          type: "polling",
-          module: "TelegramBot",
-        });
-      }
-    });
-
-    this.bot.on("error", async (error) => {
-      Logger.error("🚨 봇 에러:", error.message);
-      if (this.errorHandler) {
-        await this.errorHandler.handleError(error, {
-          type: "bot_error",
-          module: "TelegramBot",
-        });
-      }
-    });
-
-    Logger.success("✅ 이벤트 리스너 등록 완료");
-  }
-
-  // 💓 헬스 모니터링 시작
+  // 9. 헬스 모니터링 시작
   async startHealthMonitoring() {
-    Logger.info("💓 헬스 모니터링 시작...");
+    try {
+      Logger.info("💊 헬스 모니터링 시작...");
 
-    this.healthCheckInterval = setInterval(async () => {
-      try {
-        // 봇 상태 확인
-        const botInfo = await this.bot.getMe();
+      this.healthCheckInterval = setInterval(async () => {
+        try {
+          const status = this.getHealthStatus();
 
-        // 메모리 사용량 체크
-        const memUsage = process.memoryUsage();
-        const memMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+          // 메모리 사용량 체크 (500MB 초과시 경고)
+          if (status.memoryUsage > 500) {
+            Logger.warn(`⚠️ 높은 메모리 사용량: ${status.memoryUsage}MB`);
+          }
 
-        if (memMB > 100) {
-          // 100MB 이상 시 경고
-          Logger.warn(`⚠️ 메모리 사용량 높음: ${memMB}MB`);
+          // 데이터베이스 연결 상태 체크
+          if (this.databaseManager && !this.databaseManager.isConnected) {
+            Logger.warn("⚠️ 데이터베이스 연결이 끊어짐, 재연결 시도...");
+            try {
+              await this.databaseManager.connect();
+            } catch (reconnectError) {
+              Logger.error("❌ 데이터베이스 재연결 실패:", reconnectError);
+            }
+          }
+        } catch (healthError) {
+          Logger.error("❌ 헬스 체크 오류:", healthError);
         }
+      }, 30000); // 30초마다 체크
 
-        Logger.debug(`💓 헬스 체크 완료 - 메모리: ${memMB}MB`);
-      } catch (error) {
-        Logger.error("💓 헬스 체크 실패:", error.message);
-      }
-    }, 30000); // 30초마다
-
-    Logger.success("✅ 헬스 모니터링 시작됨");
+      Logger.success("✅ 헬스 모니터링 시작됨");
+    } catch (error) {
+      Logger.warn("⚠️ 헬스 모니터링 시작 실패:", error.message);
+    }
   }
 
-  // 🎉 시작 알림
+  // 시작 알림 전송 (한국시간 적용)
   async sendStartupNotification() {
     try {
-      const adminIds = process.env.ADMIN_IDS?.split(",") || [];
-
-      if (adminIds.length === 0) {
-        Logger.debug("관리자 ID가 설정되지 않아 시작 알림 생략");
-        return;
-      }
+      const adminIds = this.config.ADMIN_USER_IDS || [];
+      if (adminIds.length === 0) return;
 
       const uptime = Math.round(process.uptime());
-      const startupText =
-        `🎉 **${config.bot.name} v${config.bot.version}** 시작됨!\n\n` +
-        `🌐 환경: ${process.env.NODE_ENV || "development"}\n` +
-        `🚀 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "YES" : "NO"}\n` +
-        `💾 DB: ${process.env.MONGO_URL ? "MongoDB" : "메모리 모드"}\n` +
-        `⏱️ 부팅 시간: ${uptime}초\n` +
-        `📅 시작 시간: ${this.startTime.toLocaleString("ko-KR", {
-          timeZone: "Asia/Seoul",
-        })}`;
+      const koreaTime = this.timeManager.getKoreanTimeString();
+      const bootTime = Date.now() - this.startTime.getTime();
 
-      // 모든 관리자에게 알림
+      const startupText =
+        `🎉 **두목봇 시작됨!** (표준화 v3.0.1)\n\n` +
+        `📊 버전: ${this.config.VERSION}\n` +
+        `🌐 환경: ${this.config.NODE_ENV}\n` +
+        `🚀 Railway: ${this.config.isRailway ? "YES" : "NO"}\n` +
+        `💾 DB: ${this.databaseManager ? "MongoDB" : "메모리 모드"}\n` +
+        `⏱️ 부팅 시간: ${bootTime}ms\n` +
+        `📅 시작 시간: ${koreaTime}\n` +
+        `🎯 표준화: ✅ 적용됨\n` +
+        `🚫 중복 방지: ✅ 활성화`;
+
       for (const adminId of adminIds) {
         try {
           await this.bot.sendMessage(parseInt(adminId), startupText, {
@@ -406,20 +526,163 @@ class DoomockBot {
     }
   }
 
-  // 🚨 치명적 오류 처리
+  // 헬스 상태 조회 (표준화)
+  getHealthStatus() {
+    const memoryUsage = process.memoryUsage();
+
+    return {
+      isInitialized: this.isInitialized,
+      isRunning: this.isRunning,
+      startTime: this.startTime,
+      uptime: Math.round(process.uptime()),
+      memoryUsage: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
+      environment: this.config?.NODE_ENV || "development",
+      railway: this.config?.isRailway || false,
+      database: this.databaseManager?.isConnected || false,
+      services: {
+        todo: !!this.services.todo,
+        weather: !!this.services.weather,
+        worktime: !!this.services.worktime,
+      },
+      bot: {
+        connected: !!this.bot,
+        polling: this.bot?._polling || false,
+      },
+      standardization: {
+        duplicationPreventer: this.duplicationPreventer.getStatus(),
+        koreanTime: this.timeManager.getKoreanTimeString(),
+        parametersValidated: true,
+      },
+    };
+  }
+
+  // 정리 작업 (표준화)
+  async stop() {
+    const operationId = this.timeManager.generateOperationId(
+      "bot_stop",
+      "system"
+    );
+
+    if (this.shutdownPromise) {
+      Logger.info("종료 작업이 이미 진행 중입니다...");
+      return this.shutdownPromise;
+    }
+
+    if (!(await this.duplicationPreventer.startOperation(operationId))) {
+      Logger.warn("🚫 봇 종료 중복 호출 차단됨");
+      return;
+    }
+
+    this.shutdownPromise = this._doStop();
+    return this.shutdownPromise;
+  }
+
+  async _doStop() {
+    try {
+      Logger.info("🛑 봇 종료 시작... (표준화)");
+      const stopStartTime = Date.now();
+
+      this.isRunning = false;
+
+      // 표준화된 종료 순서
+      const shutdownSteps = [
+        { name: "헬스 모니터링", method: this.stopHealthMonitoring },
+        { name: "폴링", method: this.stopPolling },
+        { name: "모듈 매니저", method: this.stopModuleManager },
+        { name: "봇 컨트롤러", method: this.stopBotController },
+        { name: "서비스들", method: this.stopServices },
+        { name: "데이터베이스", method: this.stopDatabase },
+        { name: "표준화 시스템", method: this.stopStandardizationSystem },
+      ];
+
+      for (let i = 0; i < shutdownSteps.length; i++) {
+        const step = shutdownSteps[i];
+        try {
+          Logger.info(
+            `🛑 ${i + 1}/${shutdownSteps.length}: ${step.name} 종료 중...`
+          );
+          await step.method.call(this);
+          Logger.debug(`✅ ${step.name} 종료 완료`);
+        } catch (error) {
+          Logger.error(`❌ ${step.name} 종료 오류:`, error);
+        }
+      }
+
+      const stopDuration = Date.now() - stopStartTime;
+      Logger.success(`✅ 봇 종료 완료 (${stopDuration}ms)`);
+    } catch (error) {
+      Logger.error("❌ 봇 종료 중 오류:", error);
+    } finally {
+      this.shutdownPromise = null;
+    }
+  }
+
+  // 개별 종료 메서드들
+  async stopHealthMonitoring() {
+    if (this.healthCheckInterval) {
+      clearInterval(this.healthCheckInterval);
+      this.healthCheckInterval = null;
+    }
+  }
+
+  async stopPolling() {
+    if (this.bot) {
+      await this.bot.stopPolling();
+    }
+  }
+
+  async stopModuleManager() {
+    if (this.moduleManager) {
+      await this.moduleManager.cleanup();
+    }
+  }
+
+  async stopBotController() {
+    if (this.botController) {
+      await this.botController.cleanup();
+    }
+  }
+
+  async stopServices() {
+    for (const [name, service] of Object.entries(this.services)) {
+      if (service && typeof service.cleanup === "function") {
+        await service.cleanup();
+      }
+    }
+  }
+
+  async stopDatabase() {
+    if (this.databaseManager) {
+      await this.databaseManager.disconnect();
+    }
+    if (mongoPoolManager) {
+      await mongoPoolManager.close();
+    }
+  }
+
+  async stopStandardizationSystem() {
+    this.duplicationPreventer.cleanup();
+  }
+
+  async cleanup() {
+    await this.stop();
+  }
+
+  // 치명적 오류 처리 (표준화)
   async handleCriticalError(error) {
     Logger.error("🚨 치명적 오류 발생:", error);
 
     try {
       // 관리자에게 긴급 알림
-      const adminIds = process.env.ADMIN_IDS?.split(",") || [];
+      const adminIds = this.config?.ADMIN_USER_IDS || [];
+      const koreaTime = this.timeManager.getKoreanTimeString();
+
       const errorText =
         `🚨 **치명적 오류 발생**\n\n` +
         `⚠️ 오류: ${error.message}\n` +
-        `📅 시간: ${new Date().toLocaleString("ko-KR", {
-          timeZone: "Asia/Seoul",
-        })}\n` +
-        `🌐 환경: ${process.env.NODE_ENV || "development"}`;
+        `📅 시간: ${koreaTime}\n` +
+        `🌐 환경: ${this.config?.NODE_ENV || "unknown"}\n` +
+        `🎯 표준화: 활성화됨`;
 
       for (const adminId of adminIds) {
         try {
@@ -437,105 +700,90 @@ class DoomockBot {
     // 정리 작업
     await this.cleanup();
   }
-
-  // 🧹 정리 작업
-  async cleanup() {
-    Logger.info("🧹 봇 정리 작업 시작...");
-
-    try {
-      // 헬스 모니터링 중단
-      if (this.healthCheckInterval) {
-        clearInterval(this.healthCheckInterval);
-        Logger.debug("헬스 모니터링 중단됨");
-      }
-
-      // 데이터베이스 연결 정리
-      if (mongoPoolManager) {
-        await mongoPoolManager.close();
-        Logger.debug("데이터베이스 연결 종료됨");
-      }
-
-      // 봇 정리
-      if (this.bot) {
-        this.bot.removeAllListeners();
-        Logger.debug("봇 이벤트 리스너 제거됨");
-      }
-
-      Logger.success("✅ 정리 작업 완료");
-    } catch (error) {
-      Logger.error("정리 작업 중 오류:", error);
-    }
-  }
-
-  // 📊 봇 상태 조회
-  getStatus() {
-    return {
-      isInitialized: this.isInitialized,
-      startTime: this.startTime,
-      uptime: Math.round(process.uptime()),
-      memoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-      environment: process.env.NODE_ENV || "development",
-      railway: !!process.env.RAILWAY_ENVIRONMENT,
-      database: !!process.env.MONGO_URL,
-      commandStats: this.commandHandler?.getStats() || null,
-    };
-  }
 }
 
-// 🚀 메인 실행부
+// ✅ 종료 시그널 핸들러 (표준화)
+function setupShutdownHandlers(bot) {
+  const shutdown = async (signal) => {
+    Logger.info(`📨 ${signal} 시그널 수신됨, 표준화된 안전 종료 중...`);
+
+    const shutdownId = bot.timeManager.generateOperationId("shutdown", signal);
+
+    try {
+      if (!(await bot.duplicationPreventer.startOperation(shutdownId))) {
+        Logger.warn("🚫 종료 프로세스 중복 호출 차단됨");
+        return;
+      }
+
+      await bot.stop();
+      process.exit(0);
+    } catch (error) {
+      Logger.error("종료 중 오류:", error);
+      process.exit(1);
+    } finally {
+      bot.duplicationPreventer.endOperation(shutdownId);
+    }
+  };
+
+  process.on("SIGTERM", () => shutdown("SIGTERM"));
+  process.on("SIGINT", () => shutdown("SIGINT"));
+}
+
+// ✅ 메인 실행 함수 (표준화)
 async function main() {
-  let bot = null;
+  const doomockBot = new DoomockBot();
 
   try {
-    // 프로세스 종료 핸들러
-    process.on("SIGINT", async () => {
-      Logger.info("🛑 SIGINT 수신, 봇 종료 중...");
-      if (bot) await bot.cleanup();
-      process.exit(0);
-    });
-
-    process.on("SIGTERM", async () => {
-      Logger.info("🛑 SIGTERM 수신, 봇 종료 중...");
-      if (bot) await bot.cleanup();
-      process.exit(0);
-    });
-
+    // 🎯 표준화된 전역 에러 핸들러 설정
     process.on("uncaughtException", async (error) => {
-      Logger.error("🚨 처리되지 않은 예외:", error);
-      if (bot) await bot.handleCriticalError(error);
+      Logger.error("🚨 처리되지 않은 예외 (표준화):", error);
+      await doomockBot.handleCriticalError(error);
       process.exit(1);
     });
 
     process.on("unhandledRejection", async (reason, promise) => {
-      Logger.error("🚨 처리되지 않은 Promise 거부:", reason);
-      if (bot && reason instanceof Error) {
-        await bot.handleCriticalError(reason);
-      }
+      const error =
+        reason instanceof Error ? reason : new Error(String(reason));
+      Logger.error("🚨 처리되지 않은 Promise 거부 (표준화):", error);
+      await doomockBot.handleCriticalError(error);
     });
 
-    // 봇 인스턴스 생성 및 초기화
-    bot = new DoomockBot();
-    await bot.initialize();
+    // 종료 핸들러 설정
+    setupShutdownHandlers(doomockBot);
+
+    // 🎯 표준화된 봇 시작
+    await doomockBot.start();
+
+    // 성공 메시지
+    const config = doomockBot.config;
+    const timeString = doomockBot.timeManager.getKoreanTimeString();
 
     Logger.success(
-      `🎉 ${config.bot.name} v${config.bot.version} 완전히 시작됨!`
+      `🎉 ${config.BOT_USERNAME || "DoomockBot"} v${
+        config.VERSION
+      } 완전히 시작됨!`
     );
+    Logger.info(`📅 시작 완료 시간: ${timeString}`);
+    Logger.info(`🎯 표준화 시스템: ✅ 활성화`);
+    Logger.info(`🚫 중복 방지: ✅ 활성화`);
+    Logger.info(`🇰🇷 한국시간: ✅ 정확`);
     Logger.info("🤖 봇이 메시지를 기다리고 있습니다...");
+
+    // 무한 대기 (폴링이 계속됨)
+    process.on("exit", async () => {
+      await doomockBot.cleanup();
+    });
   } catch (error) {
     Logger.error("🚨 메인 실행 실패:", error);
-
-    if (bot) {
-      await bot.handleCriticalError(error);
-    }
-
+    await doomockBot.cleanup();
     process.exit(1);
   }
 }
 
-// 실행
+// ✅ 스크립트가 직접 실행될 때만 시작
 if (require.main === module) {
   main().catch((error) => {
-    console.error("치명적 오류:", error);
+    Logger.error("🚨 치명적 오류 발생:", error);
     process.exit(1);
   });
 }
