@@ -1,5 +1,4 @@
 // src/services/TimerService.js - Railway 환경변수를 활용한 지속성 있는 포모도로
-const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 const {
