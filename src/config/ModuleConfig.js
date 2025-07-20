@@ -3,6 +3,18 @@
 class ModuleConfig {
   static getModuleConfigs() {
     return {
+      // 🏠 시스템 모듈 (최우선)
+      SystemModule: {
+        enabled: true,
+        priority: 0, // 최우선
+        required: true, // 필수
+        path: "../modules/SystemModule",
+        features: ["menu", "help", "settings", "status"],
+        commands: ["start", "help", "status", "cancel"],
+        callbacks: ["system", "main", "help", "settings", "module"],
+        description: "시스템 메뉴 및 기본 기능",
+      },
+
       // 📝 할일 관리 모듈
       TodoModule: {
         enabled: true,

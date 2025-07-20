@@ -451,13 +451,14 @@ class ModuleManager {
   }
 
   _parseModuleCallback(callbackData) {
-    // 🔧 콜론(:)과 언더스코어(_) 둘 다 지원하도록 개선
+    // 🔧 콜론(:)과 언더스코어(_) 둘 다 지원
     const moduleMatch = callbackData.match(/^(\w+)[_:](.+)$/);
 
     if (moduleMatch) {
       const [, moduleName, action] = moduleMatch;
 
       const moduleNameMapping = {
+        // 기존 모듈들
         todo: "TodoModule",
         fortune: "FortuneModule",
         weather: "WeatherModule",
@@ -467,25 +468,27 @@ class ModuleManager {
         insight: "InsightModule",
         utils: "UtilsModule",
         reminder: "ReminderModule",
-        // 🎯 시스템 콜백도 추가 지원
-        settings: "SettingsModule",
-        help: "HelpModule",
-        admin: "AdminModule",
+
+        // 🎯 시스템 모듈 추가 (핵심!)
+        system: "SystemModule",
+        main: "SystemModule",
+        help: "SystemModule",
+        settings: "SystemModule",
+        module: "SystemModule",
+        admin: "SystemModule",
       };
 
       const fullModuleName = moduleNameMapping[moduleName];
 
       if (fullModuleName) {
         Logger.debug(
-          `🔧 콜백 파싱 성공: ${callbackData} → ${fullModuleName}.${action} (구분자: ${
-            callbackData.includes(":") ? "콜론" : "언더스코어"
-          })`
+          `🔧 콜백 파싱 성공: ${callbackData} → ${fullModuleName}.${action}`
         );
         return {
           moduleName: fullModuleName,
           action: action,
           originalData: callbackData,
-          separator: callbackData.includes(":") ? ":" : "_", // 디버깅용
+          separator: callbackData.includes(":") ? ":" : "_",
         };
       } else {
         Logger.debug(
@@ -599,7 +602,43 @@ class ModuleManager {
       Logger.error("메인 메뉴 표시 오류:", error);
     }
   }
+  // 🎯 BotFather 명령어 등록 오류도 함께 해결
+  async registerBotCommands() {
+    Logger.info("🎯 BotFather 명령어 등록 중...");
 
+    try {
+      const commands = [
+        { command: "start", description: "🚀 봇 시작 및 메인 메뉴" },
+        { command: "help", description: "❓ 도움말 및 사용법 안내" },
+        { command: "status", description: "📊 현재 봇 상태 및 시스템 정보" },
+        { command: "cancel", description: "❌ 현재 진행 중인 작업 취소" },
+      ];
+
+      Logger.debug("🔍 등록할 명령어:", JSON.stringify(commands, null, 2));
+
+      // ⏳ 잠시 대기 (봇 초기화 완료 후)
+      await new Promise((resolve) => setTimeout(resolve, 1000));
+
+      await this.bot.setMyCommands(commands);
+      Logger.success("✅ BotFather 명령어 등록 완료");
+    } catch (error) {
+      Logger.error("❌ BotFather 명령어 등록 실패:");
+      Logger.error("- 오류 메시지:", error.message);
+      Logger.error("- 오류 코드:", error.code || "N/A");
+
+      if (error.response) {
+        Logger.error(
+          "- API 응답:",
+          JSON.stringify(error.response.body, null, 2)
+        );
+        Logger.error("- 상태 코드:", error.response.statusCode);
+      }
+
+      // 🚫 치명적 오류로 처리하지 않음 (봇은 계속 실행)
+      Logger.warn("⚠️ 명령어 등록에 실패했지만 봇은 정상적으로 작동합니다");
+      Logger.info("💡 수동으로 BotFather에서 명령어를 설정할 수 있습니다");
+    }
+  }
   async _showHelpMenu(bot, chatId, messageId) {
     const helpText =
       `❓ **두목봇 도움말**\n\n` +
