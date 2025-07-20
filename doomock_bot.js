@@ -9,11 +9,13 @@ const logger = require("./src/utils/Logger");
 // ✅ 3. 표준화 시스템 (🎯 핵심!)
 const {
   DuplicationPreventer,
-  KoreanTimeManager,
   ParameterValidator,
   StandardizedBaseModule,
   STANDARD_PARAMS,
 } = require("./src/core/StandardizedSystem");
+
+// TimeHelper 추가:
+const { TimeHelper } = require("./src/utils/TimeHelper");
 
 // ✅ 4. 핵심 의존성
 const TelegramBot = require("node-telegram-bot-api");
@@ -74,7 +76,7 @@ class DoomockBot {
 
     // 🎯 표준화 시스템 (중복 방지 + 한국시간)
     this.duplicationPreventer = new DuplicationPreventer();
-    this.timeManager = new KoreanTimeManager();
+    this.timeManager = TimeHelper;
 
     // 서비스들 (mongoose 없음!)
     this.services = {
@@ -263,7 +265,7 @@ class DoomockBot {
         config: this.config,
         errorHandler: this.errorHandler,
         services: this.services,
-        timeManager: this.timeManager,
+        timeManager: this.TimeHelper,
         duplicationPreventer: this.duplicationPreventer,
       });
 
@@ -352,7 +354,7 @@ class DoomockBot {
         : "메모리 모드";
       const startupMessage = `🚀 **Doomock Bot v${this.config.VERSION} 시작됨**
 
-📅 시작 시간: ${this.timeManager.getKoreanTimeString()}
+📅 시작 시간: ${this.timeManager.getLogTimeString()}
 🌐 환경: ${this.config.NODE_ENV}
 🚂 Railway: ${this.config.isRailway ? "배포됨" : "로컬"}
 🗄️ 데이터베이스: ${dbStatus}
@@ -385,7 +387,7 @@ class DoomockBot {
   // 헬스 체크
   async performHealthCheck() {
     const status = {
-      timestamp: this.timeManager.getKoreanTimeString(),
+      timestamp: this.timeManager.getLogTimeString(),
       bot: this.bot?.isPolling() || false,
       database: this.databaseManager?.isConnected || false,
       modules: this.moduleManager?.isInitialized || false,
