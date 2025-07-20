@@ -1,6 +1,8 @@
 // src/services/HealthService.js - 핵심 헬스체크 서비스
 const AppConfig = require("../config/AppConfig");
 const logger = require("../utils/Logger");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
 
 class HealthService {
   constructor() {
@@ -75,7 +77,7 @@ class HealthService {
    * CPU 사용률 측정 (간단한 방식)
    */
   async getCpuUsage() {
-    return new Promise(resolve => {
+    return new Promise((resolve) => {
       const start = process.cpuUsage();
       setTimeout(() => {
         const usage = process.cpuUsage(start);
@@ -103,10 +105,8 @@ class HealthService {
 
     try {
       // DatabaseManager를 사용해서 연결 상태 확인
-      const {
-        ensureConnection,
-        client,
-      } = require("../database/DatabaseManager");
+      const { getInstance } = require("../database/DatabaseManager");
+      const dbManager = getInstance();
 
       const start = Date.now();
       await ensureConnection();
@@ -242,7 +242,7 @@ class HealthService {
     if (this.healthCheckHistory.length > this.maxHistoryLength) {
       this.healthCheckHistory = this.healthCheckHistory.slice(
         0,
-        this.maxHistoryLength,
+        this.maxHistoryLength
       );
     }
   }
@@ -271,12 +271,12 @@ class HealthService {
       history: this.healthCheckHistory,
       summary: {
         totalChecks: this.healthCheckHistory.length,
-        healthyChecks: this.healthCheckHistory.filter(h => h.status === "ok")
+        healthyChecks: this.healthCheckHistory.filter((h) => h.status === "ok")
           .length,
         degradedChecks: this.healthCheckHistory.filter(
-          h => h.status === "degraded",
+          (h) => h.status === "degraded"
         ).length,
-        errorChecks: this.healthCheckHistory.filter(h => h.status === "error")
+        errorChecks: this.healthCheckHistory.filter((h) => h.status === "error")
           .length,
       },
     };

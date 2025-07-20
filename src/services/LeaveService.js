@@ -1,8 +1,6 @@
 // src/services/LeaveService.js - 수정된 버전
-const {
-  ensureConnection,
-  getCollection,
-} = require("../database/DatabaseManager");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
 const { TimeHelper } = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
@@ -95,7 +93,7 @@ class LeaveService {
             remainingLeaves: newRemaining,
             updatedAt: TimeHelper.getKoreaTime(),
           },
-        },
+        }
       );
 
       logger.info(`사용자 ${userId} 총 연차 ${totalLeaves}일로 설정`);
@@ -118,7 +116,7 @@ class LeaveService {
 
       if (user.remainingLeaves < days) {
         throw new Error(
-          `잔여 연차가 부족합니다. (잔여: ${user.remainingLeaves}일)`,
+          `잔여 연차가 부족합니다. (잔여: ${user.remainingLeaves}일)`
         );
       }
 
@@ -141,7 +139,7 @@ class LeaveService {
             updatedAt: TimeHelper.getKoreaTime(),
           },
           $push: { leaveHistory: leaveRecord },
-        },
+        }
       );
 
       logger.info(`사용자 ${userId} 연차 ${days}일 사용 기록`);
@@ -182,7 +180,11 @@ class LeaveService {
       `✅ 사용한 연차: ${user.usedLeaves}일\n` +
       `⏳ 남은 연차: ${user.remainingLeaves}일\n` +
       `📊 사용률: ${percentage}%\n\n` +
-      `${user.remainingLeaves <= 3 ? "⚠️ 연차가 얼마 남지 않았습니다!" : "✨ 연차를 효율적으로 관리하세요!"}`
+      `${
+        user.remainingLeaves <= 3
+          ? "⚠️ 연차가 얼마 남지 않았습니다!"
+          : "✨ 연차를 효율적으로 관리하세요!"
+      }`
     );
   }
 

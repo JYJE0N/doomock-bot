@@ -1,9 +1,7 @@
 // src/services/InsightService.js
 // ✅ 올바른 임포트
-const {
-  ensureConnection,
-  getCollection,
-} = require("../database/DatabaseManager");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
 
 class InsightService {
   constructor() {

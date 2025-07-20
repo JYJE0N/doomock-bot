@@ -1,9 +1,7 @@
 // src/services/WorktimeService.js
 // ✅ 올바른 임포트
-const {
-  ensureConnection,
-  getCollection,
-} = require("../database/DatabaseManager");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
 
 class WorktimeService {
   constructor() {
@@ -23,7 +21,9 @@ class WorktimeService {
   }
 
   async calculateWorkingTime(userName) {
-    return `⏰ ${userName}님의 근무시간 정보\n\n${this.getWorktimeInfo().schedule}\n\n총 근무시간: ${this.schedule.total}`;
+    return `⏰ ${userName}님의 근무시간 정보\n\n${
+      this.getWorktimeInfo().schedule
+    }\n\n총 근무시간: ${this.schedule.total}`;
   }
 
   async checkInOut(userName, type) {

@@ -147,9 +147,9 @@ class ModuleManager {
         return;
       }
 
-      // ✅ DatabaseManager가 없으면 새로 생성
-      const DatabaseManager = require("../database/DatabaseManager");
-      this.db = new DatabaseManager();
+      // ✅ 방법 3: 싱글톤 인스턴스 사용 (가장 권장)
+      const { getInstance } = require("../database/DatabaseManager");
+      this.db = getInstance();
 
       if (!this.db.isConnected) {
         await this.db.connect();

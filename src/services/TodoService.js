@@ -1,9 +1,7 @@
 // src/services/TodoService.js - MongoDB + 메모리 하이브리드 저장
 
-const {
-  ensureConnection,
-  getCollection,
-} = require("../database/DatabaseManager");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
 const logger = require("../utils/Logger");
 
 class TodoService {
