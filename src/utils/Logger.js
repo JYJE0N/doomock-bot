@@ -401,7 +401,7 @@ try {
   };
 }
 
-// ✅ 정적 메서드도 안전하게
+// ✅ 정적 메서드도 안전하게 주석처리
 // try {
 //   Logger.info = (...args) => loggerInstance.info(...args);
 //   Logger.error = (...args) => loggerInstance.error(...args);
