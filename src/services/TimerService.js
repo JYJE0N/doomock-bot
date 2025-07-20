@@ -42,8 +42,9 @@ class TimerService {
   // ⭐ 데이터베이스 연결
   async connectDatabase() {
     await dbManager.ensureConnection(); // ✅ 인스턴스 메서드 호출
-    this.db = dbManager.db; // ✅ db 직접 접근
+    this.collection = dbManager.db.collection("timer_userStates"); // ✅ db 인스턴스에서 컬렉션 가져오기
     this.dbEnabled = true;
+    logger.info("📊 MongoDB timer_userStates 컬렉션 연결됨");
   }
 
   // ⭐ Railway 환경변수에서 데이터 복원
