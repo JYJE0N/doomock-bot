@@ -1,4 +1,4 @@
-// src/managers/ModuleManager.js - 캐시 안전 로딩
+// src/managers/ModuleManager.js - MongoPoolManager 참조 제거 패치
 
 const logger = require("../utils/Logger");
 const path = require("path");
@@ -9,74 +9,81 @@ class ModuleManager {
     this.bot = bot;
     this.options = options;
 
-    // 상태 관리 (단순화)
+    // 핵심 상태
     this.modules = new Map();
+    this.moduleInstances = new Map();
     this.isInitialized = false;
-    this.isInitializing = false; // 새로 추가
+    this.initializationPromise = null;
 
-    // 중복 방지 강화
-    this.loadingLock = new Set();
+    // 캐시 정리 추적
+    this.cleanedCaches = new Set();
 
-    logger.info("🔧 ModuleManager 생성됨");
+    // 처리 중복 방지
+    this.processingMessages = new Set();
+    this.processingCallbacks = new Set();
+
+    // ✅ 데이터베이스 참조 (통합된 DatabaseManager 사용)
+    // 🚫 제거: const { mongoPoolManager } = require("../database/MongoPoolManager");
+    this.db = options.dbManager || null; // ✅ 옵션에서 전달받은 dbManager 사용
+
+    // 글로벌 통계
+    this.globalStats = {
+      totalMessages: 0,
+      totalCallbacks: 0,
+      successfulMessages: 0,
+      successfulCallbacks: 0,
+      moduleErrors: new Map(),
+      uniqueUsers: new Set(),
+    };
+
+    logger.info("🔧 ModuleManager 생성됨 (DatabaseManager 통합)");
   }
 
-  // ✅ 원자적 초기화 (중복 방지 강화)
+  // =============== 초기화 ===============
+
   async initialize() {
-    // 이미 초기화됨
     if (this.isInitialized) {
-      logger.debug("ModuleManager 이미 초기화됨");
-      return true;
+      logger.warn("ModuleManager 이미 초기화됨");
+      return;
     }
 
-    // 초기화 진행 중
-    if (this.isInitializing) {
-      logger.debug("ModuleManager 초기화 진행 중... 대기");
-      // 초기화 완료까지 폴링 대기
-      while (this.isInitializing && !this.isInitialized) {
-        await new Promise((resolve) => setTimeout(resolve, 100));
-      }
-      return this.isInitialized;
+    if (this.initializationPromise) {
+      logger.debug("ModuleManager 초기화 진행 중...");
+      return await this.initializationPromise;
     }
 
-    // 초기화 시작
-    this.isInitializing = true;
+    this.initializationPromise = this._doInitialize();
+    return await this.initializationPromise;
+  }
 
+  async _doInitialize() {
     try {
       logger.info("⚙️ ModuleManager 초기화 시작...");
 
-      // 1단계: 한 번만 캐시 정리
-      await this._performOneTimeCacheClean();
+      // 1. 데이터베이스 연결 확인
+      await this._ensureDatabaseConnection();
 
-      // 2단계: 모듈 로드 (중복 체크 강화)
-      await this._loadModulesWithLock();
+      // 2. require 캐시 전체 정리 (안전하게)
+      await this._safeCleanCache();
 
-      // 3단계: 모듈 초기화
-      await this._initializeLoadedModules();
+      // 3. 모듈 로드 및 초기화
+      await this._loadModulesSafely();
+      await this._initializeModules();
 
       this.isInitialized = true;
       logger.success(
         `✅ ModuleManager 초기화 완료 (${this.modules.size}개 모듈)`
       );
-
-      return true;
     } catch (error) {
       logger.error("❌ ModuleManager 초기화 실패:", error);
-      this.isInitialized = false;
       throw error;
-    } finally {
-      this.isInitializing = false;
     }
   }
 
-  // ✅ 단 한 번만 실행되는 캐시 정리
-  async _performOneTimeCacheClean() {
-    if (this._cacheCleanCompleted) {
-      logger.debug("캐시 정리 이미 완료됨");
-      return;
-    }
-
+  // ✅ 안전한 캐시 정리
+  async _safeCleanCache() {
     try {
-      logger.info("🗑️ require 캐시 일괄 정리...");
+      logger.info("🗑️ require 캐시 안전 정리 시작...");
 
       const modulePaths = [
         "../modules/SystemModule",
@@ -84,6 +91,7 @@ class ModuleManager {
         "../modules/FortuneModule",
         "../modules/WeatherModule",
         "../modules/UtilsModule",
+        "../utils/Logger",
       ];
 
       let cleanedCount = 0;
@@ -92,259 +100,303 @@ class ModuleManager {
         try {
           const fullPath = path.resolve(__dirname, modulePath + ".js");
 
+          // 파일이 존재하는지 확인
           if (fs.existsSync(fullPath)) {
             const resolvedPath = require.resolve(fullPath);
 
-            if (require.cache[resolvedPath]) {
+            // 캐시에 있고 아직 정리하지 않았다면 정리
+            if (
+              require.cache[resolvedPath] &&
+              !this.cleanedCaches.has(resolvedPath)
+            ) {
               delete require.cache[resolvedPath];
+              this.cleanedCaches.add(resolvedPath);
               cleanedCount++;
-              logger.debug(`🗑️ ${path.basename(modulePath)} 캐시 정리`);
+              logger.debug(`🗑️ 캐시 정리: ${path.basename(modulePath)}`);
             }
           }
         } catch (error) {
-          logger.warn(`캐시 정리 부분 실패: ${modulePath}`, error.message);
+          logger.warn(`⚠️ 캐시 정리 실패 (${modulePath}):`, error.message);
         }
       }
 
-      this._cacheCleanCompleted = true;
-      logger.success(`✅ 캐시 정리 완료: ${cleanedCount}개`);
+      logger.success(`✅ 캐시 정리 완료: ${cleanedCount}개 모듈`);
     } catch (error) {
-      logger.error("❌ 캐시 정리 실패:", error);
-      // 치명적이지 않으므로 계속 진행
+      logger.error("❌ 캐시 정리 중 오류:", error);
+      // 캐시 정리 실패는 치명적이지 않으므로 계속 진행
     }
   }
 
-  // ✅ 중복 방지 모듈 로딩
-  async _loadModulesWithLock() {
-    logger.info("📦 모듈 로드 시작 (중복 방지)");
+  // ✅ 데이터베이스 연결 확인 (통합된 DatabaseManager 사용)
+  async _ensureDatabaseConnection() {
+    try {
+      if (!process.env.MONGO_URL && !process.env.MONGODB_URI) {
+        logger.warn("⚠️ MongoDB URL이 없음, 메모리 모드로 계속");
+        return;
+      }
 
-    // 하드코딩된 모듈 목록 (의존성 순서)
-    const moduleConfigs = {
-      SystemModule: {
-        enabled: true,
-        required: true,
-        path: "../modules/SystemModule",
-      },
-      TodoModule: {
-        enabled: true,
-        required: false,
-        path: "../modules/TodoModule",
-      },
-      FortuneModule: {
-        enabled: true,
-        required: false,
+      if (this.db && this.db.isConnected) {
+        logger.debug("📋 데이터베이스 이미 연결됨");
+        return;
+      }
+
+      // ✅ 옵션에서 전달받은 dbManager가 있으면 사용
+      if (this.options.dbManager) {
+        this.db = this.options.dbManager;
+        logger.debug("✅ 전달받은 DatabaseManager 사용");
+        return;
+      }
+
+      // ✅ DatabaseManager가 없으면 새로 생성
+      const DatabaseManager = require("../database/DatabaseManager");
+      this.db = new DatabaseManager();
+
+      if (!this.db.isConnected) {
+        await this.db.connect();
+      }
+
+      logger.success("✅ DatabaseManager 연결 확인 완료");
+    } catch (error) {
+      logger.warn("⚠️ 데이터베이스 연결 확인 실패:", error.message);
+      this.db = null;
+    }
+  }
+
+  // ✅ 안전한 모듈 로드
+  async _loadModulesSafely() {
+    const moduleConfigs = [
+      { name: "SystemModule", path: "../modules/SystemModule", required: true },
+      { name: "TodoModule", path: "../modules/TodoModule", required: false },
+      {
+        name: "FortuneModule",
         path: "../modules/FortuneModule",
-      },
-      WeatherModule: {
-        enabled: true,
         required: false,
+      },
+      {
+        name: "WeatherModule",
         path: "../modules/WeatherModule",
-      },
-      UtilsModule: {
-        enabled: true,
         required: false,
-        path: "../modules/UtilsModule",
       },
-    };
+      { name: "UtilsModule", path: "../modules/UtilsModule", required: false },
+    ];
 
     let loadedCount = 0;
-    let skippedCount = 0;
+    let requiredCount = 0;
 
-    for (const [moduleName, config] of Object.entries(moduleConfigs)) {
-      // 중복 로드 방지
-      if (this.modules.has(moduleName)) {
-        logger.debug(`⏭️ ${moduleName} 이미 로드됨, 건너뛰기`);
-        skippedCount++;
-        continue;
-      }
-
-      // 로딩 락 체크
-      if (this.loadingLock.has(moduleName)) {
-        logger.warn(`🔒 ${moduleName} 로딩 중, 건너뛰기`);
-        continue;
-      }
-
-      if (!config.enabled) {
-        logger.debug(`⏭️ ${moduleName} 비활성화됨`);
-        continue;
-      }
-
-      // 로딩 락 설정
-      this.loadingLock.add(moduleName);
-
+    for (const config of moduleConfigs) {
       try {
-        const success = await this._loadSingleModuleSafe(moduleName, config);
-        if (success) {
+        const ModuleClass = require(config.path);
+
+        if (typeof ModuleClass === "function") {
+          this.modules.set(config.name, ModuleClass);
           loadedCount++;
-          logger.debug(`✅ ${moduleName} 로드 성공`);
+
+          if (config.required) {
+            requiredCount++;
+          }
+
+          logger.debug(`✅ 모듈 로드: ${config.name}`);
+        } else {
+          throw new Error(`${config.name}이 올바른 클래스가 아닙니다`);
         }
       } catch (error) {
-        logger.error(`❌ ${moduleName} 로드 실패:`, error.message);
+        logger.warn(`⚠️ 모듈 로드 실패 (${config.name}):`, error.message);
+
         if (config.required) {
-          throw new Error(`필수 모듈 ${moduleName} 로드 실패`);
+          throw new Error(`필수 모듈 로드 실패: ${config.name}`);
         }
-      } finally {
-        // 로딩 락 해제
-        this.loadingLock.delete(moduleName);
       }
     }
 
-    logger.success(
-      `📦 모듈 로드 완료: ${loadedCount}개 성공, ${skippedCount}개 건너뜀`
+    logger.info(
+      `📦 모듈 로드 완료: ${loadedCount}개 (필수: ${requiredCount}개)`
     );
-
-    // 로드된 모듈이 없으면 폴백
-    if (loadedCount === 0) {
-      await this._createFallbackSystemModule();
-    }
   }
 
-  // ✅ 안전한 단일 모듈 로드 (캐시 정리 없음!)
-  async _loadSingleModuleSafe(moduleName, config) {
-    try {
-      const modulePath = path.resolve(__dirname, config.path);
+  // ✅ 모듈 초기화
+  async _initializeModules() {
+    const initResults = [];
 
-      // 파일 존재 확인
-      if (!fs.existsSync(modulePath + ".js")) {
-        logger.warn(`⚠️ ${moduleName} 파일 없음: ${modulePath}.js`);
-        return false;
-      }
-
-      // ❌ 여기서는 캐시 정리하지 않음! (이미 _performOneTimeCacheClean에서 처리됨)
-
-      // 모듈 클래스 로드
-      const ModuleClass = require(modulePath);
-
-      if (typeof ModuleClass !== "function") {
-        throw new Error(`${moduleName}은 유효한 클래스가 아님`);
-      }
-
-      // 모듈 등록 (중복 체크)
-      if (!this.modules.has(moduleName)) {
-        this.modules.set(moduleName, {
-          name: moduleName,
-          config: config,
-          class: ModuleClass,
-          instance: null,
-          isLoaded: true,
-          isInitialized: false,
-          loadTime: new Date(),
-        });
-      }
-
-      return true;
-    } catch (error) {
-      logger.error(`${moduleName} 로드 실패:`, error.message);
-      return false;
-    }
-  }
-
-  // ✅ 로드된 모듈들 초기화
-  async _initializeLoadedModules() {
-    logger.info("🔄 모듈 초기화 시작");
-
-    let initializedCount = 0;
-
-    for (const [moduleName, moduleData] of this.modules.entries()) {
-      if (moduleData.isInitialized) {
-        logger.debug(`⏭️ ${moduleName} 이미 초기화됨`);
-        continue;
-      }
-
+    for (const [name, ModuleClass] of this.modules) {
       try {
-        // 인스턴스 생성
-        if (!moduleData.instance) {
-          moduleData.instance = new moduleData.class(this.bot, {
-            moduleManager: this,
+        const moduleInstance = new ModuleClass();
+
+        // 모듈 옵션 설정
+        if (moduleInstance.setOptions) {
+          moduleInstance.setOptions({
+            dbManager: this.db, // ✅ 통합된 DatabaseManager 전달
+            bot: this.bot,
+            ...this.options,
           });
         }
 
-        // 초기화 실행
-        if (typeof moduleData.instance.initialize === "function") {
-          await moduleData.instance.initialize();
+        // 모듈 초기화
+        if (moduleInstance.initialize) {
+          await moduleInstance.initialize();
         }
 
-        moduleData.isInitialized = true;
-        initializedCount++;
-        logger.debug(`✅ ${moduleName} 초기화 완료`);
+        this.moduleInstances.set(name, moduleInstance);
+        initResults.push({ name, status: "success" });
+
+        logger.debug(`✅ 모듈 초기화: ${name}`);
       } catch (error) {
-        logger.error(`❌ ${moduleName} 초기화 실패:`, error.message);
-
-        // 필수 모듈 실패 시 예외 발생
-        if (moduleData.config.required) {
-          throw new Error(`필수 모듈 ${moduleName} 초기화 실패`);
-        }
+        logger.error(`❌ 모듈 초기화 실패 (${name}):`, error.message);
+        initResults.push({ name, status: "failed", error: error.message });
       }
     }
 
-    logger.success(`🔄 모듈 초기화 완료: ${initializedCount}개`);
+    const successCount = initResults.filter(
+      (r) => r.status === "success"
+    ).length;
+    logger.info(
+      `🎯 모듈 초기화 완료: ${successCount}/${initResults.length}개 성공`
+    );
   }
 
-  // ✅ 폴백 시스템 모듈 (최소 기능)
-  async _createFallbackSystemModule() {
-    logger.info("🆘 폴백 SystemModule 생성");
+  // =============== 메시지 및 콜백 처리 ===============
 
-    const FallbackSystemModule = class {
-      constructor(bot, options = {}) {
-        this.name = "SystemModule";
-        this.bot = bot;
-        this.moduleManager = options.moduleManager;
-        this.isInitialized = false;
-      }
+  async handleMessage(bot, msg) {
+    const msgKey = `${msg.chat.id}_${msg.message_id}`;
 
-      async initialize() {
-        this.isInitialized = true;
-        logger.info("✅ 폴백 SystemModule 초기화됨");
-      }
+    if (this.processingMessages.has(msgKey)) {
+      logger.debug(`🚫 중복 메시지 무시: ${msgKey}`);
+      return;
+    }
 
-      async handleMessage() {
-        return false;
-      }
-      async handleCallback() {
-        return false;
-      }
-    };
-
-    this.modules.set("SystemModule", {
-      name: "SystemModule",
-      config: { enabled: true, required: true },
-      class: FallbackSystemModule,
-      instance: new FallbackSystemModule(this.bot, { moduleManager: this }),
-      isLoaded: true,
-      isInitialized: false,
-      loadTime: new Date(),
-    });
-
-    // 즉시 초기화
-    await this.modules.get("SystemModule").instance.initialize();
-    this.modules.get("SystemModule").isInitialized = true;
-  }
-
-  // ✅ 정리 작업
-  async cleanup() {
-    logger.info("🧹 ModuleManager 정리 시작");
+    this.processingMessages.add(msgKey);
 
     try {
-      // 모든 모듈 정리
-      for (const [moduleName, moduleData] of this.modules.entries()) {
+      this.globalStats.totalMessages++;
+      this.globalStats.uniqueUsers.add(msg.from.id);
+
+      // 모든 모듈에 메시지 전달
+      for (const [name, instance] of this.moduleInstances) {
         try {
-          if (
-            moduleData.instance &&
-            typeof moduleData.instance.cleanup === "function"
-          ) {
-            await moduleData.instance.cleanup();
+          if (instance.handleMessage) {
+            const handled = await instance.handleMessage(bot, msg);
+            if (handled) {
+              this.globalStats.successfulMessages++;
+              logger.debug(`📨 메시지 처리됨 by ${name}`);
+              break;
+            }
           }
         } catch (error) {
-          logger.error(`${moduleName} 정리 실패:`, error);
+          logger.error(`❌ 모듈 메시지 처리 오류 (${name}):`, error.message);
+
+          if (!this.globalStats.moduleErrors.has(name)) {
+            this.globalStats.moduleErrors.set(name, 0);
+          }
+          this.globalStats.moduleErrors.set(
+            name,
+            this.globalStats.moduleErrors.get(name) + 1
+          );
+        }
+      }
+    } finally {
+      // 5초 후 중복 방지 해제
+      setTimeout(() => {
+        this.processingMessages.delete(msgKey);
+      }, 5000);
+    }
+  }
+
+  async handleCallback(bot, callbackQuery) {
+    const callbackKey = `${callbackQuery.from.id}_${callbackQuery.data}`;
+
+    if (this.processingCallbacks.has(callbackKey)) {
+      logger.debug(`🚫 중복 콜백 무시: ${callbackKey}`);
+      return;
+    }
+
+    this.processingCallbacks.add(callbackKey);
+
+    try {
+      this.globalStats.totalCallbacks++;
+
+      // 콜백 데이터 파싱
+      const [module, action, ...params] = callbackQuery.data.split("_");
+
+      // 해당 모듈 찾기
+      for (const [name, instance] of this.moduleInstances) {
+        try {
+          if (
+            instance.handleCallback &&
+            (name.toLowerCase().includes(module.toLowerCase()) ||
+              instance.commands?.includes(module))
+          ) {
+            const handled = await instance.handleCallback(
+              bot,
+              callbackQuery,
+              action,
+              params,
+              this // MenuManager 역할
+            );
+
+            if (handled) {
+              this.globalStats.successfulCallbacks++;
+              logger.debug(`📞 콜백 처리됨 by ${name}: ${action}`);
+              break;
+            }
+          }
+        } catch (error) {
+          logger.error(`❌ 모듈 콜백 처리 오류 (${name}):`, error.message);
+
+          if (!this.globalStats.moduleErrors.has(name)) {
+            this.globalStats.moduleErrors.set(name, 0);
+          }
+          this.globalStats.moduleErrors.set(
+            name,
+            this.globalStats.moduleErrors.get(name) + 1
+          );
+        }
+      }
+    } finally {
+      // 3초 후 중복 방지 해제
+      setTimeout(() => {
+        this.processingCallbacks.delete(callbackKey);
+      }, 3000);
+    }
+  }
+
+  // =============== 상태 및 정리 ===============
+
+  getStatus() {
+    return {
+      initialized: this.isInitialized,
+      moduleCount: this.modules.size,
+      activeModuleCount: this.moduleInstances.size,
+      databaseConnected: this.db?.isConnected || false,
+      globalStats: {
+        ...this.globalStats,
+        uniqueUserCount: this.globalStats.uniqueUsers.size,
+      },
+      modules: Array.from(this.moduleInstances.keys()),
+    };
+  }
+
+  async cleanup() {
+    try {
+      logger.info("🧹 ModuleManager 정리 시작...");
+
+      // 모든 모듈 정리
+      for (const [name, instance] of this.moduleInstances) {
+        try {
+          if (instance.cleanup) {
+            await instance.cleanup();
+          }
+          logger.debug(`🧹 모듈 정리: ${name}`);
+        } catch (error) {
+          logger.warn(`⚠️ 모듈 정리 실패 (${name}):`, error.message);
         }
       }
 
       // 상태 초기화
       this.modules.clear();
-      this.loadingLock.clear();
+      this.moduleInstances.clear();
+      this.processingMessages.clear();
+      this.processingCallbacks.clear();
+      this.cleanedCaches.clear();
       this.isInitialized = false;
-      this.isInitializing = false;
-      this._cacheCleanCompleted = false;
 
       logger.success("✅ ModuleManager 정리 완료");
     } catch (error) {

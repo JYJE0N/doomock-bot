@@ -1,4 +1,5 @@
-// doomock_bot.js - 3.0.1 리팩토링: 중복 제거 + 표준화 완성
+// doomock_bot.js - v3.0.1 MongoPoolManager 제거 패치
+// 🚫 MongoPoolManager 완전 제거 + DatabaseManager 통합
 
 // ✅ 1. 환경변수 최우선 로드 (무조건 첫 번째!)
 require("dotenv").config();
@@ -24,8 +25,9 @@ const { TimeHelper } = require("./src/utils/TimeHelper");
 const ErrorHandler = require("./src/utils/ErrorHandler");
 
 // ✅ 6. 데이터베이스 관련 (MongoDB 네이티브 드라이버만!)
-const { mongoPoolManager } = require("./src/database/MongoPoolManager");
+// 🚫 제거: const { mongoPoolManager } = require("./src/database/MongoPoolManager");
 const DatabaseManager = require("./src/database/DatabaseManager");
+const { mongoPoolManager } = require("./src/database/DatabaseManager"); // ✅ 통합된 위치에서 import
 
 // ✅ 7. 핵심 매니저들
 const ModuleManager = require("./src/managers/ModuleManager");
@@ -92,7 +94,9 @@ class DoomockBot {
     // 싱글톤 저장
     DoomockBot._instance = this;
 
-    logger.info("🤖 DoomockBot 인스턴스 생성됨 (표준화 + 무재귀)");
+    logger.info(
+      "🤖 DoomockBot 인스턴스 생성됨 (표준화 + MongoPoolManager 제거)"
+    );
     logger.logTimeInfo();
   }
 
@@ -117,7 +121,9 @@ class DoomockBot {
 
     try {
       this.initializationInProgress = true;
-      logger.info("🚀 Doomock 봇 시작... (표준화 시스템)");
+      logger.info(
+        "🚀 Doomock 봇 시작... (표준화 시스템 + DatabaseManager 통합)"
+      );
 
       // 🇰🇷 시작 시간 기록
       const startTimeString = this.timeManager.getKoreanTimeString();
@@ -211,19 +217,18 @@ class DoomockBot {
     }
   }
 
-  // 2. 데이터베이스 초기화 (MongoDB 네이티브만!)
+  // 2. 데이터베이스 초기화 (MongoDB 네이티브만! - 통합된 DatabaseManager)
   async initializeDatabase() {
     try {
-      logger.info("🗄️ 데이터베이스 초기화 중... (MongoDB 네이티브)");
+      logger.info("🗄️ 데이터베이스 초기화 중... (통합 DatabaseManager)");
 
       if (!this.config.MONGO_URL) {
         logger.warn("⚠️ MongoDB URL이 없음, 메모리 모드로 실행");
         return;
       }
 
-      // ✅ 올바른 DatabaseManager 사용
-      const DatabaseManager = require("./src/database/DatabaseManager");
-      this.databaseManager = new DatabaseManager(this.config.MONGO_URL);
+      // ✅ 통합된 DatabaseManager 초기화
+      this.databaseManager = new DatabaseManager();
 
       // 연결 시도 (최대 3번)
       let attempts = 0;
@@ -233,7 +238,7 @@ class DoomockBot {
         try {
           const connected = await this.databaseManager.connect();
           if (connected) {
-            logger.success("✅ MongoDB 연결 성공 (네이티브 드라이버)");
+            logger.success("✅ MongoDB 연결 성공 (통합 DatabaseManager)");
             // 인덱스 설정
             await this.setupDatabaseIndexes();
             break;
@@ -256,14 +261,9 @@ class DoomockBot {
         }
       }
 
-      // mongoPoolManager도 초기화
+      // ✅ mongoPoolManager는 이제 DatabaseManager에서 제공
       if (this.databaseManager && this.databaseManager.isConnected) {
-        try {
-          await mongoPoolManager.connect();
-          logger.debug("✅ mongoPoolManager 연결 완료");
-        } catch (poolError) {
-          logger.warn("mongoPoolManager 연결 실패:", poolError.message);
-        }
+        logger.debug("✅ 통합된 mongoPoolManager 사용 준비 완료");
       }
     } catch (error) {
       logger.error("❌ 데이터베이스 초기화 중 오류:", error);
@@ -272,81 +272,74 @@ class DoomockBot {
     }
   }
 
-  // 3. 에러 핸들러 초기화 (표준 매개변수 준수) - 중복 제거됨!
+  // 3. 에러 핸들러 초기화 (표준 매개변수 준수)
   async initializeErrorHandler() {
     try {
       logger.info("🛡️ 에러 핸들러 초기화 중...");
 
       // Railway 환경에 최적화된 설정
       const errorConfig = {
-        maxRetries: this.config.isRailway ? 5 : 3,
+        maxRetries: this.config.isRailway ? 3 : 5,
         retryDelay: this.config.isRailway ? 2000 : 1000,
-        alertThreshold: 10,
-        healthCheckInterval: 30000,
+        enableNotifications: !!this.config.ADMIN_CHAT_ID,
+        logLevel: this.config.NODE_ENV === "production" ? "error" : "debug",
       };
 
       this.errorHandler = new ErrorHandler(errorConfig);
+      await this.errorHandler.initialize();
 
       logger.success("✅ 에러 핸들러 초기화 완료");
     } catch (error) {
       logger.error("❌ 에러 핸들러 초기화 실패:", error);
-      // 에러 핸들러 실패는 치명적이지 않음 - 계속 진행
+      // 에러 핸들러 실패는 치명적이지 않음
       this.errorHandler = null;
-      logger.warn("⚠️ 에러 핸들러 없이 계속 진행");
+      logger.warn("⚠️ 기본 에러 처리로 계속 진행");
     }
   }
 
-  // 4. 서비스들 초기화 (mongoose 절대 사용 안함!)
+  // 4. 서비스들 초기화 (표준 매개변수 준수)
   async initializeServices() {
     try {
-      logger.info("🔧 서비스들 초기화 중... (MongoDB 네이티브만)");
+      logger.info("🔧 서비스들 초기화 중...");
 
-      // TodoService 초기화
-      if (this.config.ENABLE_TODO_MODULE !== false) {
-        try {
-          this.services.todo = new TodoService({
-            databaseManager: this.databaseManager,
-            config: this.config,
-          });
-          logger.debug("✅ TodoService 초기화 완료");
-        } catch (error) {
-          logger.warn("⚠️ TodoService 초기화 실패:", error.message);
-          this.services.todo = null;
-        }
+      // TODO 서비스
+      try {
+        this.services.todo = new TodoService({
+          dbManager: this.databaseManager, // ✅ 통합된 DatabaseManager 사용
+        });
+        logger.debug("✅ TodoService 초기화 완료");
+      } catch (error) {
+        logger.warn("⚠️ TodoService 초기화 실패:", error.message);
+        this.services.todo = null;
       }
 
-      // WeatherService 초기화
-      if (this.config.ENABLE_WEATHER_MODULE !== false) {
-        try {
-          this.services.weather = new WeatherService({
-            apiKey: this.config.WEATHER_API_KEY,
-            config: this.config,
-          });
-          logger.debug("✅ WeatherService 초기화 완료");
-        } catch (error) {
-          logger.warn("⚠️ WeatherService 초기화 실패:", error.message);
-          this.services.weather = null;
-        }
+      // 날씨 서비스
+      try {
+        this.services.weather = new WeatherService({
+          apiKey: this.config.WEATHER_API_KEY,
+          dbManager: this.databaseManager,
+        });
+        logger.debug("✅ WeatherService 초기화 완료");
+      } catch (error) {
+        logger.warn("⚠️ WeatherService 초기화 실패:", error.message);
+        this.services.weather = null;
       }
 
-      // WorktimeService 초기화
-      if (this.config.ENABLE_WORKTIME_MODULE !== false) {
-        try {
-          this.services.worktime = new WorktimeService({
-            databaseManager: this.databaseManager,
-            config: this.config,
-          });
-          logger.debug("✅ WorktimeService 초기화 완료");
-        } catch (error) {
-          logger.warn("⚠️ WorktimeService 초기화 실패:", error.message);
-          this.services.worktime = null;
-        }
+      // 근무시간 서비스
+      try {
+        this.services.worktime = new WorktimeService({
+          dbManager: this.databaseManager,
+        });
+        logger.debug("✅ WorktimeService 초기화 완료");
+      } catch (error) {
+        logger.warn("⚠️ WorktimeService 초기화 실패:", error.message);
+        this.services.worktime = null;
       }
 
       logger.success("✅ 서비스들 초기화 완료");
     } catch (error) {
-      logger.error("❌ 서비스 초기화 실패:", error);
-      // 서비스 실패는 치명적이지 않음 - 계속 진행
+      logger.error("❌ 서비스들 초기화 실패:", error);
+      // 서비스 실패는 부분적으로 허용
       logger.warn("⚠️ 일부 서비스 없이 계속 진행");
     }
   }
@@ -416,7 +409,7 @@ class DoomockBot {
 
       // ✅ 기존 ModuleManager 생성자 방식에 맞춤: (bot, options)
       this.moduleManager = new ModuleManager(this.bot, {
-        dbManager: this.databaseManager, // databaseManager를 dbManager로 전달
+        dbManager: this.databaseManager, // ✅ 통합된 DatabaseManager 전달
         userStates: this.botController.userStates, // BotController의 userStates 사용
         config: this.config,
         errorHandler: this.errorHandler,
@@ -503,13 +496,31 @@ class DoomockBot {
 
   // =============== 🛠️ 보조 메서드들 ===============
 
+  // 봇 이벤트 리스너 설정
+  setupBotEventListeners() {
+    // 기본적인 에러 처리만 설정 (상세한 이벤트는 BotController에서)
+    this.bot.on("polling_error", (error) => {
+      logger.error("텔레그램 폴링 에러:", error.message);
+    });
+
+    this.bot.on("error", (error) => {
+      logger.error("텔레그램 봇 에러:", error.message);
+    });
+
+    logger.debug("✅ 기본 봇 이벤트 리스너 설정 완료");
+  }
+
   // 데이터베이스 인덱스 설정
   async setupDatabaseIndexes() {
     if (!this.databaseManager) return;
 
     try {
       logger.info("📑 데이터베이스 인덱스 설정 중...");
-      // 인덱스 설정 로직... (추후 구체화)
+
+      // 기본 인덱스들은 DatabaseManager 내에서 자동 설정됨
+      const status = this.databaseManager.getStatus();
+      logger.debug(`📊 DB 상태: ${JSON.stringify(status.poolStats)}`);
+
       logger.success("✅ 데이터베이스 인덱스 설정 완료");
     } catch (error) {
       logger.warn("⚠️ 인덱스 설정 실패:", error.message);
@@ -532,80 +543,40 @@ class DoomockBot {
 
     // 데이터베이스 상태 체크
     if (this.databaseManager) {
-      const dbHealthy = (await this.databaseManager.isHealthy?.()) || false;
+      const dbHealthy = await this.databaseManager.isHealthy();
       if (!dbHealthy) {
         health.status = "degraded";
         health.issues.push("데이터베이스 연결 불안정");
       }
     }
 
-    // 메모리 사용량 체크 (Railway 제한: 512MB)
-    const memUsage = process.memoryUsage();
-    const memUsageMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-
-    if (this.config.isRailway && memUsageMB > 400) {
-      // 400MB 이상시 경고
-      health.status = "degraded";
-      health.issues.push(`높은 메모리 사용량: ${memUsageMB}MB`);
-    }
-
-    // 디버그 정보 로깅
-    if (health.status === "degraded") {
-      logger.warn("⚠️ 헬스체크 이슈:", health.issues.join(", "));
-    } else if (process.env.NODE_ENV === "development") {
-      logger.debug(`💚 헬스체크 정상 (메모리: ${memUsageMB}MB)`);
+    if (health.issues.length > 0) {
+      logger.warn(`⚠️ 헬스체크 문제: ${health.issues.join(", ")}`);
     }
 
     return health;
   }
 
-  // 봇 이벤트 리스너 설정
-  setupBotEventListeners() {
-    // 폴링 에러 처리
-    this.bot.on("polling_error", async (error) => {
-      logger.error("📡 폴링 에러:", error);
-      if (this.errorHandler) {
-        await this.errorHandler.handleError(error, { module: "polling" });
-      }
-    });
-
-    // 웹훅 에러 처리 (사용하지 않지만 안전장치)
-    this.bot.on("webhook_error", async (error) => {
-      logger.error("🌐 웹훅 에러:", error);
-      if (this.errorHandler) {
-        await this.errorHandler.handleError(error, { module: "webhook" });
-      }
-    });
-
-    // 일반 에러 처리
-    this.bot.on("error", async (error) => {
-      logger.error("🤖 봇 에러:", error);
-      if (this.errorHandler) {
-        await this.errorHandler.handleError(error, { module: "bot" });
-      }
-    });
-
-    logger.debug("✅ 봇 이벤트 리스너 설정 완료");
-  }
-
   // 시작 알림 전송
   async sendStartupNotification() {
-    // 관리자에게 시작 알림 (개발 환경에서만)
-    if (process.env.NODE_ENV === "development" && this.config.ADMIN_CHAT_ID) {
-      try {
-        const startupMessage = `🚀 *DoomockBot v${this.config.VERSION} 시작됨*
-      
+    if (!this.config.ADMIN_CHAT_ID) return;
+
+    try {
+      const dbStatus = this.databaseManager ? "연결됨" : "메모리 모드";
+      const startupMessage = `🚀 **Doomock Bot v${this.config.VERSION} 시작됨**
+
 📅 시작 시간: ${this.timeManager.getKoreanTimeString()}
 🌐 환경: ${this.config.NODE_ENV}
-🗄️ 데이터베이스: ${this.databaseManager ? "연결됨" : "메모리 모드"}
-🎯 표준화 시스템: ✅ 활성화`;
+🚂 Railway: ${this.config.isRailway ? "배포됨" : "로컬"}
+🗄️ 데이터베이스: ${dbStatus}
+🎯 표준화 시스템: ✅ 활성화
+🚫 MongoPoolManager: ✅ 제거됨 (DatabaseManager 통합)`;
 
-        await this.bot.sendMessage(this.config.ADMIN_CHAT_ID, startupMessage, {
-          parse_mode: "Markdown",
-        });
-      } catch (error) {
-        logger.warn("⚠️ 시작 알림 전송 실패:", error.message);
-      }
+      await this.bot.sendMessage(this.config.ADMIN_CHAT_ID, startupMessage, {
+        parse_mode: "Markdown",
+      });
+    } catch (error) {
+      logger.warn("⚠️ 시작 알림 전송 실패:", error.message);
     }
   }
 
@@ -637,7 +608,7 @@ class DoomockBot {
         () => this.moduleManager && this.moduleManager.cleanup(),
         () => this.botController && this.botController.cleanup(),
         () => this.databaseManager && this.databaseManager.disconnect(),
-        () => mongoPoolManager && mongoPoolManager.disconnect(),
+        // 🚫 제거: () => mongoPoolManager && mongoPoolManager.disconnect(),
         () => this.duplicationPreventer && this.duplicationPreventer.cleanup(),
       ];
 
@@ -681,9 +652,10 @@ function setupShutdownHandlers(doomockBot) {
 // 메인 실행 함수
 async function main() {
   try {
-    logger.info("🎬 Doomock Bot 3.0.1 시작 중... (표준화 + 무재귀)");
+    logger.info("🎬 Doomock Bot 3.0.1 시작 중... (DatabaseManager 통합 완료)");
     logger.info("🎯 표준 매개변수:", STANDARD_PARAMS);
     logger.info("🚫 mongoose 사용 안함 - MongoDB 네이티브 드라이버만 사용");
+    logger.info("✅ MongoPoolManager 제거됨 - DatabaseManager로 통합");
 
     // DoomockBot 인스턴스 생성
     const doomockBot = new DoomockBot();
@@ -716,6 +688,7 @@ async function main() {
     logger.info(`🚫 중복 방지: ✅ 활성화`);
     logger.info(`🇰🇷 한국시간: ✅ 정확`);
     logger.info(`🗄️ MongoDB: 네이티브 드라이버 (mongoose 없음)`);
+    logger.info(`✅ DatabaseManager: 통합 완료 (MongoPoolManager 제거)`);
     logger.info("🤖 봇이 메시지를 기다리고 있습니다...");
   } catch (error) {
     logger.error("🚨 메인 실행 실패:", error);
@@ -732,4 +705,3 @@ if (require.main === module) {
 }
 
 module.exports = DoomockBot;
-// DoomockBot 인스턴스 (싱글톤) 내보내기
