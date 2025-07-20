@@ -93,7 +93,6 @@ class KoreaTimeManager {
 
     KoreaTimeManager.instance = this;
   }
-
   // ==================== 🕐 기본 시간 조회 ====================
 
   /**
@@ -123,7 +122,7 @@ class KoreaTimeManager {
   /**
    * 로그용 시간 문자열 (캐시됨)
    * @param {Date} [date] - 포맷할 날짜 (기본값: 현재시간)
-   * @returns {string} "2025. 7. 20. 오후 10:51:09"
+   * @returns {string} "23:27"
    */
   getLogTimeString(date = null) {
     const targetDate = date || this.now();
@@ -252,7 +251,7 @@ class KoreaTimeManager {
    * @param {Object} context - 컨텍스트 정보
    * @returns {boolean} 작업 시작 가능 여부
    */
-  async startOperation(operationId, context = {}) {
+  startOperation(operationId, context = {}) {
     const now = Date.now();
 
     if (this.activeOperations.has(operationId)) {
