@@ -545,7 +545,8 @@ class CommandHandler {
 
 기본 명령어:
 • /start - 봇 시작 및 메인 메뉴
-• /help - 도움말 보기  
+• /help - 도움말 보기
+• /modules - 사용 가능한 모듈 목록
 • /status - 봇 상태 확인
 • /cancel - 현재 작업 취소
 
