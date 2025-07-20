@@ -3,10 +3,6 @@
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 const logger = require("../utils/Logger");
-const {
-  ensureConnection,
-  getCollection,
-} = require("../database/DatabaseManager");
 const { TimeHelper } = require("../utils/TimeHelper");
 
 class TodoService {
@@ -64,10 +60,9 @@ class TodoService {
 
   // ⭐ 데이터베이스 연결
   async connectDatabase() {
-    await ensureConnection();
-    this.collection = getCollection("todos");
+    await dbManager.ensureConnection(); // ✅ 인스턴스 메서드 호출
+    this.db = dbManager.db; // ✅ db 직접 접근
     this.dbEnabled = true;
-    logger.info("📊 MongoDB todos 컬렉션 연결됨");
   }
 
   // ⭐ 데이터베이스에서 모든 할일 로드

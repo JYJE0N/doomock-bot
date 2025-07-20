@@ -41,7 +41,7 @@ class TodoModule extends BaseModule {
     try {
       // 데이터베이스 연결 확인
       if (!this.db) {
-        this.logger.warn("⚠️ 데이터베이스 연결 없음, 메모리 모드로 실행");
+        logger.warn("⚠️ 데이터베이스 연결 없음, 메모리 모드로 실행");
         this.memoryTodos = new Map(); // 메모리 저장소
         return;
       }
@@ -52,12 +52,12 @@ class TodoModule extends BaseModule {
       // 기존 Todo 통계 로드
       await this._loadTodoStats();
 
-      this.logger.success("📝 TodoModule 초기화 완료");
+      logger.success("📝 TodoModule 초기화 완료");
     } catch (error) {
-      this.logger.error("TodoModule 초기화 실패:", error);
+      logger.error("TodoModule 초기화 실패:", error);
       // 메모리 모드로 폴백
       this.memoryTodos = new Map();
-      this.logger.info("메모리 모드로 실행합니다.");
+      logger.info("메모리 모드로 실행합니다.");
     }
   }
 
@@ -75,7 +75,7 @@ class TodoModule extends BaseModule {
 
       await this.db.ensureIndexes("todos", indexes);
     } catch (error) {
-      this.this.logger.warn("인덱스 생성 실패:", error.message);
+      logger.warn("인덱스 생성 실패:", error.message);
     }
   }
 
@@ -92,11 +92,11 @@ class TodoModule extends BaseModule {
       this.todoStats.totalTodos = totalCount;
       this.todoStats.completedTodos = completedCount;
 
-      this.logger.debug(
+      logger.debug(
         `📊 Todo 통계 로드됨: 전체 ${totalCount}, 완료 ${completedCount}`
       );
     } catch (error) {
-      this.logger.warn("⚠️ Todo 통계 로드 실패:", error.message);
+      logger.warn("⚠️ Todo 통계 로드 실패:", error.message);
     }
   }
 
@@ -123,11 +123,11 @@ class TodoModule extends BaseModule {
       if (typeof method === "function") {
         this.actionMap.set(actionName, method.bind(this));
       } else {
-        this.logger.warn(`⚠️ 메서드 없음: ${actionName}`);
+        logger.warn(`⚠️ 메서드 없음: ${actionName}`);
       }
     });
 
-    this.logger.debug("🎯 TodoModule 액션 등록 완료");
+    logger.debug("🎯 TodoModule 액션 등록 완료");
   }
 
   // ✅ 표준 메시지 처리 구현
@@ -186,7 +186,7 @@ class TodoModule extends BaseModule {
 
       return false; // 다른 모듈이 처리하도록
     } catch (error) {
-      this.logger.error("TodoModule 메시지 처리 오류:", error);
+      logger.error("TodoModule 메시지 처리 오류:", error);
       return false;
     }
   }
@@ -203,7 +203,7 @@ class TodoModule extends BaseModule {
     const userName = getUserName(callbackQuery.from);
 
     try {
-      this.this.logger.debug(`📞 Todo 콜백 처리: ${subAction}`);
+      logger.debug(`📞 Todo 콜백 처리: ${subAction}`);
 
       // 액션 매핑에서 처리
       const action = this.actionMap.get(subAction);
@@ -249,10 +249,10 @@ class TodoModule extends BaseModule {
       }
 
       // 알 수 없는 액션
-      this.logger.warn(`⚠️ 알 수 없는 Todo 액션: ${subAction}`);
+      logger.warn(`⚠️ 알 수 없는 Todo 액션: ${subAction}`);
       return false;
     } catch (error) {
-      this.logger.error("Todo 콜백 처리 오류:", error);
+      logger.error("Todo 콜백 처리 오류:", error);
       return false;
     }
   }
@@ -347,7 +347,7 @@ class TodoModule extends BaseModule {
         userName
       );
     } catch (error) {
-      this.logger.error("할일 목록 조회 실패:", error);
+      logger.error("할일 목록 조회 실패:", error);
       await this._sendErrorMessage(
         bot,
         chatId,
@@ -530,7 +530,7 @@ ${this._getProgressBar(completionRate)}`;
         keyboard
       );
     } catch (error) {
-      this.logger.error("통계 조회 실패:", error);
+      logger.error("통계 조회 실패:", error);
       await this._sendErrorMessage(bot, chatId, "통계를 불러올 수 없습니다.");
     }
   }
@@ -579,7 +579,7 @@ ${this._getProgressBar(completionRate)}`;
         keyboard
       );
     } catch (error) {
-      this.logger.error("완료된 할일 정리 실패:", error);
+      logger.error("완료된 할일 정리 실패:", error);
       await this._sendErrorMessage(bot, chatId, "할일 정리에 실패했습니다.");
     }
   }
@@ -630,7 +630,7 @@ ${this._getProgressBar(completionRate)}`;
         keyboard
       );
     } catch (error) {
-      this.logger.error("할일 삭제 확인 실패:", error);
+      logger.error("할일 삭제 확인 실패:", error);
       await this._sendErrorMessage(bot, chatId, "삭제 확인에 실패했습니다.");
     }
   }
@@ -683,7 +683,7 @@ ${this._getProgressBar(completionRate)}`;
         keyboard
       );
     } catch (error) {
-      this.logger.error("할일 내보내기 실패:", error);
+      logger.error("할일 내보내기 실패:", error);
       await this._sendErrorMessage(bot, chatId, "내보내기에 실패했습니다.");
     }
   }
@@ -834,7 +834,7 @@ ${this._getProgressBar(completionRate)}`;
         return; // 내용이 같아서 편집되지 않음 (정상)
       }
 
-      this.this.logger.warn("메시지 편집 실패, 새 메시지 전송:", error.message);
+      logger.warn("메시지 편집 실패, 새 메시지 전송:", error.message);
       return await bot.sendMessage(chatId, text, {
         reply_markup: keyboard,
         parse_mode: "Markdown",
@@ -853,7 +853,7 @@ ${this._getProgressBar(completionRate)}`;
         },
       });
     } catch (error) {
-      this.logger.error("에러 메시지 전송 실패:", error);
+      logger.error("에러 메시지 전송 실패:", error);
     }
   }
 
@@ -915,7 +915,7 @@ ${this._getProgressBar(completionRate)}`;
           return false;
       }
     } catch (error) {
-      this.logger.error("사용자 상태 메시지 처리 오류:", error);
+      logger.error("사용자 상태 메시지 처리 오류:", error);
       this.clearUserState(userId);
       return false;
     }
@@ -1019,7 +1019,7 @@ ${this._getProgressBar(completionRate)}`;
 
       return true;
     } catch (error) {
-      this.logger.error("검색 처리 오류:", error);
+      logger.error("검색 처리 오류:", error);
       const errorMessage = `❌ **검색 실패**\n\n검색 중 오류가 발생했습니다.`;
       await bot.sendMessage(chatId, errorMessage, { parse_mode: "Markdown" });
       return true;
@@ -1099,7 +1099,7 @@ ${this._getProgressBar(completionRate)}`;
     if (this.memoryTodos) {
       this.memoryTodos.clear();
     }
-    this.this.logger.debug("📝 TodoModule 정리 완료");
+    logger.debug("📝 TodoModule 정리 완료");
   }
 }
 

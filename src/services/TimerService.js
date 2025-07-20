@@ -1,10 +1,6 @@
 // src/services/TimerService.js - Railway 환경변수를 활용한 지속성 있는 포모도로
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
-const {
-  ensureConnection,
-  getCollection,
-} = require("../database/DatabaseUtils");
 const { generateId } = require("../utils/IdGenerator");
 const { formatDate, formatTime } = require("../utils/DateFormatter");
 const { addMinutes } = require("../utils/TimeHelper");
@@ -41,6 +37,13 @@ class TimerService {
 
     // ⭐ Railway 재시작 감지 및 복원
     this.setupGracefulShutdown();
+  }
+
+  // ⭐ 데이터베이스 연결
+  async connectDatabase() {
+    await dbManager.ensureConnection(); // ✅ 인스턴스 메서드 호출
+    this.db = dbManager.db; // ✅ db 직접 접근
+    this.dbEnabled = true;
   }
 
   // ⭐ Railway 환경변수에서 데이터 복원
