@@ -6,18 +6,9 @@ const logger = require("../utils/Logger");
 
 // 기타 안전한 imports
 const { MongoClient } = require("mongodb");
-const { StandardizedBaseModule } = require("../core/StandardizedSystem");
 
-// 🌍 싱글톤 인스턴스 저장소
-let globalDatabaseInstance = null;
-
-class DatabaseManager extends StandardizedBaseModule {
+class DatabaseManager {
   constructor(mongoUrl = null, options = {}) {
-    super("DatabaseManager", {
-      priority: 0,
-      required: true,
-    });
-
     // 🔒 싱글톤 패턴 적용
     if (globalDatabaseInstance) {
       logger.debug("🔄 기존 DatabaseManager 인스턴스 반환");
@@ -25,71 +16,49 @@ class DatabaseManager extends StandardizedBaseModule {
     }
 
     this.logger = logger;
-
-    // Railway 환경 감지
-    this.isRailwayEnvironment = !!(
-      process.env.RAILWAY_ENVIRONMENT ||
-      process.env.RAILWAY_SERVICE_NAME ||
-      process.env.RAILWAY_PROJECT_NAME
-    );
-
-    // 연결 설정
-    this.mongoUrl =
-      mongoUrl || process.env.MONGO_URL || process.env.MONGODB_URL;
-    this.databaseName =
-      options.databaseName || process.env.DB_NAME || "doomock_bot";
-
-    // 연결 상태
+    this.mongoUrl = mongoUrl || process.env.MONGO_URL;
+    this.options = options;
     this.client = null;
     this.db = null;
     this.isConnected = false;
     this.isConnecting = false;
-    this.isShuttingDown = false;
 
-    // 재연결 관련
-    this.reconnectInterval = null;
-    this.connectionAttempts = 0;
-    this.maxReconnectAttempts = 10;
-    this.reconnectDelay = 5000;
+    // Railway 환경 감지
+    this.isRailwayEnvironment = !!process.env.RAILWAY_ENVIRONMENT;
 
-    // 풀링 통계
+    // 데이터베이스 이름
+    this.databaseName = options.dbName || process.env.DB_NAME || "doomock_bot";
+
+    // 연결 통계
     this.poolStats = {
       totalQueries: 0,
       successfulQueries: 0,
       failedQueries: 0,
       averageResponseTime: 0,
       lastConnected: null,
+      connectionAttempts: 0,
       reconnectCount: 0,
       connectionsCreated: 0,
       connectionsDestroyed: 0,
       peakConnections: 0,
-      currentConnections: 0,
     };
 
-    // 성능 추적
+    // 재연결 설정
+    this.reconnectInterval = null;
+    this.reconnectDelay = 5000;
+    this.maxReconnectAttempts = 10;
+    this.connectionAttempts = 0;
+
+    // 쿼리 성능 추적
     this.queryTimes = [];
-    this.maxQueryTimeHistory = 100;
+    this.maxQueryTimeSamples = 100;
 
-    // 연결 옵션 설정
-    this.connectionOptions = {
-      maxPoolSize: 10,
-      minPoolSize: 2,
-      maxIdleTimeMS: 30000,
-      serverSelectionTimeoutMS: 10000,
-      socketTimeoutMS: 45000,
-      connectTimeoutMS: 10000,
-      heartbeatFrequencyMS: 10000,
-      retryWrites: true,
-      retryReads: true,
-      compressors: ["zlib"],
-      zlibCompressionLevel: 6,
-      ...options.connectionOptions,
-    };
+    // 종료 상태
+    this.isShuttingDown = false;
 
-    // 🔒 싱글톤 설정
     globalDatabaseInstance = this;
 
-    logger.info("🎯 DatabaseManager 생성됨 (통합 버전)");
+    logger.info("🗄️ DatabaseManager 생성됨 (MongoDB 네이티브)");
   }
 
   // 🔌 연결 메서드
@@ -471,14 +440,10 @@ const createDatabaseManager = (mongoUrl = null, options = {}) => {
   return new DatabaseManager(mongoUrl, options);
 };
 
-// ✅ 수정된 export 구조 (new DatabaseManager() 패턴 지원)
+// ✅ Export 구조 유지
 module.exports = {
-  DatabaseManager, // 클래스 자체
-  createDatabaseManager, // 팩토리 함수
+  DatabaseManager,
+  createDatabaseManager,
   getInstance: () => globalDatabaseInstance || createDatabaseManager(),
-  // 기본 export도 지원 (하위 호환성)
   default: DatabaseManager,
 };
-
-// 하위 호환성을 위한 기본 export
-module.exports.default = DatabaseManager;

@@ -1,12 +1,14 @@
-// src/core/StandardizedSystem.js - 중복 선언 해결 + 한국시간 통합
-// Railway 환경 v3.0.1 리팩토링 표준
+// src/core/StandardizedSystem.js
 const logger = require("../utils/Logger");
-const { TimeHelper } = require("../utils/TimeHelper");
 
-/**
- * 🎯 표준 매개변수 정의 (절대 변경 금지!)
- * 모든 모듈의 handleMessage, handleCallback에서 이 순서를 지켜야 함
- */
+let TimeHelper;
+try {
+  TimeHelper = require("../utils/TimeHelper");
+} catch (e) {
+  // TimeHelper가 아직 로드되지 않은 경우 처리
+  console.warn("TimeHelper 로드 지연됨");
+}
+
 const STANDARD_PARAMS = {
   // 메시지 처리: (bot, msg)
   MESSAGE_HANDLER: ["bot", "msg"],
@@ -35,6 +37,11 @@ class DuplicationPreventer {
   // 🔒 작업 시작 (중복 체크)
   async startOperation(operationId, context = {}) {
     const now = Date.now();
+    // 추가했음
+    if (!operationId && TimeHelper) {
+      operationId = TimeHelper.generateOperationId("unknown", "system");
+    }
+    // 여기까지
 
     // 이미 진행 중인 작업 체크
     if (this.activeOperations.has(operationId)) {

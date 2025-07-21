@@ -1,4 +1,5 @@
-// src/utils/Logger.js - TimeHelper 사용으로 수정
+// src/utils/Logger.js - 순환 참조 해결 버전
+
 class Logger {
   constructor() {
     if (Logger.instance) {
@@ -28,9 +29,12 @@ class Logger {
   _log(level, ...args) {
     if (this.levels[level] > this.currentLevel) return;
 
-    // ✅ TimeHelper 사용 (삭제된 KoreaTimeManager 대신)
-    const { TimeHelper } = require("./TimeHelper");
-    const timestamp = TimeHelper.getLogTimeString();
+    // ✅ TimeHelper 대신 직접 한국시간 계산
+    const now = new Date();
+    const koreaTime = new Date(
+      now.getTime() + 9 * 60 * 60 * 1000 - now.getTimezoneOffset() * 60 * 1000
+    );
+    const timestamp = koreaTime.toLocaleString("ko-KR");
 
     const emoji = this.emojis[level] || "📝";
     console.log(`${emoji} [${timestamp}]`, ...args);
@@ -39,15 +43,19 @@ class Logger {
   info(...args) {
     this._log("info", ...args);
   }
+
   error(...args) {
     this._log("error", ...args);
   }
+
   warn(...args) {
     this._log("warn", ...args);
   }
+
   debug(...args) {
     this._log("debug", ...args);
   }
+
   success(...args) {
     this._log("success", ...args);
   }
@@ -60,13 +68,17 @@ class Logger {
   trace(...args) {
     this._log("debug", ...args);
   }
+
   logTimeInfo() {
     this.info("🕐 시간 정보 로딩 완료");
   }
+
   getStatus() {
     return {
       initialized: true,
-      level: Object.keys(this.levels)[this.currentLevel],
+      level: Object.keys(this.levels).find(
+        (key) => this.levels[key] === this.currentLevel
+      ),
     };
   }
 }
