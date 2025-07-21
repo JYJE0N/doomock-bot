@@ -1,16 +1,14 @@
 // src/services/TTSService.js - Railway 환경 최적화 및 에러 처리 강화
 
+const BaseService = require("./BaseService");
 const gtts = require("gtts");
 const fs = require("fs").promises;
 const path = require("path");
 const TimeHelper = require("../utils/TimeHelper");
-const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
-const { getInstance } = require("../database/DatabaseManager");
 
 class TTSService extends BaseService {
-  constructor(db) {
-    super(db, "activeRequests");
+  constructor(options = {}) {
     // this.activeRequests = new Map();
 
     // 지원 언어 목록

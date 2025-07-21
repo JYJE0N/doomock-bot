@@ -194,6 +194,14 @@ class DatabaseManager {
     }
   }
 
+  // 🔒 안전하게 연결 보장
+  async ensureConnection() {
+    if (!this.isConnected) {
+      await this.connect();
+    }
+    return this.isConnected;
+  }
+
   // 상태 조회
   getStatus() {
     return {

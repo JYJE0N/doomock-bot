@@ -7,13 +7,12 @@ const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 
 class WeatherService extends BaseService {
-  constructor(db) {
-    super(db, "weather_cache");
-    // this.apiKey = process.env.WEATHER_API_KEY;
-    // this.baseUrl = "https://api.openweathermap.org/data/2.5";
-    // this.defaultCity = "Seoul";
-    // this.language = "kr";
-    // this.units = "metric";
+  constructor(options = {}) {
+    this.apiKey = process.env.WEATHER_API_KEY;
+    this.baseUrl = "https://api.openweathermap.org/data/2.5";
+    this.defaultCity = "Seoul";
+    this.language = "kr";
+    this.units = "metric";
 
     // 캐시 설정
     this.cache = new Map();
