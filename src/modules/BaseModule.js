@@ -149,6 +149,12 @@ class BaseModule {
     return true;
   }
 
+  // ⭐ initialize 메서드 추가 (하위 클래스 호환성)
+  async initialize() {
+    logger.debug(`📦 ${this.moduleName} initialize 호출됨`);
+    return await this.onInitialize();
+  }
+
   // 🧹 정리 메서드 (하위 클래스에서 오버라이드 가능)
   async onShutdown() {
     logger.debug(`🧹 ${this.moduleName} 정리 중...`);

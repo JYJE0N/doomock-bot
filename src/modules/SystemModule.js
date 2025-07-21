@@ -28,7 +28,12 @@ class SystemModule extends BaseModule {
   // 표준 초기화
   async initialize() {
     try {
-      await super.initialize();
+      // ⭐ super.initialize()를 제거하거나 onInitialize()로 변경
+      // BaseModule의 onInitialize 메서드 호출
+      if (typeof super.onInitialize === "function") {
+        await super.onInitialize();
+      }
+
       this.registerSystemActions();
       logger.success("✅ SystemModule 초기화 완료");
     } catch (error) {

@@ -7,7 +7,7 @@ const logger = require("../utils/Logger");
 class TimerService extends BaseService {
   constructor(db) {
     super(db, "timers");
-    thus.timers = new Map();
+    this.timers = new Map();
     this.sessionHistory = {};
     this.dbEnabled = false; // 데이터베이스 연결 여부
     this.dbManager = getInstance();
