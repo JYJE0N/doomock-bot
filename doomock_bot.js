@@ -1,9 +1,9 @@
-// doomock_bot.js - v3.0.1 DatabaseManager import 수정
+// doomock_bot.js - v3.0.1 완전 리팩토링 버전
 
 // ✅ 1. 환경변수 최우선 로드 (무조건 첫 번째!)
 require("dotenv").config();
 
-// ✅ 2. Logger 인스턴스로 로드 (변수명 변경!)
+// ✅ 2. Logger 인스턴스로 로드
 const logger = require("./src/utils/Logger");
 
 // ✅ 3. 표준화 시스템 (🎯 핵심!)
@@ -14,17 +14,17 @@ const {
   STANDARD_PARAMS,
 } = require("./src/core/StandardizedSystem");
 
-// TimeHelper 추가:
-const { TimeHelper } = require("./src/utils/TimeHelper");
+// TimeHelper 추가
+const TimeHelper = require("./src/utils/TimeHelper");
 
 // ✅ 4. 핵심 의존성
 const TelegramBot = require("node-telegram-bot-api");
 
-// ✅ 5. 설정 및 유틸리티 (logger 다음)
+// ✅ 5. 설정 및 유틸리티
 const AppConfig = require("./src/config/AppConfig");
 const ErrorHandler = require("./src/utils/ErrorHandler");
 
-// ✅ 6. 데이터베이스 관련 (수정됨)
+// ✅ 6. 데이터베이스 관련
 const {
   DatabaseManager,
   getInstance,
@@ -34,12 +34,14 @@ const {
 const ModuleManager = require("./src/managers/ModuleManager");
 const BotController = require("./src/controllers/BotController");
 
-// ✅ 8. 서비스들 (mongoose 절대 사용 안함!)
-const { TodoService } = require("./src/services/TodoService");
-const { WeatherService } = require("./src/services/WeatherService");
-const { WorktimeService } = require("./src/services/WorktimeService");
+// ✅ 8. 서비스들
+const TodoService = require("./src/services/TodoService");
+const WeatherService = require("./src/services/WeatherService");
+const WorktimeService = require("./src/services/WorktimeService");
+const HealthService = require("./src/services/HealthService");
+const HealthMiddleware = require("./src/middleware/HealthMiddleware");
 
-// ✅ 전역 에러 핸들러 (logger 인스턴스 사용)
+// ✅ 전역 에러 핸들러
 process.on("unhandledRejection", (reason, promise) => {
   const error = reason instanceof Error ? reason : new Error(String(reason));
   logger.error("🚨 처리되지 않은 Promise 거부:", {
@@ -57,7 +59,7 @@ process.on("uncaughtException", (error) => {
   setTimeout(() => process.exit(1), 1000);
 });
 
-// ✅ 메인 봇 클래스 (logger 인스턴스 사용)
+// ✅ 메인 봇 클래스
 class DoomockBot {
   constructor() {
     // 🚫 중복 초기화 방지
@@ -73,16 +75,21 @@ class DoomockBot {
     this.errorHandler = null;
     this.config = null;
 
-    // 🎯 표준화 시스템 (중복 방지 + 한국시간)
+    // 🎯 표준화 시스템
     this.duplicationPreventer = new DuplicationPreventer();
     this.timeManager = TimeHelper;
 
-    // 서비스들 (mongoose 없음!)
+    // 서비스들
     this.services = {
       todoService: null,
       weatherService: null,
       worktimeService: null,
     };
+
+    // 헬스체크 관련
+    this.healthService = null;
+    this.healthMiddleware = null;
+    this.httpServer = null;
 
     // 상태 추적
     this.isInitialized = false;
@@ -126,7 +133,7 @@ class DoomockBot {
     }
   }
 
-  // 1. 설정 초기화 (표준 매개변수 준수)
+  // 1. 설정 초기화
   async initializeConfig() {
     try {
       logger.info("⚙️ 설정 초기화 중...");
@@ -160,7 +167,7 @@ class DoomockBot {
     }
   }
 
-  // 3. 서비스들 초기화
+  // 3. 서비스들 초기화 (수정됨)
   async initializeServices() {
     try {
       logger.info("🔧 서비스들 초기화 중...");
@@ -170,6 +177,9 @@ class DoomockBot {
       this.services.weatherService = new WeatherService();
       this.services.worktimeService = new WorktimeService();
 
+      // 헬스체크 서비스 추가
+      this.healthService = new HealthService();
+
       logger.success("✅ 서비스들 초기화 완료");
     } catch (error) {
       logger.error("❌ 서비스 초기화 실패:", error);
@@ -178,7 +188,7 @@ class DoomockBot {
     }
   }
 
-  // 4. 텔레그램 봇 초기화 (표준 매개변수 준수)
+  // 4. 텔레그램 봇 초기화
   async initializeTelegramBot() {
     try {
       logger.info("🤖 텔레그램 봇 초기화 중...");
@@ -202,7 +212,7 @@ class DoomockBot {
     }
   }
 
-  // 5. 데이터베이스 매니저 초기화 (수정됨)
+  // 5. 데이터베이스 매니저 초기화
   async initializeDatabaseManager() {
     try {
       logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
@@ -213,13 +223,8 @@ class DoomockBot {
         return;
       }
 
-      // ✅ 방법 1: getInstance() 사용 (권장)
+      // getInstance() 사용
       this.databaseManager = getInstance();
-
-      // ✅ 방법 2: createDatabaseManager() 사용 (대안)
-      // const { createDatabaseManager } = require("./src/database/DatabaseManager");
-      // this.databaseManager = createDatabaseManager(this.config.MONGO_URL);
-
       await this.databaseManager.connect();
       logger.success("✅ 데이터베이스 연결 성공");
     } catch (error) {
@@ -230,7 +235,7 @@ class DoomockBot {
     }
   }
 
-  // 6. 봇 컨트롤러 초기화 (표준 매개변수 준수)
+  // 6. 봇 컨트롤러 초기화
   async initializeBotController() {
     try {
       logger.info("🎮 봇 컨트롤러 초기화 중...");
@@ -249,7 +254,7 @@ class DoomockBot {
     }
   }
 
-  // 7. 모듈 매니저 초기화 (표준 매개변수 준수)
+  // 7. 모듈 매니저 초기화
   async initializeModuleManager() {
     try {
       logger.info("🧩 모듈 매니저 초기화 중...");
@@ -264,12 +269,12 @@ class DoomockBot {
         config: this.config,
         errorHandler: this.errorHandler,
         services: this.services,
-        timeManager: this.TimeHelper,
+        timeManager: this.timeManager,
         duplicationPreventer: this.duplicationPreventer,
       });
 
       await this.moduleManager.initialize();
-      this.botController.setModuleManager(this.moduleManager); // 모듈 매니저 참조 설정
+      this.botController.setModuleManager(this.moduleManager);
       logger.success("✅ 모듈 매니저 초기화 완료");
     } catch (error) {
       logger.error("❌ 모듈 매니저 초기화 실패:", error);
@@ -279,7 +284,7 @@ class DoomockBot {
     }
   }
 
-  // 8. 폴링 시작 (표준 매개변수 준수)
+  // 8. 폴링 시작
   async startPolling() {
     try {
       logger.info("📡 텔레그램 폴링 시작 중...");
@@ -310,7 +315,7 @@ class DoomockBot {
     }
   }
 
-  // 9. 헬스 모니터링 시작 (표준 매개변수 준수)
+  // 9. 헬스 모니터링 시작 (수정됨)
   async startHealthMonitoring() {
     try {
       logger.info("💚 헬스 모니터링 시작 중...");
@@ -320,7 +325,12 @@ class DoomockBot {
         clearInterval(this.healthCheckInterval);
       }
 
-      // Railway 환경에서는 더 자주 체크
+      // Railway 환경에서는 HTTP 엔드포인트도 시작
+      if (this.config.isRailway) {
+        await this.startHealthEndpoint();
+      }
+
+      // 주기적 헬스체크
       const checkInterval = this.config.isRailway ? 30000 : 60000;
 
       this.healthCheckInterval = setInterval(async () => {
@@ -340,7 +350,27 @@ class DoomockBot {
     }
   }
 
-  // 10. 시작 알림 전송 (표준 매개변수 준수)
+  // Railway HTTP 헬스체크 엔드포인트 시작
+  async startHealthEndpoint() {
+    try {
+      const http = require("http");
+      this.healthMiddleware = new HealthMiddleware();
+
+      const handler = this.healthMiddleware.createHandler();
+      this.httpServer = http.createServer(handler);
+
+      const port = process.env.PORT || 3000;
+      this.httpServer.listen(port, () => {
+        logger.info(
+          `🌐 헬스체크 엔드포인트 시작: http://0.0.0.0:${port}/health`
+        );
+      });
+    } catch (error) {
+      logger.error("❌ 헬스체크 엔드포인트 시작 실패:", error);
+    }
+  }
+
+  // 10. 시작 알림 전송
   async sendStartupNotification() {
     if (!this.config.ADMIN_CHAT_ID) {
       logger.debug("⚠️ ADMIN_CHAT_ID 없음, 시작 알림 생략");
@@ -348,7 +378,7 @@ class DoomockBot {
     }
 
     try {
-      const dbStatus = this.databaseManager?.isConnected
+      const dbStatus = this.databaseManager?.isConnected()
         ? "연결됨"
         : "메모리 모드";
       const startupMessage = `🚀 **Doomock Bot v${this.config.VERSION} 시작됨**
@@ -383,20 +413,29 @@ class DoomockBot {
     }
   }
 
-  // 헬스 체크
+  // 헬스 체크 (수정됨 - HealthService 사용)
   async performHealthCheck() {
-    const status = {
-      timestamp: this.timeManager.getLogTimeString(),
-      bot: this.bot?.isPolling() || false,
-      database: this.databaseManager?.isConnected || false,
-      modules: this.moduleManager?.isInitialized || false,
-    };
+    try {
+      // HealthService의 빠른 체크 사용
+      const health = await this.healthService.getQuickHealth();
 
-    logger.debug("💚 헬스 체크:", status);
-    return status;
+      // 추가로 봇 관련 정보 업데이트
+      const status = {
+        ...health,
+        bot: this.bot?.isPolling() || false,
+        database: this.databaseManager?.isConnected() || false,
+        modules: this.moduleManager?.isInitialized || false,
+      };
+
+      logger.debug("💚 헬스 체크:", status);
+      return status;
+    } catch (error) {
+      logger.error("❌ 헬스 체크 실패:", error);
+      throw error;
+    }
   }
 
-  // 정리 작업
+  // 정리 작업 (수정됨)
   async cleanup() {
     try {
       logger.info("🧹 정리 작업 시작...");
@@ -404,6 +443,7 @@ class DoomockBot {
       const cleanupTasks = [
         () =>
           this.healthCheckInterval && clearInterval(this.healthCheckInterval),
+        () => this.httpServer && this.httpServer.close(), // HTTP 서버 종료 추가
         () => this.bot && this.bot.stopPolling(),
         () => this.moduleManager && this.moduleManager.cleanup(),
         () => this.botController && this.botController.cleanup(),
@@ -451,7 +491,7 @@ function setupShutdownHandlers(doomockBot) {
 // 메인 실행 함수
 async function main() {
   try {
-    logger.info("🎬 Doomock Bot 3.0.1 시작 중... (DatabaseManager 통합 완료)");
+    logger.info("🎬 두목봇 Bot 3.0.1 시작 중... (DatabaseManager 통합 완료)");
     logger.info("🎯 표준 매개변수:", STANDARD_PARAMS);
     logger.info("🚫 mongoose 사용 안함 - MongoDB 네이티브 드라이버만 사용");
 
@@ -472,9 +512,9 @@ async function main() {
     // 전체 초기화 실행
     await doomockBot.initialize();
 
-    logger.success("🎉 Doomock Bot 3.0.1 실행 준비 완료!");
+    logger.success("🎉 두목봇 3.0.1 실행 준비 완료!");
   } catch (error) {
-    logger.error("💥 Doomock Bot 실행 실패:", error);
+    logger.error("💥 두목봇 실행 실패:", error);
     process.exit(1);
   }
 }

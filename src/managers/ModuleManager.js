@@ -1,8 +1,7 @@
-// src/managers/ModuleManager.js - 완전한 중앙 관리 체제
-
+// src/managers/ModuleManager.js - main_menu 콜백 처리 수정
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
 
 class ModuleManager {
   constructor(bot, options = {}) {
@@ -124,15 +123,16 @@ class ModuleManager {
     this.processingCallbacks.add(callbackKey);
 
     try {
+      // main_menu 특별 처리
+      if (callbackData === "main_menu") {
+        logger.info(`📞 콜백 수신: ${callbackData}`);
+        return await this.handleMainMenu(callbackQuery);
+      }
+
       // 콜백 데이터 파싱
       const [targetModule, subAction, ...params] = callbackData.split(":");
 
       logger.info(`🔔 콜백 라우팅: ${targetModule} → ${subAction}`);
-
-      // main_menu 특별 처리
-      if (callbackData === "main_menu") {
-        return await this.handleMainMenu(callbackQuery);
-      }
 
       // 모듈 찾기
       const moduleClass = this.findModuleClass(targetModule);
@@ -173,20 +173,30 @@ class ModuleManager {
 
   // 🏠 메인 메뉴 처리
   async handleMainMenu(callbackQuery) {
-    const keyboard = this.createMainMenuKeyboard();
-    const userName = getUserName(callbackQuery.from);
+    try {
+      const keyboard = this.createMainMenuKeyboard();
+      const userName = getUserName(callbackQuery.from);
 
-    const menuText =
-      `🏠 **메인 메뉴**\n\n` + `안녕하세요 ${userName}님! 무엇을 도와드릴까요?`;
+      const menuText =
+        `🏠 **메인 메뉴**\n\n` +
+        `안녕하세요 ${userName}님!\n` +
+        `무엇을 도와드릴까요?`;
 
-    await this.bot.editMessageText(menuText, {
-      chat_id: callbackQuery.message.chat.id,
-      message_id: callbackQuery.message.message_id,
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
-    });
+      await this.bot.editMessageText(menuText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
 
-    return true;
+      // 콜백 응답
+      await this.bot.answerCallbackQuery(callbackQuery.id);
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 메인 메뉴 처리 오류:", error);
+      return false;
+    }
   }
 
   // 🎨 동적 메인 메뉴 생성
@@ -263,13 +273,33 @@ class ModuleManager {
     });
   }
 
+  // 🔍 모듈 조회
+  getModule(moduleName) {
+    return this.moduleInstances.get(moduleName);
+  }
+
+  hasModule(moduleName) {
+    return this.moduleInstances.has(moduleName);
+  }
+
   // 📊 상태 조회
   getStatus() {
+    const moduleStatuses = {};
+
+    for (const [name, module] of this.moduleInstances) {
+      moduleStatuses[name] = module.getStatus
+        ? module.getStatus()
+        : {
+            initialized: module.isInitialized || false,
+            name: name,
+          };
+    }
+
     return {
       initialized: this.isInitialized,
-      modules: Array.from(this.moduleInstances.keys()),
-      activeModules: this.moduleInstances.size,
-      registry: Object.keys(this.moduleRegistry),
+      moduleCount: this.moduleInstances.size,
+      modules: moduleStatuses,
+      activeCallbacks: this.processingCallbacks.size,
     };
   }
 
@@ -277,13 +307,14 @@ class ModuleManager {
   async cleanup() {
     logger.info("🧹 ModuleManager 정리 시작...");
 
-    for (const [name, instance] of this.moduleInstances) {
+    for (const [name, module] of this.moduleInstances) {
       try {
-        if (instance.cleanup) {
-          await instance.cleanup();
+        if (module.cleanup) {
+          await module.cleanup();
         }
+        logger.debug(`✅ ${name} 정리 완료`);
       } catch (error) {
-        logger.warn(`⚠️ ${name} 정리 실패:`, error.message);
+        logger.error(`❌ ${name} 정리 실패:`, error);
       }
     }
 
@@ -291,7 +322,7 @@ class ModuleManager {
     this.processingCallbacks.clear();
     this.isInitialized = false;
 
-    logger.success("✅ ModuleManager 정리 완료");
+    logger.info("✅ ModuleManager 정리 완료");
   }
 }
 
