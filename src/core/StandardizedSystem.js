@@ -1,7 +1,7 @@
 // src/core/StandardizedSystem.js - 중복 선언 해결 + 한국시간 통합
 // Railway 환경 v3.0.1 리팩토링 표준
-
 const logger = require("../utils/Logger");
+const { TimeHelper } = require("../utils/TimeHelper");
 
 /**
  * 🎯 표준 매개변수 정의 (절대 변경 금지!)
@@ -197,6 +197,8 @@ class StandardizedBaseModule {
 
     // 🚫 중복 방지 시스템
     this.duplicationPreventer = new DuplicationPreventer();
+    // ⏰ TimeHelper 설정 (인스턴스가 아닌 클래스 직접 사용)
+    this.timeHelper = TimeHelper; // ✅ TimeHelper 추가
 
     // 📊 통계
     this.stats = {
@@ -227,12 +229,12 @@ class StandardizedBaseModule {
       if (process.env.NODE_ENV === "development") {
         logger.debug(
           `${this.moduleName} 시간 정보:`,
-          this.timeManager.getDebugTimeInfo()
+          TimeHelper.getDebugInfo() // ✅ 직접 호출
         );
       }
 
       this.isInitialized = true;
-      this.stats.lastActivity = this.timeManager.getKoreanTimeString();
+      this.stats.lastActivity = TimeHelper.getLogTimeString(); // ✅ 올바른 메서드명
 
       logger.success(`✅ ${this.moduleName} 표준 초기화 완료`);
     } catch (error) {
@@ -247,7 +249,8 @@ class StandardizedBaseModule {
     ParameterValidator.validateMessageParams(bot, msg);
 
     // 🚫 중복 호출 방지
-    const operationId = this.timeManager.generateOperationId(
+    const operationId = TimeHelper.generateOperationId(
+      // ✅ TimeHelper 직접 사용
       "message",
       msg.from.id,
       `_${this.moduleName}`
@@ -266,7 +269,7 @@ class StandardizedBaseModule {
     try {
       // 통계 업데이트
       this.stats.messageCount++;
-      this.stats.lastActivity = this.timeManager.getKoreanTimeString();
+      this.stats.lastActivity = TimeHelper.getLogTimeString(); // ✅ 올바른 메서드명
 
       // 실제 처리 (하위 클래스에서 구현)
       const result = await this._processMessage(bot, msg);
@@ -294,7 +297,8 @@ class StandardizedBaseModule {
     );
 
     // 🚫 중복 호출 방지
-    const operationId = this.timeManager.generateOperationId(
+    const operationId = TimeHelper.generateOperationId(
+      // ✅ TimeHelper 직접 사용
       "callback",
       callbackQuery.from.id,
       `_${this.moduleName}_${subAction}`
@@ -313,7 +317,7 @@ class StandardizedBaseModule {
     try {
       // 통계 업데이트
       this.stats.callbackCount++;
-      this.stats.lastActivity = this.timeManager.getKoreanTimeString();
+      this.stats.lastActivity = TimeHelper.getLogTimeString(); // ✅ 올바른 메서드명
 
       // 실제 처리 (하위 클래스에서 구현)
       const result = await this._processCallback(
@@ -357,7 +361,7 @@ class StandardizedBaseModule {
       duplicationStatus: this.duplicationPreventer.getStatus(),
       timeInfo: {
         lastActivity: this.stats.lastActivity,
-        currentTime: this.timeManager.getKoreanTimeString(),
+        currentTime: TimeHelper.getLogTimeString(), // ✅ 올바른 메서드명
       },
     };
   }
