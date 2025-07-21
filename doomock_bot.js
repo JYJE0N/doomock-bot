@@ -34,7 +34,7 @@ const {
 const ModuleManager = require("./src/managers/ModuleManager");
 const BotController = require("./src/controllers/BotController");
 
-// ✅ 8. 서비스들
+// ✅ 8. 서비스들 (올바른 import)
 const TodoService = require("./src/services/TodoService");
 const WeatherService = require("./src/services/WeatherService");
 const WorktimeService = require("./src/services/WorktimeService");
@@ -491,9 +491,9 @@ function setupShutdownHandlers(doomockBot) {
 // 메인 실행 함수
 async function main() {
   try {
-    logger.info("🎬 두목봇 Bot 3.0.1 시작 중... (DatabaseManager 통합 완료)");
+    logger.info("🎬 두목봇 3.0.1 시작 중... (DatabaseManager 통합 완료)");
     logger.info("🎯 표준 매개변수:", STANDARD_PARAMS);
-    logger.info("🚫 mongoose 사용 안함 - MongoDB 네이티브 드라이버만 사용");
+    // logger.info("🚫 mongoose 사용 안함 - MongoDB 네이티브 드라이버만 사용");
 
     // DoomockBot 인스턴스 생성
     const doomockBot = new DoomockBot();
@@ -514,7 +514,7 @@ async function main() {
 
     logger.success("🎉 두목봇 3.0.1 실행 준비 완료!");
   } catch (error) {
-    logger.error("💥 두목봇 실행 실패:", error);
+    logger.error("💥 두목봇 Bot 실행 실패:", error);
     process.exit(1);
   }
 }

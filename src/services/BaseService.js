@@ -1,21 +1,17 @@
 // src/services/BaseService.js - 모든 서비스의 표준 베이스
 const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-const { getInstance } = require("../database/DatabaseManager");
 
 class BaseService {
-  constructor(db, collectionName) {
+  constructor(db = null, collectionName = null) {
     this.db = db;
     this.collectionName = collectionName;
     this.isInitialized = false;
-
-    logger.info(`📦 ${this.constructor.name} 생성됨`);
   }
 
   // 표준 초기화 메서드 (모든 서비스가 상속)
   async initialize() {
     if (this.isInitialized) {
-      logger.warn(`${this.constructor.name} 이미 초기화됨`);
+      logger.warn(`[${this.constructor.name}] 이미 초기화되었습니다.`);
       return;
     }
 
@@ -56,13 +52,16 @@ class BaseService {
     return true;
   }
 
-  // 컬렉션 가져오기
   getCollection() {
-    if (this.memoryMode) {
-      return null;
+    if (!this.db || !this.collectionName) {
+      throw new Error("Database or collection not configured");
     }
+    return this.db.collection(this.collectionName);
+  }
 
-    return this.db.getCollection(this.collectionName);
+  async cleanup() {
+    this.isInitialized = false;
+    logger.info(`🧹 ${this.constructor.name} 정리 완료`);
   }
 }
 

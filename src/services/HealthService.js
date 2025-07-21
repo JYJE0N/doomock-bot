@@ -1,10 +1,11 @@
-// src/services/HealthService.js - 핵심 헬스체크 서비스
+// src/services/HealthService.js - 완전 수정 버전
 const AppConfig = require("../config/AppConfig");
 const logger = require("../utils/Logger");
 const BaseService = require("./BaseService");
 
 class HealthService extends BaseService {
   constructor() {
+    super(); // ✅ super() 호출 필수
     this.startTime = Date.now();
     this.healthCheckHistory = [];
     this.maxHistoryLength = 10;
@@ -107,12 +108,17 @@ class HealthService extends BaseService {
       const { getInstance } = require("../database/DatabaseManager");
       const dbManager = getInstance();
 
-      const start = Date.now();
-      await ensureConnection();
-      const responseTime = Date.now() - start;
+      if (!dbManager || !dbManager.isConnected()) {
+        return {
+          status: "disconnected",
+          message: "데이터베이스 연결되지 않음",
+        };
+      }
 
+      const start = Date.now();
       // 간단한 ping 테스트
-      await client.db().admin().ping();
+      await dbManager.getDb().admin().ping();
+      const responseTime = Date.now() - start;
 
       return {
         status: "healthy",
@@ -193,11 +199,11 @@ class HealthService extends BaseService {
 
     return {
       status: "railway",
-      deploymentId: AppConfig.RAILWAY.DEPLOYMENT_ID,
-      environment: AppConfig.RAILWAY.ENVIRONMENT,
-      publicDomain: AppConfig.RAILWAY.PUBLIC_DOMAIN,
-      gitCommit: AppConfig.RAILWAY.GIT_COMMIT_SHA?.slice(0, 7),
-      gitBranch: AppConfig.RAILWAY.GIT_BRANCH,
+      deploymentId: AppConfig.RAILWAY?.DEPLOYMENT_ID,
+      environment: AppConfig.RAILWAY?.ENVIRONMENT,
+      publicDomain: AppConfig.RAILWAY?.PUBLIC_DOMAIN,
+      gitCommit: AppConfig.RAILWAY?.GIT_COMMIT_SHA?.slice(0, 7),
+      gitBranch: AppConfig.RAILWAY?.GIT_BRANCH,
     };
   }
 

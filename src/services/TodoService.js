@@ -1,16 +1,12 @@
 // src/services/TodoService.js - MongoDB + 메모리 하이브리드 저장
 
-const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
+const logger = require("../utils/Logger");
 
 class TodoService extends BaseService {
   constructor(db) {
-    super(db, "todos");
-    // ⭐ 하이브리드 저장: 메모리 + 데이터베이스
-    this.todos = new Map(); // 빠른 접근을 위한 메모리 캐시
+    super(db, "todos"); // ✅ super() 호출
+    this.maxTodosPerUser = 100;
     this.initialized = false;
     this.dbEnabled = false;
 

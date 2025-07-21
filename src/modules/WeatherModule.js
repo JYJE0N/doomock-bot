@@ -11,7 +11,7 @@ class WeatherModule extends BaseModule {
     super("WeatherModule", {
       commands: ["weather", "날씨"],
       callbacks: ["weather"],
-      features: ["current", "forecast", "cities", "quick"],
+      features: ["current", "forecast", "city", "help"],
     });
 
     this.weatherService = null;
@@ -49,71 +49,60 @@ class WeatherModule extends BaseModule {
       logger.info("🌤️ WeatherService 초기화 성공");
     } catch (error) {
       logger.error("❌ WeatherService 초기화 실패:", error);
-      logger.warn("🌤️ 기본 날씨 데이터로 서비스 제공");
+      throw error;
     }
   }
 
   // 🎯 액션 등록
   registerActions() {
     this.actionMap.set("current", this.showCurrentWeather);
-    this.actionMap.set("forecast", this.showForecast);
-    this.actionMap.set("quick", this.showQuickWeather);
-    this.actionMap.set("cities", this.showCityList);
+    this.actionMap.set("forecast", this.showWeatherForecast);
+    this.actionMap.set("city", this.selectCity);
     this.actionMap.set("help", this.showWeatherHelp);
-
-    // 도시별 액션 동적 등록
-    Object.keys(this.cities).forEach((cityKey) => {
-      this.actionMap.set(`city_${cityKey}`, (bot, query) =>
-        this.showCityWeather(bot, query, cityKey)
-      );
-    });
   }
 
   // 🎯 메시지 처리
   async onHandleMessage(bot, msg) {
     const {
       chat: { id: chatId },
-      from: { id: userId },
       text,
     } = msg;
-    const userState = this.userStates.get(userId);
 
-    // 사용자 상태에 따른 처리
-    if (userState?.action === "waiting_city_input") {
-      return await this.handleCityInput(bot, chatId, userId, text);
-    }
+    if (!text) return false;
 
-    // 명령어 처리
     const command = this.extractCommand(text);
     if (command === "weather" || command === "날씨") {
-      await this.showMenu(bot, chatId, null, userId);
+      await this.showMenu(bot, chatId);
       return true;
+    }
+
+    // 도시명으로 날씨 검색
+    if (text.includes("날씨")) {
+      const city = text.replace(/날씨/g, "").trim();
+      if (city) {
+        await this.showCityWeather(bot, chatId, city);
+        return true;
+      }
     }
 
     return false;
   }
 
   // 📋 날씨 메뉴
-  async showMenu(bot, chatId, messageId, userId) {
-    const userName = getUserName({ id: userId });
-    const currentTime = TimeHelper.getCurrentTime();
-
+  async showMenu(bot, chatId, messageId) {
     const menuText =
-      `🌤️ **날씨 정보**\n\n` +
-      `${userName}님, 실시간 날씨 정보입니다.\n` +
-      `현재 시각: ${currentTime}`;
+      `🌤️ **날씨 정보**\n\n` + `어떤 날씨 정보를 확인하시겠습니까?`;
 
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "📍 현재 날씨", callback_data: "weather:current" },
+          { text: "☀️ 현재 날씨", callback_data: "weather:current" },
           { text: "📅 일기예보", callback_data: "weather:forecast" },
         ],
         [
-          { text: "⚡ 빠른 날씨", callback_data: "weather:quick" },
-          { text: "🏙️ 도시별", callback_data: "weather:cities" },
+          { text: "🏙️ 도시 선택", callback_data: "weather:city" },
+          { text: "❓ 도움말", callback_data: "weather:help" },
         ],
-        [{ text: "❓ 도움말", callback_data: "weather:help" }],
         [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
       ],
     };
