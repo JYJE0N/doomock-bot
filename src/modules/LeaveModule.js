@@ -74,8 +74,18 @@ class LeaveModule extends BaseModule {
   }
 
   // 📋 휴가 메뉴 표시
-  async showMenu(bot, chatId, messageId, userId) {
-    const userName = getUserName({ id: userId });
+  async showMenu(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from, // from 객체 직접 가져오기
+    } = callbackQuery;
+
+    // getUserName에 from 객체 전달
+    const userName = getUserName(from);
+
     const menuText =
       `🏖️ **휴가 관리**\n\n` + `${userName}님의 휴가 관리 메뉴입니다.`;
 
@@ -90,15 +100,14 @@ class LeaveModule extends BaseModule {
           { text: "⚙️ 설정", callback_data: "leave:setting" },
         ],
         [{ text: "❓ 도움말", callback_data: "leave:help" }],
-        [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }], // main:menu로 통일
       ],
     };
 
     await this.editMessage(bot, chatId, messageId, menuText, {
+      parse_mode: "Markdown",
       reply_markup: keyboard,
     });
-
-    return true;
   }
 
   // 📊 휴가 현황 표시

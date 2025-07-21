@@ -400,31 +400,43 @@ class DoomockBot {
   // =============== 🚨 에러 및 정리 메서드들 ===============
 
   // 치명적 에러 처리
-  async handleCriticalError(error) {
-    logger.error("🚨 치명적 에러 처리:", error);
-
-    try {
-      if (this.errorHandler) {
-        await this.errorHandler.handleCriticalError(error);
-      }
-      await this.cleanup();
-    } catch (cleanupError) {
-      logger.error("❌ 치명적 에러 처리 중 추가 오류:", cleanupError);
-    }
-  }
-
-  // 헬스 체크 (수정됨 - HealthService 사용)
   async performHealthCheck() {
     try {
-      // HealthService의 빠른 체크 사용
-      const health = await this.healthService.getQuickHealth();
+      const memUsage = process.memoryUsage();
+      const uptime = process.uptime();
 
-      // 추가로 봇 관련 정보 업데이트
+      // DatabaseManager의 isConnected 메서드 확인
+      let dbConnected = false;
+      if (this.databaseManager) {
+        // isConnected가 함수인지 확인
+        if (typeof this.databaseManager.isConnected === "function") {
+          dbConnected = await this.databaseManager.isConnected();
+        } else if (typeof this.databaseManager.checkConnection === "function") {
+          // 대체 메서드 시도
+          dbConnected = await this.databaseManager.checkConnection();
+        } else if (this.databaseManager.db) {
+          // MongoDB 연결 직접 확인
+          dbConnected = this.databaseManager.db.readyState === 1;
+        }
+      }
+
       const status = {
-        ...health,
-        bot: this.bot?.isPolling() || false,
-        database: this.databaseManager?.isConnected() || false,
-        modules: this.moduleManager?.isInitialized || false,
+        timestamp: new Date().toISOString(),
+        uptime: Math.floor(uptime),
+        memory: {
+          heapUsed: Math.round(memUsage.heapUsed / 1024 / 1024),
+          heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+          external: Math.round(memUsage.external / 1024 / 1024),
+          rss: Math.round(memUsage.rss / 1024 / 1024),
+        },
+        bot: {
+          isPolling: this.bot?.isPolling() || false,
+          moduleCount: this.moduleManager?.moduleInstances?.size || 0,
+        },
+        database: {
+          connected: dbConnected,
+        },
+        moduleManagerInitialized: this.moduleManager?.isInitialized || false,
       };
 
       logger.debug("💚 헬스 체크:", status);
