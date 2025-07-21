@@ -249,7 +249,7 @@ class TodoService {
       const newTodo = {
         task: todoText.trim(),
         completed: false,
-        createdAt: new Date(),
+        createdAt: TimeHelper.getKoreaTime(),
         id: null, // DB 저장 후 ID 할당
       };
 
@@ -308,7 +308,7 @@ class TodoService {
 
       const todo = userTodos[todoIndex];
       todo.completed = !todo.completed;
-      todo.updatedAt = new Date();
+      todo.updatedAt = TimeHelper.getKoreaTime();
 
       // ⭐ 데이터베이스 업데이트
       if (this.dbEnabled && todo.id && todo.id.length === 24) {

@@ -2,6 +2,10 @@
 
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
+const { getInstance } = require("../database/DatabaseManager");
+const dbManager = getInstance();
+const { TimeHelper } = require("../utils/TimeHelper");
+// ✅ WeatherService를 모듈로 가져오기
 const { WeatherService } = require("../services/WeatherService");
 const logger = require("../utils/Logger");
 
@@ -200,7 +204,7 @@ class WeatherModule extends BaseModule {
         quickText += `${emoji} ${city}: ${weatherData.temperature}°C ${weatherData.description}\n`;
       }
 
-      quickText += `\n⏰ ${new Date().toLocaleString("ko-KR")}`;
+      quickText += `\n⏰ ${TimeHelper.getLogTimeString()}`;
 
       const keyboard = {
         inline_keyboard: [
@@ -281,33 +285,41 @@ class WeatherModule extends BaseModule {
    * 날씨 API 데이터를 사용자에게 보여줄 형태로 변환
    */
   buildCurrentWeatherText(weatherData, city) {
-    if (!weatherData) {
-      return `🌤️ **${city} 현재 날씨**\n\n날씨 정보를 불러올 수 없습니다.`;
+    const emoji = this.getWeatherEmoji(weatherData.description);
+    const windEmoji = weatherData.windSpeed > 5 ? "💨" : "🌬️";
+
+    let text = `${emoji} **${city} 현재 날씨**\n\n`;
+    text += `🌡️ **온도:** ${weatherData.temperature}°C\n`;
+    text += `📝 **날씨:** ${weatherData.description}\n`;
+    text += `💧 **습도:** ${weatherData.humidity}%\n`;
+    text += `${windEmoji} **바람:** ${weatherData.windSpeed}m/s`;
+
+    if (weatherData.windDirection) {
+      text += ` (${weatherData.windDirection})`;
     }
 
-    const emoji = this.getWeatherEmoji(weatherData.description);
+    // timestamp가 이미 TimeHelper로 포맷된 경우
+    if (weatherData.timestamp) {
+      text += `\n\n⏰ ${weatherData.timestamp}`;
+    } else {
+      // timestamp가 없는 경우 현재 시간 사용
+      text += `\n\n⏰ ${TimeHelper.getLogTimeString()}`;
+    }
 
-    return (
-      `🌤️ **${city} 현재 날씨**\n\n` +
-      `${emoji} 날씨: ${weatherData.description || "맑음"}\n` +
-      `🌡️ 기온: ${weatherData.temperature || "25"}°C\n` +
-      `💧 습도: ${weatherData.humidity || "60"}%\n` +
-      `🌪️ 바람: ${weatherData.windSpeed || "2.1"}m/s\n\n` +
-      `⏰ 업데이트: ${new Date().toLocaleString("ko-KR")}`
-    );
+    if (weatherData.isFallback) {
+      text += `\n\n⚠️ _기본 날씨 정보입니다_`;
+    }
+
+    return text;
   }
 
   /**
    * 예보 데이터를 사용자에게 보여줄 형태로 변환
    */
   buildForecastText(forecastData, city) {
-    if (!forecastData || !forecastData.forecast) {
-      return `📅 **${city} 날씨 예보**\n\n예보 정보를 불러올 수 없습니다.`;
-    }
-
     let text = `📅 **${city} 날씨 예보**\n\n`;
 
-    forecastData.forecast.slice(0, 3).forEach((day, index) => {
+    forecastData.forecast.forEach((day, index) => {
       const dayLabel = index === 0 ? "오늘" : index === 1 ? "내일" : "모레";
       const emoji = this.getWeatherEmoji(day.description);
       text += `${dayLabel}: ${emoji} ${day.description || "맑음"} ${
@@ -315,7 +327,13 @@ class WeatherModule extends BaseModule {
       }°C\n`;
     });
 
-    text += `\n⏰ 업데이트: ${new Date().toLocaleString("ko-KR")}`;
+    // timestamp가 이미 포맷된 경우
+    if (forecastData.timestamp) {
+      text += `\n⏰ 업데이트: ${forecastData.timestamp}`;
+    } else {
+      // timestamp가 없는 경우 현재 시간 사용
+      text += `\n⏰ 업데이트: ${TimeHelper.getLogTimeString()}`;
+    }
 
     return text;
   }
