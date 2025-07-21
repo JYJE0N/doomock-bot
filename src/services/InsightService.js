@@ -1,11 +1,11 @@
 // src/services/InsightService.js
-const logger = require("../utils/Logger");
-const { getInstance } = require("../database/DatabaseManager");
 const BaseService = require("./BaseService");
+const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 
 class InsightService extends BaseService {
-  constructor() {
-    // 초기화
+  constructor(db) {
+    super(db, "insights");
   }
 
   async generateFullInsight(userName) {

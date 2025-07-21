@@ -1,7 +1,6 @@
 // src/services/HealthService.js - 핵심 헬스체크 서비스
 const AppConfig = require("../config/AppConfig");
 const logger = require("../utils/Logger");
-const { getInstance } = require("../database/DatabaseManager");
 const BaseService = require("./BaseService");
 
 class HealthService extends BaseService {

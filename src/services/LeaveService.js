@@ -1,12 +1,11 @@
 // src/services/LeaveService.js - 수정된 버전
-const { getInstance } = require("../database/DatabaseManager");
 const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 
 class LeaveService extends BaseService {
-  constructor() {
-    this.collectionName = "leaves";
+  constructor(db) {
+    super(db, "leaves");
   }
 
   async initializeUser(userId) {

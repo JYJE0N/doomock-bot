@@ -5,8 +5,8 @@ const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 
 class TimerService extends BaseService {
-  constructor() {
-    this.timers = new Map();
+  constructor(db) {
+    super(db, "timers");
     this.pomodoroSessions = new Map();
 
     // ⭐ Railway 환경변수를 활용한 설정

@@ -3,7 +3,8 @@ const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 class FortuneService extends BaseService {
-  constructor() {
+  constructor(db) {
+    super(db, "fortune_history");
     this.initializeMessages();
     this.initializeTarotCards();
     this.initializeLuckyItems();

@@ -9,11 +9,9 @@ const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 
 class TTSService extends BaseService {
-  constructor() {
-    // 사용자별 TTS 모드 저장
-    this.userModes = new Map();
-    this.userLanguages = new Map();
-    this.activeRequests = new Map();
+  constructor(db) {
+    super(db, "activeRequests");
+    // this.activeRequests = new Map();
 
     // 지원 언어 목록
     this.supportedLanguages = {

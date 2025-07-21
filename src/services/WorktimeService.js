@@ -5,7 +5,8 @@ const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 
 class WorktimeService extends BaseService {
-  constructor() {
+  constructor(db) {
+    super(db, "worktime");
     this.schedule = {
       start: "08:30",
       lunch: "11:30 ~ 13:00",

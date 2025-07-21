@@ -4,10 +4,11 @@ const { getInstance } = require("../database/DatabaseManager");
 const BaseService = require("./BaseService");
 
 class ReminderService extends BaseService {
-  constructor() {
-    this.reminders = new Map(); // reminderId -> reminderData
-    this.timeouts = new Map(); // reminderId -> timeoutId
-    this.nextId = 1;
+  constructor(db) {
+    super(db, "reminders");
+    // this.reminders = new Map(); // reminderId -> reminderData
+    // this.timeouts = new Map(); // reminderId -> timeoutId
+    // this.nextId = 1;
   }
 
   // 리마인더 명령어 파싱
