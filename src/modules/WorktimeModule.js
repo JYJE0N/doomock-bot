@@ -1,9 +1,9 @@
 // src/modules/WorktimeModule.js - 표준화된 근무시간 모듈
 
 const BaseModule = require("./BaseModule");
-const { WorktimeService } = require("../services/WorktimeService");
+const WorktimeService = require("../services/WorktimeService");
 const { getUserName } = require("../utils/UserHelper");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
 class WorktimeModule extends BaseModule {

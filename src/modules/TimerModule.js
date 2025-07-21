@@ -1,8 +1,8 @@
 // src/modules/TimerModule.js - 사용자 친화적 포모도로 특화
 
 const BaseModule = require("./BaseModule");
-const { TimerService } = require("../services/TimerService");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimerService = require("../services/TimerService");
+const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 
 // ✅ 새로운 해결책 (logger를 함수로 가져오기)

@@ -1,9 +1,9 @@
 // src/modules/WeatherModule.js - 표준화된 날씨 모듈
 
 const BaseModule = require("./BaseModule");
-const { WeatherService } = require("../services/WeatherService");
+const WeatherService = require("../services/WeatherService");
 const { getUserName } = require("../utils/UserHelper");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
 class WeatherModule extends BaseModule {

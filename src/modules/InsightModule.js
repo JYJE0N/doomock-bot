@@ -1,5 +1,5 @@
 const BaseModule = require("./BaseModule");
-const { InsightService } = require("../services/InsightService");
+const InsightService = require("../services/InsightService");
 const { getUserName } = require("../utils/UserHelper");
 
 // ✅ 새로운 해결책 (logger를 함수로 가져오기)

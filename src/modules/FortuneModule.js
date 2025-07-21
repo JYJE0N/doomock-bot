@@ -2,7 +2,7 @@
 
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
-const { FortuneService } = require("../services/FortuneService");
+const FortuneService = require("../services/FortuneService");
 
 // ✅ BaseModule과 동일한 logger 방식 사용 (getLogger 함수 삭제됨)
 const logger = require("../utils/Logger");

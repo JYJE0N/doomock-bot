@@ -1,7 +1,7 @@
 // src/modules/BaseModule.js - 표준화된 베이스 모듈
 
 const logger = require("../utils/Logger");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
 
 class BaseModule {
   constructor(moduleName, options = {}) {

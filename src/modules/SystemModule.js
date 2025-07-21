@@ -1,10 +1,9 @@
 // src/modules/SystemModule.js - 완전 리팩토링 (Logger 통일 + 단순화)
-
+const BaseModule = require("./BaseModule");
 const logger = require("../utils/Logger");
-const { StandardizedBaseModule } = require("../core/StandardizedSystem");
 const { getUserName } = require("../utils/UserHelper");
 
-class SystemModule extends StandardizedBaseModule {
+class SystemModule extends BaseModule {
   constructor(bot, options = {}) {
     super("SystemModule", {
       commands: ["start", "help", "status", "cancel"],

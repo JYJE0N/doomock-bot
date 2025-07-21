@@ -1,7 +1,8 @@
 // src/modules/LeaveModule.js - 표준화된 휴가 관리 모듈
 
 const BaseModule = require("./BaseModule");
-const { LeaveService } = require("../services/LeaveService");
+const LeaveService = require("../services/LeaveService");
+const timeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
 

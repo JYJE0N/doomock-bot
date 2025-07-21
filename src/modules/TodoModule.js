@@ -1,9 +1,9 @@
 // src/modules/TodoModule.js - 표준화된 할일 관리 모듈
 
 const BaseModule = require("./BaseModule");
-const { TodoService } = require("../services/TodoService");
+const TodoService = require("../services/TodoService");
 const { getUserName } = require("../utils/UserHelper");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
 const { ValidationHelper } = require("../utils/ValidationHelper");
 const logger = require("../utils/Logger");
 
