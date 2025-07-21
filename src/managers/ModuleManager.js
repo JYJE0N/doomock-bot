@@ -112,24 +112,30 @@ class ModuleManager {
   // 🎯 중앙 콜백 라우팅
   async handleCallback(callbackQuery) {
     const callbackData = callbackQuery.data;
-    const callbackKey = `${callbackQuery.from.id}_${callbackQuery.id}`;
+    const callbackKey = `${callbackQuery.from.id}-${callbackData}`;
 
     // 중복 처리 방지
     if (this.processingCallbacks.has(callbackKey)) {
-      logger.warn(`⚠️ 중복 콜백 차단: ${callbackData}`);
+      logger.debug("🔁 중복 콜백 무시:", callbackData);
       return false;
     }
 
     this.processingCallbacks.add(callbackKey);
 
     try {
-      // main_menu 특별 처리
-      if (callbackData === "main_menu") {
-        logger.info(`📞 콜백 수신: ${callbackData}`);
+      logger.info(`📨 콜백 데이터 수신: ${callbackData}`);
+
+      // ⭐ main:menu 처리 (콜론 형식)
+      if (callbackData === "main:menu") {
         return await this.handleMainMenu(callbackQuery);
       }
 
-      // 콜백 데이터 파싱
+      // ⭐ 레거시 main_menu 처리 (언더스코어 형식 - 호환성)
+      if (callbackData === "main_menu") {
+        return await this.handleMainMenu(callbackQuery);
+      }
+
+      // 콜백 데이터 파싱 (콜론 기준)
       const [targetModule, subAction, ...params] = callbackData.split(":");
 
       logger.info(`🔔 콜백 라우팅: ${targetModule} → ${subAction}`);
@@ -151,7 +157,7 @@ class ModuleManager {
           callbackQuery,
           subAction,
           params,
-          this // menuManager 대신 자기 자신 전달
+          this // menuManager로 자기 자신 전달
         );
 
         // 콜백 응답

@@ -27,6 +27,9 @@ class BaseModule {
       lastActivity: null,
     };
 
+    // ⭐ 기본 액션 등록
+    this.registerDefaultActions();
+
     // 액션맵 (콜백 처리를 위한 표준 방식)
     this.actionMap = new Map();
     this.registerActions();
@@ -57,6 +60,20 @@ class BaseModule {
     } catch (error) {
       logger.error(`❌ ${this.moduleName} 초기화 실패:`, error);
       throw error;
+    }
+  }
+
+  // ⭐ 기본 액션을 자동으로 등록
+  registerDefaultActions() {
+    // 모든 모듈에서 공통으로 사용하는 기본 액션들
+    if (this.showMenu) {
+      this.actionMap.set("menu", this.showMenu.bind(this));
+    }
+    if (this.goBack) {
+      this.actionMap.set("back", this.goBack.bind(this));
+    }
+    if (this.showHelp) {
+      this.actionMap.set("help", this.showHelp.bind(this));
     }
   }
 
@@ -112,31 +129,67 @@ class BaseModule {
       this.stats.callbackCount++;
       this.stats.lastActivity = TimeHelper.getCurrentTime();
 
-      // 액션맵 확인
+      // 1. 액션맵에서 먼저 찾기
       const action = this.actionMap.get(subAction);
       if (action) {
         logger.debug(`🎯 ${this.moduleName} 액션 실행: ${subAction}`);
-        return await action.call(this, bot, callbackQuery, params);
+        return await action(bot, callbackQuery, params, moduleManager);
       }
 
-      // 기본 액션 처리
+      // 2. 동적 핸들러 확인 (하위 클래스에서 오버라이드 가능)
+      if (this.handleDynamicCallback) {
+        const handled = await this.handleDynamicCallback(
+          bot,
+          callbackQuery,
+          subAction,
+          params,
+          moduleManager
+        );
+        if (handled) return true;
+      }
+
+      // 3. 기본 액션 처리 (레거시 호환성)
       switch (subAction) {
         case "menu":
-          return await this.showMenu(bot, chatId, messageId, userId);
+          if (this.showMenu) {
+            return await this.showMenu(bot, chatId, messageId, userId);
+          }
+          break;
         case "back":
-          return await this.goBack(bot, callbackQuery);
+          if (this.goBack) {
+            return await this.goBack(bot, callbackQuery);
+          }
+          break;
+        case "help":
+          if (this.showHelp) {
+            return await this.showHelp(bot, chatId, messageId);
+          }
+          break;
         default:
-          logger.warn(`⚠️ ${this.moduleName}: 알 수 없는 액션 - ${subAction}`);
+          logger.warn(
+            `⚠️ ${this.moduleName}: 처리되지 않은 액션 - ${subAction}`
+          );
           return false;
       }
     } catch (error) {
       this.stats.errorCount++;
       logger.error(`❌ ${this.moduleName} 콜백 처리 오류:`, error);
       await this.sendError(bot, chatId, "처리 중 오류가 발생했습니다.");
-      return true;
+      return false;
     }
   }
 
+  // ⭐ 동적 콜백을 처리하기 위한 훅 (하위 클래스에서 오버라이드)
+  async handleDynamicCallback(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    // 하위 클래스에서 구현
+    return false;
+  }
   // 🔧 하위 클래스에서 구현해야 할 메서드들
   async onInitialize() {
     // 하위 클래스에서 구현
@@ -147,9 +200,13 @@ class BaseModule {
     return false;
   }
 
-  registerActions() {
-    // 하위 클래스에서 액션 등록
-    // this.actionMap.set('action_name', this.methodName);
+  registerActions(actions) {
+    for (const [actionName, handler] of Object.entries(actions)) {
+      if (typeof handler === "function") {
+        this.actionMap.set(actionName, handler.bind(this));
+        logger.debug(`📝 ${this.moduleName}: 액션 등록 - ${actionName}`);
+      }
+    }
   }
 
   async showMenu(bot, chatId, messageId, userId) {
