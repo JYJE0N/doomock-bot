@@ -1,11 +1,10 @@
-// src/database/DatabaseManager.js - 중복 선언 문제 해결
-// 표준 매개변수: (bot, callbackQuery, subAction, params, menuManager)
+// src/database/DatabaseManager.js - 완전 수정 버전
 
-// ✅ 안전한 로거 획득
 const logger = require("../utils/Logger");
-
-// 기타 안전한 imports
 const { MongoClient } = require("mongodb");
+
+// 🌍 싱글톤 인스턴스 저장소 - 파일 최상단에 선언
+let globalDatabaseInstance = null;
 
 class DatabaseManager {
   constructor(mongoUrl = null, options = {}) {
@@ -56,6 +55,7 @@ class DatabaseManager {
     // 종료 상태
     this.isShuttingDown = false;
 
+    // 싱글톤 인스턴스 저장
     globalDatabaseInstance = this;
 
     logger.info("🗄️ DatabaseManager 생성됨 (MongoDB 네이티브)");
@@ -64,386 +64,169 @@ class DatabaseManager {
   // 🔌 연결 메서드
   async connect() {
     if (this.isConnected) {
-      this.logger.debug("✅ 이미 연결됨");
+      logger.debug("이미 MongoDB에 연결됨");
       return true;
     }
 
     if (this.isConnecting) {
-      this.logger.debug("🔄 연결 진행 중...");
-      return this.waitForConnection();
-    }
-
-    if (!this.mongoUrl) {
-      this.logger.warn("⚠️ MongoDB URL이 설정되지 않음");
-      return false;
+      logger.debug("MongoDB 연결 진행 중...");
+      await this.waitForConnection();
+      return this.isConnected;
     }
 
     this.isConnecting = true;
     this.connectionAttempts++;
 
     try {
-      this.logger.info(
-        `🔌 MongoDB 연결 시도 중... (${this.connectionAttempts}/${this.maxReconnectAttempts})`
+      logger.info(
+        `🔌 MongoDB 연결 시도 중... (시도 #${this.connectionAttempts})`
       );
 
-      const startTime = Date.now();
-      this.client = new MongoClient(this.mongoUrl, this.connectionOptions);
+      const options = {
+        useNewUrlParser: true,
+        useUnifiedTopology: true,
+        maxPoolSize: 10,
+        minPoolSize: 2,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 30000,
+        family: 4,
+      };
+
+      this.client = new MongoClient(this.mongoUrl, options);
       await this.client.connect();
 
       this.db = this.client.db(this.databaseName);
       this.isConnected = true;
-      this.isConnecting = false;
-
-      const connectTime = Date.now() - startTime;
       this.poolStats.lastConnected = new Date();
       this.poolStats.connectionsCreated++;
-      this.poolStats.currentConnections++;
-      this.poolStats.peakConnections = Math.max(
-        this.poolStats.peakConnections,
-        this.poolStats.currentConnections
+
+      // 연결 이벤트 리스너
+      this.setupEventListeners();
+
+      logger.success(
+        `✅ MongoDB 연결 성공 (데이터베이스: ${this.databaseName})`
       );
-
-      this.logger.success(`✅ MongoDB 연결 성공! (${connectTime}ms)`);
-      this.logger.info(`📊 데이터베이스: ${this.databaseName}`);
-
-      // 연결 성공 시 재연결 카운터 리셋
-      this.connectionAttempts = 0;
 
       return true;
     } catch (error) {
-      this.isConnecting = false;
-      this.poolStats.failedQueries++;
+      logger.error("❌ MongoDB 연결 실패:", error);
+      this.isConnected = false;
 
-      this.logger.error(
-        `❌ MongoDB 연결 실패 (${this.connectionAttempts}/${this.maxReconnectAttempts}):`,
-        error.message
-      );
-
+      // 재연결 시도
       if (this.connectionAttempts < this.maxReconnectAttempts) {
-        this.logger.info(
-          `🔄 ${this.reconnectDelay / 1000}초 후 재연결 시도...`
-        );
-        await this.sleep(this.reconnectDelay);
-        return this.connect();
-      } else {
-        this.logger.error("💥 최대 재연결 시도 횟수 초과");
-        throw error;
+        this.scheduleReconnect();
       }
+
+      throw error;
+    } finally {
+      this.isConnecting = false;
     }
   }
 
-  // ⏱️ 연결 대기
-  async waitForConnection(timeout = 30000) {
+  // 이벤트 리스너 설정
+  setupEventListeners() {
+    if (!this.client) return;
+
+    this.client.on("close", () => {
+      logger.warn("⚠️ MongoDB 연결 종료됨");
+      this.isConnected = false;
+      if (!this.isShuttingDown) {
+        this.scheduleReconnect();
+      }
+    });
+
+    this.client.on("error", (error) => {
+      logger.error("❌ MongoDB 오류:", error);
+    });
+  }
+
+  // 재연결 스케줄
+  scheduleReconnect() {
+    if (this.reconnectInterval) return;
+
+    logger.info(`🔄 ${this.reconnectDelay / 1000}초 후 재연결 시도...`);
+
+    this.reconnectInterval = setTimeout(async () => {
+      this.reconnectInterval = null;
+      this.poolStats.reconnectCount++;
+
+      try {
+        await this.connect();
+      } catch (error) {
+        logger.error("재연결 실패:", error);
+      }
+    }, this.reconnectDelay);
+  }
+
+  // 연결 대기
+  async waitForConnection(timeout = 10000) {
     const startTime = Date.now();
 
-    while (this.isConnecting && Date.now() - startTime < timeout) {
-      await this.sleep(100);
+    while (!this.isConnected && Date.now() - startTime < timeout) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
     }
 
     return this.isConnected;
   }
 
-  // 💤 sleep 유틸리티
-  sleep(ms) {
-    return new Promise((resolve) => setTimeout(resolve, ms));
-  }
-
-  // 🔌 연결 확인
-  async ensureConnection() {
-    if (!this.isConnected) {
-      await this.connect();
+  // 컬렉션 가져오기
+  getCollection(name) {
+    if (!this.isConnected || !this.db) {
+      throw new Error("데이터베이스에 연결되지 않음");
     }
 
-    if (!this.isConnected) {
-      throw new Error("데이터베이스 연결을 설정할 수 없습니다");
-    }
+    return this.db.collection(name);
   }
 
-  // 🔌 연결 해제
+  // 연결 종료
   async disconnect() {
-    if (this.isShuttingDown) return;
-
-    this.isShuttingDown = true;
-    this.logger.info("🔌 MongoDB 연결 해제 중...");
-
-    // 재연결 타이머 정리
     if (this.reconnectInterval) {
-      clearInterval(this.reconnectInterval);
+      clearTimeout(this.reconnectInterval);
       this.reconnectInterval = null;
     }
 
-    try {
-      if (this.client) {
-        await this.client.close();
-        this.poolStats.connectionsDestroyed++;
-        this.poolStats.currentConnections = Math.max(
-          0,
-          this.poolStats.currentConnections - 1
-        );
-      }
-    } catch (error) {
-      this.logger.warn("⚠️ 연결 해제 중 오류:", error.message);
-    } finally {
-      this.client = null;
-      this.db = null;
+    if (this.client) {
+      this.isShuttingDown = true;
+      await this.client.close();
       this.isConnected = false;
-      this.isShuttingDown = false;
-      this.logger.success("✅ MongoDB 연결 해제 완료");
+      this.poolStats.connectionsDestroyed++;
+      logger.info("✅ MongoDB 연결 종료됨");
     }
   }
 
-  // 🔄 재연결
-  async reconnect() {
-    this.logger.info("🔄 재연결 시도...");
-    await this.disconnect();
-    await this.sleep(1000);
-    return this.connect();
-  }
-
-  // ⚡ 쿼리 실행 (표준 매개변수 준수)
-  async executeQuery(collectionName, operation, ...params) {
-    await this.ensureConnection();
-
-    const startTime = Date.now();
-
-    try {
-      const collection = this.db.collection(collectionName);
-      const result = await collection[operation](...params);
-
-      const responseTime = Date.now() - startTime;
-      this.updateQueryStats(responseTime, true);
-
-      this.logger.debug(
-        `✅ 쿼리 완료: ${collectionName}.${operation} (${responseTime}ms)`
-      );
-      return result;
-    } catch (error) {
-      const responseTime = Date.now() - startTime;
-      this.updateQueryStats(responseTime, false);
-
-      this.logger.error(`❌ 쿼리 실패: ${collectionName}.${operation}`, error);
-      throw error;
-    }
-  }
-
-  // 📊 쿼리 통계 업데이트
-  updateQueryStats(responseTime, success) {
-    this.poolStats.totalQueries++;
-
-    if (success) {
-      this.poolStats.successfulQueries++;
-    } else {
-      this.poolStats.failedQueries++;
-    }
-
-    // 응답 시간 추적
-    this.queryTimes.push(responseTime);
-    if (this.queryTimes.length > this.maxQueryTimeHistory) {
-      this.queryTimes.shift();
-    }
-
-    // 평균 응답 시간 계산
-    this.poolStats.averageResponseTime = Math.round(
-      this.queryTimes.reduce((sum, time) => sum + time, 0) /
-        this.queryTimes.length
-    );
-  }
-
-  // 📋 기본 CRUD 작업들 (표준 매개변수 준수)
-  async findOne(collectionName, query = {}, options = {}) {
-    return this.executeQuery(collectionName, "findOne", query, options);
-  }
-
-  async findMany(collectionName, query = {}, options = {}) {
-    const cursor = await this.executeQuery(
-      collectionName,
-      "find",
-      query,
-      options
-    );
-    return cursor.toArray();
-  }
-
-  async insertOne(collectionName, document) {
-    return this.executeQuery(collectionName, "insertOne", document);
-  }
-
-  async insertMany(collectionName, documents) {
-    return this.executeQuery(collectionName, "insertMany", documents);
-  }
-
-  async updateOne(collectionName, filter, update, options = {}) {
-    return this.executeQuery(
-      collectionName,
-      "updateOne",
-      filter,
-      update,
-      options
-    );
-  }
-
-  async updateMany(collectionName, filter, update, options = {}) {
-    return this.executeQuery(
-      collectionName,
-      "updateMany",
-      filter,
-      update,
-      options
-    );
-  }
-
-  async deleteOne(collectionName, filter) {
-    return this.executeQuery(collectionName, "deleteOne", filter);
-  }
-
-  async deleteMany(collectionName, filter) {
-    return this.executeQuery(collectionName, "deleteMany", filter);
-  }
-
-  async countDocuments(collectionName, query = {}) {
-    return this.executeQuery(collectionName, "countDocuments", query);
-  }
-
-  async aggregate(collectionName, pipeline) {
-    const cursor = await this.executeQuery(
-      collectionName,
-      "aggregate",
-      pipeline
-    );
-    return cursor.toArray();
-  }
-
-  // 📊 상태 조회 (표준 매개변수 준수)
+  // 상태 조회
   getStatus() {
-    const successRate =
-      this.poolStats.totalQueries > 0
-        ? (
-            (this.poolStats.successfulQueries / this.poolStats.totalQueries) *
-            100
-          ).toFixed(2)
-        : 0;
-
     return {
-      // 기본 연결 상태
       connected: this.isConnected,
       connecting: this.isConnecting,
       database: this.databaseName,
       railwayDetected: this.isRailwayEnvironment,
-
-      // 재연결 상태
       reconnecting: !!this.reconnectInterval,
-      shuttingDown: this.isShuttingDown,
       connectionAttempts: this.connectionAttempts,
-      hasClient: !!this.client,
-
-      // 풀링 통계
-      poolStats: {
-        ...this.poolStats,
-        successRate: `${successRate}%`,
-        lastConnectedString: this.poolStats.lastConnected,
-        performanceMetrics: {
-          averageResponseTime: `${this.poolStats.averageResponseTime}ms`,
-          queryHistory: this.queryTimes.length,
-          maxHistorySize: this.maxQueryTimeHistory,
-        },
-      },
-
-      // 환경 정보
-      environment: {
-        isRailway: this.isRailwayEnvironment,
-        nodeEnv: process.env.NODE_ENV,
-        mongooseUsed: false, // mongoose 사용 안함 명시
-        nativeDriver: true, // 네이티브 드라이버 사용 명시
-      },
-
-      // 시스템 정보
-      moduleInfo: super.getStatus(),
-    };
-  }
-
-  // 🧹 정리 작업
-  async cleanup() {
-    try {
-      this.logger.info("🧹 DatabaseManager 정리 작업 시작...");
-
-      await this.disconnect();
-
-      // 통계 초기화
-      this.poolStats = {
-        totalQueries: 0,
-        successfulQueries: 0,
-        failedQueries: 0,
-        averageResponseTime: 0,
-        lastConnected: null,
-        reconnectCount: 0,
-        connectionsCreated: 0,
-        connectionsDestroyed: 0,
-        peakConnections: 0,
-        currentConnections: 0,
-      };
-
-      this.queryTimes = [];
-
-      // 싱글톤 해제
-      globalDatabaseInstance = null;
-
-      // 부모 클래스 정리
-      await super.cleanup();
-
-      this.logger.success("✅ DatabaseManager 정리 완료");
-    } catch (error) {
-      this.logger.error("❌ DatabaseManager 정리 중 오류:", error);
-    }
-  }
-
-  // 📊 성능 리포트
-  getPerformanceReport() {
-    const stats = this.poolStats;
-    const totalConnections = stats.connectionsCreated;
-    const activeConnections = stats.currentConnections;
-
-    return {
-      connectionHealth: {
-        status: this.isConnected ? "healthy" : "disconnected",
-        totalQueries: stats.totalQueries,
-        successRate:
-          stats.totalQueries > 0
-            ? `${((stats.successfulQueries / stats.totalQueries) * 100).toFixed(
-                2
-              )}%`
-            : "0%",
-        averageResponseTime: `${stats.averageResponseTime}ms`,
-      },
-      connectionPool: {
-        active: activeConnections,
-        created: totalConnections,
-        destroyed: stats.connectionsDestroyed,
-        peak: stats.peakConnections,
-        reconnects: stats.reconnectCount,
-      },
-      environment: {
-        railway: this.isRailwayEnvironment,
-        database: this.databaseName,
-        mongooseDisabled: true,
-        nativeDriverOnly: true,
-      },
-      lastActivity: this.poolStats.lastConnected,
+      poolStats: this.poolStats,
     };
   }
 }
 
 // 🌍 싱글톤 팩토리 함수
-const createDatabaseManager = (mongoUrl = null, options = {}) => {
+function createDatabaseManager(mongoUrl = null, options = {}) {
   if (globalDatabaseInstance) {
     return globalDatabaseInstance;
   }
   return new DatabaseManager(mongoUrl, options);
-};
+}
 
-// ✅ Export 구조 유지
+// 🌍 getInstance 함수
+function getInstance() {
+  if (!globalDatabaseInstance) {
+    globalDatabaseInstance = createDatabaseManager();
+  }
+  return globalDatabaseInstance;
+}
+
+// ✅ 올바른 Export 구조
 module.exports = {
   DatabaseManager,
   createDatabaseManager,
-  getInstance: () => globalDatabaseInstance || createDatabaseManager(),
-  default: DatabaseManager,
+  getInstance,
 };

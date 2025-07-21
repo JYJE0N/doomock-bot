@@ -1,6 +1,5 @@
 // src/services/TimerService.js - Railway 환경변수를 활용한 지속성 있는 포모도로
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
@@ -707,4 +706,4 @@ class TimerService extends BaseService {
   }
 }
 
-module.exports = { TimerService };
+module.exports = TimerService;

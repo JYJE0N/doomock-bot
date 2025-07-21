@@ -2,7 +2,6 @@
 const AppConfig = require("../config/AppConfig");
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 const BaseService = require("./BaseService");
 
 class HealthService extends BaseService {

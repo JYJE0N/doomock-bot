@@ -1,6 +1,6 @@
-const TimeHelper = require("../utils/TimeHelper");
-const logger = require("../utils/Logger");
 const BaseService = require("./BaseService");
+const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 
 class FortuneService extends BaseService {
   constructor() {
@@ -1106,4 +1106,4 @@ class FortuneService extends BaseService {
   }
 }
 
-module.exports = { FortuneService };
+module.exports = FortuneService;

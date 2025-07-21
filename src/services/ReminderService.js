@@ -1,7 +1,6 @@
 // src/services/ReminderService.js - 리마인더 관리 서비스
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 const BaseService = require("./BaseService");
 
 class ReminderService extends BaseService {
@@ -316,4 +315,4 @@ class ReminderService extends BaseService {
   }
 }
 
-module.exports = { ReminderService };
+module.exports = ReminderService;

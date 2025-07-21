@@ -7,7 +7,6 @@ const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 
 class TTSService extends BaseService {
   constructor() {
@@ -481,4 +480,4 @@ class TTSService extends BaseService {
   }
 }
 
-module.exports = { TTSService };
+module.exports = TTSService;

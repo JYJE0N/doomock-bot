@@ -1,7 +1,5 @@
 // src/services/WorktimeService.js
-// ✅ 올바른 임포트
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
@@ -44,4 +42,4 @@ class WorktimeService extends BaseService {
   }
 }
 
-module.exports = { WorktimeService };
+module.exports = WorktimeService;

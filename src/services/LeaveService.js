@@ -1,6 +1,5 @@
 // src/services/LeaveService.js - 수정된 버전
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
@@ -214,4 +213,4 @@ class LeaveService extends BaseService {
   }
 }
 
-module.exports = { LeaveService };
+module.exports = LeaveService;

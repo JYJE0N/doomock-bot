@@ -641,4 +641,4 @@ class TodoService extends BaseService {
   }
 }
 
-module.exports = { TodoService };
+module.exports = TodoService;

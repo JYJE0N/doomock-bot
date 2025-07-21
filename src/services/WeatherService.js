@@ -3,7 +3,6 @@
 const axios = require("axios");
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 

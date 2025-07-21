@@ -1,6 +1,7 @@
 // src/services/BaseService.js - 모든 서비스의 표준 베이스
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const { getInstance } = require("../database/DatabaseManager");
 
 class BaseService {
   constructor(db, collectionName) {

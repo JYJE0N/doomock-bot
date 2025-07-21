@@ -1,7 +1,6 @@
 // src/services/InsightService.js
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
 const BaseService = require("./BaseService");
 
 class InsightService extends BaseService {
@@ -51,4 +50,4 @@ class InsightService extends BaseService {
 }
 
 // ✅ 수정
-module.exports = { InsightService };
+module.exports = InsightService;
