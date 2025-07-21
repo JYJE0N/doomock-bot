@@ -1,7 +1,8 @@
-// src/managers/ModuleManager.js - main_menu 콜백 특별 처리 추가
+// src/managers/ModuleManager.js - 완전한 중앙 관리 체제
 
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
+const { TimeHelper } = require("../utils/TimeHelper");
 
 class ModuleManager {
   constructor(bot, options = {}) {
@@ -12,6 +13,19 @@ class ModuleManager {
 
     // 중복 처리 방지
     this.processingCallbacks = new Set();
+
+    // 모듈 레지스트리 (중앙 등록소)
+    this.moduleRegistry = {
+      system: { class: "SystemModule", path: "../modules/SystemModule" },
+      todo: { class: "TodoModule", path: "../modules/TodoModule" },
+      timer: { class: "TimerModule", path: "../modules/TimerModule" },
+      worktime: { class: "WorktimeModule", path: "../modules/WorktimeModule" },
+      leave: { class: "LeaveModule", path: "../modules/LeaveModule" },
+      reminder: { class: "ReminderModule", path: "../modules/ReminderModule" },
+      fortune: { class: "FortuneModule", path: "../modules/FortuneModule" },
+      weather: { class: "WeatherModule", path: "../modules/WeatherModule" },
+      utils: { class: "UtilsModule", path: "../modules/UtilsModule" },
+    };
 
     logger.info("🔧 ModuleManager 생성됨");
   }
@@ -36,229 +50,178 @@ class ModuleManager {
   }
 
   async loadModules() {
-    const moduleConfigs = [
-      { name: "SystemModule", path: "../modules/SystemModule" },
-      { name: "TodoModule", path: "../modules/TodoModule" },
-      { name: "TimerModule", path: "../modules/TimerModule" },
-      { name: "WorktimeModule", path: "../modules/WorktimeModule" },
-      { name: "BaseModule", path: "../modules/BaseModule" },
-      { name: "LeaveModule", path: "../modules/LeaveModule" },
-      { name: "ReminderModule", path: "../modules/ReminderModule" },
-      { name: "FortuneModule", path: "../modules/FortuneModule" },
-      { name: "WeatherModule", path: "../modules/WeatherModule" },
-      { name: "UtilsModule", path: "../modules/UtilsModule" },
-    ];
-
-    for (const config of moduleConfigs) {
+    for (const [key, config] of Object.entries(this.moduleRegistry)) {
       try {
         const ModuleClass = require(config.path);
         const moduleInstance = new ModuleClass(this.bot, {
           dbManager: this.db,
+          moduleManager: this, // 자신의 참조 전달
         });
 
+        // 모듈 초기화
         if (moduleInstance.initialize) {
           await moduleInstance.initialize();
         }
 
-        this.moduleInstances.set(config.name, moduleInstance);
-        logger.debug(`✅ ${config.name} 로드 완료`);
+        this.moduleInstances.set(config.class, moduleInstance);
+        logger.debug(`✅ ${config.class} 로드 완료`);
       } catch (error) {
-        logger.warn(`⚠️ 모듈 로드 실패 (${config.name}):`, error.message);
+        logger.error(`❌ ${config.class} 로드 실패:`, error.message);
       }
     }
   }
 
+  // 🎯 중앙 메시지 라우팅
   async handleMessage(bot, msg) {
-    for (const [name, instance] of this.moduleInstances) {
-      try {
-        if (instance.handleMessage) {
-          const handled = await instance.handleMessage(bot, msg);
-          if (handled) break;
+    if (!msg.text) return false;
+
+    const operationId = TimeHelper.generateOperationId("message", msg.from.id);
+
+    // 모든 모듈에게 메시지 전달 (우선순위 순서대로)
+    const moduleOrder = [
+      "system",
+      "todo",
+      "leave",
+      "worktime",
+      "timer",
+      "reminder",
+      "fortune",
+      "weather",
+      "utils",
+    ];
+
+    for (const moduleName of moduleOrder) {
+      const moduleClass = this.moduleRegistry[moduleName]?.class;
+      const module = this.moduleInstances.get(moduleClass);
+
+      if (module?.handleMessage) {
+        try {
+          const handled = await module.handleMessage(bot, msg);
+          if (handled) {
+            logger.debug(`📬 메시지가 ${moduleClass}에서 처리됨`);
+            return true;
+          }
+        } catch (error) {
+          logger.error(`❌ ${moduleClass} 메시지 처리 오류:`, error);
         }
-      } catch (error) {
-        logger.error(`❌ 모듈 메시지 처리 오류 (${name}):`, error.message);
       }
     }
+
+    return false;
   }
-  async handleCallback(bot, callbackQuery) {
-    const callbackKey = `${callbackQuery.from.id}_${callbackQuery.data}`;
+
+  // 🎯 중앙 콜백 라우팅
+  async handleCallback(callbackQuery) {
+    const callbackData = callbackQuery.data;
+    const callbackKey = `${callbackQuery.from.id}_${callbackQuery.id}`;
 
     // 중복 처리 방지
     if (this.processingCallbacks.has(callbackKey)) {
-      logger.debug(`중복 콜백 무시: ${callbackKey}`);
-      return;
+      logger.warn(`⚠️ 중복 콜백 차단: ${callbackData}`);
+      return false;
     }
+
     this.processingCallbacks.add(callbackKey);
 
     try {
-      logger.info(`📞 콜백 수신: ${callbackQuery.data}`);
+      // 콜백 데이터 파싱
+      const [targetModule, subAction, ...params] = callbackData.split(":");
 
-      // 1. main_menu 특별 처리
-      if (callbackQuery.data === "main_menu") {
-        return await this.showMainMenu(bot, callbackQuery);
+      logger.info(`🔔 콜백 라우팅: ${targetModule} → ${subAction}`);
+
+      // main_menu 특별 처리
+      if (callbackData === "main_menu") {
+        return await this.handleMainMenu(callbackQuery);
       }
 
-      // 2. 콜백 데이터 파싱
-      let targetModule, action, params;
+      // 모듈 찾기
+      const moduleClass = this.findModuleClass(targetModule);
+      const module = this.moduleInstances.get(moduleClass);
 
-      if (callbackQuery.data.includes(":")) {
-        // "todo:list" 형식
-        const parts = callbackQuery.data.split(":");
-        targetModule = parts[0];
-        action = parts[1];
-        params = parts[2] || null;
-      } else if (callbackQuery.data.includes("_")) {
-        // "todo_list" 형식 (레거시 지원)
-        const parts = callbackQuery.data.split("_");
-        targetModule = parts[0];
-        action = parts.slice(1).join("_");
-      } else {
-        logger.warn(`알 수 없는 콜백 형식: ${callbackQuery.data}`);
+      if (!module) {
+        logger.warn(`⚠️ 모듈을 찾을 수 없음: ${targetModule}`);
+        await this.sendModuleNotFoundMessage(callbackQuery);
         return false;
       }
 
-      // 3. 모듈 찾기
-      const moduleName = this.findModuleName(targetModule);
-      const moduleInstance = this.moduleInstances.get(moduleName);
-
-      if (!moduleInstance) {
-        logger.warn(`모듈을 찾을 수 없음: ${targetModule}`);
-        return false;
-      }
-
-      // 4. 모듈에게 위임
-      if (moduleInstance.handleCallback) {
-        return await moduleInstance.handleCallback(
-          bot,
+      // 표준 매개변수로 모듈 콜백 호출
+      if (module.handleCallback) {
+        const result = await module.handleCallback(
+          this.bot,
           callbackQuery,
-          action,
+          subAction,
           params,
-          this
+          this // menuManager 대신 자기 자신 전달
         );
-      }
 
-      logger.warn(`${moduleName}에 handleCallback이 없음`);
-      return false;
+        // 콜백 응답
+        await this.bot.answerCallbackQuery(callbackQuery.id);
+        return result;
+      }
     } catch (error) {
-      logger.error("콜백 처리 오류:", error);
-      return false;
+      logger.error("❌ 콜백 처리 오류:", error);
+      await this.sendErrorCallback(callbackQuery);
     } finally {
+      // 3초 후 중복 방지 해제
       setTimeout(() => {
         this.processingCallbacks.delete(callbackKey);
       }, 3000);
     }
+
+    return false;
   }
 
-  // ✅ 메인메뉴 표시 메서드 추가
-  async showMainMenu(bot, callbackQuery) {
-    try {
-      const {
-        message: {
-          chat: { id: chatId },
-          message_id: messageId,
-        },
-        from,
-      } = callbackQuery;
+  // 🏠 메인 메뉴 처리
+  async handleMainMenu(callbackQuery) {
+    const keyboard = this.createMainMenuKeyboard();
+    const userName = getUserName(callbackQuery.from);
 
-      const userName = getUserName(from);
+    const menuText =
+      `🏠 **메인 메뉴**\n\n` + `안녕하세요 ${userName}님! 무엇을 도와드릴까요?`;
 
-      // 동적으로 활성화된 모듈들의 메뉴 생성
-      const menuKeyboard = this.createMainMenuKeyboard();
+    await this.bot.editMessageText(menuText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
 
-      const mainMenuText = `🏠 **${userName}님, 환영합니다!**\n\n원하는 기능을 선택해주세요:`;
-
-      await bot.editMessageText(mainMenuText, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "Markdown",
-        reply_markup: menuKeyboard,
-      });
-
-      logger.debug("✅ 메인메뉴 표시 완료");
-      return true;
-    } catch (error) {
-      logger.error("❌ 메인메뉴 표시 실패:", error);
-
-      // 폴백: 기본 메뉴
-      try {
-        await bot.editMessageText("🏠 **메인 메뉴**\n\n기본 메뉴입니다.", {
-          chat_id: callbackQuery.message.chat.id,
-          message_id: callbackQuery.message.message_id,
-          parse_mode: "Markdown",
-          reply_markup: this.createMainMenuKeyboard(),
-        });
-        return true;
-      } catch (fallbackError) {
-        logger.error("❌ 폴백 메뉴도 실패:", fallbackError);
-        return false;
-      }
-    }
+    return true;
   }
 
-  // 모듈명 매핑 (system → SystemModule)
-  findModuleName(targetModule) {
-    const moduleMap = {
-      system: "SystemModule",
-      todo: "TodoModule",
-      fortune: "FortuneModule",
-      weather: "WeatherModule",
-      utils: "UtilsModule",
-      timer: "TimerModule",
-      worktime: "WorktimeModule",
-    };
-
-    return (
-      moduleMap[targetModule.toLowerCase()] ||
-      targetModule.charAt(0).toUpperCase() + targetModule.slice(1) + "Module"
-    );
-  }
-
-  // ✅ 동적 메인 메뉴 키보드 (활성화된 모듈만 표시)
+  // 🎨 동적 메인 메뉴 생성
   createMainMenuKeyboard() {
     const menuButtons = [];
 
-    // 모듈별 버튼 정의
-    const moduleButtons = [
-      {
-        text: "📝 할일 관리",
-        callback_data: "todo:menu",
-        module: "TodoModule",
-      },
-      {
-        text: "🔮 운세 확인",
-        callback_data: "fortune:menu",
-        module: "FortuneModule",
-      },
-      {
-        text: "🌤️ 날씨 조회",
-        callback_data: "weather:menu",
-        module: "WeatherModule",
-      },
-      {
-        text: "🛠️ 유틸리티",
-        callback_data: "utils:menu",
-        module: "UtilsModule",
-      },
+    const moduleMenus = [
+      { key: "todo", text: "📝 할일 관리", callback: "todo:menu" },
+      { key: "leave", text: "📅 휴가 관리", callback: "leave:menu" },
+      { key: "worktime", text: "🕐 근무시간", callback: "worktime:menu" },
+      { key: "timer", text: "⏰ 타이머", callback: "timer:menu" },
+      { key: "reminder", text: "🔔 리마인더", callback: "reminder:menu" },
+      { key: "fortune", text: "🔮 운세", callback: "fortune:menu" },
+      { key: "weather", text: "🌤️ 날씨", callback: "weather:menu" },
+      { key: "utils", text: "🛠️ 유틸리티", callback: "utils:menu" },
     ];
 
-    // 활성화된 모듈만 메뉴에 추가
-    for (const button of moduleButtons) {
-      if (this.moduleInstances.has(button.module)) {
+    // 활성화된 모듈만 추가
+    for (const menu of moduleMenus) {
+      const moduleClass = this.moduleRegistry[menu.key]?.class;
+      if (this.moduleInstances.has(moduleClass)) {
         menuButtons.push({
-          text: button.text,
-          callback_data: button.callback_data,
+          text: menu.text,
+          callback_data: menu.callback,
         });
       }
     }
 
-    // 2열 배치로 키보드 생성
+    // 2열 배치
     const keyboard = [];
     for (let i = 0; i < menuButtons.length; i += 2) {
-      const row = menuButtons.slice(i, i + 2);
-      keyboard.push(row);
+      keyboard.push(menuButtons.slice(i, i + 2));
     }
 
-    // 시스템 기능 추가 (항상 표시)
+    // 시스템 메뉴 추가
     keyboard.push([
       { text: "📊 시스템 상태", callback_data: "system:status" },
       { text: "❓ 도움말", callback_data: "system:help" },
@@ -267,38 +230,68 @@ class ModuleManager {
     return { inline_keyboard: keyboard };
   }
 
-  // 상태 조회
+  // 🔍 모듈 클래스 찾기
+  findModuleClass(moduleKey) {
+    // 직접 매핑
+    const directMapping = {
+      system: "SystemModule",
+      todo: "TodoModule",
+      timer: "TimerModule",
+      worktime: "WorktimeModule",
+      leave: "LeaveModule",
+      reminder: "ReminderModule",
+      fortune: "FortuneModule",
+      weather: "WeatherModule",
+      utils: "UtilsModule",
+    };
+
+    return directMapping[moduleKey.toLowerCase()] || null;
+  }
+
+  // ❌ 에러 처리
+  async sendModuleNotFoundMessage(callbackQuery) {
+    await this.bot.answerCallbackQuery(callbackQuery.id, {
+      text: "⚠️ 해당 모듈을 찾을 수 없습니다.",
+      show_alert: true,
+    });
+  }
+
+  async sendErrorCallback(callbackQuery) {
+    await this.bot.answerCallbackQuery(callbackQuery.id, {
+      text: "❌ 처리 중 오류가 발생했습니다.",
+      show_alert: true,
+    });
+  }
+
+  // 📊 상태 조회
   getStatus() {
     return {
       initialized: this.isInitialized,
-      activeModuleCount: this.moduleInstances.size,
       modules: Array.from(this.moduleInstances.keys()),
+      activeModules: this.moduleInstances.size,
+      registry: Object.keys(this.moduleRegistry),
     };
   }
 
-  // 정리 작업
+  // 🧹 정리
   async cleanup() {
-    try {
-      logger.info("🧹 ModuleManager 정리 시작...");
+    logger.info("🧹 ModuleManager 정리 시작...");
 
-      for (const [name, instance] of this.moduleInstances) {
-        try {
-          if (instance.cleanup) {
-            await instance.cleanup();
-          }
-        } catch (error) {
-          logger.warn(`⚠️ 모듈 정리 실패 (${name}):`, error.message);
+    for (const [name, instance] of this.moduleInstances) {
+      try {
+        if (instance.cleanup) {
+          await instance.cleanup();
         }
+      } catch (error) {
+        logger.warn(`⚠️ ${name} 정리 실패:`, error.message);
       }
-
-      this.moduleInstances.clear();
-      this.processingCallbacks.clear();
-      this.isInitialized = false;
-
-      logger.success("✅ ModuleManager 정리 완료");
-    } catch (error) {
-      logger.error("❌ ModuleManager 정리 중 오류:", error);
     }
+
+    this.moduleInstances.clear();
+    this.processingCallbacks.clear();
+    this.isInitialized = false;
+
+    logger.success("✅ ModuleManager 정리 완료");
   }
 }
 
