@@ -180,6 +180,13 @@ class TimeHelper {
       railwayEnvironment: !!process.env.RAILWAY_ENVIRONMENT,
     };
   }
+  static getCurrentTime() {
+    const now = this.getKoreaTime();
+    return {
+      hours: now.getHours(),
+      minutes: now.getMinutes(),
+    };
+  }
 }
 
 module.exports = TimeHelper;
