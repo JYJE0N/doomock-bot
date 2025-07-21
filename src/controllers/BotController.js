@@ -37,8 +37,8 @@ class BotController {
       // 1. 데이터베이스 초기화 (안전하게)
       await this.initializeDatabase();
 
-      // 2. 모듈 매니저 초기화
-      // await this.initializeModuleManager();
+      // 2. 모듈 매니저 초기화 - 주석 해제!
+      await this.initializeModuleManager();
 
       // 3. 이벤트 리스너 등록
       if (!this.eventListenersRegistered) {
@@ -76,23 +76,29 @@ class BotController {
     }
   }
 
-  // // ⭐ 모듈 매니저 초기화
-  // async initializeModuleManager() {
-  //   logger.info("📦 모듈 매니저 초기화 중...");
+  // ⭐ 모듈 매니저 초기화
+  async initializeModuleManager() {
+    logger.info("📦 모듈 매니저 초기화 중...");
 
-  //   try {
-  //     this.moduleManager = new ModuleManager(this.bot, {
-  //       dbManager: this.dbManager,
-  //       userStates: this.userStates,
-  //     });
+    try {
+      this.moduleManager = new ModuleManager(this.bot, {
+        dbManager: this.dbManager,
+        userStates: this.userStates,
+      });
 
-  //     await this.moduleManager.initialize();
-  //     logger.success("✅ 모듈 매니저 초기화 완료");
-  //   } catch (error) {
-  //     logger.error("❌ 모듈 매니저 초기화 실패:", error);
-  //     throw error;
-  //   }
-  // }
+      await this.moduleManager.initialize();
+      logger.success("✅ 모듈 매니저 초기화 완료");
+    } catch (error) {
+      logger.error("❌ 모듈 매니저 초기화 실패:", error);
+      throw error;
+    }
+  }
+
+  // ⭐ 모듈 매니저 설정
+  setModuleManager(moduleManager) {
+    this.moduleManager = moduleManager;
+    logger.info("📋 ModuleManager가 BotController에 설정됨");
+  }
 
   // ⭐ 이벤트 리스너 등록
   registerEventListeners() {
@@ -141,7 +147,8 @@ class BotController {
       try {
         logger.info(`📞 콜백 수신: ${callbackQuery.data}`);
         if (this.moduleManager) {
-          await this.moduleManager.handleCallback(this.bot, callbackQuery);
+          // ✅ 수정: bot 매개변수 제거 - ModuleManager가 이미 bot을 가지고 있음
+          await this.moduleManager.handleCallback(callbackQuery);
         } else {
           logger.warn("⚠️ ModuleManager가 설정되지 않음");
           throw new Error("ModuleManager not initialized");
@@ -154,15 +161,18 @@ class BotController {
             text: "❌ 처리 중 오류가 발생했습니다.",
             show_alert: true,
           });
-        } catch (answerError) {
-          logger.debug("콜백 응답 실패");
-        }
 
-        await this.sendErrorMessage(callbackQuery.message.chat.id);
+          // 에러 메시지 전송
+          if (callbackQuery.message && callbackQuery.message.chat) {
+            await this.sendErrorMessage(callbackQuery.message.chat.id);
+          }
+        } catch (answerError) {
+          logger.error("콜백 응답 실패:", answerError);
+        }
       } finally {
         setTimeout(() => {
           this.processingCallbacks.delete(callbackKey);
-        }, 3000);
+        }, 5000);
       }
     });
 
@@ -187,10 +197,6 @@ class BotController {
 
   // ⭐ 메시지 처리
 
-  setModuleManager(moduleManager) {
-    this.moduleManager = moduleManager;
-    logger.info("📦 ModuleManager 참조 설정됨");
-  }
   // 메시지 핸들러
   async handleMessage(msg) {
     const text = msg.text;
