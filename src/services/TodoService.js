@@ -9,10 +9,10 @@ const BaseService = require("./BaseService");
 class TodoService extends BaseService {
   constructor(db) {
     super(db, "todos");
-    // // ⭐ 하이브리드 저장: 메모리 + 데이터베이스
-    // this.todos = new Map(); // 빠른 접근을 위한 메모리 캐시
-    // this.initialized = false;
-    // this.dbEnabled = false;
+    // ⭐ 하이브리드 저장: 메모리 + 데이터베이스
+    this.todos = new Map(); // 빠른 접근을 위한 메모리 캐시
+    this.initialized = false;
+    this.dbEnabled = false;
 
     // Railway 환경변수 설정
     this.config = {
