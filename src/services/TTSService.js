@@ -4,12 +4,12 @@ const gtts = require("gtts");
 const fs = require("fs").promises;
 const path = require("path");
 const TimeHelper = require("../utils/TimeHelper");
-
+const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 
-class TTSService {
+class TTSService extends BaseService {
   constructor() {
     // 사용자별 TTS 모드 저장
     this.userModes = new Map();

@@ -2,8 +2,9 @@
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
+const BaseService = require("./BaseService");
 
-class InsightService {
+class InsightService extends BaseService {
   constructor() {
     // 초기화
   }

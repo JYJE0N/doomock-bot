@@ -4,10 +4,10 @@ const axios = require("axios");
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
-// ✅ 올바른 서비스 Export 방식
 const TimeHelper = require("../utils/TimeHelper");
+const BaseService = require("./BaseService");
 
-class WeatherService {
+class WeatherService extends BaseService {
   constructor() {
     this.apiKey = process.env.WEATHER_API_KEY;
     this.baseUrl = "https://api.openweathermap.org/data/2.5";

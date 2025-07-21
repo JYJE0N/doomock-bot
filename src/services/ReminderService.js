@@ -2,8 +2,9 @@
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
+const BaseService = require("./BaseService");
 
-class ReminderService {
+class ReminderService extends BaseService {
   constructor() {
     this.reminders = new Map(); // reminderId -> reminderData
     this.timeouts = new Map(); // reminderId -> timeoutId

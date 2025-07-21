@@ -2,10 +2,10 @@
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 const TimeHelper = require("../utils/TimeHelper");
-
+const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 
-class TimerService {
+class TimerService extends BaseService {
   constructor() {
     this.timers = new Map();
     this.pomodoroSessions = new Map();

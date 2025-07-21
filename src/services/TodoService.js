@@ -4,8 +4,9 @@ const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const BaseService = require("./BaseService");
 
-class TodoService {
+class TodoService extends BaseService {
   constructor() {
     // ⭐ 하이브리드 저장: 메모리 + 데이터베이스
     this.todos = new Map(); // 빠른 접근을 위한 메모리 캐시

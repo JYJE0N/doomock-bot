@@ -1,7 +1,8 @@
 const TimeHelper = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
+const BaseService = require("./BaseService");
 
-class FortuneService {
+class FortuneService extends BaseService {
   constructor() {
     this.initializeMessages();
     this.initializeTarotCards();
