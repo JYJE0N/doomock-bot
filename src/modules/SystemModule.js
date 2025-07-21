@@ -47,7 +47,7 @@ class SystemModule extends BaseModule {
     // 메인 메뉴
     this.actionMap.set("main", this.showMainMenu.bind(this));
     this.actionMap.set("menu", this.showMainMenu.bind(this));
-    this.actionMap.set("main_menu", this.showMainMenu.bind(this));
+    this.actionMap.set("main:menu", this.showMainMenu.bind(this));
 
     // 도움말
     this.actionMap.set("help", this.showHelpMenu.bind(this));

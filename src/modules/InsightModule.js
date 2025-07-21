@@ -100,7 +100,7 @@ class InsightModule extends BaseModule {
           { text: "📱 대시보드", callback_data: "insight_dashboard" },
           { text: "🗺️ 전국 현황", callback_data: "insight_national" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
 
@@ -134,7 +134,7 @@ class InsightModule extends BaseModule {
           ],
           [
             { text: "🔄 새로고침", callback_data: "insight_refresh" },
-            { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+            { text: "🔙 메인 메뉴", callback_data: "main:menu" },
           ],
         ],
       };
@@ -168,7 +168,7 @@ class InsightModule extends BaseModule {
           { text: "📊 종합 인사이트", callback_data: "insight_full" },
           { text: "📱 대시보드", callback_data: "insight_dashboard" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
 

@@ -942,7 +942,7 @@ class TimerModule extends BaseModule {
         inline_keyboard: [
           [
             { text: "🔄 다시 시도", callback_data: "timer_menu" },
-            { text: "🏠 메인 메뉴", callback_data: "main_menu" },
+            { text: "🏠 메인 메뉴", callback_data: "main:menu" },
           ],
         ],
       },

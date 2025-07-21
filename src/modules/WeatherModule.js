@@ -103,7 +103,7 @@ class WeatherModule extends BaseModule {
           { text: "🏙️ 도시 선택", callback_data: "weather:city" },
           { text: "❓ 도움말", callback_data: "weather:help" },
         ],
-        [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
 

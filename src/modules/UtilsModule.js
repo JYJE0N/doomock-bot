@@ -66,7 +66,7 @@ class UtilsModule extends BaseModule {
           ],
           [
             { text: "❓ 도움말", callback_data: "utils_help" },
-            { text: "🔙 메인 메뉴", callback_data: "main_menu" },
+            { text: "🔙 메인 메뉴", callback_data: "main:menu" },
           ],
         ],
       },
@@ -403,7 +403,7 @@ class UtilsModule extends BaseModule {
           inline_keyboard: [
             [
               { text: "🔙 유틸리티 메뉴", callback_data: "utils_menu" },
-              { text: "🏠 메인 메뉴", callback_data: "main_menu" },
+              { text: "🏠 메인 메뉴", callback_data: "main:menu" },
             ],
           ],
         },

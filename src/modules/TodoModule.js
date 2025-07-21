@@ -140,7 +140,7 @@ class TodoModule extends BaseModule {
           { text: "📥 가져오기", callback_data: "todo:import" },
         ],
         [{ text: "🗑️ 정리", callback_data: "todo:clear_completed" }],
-        [{ text: "🏠 메인 메뉴", callback_data: "main_menu" }],
+        [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
 
