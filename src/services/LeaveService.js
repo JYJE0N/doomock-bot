@@ -1,7 +1,8 @@
 // src/services/LeaveService.js - 수정된 버전
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
+
 const logger = require("../utils/Logger");
 
 class LeaveService {

@@ -1,4 +1,4 @@
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
 class FortuneService {

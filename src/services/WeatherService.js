@@ -5,7 +5,8 @@ const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 // ✅ 올바른 서비스 Export 방식
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
+
 class WeatherService {
   constructor() {
     this.apiKey = process.env.WEATHER_API_KEY;

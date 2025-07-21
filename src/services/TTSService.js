@@ -3,7 +3,8 @@
 const gtts = require("gtts");
 const fs = require("fs").promises;
 const path = require("path");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
+
 const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();

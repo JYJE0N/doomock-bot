@@ -208,4 +208,4 @@ class TimeHelper {
   }
 }
 
-module.exports = { TimeHelper };
+module.exports = TimeHelper;

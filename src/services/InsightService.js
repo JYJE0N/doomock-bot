@@ -1,6 +1,5 @@
 // src/services/InsightService.js
 const logger = require("../utils/Logger");
-// ✅ 올바른 임포트
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 

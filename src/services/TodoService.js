@@ -3,7 +3,7 @@
 const { getInstance } = require("../database/DatabaseManager");
 const dbManager = getInstance();
 const logger = require("../utils/Logger");
-const { TimeHelper } = require("../utils/TimeHelper");
+const TimeHelper = require("../utils/TimeHelper");
 
 class TodoService {
   constructor() {
