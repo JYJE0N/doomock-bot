@@ -198,13 +198,29 @@ class BaseModule {
   // ✅ 메뉴 데이터 제공 (하위 클래스에서 오버라이드)
   getMenuData(userName) {
     return {
-      text: `📦 **${userName}님의 ${this.name}**\n\n기본 메뉴입니다.`,
+      text: `📝 **${userName}님의 할일 관리**\n\n무엇을 도와드릴까요?`,
       keyboard: {
         inline_keyboard: [
           [
-            { text: "❓ 도움말", callback_data: `${this.moduleName}_help` },
-            { text: "🏠 메인 메뉴", callback_data: "main_menu" },
+            { text: "📋 할일 목록", callback_data: "todo:list" },
+            { text: "➕ 할일 추가", callback_data: "todo:add" },
           ],
+          [
+            { text: "🔍 할일 검색", callback_data: "todo:search" },
+            { text: "📊 할일 통계", callback_data: "todo:stats" },
+          ],
+          [
+            {
+              text: "✅ 완료된 할일 정리",
+              callback_data: "todo:clear_completed",
+            },
+            { text: "🗑️ 모든 할일 삭제", callback_data: "todo:clear_all" },
+          ],
+          [
+            { text: "📤 할일 내보내기", callback_data: "todo:export" },
+            { text: "📥 할일 가져오기", callback_data: "todo:import" },
+          ],
+          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
         ],
       },
     };
