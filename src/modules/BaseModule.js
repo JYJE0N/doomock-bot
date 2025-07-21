@@ -6,123 +6,84 @@ const { getUserName } = require("../utils/UserHelper");
 class BaseModule {
   constructor(name, config = {}) {
     this.name = name;
-    this.moduleName = name.replace("Module", "").toLowerCase();
-    // ✅ 생성자에서 dbManager 받기
-    this.dbManager = config.dbManager || null;
-    this.db = this.dbManager; // ✅ this.db로 참조 설정
-    this.config = {
-      enabled: true,
-      priority: 100,
-      required: false,
-      ...config,
-    };
+    this.moduleName = name.toLowerCase().replace("module", "");
+    this.config = config;
 
-    // ✅ 핵심: 즉시 초기화
+    // 액션 맵
     this.actionMap = new Map();
-    this.isInitialized = false;
-    this.startTime = new Date();
 
-    // 통계 및 상태
-    this.stats = {
-      commandCount: 0,
-      callbackCount: 0,
-      errorCount: 0,
-      lastUsed: null,
-      uniqueUsers: new Set(),
-    };
-
+    // 사용자 상태
     this.userStates = new Map();
-
-    logger.debug(`📦 ${this.name} 생성됨`);
   }
 
-  // 🔧 초기화
+  // 초기화
   async initialize() {
-    if (this.isInitialized) {
-      logger.debug(`${this.name} 이미 초기화됨, 스킵`);
-      return;
-    }
-
     try {
-      logger.info(`🔧 ${this.name} 초기화 중...`);
+      // 기본 액션 등록
+      this.registerDefaultActions();
 
-      // 1. 모듈별 초기화 (하위 클래스)
-      if (typeof this.onInitialize === "function") {
+      // 모듈별 액션 등록
+      if (this.registerActions) {
+        this.registerActions();
+      }
+
+      // 모듈별 초기화
+      if (this.onInitialize) {
         await this.onInitialize();
       }
 
-      // 2. 액션 등록
-      this.registerActions();
-
-      this.isInitialized = true;
-      logger.success(`✅ ${this.name} 초기화 완료`);
+      logger.debug(`${this.name} 초기화 완료`);
     } catch (error) {
-      this.stats.errorCount++;
-      logger.error(`❌ ${this.name} 초기화 실패:`, error);
+      logger.error(`${this.name} 초기화 실패:`, error);
       throw error;
     }
   }
 
-  // 🎯 기본 액션 등록
-  registerActions() {
-    // 기본 액션들
+  // 기본 액션 등록
+  registerDefaultActions() {
     this.actionMap.set("menu", this.showMenu.bind(this));
+    this.actionMap.set("main", this.showMenu.bind(this));
     this.actionMap.set("help", this.showHelp.bind(this));
-
-    logger.debug(`🎯 ${this.name} 기본 액션 등록 완료`);
+    this.actionMap.set("cancel", this.handleCancel.bind(this));
   }
 
-  // ✅ 메시지 처리 (표준 패턴)
-  async handleMessage(bot, msg) {
-    this.stats.commandCount++;
-    this.stats.lastUsed = new Date();
-    this.stats.uniqueUsers.add(msg.from.id);
-
-    // 하위 클래스에서 구현
-    return await this.onHandleMessage(bot, msg);
-  }
-
-  // ✅ 콜백 처리 (표준 패턴)
+  // 표준 콜백 처리
   async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
-    this.stats.callbackCount++;
-    this.stats.lastUsed = new Date();
-    this.stats.uniqueUsers.add(callbackQuery.from.id);
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+    const userName = getUserName(callbackQuery.from);
 
     try {
-      // actionMap에서 찾기
-      if (this.actionMap.has(subAction)) {
-        const actionHandler = this.actionMap.get(subAction);
-        const {
-          message: {
-            chat: { id: chatId },
-            message_id: messageId,
-          },
-          from: { id: userId },
-        } = callbackQuery;
-        const userName = getUserName(callbackQuery.from);
+      // 콜백 응답
+      await bot.answerCallbackQuery(callbackQuery.id);
 
-        await actionHandler(
-          bot,
-          chatId,
-          messageId,
-          userId,
-          userName,
-          menuManager
-        );
-        return true;
+      // 액션 맵에서 처리
+      const action = this.actionMap.get(subAction);
+      if (action) {
+        return await action(bot, chatId, messageId, userId, userName, params);
       }
 
-      // 하위 클래스 처리
-      return await this.onHandleCallback(
-        bot,
-        callbackQuery,
-        subAction,
-        params,
-        menuManager
-      );
+      // 모듈별 커스텀 처리
+      if (this.onHandleCallback) {
+        return await this.onHandleCallback(
+          bot,
+          callbackQuery,
+          subAction,
+          params,
+          menuManager
+        );
+      }
+
+      logger.warn(`${this.name}: 알 수 없는 액션 - ${subAction}`);
+      return false;
     } catch (error) {
-      this.stats.errorCount++;
-      logger.error(`❌ ${this.name} 콜백 처리 오류:`, error);
+      logger.error(`${this.name} 콜백 처리 오류:`, error);
+      await this.sendErrorMessage(bot, chatId);
       return false;
     }
   }

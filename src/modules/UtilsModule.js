@@ -32,9 +32,9 @@ class UtilsModule extends BaseModule {
 
   // ✅ 표준 액션 등록
   registerActions() {
-    // 기본 액션들
-    this.actionMap.set("menu", this.showUtilsMenu.bind(this));
-    this.actionMap.set("help", this.showUtilsHelp.bind(this));
+    super.registerActions(); // 기본 액션 유지
+    this.actionMap.set("main", this.showMenu.bind(this));
+    this.actionMap.set("menu", this.showMenu.bind(this));
 
     // TTS 관련 액션들
     this.actionMap.set("tts_menu", this.showTTSMenu.bind(this));

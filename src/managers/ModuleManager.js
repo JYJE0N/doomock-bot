@@ -39,6 +39,11 @@ class ModuleManager {
     const moduleConfigs = [
       { name: "SystemModule", path: "../modules/SystemModule" },
       { name: "TodoModule", path: "../modules/TodoModule" },
+      { name: "TimerModule", path: "../modules/TimerModule" },
+      { name: "WorktimeModule", path: "../modules/WorktimeModule" },
+      { name: "BaseModule", path: "../modules/BaseModule" },
+      { name: "LeaveModule", path: "../modules/LeaveModule" },
+      { name: "ReminderModule", path: "../modules/ReminderModule" },
       { name: "FortuneModule", path: "../modules/FortuneModule" },
       { name: "WeatherModule", path: "../modules/WeatherModule" },
       { name: "UtilsModule", path: "../modules/UtilsModule" },
@@ -75,88 +80,68 @@ class ModuleManager {
       }
     }
   }
-
-  // 📍 src/managers/ModuleManager.js 파일에서 찾아서 수정할 부분
-
-  // ❌ 현재 코드 (약 95-110줄 근처) - 이 부분을 찾으세요
-  async handleCallback(bot, callbackQuery) {
-    // ... 기존 코드 ...
-
-    // 콜백 데이터 파싱 (system:status → system, status)
-    const [targetModule, action] = callbackQuery.data.split(":");
-
-    if (!targetModule || !action) {
-      logger.warn(`잘못된 콜백 형식: ${callbackQuery.data}`);
-      return;
-    }
-
-    // ... 나머지 코드 ...
-  }
-
-  // ✅ 수정 후 코드 - 위 부분을 이렇게 바꾸세요
   async handleCallback(bot, callbackQuery) {
     const callbackKey = `${callbackQuery.from.id}_${callbackQuery.data}`;
 
     // 중복 처리 방지
     if (this.processingCallbacks.has(callbackKey)) {
+      logger.debug(`중복 콜백 무시: ${callbackKey}`);
       return;
     }
     this.processingCallbacks.add(callbackKey);
 
     try {
-      // ✅ main_menu 특별 처리
+      logger.info(`📞 콜백 수신: ${callbackQuery.data}`);
+
+      // 1. main_menu 특별 처리
       if (callbackQuery.data === "main_menu") {
-        const handled = await this.showMainMenu(bot, callbackQuery);
-        if (handled) {
-          logger.debug("✅ 메인메뉴 표시 완료");
-          return;
-        }
+        return await this.showMainMenu(bot, callbackQuery);
       }
 
-      // 🎯 유연한 콜백 파싱 - 두 가지 형식 지원
-      let targetModule, action;
+      // 2. 콜백 데이터 파싱
+      let targetModule, action, params;
 
       if (callbackQuery.data.includes(":")) {
-        // 모듈 간 라우팅: "todo:menu" 형식
-        [targetModule, action] = callbackQuery.data.split(":");
+        // "todo:list" 형식
+        const parts = callbackQuery.data.split(":");
+        targetModule = parts[0];
+        action = parts[1];
+        params = parts[2] || null;
       } else if (callbackQuery.data.includes("_")) {
-        // 모듈 내 액션: "todo_list" 형식
+        // "todo_list" 형식 (레거시 지원)
         const parts = callbackQuery.data.split("_");
         targetModule = parts[0];
         action = parts.slice(1).join("_");
       } else {
-        logger.warn(`지원하지 않는 콜백 형식: ${callbackQuery.data}`);
-        return;
+        logger.warn(`알 수 없는 콜백 형식: ${callbackQuery.data}`);
+        return false;
       }
 
-      if (!targetModule || !action) {
-        logger.warn(`잘못된 콜백 형식: ${callbackQuery.data}`);
-        return;
-      }
-
-      // 대상 모듈 찾기
+      // 3. 모듈 찾기
       const moduleName = this.findModuleName(targetModule);
       const moduleInstance = this.moduleInstances.get(moduleName);
 
-      if (moduleInstance && moduleInstance.handleCallback) {
-        const handled = await moduleInstance.handleCallback(
+      if (!moduleInstance) {
+        logger.warn(`모듈을 찾을 수 없음: ${targetModule}`);
+        return false;
+      }
+
+      // 4. 모듈에게 위임
+      if (moduleInstance.handleCallback) {
+        return await moduleInstance.handleCallback(
           bot,
           callbackQuery,
           action,
-          {},
+          params,
           this
         );
-
-        if (handled) {
-          logger.debug(`✅ 콜백 처리 성공: ${callbackQuery.data}`);
-        } else {
-          logger.debug(`⚠️ 콜백 처리 거부: ${callbackQuery.data}`);
-        }
-      } else {
-        logger.warn(`모듈을 찾을 수 없음: ${targetModule} → ${moduleName}`);
       }
+
+      logger.warn(`${moduleName}에 handleCallback이 없음`);
+      return false;
     } catch (error) {
-      logger.error(`❌ 콜백 처리 오류:`, error.message);
+      logger.error("콜백 처리 오류:", error);
+      return false;
     } finally {
       setTimeout(() => {
         this.processingCallbacks.delete(callbackKey);

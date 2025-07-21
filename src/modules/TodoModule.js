@@ -13,30 +13,44 @@ class TodoModule extends BaseModule {
       commands: ["todo", "할일", "add"],
       callbacks: ["todo"],
       description: "📝 할일 관리",
-      emoji: "📝",
-      features: ["할일 추가", "완료 처리", "통계", "삭제", "검색"],
-      priority: 1,
-      maxConcurrentUsers: 50,
-      timeout: 60000,
     });
 
     this.bot = bot;
-    this.dbManager = options.dbManager || null;
-
-    // ✅ TodoService 초기화 추가
     this.todoService = new TodoService();
-
-    // 통계는 그대로 유지
-    this.todoStats = {
-      totalTodos: 0,
-      completedTodos: 0,
-      deletedTodos: 0,
-      averageCompletionTime: 0,
-    };
-
-    this.searchStates = new Map();
+  }
+  // Todo 전용 액션만 등록
+  registerActions() {
+    // BaseModule의 기본 액션은 이미 등록됨
+    // Todo 전용 액션만 추가
+    this.actionMap.set("list", this.showTodoList.bind(this));
+    this.actionMap.set("add", this.startTodoAdd.bind(this));
+    this.actionMap.set("search", this.startTodoSearch.bind(this));
+    this.actionMap.set("stats", this.showTodoStats.bind(this));
+    this.actionMap.set("clear_completed", this.clearCompletedTodos.bind(this));
+    this.actionMap.set("clear_all", this.clearAllTodos.bind(this));
+    this.actionMap.set("export", this.exportTodos.bind(this));
+    this.actionMap.set("import", this.startTodoImport.bind(this));
   }
 
+  // 커스텀 콜백 처리 (동적 액션)
+  async onHandleCallback(bot, callbackQuery, subAction, params, menuManager) {
+    if (subAction.startsWith("complete_")) {
+      const todoId = subAction.substring(9);
+      return await this.completeTodo(bot, callbackQuery, todoId);
+    }
+
+    if (subAction.startsWith("delete_")) {
+      const todoId = subAction.substring(7);
+      return await this.deleteTodo(bot, callbackQuery, todoId);
+    }
+
+    if (subAction.startsWith("page_")) {
+      const page = parseInt(subAction.substring(5));
+      return await this.showTodoPage(bot, callbackQuery, page);
+    }
+
+    return false;
+  }
   // 모듈 초기화
   async onInitialize() {
     try {
@@ -181,7 +195,7 @@ class TodoModule extends BaseModule {
 
 📝 **전체 할일:** ${stats.total}개
 ✅ **완료된 할일:** ${stats.completed}개
-⭕ **진행중인 할일:** ${stats.pending}개
+📌 **진행중인 할일:** ${stats.pending}개
 📈 **완료율:** ${stats.completionRate}%
 
 ${this._getProgressBar(stats.completionRate)}`;
