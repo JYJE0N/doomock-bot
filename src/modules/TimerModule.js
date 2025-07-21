@@ -8,7 +8,10 @@ const logger = require("../utils/Logger");
 
 class TimerModule extends BaseModule {
   constructor() {
+    // ⭐ 중요: super()를 먼저 호출해야 this.actionMap이 초기화됨
     super("TimerModule");
+
+    // 이제 안전하게 인스턴스 변수들을 초기화
     this.timerService = new TimerService();
     this.userStates = new Map();
 
@@ -35,8 +38,47 @@ class TimerModule extends BaseModule {
       numbers: ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"],
     };
 
-    // ⭐ 액션 등록
+    // ⭐ super() 호출 후에 액션 등록
     this.registerTimerActions();
+  }
+
+  // ⭐ Timer 모듈의 액션들을 등록
+  registerTimerActions() {
+    // 디버깅용 로그
+    logger.debug(
+      `⏰ TimerModule: actionMap 상태 = ${this.actionMap ? "OK" : "NULL"}`
+    );
+
+    if (!this.actionMap) {
+      logger.error("❌ TimerModule: actionMap이 없습니다!");
+      return;
+    }
+
+    // 메서드들이 정의되어 있는지 확인
+    const methods = {
+      menu: this.showTimerMenu,
+      help: this.showTimerHelp,
+      pomodoro_start: this.showPomodoroTaskPrompt,
+      pomodoro_quick: this.startQuickPomodoro,
+      complete: this.completePomodoro,
+      continue: this.continuePomodoro,
+      start_prompt: this.startTimerPrompt,
+      status: this.showTimerStatus,
+      stop: this.stopTimer,
+      stats: this.showUserStats,
+    };
+
+    // 각 메서드가 실제로 존재하는지 확인
+    for (const [name, method] of Object.entries(methods)) {
+      if (typeof method === "function") {
+        logger.debug(`✅ TimerModule: ${name} 메서드 존재`);
+      } else {
+        logger.warn(`⚠️ TimerModule: ${name} 메서드가 정의되지 않음`);
+      }
+    }
+
+    // ⭐ 액션 등록
+    this.registerActions(methods);
   }
 
   // ⭐ Timer 모듈의 액션들을 등록
