@@ -9,7 +9,7 @@ class TimerService extends BaseService {
     this.timers = new Map();
     this.sessionHistory = {};
     this.dbEnabled = false; // 데이터베이스 연결 여부
-    this.dbManager = getInstance();
+    // this.dbManager = getInstance();
     this.pomodoroSessions = new Map();
 
     // ⭐ Railway 환경변수를 활용한 설정
