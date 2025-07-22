@@ -17,6 +17,7 @@ class TodoModule extends BaseModule {
 
     this.todoService = null;
     this.pageSize = 10; // 페이지당 할일 수
+    this.userStates = new Map();
   }
 
   // 🎯 모듈별 초기화
@@ -176,7 +177,7 @@ class TodoModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      const todos = await this.todoService.getTodos(userId);
+      const todos = await this.todoService.getUserTodos(userId);
 
       if (todos.length === 0) {
         const emptyText =
@@ -217,7 +218,7 @@ class TodoModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      const todos = await this.todoService.getTodos(userId);
+      const todos = await this.todoService.getUserTodos(userId);
       const totalPages = Math.ceil(todos.length / this.pageSize);
       const currentPage = Math.max(1, Math.min(page, totalPages));
 
@@ -414,7 +415,7 @@ class TodoModule extends BaseModule {
       }
 
       // 목록 새로고침
-      const todos = await this.todoService.getTodos(userId);
+      const todos = await this.todoService.getUserTodos(userId);
       const currentPage = Math.floor(idx / this.pageSize) + 1;
 
       await bot.answerCallbackQuery(callbackQuery.id, {
@@ -455,7 +456,7 @@ class TodoModule extends BaseModule {
       });
 
       // 목록 새로고침
-      const todos = await this.todoService.getTodos(userId);
+      const todos = await this.todoService.getUserTodos(userId);
       if (todos.length === 0) {
         return await this.showTodoList(bot, callbackQuery);
       }
@@ -499,12 +500,16 @@ class TodoModule extends BaseModule {
   // 🔍 검색 입력 처리
   async handleSearchInput(bot, chatId, userId, keyword) {
     try {
-      const result = await this.todoService.searchTodos(userId, keyword);
+      // ✅ searchTodos 결과를 getUserTodos 기반으로 수정
+      const allTodos = await this.todoService.getUserTodos(userId);
+      const filteredTodos = allTodos.filter((todo) =>
+        todo.task.toLowerCase().includes(keyword.toLowerCase())
+      );
 
       // 상태 초기화
       this.userStates.delete(userId);
 
-      if (result.todos.length === 0) {
+      if (filteredTodos.length === 0) {
         const noResultText =
           `🔍 **검색 결과 없음**\n\n` +
           `"${keyword}"에 대한 검색 결과가 없습니다.`;
@@ -525,10 +530,10 @@ class TodoModule extends BaseModule {
         return true;
       }
 
-      let resultText = `🔍 **검색 결과** (${result.todos.length}개)\n\n`;
+      let resultText = `🔍 **검색 결과** (${filteredTodos.length}개)\n\n`;
       resultText += `키워드: "${keyword}"\n\n`;
 
-      result.todos.forEach((todo, idx) => {
+      filteredTodos.forEach((todo, idx) => {
         const status = todo.completed ? "✅" : "⭕";
         const date = TimeHelper.formatDate(todo.createdAt);
         resultText += `${status} **${idx + 1}.** ${todo.task}\n`;
@@ -548,16 +553,15 @@ class TodoModule extends BaseModule {
       await this.sendMessage(bot, chatId, resultText, {
         reply_markup: keyboard,
       });
-
       return true;
     } catch (error) {
-      logger.error("검색 처리 실패:", error);
-      await this.sendError(bot, chatId, "검색 처리에 실패했습니다.");
+      logger.error("할일 검색 실패:", error);
+      await this.sendError(bot, chatId, "검색에 실패했습니다.");
       return true;
     }
   }
 
-  // 📊 통계 표시
+  // 📊 통계 표시 (수정됨)
   async showTodoStats(bot, callbackQuery) {
     const {
       message: {
@@ -569,22 +573,29 @@ class TodoModule extends BaseModule {
 
     try {
       const stats = await this.todoService.getTodoStats(userId);
-      const userName = getUserName(callbackQuery.from) || "사용자";
+      const todos = await this.todoService.getUserTodos(userId); // ✅ 추가
 
-      const progressBar = this.createProgressBar(stats.completionRate);
+      const completionRate =
+        stats.total > 0
+          ? ((stats.completed / stats.total) * 100).toFixed(1)
+          : 0;
 
       const statsText =
-        `📊 **${userName}님의 할일 통계**\n\n` +
-        `📝 전체 할일: ${stats.total}개\n` +
-        `✅ 완료된 할일: ${stats.completed}개\n` +
-        `📌 진행중인 할일: ${stats.pending}개\n` +
-        `📈 완료율: ${stats.completionRate}%\n\n` +
-        `${progressBar}`;
+        `📊 **할일 통계**\n\n` +
+        `📈 **전체 현황:**\n` +
+        `• 총 할일: ${stats.total}개\n` +
+        `• 완료: ${stats.completed}개\n` +
+        `• 진행중: ${stats.pending}개\n` +
+        `• 완료율: ${completionRate}%\n\n` +
+        `🎯 **우선순위 별:**\n` +
+        `• 높음: ${stats.highPriority}개\n` +
+        `• 보통: ${stats.normalPriority}개\n` +
+        `• 낮음: ${stats.lowPriority}개`;
 
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "📋 할일 목록", callback_data: "todo:list" },
+            { text: "📋 목록 보기", callback_data: "todo:list" },
             { text: "➕ 할일 추가", callback_data: "todo:add" },
           ],
           [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
@@ -598,19 +609,12 @@ class TodoModule extends BaseModule {
       return true;
     } catch (error) {
       logger.error("통계 조회 실패:", error);
-      await this.sendError(bot, chatId, "통계를 조회할 수 없습니다.");
+      await this.sendError(bot, chatId, "통계를 불러올 수 없습니다.");
       return true;
     }
   }
 
   // 📊 진행률 바 생성
-  createProgressBar(percentage) {
-    const filled = Math.round(percentage / 10);
-    const empty = 10 - filled;
-    return "█".repeat(filled) + "░".repeat(empty);
-  }
-
-  // 🗑️ 완료된 할일 정리
   async clearCompletedTodos(bot, callbackQuery) {
     const {
       message: {
@@ -621,28 +625,13 @@ class TodoModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      const result = await this.todoService.clearCompleted(userId);
-
-      if (result.cleared === 0) {
-        const noCompleteText =
-          `🗑️ **정리할 항목 없음**\n\n` + `완료된 할일이 없습니다.`;
-
-        const keyboard = {
-          inline_keyboard: [
-            [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
-          ],
-        };
-
-        await this.editMessage(bot, chatId, messageId, noCompleteText, {
-          reply_markup: keyboard,
-        });
-        return true;
-      }
+      const clearedCount = await this.todoService.clearCompleted(userId);
+      const remainingTodos = await this.todoService.getUserTodos(userId); // ✅ 추가
 
       const clearedText =
-        `✅ **정리 완료!**\n\n` +
-        `${result.cleared}개의 완료된 할일을 정리했습니다.\n` +
-        `현재 ${result.remaining}개의 할일이 남아있습니다.`;
+        `🗑️ **정리 완료**\n\n` +
+        `${clearedCount}개의 완료된 할일을 정리했습니다.\n` +
+        `현재 ${remainingTodos.length}개의 할일이 남아있습니다.`;
 
       const keyboard = {
         inline_keyboard: [
@@ -665,6 +654,7 @@ class TodoModule extends BaseModule {
       return true;
     }
   }
+
   // ❓ 도움말 표시
   async showHelp(bot, chatId, messageId, from) {
     await this.sendMessage(bot, chatId, "❓ /todo, /add로 할일을 관리하세요.");
