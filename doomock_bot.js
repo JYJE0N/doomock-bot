@@ -31,7 +31,7 @@ const {
 } = require("./src/database/DatabaseManager");
 
 // ✅ 7. 핵심 매니저들
-const ModuleManager = requirer("./src/managers/ModuleManager");
+const ModuleManager = require("./src/managers/ModuleManager");
 const BotController = require("./src/controllers/BotController");
 
 // ✅ 8. 서비스들 (올바른 import)
