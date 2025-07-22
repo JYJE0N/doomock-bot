@@ -7,7 +7,7 @@ const path = require("path");
 const TimeHelper = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
-class TTSService extends SomeBase {
+class TTSService extends BaseService {
   constructor() {
     super(); // 반드시 제일 위에 와야 함
     this.engine = new TTSClient();

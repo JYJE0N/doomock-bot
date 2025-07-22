@@ -190,6 +190,11 @@ class BotController {
 
     logger.success("✅ 이벤트 리스너 등록 완료!");
   }
+  setModuleManager(moduleManager) {
+    this.moduleManager = moduleManager;
+  }
+  // 💬 메시지 처리 메서드
+
   // 시스템 콜백 처리 메서드 (새로 추가!)
   async handleSystemCallback(callbackQuery) {
     const [targetModule, ...actionParts] = callbackQuery.data.split(":");
