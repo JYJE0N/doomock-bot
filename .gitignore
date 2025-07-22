@@ -39,7 +39,54 @@ dist/
 build/
 
 # 모든 _bak.js 파일 제외
-*_bak.js
+📝 .gitignore에 백업 파일 패턴 추가
+가장 일반적인 백업 파일 패턴들:
+gitignore# 백업 파일 - 모든 확장자
+*.bak
+*.backup
+*.back
+*.old
+*.orig
+*.save
+*.tmp
+*.temp
+*~
+
+# JavaScript 관련 백업
+*.js.bak
+*.js.backup
+*.js.old
+*.js.orig
+*.js.save
+
+# macOS sed 백업 파일
+*.js.bak
+*..bak
+
+# 백업 폴더
+backup/
+backups/
+*_backup/
+*_bak/
+src_backup/
+.backup/
+
+# 에디터 백업 파일
+.*.swp
+.*.swo
+*~
+.DS_Store
+
+# 숫자가 붙은 백업
+*.1
+*.2
+*.[0-9]
+*.~[0-9]~
+
+# 날짜가 붙은 백업
+*_20[0-9][0-9]*
+*.20[0-9][0-9]-*
+*_backup_*
 
 *어트리븉
 .gitattributes

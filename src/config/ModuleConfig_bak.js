@@ -161,7 +161,7 @@ class ModuleManager {
           callbackQuery,
           subAction || "menu", // subAction이 없으면 기본값 "menu"
           params,
-          this // menuManager로 자기 자신 전달
+          this // moduleManager로 자기 자신 전달
         );
 
         // 콜백 응답

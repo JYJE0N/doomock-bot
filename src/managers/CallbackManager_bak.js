@@ -315,7 +315,7 @@ class CallbackManager {
     const [prefix, ...parts] = callbackQuery.data.split(":");
     const subAction = parts.join(":");
     const params = {};
-    const menuManager = this;
+    const moduleManager = this;
 
     try {
       if (typeof module.handleCallback === "function") {
@@ -324,7 +324,7 @@ class CallbackManager {
           callbackQuery,
           subAction,
           params,
-          menuManager
+          moduleManager
         );
       } else {
         logger.error(`❌ 모듈 ${moduleName}에 handleCallback 메서드 없음`);
