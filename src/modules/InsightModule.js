@@ -93,12 +93,12 @@ class InsightModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "📈 종합 인사이트", callback_data: "insight_full" },
-          { text: "⚡ 빠른 인사이트", callback_data: "insight_quick" },
+          { text: "📈 종합 인사이트", callback_data: "insight:full" },
+          { text: "⚡ 빠른 인사이트", callback_data: "insight:quick" },
         ],
         [
-          { text: "📱 대시보드", callback_data: "insight_dashboard" },
-          { text: "🗺️ 전국 현황", callback_data: "insight_national" },
+          { text: "📱 대시보드", callback_data: "insight:dashboard" },
+          { text: "🗺️ 전국 현황", callback_data: "insight:national" },
         ],
         [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
       ],
@@ -117,23 +117,23 @@ class InsightModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "🎁 제품 전략", callback_data: "insight_products" },
-            { text: "💰 가격 전략", callback_data: "insight_pricing" },
+            { text: "🎁 제품 전략", callback_data: "insight:products" },
+            { text: "💰 가격 전략", callback_data: "insight:pricing" },
           ],
           [
-            { text: "📦 재고 전략", callback_data: "insight_inventory" },
-            { text: "🎯 마케팅 전략", callback_data: "insight_marketing" },
+            { text: "📦 재고 전략", callback_data: "insight:inventory" },
+            { text: "🎯 마케팅 전략", callback_data: "insight:marketing" },
           ],
           [
-            { text: "🏙️ 지역 전략", callback_data: "insight_regional" },
-            { text: "⚔️ 경쟁사 분석", callback_data: "insight_competitor" },
+            { text: "🏙️ 지역 전략", callback_data: "insight:regional" },
+            { text: "⚔️ 경쟁사 분석", callback_data: "insight:competitor" },
           ],
           [
-            { text: "📱 대시보드", callback_data: "insight_dashboard" },
-            { text: "🗺️ 전국 현황", callback_data: "insight_national" },
+            { text: "📱 대시보드", callback_data: "insight:dashboard" },
+            { text: "🗺️ 전국 현황", callback_data: "insight:national" },
           ],
           [
-            { text: "🔄 새로고침", callback_data: "insight_refresh" },
+            { text: "🔄 새로고침", callback_data: "insight:refresh" },
             { text: "🔙 메인 메뉴", callback_data: "main:menu" },
           ],
         ],
@@ -165,8 +165,8 @@ class InsightModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "📊 종합 인사이트", callback_data: "insight_full" },
-          { text: "📱 대시보드", callback_data: "insight_dashboard" },
+          { text: "📊 종합 인사이트", callback_data: "insight:full" },
+          { text: "📱 대시보드", callback_data: "insight:dashboard" },
         ],
         [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
       ],
