@@ -1,4 +1,4 @@
-// src/managers/ModuleManager.js - main:menu 콜백 처리 수정
+// src/managers/ModuleManager.js - 표준화된 콜백 처리
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
@@ -109,7 +109,7 @@ class ModuleManager {
     return false;
   }
 
-  // 🎯 중앙 콜백 라우팅
+  // 🎯 중앙 콜백 라우팅 (표준화)
   async handleCallback(callbackQuery) {
     const callbackData = callbackQuery.data;
     const callbackKey = `${callbackQuery.from.id}-${callbackData}`;
@@ -125,12 +125,24 @@ class ModuleManager {
     try {
       logger.info(`📨 콜백 데이터 수신: ${callbackData}`);
 
-      // ⭐ 메인 메뉴 처리 (모든 형식 지원)
-      if (callbackData === "main:menu" || callbackData === "main:menu") {
+      // ⭐ 메인 메뉴 처리
+      if (callbackData === "main:menu") {
         return await this.handleMainMenu(callbackQuery);
       }
 
-      logger.info(`🔔 콜백 라우팅: ${targetModule} → ${subAction}`);
+      // ⭐ 콜백 데이터 파싱 (콜론 형식)
+      const [targetModule, subAction, ...params] = callbackData.split(":");
+
+      // 파싱 검증
+      if (!targetModule) {
+        logger.warn(`⚠️ 잘못된 콜백 형식: ${callbackData}`);
+        await this.sendErrorCallback(callbackQuery);
+        return false;
+      }
+
+      logger.info(
+        `🔔 콜백 라우팅: ${targetModule} → ${subAction || "default"}`
+      );
 
       // 모듈 찾기
       const moduleClass = this.findModuleClass(targetModule);
@@ -147,7 +159,7 @@ class ModuleManager {
         const result = await module.handleCallback(
           this.bot,
           callbackQuery,
-          subAction,
+          subAction || "menu", // subAction이 없으면 기본값 "menu"
           params,
           this // menuManager로 자기 자신 전달
         );
@@ -155,6 +167,9 @@ class ModuleManager {
         // 콜백 응답
         await this.bot.answerCallbackQuery(callbackQuery.id);
         return result;
+      } else {
+        logger.warn(`⚠️ ${moduleClass}에 handleCallback 메서드가 없음`);
+        await this.sendModuleNotFoundMessage(callbackQuery);
       }
     } catch (error) {
       logger.error("❌ 콜백 처리 오류:", error);
@@ -251,6 +266,7 @@ class ModuleManager {
       fortune: "FortuneModule",
       weather: "WeatherModule",
       utils: "UtilsModule",
+      main: "SystemModule", // main도 SystemModule로 처리
     };
 
     return directMapping[moduleKey.toLowerCase()] || null;
@@ -311,6 +327,33 @@ class ModuleManager {
     } catch (error) {
       logger.error("에러 메시지 전송 실패:", error);
     }
+  }
+
+  // 🔍 모듈 조회
+  getModule(moduleName) {
+    return this.moduleInstances.get(moduleName);
+  }
+
+  hasModule(moduleName) {
+    return this.moduleInstances.has(moduleName);
+  }
+
+  // 📊 상태 조회
+  getStatus() {
+    const moduleStatuses = {};
+
+    for (const [name, module] of this.moduleInstances) {
+      moduleStatuses[name] = module.getStatus
+        ? module.getStatus()
+        : { active: true, initialized: true };
+    }
+
+    return {
+      initialized: this.isInitialized,
+      totalModules: this.moduleInstances.size,
+      activeCallbacks: this.processingCallbacks.size,
+      modules: moduleStatuses,
+    };
   }
 
   // 🧹 정리
