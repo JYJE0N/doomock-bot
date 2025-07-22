@@ -247,20 +247,20 @@ class WeatherModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🏙️ 서울", callback_data: "weather:city_seoul" },
-          { text: "🌊 부산", callback_data: "weather:city_busan" },
+          { text: "🏙️ 서울", callback_data: "weather:city:seoul" },
+          { text: "🌊 부산", callback_data: "weather:city:busan" },
         ],
         [
-          { text: "🏛️ 대구", callback_data: "weather:city_daegu" },
-          { text: "✈️ 인천", callback_data: "weather:city_incheon" },
+          { text: "🏛️ 대구", callback_data: "weather:city:daegu" },
+          { text: "✈️ 인천", callback_data: "weather:city:incheon" },
         ],
         [
-          { text: "🌻 광주", callback_data: "weather:city_gwangju" },
-          { text: "🚄 대전", callback_data: "weather:city_daejeon" },
+          { text: "🌻 광주", callback_data: "weather:city:gwangju" },
+          { text: "🚄 대전", callback_data: "weather:city:daejeon" },
         ],
         [
-          { text: "🏭 울산", callback_data: "weather:city_ulsan" },
-          { text: "🏝️ 제주", callback_data: "weather:city_jeju" },
+          { text: "🏭 울산", callback_data: "weather:city:ulsan" },
+          { text: "🏝️ 제주", callback_data: "weather:city:jeju" },
         ],
         [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
       ],
@@ -295,7 +295,7 @@ class WeatherModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "🔄 새로고침", callback_data: `weather:city_${cityKey}` },
+            { text: "🔄 새로고침", callback_data: `weather:city:${cityKey}` },
             { text: "📅 일기예보", callback_data: "weather:forecast" },
           ],
           [{ text: "🏙️ 다른 도시", callback_data: "weather:cities" }],

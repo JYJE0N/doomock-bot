@@ -360,8 +360,8 @@ class TTSService extends BaseService {
           reply_markup: {
             inline_keyboard: [
               [
-                { text: "⏹️ TTS 정지", callback_data: "utils_tts_stop" },
-                { text: "🔧 TTS 설정", callback_data: "utils_tts:menu" },
+                { text: "⏹️ TTS 정지", callback_data: "utils:tts_stop" },
+                { text: "🔧 TTS 설정", callback_data: "utils:tts:menu" },
               ],
             ],
           },

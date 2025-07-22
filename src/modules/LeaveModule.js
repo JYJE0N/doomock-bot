@@ -174,10 +174,10 @@ class LeaveModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "1일", callback_data: "leave:use_1" },
-          { text: "0.5일", callback_data: "leave:use_0.5" },
+          { text: "1일", callback_data: "leave:use:1" },
+          { text: "0.5일", callback_data: "leave:use:0.5" },
         ],
-        [{ text: "🔢 직접 입력", callback_data: "leave:use_custom" }],
+        [{ text: "🔢 직접 입력", callback_data: "leave:use:custom" }],
         [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
       ],
     };

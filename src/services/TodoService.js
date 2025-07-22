@@ -58,7 +58,7 @@ class TodoService extends BaseService {
 
   // ⭐ 데이터베이스 연결
   async connectDatabase() {
-    await dbManager.ensureConnection(); // ✅ 인스턴스 메서드 호출
+    const dbManager = getInstance(); await dbManager.ensureConnection(); // ✅ 인스턴스 메서드 호출
     this.collection = dbManager.db.collection("todo_userStates"); // ✅ db 인스턴스에서 컬렉션 가져오기
     this.dbEnabled = true;
     logger.info("📊 MongoDB todo_userStates 컬렉션 연결됨");

@@ -128,7 +128,7 @@ class WorktimeModule extends BaseModule {
             [
               {
                 text: "📝 메모 추가",
-                callback_data: "worktime:add_checkin_note",
+                callback_data: "worktime:add:checkin_note",
               },
               { text: "📊 상태 보기", callback_data: "worktime:status" },
             ],
@@ -204,9 +204,9 @@ class WorktimeModule extends BaseModule {
             [
               {
                 text: "📝 메모 추가",
-                callback_data: "worktime:add_checkout_note",
+                callback_data: "worktime:add:checkout_note",
               },
-              { text: "📜 오늘 기록", callback_data: "worktime:today_record" },
+              { text: "📜 오늘 기록", callback_data: "worktime:today:record" },
             ],
             [{ text: "🔙 근무 메뉴", callback_data: "worktime:menu" }],
           ],

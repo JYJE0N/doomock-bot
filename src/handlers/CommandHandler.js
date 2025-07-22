@@ -241,7 +241,7 @@ ${moduleList}`;
         inline_keyboard: modules.map((m) => [
           {
             text: m.name,
-            callback_data: `module_select:${m.id}`,
+            callback_data: `module:select:${m.id}`,
           },
         ]),
       };

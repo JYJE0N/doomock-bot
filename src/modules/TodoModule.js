@@ -139,7 +139,7 @@ class TodoModule extends BaseModule {
           { text: "📤 내보내기", callback_data: "todo:export" },
           { text: "📥 가져오기", callback_data: "todo:import" },
         ],
-        [{ text: "🗑️ 정리", callback_data: "todo:clear_completed" }],
+        [{ text: "🗑️ 정리", callback_data: "todo:clear:completed" }],
         [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
@@ -260,11 +260,11 @@ class TodoModule extends BaseModule {
         keyboard.push([
           {
             text: `${globalIdx + 1}. ${toggleText}`,
-            callback_data: `todo:complete_${globalIdx}`,
+            callback_data: `todo:complete:${globalIdx}`,
           },
           {
             text: `${globalIdx + 1}. 🗑️`,
-            callback_data: `todo:delete_${globalIdx}`,
+            callback_data: `todo:delete:${globalIdx}`,
           },
         ]);
       }
@@ -275,7 +275,7 @@ class TodoModule extends BaseModule {
       const lastIdx = startIdx + todos.length - 1;
       keyboard[keyboard.length - 1].push({
         text: `${lastIdx + 1}. 🗑️`,
-        callback_data: `todo:delete_${lastIdx}`,
+        callback_data: `todo:delete:${lastIdx}`,
       });
     }
 
@@ -284,7 +284,7 @@ class TodoModule extends BaseModule {
     if (currentPage > 1) {
       navButtons.push({
         text: "◀️ 이전",
-        callback_data: `todo:page_${currentPage - 1}`,
+        callback_data: `todo:page:${currentPage - 1}`,
       });
     }
     navButtons.push({
@@ -294,7 +294,7 @@ class TodoModule extends BaseModule {
     if (currentPage < totalPages) {
       navButtons.push({
         text: "다음 ▶️",
-        callback_data: `todo:page_${currentPage + 1}`,
+        callback_data: `todo:page:${currentPage + 1}`,
       });
     }
 

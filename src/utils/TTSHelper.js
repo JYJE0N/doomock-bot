@@ -20,8 +20,8 @@ class TTSService {
     return {
       inline_keyboard: [
         [
-          { text: "🔊 자동 모드 ON", callback_data: "tts_auto_on" },
-          { text: "❌ OFF", callback_data: "tts_auto_off" },
+          { text: "🔊 자동 모드 ON", callback_data: "tts:auto_on" },
+          { text: "❌ OFF", callback_data: "tts:auto_off" },
         ],
       ],
     };

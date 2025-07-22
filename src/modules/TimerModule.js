@@ -202,7 +202,7 @@ class TimerModule extends BaseModule {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: "⚡ 빠른 시작", callback_data: "timer:pomodoro_quick" },
+              { text: "⚡ 빠른 시작", callback_data: "timer:pomodoro:quick" },
               { text: "❌ 취소", callback_data: "timer:menu" },
             ],
           ],
@@ -379,7 +379,7 @@ class TimerModule extends BaseModule {
       inline_keyboard: data.completed
         ? [
             [
-              { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+              { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
               { text: "📊 통계 보기", callback_data: "timer:stats" },
             ],
             [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
@@ -526,8 +526,8 @@ class TimerModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "☕ 휴식 시작", callback_data: "timer:break_start" },
-            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+            { text: "☕ 휴식 시작", callback_data: "timer:break:start" },
+            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
           ],
           [
             { text: "📊 통계 보기", callback_data: "timer:stats" },
@@ -562,7 +562,7 @@ class TimerModule extends BaseModule {
               [
                 {
                   text: "🍅 첫 포모도로 시작",
-                  callback_data: "timer:pomodoro_start",
+                  callback_data: "timer:pomodoro:start",
                 },
               ],
               [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
@@ -614,7 +614,7 @@ class TimerModule extends BaseModule {
       inline_keyboard: [
         [
           { text: "🔄 새로고침", callback_data: "timer:stats" },
-          { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+          { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
         ],
         [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
@@ -714,7 +714,7 @@ class TimerModule extends BaseModule {
         inline_keyboard: [
           [
             { text: "📊 통계 보기", callback_data: "timer:stats" },
-            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
           ],
           [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
         ],
@@ -905,8 +905,8 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🍅 포모도로 시작", callback_data: "timer:pomodoro_start" },
-          { text: "⏱️ 일반 타이머", callback_data: "timer:start_prompt" },
+          { text: "🍅 포모도로 시작", callback_data: "timer:pomodoro:start" },
+          { text: "⏱️ 일반 타이머", callback_data: "timer:start:prompt" },
         ],
         [
           { text: "⏰ 타이머 메뉴", callback_data: "timer:menu" },
@@ -989,7 +989,7 @@ class TimerModule extends BaseModule {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: "⚡ 빠른 시작", callback_data: "timer:pomodoro_quick" },
+              { text: "⚡ 빠른 시작", callback_data: "timer:pomodoro:quick" },
               { text: "❌ 취소", callback_data: "timer:menu" },
             ],
           ],
@@ -1166,7 +1166,7 @@ class TimerModule extends BaseModule {
       inline_keyboard: data.completed
         ? [
             [
-              { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+              { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
               { text: "📊 통계 보기", callback_data: "timer:stats" },
             ],
             [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
@@ -1313,8 +1313,8 @@ class TimerModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "☕ 휴식 시작", callback_data: "timer:break_start" },
-            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+            { text: "☕ 휴식 시작", callback_data: "timer:break:start" },
+            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
           ],
           [
             { text: "📊 통계 보기", callback_data: "timer:stats" },
@@ -1349,7 +1349,7 @@ class TimerModule extends BaseModule {
               [
                 {
                   text: "🍅 첫 포모도로 시작",
-                  callback_data: "timer:pomodoro_start",
+                  callback_data: "timer:pomodoro:start",
                 },
               ],
               [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
@@ -1401,7 +1401,7 @@ class TimerModule extends BaseModule {
       inline_keyboard: [
         [
           { text: "🔄 새로고침", callback_data: "timer:stats" },
-          { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+          { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
         ],
         [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
@@ -1501,7 +1501,7 @@ class TimerModule extends BaseModule {
         inline_keyboard: [
           [
             { text: "📊 통계 보기", callback_data: "timer:stats" },
-            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro:start" },
           ],
           [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
         ],
@@ -1692,8 +1692,8 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🍅 포모도로 시작", callback_data: "timer:pomodoro_start" },
-          { text: "⏱️ 일반 타이머", callback_data: "timer:start_prompt" },
+          { text: "🍅 포모도로 시작", callback_data: "timer:pomodoro:start" },
+          { text: "⏱️ 일반 타이머", callback_data: "timer:start:prompt" },
         ],
         [
           { text: "⏰ 타이머 메뉴", callback_data: "timer:menu" },
@@ -1791,9 +1791,9 @@ class TimerModule extends BaseModule {
             [
               {
                 text: "🍅 포모도로 시작",
-                callback_data: "timer:pomodoro_start",
+                callback_data: "timer:pomodoro:start",
               },
-              { text: "⏱️ 일반 타이머", callback_data: "timer:start_prompt" },
+              { text: "⏱️ 일반 타이머", callback_data: "timer:start:prompt" },
             ],
             [
               { text: "📈 내 통계", callback_data: "timer:stats" },

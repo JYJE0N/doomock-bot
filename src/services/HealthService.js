@@ -117,7 +117,7 @@ class HealthService extends BaseService {
 
       const start = Date.now();
       // 간단한 ping 테스트
-      await dbManager.getDb().admin().ping();
+      const dbManager = getInstance(); await dbManager.getDb().admin().ping();
       const responseTime = Date.now() - start;
 
       return {

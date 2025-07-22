@@ -62,8 +62,8 @@ class UtilsModule extends BaseModule {
       keyboard: {
         inline_keyboard: [
           [
-            { text: "🔊 TTS (음성변환)", callback_data: "utils_tts:menu" },
-            { text: "🔧 TTS 설정", callback_data: "utils_tts:diagnostics" },
+            { text: "🔊 TTS (음성변환)", callback_data: "utils:tts:menu" },
+            { text: "🔧 TTS 설정", callback_data: "utils:tts:diagnostics" },
           ],
           [
             { text: "❓ 도움말", callback_data: "utils:help" },
@@ -215,15 +215,15 @@ class UtilsModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🗣️ 수동 모드", callback_data: "utils_tts_manual" },
-          { text: "🤖 자동 모드", callback_data: "utils_tts_auto_on" },
+          { text: "🗣️ 수동 모드", callback_data: "utils:tts_manual" },
+          { text: "🤖 자동 모드", callback_data: "utils:tts_auto_on" },
         ],
         [
-          { text: "🛑 TTS 끄기", callback_data: "utils_tts_auto_off" },
-          { text: "🔧 진단", callback_data: "utils_tts_diagnostics" },
+          { text: "🛑 TTS 끄기", callback_data: "utils:tts_auto_off" },
+          { text: "🔧 진단", callback_data: "utils:tts_diagnostics" },
         ],
         [
-          { text: "❓ 도움말", callback_data: "utils_tts_help" },
+          { text: "❓ 도움말", callback_data: "utils:tts_help" },
           { text: "🔙 유틸리티", callback_data: "utils:menu" },
         ],
       ],
@@ -260,7 +260,7 @@ class UtilsModule extends BaseModule {
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: "🔙 TTS 메뉴", callback_data: "utils_tts:menu" }],
+        [{ text: "🔙 TTS 메뉴", callback_data: "utils:tts:menu" }],
       ],
     };
 
@@ -336,7 +336,7 @@ class UtilsModule extends BaseModule {
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: "🔙 TTS 메뉴", callback_data: "utils_tts:menu" }],
+        [{ text: "🔙 TTS 메뉴", callback_data: "utils:tts:menu" }],
       ],
     };
 
