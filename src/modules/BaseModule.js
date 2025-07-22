@@ -196,7 +196,58 @@ class BaseModule {
       actionCount: this.actionMap.size,
     };
   }
+  xtractCommand(text) {
+    if (!text || typeof text !== "string") {
+      return null;
+    }
 
+    // 텍스트 정리
+    text = text.trim();
+
+    // 명령어가 /로 시작하는지 확인
+    if (text.startsWith("/")) {
+      // /weather@botname 형태에서 @botname 제거
+      const command = text.substring(1).split(" ")[0].replace(/@\w+$/, "");
+      return command.toLowerCase();
+    }
+
+    // 일반 텍스트에서 명령어 추출 (예: "날씨" -> "날씨")
+    const firstWord = text.split(" ")[0].toLowerCase();
+    return firstWord;
+  }
+
+  // 🎯 메시지 처리 (수정된 버전 - 더 안전한 처리)
+  async onHandleMessage(bot, msg) {
+    const {
+      chat: { id: chatId },
+      text,
+    } = msg;
+
+    if (!text) return false;
+
+    try {
+      const command = this.extractCommand(text);
+
+      if (command === "weather" || command === "날씨") {
+        await this.showMenu(bot, chatId);
+        return true;
+      }
+
+      // 도시명으로 날씨 검색
+      if (text.includes("날씨")) {
+        const city = text.replace(/날씨/g, "").trim();
+        if (city) {
+          await this.showCityWeather(bot, chatId, city);
+          return true;
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logger.error(`WeatherModule 메시지 처리 오류:`, error);
+      return false;
+    }
+  }
   // 🧹 정리
   async cleanup() {
     try {

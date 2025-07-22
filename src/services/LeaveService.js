@@ -70,6 +70,38 @@ class LeaveService extends BaseService {
       throw error;
     }
   }
+  // src/services/LeaveService.js에 추가할 메서드
+
+  // 🔧 LeaveModule에서 요구하는 getUserLeaveData 메서드 추가
+  async getUserLeaveData(userId) {
+    try {
+      const user = await this.getUserLeaves(userId);
+
+      if (!user) {
+        // 사용자 정보가 없으면 초기화
+        await this.initializeUser(userId);
+        const newUser = await this.getUserLeaves(userId);
+        return this.formatUserLeaveData(newUser);
+      }
+
+      return this.formatUserLeaveData(user);
+    } catch (error) {
+      logger.error(`사용자 ${userId} 휴가 데이터 조회 실패:`, error);
+      throw error;
+    }
+  }
+  formatUserLeaveData(user) {
+    return {
+      totalDays: user.totalLeaves, // totalLeaves -> totalDays
+      usedDays: user.usedLeaves, // usedLeaves -> usedDays
+      remainingDays: user.remainingLeaves, // remainingLeaves -> remainingDays
+      lastUpdate: user.updatedAt
+        ? TimeHelper.formatDateTime(user.updatedAt)
+        : TimeHelper.getKoreaTimeString(),
+      year: user.year,
+      userId: user.userId,
+    };
+  }
 
   async setTotalLeaves(userId, totalLeaves) {
     try {
