@@ -80,24 +80,33 @@ class SystemModule extends BaseModule {
       },
     } = callbackQuery;
 
-    const text = `📱 **메인 메뉴**
+    const userName = getUserName(callbackQuery.from);
 
-원하시는 기능을 선택해주세요:
+    const text = `🏠 **메인 메뉴**
 
-🔹 **할 일 관리** - 작업 추가, 완료, 삭제
-🔹 **운세 확인** - 오늘의 운세 보기  
-🔹 **날씨 조회** - 현재 날씨 및 예보
-🔹 **시스템 정보** - 봇 상태 및 통계`;
+안녕하세요! ${userName}님!
+무엇을 도와드릴까요?
 
+아래 메뉴에서 원하는 기능을 선택해주세요:`;
+
+    // 🎯 할일 관리를 최우선으로 배치
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "📝 할 일 관리", callback_data: "todo:menu" },
-          { text: "🔮 운세 확인", callback_data: "fortune:menu" },
+          { text: "📝 할일 관리", callback_data: "todo:menu" },
+          { text: "🔮 운세", callback_data: "fortune:menu" },
         ],
         [
-          { text: "🌤️ 날씨 조회", callback_data: "weather:menu" },
-          { text: "🔧 유틸리티", callback_data: "utils:menu" },
+          { text: "🌤️ 날씨", callback_data: "weather:menu" },
+          { text: "⏰ 타이머", callback_data: "timer:menu" },
+        ],
+        [
+          { text: "🛠️ 유틸리티", callback_data: "utils:menu" },
+          { text: "📅 휴가 관리", callback_data: "leave:menu" },
+        ],
+        [
+          { text: "🕐 근무시간", callback_data: "worktime:menu" },
+          { text: "🔔 리마인더", callback_data: "reminder:menu" },
         ],
         [
           { text: "📊 시스템 상태", callback_data: "system:status" },
@@ -108,7 +117,11 @@ class SystemModule extends BaseModule {
 
     await this.editMessage(bot, chatId, messageId, text, {
       reply_markup: keyboard,
+      parse_mode: "Markdown",
     });
+
+    logger.info(`🏠 메인 메뉴 표시: ${userName} (${callbackQuery.from.id})`);
+    return true;
   }
 
   async showHelp(bot, callbackQuery, params, moduleManager) {
