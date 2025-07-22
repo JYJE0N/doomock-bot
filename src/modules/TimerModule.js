@@ -37,10 +37,10 @@ class TimerModule extends BaseModule {
   setupActions() {
     this.registerActions({
       menu: this.showTimerMenu,
-      "start:prompt": this.startTimerMenu,
+      "start:prompt": this.startTimerPrompt,
       "start:5": () => this.startTimer(5),
       "start:10": () => this.startTimer(10),
-      "start:custom": this.promptCustomTimer,
+      // "start:custom": this.startCustomTimer, // 구현 시 주석 해제
       cancel: this.cancelTimer,
       help: this.showTimerHelp,
     });
