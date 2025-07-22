@@ -32,7 +32,7 @@ class UtilsModule extends BaseModule {
   }
 
   // ✅ 표준 액션 등록
-  registerActions() {
+  setupActions() {
     super.registerActions(); // 기본 액션 유지
     this.actionMap.set("main", this.showMenu.bind(this));
     this.actionMap.set("menu", this.showMenu.bind(this));

@@ -7,9 +7,7 @@ const { getUserName } = require("../utils/UserHelper");
 class BaseModule {
   constructor(moduleName) {
     this.moduleName = moduleName;
-
-    // ⭐ 중요: actionMap을 먼저 초기화
-    this.actionMap = new Map();
+    this.actionMap = new Map(); //액션맵 초기화
 
     // 통계 초기화
     this.stats = {
@@ -18,6 +16,11 @@ class BaseModule {
       errorCount: 0,
       lastActivity: null,
     };
+
+    // ✅ 하위 클래스의 setupActions 메서드 자동 호출
+    if (typeof this.setupActions === "function") {
+      this.setupActions();
+    }
 
     // ⭐ 기본 액션 등록 (생성자 안에서)
     this.registerDefaultActions();

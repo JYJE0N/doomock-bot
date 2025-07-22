@@ -32,19 +32,18 @@ class TodoModule extends BaseModule {
   }
 
   // 🎯 액션 등록
-  registerActions() {
-    // 기본 액션
-    this.actionMap.set("list", this.showTodoList);
-    this.actionMap.set("add", this.startTodoAdd);
-    this.actionMap.set("search", this.startTodoSearch);
-    this.actionMap.set("stats", this.showTodoStats);
-    this.actionMap.set("export", this.exportTodos);
-    this.actionMap.set("import", this.startTodoImport);
-    this.actionMap.set("clear_completed", this.clearCompletedTodos);
-    this.actionMap.set("clear_all", this.showClearAllConfirm);
-    this.actionMap.set("clear_all_confirm", this.clearAllTodos);
-
-    // 동적 액션은 handleCallback에서 처리
+  setupActions() {
+    this.registerActions({
+      menu: this.showMenu,
+      status: this.showLeaveStatus,
+      use: this.showLeaveUseMenu,
+      "use:1": this.useOneDay,
+      "use:0.5": this.useHalfDay,
+      "use:custom": this.startCustomInput,
+      history: this.showLeaveHistory,
+      setting: this.showLeaveSetting,
+      help: this.showLeaveHelp,
+    });
   }
 
   // 🎯 메시지 처리

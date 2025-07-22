@@ -113,7 +113,6 @@ class ModuleManager {
 
   // 🎯 중앙 콜백 라우팅 (표준화)
   async handleCallback(callbackQuery) {
-    // ✅ callbackData 변수 정의 (주석 해제!)
     const callbackData = callbackQuery.data;
     const callbackKey = `${callbackQuery.message.chat.id}-${callbackQuery.id}`;
 

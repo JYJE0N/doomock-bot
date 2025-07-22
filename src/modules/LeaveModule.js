@@ -30,16 +30,18 @@ class LeaveModule extends BaseModule {
   }
 
   // 🎯 액션 등록
-  registerActions() {
-    // 표준 액션맵 등록
-    this.actionMap.set("status", this.showLeaveStatus);
-    this.actionMap.set("use", this.showLeaveUseMenu);
-    this.actionMap.set("use_1", this.useOneDay);
-    this.actionMap.set("use_0.5", this.useHalfDay);
-    this.actionMap.set("use_custom", this.startCustomInput);
-    this.actionMap.set("history", this.showLeaveHistory);
-    this.actionMap.set("setting", this.showLeaveSetting);
-    this.actionMap.set("help", this.showLeaveHelp);
+  setupActions() {
+    this.registerActions({
+      menu: this.showMenu,
+      status: this.showLeaveStatus,
+      use: this.showLeaveUseMenu,
+      "use:1": this.useOneDay,
+      "use:0.5": this.useHalfDay,
+      "use:custom": this.startCustomInput,
+      history: this.showLeaveHistory,
+      setting: this.showLeaveSetting,
+      help: this.showLeaveHelp,
+    });
   }
 
   // 🎯 메시지 처리
