@@ -137,11 +137,17 @@ class BotController {
       try {
         logger.info(`📞 콜백 수신: ${callbackQuery.data}`);
 
+        // 🎯 시스템 콜백 우선 처리 (새로 추가!)
+        const systemHandled = await this.handleSystemCallback(callbackQuery);
+
+        if (systemHandled) {
+          // 시스템에서 처리했으면 완료
+          await this.answerCallback(callbackQuery.id);
+          return;
+        }
         // ModuleManager에 위임 (응답은 여기서 처리)
         if (this.moduleManager) {
           await this.moduleManager.handleCallback(callbackQuery);
-
-          // 성공 시 한 번만 응답
           await this.answerCallback(callbackQuery.id);
         } else {
           throw new Error("ModuleManager not initialized");
@@ -184,7 +190,159 @@ class BotController {
 
     logger.success("✅ 이벤트 리스너 등록 완료!");
   }
+  // 시스템 콜백 처리 메서드 (새로 추가!)
+  async handleSystemCallback(callbackQuery) {
+    const [targetModule, ...actionParts] = callbackQuery.data.split(":");
+    const subAction = actionParts.join(":") || "menu";
 
+    // 시스템 콜백이 아니면 false 반환
+    if (!["main", "system", "help"].includes(targetModule)) {
+      return false;
+    }
+
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    try {
+      logger.info(`🏠 시스템 콜백 처리: ${targetModule}:${subAction}`);
+
+      if (
+        targetModule === "main" &&
+        (subAction === "menu" || subAction === "main")
+      ) {
+        // 🏠 메인 메뉴
+        await this.showMainMenu(chatId, messageId);
+        return true;
+      }
+
+      if (targetModule === "system" && subAction === "status") {
+        // 📊 시스템 상태
+        await this.showSystemStatus(chatId, messageId);
+        return true;
+      }
+
+      if (
+        targetModule === "help" ||
+        (targetModule === "system" && subAction === "help")
+      ) {
+        // ❓ 도움말
+        await this.showHelp(chatId, messageId);
+        return true;
+      }
+
+      return false;
+    } catch (error) {
+      logger.error(
+        `시스템 콜백 처리 오류 (${targetModule}:${subAction}):`,
+        error
+      );
+      throw error;
+    }
+  }
+  // 🏠 메인 메뉴 표시 (새로 추가!)
+  async showMainMenu(chatId, messageId) {
+    const menuText =
+      `🏠 **메인 메뉴**\n\n` +
+      `안녕하세요! 무엇을 도와드릴까요?\n\n` +
+      `아래 메뉴에서 원하는 기능을 선택해주세요:`;
+
+    const keyboard = this.moduleManager?.createMainMenuKeyboard() || {
+      inline_keyboard: [
+        [
+          { text: "📝 할일 관리", callback_data: "todo:menu" },
+          { text: "🔮 운세", callback_data: "fortune:menu" },
+        ],
+        [
+          { text: "🌤️ 날씨", callback_data: "weather:menu" },
+          { text: "📊 시스템 상태", callback_data: "system:status" },
+        ],
+        [{ text: "❓ 도움말", callback_data: "help:main" }],
+      ],
+    };
+
+    await this.bot.editMessageText(menuText, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+
+    logger.info("✅ 메인 메뉴 표시 완료");
+  }
+
+  // 📊 시스템 상태 표시 (새로 추가!)
+  async showSystemStatus(chatId, messageId) {
+    const uptime = process.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+
+    const statusText =
+      `📊 **시스템 상태**\n\n` +
+      `⏰ **가동시간:** ${hours}시간 ${minutes}분\n` +
+      `💾 **메모리 사용:** ${memUsage}MB\n` +
+      `📦 **로드된 모듈:** ${
+        this.moduleManager?.moduleInstances?.size || 0
+      }개\n` +
+      `🌐 **환경:** ${process.env.NODE_ENV || "development"}\n` +
+      `☁️ **플랫폼:** ${
+        process.env.RAILWAY_ENVIRONMENT ? "Railway" : "로컬"
+      }\n\n` +
+      `✅ 모든 시스템이 정상 작동 중입니다.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🔄 새로고침", callback_data: "system:status" },
+          { text: "🔙 메인 메뉴", callback_data: "main:menu" },
+        ],
+      ],
+    };
+
+    await this.bot.editMessageText(statusText, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+
+    logger.info("✅ 시스템 상태 표시 완료");
+  }
+
+  // ❓ 도움말 표시 (새로 추가!)
+  async showHelp(chatId, messageId) {
+    const helpText =
+      `❓ **두목봇 도움말**\n\n` +
+      `**기본 명령어:**\n` +
+      `• \`/start\` - 봇 시작 및 메인 메뉴\n` +
+      `• \`/help\` - 도움말 보기\n` +
+      `• \`/cancel\` - 현재 작업 취소\n\n` +
+      `**주요 기능:**\n` +
+      `📝 **할일 관리** - 작업 추가/완료/삭제\n` +
+      `🔮 **운세** - 오늘의 운세 확인\n` +
+      `🌤️ **날씨** - 실시간 날씨 정보\n` +
+      `⏰ **타이머** - 시간 관리 도구\n` +
+      `📅 **휴가 관리** - 연차 사용 관리\n` +
+      `🛠️ **유틸리티** - 편의 기능들\n\n` +
+      `💡 **팁:** 메뉴 버튼을 사용하면 쉽게 기능에 접근할 수 있습니다!`;
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main:menu" }]],
+    };
+
+    await this.bot.editMessageText(helpText, {
+      chat_id: chatId,
+      message_id: messageId,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+
+    logger.info("✅ 도움말 표시 완료");
+  }
   // 🔔 콜백 응답 (안전하게 처리)
   async answerCallback(callbackId, options = {}) {
     try {
