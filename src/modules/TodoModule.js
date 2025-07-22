@@ -35,14 +35,14 @@ class TodoModule extends BaseModule {
   setupActions() {
     this.registerActions({
       menu: this.showMenu,
-      status: this.showLeaveStatus,
-      use: this.showLeaveUseMenu,
-      "use:1": this.useOneDay,
-      "use:0.5": this.useHalfDay,
-      "use:custom": this.startCustomInput,
-      history: this.showLeaveHistory,
-      setting: this.showLeaveSetting,
-      help: this.showLeaveHelp,
+      list: this.showTodoList,
+      add: this.startTodoAdd,
+      search: this.startTodoSearch,
+      stats: this.showTodoStats,
+      export: this.exportTodos,
+      import: this.startImportTodoData,
+      clear: this.clearCompletedTodos,
+      help: this.showHelp, // ← 선택적으로 추가
     });
   }
 
@@ -655,6 +655,15 @@ class TodoModule extends BaseModule {
       await this.sendError(bot, chatId, "할일 정리에 실패했습니다.");
       return true;
     }
+  }
+  // ❓ 도움말 표시
+  async showHelp(bot, chatId, messageId, from) {
+    await this.sendMessage(bot, chatId, "❓ /todo, /add로 할일을 관리하세요.");
+  }
+
+  // 📥 할일 가져오기 (준비 중)
+  async startImportTodoData(bot, chatId, messageId, from) {
+    await this.sendMessage(bot, chatId, "📥 가져오기 기능은 준비 중입니다.");
   }
 
   // 📤 할일 내보내기
