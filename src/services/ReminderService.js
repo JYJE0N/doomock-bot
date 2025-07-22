@@ -1,11 +1,10 @@
 // src/services/ReminderService.js - 리마인더 관리 서비스
 const logger = require("../utils/Logger");
-const { getInstance } = require("../database/DatabaseManager");
 const BaseService = require("./BaseService");
 
 class ReminderService extends BaseService {
-  constructor(db) {
-    super(db, "reminders");
+  constructor() {
+    super("reminders");
     this.reminders = new Map(); // reminderId -> reminderData
     this.timeouts = new Map(); // reminderId -> timeoutId
     this.nextId = 1;

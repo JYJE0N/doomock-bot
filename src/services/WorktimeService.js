@@ -1,11 +1,10 @@
-const { getInstance } = require("../database/DatabaseManager");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 
 class WorktimeService extends BaseService {
-  constructor(db) {
-    super(db, "worktime"); // ✅ super() 호출
+  constructor() {
+    super("worktime_records");
     this.schedule = {
       start: "08:30",
       lunch: "11:30 ~ 13:00",

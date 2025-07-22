@@ -38,6 +38,9 @@ Thumbs.db
 dist/
 build/
 
+# 모든 _bak.js 파일 제외
+*_bak.js
+
 # 환경 변수 파일들 (민감한 정보)
 .env
 .env.local

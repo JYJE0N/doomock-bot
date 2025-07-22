@@ -4,8 +4,8 @@ const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 
 class LeaveService extends BaseService {
-  constructor(db) {
-    super(db, "leaves");
+  constructor() {
+    super("leaves");
   }
 
   async initializeUser(userId) {

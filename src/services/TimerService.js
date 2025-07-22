@@ -1,12 +1,11 @@
 // src/services/TimerService.js - Railway 환경변수를 활용한 지속성 있는 포모도로
-const { getInstance } = require("../database/DatabaseManager");
 const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 
 class TimerService extends BaseService {
-  constructor(db) {
-    super(db, "timers");
+  constructor() {
+    super("timer_userStates");
     this.timers = new Map();
     this.sessionHistory = {};
     this.dbEnabled = false; // 데이터베이스 연결 여부
@@ -40,7 +39,8 @@ class TimerService extends BaseService {
 
   // ⭐ 데이터베이스 연결
   async connectDatabase() {
-    const dbManager = getInstance(); await dbManager.ensureConnection(); // ✅ 인스턴스 메서드 호출
+    const dbManager = getInstance();
+    await dbManager.ensureConnection(); // ✅ 인스턴스 메서드 호출
     this.collection = dbManager.db.collection("timer_userStates"); // ✅ db 인스턴스에서 컬렉션 가져오기
     this.dbEnabled = true;
     logger.info("📊 MongoDB timer_userStates 컬렉션 연결됨");
