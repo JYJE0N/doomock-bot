@@ -113,7 +113,8 @@ class ModuleManager {
 
   // 🎯 중앙 콜백 라우팅 (표준화)
   async handleCallback(callbackQuery) {
-    // const callbackData = callbackQuery.data;
+    // ✅ callbackData 변수 정의 (주석 해제!)
+    const callbackData = callbackQuery.data;
     const callbackKey = `${callbackQuery.message.chat.id}-${callbackQuery.id}`;
 
     // 중복 처리 방지
@@ -127,27 +128,11 @@ class ModuleManager {
     try {
       logger.info(`📨 콜백 데이터 수신: ${callbackData}`);
 
-      // ⭐ 메인 메뉴 처리
-      if (callbackData === "main:menu") {
-        return await this.handleMainMenu(callbackQuery);
-      }
-
       // ⭐ 콜백 데이터 파싱 (콜론 형식)
       const parts = callbackData.split(":");
       let targetModule,
         subAction,
         params = {};
-
-      // 파싱 검증
-      if (!targetModule) {
-        logger.warn(`⚠️ 잘못된 콜백 형식: ${callbackData}`);
-        await this.sendErrorCallback(callbackQuery);
-        return false;
-      }
-
-      logger.info(
-        `🔔 콜백 라우팅: ${targetModule} → ${subAction || "default"}`
-      );
 
       // ✅ 3단계 이상의 콜백 데이터 처리
       if (parts.length === 1) {
@@ -187,6 +172,13 @@ class ModuleManager {
       if (targetModule === "system" && subAction === "status") {
         logger.info("📊 시스템 상태 요청");
         return await this.handleSystemStatus(callbackQuery);
+      }
+
+      // 파싱 검증
+      if (!targetModule) {
+        logger.warn(`⚠️ 잘못된 콜백 형식: ${callbackData}`);
+        await this.sendErrorCallback(callbackQuery);
+        return false;
       }
 
       // 모듈 클래스 찾기
@@ -300,6 +292,7 @@ class ModuleManager {
       { key: "leave", text: "📅 휴가 관리", callback: "leave:menu" },
       { key: "worktime", text: "🕐 근무시간", callback: "worktime:menu" },
       { key: "timer", text: "⏰ 타이머", callback: "timer:menu" },
+      { key: "insight", text: "📊 인사이트", callback: "insight:menu" },
       { key: "reminder", text: "🔔 리마인더", callback: "reminder:menu" },
       { key: "fortune", text: "🔮 운세", callback: "fortune:menu" },
       { key: "weather", text: "🌤️ 날씨", callback: "weather:menu" },
@@ -483,7 +476,75 @@ class ModuleManager {
       return false;
     }
   }
+  // 📊 시스템 상태 핸들러
+  async handleSystemStatus(callbackQuery) {
+    try {
+      const status = this.getStatus();
+      const uptime = process.uptime();
+      const memUsage = process.memoryUsage();
 
+      const statusText =
+        `📊 **시스템 상태**\n\n` +
+        `**봇 정보:**\n` +
+        `• 버전: v${process.env.npm_package_version || "3.0.1"}\n` +
+        `• 환경: ${process.env.NODE_ENV || "development"}\n` +
+        `• 가동 시간: ${this.formatUptime(uptime)}\n\n` +
+        `**시스템 리소스:**\n` +
+        `• 메모리 사용: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB\n` +
+        `• 총 메모리: ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB\n\n` +
+        `**모듈 상태:**\n` +
+        `• 총 모듈: ${status.totalModules}개\n` +
+        `• 활성 콜백: ${status.activeCallbacks}개\n\n` +
+        `**활성 모듈:**\n` +
+        Object.entries(status.modules)
+          .map(([name, info]) => `• ${name}: ${info.active ? "✅" : "❌"}`)
+          .join("\n");
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 새로고침", callback_data: "system:status" },
+            { text: "🔙 메인 메뉴", callback_data: "main:menu" },
+          ],
+        ],
+      };
+
+      await this.bot.editMessageText(statusText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      await this.bot.answerCallbackQuery(callbackQuery.id, {
+        text: "시스템 상태를 확인했습니다",
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 시스템 상태 처리 오류:", error);
+      await this.sendErrorCallback(callbackQuery);
+      return false;
+    }
+  }
+
+  // 시간 포맷 헬퍼 메서드
+  formatUptime(seconds) {
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (days > 0) {
+      return `${days}일 ${hours}시간 ${minutes}분`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes}분`;
+    } else if (minutes > 0) {
+      return `${minutes}분 ${secs}초`;
+    } else {
+      return `${secs}초`;
+    }
+  }
   // 🧹 정리
   async cleanup() {
     logger.info("🧹 ModuleManager 정리 시작...");
