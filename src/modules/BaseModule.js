@@ -23,30 +23,30 @@ class BaseModule {
     }
 
     // ⭐ 기본 액션 등록 (생성자 안에서)
-    this.registerDefaultActions();
+    // this.registerDefaultActions();
 
     logger.debug(`📦 ${moduleName} 모듈 생성됨`);
   }
 
   // ⭐ 기본 액션을 자동으로 등록
-  registerDefaultActions() {
-    try {
-      // 기본 액션들을 등록 (모든 모듈에서 공통으로 사용)
-      if (typeof this.showMenu === "function") {
-        this.actionMap.set("menu", this.showMenu.bind(this));
-      }
-      if (typeof this.goBack === "function") {
-        this.actionMap.set("back", this.goBack.bind(this));
-      }
-      if (typeof this.showHelp === "function") {
-        this.actionMap.set("help", this.showHelp.bind(this));
-      }
+  // registerDefaultActions() {
+  //   try {
+  //     // 기본 액션들을 등록 (모든 모듈에서 공통으로 사용)
+  //     if (typeof this.showMenu === "function") {
+  //       this.actionMap.set("menu", this.showMenu.bind(this));
+  //     }
+  //     if (typeof this.goBack === "function") {
+  //       this.actionMap.set("back", this.goBack.bind(this));
+  //     }
+  //     if (typeof this.showHelp === "function") {
+  //       this.actionMap.set("help", this.showHelp.bind(this));
+  //     }
 
-      logger.debug(`✅ ${this.moduleName}: 기본 액션 등록 완료`);
-    } catch (error) {
-      logger.error(`❌ ${this.moduleName}: 기본 액션 등록 실패`, error);
-    }
-  }
+  //     logger.debug(`✅ ${this.moduleName}: 기본 액션 등록 완료`);
+  //   } catch (error) {
+  //     logger.error(`❌ ${this.moduleName}: 기본 액션 등록 실패`, error);
+  //   }
+  // }
 
   // ⭐ 하위 모듈에서 액션을 등록할 수 있도록 하는 메서드
   registerActions(actions) {
