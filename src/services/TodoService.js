@@ -462,56 +462,59 @@ class TodoService extends BaseService {
    * 📊 할일 통계 조회 (데이터 분석만)
    */
   async getTodoStats(userId) {
-    userId = userId.toString();
-
     try {
-      const userTodos = await this.getUserTodos(userId);
+      const todos = await this.getUserTodos(userId);
 
+      // 🎯 직접 통계 객체 반환 (래핑하지 않음)
       const stats = {
-        total: userTodos.length,
-        completed: userTodos.filter((todo) => todo.completed).length,
-        incomplete: userTodos.filter((todo) => !todo.completed).length,
-        completionRate: 0,
-        recentlyAdded: 0,
-        oldestTodo: null,
-        newestTodo: null,
+        total: todos.length,
+        completed: todos.filter((t) => t.completed).length,
+        incomplete: todos.filter((t) => !t.completed).length,
+        pending: todos.filter((t) => !t.completed).length, // ← 중요: pending은 incomplete와 동일
+        highPriority: todos.filter((t) => t.priority === "high").length,
+        normalPriority: todos.filter((t) => t.priority === "normal").length,
+        lowPriority: todos.filter((t) => t.priority === "low").length,
+        completionRate:
+          todos.length > 0
+            ? Math.round(
+                (todos.filter((t) => t.completed).length / todos.length) * 100
+              )
+            : 0,
       };
 
-      // 완료율 계산
-      stats.completionRate =
-        stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
-
-      // 최근 7일 내 추가된 할일
-      const weekAgo = new Date();
-      weekAgo.setDate(weekAgo.getDate() - 7);
-      stats.recentlyAdded = userTodos.filter(
-        (todo) => new Date(todo.createdAt) >= weekAgo
-      ).length;
-
-      // 가장 오래된/최신 할일
-      if (userTodos.length > 0) {
-        const sortedByDate = [...userTodos].sort(
-          (a, b) => new Date(a.createdAt) - new Date(b.createdAt)
-        );
-        stats.oldestTodo = sortedByDate[0];
-        stats.newestTodo = sortedByDate[sortedByDate.length - 1];
-      }
-
-      return stats;
+      logger.debug(`📊 사용자 ${userId} 통계:`, stats);
+      return stats; // ← ResponseHelper 없이 직접 반환
     } catch (error) {
-      logger.error("통계 조회 실패:", error);
+      logger.error("할일 통계 조회 실패:", error);
+      // 에러 시에도 기본 구조 반환
       return {
         total: 0,
         completed: 0,
         incomplete: 0,
+        pending: 0,
+        highPriority: 0,
+        normalPriority: 0,
+        lowPriority: 0,
         completionRate: 0,
-        recentlyAdded: 0,
-        oldestTodo: null,
-        newestTodo: null,
       };
     }
   }
+  /**
+   * 📊 할일 통계 조회 (🌐 API용 래핑된 버전)
+   */
+  async getTodoStatsForAPI(userId) {
+    try {
+      const stats = await this.getTodoStats(userId);
 
+      // ✅ 표준 성공 응답 (API나 외부 호출용)
+      return ResponseHelper.successWithData(stats, {
+        message: "통계를 성공적으로 조회했습니다.",
+      });
+    } catch (error) {
+      logger.error("할일 통계 조회 실패:", error);
+      return ResponseHelper.serverError("통계 조회 중 오류가 발생했습니다.");
+    }
+  }
   /**
    * 📤 할일 내보내기 (데이터 포맷팅만)
    */
