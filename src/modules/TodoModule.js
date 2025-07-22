@@ -4,7 +4,6 @@ const BaseModule = require("./BaseModule");
 const TodoService = require("../services/TodoService");
 const { getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
-const { ValidationHelper } = require("../utils/ValidationHelper");
 const logger = require("../utils/Logger");
 
 class TodoModule extends BaseModule {
@@ -35,15 +34,15 @@ class TodoModule extends BaseModule {
   // 🎯 액션 등록
   setupActions() {
     this.registerActions({
-      menu: this.showMenu,
-      list: this.showTodoList,
-      add: this.startTodoAdd,
-      search: this.startTodoSearch,
-      stats: this.showTodoStats,
-      export: this.exportTodos,
-      import: this.startImportTodoData,
-      clear: this.clearCompletedTodos,
-      help: this.showHelp, // ← 선택적으로 추가
+      menu: this.showMenu.bind(this), // bind 추가로 this 컨텍스트 유지
+      list: this.showTodoList.bind(this),
+      add: this.startTodoAdd.bind(this),
+      search: this.startTodoSearch.bind(this),
+      stats: this.showTodoStats.bind(this),
+      export: this.exportTodos.bind(this),
+      import: this.startImportTodoData.bind(this),
+      "clear:completed": this.clearCompletedTodos.bind(this),
+      help: this.showHelp.bind(this), // ← 선택적으로 추가
     });
   }
 
@@ -123,47 +122,48 @@ class TodoModule extends BaseModule {
       from: { id: userId },
     } = callbackQuery;
 
-    // ✅ 올바른 사용자 이름 추출
+    // ✅ 올바른 사용자명 추출
     const userName = getUserName(callbackQuery.from);
-    const stats = await this.todoService.getTodoStats(userId);
 
-    const menuText =
-      `📝 **할일 관리**\n\n` +
-      `${userName}님의 할일 현황:\n` +
-      `• 전체: ${stats.total}개\n` +
-      `• 완료: ${stats.completed}개\n` +
-      `• 진행중: ${stats.pending}개`;
+    try {
+      const stats = await this.todoService.getTodoStats(userId);
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 목록 보기", callback_data: "todo:list" },
-          { text: "➕ 할일 추가", callback_data: "todo:add" },
-        ],
-        [
-          { text: "🔍 검색", callback_data: "todo:search" },
-          { text: "📊 통계", callback_data: "todo:stats" },
-        ],
-        [
-          { text: "📤 내보내기", callback_data: "todo:export" },
-          { text: "📥 가져오기", callback_data: "todo:import" },
-        ],
-        [{ text: "🗑️ 정리", callback_data: "todo:clear:completed" }],
-        [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
-      ],
-    };
+      const menuText =
+        `📝 **할일 관리**\n\n` +
+        `${userName}님의 할일 현황:\n` + // ← 이제 "undefined" 대신 실제 이름 표시
+        `• 전체: ${stats.total}개\n` +
+        `• 완료: ${stats.completed}개\n` +
+        `• 진행중: ${stats.pending}개`;
 
-    if (messageId) {
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📋 목록 보기", callback_data: "todo:list" },
+            { text: "➕ 할일 추가", callback_data: "todo:add" },
+          ],
+          [
+            { text: "🔍 검색", callback_data: "todo:search" },
+            { text: "📊 통계", callback_data: "todo:stats" },
+          ],
+          [
+            { text: "📤 내보내기", callback_data: "todo:export" },
+            { text: "📥 가져오기", callback_data: "todo:import" },
+          ],
+          [{ text: "🗑️ 정리", callback_data: "todo:clear:completed" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+        ],
+      };
+
       await this.editMessage(bot, chatId, messageId, menuText, {
         reply_markup: keyboard,
       });
-    } else {
-      await this.sendMessage(bot, chatId, menuText, {
-        reply_markup: keyboard,
-      });
-    }
 
-    return true;
+      return true;
+    } catch (error) {
+      logger.error("할일 메뉴 표시 실패:", error);
+      await this.sendError(bot, chatId, "메뉴를 불러올 수 없습니다.");
+      return true;
+    }
   }
 
   // 📋 할일 목록 표시
@@ -177,7 +177,8 @@ class TodoModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      const todos = await this.todoService.getUserTodos(userId);
+      // ✅ getTodos 메서드 사용 (이제 별칭으로 정의됨)
+      const todos = await this.todoService.getTodos(userId);
 
       if (todos.length === 0) {
         const emptyText =
@@ -357,7 +358,7 @@ class TodoModule extends BaseModule {
         return true;
       }
 
-      // 할일 추가
+      // ✅ addTodo 결과 처리 (success/error 형태)
       const result = await this.todoService.addTodo(userId, text);
 
       if (!result.success) {
@@ -366,7 +367,6 @@ class TodoModule extends BaseModule {
       }
 
       // 상태 초기화
-      const userState = this.userStates.get(userId);
       this.userStates.delete(userId);
 
       const successText =

@@ -1,4 +1,4 @@
-// src/services/TodoService.js
+// src/services/TodoService.js - 완전 리팩토링된 버전
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
@@ -82,7 +82,7 @@ class TodoService extends BaseService {
   }
 
   /**
-   * 사용자 할일 조회
+   * 사용자 할일 조회 (원본 메서드)
    */
   async getUserTodos(userId) {
     userId = userId.toString();
@@ -116,148 +116,221 @@ class TodoService extends BaseService {
   }
 
   /**
-   * 할일 추가
+   * ✅ TodoModule 호환용 별칭 메서드
+   */
+  async getTodos(userId) {
+    return await this.getUserTodos(userId);
+  }
+
+  /**
+   * ✅ 할일 추가 (성공/실패 응답 형태 통일)
    */
   async addTodo(userId, task, priority = "normal") {
-    userId = userId.toString();
+    try {
+      userId = userId.toString();
 
-    // 할일 수 제한 확인
-    const todos = await this.getUserTodos(userId);
-    if (todos.length >= this.maxTodosPerUser) {
-      throw new Error(
-        `최대 ${this.maxTodosPerUser}개까지만 추가할 수 있습니다.`
-      );
-    }
-
-    const newTodo = {
-      id: Date.now().toString(),
-      task,
-      completed: false,
-      createdAt: new Date(),
-      updatedAt: null,
-      priority,
-    };
-
-    // 메모리에 추가
-    if (!this.userTodos.has(userId)) {
-      this.userTodos.set(userId, []);
-    }
-    this.userTodos.get(userId).push(newTodo);
-
-    // DB에 저장
-    if (this.dbEnabled) {
-      try {
-        await this.collection.insertOne({
-          _id: newTodo.id,
-          userId,
-          ...newTodo,
-        });
-      } catch (error) {
-        logger.error("할일 DB 저장 실패:", error);
+      // 할일 수 제한 확인
+      const todos = await this.getUserTodos(userId);
+      if (todos.length >= this.maxTodosPerUser) {
+        return {
+          success: false,
+          error: `최대 ${this.maxTodosPerUser}개까지만 추가할 수 있습니다.`,
+        };
       }
+
+      const newTodo = {
+        id: Date.now().toString(),
+        task,
+        completed: false,
+        createdAt: new Date(),
+        updatedAt: null,
+        priority,
+      };
+
+      // 메모리에 추가
+      if (!this.userTodos.has(userId)) {
+        this.userTodos.set(userId, []);
+      }
+      this.userTodos.get(userId).push(newTodo);
+
+      // DB에 저장
+      if (this.dbEnabled) {
+        try {
+          await this.collection.insertOne({
+            _id: newTodo.id,
+            userId,
+            ...newTodo,
+          });
+        } catch (error) {
+          logger.error("할일 DB 저장 실패:", error);
+        }
+      }
+
+      // 메모리 스토리지 업데이트
+      await this.save(userId, { todos: this.userTodos.get(userId) });
+
+      // ✅ TodoModule이 기대하는 응답 형태
+      return {
+        success: true,
+        todo: newTodo,
+        stats: await this.getTodoStats(userId),
+      };
+    } catch (error) {
+      logger.error("할일 추가 실패:", error);
+      return {
+        success: false,
+        error: "할일 추가 중 오류가 발생했습니다.",
+      };
     }
-
-    // 메모리 스토리지 업데이트
-    await this.save(userId, { todos: this.userTodos.get(userId) });
-
-    return newTodo;
   }
 
   /**
-   * 할일 완료/미완료 토글
+   * ✅ 할일 완료/미완료 토글 (응답 형태 통일)
    */
   async toggleTodo(userId, todoId) {
-    userId = userId.toString();
-    const todos = await this.getUserTodos(userId);
+    try {
+      userId = userId.toString();
+      const todos = await this.getUserTodos(userId);
 
-    const todo = todos.find((t) => t.id === todoId);
-    if (!todo) {
-      throw new Error("할일을 찾을 수 없습니다.");
-    }
-
-    todo.completed = !todo.completed;
-    todo.updatedAt = new Date();
-
-    // DB 업데이트
-    if (this.dbEnabled) {
-      try {
-        await this.collection.updateOne(
-          { _id: todoId },
-          {
-            $set: {
-              completed: todo.completed,
-              updatedAt: todo.updatedAt,
-            },
-          }
-        );
-      } catch (error) {
-        logger.error("할일 상태 업데이트 실패:", error);
+      const todo = todos.find((t) => t.id === todoId);
+      if (!todo) {
+        return {
+          success: false,
+          error: "할일을 찾을 수 없습니다.",
+        };
       }
+
+      todo.completed = !todo.completed;
+      todo.updatedAt = new Date();
+
+      // DB 업데이트
+      if (this.dbEnabled) {
+        try {
+          await this.collection.updateOne(
+            { _id: todoId },
+            {
+              $set: {
+                completed: todo.completed,
+                updatedAt: todo.updatedAt,
+              },
+            }
+          );
+        } catch (error) {
+          logger.error("할일 상태 업데이트 실패:", error);
+        }
+      }
+
+      // 메모리 스토리지 업데이트
+      await this.save(userId, { todos: this.userTodos.get(userId) });
+
+      // ✅ TodoModule이 기대하는 응답 형태
+      return {
+        success: true,
+        todo: todo,
+        completed: todo.completed,
+      };
+    } catch (error) {
+      logger.error("할일 토글 실패:", error);
+      return {
+        success: false,
+        error: "할일 상태 변경 중 오류가 발생했습니다.",
+      };
     }
-
-    // 메모리 스토리지 업데이트
-    await this.save(userId, { todos: this.userTodos.get(userId) });
-
-    return todo;
   }
 
   /**
-   * 할일 삭제
+   * ✅ 할일 삭제 (응답 형태 통일)
    */
   async deleteTodo(userId, todoId) {
-    userId = userId.toString();
-    const todos = await this.getUserTodos(userId);
+    try {
+      userId = userId.toString();
+      const todos = await this.getUserTodos(userId);
 
-    const index = todos.findIndex((t) => t.id === todoId);
-    if (index === -1) {
-      throw new Error("할일을 찾을 수 없습니다.");
-    }
-
-    todos.splice(index, 1);
-
-    // DB에서 삭제
-    if (this.dbEnabled) {
-      try {
-        await this.collection.deleteOne({ _id: todoId });
-      } catch (error) {
-        logger.error("할일 삭제 실패:", error);
+      const index = todos.findIndex((t) => t.id === todoId);
+      if (index === -1) {
+        return {
+          success: false,
+          error: "할일을 찾을 수 없습니다.",
+        };
       }
+
+      const deletedTodo = todos.splice(index, 1)[0];
+
+      // DB에서 삭제
+      if (this.dbEnabled) {
+        try {
+          await this.collection.deleteOne({ _id: todoId });
+        } catch (error) {
+          logger.error("할일 삭제 실패:", error);
+        }
+      }
+
+      // 메모리 스토리지 업데이트
+      await this.save(userId, { todos: this.userTodos.get(userId) });
+
+      return {
+        success: true,
+        todo: deletedTodo,
+      };
+    } catch (error) {
+      logger.error("할일 삭제 실패:", error);
+      return {
+        success: false,
+        error: "할일 삭제 중 오류가 발생했습니다.",
+      };
     }
-
-    // 메모리 스토리지 업데이트
-    await this.save(userId, { todos: this.userTodos.get(userId) });
-
-    return true;
   }
 
   /**
-   * 완료된 할일 삭제
+   * ✅ 완료된 할일 삭제 (응답 형태 통일)
    */
   async clearCompleted(userId) {
-    userId = userId.toString();
-    const todos = await this.getUserTodos(userId);
+    try {
+      userId = userId.toString();
+      const todos = await this.getUserTodos(userId);
 
-    const completedIds = todos.filter((t) => t.completed).map((t) => t.id);
+      const completedIds = todos.filter((t) => t.completed).map((t) => t.id);
+      const clearedCount = completedIds.length;
 
-    // 메모리에서 제거
-    const remainingTodos = todos.filter((t) => !t.completed);
-    this.userTodos.set(userId, remainingTodos);
-
-    // DB에서 삭제
-    if (this.dbEnabled && completedIds.length > 0) {
-      try {
-        await this.collection.deleteMany({
-          _id: { $in: completedIds },
-        });
-      } catch (error) {
-        logger.error("완료된 할일 삭제 실패:", error);
+      if (clearedCount === 0) {
+        return {
+          success: true,
+          cleared: 0,
+          remaining: todos.length,
+          message: "정리할 완료된 할일이 없습니다.",
+        };
       }
+
+      // 메모리에서 제거
+      const remainingTodos = todos.filter((t) => !t.completed);
+      this.userTodos.set(userId, remainingTodos);
+
+      // DB에서 삭제
+      if (this.dbEnabled && completedIds.length > 0) {
+        try {
+          await this.collection.deleteMany({
+            _id: { $in: completedIds },
+          });
+        } catch (error) {
+          logger.error("완료된 할일 삭제 실패:", error);
+        }
+      }
+
+      // 메모리 스토리지 업데이트
+      await this.save(userId, { todos: remainingTodos });
+
+      return {
+        success: true,
+        cleared: clearedCount,
+        remaining: remainingTodos.length,
+      };
+    } catch (error) {
+      logger.error("완료된 할일 정리 실패:", error);
+      return {
+        success: false,
+        error: "할일 정리 중 오류가 발생했습니다.",
+      };
     }
-
-    // 메모리 스토리지 업데이트
-    await this.save(userId, { todos: remainingTodos });
-
-    return completedIds.length;
   }
 
   /**
@@ -277,36 +350,94 @@ class TodoService extends BaseService {
   }
 
   /**
-   * 할일 검색
+   * ✅ 할일 검색 (응답 형태 통일)
    */
   async searchTodos(userId, keyword) {
-    const todos = await this.getUserTodos(userId);
-    const lowerKeyword = keyword.toLowerCase();
+    try {
+      const todos = await this.getUserTodos(userId);
+      const lowerKeyword = keyword.toLowerCase();
 
-    return todos.filter((todo) =>
-      todo.task.toLowerCase().includes(lowerKeyword)
-    );
+      const filteredTodos = todos.filter((todo) =>
+        todo.task.toLowerCase().includes(lowerKeyword)
+      );
+
+      return {
+        success: true,
+        todos: filteredTodos,
+        keyword: keyword,
+        total: filteredTodos.length,
+      };
+    } catch (error) {
+      logger.error("할일 검색 실패:", error);
+      return {
+        success: false,
+        error: "검색 중 오류가 발생했습니다.",
+        todos: [],
+      };
+    }
   }
 
   /**
-   * 할일 내보내기
+   * ✅ 할일 내보내기 (응답 형태 통일)
    */
   async exportTodos(userId) {
-    const todos = await this.getUserTodos(userId);
-    const stats = await this.getTodoStats(userId);
+    try {
+      const todos = await this.getUserTodos(userId);
+      const stats = await this.getTodoStats(userId);
 
+      if (todos.length === 0) {
+        return {
+          success: false,
+          error: "내보낼 할일이 없습니다.",
+        };
+      }
+
+      let exportText = `📋 **할일 목록 내보내기**\n\n`;
+      exportText += `📊 **통계:**\n`;
+      exportText += `• 총 할일: ${stats.total}개\n`;
+      exportText += `• 완료: ${stats.completed}개\n`;
+      exportText += `• 진행중: ${stats.pending}개\n\n`;
+
+      exportText += `📝 **할일 목록:**\n`;
+      todos.forEach((todo, index) => {
+        const status = todo.completed ? "✅" : "⭕";
+        const date = TimeHelper.formatDate(todo.createdAt);
+        exportText += `${status} ${index + 1}. ${todo.task} (${date})\n`;
+      });
+
+      exportText += `\n📅 내보내기 날짜: ${TimeHelper.getKoreaTimeString()}`;
+
+      return {
+        success: true,
+        data: exportText,
+        stats: stats,
+        exportDate: TimeHelper.getKoreaTimeString(),
+      };
+    } catch (error) {
+      logger.error("할일 내보내기 실패:", error);
+      return {
+        success: false,
+        error: "내보내기 중 오류가 발생했습니다.",
+      };
+    }
+  }
+
+  /**
+   * ✅ 사용할 일 사용 처리 (TodoModule 호환)
+   */
+  async useLeave(userId, days) {
+    // 이 메서드는 LeaveService용이므로 TodoService에서는 에러 반환
     return {
-      exportDate: TimeHelper.getKoreaTimeString(),
-      userId,
-      stats,
-      todos: todos.map((t) => ({
-        task: t.task,
-        completed: t.completed,
-        priority: t.priority,
-        createdAt: TimeHelper.formatDate(t.createdAt),
-        updatedAt: t.updatedAt ? TimeHelper.formatDate(t.updatedAt) : null,
-      })),
+      success: false,
+      message: "할일 서비스에서는 지원하지 않는 기능입니다.",
     };
+  }
+
+  /**
+   * ✅ 할일 사용 내역 (호환성을 위한 더미 메서드)
+   */
+  async getLeaveHistory(userId) {
+    return [];
   }
 
   /**
