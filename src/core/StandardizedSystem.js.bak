@@ -13,13 +13,13 @@ const STANDARD_PARAMS = {
   // 메시지 처리: (bot, msg)
   MESSAGE_HANDLER: ["bot", "msg"],
 
-  // 콜백 처리: (bot, callbackQuery, subAction, params, moduleManager)
+  // 콜백 처리: (bot, callbackQuery, subAction, params, menuManager)
   CALLBACK_HANDLER: [
     "bot",
     "callbackQuery",
     "subAction",
     "params",
-    "moduleManager",
+    "menuManager",
   ],
 };
 
@@ -163,7 +163,7 @@ class ParameterValidator {
     callbackQuery,
     subAction,
     params,
-    moduleManager
+    menuManager
   ) {
     const errors = [];
 
@@ -183,7 +183,7 @@ class ParameterValidator {
       errors.push("params는 객체여야 함");
     }
 
-    // moduleManager는 선택적이므로 null 허용
+    // menuManager는 선택적이므로 null 허용
 
     if (errors.length > 0) {
       throw new Error(`콜백 핸들러 매개변수 오류: ${errors.join(", ")}`);
@@ -293,14 +293,14 @@ class StandardizedBaseModule {
   }
 
   // 🎯 표준 콜백 핸들러 (모든 모듈에서 오버라이드)
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     // 🔒 매개변수 검증
     ParameterValidator.validateCallbackParams(
       bot,
       callbackQuery,
       subAction,
       params,
-      moduleManager
+      menuManager
     );
 
     // 🚫 중복 호출 방지
@@ -332,7 +332,7 @@ class StandardizedBaseModule {
         callbackQuery,
         subAction,
         params,
-        moduleManager
+        menuManager
       );
 
       return result;
@@ -353,7 +353,7 @@ class StandardizedBaseModule {
     );
   }
 
-  async _processCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async _processCallback(bot, callbackQuery, subAction, params, menuManager) {
     throw new Error(
       `${this.moduleName}에서 _processCallback 메서드를 구현해야 합니다`
     );

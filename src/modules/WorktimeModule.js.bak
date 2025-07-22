@@ -86,7 +86,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // ✅ showMenu 메서드 추가
-  async showMenu(bot, callbackQuery, params, moduleManager) {
+  async showMenu(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -124,7 +124,7 @@ class WorktimeModule extends BaseModule {
     });
   }
   // 📊 근무 상태 표시
-  async showWorktimeStatus(bot, callbackQuery, params, moduleManager) {
+  async showWorktimeStatus(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -173,7 +173,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // 🏢 출근 처리
-  async processCheckIn(bot, callbackQuery, params, moduleManager) {
+  async processCheckIn(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -243,7 +243,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // 🏠 퇴근 처리
-  async processCheckOut(bot, callbackQuery, params, moduleManager) {
+  async processCheckOut(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -317,7 +317,7 @@ class WorktimeModule extends BaseModule {
       return true;
     }
   }
-  async showDetailedProgress(bot, callbackQuery, params, moduleManager) {
+  async showDetailedProgress(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -438,7 +438,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // 📜 근무 기록 보기
-  async showHistory(bot, callbackQuery, params, moduleManager) {
+  async showHistory(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -467,7 +467,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // ⚙️ 설정 보기
-  async showSettings(bot, callbackQuery, params, moduleManager) {
+  async showSettings(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -492,7 +492,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // 📜 오늘 기록
-  async showTodayRecord(bot, callbackQuery, params, moduleManager) {
+  async showTodayRecord(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -518,13 +518,13 @@ class WorktimeModule extends BaseModule {
   }
 
   // 📝 출근 메모 추가
-  async addCheckInNote(bot, callbackQuery, params, moduleManager) {
+  async addCheckInNote(bot, callbackQuery, params, menuManager) {
     const chatId = callbackQuery.message.chat.id;
     await this.sendMessage(bot, chatId, "📝 출근 메모 기능은 준비 중입니다.");
   }
 
   // 📝 퇴근 메모 추가
-  async addCheckOutNote(bot, callbackQuery, params, moduleManager) {
+  async addCheckOutNote(bot, callbackQuery, params, menuManager) {
     const chatId = callbackQuery.message.chat.id;
     await this.sendMessage(bot, chatId, "📝 퇴근 메모 기능은 준비 중입니다.");
   }

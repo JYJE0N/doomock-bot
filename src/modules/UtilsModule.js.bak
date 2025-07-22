@@ -108,7 +108,7 @@ class UtilsModule extends BaseModule {
   }
 
   // ✅ 콜백 처리 (표준화된 매개변수)
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     // null 체크 추가
     if (!subAction) {
       logger.warn("UtilsModule: subAction이 null입니다");
@@ -134,7 +134,7 @@ class UtilsModule extends BaseModule {
           messageId,
           userId,
           userName,
-          moduleManager
+          menuManager
         );
         return true;
       }
@@ -147,7 +147,7 @@ class UtilsModule extends BaseModule {
           messageId,
           userId,
           userName,
-          moduleManager
+          menuManager
         );
         return true;
       }
@@ -193,7 +193,7 @@ class UtilsModule extends BaseModule {
     }
   }
 
-  async showUtilsMenu(bot, chatId, messageId, userId, userName, moduleManager) {
+  async showUtilsMenu(bot, chatId, messageId, userId, userName, menuManager) {
     const menuData = this.getMenuData(userName);
 
     try {

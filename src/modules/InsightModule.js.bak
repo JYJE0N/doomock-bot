@@ -40,7 +40,7 @@ class InsightModule extends BaseModule {
     return await this.handleInsightCommand(bot, msg);
   }
 
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },

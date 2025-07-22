@@ -80,7 +80,7 @@ class TimerModule extends BaseModule {
   }
 
   // ⭐ 표준화된 콜백 처리
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -98,7 +98,7 @@ class TimerModule extends BaseModule {
         callbackQuery,
         subAction,
         params,
-        moduleManager
+        menuManager
       );
 
       if (!handled) {
@@ -349,7 +349,7 @@ class TimerModule extends BaseModule {
   }
 
   // ⭐ 스타트 브레이크 (휴식)
-  async startBreak(bot, callbackQuery, params, moduleManager) {
+  async startBreak(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },

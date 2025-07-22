@@ -76,7 +76,7 @@ class LeaveModule extends BaseModule {
   }
 
   // 📋 휴가 메뉴 표시
-  async showMenu(bot, callbackQuery, params, moduleManager) {
+  async showMenu(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },

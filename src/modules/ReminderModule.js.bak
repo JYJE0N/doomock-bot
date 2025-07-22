@@ -38,10 +38,10 @@ class ReminderModule extends BaseModule {
   }
 
   // 🎯 액션 메서드들
-  async showMenu(bot, chatId, messageId, from, moduleManager) {
+  async showMenu(bot, chatId, messageId, from, menuManager) {
     const userName = getUserName(from);
-    const text = moduleManager.getMenuText("reminder", userName);
-    const keyboard = moduleManager.createKeyboard("reminder");
+    const text = menuManager.getMenuText("reminder", userName);
+    const keyboard = menuManager.createKeyboard("reminder");
 
     await this.editMessage(bot, chatId, messageId, text, {
       parse_mode: "Markdown",

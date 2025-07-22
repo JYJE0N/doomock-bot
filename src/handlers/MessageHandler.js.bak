@@ -6,7 +6,7 @@ class MessageHandler {
   constructor(bot, options) {
     this.bot = bot;
     this.moduleManager = options.moduleManager;
-    this.moduleManager = options.moduleManager;
+    this.menuManager = options.menuManager;
     this.callbackManager = options.callbackManager;
     this.userStates = options.userStates;
 
@@ -149,7 +149,7 @@ class MessageHandler {
   async showMainMenu(chatId, userName) {
     try {
       const menuText = this.getMainMenuText(userName);
-      const keyboard = await this.moduleManager.getMainMenuKeyboard();
+      const keyboard = await this.menuManager.getMainMenuKeyboard();
 
       await this.bot.sendMessage(chatId, menuText, {
         parse_mode: "Markdown",

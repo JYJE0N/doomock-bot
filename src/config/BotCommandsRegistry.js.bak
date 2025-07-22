@@ -22,7 +22,7 @@ class BotCommandsRegistry {
       category: "system",
       isPublic: true,
       handler: "CommandHandler.handleStart",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       scope: ["private", "group"],
     });
 
@@ -32,7 +32,7 @@ class BotCommandsRegistry {
       category: "system",
       isPublic: true,
       handler: "CommandHandler.handleHelp",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       scope: ["private", "group"],
     });
 
@@ -42,7 +42,7 @@ class BotCommandsRegistry {
       category: "system",
       isPublic: true,
       handler: "CommandHandler.handleCancel",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       scope: ["private", "group"],
     });
 
@@ -52,7 +52,7 @@ class BotCommandsRegistry {
       category: "system",
       isPublic: true,
       handler: "CommandHandler.handleStatus",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       scope: ["private", "group"],
     });
 
@@ -64,7 +64,7 @@ class BotCommandsRegistry {
       category: "productivity",
       isPublic: true,
       handler: "TodoModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["add", "list", "stats"],
     });
 
@@ -75,7 +75,7 @@ class BotCommandsRegistry {
       category: "entertainment",
       isPublic: true,
       handler: "FortuneModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["today", "work", "love", "money"],
     });
 
@@ -86,7 +86,7 @@ class BotCommandsRegistry {
       category: "info",
       isPublic: true,
       handler: "WeatherModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["now", "today", "tomorrow"],
     });
 
@@ -97,7 +97,7 @@ class BotCommandsRegistry {
       category: "productivity",
       isPublic: true,
       handler: "TimerModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["start", "stop", "pomodoro"],
     });
 
@@ -108,7 +108,7 @@ class BotCommandsRegistry {
       category: "work",
       isPublic: true,
       handler: "LeaveModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["status", "request", "history"],
     });
 
@@ -119,7 +119,7 @@ class BotCommandsRegistry {
       category: "business",
       isPublic: true,
       handler: "InsightModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["dashboard", "report", "alert"],
     });
 
@@ -130,7 +130,7 @@ class BotCommandsRegistry {
       category: "tools",
       isPublic: true,
       handler: "UtilsModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["tts", "voice", "file"],
     });
 
@@ -141,7 +141,7 @@ class BotCommandsRegistry {
       category: "work",
       isPublic: true,
       handler: "WorktimeModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       quickActions: ["checkin", "checkout", "status"],
     });
 
@@ -152,7 +152,7 @@ class BotCommandsRegistry {
       category: "admin",
       isPublic: false,
       handler: "CommandHandler.handleAdmin",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       scope: ["private"],
       requiredRole: "admin",
     });
@@ -163,7 +163,7 @@ class BotCommandsRegistry {
       category: "admin",
       isPublic: false,
       handler: "AdminModule.handleStats",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       scope: ["private"],
       requiredRole: "admin",
     });
@@ -174,7 +174,7 @@ class BotCommandsRegistry {
       category: "admin",
       isPublic: false,
       handler: "AdminModule.handleLogs",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       scope: ["private"],
       requiredRole: "admin",
     });
@@ -304,7 +304,7 @@ class BotCommandsRegistry {
     // 표준 매개변수 강제 적용
     const standardizedConfig = {
       ...config,
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
+      params: "(bot, callbackQuery, subAction, params, menuManager)",
       isPublic: config.isPublic !== false, // 기본값 true
     };
 

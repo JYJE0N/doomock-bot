@@ -6,7 +6,7 @@ class CommandHandler {
   constructor(bot, dependencies) {
     this.bot = bot;
     this.moduleManager = dependencies.moduleManager;
-    this.moduleManager = dependencies.moduleManager;
+    this.menuManager = dependencies.menuManager;
     this.userStates = dependencies.userStates;
 
     // 🎯 명령어 라우터 초기화
