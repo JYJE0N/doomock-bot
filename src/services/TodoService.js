@@ -2,15 +2,12 @@
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const ResponseHelper = require("../utils/ResponseHelper");
 
 class TodoService extends BaseService {
   constructor() {
-    super("todo_userStates"); // 컬렉션 이름만 전달
-
-    // Todo 전용 설정
+    super("todo_userStates");
     this.maxTodosPerUser = parseInt(process.env.MAX_TODOS_PER_USER) || 50;
-
-    // 사용자별 할일 관리 (메모리)
     this.userTodos = new Map();
   }
 
@@ -82,7 +79,7 @@ class TodoService extends BaseService {
   }
 
   /**
-   * 사용자 할일 조회 (원본 메서드)
+   * ✅ 호환성을 위한 기존 getUserTodos 메서드 (원시 데이터 반환)
    */
   async getUserTodos(userId) {
     userId = userId.toString();
@@ -116,10 +113,28 @@ class TodoService extends BaseService {
   }
 
   /**
-   * ✅ TodoModule 호환용 별칭 메서드
+   * ✅ 할일 목록 조회 - 표준 응답 형태 (새로 추가)
    */
   async getTodos(userId) {
-    return await this.getUserTodos(userId);
+    try {
+      const todos = await this.getUserTodos(userId);
+
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(todos, {
+        totalCount: todos.length,
+        completedCount: todos.filter((t) => t.completed).length,
+        pendingCount: todos.filter((t) => !t.completed).length,
+        message:
+          todos.length > 0
+            ? `${todos.length}개의 할일을 불러왔습니다.`
+            : "등록된 할일이 없습니다.",
+      });
+    } catch (error) {
+      logger.error("할일 목록 조회 실패:", error);
+      return ResponseHelper.serverError(
+        "할일 목록을 불러오는 중 오류가 발생했습니다."
+      );
+    }
   }
 
   /**
@@ -129,18 +144,32 @@ class TodoService extends BaseService {
     try {
       userId = userId.toString();
 
+      // 입력 검증
+      if (!task || task.trim().length === 0) {
+        return ResponseHelper.validationError(
+          "task",
+          "할일 내용을 입력해주세요."
+        );
+      }
+
+      if (task.length > 200) {
+        return ResponseHelper.validationError(
+          "task",
+          "할일은 200자 이내로 입력해주세요."
+        );
+      }
+
       // 할일 수 제한 확인
       const todos = await this.getUserTodos(userId);
       if (todos.length >= this.maxTodosPerUser) {
-        return {
-          success: false,
-          error: `최대 ${this.maxTodosPerUser}개까지만 추가할 수 있습니다.`,
-        };
+        return ResponseHelper.error(
+          `최대 ${this.maxTodosPerUser}개까지만 추가할 수 있습니다.`
+        );
       }
 
       const newTodo = {
         id: Date.now().toString(),
-        task,
+        task: task.trim(),
         completed: false,
         createdAt: new Date(),
         updatedAt: null,
@@ -169,18 +198,14 @@ class TodoService extends BaseService {
       // 메모리 스토리지 업데이트
       await this.save(userId, { todos: this.userTodos.get(userId) });
 
-      // ✅ TodoModule이 기대하는 응답 형태
-      return {
-        success: true,
-        todo: newTodo,
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(newTodo, {
         stats: await this.getTodoStats(userId),
-      };
+        message: "할일이 성공적으로 추가되었습니다.",
+      });
     } catch (error) {
       logger.error("할일 추가 실패:", error);
-      return {
-        success: false,
-        error: "할일 추가 중 오류가 발생했습니다.",
-      };
+      return ResponseHelper.serverError("할일 추가 중 오류가 발생했습니다.");
     }
   }
 
@@ -190,16 +215,15 @@ class TodoService extends BaseService {
   async toggleTodo(userId, todoId) {
     try {
       userId = userId.toString();
-      const todos = await this.getUserTodos(userId);
 
+      const todos = await this.getUserTodos(userId);
       const todo = todos.find((t) => t.id === todoId);
+
       if (!todo) {
-        return {
-          success: false,
-          error: "할일을 찾을 수 없습니다.",
-        };
+        return ResponseHelper.notFound("할일");
       }
 
+      const previousState = todo.completed;
       todo.completed = !todo.completed;
       todo.updatedAt = new Date();
 
@@ -223,35 +247,34 @@ class TodoService extends BaseService {
       // 메모리 스토리지 업데이트
       await this.save(userId, { todos: this.userTodos.get(userId) });
 
-      // ✅ TodoModule이 기대하는 응답 형태
-      return {
-        success: true,
-        todo: todo,
-        completed: todo.completed,
-      };
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(todo, {
+        message: todo.completed
+          ? "할일이 완료되었습니다."
+          : "할일이 미완료로 변경되었습니다.",
+        previousState,
+        currentState: todo.completed,
+      });
     } catch (error) {
       logger.error("할일 토글 실패:", error);
-      return {
-        success: false,
-        error: "할일 상태 변경 중 오류가 발생했습니다.",
-      };
+      return ResponseHelper.serverError(
+        "할일 상태 변경 중 오류가 발생했습니다."
+      );
     }
   }
 
   /**
-   * ✅ 할일 삭제 (응답 형태 통일)
+   * ✅ 할일 삭제 - 표준 응답 형태
    */
   async deleteTodo(userId, todoId) {
     try {
       userId = userId.toString();
-      const todos = await this.getUserTodos(userId);
 
+      const todos = await this.getUserTodos(userId);
       const index = todos.findIndex((t) => t.id === todoId);
+
       if (index === -1) {
-        return {
-          success: false,
-          error: "할일을 찾을 수 없습니다.",
-        };
+        return ResponseHelper.notFound("할일");
       }
 
       const deletedTodo = todos.splice(index, 1)[0];
@@ -268,41 +291,70 @@ class TodoService extends BaseService {
       // 메모리 스토리지 업데이트
       await this.save(userId, { todos: this.userTodos.get(userId) });
 
-      return {
-        success: true,
-        todo: deletedTodo,
-      };
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(deletedTodo, {
+        message: "할일이 삭제되었습니다.",
+        remainingCount: todos.length,
+      });
     } catch (error) {
       logger.error("할일 삭제 실패:", error);
-      return {
-        success: false,
-        error: "할일 삭제 중 오류가 발생했습니다.",
-      };
+      return ResponseHelper.serverError("할일 삭제 중 오류가 발생했습니다.");
     }
   }
 
   /**
-   * ✅ 완료된 할일 삭제 (응답 형태 통일)
+   * ✅ 할일 검색 - 표준 응답 형태
+   */
+  async searchTodos(userId, keyword) {
+    try {
+      if (!keyword || keyword.trim().length === 0) {
+        return ResponseHelper.validationError(
+          "keyword",
+          "검색 키워드를 입력해주세요."
+        );
+      }
+
+      const todos = await this.getUserTodos(userId);
+      const lowerKeyword = keyword.trim().toLowerCase();
+
+      const filteredTodos = todos.filter((todo) =>
+        todo.task.toLowerCase().includes(lowerKeyword)
+      );
+
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(filteredTodos, {
+        keyword: keyword.trim(),
+        totalFound: filteredTodos.length,
+        totalTodos: todos.length,
+        message:
+          filteredTodos.length > 0
+            ? `${filteredTodos.length}개의 할일을 찾았습니다.`
+            : "검색 결과가 없습니다.",
+      });
+    } catch (error) {
+      logger.error("할일 검색 실패:", error);
+      return ResponseHelper.serverError("검색 중 오류가 발생했습니다.");
+    }
+  }
+
+  /**
+   * ✅ 완료된 할일 정리 - 표준 응답 형태
    */
   async clearCompleted(userId) {
     try {
       userId = userId.toString();
+
       const todos = await this.getUserTodos(userId);
+      const completedTodos = todos.filter((t) => t.completed);
 
-      const completedIds = todos.filter((t) => t.completed).map((t) => t.id);
-      const clearedCount = completedIds.length;
-
-      if (clearedCount === 0) {
-        return {
-          success: true,
-          cleared: 0,
-          remaining: todos.length,
-          message: "정리할 완료된 할일이 없습니다.",
-        };
+      if (completedTodos.length === 0) {
+        return ResponseHelper.success(null, "정리할 완료된 할일이 없습니다.");
       }
 
-      // 메모리에서 제거
+      const completedIds = completedTodos.map((t) => t.id);
       const remainingTodos = todos.filter((t) => !t.completed);
+
+      // 메모리에서 제거
       this.userTodos.set(userId, remainingTodos);
 
       // DB에서 삭제
@@ -319,34 +371,54 @@ class TodoService extends BaseService {
       // 메모리 스토리지 업데이트
       await this.save(userId, { todos: remainingTodos });
 
-      return {
-        success: true,
-        cleared: clearedCount,
-        remaining: remainingTodos.length,
-      };
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(
+        {
+          clearedTodos: completedTodos,
+          remainingTodos: remainingTodos,
+        },
+        {
+          clearedCount: completedIds.length,
+          remainingCount: remainingTodos.length,
+          message: `${completedIds.length}개의 완료된 할일을 정리했습니다.`,
+        }
+      );
     } catch (error) {
       logger.error("완료된 할일 정리 실패:", error);
-      return {
-        success: false,
-        error: "할일 정리 중 오류가 발생했습니다.",
-      };
+      return ResponseHelper.serverError("할일 정리 중 오류가 발생했습니다.");
     }
   }
 
   /**
-   * 통계 조회
+   * ✅ 통계 조회 - 표준 응답 형태
    */
   async getTodoStats(userId) {
-    const todos = await this.getUserTodos(userId);
+    try {
+      const todos = await this.getUserTodos(userId);
 
-    return {
-      total: todos.length,
-      completed: todos.filter((t) => t.completed).length,
-      pending: todos.filter((t) => !t.completed).length,
-      highPriority: todos.filter((t) => t.priority === "high").length,
-      normalPriority: todos.filter((t) => t.priority === "normal").length,
-      lowPriority: todos.filter((t) => t.priority === "low").length,
-    };
+      const stats = {
+        total: todos.length,
+        completed: todos.filter((t) => t.completed).length,
+        pending: todos.filter((t) => !t.completed).length,
+        highPriority: todos.filter((t) => t.priority === "high").length,
+        normalPriority: todos.filter((t) => t.priority === "normal").length,
+        lowPriority: todos.filter((t) => t.priority === "low").length,
+        completionRate:
+          todos.length > 0
+            ? Math.round(
+                (todos.filter((t) => t.completed).length / todos.length) * 100
+              )
+            : 0,
+      };
+
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(stats, {
+        message: "통계를 성공적으로 조회했습니다.",
+      });
+    } catch (error) {
+      logger.error("할일 통계 조회 실패:", error);
+      return ResponseHelper.serverError("통계 조회 중 오류가 발생했습니다.");
+    }
   }
 
   /**
@@ -378,19 +450,17 @@ class TodoService extends BaseService {
   }
 
   /**
-   * ✅ 할일 내보내기 (응답 형태 통일)
+   * ✅ 할일 내보내기 - 표준 응답 형태
    */
   async exportTodos(userId) {
     try {
       const todos = await this.getUserTodos(userId);
-      const stats = await this.getTodoStats(userId);
 
       if (todos.length === 0) {
-        return {
-          success: false,
-          error: "내보낼 할일이 없습니다.",
-        };
+        return ResponseHelper.error("내보낼 할일이 없습니다.");
       }
+
+      const stats = await this.getTodoStats(userId);
 
       let exportText = `📋 **할일 목록 내보내기**\n\n`;
       exportText += `📊 **통계:**\n`;
@@ -407,18 +477,22 @@ class TodoService extends BaseService {
 
       exportText += `\n📅 내보내기 날짜: ${TimeHelper.getKoreaTimeString()}`;
 
-      return {
-        success: true,
-        data: exportText,
-        stats: stats,
-        exportDate: TimeHelper.getKoreaTimeString(),
-      };
+      // ✅ 표준 성공 응답
+      return ResponseHelper.successWithData(
+        {
+          exportText: exportText,
+          todos: todos,
+          stats: stats,
+        },
+        {
+          exportDate: TimeHelper.getKoreaTimeString(),
+          totalExported: todos.length,
+          message: `${todos.length}개의 할일을 내보냈습니다.`,
+        }
+      );
     } catch (error) {
       logger.error("할일 내보내기 실패:", error);
-      return {
-        success: false,
-        error: "내보내기 중 오류가 발생했습니다.",
-      };
+      return ResponseHelper.serverError("내보내기 중 오류가 발생했습니다.");
     }
   }
 
