@@ -18,6 +18,7 @@ class ModuleManager {
       system: { class: "SystemModule", path: "../modules/SystemModule" },
       todo: { class: "TodoModule", path: "../modules/TodoModule" },
       timer: { class: "TimerModule", path: "../modules/TimerModule" },
+      insight: { class: "InsightModule", path: "../modules/InsightModule" },
       worktime: { class: "WorktimeModule", path: "../modules/WorktimeModule" },
       leave: { class: "LeaveModule", path: "../modules/LeaveModule" },
       reminder: { class: "ReminderModule", path: "../modules/ReminderModule" },
@@ -83,6 +84,7 @@ class ModuleManager {
       "leave",
       "worktime",
       "timer",
+      "insight",
       "reminder",
       "fortune",
       "weather",
@@ -111,7 +113,7 @@ class ModuleManager {
 
   // 🎯 중앙 콜백 라우팅 (표준화)
   async handleCallback(callbackQuery) {
-    const callbackData = callbackQuery.data;
+    // const callbackData = callbackQuery.data;
     const callbackKey = `${callbackQuery.message.chat.id}-${callbackQuery.id}`;
 
     // 중복 처리 방지
@@ -175,6 +177,18 @@ class ModuleManager {
         return await this.handleMainMenu(callbackQuery);
       }
 
+      // 특수 케이스 처리 (모듈이 아닌 시스템 명령)
+      if (targetModule === "help") {
+        logger.info("❓ 도움말 요청");
+        return await this.handleHelp(callbackQuery);
+      }
+
+      // 시스템 상태 처리
+      if (targetModule === "system" && subAction === "status") {
+        logger.info("📊 시스템 상태 요청");
+        return await this.handleSystemStatus(callbackQuery);
+      }
+
       // 모듈 클래스 찾기
       const moduleClass = this.findModuleClass(targetModule);
       if (!moduleClass) {
@@ -229,7 +243,6 @@ class ModuleManager {
     return false;
   }
 
-  // ✅ MenuManager 인스턴스를 가져오는 메서드 추가
   getMenuManager() {
     // BotController에서 설정한 MenuManager 인스턴스를 반환
     if (this.menuManager) {
@@ -326,6 +339,7 @@ class ModuleManager {
       system: "SystemModule",
       todo: "TodoModule",
       timer: "TimerModule",
+      insight: "InsightModule",
       worktime: "WorktimeModule",
       leave: "LeaveModule",
       reminder: "ReminderModule",
@@ -420,6 +434,54 @@ class ModuleManager {
       activeCallbacks: this.processingCallbacks.size,
       modules: moduleStatuses,
     };
+  }
+  // handleHelp 메서드 추가
+  async handleHelp(callbackQuery) {
+    try {
+      const helpText =
+        `❓ **도움말**\n\n` +
+        `**기본 명령어:**\n` +
+        `• /start - 봇 시작\n` +
+        `• /help - 도움말 보기\n` +
+        `• /menu - 메인 메뉴\n\n` +
+        `**주요 기능:**\n` +
+        `📝 **할일 관리** - 작업 추가/완료/삭제\n` +
+        `🔮 **운세** - 오늘의 운세 확인\n` +
+        `🌤️ **날씨** - 실시간 날씨 정보\n` +
+        `⏰ **타이머** - 시간 관리\n` +
+        `📅 **휴가 관리** - 연차 관리\n` +
+        `🕐 **근무시간** - 출퇴근 기록\n` +
+        `🔔 **리마인더** - 알림 설정\n` +
+        `🛠️ **유틸리티** - TTS 등 편의기능\n` +
+        `📊 **인사이트** - 비즈니스 분석\n\n` +
+        `각 메뉴를 선택하면 자세한 사용법을 확인할 수 있습니다.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📱 메인 메뉴", callback_data: "main:menu" },
+            { text: "📊 봇 상태", callback_data: "system:status" },
+          ],
+        ],
+      };
+
+      await this.bot.editMessageText(helpText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      await this.bot.answerCallbackQuery(callbackQuery.id, {
+        text: "도움말을 표시했습니다",
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 도움말 처리 오류:", error);
+      await this.sendErrorCallback(callbackQuery);
+      return false;
+    }
   }
 
   // 🧹 정리
