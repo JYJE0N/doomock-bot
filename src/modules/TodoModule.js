@@ -32,18 +32,33 @@ class TodoModule extends BaseModule {
   }
 
   // 🎯 액션 등록 (UI 라우팅만)
+  // setupActions() {
+  //   this.registerActions({
+  //     menu: this.showMenu.bind(this),
+  //     list: this.showTodoList.bind(this),
+  //     add: this.handleAddFlow.bind(this), // 🔄 이름 변경
+  //     search: this.handleSearchFlow.bind(this), // 🔄 이름 변경
+  //     stats: this.showStats.bind(this), // 🔄 이름 변경
+  //     export: this.handleExport.bind(this), // 🔄 이름 변경
+  //     import: this.handleImport.bind(this), // 🔄 이름 변경
+  //     "clear:completed": this.handleClearCompleted.bind(this),
+  //     toggle: this.handleToggle.bind(this), // 🔄 새로 추가
+  //     delete: this.handleDelete.bind(this), // 🔄 새로 추가
+  //   });
+  // }
+
   setupActions() {
     this.registerActions({
-      menu: this.showMenu.bind(this),
-      list: this.showTodoList.bind(this),
-      add: this.handleAddFlow.bind(this), // 🔄 이름 변경
-      search: this.handleSearchFlow.bind(this), // 🔄 이름 변경
-      stats: this.showStats.bind(this), // 🔄 이름 변경
-      export: this.handleExport.bind(this), // 🔄 이름 변경
-      import: this.handleImport.bind(this), // 🔄 이름 변경
-      "clear:completed": this.handleClearCompleted.bind(this),
-      toggle: this.handleToggle.bind(this), // 🔄 새로 추가
-      delete: this.handleDelete.bind(this), // 🔄 새로 추가
+      menu: this.showMenu,
+      list: this.showTodoList,
+      add: this.handleAddFlow, // 🔄 이름 변경
+      search: this.handleSearchFlow, // 🔄 이름 변경
+      stats: this.showStats, // 🔄 이름 변경
+      export: this.handleExport, // 🔄 이름 변경
+      import: this.handleImport, // 🔄 이름 변경
+      "clear:completed": this.handleClearCompleted,
+      toggle: this.handleToggle, // 🔄 새로 추가
+      delete: this.handleDelete, // 🔄 새로 추가
     });
   }
 
