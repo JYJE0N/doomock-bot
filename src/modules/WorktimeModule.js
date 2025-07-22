@@ -22,17 +22,15 @@ class WorktimeModule extends BaseModule {
 
     this.worktimeService = null;
 
-    // 근무 시간 설정 (기본값)
+    this.worktimeService = null;
     this.workSchedule = {
       startTime: "08:30",
       lunchStart: "11:30",
       lunchEnd: "13:00",
       endTime: "17:30",
-      workDays: [1, 2, 3, 4, 5], // 월-금
-      totalWorkHours: 7.5, // 점심시간 제외
+      workDays: [1, 2, 3, 4, 5],
+      totalWorkHours: 7.5,
     };
-
-    // 진행률 이모지
     this.progressEmojis = {
       morning: "🌅",
       working: "💼",
@@ -43,9 +41,76 @@ class WorktimeModule extends BaseModule {
       weekend: "🎉",
     };
   }
+  // ✅ setupActions 메서드 추가
+  setupActions() {
+    this.registerActions({
+      menu: this.showMenu,
+      status: this.showWorktimeStatus,
+      checkin: this.processCheckIn,
+      checkout: this.processCheckOut,
+      progress: this.showDetailedProgress,
+      history: this.showHistory,
+      settings: this.showSettings,
+      "today:record": this.showTodayRecord,
+      "add:checkin_note": this.addCheckInNote,
+      "add:checkout_note": this.addCheckOutNote,
+    });
 
+    logger.debug(`🕐 WorktimeModule 액션 등록 완료: ${this.actionMap.size}개`);
+  }
+
+  // ✅ onInitialize 추가 (WorktimeService 초기화)
+  async onInitialize() {
+    try {
+      this.worktimeService = new WorktimeService(this.db);
+      await this.worktimeService.initialize();
+      logger.info("🕐 WorktimeService 초기화 성공");
+    } catch (error) {
+      logger.error("❌ WorktimeService 초기화 실패:", error);
+      throw error;
+    }
+  }
+
+  // ✅ showMenu 메서드 추가
+  async showMenu(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from,
+    } = callbackQuery;
+
+    const userName = getUserName(from);
+    const menuText =
+      `🕐 **${userName}님의 근무시간 관리**\n\n` +
+      `효율적인 근무시간 관리를 도와드립니다.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🏢 출근하기", callback_data: "worktime:checkin" },
+          { text: "🏠 퇴근하기", callback_data: "worktime:checkout" },
+        ],
+        [
+          { text: "📊 근무 현황", callback_data: "worktime:status" },
+          { text: "📈 상세 진행률", callback_data: "worktime:progress" },
+        ],
+        [
+          { text: "📜 근무 기록", callback_data: "worktime:history" },
+          { text: "⚙️ 설정", callback_data: "worktime:settings" },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+      ],
+    };
+
+    await this.editMessage(bot, chatId, messageId, menuText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
   // 📊 근무 상태 표시
-  async showWorktimeStatus(bot, callbackQuery) {
+  async showWorktimeStatus(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -55,7 +120,7 @@ class WorktimeModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      const now = TimeHelper.getShortTimeString(); // ✅ getCurrentTime 대신 사용
+      const now = TimeHelper.getShortTimeString();
       const status = await this.calculateWorktimeStatus();
       const progressBar = this.createProgressBar(status.progress);
 
@@ -81,6 +146,7 @@ class WorktimeModule extends BaseModule {
       };
 
       await this.editMessage(bot, chatId, messageId, statusText, {
+        parse_mode: "Markdown",
         reply_markup: keyboard,
       });
 
@@ -93,7 +159,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // 🏢 출근 처리
-  async processCheckIn(bot, callbackQuery) {
+  async processCheckIn(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -103,7 +169,16 @@ class WorktimeModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      // 이미 출근했는지 확인
+      // WorktimeService 초기화 확인
+      if (!this.worktimeService) {
+        await this.sendError(
+          bot,
+          chatId,
+          "근무 서비스가 초기화되지 않았습니다."
+        );
+        return true;
+      }
+
       const todayRecord = await this.worktimeService.getTodayRecord(userId);
       if (todayRecord?.checkIn) {
         await bot.answerCallbackQuery(callbackQuery.id, {
@@ -113,8 +188,7 @@ class WorktimeModule extends BaseModule {
         return true;
       }
 
-      // 출근 시간 기록
-      const checkInTime = TimeHelper.getShortTimeString(); // ✅ getCurrentTime 대신 사용
+      const checkInTime = TimeHelper.getShortTimeString();
       const result = await this.worktimeService.checkIn(userId, checkInTime);
 
       if (result.success) {
@@ -137,6 +211,7 @@ class WorktimeModule extends BaseModule {
         };
 
         await this.editMessage(bot, chatId, messageId, successText, {
+          parse_mode: "Markdown",
           reply_markup: keyboard,
         });
 
@@ -154,7 +229,7 @@ class WorktimeModule extends BaseModule {
   }
 
   // 🏠 퇴근 처리
-  async processCheckOut(bot, callbackQuery) {
+  async processCheckOut(bot, callbackQuery, params, menuManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -228,7 +303,25 @@ class WorktimeModule extends BaseModule {
       return true;
     }
   }
+  async showDetailedProgress(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
 
+    const detailText = `📈 **상세 진행률**\n\n` + `구현 예정입니다.`;
+
+    await this.editMessage(bot, chatId, messageId, detailText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 근무 메뉴", callback_data: "worktime:menu" }],
+        ],
+      },
+    });
+  }
   // 근무 상태 계산
   async calculateWorktimeStatus() {
     const now = TimeHelper.getKoreaTime(); // ✅ Date 객체로 받음

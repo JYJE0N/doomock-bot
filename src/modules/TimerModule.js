@@ -11,22 +11,16 @@ class TimerModule extends BaseModule {
     // ⭐ 중요: super()를 먼저 호출해야 this.actionMap이 초기화됨
     super("TimerModule");
 
-    // 이제 안전하게 인스턴스 변수들을 초기화
+    // 인스턴스 변수들 초기화
     this.timerService = new TimerService();
     this.userStates = new Map();
-
-    // 사용자 친화적 설정
     this.config = {
-      refreshInterval: 30000, // 30초마다 자동 새로고침
+      refreshInterval: 30000,
       enableNotifications: true,
       showProgressAnimation: true,
       autoCompletePrompt: true,
     };
-
-    // 자동 새로고침 관리
-    this.activeRefreshes = new Map(); // userId -> intervalId
-
-    // 이모지 및 시각적 요소
+    this.activeRefreshes = new Map();
     this.emojis = {
       work: "💼",
       break: "☕",
@@ -37,71 +31,34 @@ class TimerModule extends BaseModule {
       progress: ["🔴", "🟠", "🟡", "🟢"],
       numbers: ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"],
     };
-
     // ⭐ super() 호출 후에 액션 등록
-    this.registerTimerActions();
   }
 
   // ⭐ Timer 모듈의 액션들을 등록
-  registerTimerActions() {
-    // 디버깅용 로그
-    logger.debug(
-      `⏰ TimerModule: actionMap 상태 = ${this.actionMap ? "OK" : "NULL"}`
-    );
-
-    if (!this.actionMap) {
-      logger.error("❌ TimerModule: actionMap이 없습니다!");
-      return;
-    }
-
-    // 메서드들이 정의되어 있는지 확인
-    const methods = {
-      menu: this.showTimerMenu,
-      help: this.showTimerHelp,
-      pomodoro_start: this.showPomodoroTaskPrompt,
-      pomodoro_quick: this.startQuickPomodoro,
-      complete: this.completePomodoro,
-      continue: this.continuePomodoro,
-      start_prompt: this.startTimerPrompt,
-      status: this.showTimerStatus,
-      stop: this.stopTimer,
-      stats: this.showUserStats,
-    };
-
-    // 각 메서드가 실제로 존재하는지 확인
-    for (const [name, method] of Object.entries(methods)) {
-      if (typeof method === "function") {
-        logger.debug(`✅ TimerModule: ${name} 메서드 존재`);
-      } else {
-        logger.warn(`⚠️ TimerModule: ${name} 메서드가 정의되지 않음`);
-      }
-    }
-
-    // ⭐ 액션 등록
-    this.registerActions(methods);
-  }
-
-  // ⭐ Timer 모듈의 액션들을 등록
-  registerTimerActions() {
+  setupActions() {
     this.registerActions({
       // 메뉴 관련
       menu: this.showTimerMenu,
       help: this.showTimerHelp,
 
       // 포모도로 관련
-      pomodoro_start: this.showPomodoroTaskPrompt,
-      pomodoro_quick: this.startQuickPomodoro,
+      "pomodoro:start": this.showPomodoroTaskPrompt,
+      "pomodoro:quick": this.startQuickPomodoro,
       complete: this.completePomodoro,
       continue: this.continuePomodoro,
 
       // 일반 타이머 관련
-      start_prompt: this.startTimerPrompt,
+      "start:prompt": this.startTimerPrompt,
       status: this.showTimerStatus,
       stop: this.stopTimer,
 
       // 통계
       stats: this.showUserStats,
+
+      // 휴식 관련 (추가)
+      "break:start": this.startBreak,
     });
+    logger.debug(`⏰ TimerModule 액션 등록 완료: ${this.actionMap.size}개`);
   }
 
   async handleMessage(bot, msg) {
@@ -404,6 +361,34 @@ class TimerModule extends BaseModule {
     if (!data.completed) {
       this.startAutoRefresh(bot, chatId, messageId, userId);
     }
+  }
+
+  // ⭐ 스타트 브레이크 (휴식)
+  async startBreak(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    // 포모도로 완료 후 휴식 시작 로직
+    const breakText =
+      "☕ **휴식 시간!**\n\n" +
+      "5분간 휴식을 취하세요.\n" +
+      "스트레칭, 물 마시기, 눈 운동 등을 추천합니다!\n\n" +
+      "휴식도 생산성의 일부입니다. 🌱";
+
+    await this.editMessage(bot, chatId, messageId, breakText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "⏹️ 휴식 종료", callback_data: "timer:stop" }],
+          [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
+        ],
+      },
+    });
   }
 
   // ⭐ 타이머 상태 표시 (실시간 업데이트)

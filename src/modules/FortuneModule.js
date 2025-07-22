@@ -37,28 +37,34 @@ class FortuneModule extends BaseModule {
   }
 
   // ✅ BaseModule 표준 액션 등록 (이게 핵심!)
-  registerActions() {
-    // BaseModule의 기본 액션 유지 (menu, help)
-    super.registerActions();
+  // FortuneModule의 setupActions 메서드
 
-    // 🔮 운세 타입별 액션 등록
-    this.actionMap.set("general", this.showGeneralFortune.bind(this));
-    this.actionMap.set("work", this.showWorkFortune.bind(this));
-    this.actionMap.set("love", this.showLoveFortune.bind(this));
-    this.actionMap.set("money", this.showMoneyFortune.bind(this));
-    this.actionMap.set("health", this.showHealthFortune.bind(this));
-    this.actionMap.set("meeting", this.showMeetingFortune.bind(this));
+  setupActions() {
+    // ✅ BaseModule의 registerActions 헬퍼 활용
+    this.registerActions({
+      // 기본 액션
+      menu: this.showMenu,
+      help: this.showFortuneHelp,
 
-    // 🃏 타로카드 액션들
-    this.actionMap.set("tarot", this.showTarot.bind(this));
-    this.actionMap.set("tarot3", this.showTarotThreeSpread.bind(this));
+      // 🔮 운세 타입별 액션
+      general: this.showGeneralFortune,
+      work: this.showWorkFortune,
+      love: this.showLoveFortune,
+      money: this.showMoneyFortune,
+      health: this.showHealthFortune,
+      meeting: this.showMeetingFortune,
 
-    // 🍀 기타 운세 액션들
-    this.actionMap.set("lucky", this.showLucky.bind(this));
-    this.actionMap.set("all", this.showAllFortune.bind(this));
+      // 🃏 타로카드 액션
+      tarot: this.showTarot,
+      tarot3: this.showTarotThreeSpread,
 
-    // 📋 호환성을 위한 별칭
-    this.actionMap.set("today", this.showGeneralFortune.bind(this));
+      // 🍀 기타 운세 액션
+      lucky: this.showLucky,
+      all: this.showAllFortune,
+
+      // 📋 호환성을 위한 별칭
+      today: this.showGeneralFortune,
+    });
 
     logger.debug(`🎯 FortuneModule 액션 등록 완료: ${this.actionMap.size}개`);
   }

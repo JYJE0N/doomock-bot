@@ -10,7 +10,20 @@ class InsightModule extends BaseModule {
     super("InsightModule");
     this.insightService = new InsightService();
   }
-
+  // 🎯 모듈별 초기화
+  setupActions() {
+    this.registerActions({
+      menu: this.showMenu,
+      status: this.showLeaveStatus,
+      use: this.showLeaveUseMenu,
+      "use:1": this.useOneDay,
+      "use:0.5": this.useHalfDay,
+      "use:custom": this.startCustomInput,
+      history: this.showLeaveHistory,
+      setting: this.showLeaveSetting,
+      help: this.showLeaveHelp,
+    });
+  }
   async handleMessage(bot, msg) {
     const { text } = msg;
     if (text && text.startsWith("/insight")) {
