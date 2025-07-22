@@ -188,23 +188,66 @@ class BaseModule {
 
   async editMessage(bot, chatId, messageId, text, options = {}) {
     try {
-      const defaultOptions = {
-        parse_mode: "Markdown",
-        disable_web_page_preview: true,
-      };
-      return await bot.editMessageText(text, {
+      // messageId가 없으면 새 메시지 전송
+      if (!messageId) {
+        logger.warn("⚠️ messageId가 없어 새 메시지 전송");
+        return await this.sendMessage(bot, chatId, text, options);
+      }
+
+      const editOptions = {
         chat_id: chatId,
         message_id: messageId,
-        ...defaultOptions,
         ...options,
-      });
+      };
+
+      return await bot.editMessageText(text, editOptions);
     } catch (error) {
-      logger.error(`❌ ${this.moduleName} 메시지 수정 실패:`, error);
-      // 메시지가 변경되지 않은 경우 무시
-      if (error.message?.includes("message is not modified")) {
-        return null;
+      // 메시지 편집 실패 시 처리
+      if (error.response?.body?.error_code === 400) {
+        const errorDesc = error.response.body.description;
+
+        if (errorDesc.includes("message identifier is not specified")) {
+          logger.warn("⚠️ 메시지 ID 오류, 새 메시지 전송");
+          return await this.sendMessage(bot, chatId, text, options);
+        }
+
+        if (errorDesc.includes("message is not modified")) {
+          logger.debug("메시지 내용이 동일하여 수정하지 않음");
+          return null;
+        }
+
+        if (errorDesc.includes("message to edit not found")) {
+          logger.warn("⚠️ 편집할 메시지를 찾을 수 없음, 새 메시지 전송");
+          return await this.sendMessage(bot, chatId, text, options);
+        }
       }
+
+      logger.error("메시지 편집 실패:", error);
       throw error;
+    }
+  }
+  // ✅ 에러 메시지 전송 헬퍼
+  async sendErrorMessage(bot, chatId, messageId, errorText = null) {
+    const defaultErrorText =
+      "❌ **오류 발생**\n\n" +
+      "처리 중 문제가 발생했습니다.\n" +
+      "잠시 후 다시 시도해주세요.";
+
+    const text = errorText || defaultErrorText;
+    const keyboard = {
+      inline_keyboard: [[{ text: "🔙 메인 메뉴", callback_data: "main:menu" }]],
+    };
+
+    if (messageId) {
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+    } else {
+      await this.sendMessage(bot, chatId, text, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
     }
   }
 

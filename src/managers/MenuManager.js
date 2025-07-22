@@ -1,3 +1,4 @@
+// src/managers/MenuManager.js - getMenuText 메서드 추가
 const logger = require("../utils/Logger");
 const MenuConfig = require("../config/MenuConfig");
 const AppConfig = require("../config/AppConfig");
@@ -34,6 +35,94 @@ class MenuManager {
     if (dependencies.moduleManager) {
       this.setModuleManager(dependencies.moduleManager);
     }
+  }
+
+  // ✅ getMenuText 메서드 추가
+  getMenuText(menuType, userName) {
+    const menuTexts = {
+      reminder: `🔔 **${userName}님의 리마인더**\n\n필요한 시간에 알림을 받아보세요!`,
+      todo: `📝 **${userName}님의 할일 목록**\n\n효율적인 할일 관리를 시작하세요!`,
+      worktime: `🕐 **${userName}님의 근무시간**\n\n근무시간을 관리하세요!`,
+      leave: `📅 **${userName}님의 휴가 관리**\n\n휴가를 계획하고 관리하세요!`,
+      weather: `🌤️ **날씨 정보**\n\n오늘의 날씨를 확인하세요!`,
+      fortune: `🔮 **오늘의 운세**\n\n${userName}님의 운세를 확인하세요!`,
+      timer: `⏰ **타이머 관리**\n\n시간을 효율적으로 관리하세요!`,
+      utils: `🛠️ **유틸리티**\n\n다양한 편의 기능을 사용하세요!`,
+      main: `🏠 **메인 메뉴**\n\n안녕하세요 ${userName}님!\n무엇을 도와드릴까요?`,
+    };
+
+    return menuTexts[menuType] || `📋 **${userName}님의 메뉴**`;
+  }
+
+  // ✅ createKeyboard 메서드 추가
+  createKeyboard(menuType) {
+    const keyboards = {
+      reminder: {
+        inline_keyboard: [
+          [
+            { text: "⏰ 분 단위 리마인더", callback_data: "reminder:minutes" },
+            { text: "🕐 시간 설정", callback_data: "reminder:time" },
+          ],
+          [
+            { text: "❓ 사용법", callback_data: "reminder:help" },
+            { text: "🔙 메인 메뉴", callback_data: "main:menu" },
+          ],
+        ],
+      },
+      todo: {
+        inline_keyboard: [
+          [
+            { text: "➕ 할일 추가", callback_data: "todo:add" },
+            { text: "📋 목록 보기", callback_data: "todo:list" },
+          ],
+          [
+            { text: "✅ 완료 목록", callback_data: "todo:done" },
+            { text: "🗑️ 할일 삭제", callback_data: "todo:delete" },
+          ],
+          [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+        ],
+      },
+      worktime: {
+        inline_keyboard: [
+          [
+            { text: "🚀 출근하기", callback_data: "worktime:checkin" },
+            { text: "🏡 퇴근하기", callback_data: "worktime:checkout" },
+          ],
+          [
+            { text: "📊 근무 현황", callback_data: "worktime:status" },
+            { text: "📈 월간 통계", callback_data: "worktime:monthly" },
+          ],
+          [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+        ],
+      },
+      leave: {
+        inline_keyboard: [
+          [
+            { text: "📊 연차 현황", callback_data: "leave:status" },
+            { text: "➕ 휴가 신청", callback_data: "leave:add" },
+          ],
+          [
+            { text: "📋 휴가 내역", callback_data: "leave:history" },
+            { text: "🔙 메인 메뉴", callback_data: "main:menu" },
+          ],
+        ],
+      },
+      utils: {
+        inline_keyboard: [
+          [
+            { text: "🔊 TTS 메뉴", callback_data: "utils:tts:menu" },
+            { text: "📌 공지사항", callback_data: "utils:notice" },
+          ],
+          [
+            { text: "❓ 도움말", callback_data: "utils:help" },
+            { text: "🔙 메인 메뉴", callback_data: "main:menu" },
+          ],
+        ],
+      },
+      // 다른 메뉴들도 필요에 따라 추가
+    };
+
+    return keyboards[menuType] || this.getDefaultKeyboard();
   }
 
   async getMainMenuKeyboard() {
@@ -78,100 +167,64 @@ class MenuManager {
 
     for (const button of moduleButtons) {
       const isEnabled = this.isModuleEnabledQuick(button.module);
-      console.log(`📱 ${button.module}: ${isEnabled ? "✅" : "❌"}`);
-
+      console.log(`📱 ${button.module}: ${isEnabled ? "활성" : "비활성"}`);
       if (isEnabled) {
         menuItems.push(button);
       }
     }
 
-    console.log(`📋 최종 메뉴 아이템: ${menuItems.length}개`);
     return menuItems;
   }
 
-  isModuleEnabledQuick(moduleKey) {
-    if (!this.moduleManager) {
-      console.log(`❌ ${moduleKey}: ModuleManager 없음`);
+  isModuleEnabledQuick(moduleName) {
+    try {
+      if (!this.moduleManager) {
+        return false;
+      }
+
+      const moduleClass = this.moduleMapping[moduleName];
+      if (!moduleClass) {
+        return false;
+      }
+
+      return this.moduleManager.hasModule(moduleClass);
+    } catch (error) {
+      logger.error(`모듈 활성화 확인 실패 (${moduleName}):`, error);
       return false;
     }
+  }
 
-    // 🔧 this.moduleMapping으로 변경 (static 제거)
-    const moduleName = this.moduleMapping[moduleKey];
-    if (!moduleName) {
-      console.log(`❌ ${moduleKey}: 매핑된 모듈명 없음`);
-      return false;
+  createKeyboardLayout(items, options = {}) {
+    const { columns = 2 } = options;
+    const keyboard = [];
+
+    for (let i = 0; i < items.length; i += columns) {
+      const row = [];
+      for (let j = 0; j < columns && i + j < items.length; j++) {
+        row.push({
+          text: items[i + j].text,
+          callback_data: items[i + j].callback_data,
+        });
+      }
+      keyboard.push(row);
     }
 
-    // 여러 방법으로 모듈 존재 확인
-    const hasModule =
-      this.moduleManager.hasModule && this.moduleManager.hasModule(moduleName);
-    const getModule =
-      this.moduleManager.getModule && this.moduleManager.getModule(moduleName);
-
-    console.log(`🔍 ${moduleKey} (${moduleName}):`, {
-      hasModule: !!hasModule,
-      getModule: !!getModule,
-      moduleManager: !!this.moduleManager,
-    });
-
-    return hasModule || !!getModule;
+    return { inline_keyboard: keyboard };
   }
 
   getDefaultKeyboard() {
     return {
       inline_keyboard: [
         [
-          { text: "📝 할일", callback_data: "todo:menu" },
-          { text: "🌤️ 날씨", callback_data: "weather:menu" },
+          { text: "📝 할일 관리", callback_data: "todo:menu" },
+          { text: "🔮 운세", callback_data: "fortune:menu" },
         ],
         [
-          { text: "🕐 근무시간", callback_data: "worktime:menu" },
-          { text: "❓ 도움말", callback_data: "help:menu" },
+          { text: "⏰ 타이머", callback_data: "timer:menu" },
+          { text: "🌤️ 날씨", callback_data: "weather:menu" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
-  }
-
-  createKeyboardLayout(items, options = {}) {
-    const {
-      columns = 2,
-      backButton = false,
-      backCallback = "main:menu",
-      extraButtons = [],
-    } = options;
-
-    const keyboard = [];
-
-    // 🔧 item.emoji 제거 (text에 이미 포함됨)
-    for (let i = 0; i < items.length; i += columns) {
-      const row = items.slice(i, i + columns).map((item) => ({
-        text: item.text,
-        callback_data: item.callback_data,
-      }));
-      keyboard.push(row);
-    }
-
-    if (extraButtons.length > 0) {
-      extraButtons.forEach((buttonRow) => {
-        keyboard.push(Array.isArray(buttonRow) ? buttonRow : [buttonRow]);
-      });
-    }
-
-    if (backButton) {
-      keyboard.push([{ text: "🔙 메인 메뉴", callback_data: backCallback }]);
-    }
-
-    return { inline_keyboard: keyboard };
-  }
-
-  cleanupCache() {
-    const now = Date.now();
-    for (const [key, cached] of this.menuCache.entries()) {
-      if (now - cached.timestamp >= this.cacheTimeout) {
-        this.menuCache.delete(key);
-      }
-    }
   }
 }
 

@@ -1,6 +1,7 @@
 // src/controllers/BotController.js - 최종 수정 (핸들러 의존성 제거)
 
 const ModuleManager = require("../managers/ModuleManager");
+const MenuManager = require("../managers/MenuManager");
 const logger = require("../utils/Logger");
 const UserHelper = require("../utils/UserHelper");
 
@@ -9,9 +10,10 @@ class BotController {
     this.bot = bot;
     this.config = config;
 
-    // 핵심 매니저만
+    // 핵심 매니저들
     this.dbManager = null;
     this.moduleManager = null;
+    this.menuManager = null; // ✅ MenuManager 추가
 
     // 사용자 상태 관리
     this.userStates = new Map();
@@ -37,10 +39,13 @@ class BotController {
       // 1. 데이터베이스 초기화 (안전하게)
       await this.initializeDatabase();
 
-      // 2. 모듈 매니저 초기화 - 주석 해제!
+      // 2. 모듈 매니저 초기화
       await this.initializeModuleManager();
 
-      // 3. 이벤트 리스너 등록
+      // ✅ 3. 메뉴 매니저 초기화 및 연결
+      await this.initializeMenuManager();
+
+      // 4. 이벤트 리스너 등록
       if (!this.eventListenersRegistered) {
         this.registerEventListeners();
         this.eventListenersRegistered = true;
@@ -51,6 +56,24 @@ class BotController {
     } catch (error) {
       logger.error("❌ BotController 초기화 실패:", error);
       logger.error("에러 스택:", error.stack);
+      throw error;
+    }
+  }
+
+  // ✅ MenuManager 초기화 메서드 추가
+  async initializeMenuManager() {
+    logger.info("📋 메뉴 매니저 초기화 중...");
+
+    try {
+      this.menuManager = new MenuManager();
+
+      // 상호 참조 설정
+      this.menuManager.setModuleManager(this.moduleManager);
+      this.moduleManager.setMenuManager(this.menuManager);
+
+      logger.success("✅ 메뉴 매니저 초기화 완료");
+    } catch (error) {
+      logger.error("❌ 메뉴 매니저 초기화 실패:", error);
       throw error;
     }
   }

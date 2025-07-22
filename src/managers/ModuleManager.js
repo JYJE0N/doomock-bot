@@ -112,11 +112,11 @@ class ModuleManager {
   // 🎯 중앙 콜백 라우팅 (표준화)
   async handleCallback(callbackQuery) {
     const callbackData = callbackQuery.data;
-    const callbackKey = `${callbackQuery.from.id}-${callbackData}`;
+    const callbackKey = `${callbackQuery.message.chat.id}-${callbackQuery.id}`;
 
     // 중복 처리 방지
     if (this.processingCallbacks.has(callbackKey)) {
-      logger.debug("🔁 중복 콜백 무시:", callbackData);
+      logger.debug("🔄 콜백 중복 처리 방지:", callbackKey);
       return false;
     }
 
@@ -131,7 +131,10 @@ class ModuleManager {
       }
 
       // ⭐ 콜백 데이터 파싱 (콜론 형식)
-      const [targetModule, subAction, ...params] = callbackData.split(":");
+      const parts = callbackData.split(":");
+      let targetModule,
+        subAction,
+        params = {};
 
       // 파싱 검증
       if (!targetModule) {
@@ -144,8 +147,47 @@ class ModuleManager {
         `🔔 콜백 라우팅: ${targetModule} → ${subAction || "default"}`
       );
 
-      // 모듈 찾기
+      // ✅ 3단계 이상의 콜백 데이터 처리
+      if (parts.length === 1) {
+        // "main" 같은 단일 명령
+        targetModule = parts[0];
+        subAction = "menu";
+      } else if (parts.length === 2) {
+        // "todo:menu" 같은 2단계
+        [targetModule, subAction] = parts;
+      } else if (parts.length >= 3) {
+        // "utils:tts:menu" 같은 3단계 이상
+        targetModule = parts[0];
+
+        // ✅ 특별 처리: utils 모듈의 tts 관련 액션
+        if (targetModule === "utils" && parts[1] === "tts") {
+          // "tts:menu" 형태로 조합
+          subAction = parts.slice(1).join(":");
+        } else {
+          // 기본적으로 나머지를 모두 subAction으로
+          subAction = parts.slice(1).join(":");
+        }
+      }
+
+      // 메인 메뉴 특별 처리
+      if (targetModule === "main" && subAction === "menu") {
+        logger.info("🏠 메인 메뉴 요청");
+        return await this.handleMainMenu(callbackQuery);
+      }
+
+      // 모듈 클래스 찾기
       const moduleClass = this.findModuleClass(targetModule);
+      if (!moduleClass) {
+        logger.warn(`⚠️ 알 수 없는 모듈: ${targetModule}`);
+        await this.sendModuleNotFoundMessage(callbackQuery);
+        return false;
+      }
+
+      logger.info(
+        `🔔 콜백 라우팅: ${targetModule} → ${subAction || "default"}`
+      );
+
+      // 모듈 인스턴스 찾기
       const module = this.moduleInstances.get(moduleClass);
 
       if (!module) {
@@ -154,14 +196,17 @@ class ModuleManager {
         return false;
       }
 
+      // ✅ MenuManager 인스턴스 가져오기
+      const menuManager = this.getMenuManager();
+
       // 표준 매개변수로 모듈 콜백 호출
       if (module.handleCallback) {
         const result = await module.handleCallback(
           this.bot,
           callbackQuery,
-          subAction || "menu", // subAction이 없으면 기본값 "menu"
+          subAction || "menu",
           params,
-          this // menuManager로 자기 자신 전달
+          menuManager // MenuManager 인스턴스 전달
         );
 
         // 콜백 응답
@@ -182,6 +227,27 @@ class ModuleManager {
     }
 
     return false;
+  }
+
+  // ✅ MenuManager 인스턴스를 가져오는 메서드 추가
+  getMenuManager() {
+    // BotController에서 설정한 MenuManager 인스턴스를 반환
+    if (this.menuManager) {
+      return this.menuManager;
+    }
+
+    // MenuManager가 없으면 임시로 생성 (권장하지 않음)
+    logger.warn("⚠️ MenuManager가 설정되지 않음. 임시 인스턴스 생성");
+    const MenuManager = require("./MenuManager");
+    const tempMenuManager = new MenuManager();
+    tempMenuManager.setModuleManager(this);
+    return tempMenuManager;
+  }
+
+  // ✅ MenuManager 설정 메서드 추가
+  setMenuManager(menuManager) {
+    this.menuManager = menuManager;
+    logger.info("📋 ModuleManager에 MenuManager 연결됨");
   }
 
   // 🏠 메인 메뉴 처리
