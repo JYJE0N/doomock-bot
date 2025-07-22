@@ -161,6 +161,87 @@ class LeaveModule extends BaseModule {
       return true;
     }
   }
+  // 📜 휴가 사용 내역 보기
+  async showLeaveHistory(bot, callbackQuery) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    const history = await this.leaveService.getLeaveHistory(userId); // 서비스에 메서드가 필요
+
+    const message =
+      history.length > 0
+        ? "📜 **휴가 사용 내역**\n\n" +
+          history.map((h) => `• ${h.date}: ${h.days}일 사용`).join("\n")
+        : "📭 사용 내역이 없습니다.";
+
+    await this.editMessage(bot, chatId, messageId, message, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
+        ],
+      },
+    });
+  }
+
+  // ⚙️ 휴가 설정 보기
+  async showLeaveSetting(bot, callbackQuery) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    const leaveData = await this.leaveService.getUserLeaveData(userId);
+
+    const message =
+      `⚙️ **휴가 설정**\n\n` +
+      `총 휴가: ${leaveData.totalDays}일\n` +
+      `사용 가능: ${leaveData.remainingDays}일\n` +
+      `_설정 변경은 관리자에게 문의하세요._`;
+
+    await this.editMessage(bot, chatId, messageId, message, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
+        ],
+      },
+    });
+  }
+
+  // ❓ 도움말
+  async showLeaveHelp(bot, callbackQuery) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    const text =
+      "❓ *휴가 기능 안내*\n\n" +
+      "• `잔여 휴가`로 남은 일수 확인\n" +
+      "• `휴가 사용`으로 원하는 일수 선택\n" +
+      "• `사용 내역`에서 기록 확인\n\n" +
+      "휴가를 효율적으로 관리하세요!";
+
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
+        ],
+      },
+    });
+  }
 
   // ✅ 휴가 사용 메뉴
   async showLeaveUseMenu(bot, callbackQuery) {

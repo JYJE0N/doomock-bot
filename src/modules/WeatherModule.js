@@ -60,6 +60,15 @@ class WeatherModule extends BaseModule {
       help: this.showWeatherHelp,
     });
   }
+  // 📅 일기예보 액션 처리
+  async showWeatherForecast(bot, callbackQuery) {
+    return await this.showForecast(bot, callbackQuery);
+  }
+
+  // 🏙️ 도시 선택 메뉴
+  async selectCity(bot, callbackQuery) {
+    return await this.showCityList(bot, callbackQuery);
+  }
 
   // 🎯 메시지 처리
   async onHandleMessage(bot, msg) {

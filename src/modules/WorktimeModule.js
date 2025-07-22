@@ -58,16 +58,16 @@ class WorktimeModule extends BaseModule {
   // ✅ 액션 등록
   setupActions() {
     this.registerActions({
-      menu: this.showMenu,
-      status: this.showWorktimeStatus,
-      checkin: this.processCheckIn,
-      checkout: this.processCheckOut,
-      progress: this.showDetailedProgress,
-      history: this.showHistory,
-      settings: this.showSettings,
-      "today:record": this.showTodayRecord,
-      "add:checkin_note": this.addCheckInNote,
-      "add:checkout_note": this.addCheckOutNote,
+      menu: this.showMenu.bind(this),
+      status: this.showWorktimeStatus.bind(this),
+      checkin: this.processCheckIn.bind(this),
+      checkout: this.processCheckOut.bind(this),
+      progress: this.showDetailedProgress.bind(this),
+      history: this.showHistory?.bind(this),
+      settings: this.showSettings?.bind(this),
+      "today:record": this.showTodayRecord?.bind(this),
+      "add:checkin_note": this.addCheckInNote?.bind(this),
+      "add:checkout_note": this.addCheckOutNote?.bind(this),
     });
 
     logger.debug(`🕐 WorktimeModule 액션 등록 완료: ${this.actionMap.size}개`);
@@ -437,7 +437,97 @@ class WorktimeModule extends BaseModule {
     return `[${bar}]`;
   }
 
-  // 나머지 메서드들은 그대로 유지...
+  // 📜 근무 기록 보기
+  async showHistory(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    const history = await this.worktimeService.getRecentHistory(userId); // 이 메서드가 Service에 존재해야 함
+    const historyText =
+      history.length > 0
+        ? `📜 **최근 근무 기록**\n\n` +
+          history
+            .map((r) => `• ${r.date}: ${r.checkIn} ~ ${r.checkOut || "미기록"}`)
+            .join("\n")
+        : "📭 최근 근무 기록이 없습니다.";
+
+    await this.editMessage(bot, chatId, messageId, historyText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 메뉴로", callback_data: "worktime:menu" }],
+        ],
+      },
+    });
+  }
+
+  // ⚙️ 설정 보기
+  async showSettings(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    const text =
+      `⚙️ **근무시간 설정**\n\n` +
+      `• 출근: ${this.workSchedule.startTime}\n` +
+      `• 점심: ${this.workSchedule.lunchStart} ~ ${this.workSchedule.lunchEnd}\n` +
+      `• 퇴근: ${this.workSchedule.endTime}`;
+
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 메뉴로", callback_data: "worktime:menu" }],
+        ],
+      },
+    });
+  }
+
+  // 📜 오늘 기록
+  async showTodayRecord(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    const record = await this.worktimeService.getTodayRecord(userId);
+    const text =
+      `📜 **오늘의 근무 기록**\n\n` +
+      `• 출근: ${record.checkIn || "❌ 없음"}\n` +
+      `• 퇴근: ${record.checkOut || "❌ 없음"}`;
+
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 메뉴로", callback_data: "worktime:menu" }],
+        ],
+      },
+    });
+  }
+
+  // 📝 출근 메모 추가
+  async addCheckInNote(bot, callbackQuery, params, menuManager) {
+    const chatId = callbackQuery.message.chat.id;
+    await this.sendMessage(bot, chatId, "📝 출근 메모 기능은 준비 중입니다.");
+  }
+
+  // 📝 퇴근 메모 추가
+  async addCheckOutNote(bot, callbackQuery, params, menuManager) {
+    const chatId = callbackQuery.message.chat.id;
+    await this.sendMessage(bot, chatId, "📝 퇴근 메모 기능은 준비 중입니다.");
+  }
 }
 
 module.exports = WorktimeModule;

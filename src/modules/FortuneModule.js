@@ -99,6 +99,41 @@ class FortuneModule extends BaseModule {
       },
     };
   }
+  // 🎴 운세 메뉴
+  async showMenu(bot, chatId, messageId, from) {
+    const userName = from?.first_name || "사용자";
+    const text = `🔮 *${userName}님의 운세 메뉴*\n\n오늘의 운세를 확인해보세요!`;
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🎴 운세 뽑기", callback_data: "fortune:draw" }],
+        [{ text: "❓ 도움말", callback_data: "fortune:help" }],
+        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+      ],
+    };
+
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
+  // ❓ 운세 도움말
+  async showHelp(bot, chatId, messageId, from) {
+    const text =
+      "🎴 *운세 도움말*\n\n" +
+      "• 운세 뽑기: 무작위 운세를 보여줍니다\n" +
+      "• 매일 한 번만 뽑을 수 있어요\n" +
+      "• 재미로만 보세요 😉";
+
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
+        ],
+      },
+    });
+  }
 
   // ========== 개별 운세 메서드들 - BaseModule 표준 패턴 ==========
 

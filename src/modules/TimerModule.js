@@ -36,13 +36,13 @@ class TimerModule extends BaseModule {
   // ⭐ Timer 모듈의 액션들을 등록
   setupActions() {
     this.registerActions({
-      menu: this.showMenu,
+      menu: this.showTimerMenu,
       start: this.startTimerMenu,
       "start:5": () => this.startTimer(5),
       "start:10": () => this.startTimer(10),
       "start:custom": this.promptCustomTimer,
       cancel: this.cancelTimer,
-      help: this.showHelp,
+      help: this.showTimerHelp,
     });
   }
 
