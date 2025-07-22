@@ -222,15 +222,15 @@ class UtilsModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🗣️ 수동 모드", callback_data: "utils:tts_manual" },
-          { text: "🤖 자동 모드", callback_data: "utils:tts_auto_on" },
+          { text: "🗣️ 수동 모드", callback_data: "utils:tts:manual" },
+          { text: "🤖 자동 모드", callback_data: "utils:tts:auto_on" },
         ],
         [
-          { text: "🛑 TTS 끄기", callback_data: "utils:tts_auto_off" },
-          { text: "🔧 진단", callback_data: "utils:tts_diagnostics" },
+          { text: "🛑 TTS 끄기", callback_data: "utils:tts:auto_off" },
+          { text: "🔧 진단", callback_data: "utils:tts:diagnostic ds" },
         ],
         [
-          { text: "❓ 도움말", callback_data: "utils:tts_help" },
+          { text: "❓ 도움말", callback_data: "utils:tts:help" },
           { text: "🔙 유틸리티", callback_data: "utils:menu" },
         ],
       ],
