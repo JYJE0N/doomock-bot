@@ -37,7 +37,7 @@ class UtilsModule extends BaseModule {
     this.actionMap.set("menu", this.showMenu.bind(this));
 
     // TTS 관련 액션들
-    this.actionMap.set("tts_menu", this.showTTSMenu.bind(this));
+    this.actionMap.set("tts:menu", this.showTTSMenu.bind(this));
     this.actionMap.set("tts_help", this.showTTSHelp.bind(this));
     this.actionMap.set("tts_stop", this.stopTTS.bind(this));
     this.actionMap.set("tts_auto_on", this.enableAutoTTS.bind(this));
@@ -61,11 +61,11 @@ class UtilsModule extends BaseModule {
       keyboard: {
         inline_keyboard: [
           [
-            { text: "🔊 TTS (음성변환)", callback_data: "utils_tts_menu" },
-            { text: "🔧 TTS 설정", callback_data: "utils_tts_diagnostics" },
+            { text: "🔊 TTS (음성변환)", callback_data: "utils_tts:menu" },
+            { text: "🔧 TTS 설정", callback_data: "utils_tts:diagnostics" },
           ],
           [
-            { text: "❓ 도움말", callback_data: "utils_help" },
+            { text: "❓ 도움말", callback_data: "utils:help" },
             { text: "🔙 메인 메뉴", callback_data: "main:menu" },
           ],
         ],
@@ -223,7 +223,7 @@ class UtilsModule extends BaseModule {
         ],
         [
           { text: "❓ 도움말", callback_data: "utils_tts_help" },
-          { text: "🔙 유틸리티", callback_data: "utils_menu" },
+          { text: "🔙 유틸리티", callback_data: "utils:menu" },
         ],
       ],
     };
@@ -259,7 +259,7 @@ class UtilsModule extends BaseModule {
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: "🔙 TTS 메뉴", callback_data: "utils_tts_menu" }],
+        [{ text: "🔙 TTS 메뉴", callback_data: "utils_tts:menu" }],
       ],
     };
 
@@ -289,7 +289,7 @@ class UtilsModule extends BaseModule {
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: "🔙 유틸리티 메뉴", callback_data: "utils_menu" }],
+        [{ text: "🔙 유틸리티 메뉴", callback_data: "utils:menu" }],
       ],
     };
 
@@ -335,7 +335,7 @@ class UtilsModule extends BaseModule {
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: "🔙 TTS 메뉴", callback_data: "utils_tts_menu" }],
+        [{ text: "🔙 TTS 메뉴", callback_data: "utils_tts:menu" }],
       ],
     };
 
@@ -402,7 +402,7 @@ class UtilsModule extends BaseModule {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: "🔙 유틸리티 메뉴", callback_data: "utils_menu" },
+              { text: "🔙 유틸리티 메뉴", callback_data: "utils:menu" },
               { text: "🏠 메인 메뉴", callback_data: "main:menu" },
             ],
           ],

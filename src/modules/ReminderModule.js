@@ -119,7 +119,7 @@ class ReminderModule extends BaseModule {
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🔙 리마인더 메뉴", callback_data: "reminder_menu" }],
+          [{ text: "🔙 리마인더 메뉴", callback_data: "reminder:menu" }],
         ],
       },
     });
@@ -144,7 +144,7 @@ class ReminderModule extends BaseModule {
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🔙 리마인더 메뉴", callback_data: "reminder_menu" }],
+          [{ text: "🔙 리마인더 메뉴", callback_data: "reminder:menu" }],
         ],
       },
     });
@@ -172,7 +172,7 @@ class ReminderModule extends BaseModule {
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🔙 리마인더 메뉴", callback_data: "reminder_menu" }],
+          [{ text: "🔙 리마인더 메뉴", callback_data: "reminder:menu" }],
         ],
       },
     });

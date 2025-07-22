@@ -166,7 +166,7 @@ class MessageHandler {
       const helpText = this.getHelpMenuText(userName);
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
 

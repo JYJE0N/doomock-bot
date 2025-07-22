@@ -55,21 +55,21 @@ class MenuManager {
   buildMainMenuItemsSync() {
     const menuItems = [];
     const moduleButtons = [
-      { text: "📝 할일 관리", callback_data: "todo_menu", module: "todo" },
-      { text: "🔮 운세", callback_data: "fortune_menu", module: "fortune" },
-      { text: "🌤️ 날씨", callback_data: "weather_menu", module: "weather" },
-      { text: "⏰ 타이머", callback_data: "timer_menu", module: "timer" },
-      { text: "📊 인사이트", callback_data: "insight_menu", module: "insight" },
-      { text: "🛠️ 유틸리티", callback_data: "utils_menu", module: "utils" },
+      { text: "📝 할일 관리", callback_data: "todo:menu", module: "todo" },
+      { text: "🔮 운세", callback_data: "fortune:menu", module: "fortune" },
+      { text: "🌤️ 날씨", callback_data: "weather:menu", module: "weather" },
+      { text: "⏰ 타이머", callback_data: "timer:menu", module: "timer" },
+      { text: "📊 인사이트", callback_data: "insight:menu", module: "insight" },
+      { text: "🛠️ 유틸리티", callback_data: "utils:menu", module: "utils" },
       {
         text: "🔔 리마인더",
-        callback_data: "reminder_menu",
+        callback_data: "reminder:menu",
         module: "reminder",
       },
-      { text: "📅 휴가 관리", callback_data: "leave_menu", module: "leave" },
+      { text: "📅 휴가 관리", callback_data: "leave:menu", module: "leave" },
       {
         text: "🕐 근무시간",
-        callback_data: "worktime_menu",
+        callback_data: "worktime:menu",
         module: "worktime",
       },
     ];
@@ -121,14 +121,14 @@ class MenuManager {
     return {
       inline_keyboard: [
         [
-          { text: "📝 할일", callback_data: "todo_menu" },
-          { text: "🌤️ 날씨", callback_data: "weather_menu" },
+          { text: "📝 할일", callback_data: "todo:menu" },
+          { text: "🌤️ 날씨", callback_data: "weather:menu" },
         ],
         [
-          { text: "🕐 근무시간", callback_data: "worktime_menu" },
-          { text: "❓ 도움말", callback_data: "help_menu" },
+          { text: "🕐 근무시간", callback_data: "worktime:menu" },
+          { text: "❓ 도움말", callback_data: "help:menu" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
   }
@@ -137,7 +137,7 @@ class MenuManager {
     const {
       columns = 2,
       backButton = false,
-      backCallback = "main_menu",
+      backCallback = "main:menu",
       extraButtons = [],
     } = options;
 

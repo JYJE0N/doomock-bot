@@ -55,9 +55,9 @@ class CallbackManager {
   // 🏠 시스템 라우팅
   addSystemRoutes() {
     const systemRoutes = [
-      ["main_menu", "system", "showMainMenu"],
-      ["help_menu", "system", "showHelpMenu"],
-      ["cancel_action", "system", "handleCancel"],
+      ["main:menu", "system", "showMainMenu"],
+      ["help:menu", "system", "showHelpMenu"],
+      ["cancel:action", "system", "handleCancel"],
     ];
 
     systemRoutes.forEach(([route, module, method]) => {
@@ -75,14 +75,14 @@ class CallbackManager {
       "add", // 할일 추가
       "stats", // 할일 통계
       "clear", // 할일 삭제 메뉴
-      "clear_completed", // 완료된 할일 삭제
-      "clear_all", // 모든 할일 삭제
-      "clear_all_confirm", // ⭐ 누락된 확인 콜백 추가!
+      "clear:completed", // 완료된 할일 삭제
+      "clear:all", // 모든 할일 삭제
+      "clear:all:confirm", // ⭐ 누락된 확인 콜백 추가!
       "help", // 할일 도움말
     ];
 
     todoActions.forEach((action) => {
-      this.routes.set(`todo_${action}`, { module: "todo", method: action });
+      this.routes.set(`todo:${action}`, { module: "todo", method: action });
     });
 
     logger.debug(`📝 할일 라우팅 ${todoActions.length}개 등록`);
@@ -107,7 +107,7 @@ class CallbackManager {
     ];
 
     fortuneActions.forEach((action) => {
-      this.routes.set(`fortune_${action}`, {
+      this.routes.set(`fortune:${action}`, {
         module: "fortune",
         method: action,
       });
@@ -124,12 +124,12 @@ class CallbackManager {
       "forecast", // 날씨 예보
       "seoul", // 서울 날씨
       "busan", // 부산 날씨
-      "more_cities", // 더 많은 도시
+      "more:cities", // 더 많은 도시
       "help", // 날씨 도움말
     ];
 
     weatherActions.forEach((action) => {
-      this.routes.set(`weather_${action}`, {
+      this.routes.set(`weather:${action}`, {
         module: "weather",
         method: action,
       });
@@ -142,15 +142,15 @@ class CallbackManager {
   addTimerRoutes() {
     const timerActions = [
       "menu", // 타이머 메인 메뉴
-      "start_prompt", // 타이머 시작 입력
-      "pomodoro_start", // 포모도로 시작
+      "start:prompt", // 타이머 시작 입력
+      "pomodoro:start", // 포모도로 시작
       "stop", // 타이머 정지
       "status", // 타이머 상태
       "help", // 타이머 도움말
     ];
 
     timerActions.forEach((action) => {
-      this.routes.set(`timer_${action}`, {
+      this.routes.set(`timer:${action}`, {
         module: "timer",
         method: action,
       });
@@ -170,7 +170,7 @@ class CallbackManager {
     ];
 
     leaveActions.forEach((action) => {
-      this.routes.set(`leave_${action}`, {
+      this.routes.set(`leave:${action}`, {
         module: "leave",
         method: action,
       });
@@ -189,7 +189,7 @@ class CallbackManager {
     ];
 
     insightActions.forEach((action) => {
-      this.routes.set(`insight_${action}`, {
+      this.routes.set(`insight:${action}`, {
         module: "insight",
         method: action,
       });
@@ -208,7 +208,7 @@ class CallbackManager {
     ];
 
     utilsActions.forEach((action) => {
-      this.routes.set(`utils_${action}`, {
+      this.routes.set(`utils:${action}`, {
         module: "utils",
         method: action,
       });
@@ -227,19 +227,19 @@ class CallbackManager {
     ];
 
     reminderActions.forEach((action) => {
-      this.routes.set(`reminder_${action}`, {
+      this.routes.set(`reminder:${action}`, {
         module: "reminder",
         method: action,
       });
     });
 
-    // 별칭 라우팅 (remind_로 시작하는 것들)
-    this.routes.set("remind_minutes", {
+    // 별칭 라우팅 (remind:로 시작하는 것들)
+    this.routes.set("remind:minutes", {
       module: "reminder",
       method: "minutes",
     });
-    this.routes.set("remind_time", { module: "reminder", method: "time" });
-    this.routes.set("remind_help", { module: "reminder", method: "help" });
+    this.routes.set("remind:time", { module: "reminder", method: "time" });
+    this.routes.set("remind:help", { module: "reminder", method: "help" });
 
     logger.debug(`🔔 리마인더 라우팅 ${reminderActions.length + 3}개 등록`);
   }
@@ -256,7 +256,7 @@ class CallbackManager {
     ];
 
     worktimeActions.forEach((action) => {
-      this.routes.set(`worktime_${action}`, {
+      this.routes.set(`worktime:${action}`, {
         module: "worktime",
         method: action,
       });
@@ -312,8 +312,8 @@ class CallbackManager {
     }
 
     // ⭐ 표준화된 방식으로 모듈의 handleCallback 호출
-    const [prefix, ...parts] = callbackQuery.data.split("_");
-    const subAction = parts.join("_");
+    const [prefix, ...parts] = callbackQuery.data.split(":");
+    const subAction = parts.join(":");
     const params = {};
     const menuManager = this;
 
@@ -352,12 +352,12 @@ class CallbackManager {
             reply_markup: {
               inline_keyboard: [
                 [
-                  { text: "📝 할일 관리", callback_data: "todo_menu" },
-                  { text: "🔮 운세", callback_data: "fortune_menu" },
+                  { text: "📝 할일 관리", callback_data: "todo:menu" },
+                  { text: "🔮 운세", callback_data: "fortune:menu" },
                 ],
                 [
-                  { text: "⏰ 타이머", callback_data: "timer_menu" },
-                  { text: "🌤️ 날씨", callback_data: "weather_menu" },
+                  { text: "⏰ 타이머", callback_data: "timer:menu" },
+                  { text: "🌤️ 날씨", callback_data: "weather:menu" },
                 ],
               ],
             },
@@ -375,7 +375,7 @@ class CallbackManager {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+                [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
               ],
             },
           }
@@ -392,7 +392,7 @@ class CallbackManager {
             parse_mode: "Markdown",
             reply_markup: {
               inline_keyboard: [
-                [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+                [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
               ],
             },
           }
@@ -417,7 +417,7 @@ class CallbackManager {
           parse_mode: "Markdown",
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+              [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
             ],
           },
         }
@@ -435,7 +435,7 @@ class CallbackManager {
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+              [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
             ],
           },
         }

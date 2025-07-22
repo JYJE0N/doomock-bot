@@ -70,24 +70,24 @@ class FortuneModule extends BaseModule {
       keyboard: {
         inline_keyboard: [
           [
-            { text: "🌟 일반운", callback_data: "fortune_general" },
-            { text: "💼 업무운", callback_data: "fortune_work" },
+            { text: "🌟 일반운", callback_data: "fortune:general" },
+            { text: "💼 업무운", callback_data: "fortune:work" },
           ],
           [
-            { text: "💕 연애운", callback_data: "fortune_love" },
-            { text: "💰 재물운", callback_data: "fortune_money" },
+            { text: "💕 연애운", callback_data: "fortune:love" },
+            { text: "💰 재물운", callback_data: "fortune:money" },
           ],
           [
-            { text: "🌿 건강운", callback_data: "fortune_health" },
-            { text: "🍻 회식운", callback_data: "fortune_meeting" },
+            { text: "🌿 건강운", callback_data: "fortune:health" },
+            { text: "🍻 회식운", callback_data: "fortune:meeting" },
           ],
           [
-            { text: "🃏 타로카드", callback_data: "fortune_tarot" },
-            { text: "🔮 타로 3장", callback_data: "fortune_tarot3" },
+            { text: "🃏 타로카드", callback_data: "fortune:tarot" },
+            { text: "🔮 타로 3장", callback_data: "fortune:tarot3" },
           ],
           [
-            { text: "🍀 행운정보", callback_data: "fortune_lucky" },
-            { text: "📋 종합운세", callback_data: "fortune_all" },
+            { text: "🍀 행운정보", callback_data: "fortune:lucky" },
+            { text: "📋 종합운세", callback_data: "fortune:all" },
           ],
           [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
         ],
@@ -108,7 +108,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -141,7 +141,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -174,7 +174,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -207,7 +207,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -240,7 +240,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -273,7 +273,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -306,7 +306,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -339,7 +339,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -372,7 +372,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -404,7 +404,7 @@ class FortuneModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔙 운세 메뉴", callback_data: "fortune_menu" }],
+          [{ text: "🔙 운세 메뉴", callback_data: "fortune:menu" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };

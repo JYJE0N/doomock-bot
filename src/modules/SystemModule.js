@@ -51,11 +51,11 @@ class SystemModule extends BaseModule {
 
     // 도움말
     this.actionMap.set("help", this.showHelpMenu.bind(this));
-    this.actionMap.set("help_menu", this.showHelpMenu.bind(this));
+    this.actionMap.set("help:menu", this.showHelpMenu.bind(this));
 
     // 설정
     this.actionMap.set("settings", this.showSettingsMenu.bind(this));
-    this.actionMap.set("settings_menu", this.showSettingsMenu.bind(this));
+    this.actionMap.set("settings:menu", this.showSettingsMenu.bind(this));
 
     // 상태
     this.actionMap.set("status", this.showBotStatus.bind(this));

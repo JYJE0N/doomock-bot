@@ -1,4 +1,4 @@
-// src/managers/ModuleManager.js - main_menu 콜백 처리 수정
+// src/managers/ModuleManager.js - main:menu 콜백 처리 수정
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
@@ -125,18 +125,10 @@ class ModuleManager {
     try {
       logger.info(`📨 콜백 데이터 수신: ${callbackData}`);
 
-      // ⭐ main:menu 처리 (콜론 형식)
-      if (callbackData === "main:menu") {
+      // ⭐ 메인 메뉴 처리 (모든 형식 지원)
+      if (callbackData === "main:menu" || callbackData === "main:menu") {
         return await this.handleMainMenu(callbackQuery);
       }
-
-      // ⭐ 레거시 main_menu 처리 (언더스코어 형식 - 호환성)
-      if (callbackData === "main_menu") {
-        return await this.handleMainMenu(callbackQuery);
-      }
-
-      // 콜백 데이터 파싱 (콜론 기준)
-      const [targetModule, subAction, ...params] = callbackData.split(":");
 
       logger.info(`🔔 콜백 라우팅: ${targetModule} → ${subAction}`);
 
@@ -266,47 +258,59 @@ class ModuleManager {
 
   // ❌ 에러 처리
   async sendModuleNotFoundMessage(callbackQuery) {
-    await this.bot.answerCallbackQuery(callbackQuery.id, {
-      text: "⚠️ 해당 모듈을 찾을 수 없습니다.",
-      show_alert: true,
-    });
+    try {
+      await this.bot.answerCallbackQuery(callbackQuery.id, {
+        text: "⚠️ 해당 기능을 찾을 수 없습니다.",
+        show_alert: false,
+      });
+
+      if (callbackQuery.message) {
+        await this.bot.editMessageText(
+          "⚠️ **기능을 찾을 수 없음**\n\n요청하신 기능이 비활성화되었거나 존재하지 않습니다.",
+          {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+              ],
+            },
+          }
+        );
+      }
+    } catch (error) {
+      logger.error("모듈 없음 메시지 전송 실패:", error);
+    }
   }
 
   async sendErrorCallback(callbackQuery) {
-    await this.bot.answerCallbackQuery(callbackQuery.id, {
-      text: "❌ 처리 중 오류가 발생했습니다.",
-      show_alert: true,
-    });
-  }
+    try {
+      // 콜백 응답
+      await this.bot.answerCallbackQuery(callbackQuery.id, {
+        text: "❌ 처리 중 오류가 발생했습니다.",
+        show_alert: true,
+      });
 
-  // 🔍 모듈 조회
-  getModule(moduleName) {
-    return this.moduleInstances.get(moduleName);
-  }
-
-  hasModule(moduleName) {
-    return this.moduleInstances.has(moduleName);
-  }
-
-  // 📊 상태 조회
-  getStatus() {
-    const moduleStatuses = {};
-
-    for (const [name, module] of this.moduleInstances) {
-      moduleStatuses[name] = module.getStatus
-        ? module.getStatus()
-        : {
-            initialized: module.isInitialized || false,
-            name: name,
-          };
+      // 에러 메시지 편집
+      if (callbackQuery.message) {
+        await this.bot.editMessageText(
+          "❌ **오류 발생**\n\n처리 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.",
+          {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+              ],
+            },
+          }
+        );
+      }
+    } catch (error) {
+      logger.error("에러 메시지 전송 실패:", error);
     }
-
-    return {
-      initialized: this.isInitialized,
-      moduleCount: this.moduleInstances.size,
-      modules: moduleStatuses,
-      activeCallbacks: this.processingCallbacks.size,
-    };
   }
 
   // 🧹 정리

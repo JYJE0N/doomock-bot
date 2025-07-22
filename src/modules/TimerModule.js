@@ -113,7 +113,7 @@ class TimerModule extends BaseModule {
     const userState = this.userStates.get(userId);
 
     // 타이머 입력 대기 중인 경우
-    if (userState?.action === "waiting_timer_input") {
+    if (userState?.action === "waiting_timer:input") {
       return await this.handleTimerInput(bot, chatId, userId, text, userState);
     }
 
@@ -202,8 +202,8 @@ class TimerModule extends BaseModule {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: "⚡ 빠른 시작", callback_data: "timer_pomodoro_quick" },
-              { text: "❌ 취소", callback_data: "timer_menu" },
+              { text: "⚡ 빠른 시작", callback_data: "timer:pomodoro_quick" },
+              { text: "❌ 취소", callback_data: "timer:menu" },
             ],
           ],
         },
@@ -320,12 +320,12 @@ class TimerModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "📊 현재 상태", callback_data: "timer_status" },
-            { text: "✅ 완료", callback_data: "timer_complete" },
+            { text: "📊 현재 상태", callback_data: "timer:status" },
+            { text: "✅ 완료", callback_data: "timer:complete" },
           ],
           [
-            { text: "⏹️ 정지", callback_data: "timer_stop" },
-            { text: "🔙 타이머 메뉴", callback_data: "timer_menu" },
+            { text: "⏹️ 정지", callback_data: "timer:stop" },
+            { text: "🔙 타이머 메뉴", callback_data: "timer:menu" },
           ],
         ],
       };
@@ -341,7 +341,7 @@ class TimerModule extends BaseModule {
       await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         },
       });
@@ -379,19 +379,19 @@ class TimerModule extends BaseModule {
       inline_keyboard: data.completed
         ? [
             [
-              { text: "🍅 새 포모도로", callback_data: "timer_pomodoro_start" },
-              { text: "📊 통계 보기", callback_data: "timer_stats" },
+              { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+              { text: "📊 통계 보기", callback_data: "timer:stats" },
             ],
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ]
         : [
             [
-              { text: "▶️ 계속하기", callback_data: "timer_continue" },
-              { text: "⏹️ 정지", callback_data: "timer_stop" },
+              { text: "▶️ 계속하기", callback_data: "timer:continue" },
+              { text: "⏹️ 정지", callback_data: "timer:stop" },
             ],
             [
-              { text: "📊 현재 상태", callback_data: "timer_status" },
-              { text: "🔙 타이머 메뉴", callback_data: "timer_menu" },
+              { text: "📊 현재 상태", callback_data: "timer:status" },
+              { text: "🔙 타이머 메뉴", callback_data: "timer:menu" },
             ],
           ],
     };
@@ -414,7 +414,7 @@ class TimerModule extends BaseModule {
       await this.editMessage(bot, chatId, messageId, `❌ ${status.error}`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         },
       });
@@ -447,7 +447,7 @@ class TimerModule extends BaseModule {
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
             ],
           },
         }
@@ -487,14 +487,14 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔄 새로고침", callback_data: "timer_status" },
-          { text: "✅ 완료", callback_data: "timer_complete" },
+          { text: "🔄 새로고침", callback_data: "timer:status" },
+          { text: "✅ 완료", callback_data: "timer:complete" },
         ],
         [
-          { text: "⏹️ 정지", callback_data: "timer_stop" },
-          { text: "📊 통계", callback_data: "timer_stats" },
+          { text: "⏹️ 정지", callback_data: "timer:stop" },
+          { text: "📊 통계", callback_data: "timer:stats" },
         ],
-        [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+        [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
     };
 
@@ -562,10 +562,10 @@ class TimerModule extends BaseModule {
               [
                 {
                   text: "🍅 첫 포모도로 시작",
-                  callback_data: "timer_pomodoro_start",
+                  callback_data: "timer:pomodoro_start",
                 },
               ],
-              [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
             ],
           },
         }
@@ -613,10 +613,10 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔄 새로고침", callback_data: "timer_stats" },
-          { text: "🍅 새 포모도로", callback_data: "timer_pomodoro_start" },
+          { text: "🔄 새로고침", callback_data: "timer:stats" },
+          { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
         ],
-        [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+        [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
     };
 
@@ -713,10 +713,10 @@ class TimerModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "📊 통계 보기", callback_data: "timer_stats" },
-            { text: "🍅 새 포모도로", callback_data: "timer_pomodoro_start" },
+            { text: "📊 통계 보기", callback_data: "timer:stats" },
+            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
           ],
-          [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+          [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
         ],
       };
 
@@ -728,7 +728,7 @@ class TimerModule extends BaseModule {
       await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         },
       });
@@ -750,7 +750,7 @@ class TimerModule extends BaseModule {
   // 일반 타이머 입력 프롬프트
   async startTimerPrompt(bot, chatId, messageId, userId) {
     this.userStates.set(userId, {
-      action: "waiting_timer_input",
+      action: "waiting_timer:input",
       messageId: messageId,
     });
 
@@ -812,10 +812,10 @@ class TimerModule extends BaseModule {
         const keyboard = {
           inline_keyboard: [
             [
-              { text: "📊 현재 상태", callback_data: "timer_status" },
-              { text: "⏹️ 정지", callback_data: "timer_stop" },
+              { text: "📊 현재 상태", callback_data: "timer:status" },
+              { text: "⏹️ 정지", callback_data: "timer:stop" },
             ],
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         };
 
@@ -832,7 +832,7 @@ class TimerModule extends BaseModule {
           {
             reply_markup: {
               inline_keyboard: [
-                [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+                [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
               ],
             },
           }
@@ -863,10 +863,10 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔄 새로고침", callback_data: "timer_status" },
-          { text: "⏹️ 정지", callback_data: "timer_stop" },
+          { text: "🔄 새로고침", callback_data: "timer:status" },
+          { text: "⏹️ 정지", callback_data: "timer:stop" },
         ],
-        [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+        [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
     };
 
@@ -941,7 +941,7 @@ class TimerModule extends BaseModule {
       reply_markup: {
         inline_keyboard: [
           [
-            { text: "🔄 다시 시도", callback_data: "timer_menu" },
+            { text: "🔄 다시 시도", callback_data: "timer:menu" },
             { text: "🏠 메인 메뉴", callback_data: "main:menu" },
           ],
         ],
@@ -989,8 +989,8 @@ class TimerModule extends BaseModule {
         reply_markup: {
           inline_keyboard: [
             [
-              { text: "⚡ 빠른 시작", callback_data: "timer_pomodoro_quick" },
-              { text: "❌ 취소", callback_data: "timer_menu" },
+              { text: "⚡ 빠른 시작", callback_data: "timer:pomodoro_quick" },
+              { text: "❌ 취소", callback_data: "timer:menu" },
             ],
           ],
         },
@@ -1107,12 +1107,12 @@ class TimerModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "📊 현재 상태", callback_data: "timer_status" },
-            { text: "✅ 완료", callback_data: "timer_complete" },
+            { text: "📊 현재 상태", callback_data: "timer:status" },
+            { text: "✅ 완료", callback_data: "timer:complete" },
           ],
           [
-            { text: "⏹️ 정지", callback_data: "timer_stop" },
-            { text: "🔙 타이머 메뉴", callback_data: "timer_menu" },
+            { text: "⏹️ 정지", callback_data: "timer:stop" },
+            { text: "🔙 타이머 메뉴", callback_data: "timer:menu" },
           ],
         ],
       };
@@ -1128,7 +1128,7 @@ class TimerModule extends BaseModule {
       await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         },
       });
@@ -1166,19 +1166,19 @@ class TimerModule extends BaseModule {
       inline_keyboard: data.completed
         ? [
             [
-              { text: "🍅 새 포모도로", callback_data: "timer_pomodoro_start" },
-              { text: "📊 통계 보기", callback_data: "timer_stats" },
+              { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
+              { text: "📊 통계 보기", callback_data: "timer:stats" },
             ],
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ]
         : [
             [
-              { text: "▶️ 계속하기", callback_data: "timer_continue" },
-              { text: "⏹️ 정지", callback_data: "timer_stop" },
+              { text: "▶️ 계속하기", callback_data: "timer:continue" },
+              { text: "⏹️ 정지", callback_data: "timer:stop" },
             ],
             [
-              { text: "📊 현재 상태", callback_data: "timer_status" },
-              { text: "🔙 타이머 메뉴", callback_data: "timer_menu" },
+              { text: "📊 현재 상태", callback_data: "timer:status" },
+              { text: "🔙 타이머 메뉴", callback_data: "timer:menu" },
             ],
           ],
     };
@@ -1201,7 +1201,7 @@ class TimerModule extends BaseModule {
       await this.editMessage(bot, chatId, messageId, `❌ ${status.error}`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         },
       });
@@ -1234,7 +1234,7 @@ class TimerModule extends BaseModule {
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
             ],
           },
         }
@@ -1274,14 +1274,14 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔄 새로고침", callback_data: "timer_status" },
-          { text: "✅ 완료", callback_data: "timer_complete" },
+          { text: "🔄 새로고침", callback_data: "timer:status" },
+          { text: "✅ 완료", callback_data: "timer:complete" },
         ],
         [
-          { text: "⏹️ 정지", callback_data: "timer_stop" },
-          { text: "📊 통계", callback_data: "timer_stats" },
+          { text: "⏹️ 정지", callback_data: "timer:stop" },
+          { text: "📊 통계", callback_data: "timer:stats" },
         ],
-        [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+        [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
     };
 
@@ -1349,10 +1349,10 @@ class TimerModule extends BaseModule {
               [
                 {
                   text: "🍅 첫 포모도로 시작",
-                  callback_data: "timer_pomodoro_start",
+                  callback_data: "timer:pomodoro_start",
                 },
               ],
-              [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
             ],
           },
         }
@@ -1400,10 +1400,10 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔄 새로고침", callback_data: "timer_stats" },
-          { text: "🍅 새 포모도로", callback_data: "timer_pomodoro_start" },
+          { text: "🔄 새로고침", callback_data: "timer:stats" },
+          { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
         ],
-        [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+        [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
     };
 
@@ -1500,10 +1500,10 @@ class TimerModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "📊 통계 보기", callback_data: "timer_stats" },
-            { text: "🍅 새 포모도로", callback_data: "timer_pomodoro_start" },
+            { text: "📊 통계 보기", callback_data: "timer:stats" },
+            { text: "🍅 새 포모도로", callback_data: "timer:pomodoro_start" },
           ],
-          [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+          [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
         ],
       };
 
@@ -1515,7 +1515,7 @@ class TimerModule extends BaseModule {
       await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         },
       });
@@ -1537,7 +1537,7 @@ class TimerModule extends BaseModule {
   // 일반 타이머 입력 프롬프트
   async startTimerPrompt(bot, chatId, messageId, userId) {
     this.userStates.set(userId, {
-      action: "waiting_timer_input",
+      action: "waiting_timer:input",
       messageId: messageId,
     });
 
@@ -1599,10 +1599,10 @@ class TimerModule extends BaseModule {
         const keyboard = {
           inline_keyboard: [
             [
-              { text: "📊 현재 상태", callback_data: "timer_status" },
-              { text: "⏹️ 정지", callback_data: "timer_stop" },
+              { text: "📊 현재 상태", callback_data: "timer:status" },
+              { text: "⏹️ 정지", callback_data: "timer:stop" },
             ],
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
           ],
         };
 
@@ -1619,7 +1619,7 @@ class TimerModule extends BaseModule {
           {
             reply_markup: {
               inline_keyboard: [
-                [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+                [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
               ],
             },
           }
@@ -1650,10 +1650,10 @@ class TimerModule extends BaseModule {
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔄 새로고침", callback_data: "timer_status" },
-          { text: "⏹️ 정지", callback_data: "timer_stop" },
+          { text: "🔄 새로고침", callback_data: "timer:status" },
+          { text: "⏹️ 정지", callback_data: "timer:stop" },
         ],
-        [{ text: "🔙 타이머 메뉴", callback_data: "timer_menu" }],
+        [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
       ],
     };
 

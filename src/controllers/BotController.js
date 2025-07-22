@@ -252,7 +252,7 @@ class BotController {
         {
           reply_markup: {
             inline_keyboard: [
-              [{ text: "🔙 메인 메뉴", callback_data: "main_menu" }],
+              [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
             ],
           },
         }
