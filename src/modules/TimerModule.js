@@ -37,7 +37,7 @@ class TimerModule extends BaseModule {
   setupActions() {
     this.registerActions({
       menu: this.showTimerMenu,
-      start: this.startTimerMenu,
+      "start:prompt": this.startTimerMenu,
       "start:5": () => this.startTimer(5),
       "start:10": () => this.startTimer(10),
       "start:custom": this.promptCustomTimer,
@@ -1684,7 +1684,37 @@ class TimerModule extends BaseModule {
       });
     }
   }
+  // 🛑 타이머 취소
+  async cancelTimer(bot, chatId, messageId, from) {
+    const userId = from?.id;
+    const userName = from?.first_name || "사용자";
 
+    const timer = this.activeTimers.get(userId);
+
+    if (timer) {
+      clearTimeout(timer.timeout); // 타이머 정지
+      this.activeTimers.delete(userId);
+
+      const text = `⏹️ *${userName}님의 타이머가 취소되었습니다.*`;
+      await this.editOrSend(bot, chatId, messageId, text);
+    } else {
+      const text = `⚠️ *현재 실행 중인 타이머가 없습니다.*`;
+      await this.editOrSend(bot, chatId, messageId, text);
+    }
+  }
+
+  // 도우미: messageId가 있으면 edit, 없으면 send
+  async editOrSend(bot, chatId, messageId, text) {
+    if (messageId) {
+      await this.editMessage(bot, chatId, messageId, text, {
+        parse_mode: "Markdown",
+      });
+    } else {
+      await this.sendMessage(bot, chatId, text, {
+        parse_mode: "Markdown",
+      });
+    }
+  }
   // 에러 처리
   async handleError(bot, chatId, error) {
     const errorText =

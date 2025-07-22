@@ -43,7 +43,7 @@ class FortuneModule extends BaseModule {
     this.registerActions({
       // 기본 액션
       menu: this.showMenu,
-      help: this.showFortuneHelp,
+      help: this.showHelp,
 
       // 🔮 운세 타입별 액션
       general: this.showGeneralFortune,

@@ -7,8 +7,10 @@ const path = require("path");
 const TimeHelper = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
-class TTSService extends BaseService {
-  constructor(options = {}) {
+class TTSService extends SomeBase {
+  constructor() {
+    super(); // 반드시 제일 위에 와야 함
+    this.engine = new TTSClient();
     // this.activeRequests = new Map();
 
     // 지원 언어 목록
