@@ -16,7 +16,8 @@ class UtilsModule extends BaseModule {
 
     // TTS 서비스 안전하게 초기화
     try {
-      const { TTSService } = require("../services/TTSService");
+      // ✅ 수정 (올바른 import)
+      const TTSService = require("../services/TTSService");
       this.ttsService = new TTSService();
       logger.info("✅ TTSService 초기화 성공");
     } catch (error) {
