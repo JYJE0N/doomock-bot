@@ -13,6 +13,26 @@ class TodoService extends BaseService {
   }
 
   // ========== 🚀 초기화 ==========
+  async cleanupDuplicateData() {
+    if (!this.dbEnabled || !this.collection) return;
+
+    try {
+      logger.info("🧹 중복 데이터 정리 시작...");
+
+      // moduleName이 null인 레코드 삭제
+      const result = await this.collection.deleteMany({
+        moduleName: null,
+      });
+
+      logger.info(`🧹 ${result.deletedCount}개의 중복 데이터 정리 완료`);
+
+      // 인덱스 재구성 (선택사항)
+      await this.collection.reIndex();
+      logger.info("🔧 인덱스 재구성 완료");
+    } catch (error) {
+      logger.error("❌ 데이터 정리 실패:", error);
+    }
+  }
 
   /**
    * 초기화 시 DB에서 데이터 로드 (🛡️ 자동 복구 포함)
@@ -22,6 +42,7 @@ class TodoService extends BaseService {
 
     if (this.dbEnabled) {
       // 1단계: 기본 로드 시도
+      await this.cleanupDuplicateData();
       await this.loadFromDatabase();
 
       // 2단계: 개발 환경에서만 자동 정리
