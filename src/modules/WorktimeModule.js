@@ -22,15 +22,16 @@ class WorktimeModule extends BaseModule {
 
     this.worktimeService = null;
 
-    this.worktimeService = null;
+    // 기본 근무 시간 설정
     this.workSchedule = {
       startTime: "08:30",
       lunchStart: "11:30",
       lunchEnd: "13:00",
       endTime: "17:30",
-      workDays: [1, 2, 3, 4, 5],
+      workDays: [1, 2, 3, 4, 5], // 월~금
       totalWorkHours: 7.5,
     };
+
     this.progressEmojis = {
       morning: "🌅",
       working: "💼",
@@ -41,7 +42,20 @@ class WorktimeModule extends BaseModule {
       weekend: "🎉",
     };
   }
-  // ✅ setupActions 메서드 추가
+
+  // ✅ 서비스 초기화
+  async onInitialize() {
+    try {
+      this.worktimeService = new WorktimeService(this.db);
+      await this.worktimeService.initialize();
+      logger.info("🕐 WorktimeService 초기화 성공");
+    } catch (error) {
+      logger.error("❌ WorktimeService 초기화 실패:", error);
+      throw error;
+    }
+  }
+
+  // ✅ 액션 등록
   setupActions() {
     this.registerActions({
       menu: this.showMenu,

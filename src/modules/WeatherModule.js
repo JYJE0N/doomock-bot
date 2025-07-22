@@ -16,7 +16,6 @@ class WeatherModule extends BaseModule {
 
     this.weatherService = null;
 
-    // 도시 목록
     this.cities = {
       seoul: { name: "서울", emoji: "🏙️" },
       busan: { name: "부산", emoji: "🌊" },
@@ -28,7 +27,6 @@ class WeatherModule extends BaseModule {
       jeju: { name: "제주", emoji: "🏝️" },
     };
 
-    // 날씨 이모지 매핑
     this.weatherEmojis = {
       맑음: "☀️",
       구름조금: "🌤️",
@@ -41,7 +39,7 @@ class WeatherModule extends BaseModule {
     };
   }
 
-  // 🎯 모듈별 초기화
+  // 🎯 초기화
   async onInitialize() {
     try {
       this.weatherService = new WeatherService();
@@ -53,12 +51,14 @@ class WeatherModule extends BaseModule {
     }
   }
 
-  // 🎯 액션 등록
-  registerActions() {
-    this.actionMap.set("current", this.showCurrentWeather);
-    this.actionMap.set("forecast", this.showWeatherForecast);
-    this.actionMap.set("city", this.selectCity);
-    this.actionMap.set("help", this.showWeatherHelp);
+  // 🎯 액션맵 등록 (표준화된 이름)
+  setupActions() {
+    this.registerActions({
+      current: this.showCurrentWeather,
+      forecast: this.showWeatherForecast,
+      city: this.selectCity,
+      help: this.showWeatherHelp,
+    });
   }
 
   // 🎯 메시지 처리

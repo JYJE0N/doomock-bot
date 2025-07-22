@@ -37,28 +37,14 @@ class TimerModule extends BaseModule {
   // ⭐ Timer 모듈의 액션들을 등록
   setupActions() {
     this.registerActions({
-      // 메뉴 관련
-      menu: this.showTimerMenu,
-      help: this.showTimerHelp,
-
-      // 포모도로 관련
-      "pomodoro:start": this.showPomodoroTaskPrompt,
-      "pomodoro:quick": this.startQuickPomodoro,
-      complete: this.completePomodoro,
-      continue: this.continuePomodoro,
-
-      // 일반 타이머 관련
-      "start:prompt": this.startTimerPrompt,
-      status: this.showTimerStatus,
-      stop: this.stopTimer,
-
-      // 통계
-      stats: this.showUserStats,
-
-      // 휴식 관련 (추가)
-      "break:start": this.startBreak,
+      menu: this.showMenu,
+      start: this.startTimerMenu,
+      "start:5": () => this.startTimer(5),
+      "start:10": () => this.startTimer(10),
+      "start:custom": this.promptCustomTimer,
+      cancel: this.cancelTimer,
+      help: this.showHelp,
     });
-    logger.debug(`⏰ TimerModule 액션 등록 완료: ${this.actionMap.size}개`);
   }
 
   async handleMessage(bot, msg) {

@@ -40,7 +40,6 @@ class FortuneModule extends BaseModule {
   // FortuneModule의 setupActions 메서드
 
   setupActions() {
-    // ✅ BaseModule의 registerActions 헬퍼 활용
     this.registerActions({
       // 기본 액션
       menu: this.showMenu,

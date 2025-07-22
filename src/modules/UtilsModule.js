@@ -2,21 +2,17 @@
 
 const BaseModule = require("./BaseModule");
 const { getUserName } = require("../utils/UserHelper");
-
-// ✅ 새로운 해결책 (logger를 함수로 가져오기)
 const logger = require("../utils/Logger");
 
 class UtilsModule extends BaseModule {
-  constructor() {
+  constructor(bot, dependencies) {
     super("UtilsModule", {
       commands: ["tts", "utils"],
       callbacks: ["utils"],
       features: ["tts", "tools"],
     });
 
-    // TTS 서비스 안전하게 초기화
     try {
-      // ✅ 수정 (올바른 import)
       const TTSService = require("../services/TTSService");
       this.ttsService = new TTSService();
       logger.info("✅ TTSService 초기화 성공");
@@ -31,31 +27,42 @@ class UtilsModule extends BaseModule {
     this.lastDiagnostics = null;
   }
 
-  // ✅ 표준 액션 등록
+  // ✅ 표준화된 액션맵 등록
   setupActions() {
-    super.registerActions(); // 기본 액션 유지
-    this.actionMap.set("main", this.showMenu.bind(this));
-    this.actionMap.set("menu", this.showMenu.bind(this));
-
-    // TTS 관련 액션들
-    this.actionMap.set("tts:menu", this.showTTSMenu.bind(this));
-    this.actionMap.set("tts_help", this.showTTSHelp.bind(this));
-    this.actionMap.set("tts_stop", this.stopTTS.bind(this));
-    this.actionMap.set("tts_auto_on", this.enableAutoTTS.bind(this));
-    this.actionMap.set("tts_auto_off", this.disableAutoTTS.bind(this));
-    this.actionMap.set("tts_manual", this.enableManualTTS.bind(this));
-    this.actionMap.set("tts_diagnostics", this.showTTSDiagnostics.bind(this));
-
-    // 언어 설정 액션들
-    this.actionMap.set("lang_ko", this.setLanguage.bind(this, "ko"));
-    this.actionMap.set("lang_en", this.setLanguage.bind(this, "en"));
-    this.actionMap.set("lang_ja", this.setLanguage.bind(this, "ja"));
-    this.actionMap.set("lang_zh", this.setLanguage.bind(this, "zh"));
-    this.actionMap.set("lang_es", this.setLanguage.bind(this, "es"));
-    this.actionMap.set("lang_fr", this.setLanguage.bind(this, "fr"));
+    this.registerActions({
+      menu: this.showMenu,
+      "tts:menu": this.showTTSMenu,
+      "tts:help": this.showTTSHelp,
+      "tts:stop": this.stopTTS,
+      "tts:auto:on": this.enableAutoTTS,
+      "tts:auto:off": this.disableAutoTTS,
+      "tts:manual": this.enableManualTTS,
+      "tts:diagnostics": this.showTTSDiagnostics,
+      "lang:ko": (bot, chatId, messageId, from) =>
+        this.setLanguage(bot, chatId, messageId, from, "ko"),
+      "lang:en": (bot, chatId, messageId, from) =>
+        this.setLanguage(bot, chatId, messageId, from, "en"),
+      "lang:ja": (bot, chatId, messageId, from) =>
+        this.setLanguage(bot, chatId, messageId, from, "ja"),
+      "lang:zh": (bot, chatId, messageId, from) =>
+        this.setLanguage(bot, chatId, messageId, from, "zh"),
+      "lang:es": (bot, chatId, messageId, from) =>
+        this.setLanguage(bot, chatId, messageId, from, "es"),
+      "lang:fr": (bot, chatId, messageId, from) =>
+        this.setLanguage(bot, chatId, messageId, from, "fr"),
+    });
   }
 
-  // ✅ 메뉴 데이터 제공
+  // 메뉴 응답용
+  async showMenu(bot, chatId, messageId, from) {
+    const userName = from?.first_name || "사용자";
+    const { text, keyboard } = this.getMenuData(userName);
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
   getMenuData(userName) {
     return {
       text: `🛠️ **${userName}님의 유틸리티**\n\n다양한 편의 기능을 사용하세요!`,
@@ -66,7 +73,7 @@ class UtilsModule extends BaseModule {
             { text: "🔧 TTS 설정", callback_data: "utils:tts:diagnostics" },
           ],
           [
-            { text: "❓ 도움말", callback_data: "utils:help" },
+            { text: "❓ 도움말", callback_data: "utils:tts:help" },
             { text: "🔙 메인 메뉴", callback_data: "main:menu" },
           ],
         ],

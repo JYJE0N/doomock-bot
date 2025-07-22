@@ -1,29 +1,32 @@
 const BaseModule = require("./BaseModule");
 const InsightService = require("../services/InsightService");
 const { getUserName } = require("../utils/UserHelper");
-
-// ✅ 새로운 해결책 (logger를 함수로 가져오기)
 const logger = require("../utils/Logger");
 
 class InsightModule extends BaseModule {
   constructor() {
-    super("InsightModule");
+    super("insight"); // 부모 생성자 호출
     this.insightService = new InsightService();
   }
-  // 🎯 모듈별 초기화
+  // ✅ BaseModule 표준 액션 등록
   setupActions() {
     this.registerActions({
-      menu: this.showMenu,
-      status: this.showLeaveStatus,
-      use: this.showLeaveUseMenu,
-      "use:1": this.useOneDay,
-      "use:0.5": this.useHalfDay,
-      "use:custom": this.startCustomInput,
-      history: this.showLeaveHistory,
-      setting: this.showLeaveSetting,
-      help: this.showLeaveHelp,
+      menu: this.showInsightMenu,
+      full: this.showFullInsight,
+      quick: this.showQuickInsight,
+      dashboard: this.showDashboard,
+      products: this.showProductStrategy,
+      pricing: this.showPricingStrategy,
+      inventory: this.showInventoryStrategy,
+      marketing: this.showMarketingStrategy,
+      regional: this.showRegionalStrategy,
+      competitor: this.showCompetitorStrategy,
+      national: this.showNationalStatus,
+      refresh: this.showFullInsight,
     });
+    this.insightService = new InsightService();
   }
+
   async handleMessage(bot, msg) {
     const { text } = msg;
     if (text && text.startsWith("/insight")) {
