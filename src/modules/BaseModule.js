@@ -19,6 +19,26 @@ class BaseModule {
     logger.debug(`📦 ${moduleName} 모듈 생성됨`);
   }
 
+  extractCommand(text) {
+    if (!text || typeof text !== "string") {
+      return null;
+    }
+
+    // 텍스트 정리
+    text = text.trim();
+
+    // 명령어가 /로 시작하는지 확인
+    if (text.startsWith("/")) {
+      // /weather@botname 형태에서 @botname 제거
+      const command = text.substring(1).split(" ")[0].replace(/@\w+$/, "");
+      return command.toLowerCase();
+    }
+
+    // 일반 텍스트에서 명령어 추출 (예: "날씨" -> "날씨")
+    const firstWord = text.split(" ")[0].toLowerCase();
+    return firstWord;
+  }
+
   // 🎯 표준 초기화 메서드
   async initialize() {
     try {
