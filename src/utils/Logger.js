@@ -1,4 +1,5 @@
 // src/utils/Logger.js - 순환 참조 해결 버전
+const logLevel = process.env.LOG_LEVEL || "info"; // 'debug' 대신 'info' 사용
 
 class Logger {
   constructor() {

@@ -86,10 +86,10 @@ class TodoModule extends BaseModule {
 
   // 🎯 콜백 처리 (동적 액션 포함)
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
-    // 동적 액션 처리
-    if (subAction.startsWith("complete_")) {
-      const todoId = subAction.substring(9);
-      return await this.toggleTodo(bot, callbackQuery, todoId);
+    // ✅ from 객체를 메서드에 전달
+    if (subAction === "menu") {
+      await this.showMenu(bot, callbackQuery, moduleManager); // 전체 callbackQuery 전달
+      return true;
     }
 
     if (subAction.startsWith("delete_")) {
@@ -113,8 +113,17 @@ class TodoModule extends BaseModule {
   }
 
   // 📋 할일 메뉴
-  async showMenu(bot, chatId, messageId, userId) {
-    const userName = getUserName({ id: userId });
+  async showMenu(bot, callbackQuery, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    // ✅ 올바른 사용자 이름 추출
+    const userName = getUserName(callbackQuery.from);
     const stats = await this.todoService.getTodoStats(userId);
 
     const menuText =
@@ -560,7 +569,7 @@ class TodoModule extends BaseModule {
 
     try {
       const stats = await this.todoService.getTodoStats(userId);
-      const userName = getUserName(callbackQuery.from);
+      const userName = getUserName(callbackQuery.from) || "사용자";
 
       const progressBar = this.createProgressBar(stats.completionRate);
 
