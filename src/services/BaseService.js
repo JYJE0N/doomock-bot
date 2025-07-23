@@ -1,286 +1,300 @@
-// src/services/BaseService.js
-const { getInstance } = require("../database/DatabaseManager");
+// src/services/BaseService.js - 모든 서비스의 표준 부모 클래스
 const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
+const { MongoClient } = require("mongodb");
 
+/**
+ * 모든 서비스의 기본 클래스
+ * - MongoDB 네이티브 드라이버 사용 (mongoose 사용 안함!)
+ * - 풀링 방식 데이터베이스 연결
+ * - 메모리 캐싱 지원
+ */
 class BaseService {
-  constructor(collectionName) {
+  constructor(collectionName, options = {}) {
     this.collectionName = collectionName;
+    this.db = options.db || null;
     this.collection = null;
-    this.dbEnabled = false;
-    this.isInitialized = false;
 
-    // 메모리 스토리지 (DB 연결 실패 시 폴백)
-    this.memoryStorage = new Map();
-
-    // Railway 환경변수 기반 설정
+    // 설정
     this.config = {
-      enableDatabase: process.env.ENABLE_DATABASE !== "false",
-      syncInterval: parseInt(process.env.SYNC_INTERVAL) || 30000,
-      maxRetries: parseInt(process.env.MAX_RETRIES) || 3,
+      enableCache: true,
+      cacheTimeout: 300000, // 5분
+      maxRetries: 3,
+      retryDelay: 1000,
+      ...options.config,
     };
 
-    // 동기화 인터벌
-    this.syncInterval = null;
-  }
-  // 🎯 getDependency 메서드
-  getDependency(name) {
-    // DIContainer가 있으면 사용, 없으면 null
-    if (global.DIContainer || this.container) {
-      return (global.DIContainer || this.container).get(name);
-    }
-    return null;
-  }
+    // 메모리 캐시
+    this.cache = new Map();
+    this.cacheTimestamps = new Map();
 
-  // 🎯 선택적 getter 추가 (기존 logger와 충돌 안되게)
-  get timeHelper() {
-    // DI가 있으면 DI에서, 없으면 직접 require
-    const helper = this.getDependency("timeHelper");
-    return helper || require("../utils/TimeHelper");
+    // Railway 환경 체크
+    this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+
+    logger.info(`🔧 ${this.constructor.name} 서비스 생성됨`);
   }
 
   /**
    * 서비스 초기화
    */
   async initialize() {
-    if (this.isInitialized) {
-      logger.warn(`${this.constructor.name} 이미 초기화됨`);
-      return;
-    }
-
     try {
-      logger.info(`🚀 ${this.constructor.name} 초기화 시작...`);
+      if (this.db && this.collectionName) {
+        this.collection = this.db.collection(this.collectionName);
 
-      // DB 연결 시도
-      if (this.config.enableDatabase) {
-        await this.connectDatabase();
+        // 인덱스 생성 (자식 클래스에서 정의)
+        await this.createIndexes();
+
+        logger.info(`✅ ${this.constructor.name} 초기화 완료`);
       }
 
-      // 하위 클래스별 초기화
+      // 자식 클래스의 초기화 로직
       await this.onInitialize();
-
-      // 주기적 동기화 설정
-      if (this.dbEnabled && this.config.syncInterval > 0) {
-        this.setupPeriodicSync();
-      }
-
-      this.isInitialized = true;
-      logger.success(`✅ ${this.constructor.name} 초기화 완료`);
     } catch (error) {
       logger.error(`❌ ${this.constructor.name} 초기화 실패:`, error);
-      // 초기화 실패해도 메모리 모드로 동작
-      this.dbEnabled = false;
-      this.isInitialized = true;
+      throw error;
     }
   }
 
   /**
-   * 데이터베이스 연결
+   * 인덱스 생성 (자식 클래스에서 구현)
    */
-  async connectDatabase() {
+  async createIndexes() {
+    // 기본 인덱스: createdAt, updatedAt
+    if (this.collection) {
+      await this.collection.createIndex({ createdAt: -1 });
+      await this.collection.createIndex({ updatedAt: -1 });
+    }
+  }
+
+  // ===== CRUD 기본 메서드 =====
+
+  /**
+   * 문서 생성
+   */
+  async create(data) {
     try {
-      const dbManager = getInstance();
-      await dbManager.ensureConnection();
+      const document = {
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
 
-      this.collection = dbManager.getCollection(this.collectionName);
-      this.dbEnabled = true;
+      const result = await this.collection.insertOne(document);
 
-      logger.info(`📊 ${this.collectionName} 컬렉션 연결됨`);
+      // 캐시 무효화
+      this.invalidateCache();
+
+      return { _id: result.insertedId, ...document };
     } catch (error) {
-      logger.warn(`⚠️ ${this.collectionName} DB 연결 실패, 메모리 모드로 실행`);
-      logger.debug(`에러: ${error.message}`);
-      this.dbEnabled = false;
+      logger.error(`${this.constructor.name} 생성 오류:`, error);
+      throw error;
     }
   }
 
   /**
-   * 주기적 동기화 설정
+   * 문서 조회
    */
-  setupPeriodicSync() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-    }
-
-    this.syncInterval = setInterval(async () => {
-      try {
-        await this.syncToDatabase();
-      } catch (error) {
-        logger.error(`동기화 실패 (${this.constructor.name}):`, error);
-      }
-    }, this.config.syncInterval);
-
-    logger.info(
-      `⏰ ${this.constructor.name} 동기화 설정 (${this.config.syncInterval / 1000}초마다)`
-    );
-  }
-
-  /**
-   * 데이터 저장 (DB + 메모리)
-   */
-  async save(id, data) {
-    // 메모리에 저장
-    this.memoryStorage.set(id, data);
-
-    // DB에 저장
-    if (this.dbEnabled && this.collection) {
-      try {
-        await this.collection.replaceOne(
-          { _id: id },
-          { _id: id, ...data, updatedAt: new Date() },
-          { upsert: true }
-        );
-      } catch (error) {
-        logger.error(`DB 저장 실패 (${id}):`, error);
-      }
-    }
-  }
-
-  /**
-   * 데이터 조회 (DB + 메모리)
-   */
-  async find(id) {
-    // 먼저 메모리에서 조회
-    if (this.memoryStorage.has(id)) {
-      return this.memoryStorage.get(id);
-    }
-
-    // DB에서 조회
-    if (this.dbEnabled && this.collection) {
-      try {
-        const doc = await this.collection.findOne({ _id: id });
-        if (doc) {
-          // 메모리에 캐시
-          const { _id, ...data } = doc;
-          this.memoryStorage.set(id, data);
-          return data;
+  async findOne(filter, options = {}) {
+    try {
+      // 캐시 확인
+      const cacheKey = JSON.stringify({ filter, options });
+      if (this.config.enableCache && this.cache.has(cacheKey)) {
+        if (this.isCacheValid(cacheKey)) {
+          return this.cache.get(cacheKey);
         }
-      } catch (error) {
-        logger.error(`DB 조회 실패 (${id}):`, error);
       }
-    }
 
-    return null;
-  }
+      const document = await this.collection.findOne(filter, options);
 
-  /**
-   * 데이터 삭제
-   */
-  async remove(id) {
-    // 메모리에서 삭제
-    this.memoryStorage.delete(id);
-
-    // DB에서 삭제
-    if (this.dbEnabled && this.collection) {
-      try {
-        await this.collection.deleteOne({ _id: id });
-      } catch (error) {
-        logger.error(`DB 삭제 실패 (${id}):`, error);
+      // 캐시 저장
+      if (this.config.enableCache && document) {
+        this.setCache(cacheKey, document);
       }
-    }
-  }
 
-  /**
-   * 모든 데이터 조회
-   */
-  async findAll(filter = {}) {
-    if (this.dbEnabled && this.collection) {
-      try {
-        const docs = await this.collection.find(filter).toArray();
-        // 메모리에 캐시
-        docs.forEach((doc) => {
-          const { _id, ...data } = doc;
-          this.memoryStorage.set(_id, data);
-        });
-        return docs;
-      } catch (error) {
-        logger.error("전체 조회 실패:", error);
-      }
-    }
-
-    // 메모리에서 반환
-    return Array.from(this.memoryStorage.entries()).map(([id, data]) => ({
-      _id: id,
-      ...data,
-    }));
-  }
-
-  /**
-   * 메모리 데이터를 DB로 동기화
-   */
-  async syncToDatabase() {
-    if (!this.dbEnabled || !this.collection) return;
-
-    const entries = Array.from(this.memoryStorage.entries());
-    if (entries.length === 0) return;
-
-    logger.debug(
-      `🔄 ${this.constructor.name} 동기화 시작 (${entries.length}개)`
-    );
-
-    try {
-      const operations = entries.map(([id, data]) => ({
-        replaceOne: {
-          filter: { _id: id },
-          replacement: { _id: id, ...data, updatedAt: new Date() },
-          upsert: true,
-        },
-      }));
-
-      await this.collection.bulkWrite(operations);
-      logger.debug(`✅ ${this.constructor.name} 동기화 완료`);
+      return document;
     } catch (error) {
-      logger.error(`동기화 실패 (${this.constructor.name}):`, error);
+      logger.error(`${this.constructor.name} 조회 오류:`, error);
+      throw error;
     }
   }
 
   /**
-   * 정리 작업
+   * 여러 문서 조회
    */
-  async cleanup() {
-    if (this.syncInterval) {
-      clearInterval(this.syncInterval);
-      this.syncInterval = null;
-    }
+  async find(filter = {}, options = {}) {
+    try {
+      const { sort = { createdAt: -1 }, limit = 100, skip = 0 } = options;
 
-    // 마지막 동기화
-    if (this.dbEnabled) {
-      await this.syncToDatabase();
-    }
+      const documents = await this.collection
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .toArray();
 
-    this.isInitialized = false;
-    logger.info(`🧹 ${this.constructor.name} 정리 완료`);
+      return documents;
+    } catch (error) {
+      logger.error(`${this.constructor.name} 목록 조회 오류:`, error);
+      throw error;
+    }
   }
 
   /**
-   * 하위 클래스에서 구현할 메서드
+   * 문서 업데이트
+   */
+  async updateOne(filter, update, options = {}) {
+    try {
+      const updateDoc = {
+        $set: {
+          ...update.$set,
+          updatedAt: new Date(),
+        },
+      };
+
+      if (update.$push) updateDoc.$push = update.$push;
+      if (update.$pull) updateDoc.$pull = update.$pull;
+      if (update.$inc) updateDoc.$inc = update.$inc;
+
+      const result = await this.collection.updateOne(
+        filter,
+        updateDoc,
+        options
+      );
+
+      // 캐시 무효화
+      this.invalidateCache();
+
+      return result;
+    } catch (error) {
+      logger.error(`${this.constructor.name} 업데이트 오류:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 문서 삭제
+   */
+  async deleteOne(filter) {
+    try {
+      const result = await this.collection.deleteOne(filter);
+
+      // 캐시 무효화
+      this.invalidateCache();
+
+      return result;
+    } catch (error) {
+      logger.error(`${this.constructor.name} 삭제 오류:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 카운트
+   */
+  async count(filter = {}) {
+    try {
+      return await this.collection.countDocuments(filter);
+    } catch (error) {
+      logger.error(`${this.constructor.name} 카운트 오류:`, error);
+      throw error;
+    }
+  }
+
+  // ===== 캐시 관리 =====
+
+  /**
+   * 캐시 설정
+   */
+  setCache(key, value) {
+    this.cache.set(key, value);
+    this.cacheTimestamps.set(key, Date.now());
+  }
+
+  /**
+   * 캐시 유효성 확인
+   */
+  isCacheValid(key) {
+    const timestamp = this.cacheTimestamps.get(key);
+    if (!timestamp) return false;
+
+    return Date.now() - timestamp < this.config.cacheTimeout;
+  }
+
+  /**
+   * 캐시 무효화
+   */
+  invalidateCache() {
+    this.cache.clear();
+    this.cacheTimestamps.clear();
+  }
+
+  // ===== 유틸리티 메서드 =====
+
+  /**
+   * 재시도 로직
+   */
+  async withRetry(operation, retries = this.config.maxRetries) {
+    for (let i = 0; i < retries; i++) {
+      try {
+        return await operation();
+      } catch (error) {
+        if (i === retries - 1) throw error;
+
+        logger.warn(`재시도 ${i + 1}/${retries}:`, error.message);
+        await this.delay(this.config.retryDelay * (i + 1));
+      }
+    }
+  }
+
+  /**
+   * 지연 함수
+   */
+  delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * 현재 한국 시간
+   */
+  getKoreanTime() {
+    return TimeHelper.getKoreanTime();
+  }
+
+  /**
+   * 날짜 포맷팅
+   */
+  formatDate(date, format) {
+    return TimeHelper.formatDate(date, format);
+  }
+
+  // ===== 자식 클래스에서 구현 =====
+
+  /**
+   * 서비스별 초기화 로직
    */
   async onInitialize() {
-    // 하위 클래스에서 구현
+    // 자식 클래스에서 구현
   }
 
   /**
-   * 상태 정보
+   * 서비스 정리
+   */
+  async cleanup() {
+    logger.info(`🧹 ${this.constructor.name} 정리 중...`);
+    this.invalidateCache();
+  }
+
+  /**
+   * 서비스 상태 조회
    */
   getStatus() {
     return {
       service: this.constructor.name,
-      initialized: this.isInitialized,
-      dbEnabled: this.dbEnabled,
-      memoryCount: this.memoryStorage.size,
       collection: this.collectionName,
+      cacheSize: this.cache.size,
+      isRailway: this.isRailway,
     };
-  }
-
-  // 🎯 logger getter (기존 require와 DI 둘 다 지원)
-  get logger() {
-    if (!this._logger) {
-      // DI 컨테이너가 있으면 거기서, 없으면 직접 require
-      if (this.container && this.container.has("logger")) {
-        this._logger = this.container.get("logger");
-      } else {
-        this._logger = require("../utils/Logger");
-      }
-    }
-    return this._logger;
   }
 }
 

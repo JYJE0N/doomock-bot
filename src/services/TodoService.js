@@ -1,891 +1,441 @@
-// src/services/TodoService.js - 순수 데이터 서비스
-
+// src/services/TodoService.js - 리팩토링된 할일 데이터 서비스
 const BaseService = require("./BaseService");
-// const logger = require("../utils/Logger");
-// const TimeHelper = require("../utils/TimeHelper");
-// const ResponseHelper = require("../utils/ResponseHelper");
+const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
+const { ObjectId } = require("mongodb");
 
+/**
+ * 할일 데이터 서비스
+ * - 순수 데이터 처리만 담당
+ * - UI/메시지는 TodoModule에서 처리
+ * - MongoDB 네이티브 드라이버 사용
+ */
 class TodoService extends BaseService {
   constructor() {
-    super("todo_userStates");
+    super("todos", {
+      enableCache: true,
+      cacheTimeout: 60000, // 1분
+    });
+
+    // 설정
     this.maxTodosPerUser = parseInt(process.env.MAX_TODOS_PER_USER) || 50;
-    this.userTodos = new Map(); // 메모리 캐시
-  }
 
-  // ========== 🚀 초기화 ==========
-  async cleanupDuplicateData() {
-    if (!this.dbEnabled || !this.collection) return;
-
-    try {
-      logger.info("🧹 중복 데이터 정리 시작...");
-
-      // moduleName이 null인 레코드 삭제
-      const result = await this.collection.deleteMany({
-        moduleName: null,
-      });
-
-      logger.info(`🧹 ${result.deletedCount}개의 중복 데이터 정리 완료`);
-
-      // 인덱스 재구성 (선택사항)
-      await this.collection.reIndex();
-      logger.info("🔧 인덱스 재구성 완료");
-    } catch (error) {
-      logger.error("❌ 데이터 정리 실패:", error);
-    }
-  }
-
-  async initialize() {
-    // 의존성 가져오기
-    this.logger = this.getDependency("logger");
-    this.timeHelper = this.getDependency("timeHelper");
-    this.db = this.getDependency("dbManager");
-
-    // DB 연결 확인
-    if (this.db && this.db.isConnected()) {
-      await this.loadFromDatabase();
-    }
-
-    this.logger.info("✅ TodoService 초기화 완료");
+    logger.info("📝 TodoService 생성됨");
   }
 
   /**
-   * 초기화 시 DB에서 데이터 로드 (🛡️ 자동 복구 포함)
+   * 인덱스 생성
    */
-  async onInitialize() {
-    logger.info("📋 TodoService 데이터 로드 중...");
+  async createIndexes() {
+    if (this.collection) {
+      // 기본 인덱스
+      await super.createIndexes();
 
-    if (this.dbEnabled) {
-      // 1단계: 기본 로드 시도
-      await this.cleanupDuplicateData();
-      await this.loadFromDatabase();
+      // 사용자별 조회 최적화
+      await this.collection.createIndex({ userId: 1, createdAt: -1 });
+      await this.collection.createIndex({ userId: 1, completed: 1 });
 
-      // 2단계: 개발 환경에서만 자동 정리
-      if (process.env.NODE_ENV === "development") {
-        logger.info("🛠️ 개발 환경: 데이터 정리 및 마이그레이션 실행");
+      // 텍스트 검색을 위한 인덱스
+      await this.collection.createIndex({ text: "text" });
 
-        const cleanupResult = await this.cleanupCorruptedData();
-        if (cleanupResult.cleaned > 0) {
-          logger.info(
-            `🧹 ${cleanupResult.cleaned}개의 손상된 데이터를 자동 정리했습니다.`
-          );
-          // 정리 후 다시 로드
-          this.userTodos.clear();
-          await this.loadFromDatabase();
-        }
-
-        const migrationResult = await this.migrateDataStructure();
-        if (migrationResult.migrated > 0) {
-          logger.info(
-            `🔄 ${migrationResult.migrated}개의 데이터를 마이그레이션했습니다.`
-          );
-        }
-      }
-
-      // 3단계: 최종 통계
-      const totalUsers = this.userTodos.size;
-      const totalTodos = Array.from(this.userTodos.values()).reduce(
-        (sum, todos) => sum + todos.length,
-        0
-      );
-      logger.success(
-        `✅ TodoService 로드 완료: 사용자 ${totalUsers}명, 할일 ${totalTodos}개`
-      );
-    } else {
-      await this.loadFromBackup();
+      logger.debug("📝 Todo 인덱스 생성 완료");
     }
   }
 
-  /**
-   * DB에서 모든 할일 로드 (🛡️ 데이터 검증 강화)
-   */
-  async loadFromDatabase() {
-    try {
-      const todos = await this.collection.find({}).toArray();
-      let validCount = 0;
-      let invalidCount = 0;
-
-      todos.forEach((todo) => {
-        try {
-          // 🛡️ 필수 데이터 검증
-          if (!todo || !todo.userId || !todo.task) {
-            logger.warn("⚠️ 유효하지 않은 할일 데이터 발견:", {
-              todoId: todo?._id?.toString() || "unknown",
-              hasUserId: !!todo?.userId,
-              hasTask: !!todo?.task,
-            });
-            invalidCount++;
-            return; // 이 할일은 건너뛰기
-          }
-
-          // 🔄 안전한 userId 변환
-          let userId;
-          if (typeof todo.userId === "string") {
-            userId = todo.userId;
-          } else if (typeof todo.userId === "number") {
-            userId = todo.userId.toString();
-          } else if (
-            todo.userId &&
-            typeof todo.userId === "object" &&
-            todo.userId.toString
-          ) {
-            userId = todo.userId.toString();
-          } else {
-            logger.warn("⚠️ userId 변환 불가:", {
-              todoId: todo._id?.toString(),
-              userId: todo.userId,
-              userIdType: typeof todo.userId,
-            });
-            invalidCount++;
-            return;
-          }
-
-          // 사용자별 그룹 생성
-          if (!this.userTodos.has(userId)) {
-            this.userTodos.set(userId, []);
-          }
-
-          // 🏗️ 안전한 할일 객체 생성
-          const safeTodo = {
-            id: todo._id?.toString() || `temp_${Date.now()}_${Math.random()}`,
-            task: todo.task || "제목 없음",
-            completed: Boolean(todo.completed),
-            createdAt: todo.createdAt ? new Date(todo.createdAt) : new Date(),
-            updatedAt: todo.updatedAt ? new Date(todo.updatedAt) : null,
-            priority: todo.priority || "normal",
-          };
-
-          this.userTodos.get(userId).push(safeTodo);
-          validCount++;
-        } catch (itemError) {
-          logger.error("개별 할일 처리 실패:", {
-            error: itemError.message,
-            todoId: todo?._id?.toString() || "unknown",
-          });
-          invalidCount++;
-        }
-      });
-
-      // 📊 로드 결과 리포트
-      logger.info(
-        `✅ 할일 로드 완료: 성공 ${validCount}개, 실패 ${invalidCount}개`
-      );
-
-      if (invalidCount > 0) {
-        logger.warn(
-          `⚠️ ${invalidCount}개의 유효하지 않은 데이터가 건너뛰어졌습니다.`
-        );
-      }
-    } catch (error) {
-      logger.error("할일 로드 실패:", error);
-      // 🔧 DB 로드 실패시 백업으로 폴백
-      logger.info("🔄 백업 데이터로 폴백 시도...");
-      await this.loadFromBackup();
-    }
-  }
+  // ===== 기본 CRUD 메서드 =====
 
   /**
-   * Railway 환경변수에서 백업 로드 (🛡️ 안전한 파싱)
+   * 할일 추가
    */
-  async loadFromBackup() {
+  async addTodo(userId, text) {
     try {
-      const backup = process.env.TODO_BACKUP_DATA;
-      if (!backup) {
-        logger.info("환경변수에 백업 데이터가 없습니다.");
-        return;
+      // 유효성 검사
+      if (!text || text.trim().length === 0) {
+        throw new Error("할일 내용이 비어있습니다.");
       }
-
-      let data;
-      try {
-        data = JSON.parse(backup);
-      } catch (parseError) {
-        logger.error("백업 데이터 JSON 파싱 실패:", parseError.message);
-        return;
-      }
-
-      if (!data || typeof data !== "object") {
-        logger.warn("백업 데이터 형식이 잘못되었습니다.");
-        return;
-      }
-
-      let restoredUsers = 0;
-      let restoredTodos = 0;
-
-      Object.entries(data).forEach(([userId, userData]) => {
-        try {
-          if (userData && Array.isArray(userData.todos)) {
-            // 🛡️ 각 할일 데이터 검증
-            const validTodos = userData.todos.filter((todo) => {
-              return (
-                todo &&
-                typeof todo === "object" &&
-                todo.task &&
-                typeof todo.task === "string"
-              );
-            });
-
-            if (validTodos.length > 0) {
-              this.userTodos.set(userId, validTodos);
-              restoredUsers++;
-              restoredTodos += validTodos.length;
-            }
-          }
-        } catch (userError) {
-          logger.warn(`사용자 ${userId} 백업 복원 실패:`, userError.message);
-        }
-      });
-
-      logger.success(
-        `✅ 백업에서 복원: 사용자 ${restoredUsers}명, 할일 ${restoredTodos}개`
-      );
-    } catch (error) {
-      logger.error("백업 로드 실패:", error);
-    }
-  }
-
-  // ========== 📊 순수 데이터 메서드들 ==========
-
-  /**
-   * 👤 사용자 할일 목록 조회 (🛡️ 안전한 데이터 접근)
-   */
-  async getUserTodos(userId) {
-    try {
-      // 🔒 userId 검증 및 정규화
-      if (!userId) {
-        logger.warn("getUserTodos: userId가 없습니다.");
-        return [];
-      }
-
-      userId = userId.toString();
-
-      // 메모리 캐시 확인
-      if (this.userTodos.has(userId)) {
-        return this.userTodos.get(userId);
-      }
-
-      // DB에서 조회 (캐시 미스)
-      if (this.dbEnabled && this.collection) {
-        try {
-          const todos = await this.collection
-            .find({
-              userId: userId,
-              task: { $exists: true, $ne: null, $ne: "" }, // 유효한 할일만
-            })
-            .toArray();
-
-          const formattedTodos = todos.map((todo) => ({
-            id: todo._id?.toString() || `temp_${Date.now()}_${Math.random()}`,
-            task: todo.task || "제목 없음",
-            completed: Boolean(todo.completed),
-            createdAt: todo.createdAt ? new Date(todo.createdAt) : new Date(),
-            updatedAt: todo.updatedAt ? new Date(todo.updatedAt) : null,
-            priority: todo.priority || "normal",
-          }));
-
-          // 캐시 업데이트
-          this.userTodos.set(userId, formattedTodos);
-
-          logger.debug(
-            `👤 사용자 ${userId} 할일 ${formattedTodos.length}개 로드됨`
-          );
-          return formattedTodos;
-        } catch (dbError) {
-          logger.error(`사용자 ${userId} 할일 DB 조회 실패:`, dbError);
-        }
-      }
-
-      // 빈 배열로 초기화
-      const emptyTodos = [];
-      this.userTodos.set(userId, emptyTodos);
-      return emptyTodos;
-    } catch (error) {
-      logger.error("getUserTodos 실패:", error);
-      return [];
-    }
-  }
-
-  /**
-   * ➕ 할일 추가 (데이터 처리만)
-   */
-  async addTodo(userId, task) {
-    userId = userId.toString();
-
-    try {
-      // 입력 검증
-      if (!task || task.trim().length === 0) {
-        return ResponseHelper.validationError("할일 내용을 입력해주세요.");
-      }
-
-      if (task.length > 200) {
-        return ResponseHelper.validationError(
-          "할일 내용이 너무 깁니다. (최대 200자)"
-        );
-      }
-
-      // 사용자 할일 목록 가져오기
-      const userTodos = await this.getUserTodos(userId);
 
       // 개수 제한 확인
-      if (userTodos.length >= this.maxTodosPerUser) {
-        return ResponseHelper.validationError(
-          `할일은 최대 ${this.maxTodosPerUser}개까지 등록할 수 있습니다.`
+      const count = await this.getUserTodoCount(userId);
+      if (count >= this.maxTodosPerUser) {
+        throw new Error(
+          `최대 ${this.maxTodosPerUser}개까지만 등록 가능합니다.`
         );
       }
 
-      // 중복 검사
-      const existingTodo = userTodos.find(
-        (todo) => todo.task.toLowerCase() === task.trim().toLowerCase()
-      );
-
-      if (existingTodo) {
-        return ResponseHelper.validationError("이미 동일한 할일이 있습니다.");
-      }
-
-      // 새로운 할일 생성
-      const newTodo = {
-        id: TimeHelper.generateOperationId("todo", userId),
-        task: task.trim(),
+      // 할일 생성
+      const todo = {
+        userId: userId.toString(),
+        text: text.trim(),
         completed: false,
+        completedAt: null,
         createdAt: new Date(),
         updatedAt: new Date(),
-        priority: "normal",
       };
 
-      // 메모리에 추가
-      userTodos.push(newTodo);
+      const result = await this.collection.insertOne(todo);
+      todo._id = result.insertedId;
 
-      // DB에 저장 (비동기)
-      if (this.dbEnabled) {
-        this.saveTodoToDatabase(userId, newTodo).catch((error) => {
-          logger.error("할일 DB 저장 실패:", error);
-        });
-      }
+      // 캐시 무효화
+      this.invalidateCache();
 
-      // 백업에 저장 (비동기)
-      this.saveToBackup();
-
-      return ResponseHelper.successWithData(
-        { todo: newTodo },
-        { message: "할일이 추가되었습니다!" }
-      );
+      logger.debug(`할일 추가: ${userId} - ${text}`);
+      return todo;
     } catch (error) {
-      logger.error("할일 추가 실패:", error);
-      return ResponseHelper.serverError("할일 추가 중 오류가 발생했습니다.");
+      logger.error("할일 추가 오류:", error);
+      throw error;
     }
   }
 
   /**
-   * 🔄 할일 완료/미완료 토글 (데이터 처리만)
+   * 사용자의 모든 할일 조회
+   */
+  async getUserTodos(userId, options = {}) {
+    try {
+      const {
+        includeCompleted = true,
+        sort = { createdAt: -1 },
+        limit = 100,
+      } = options;
+
+      const filter = { userId: userId.toString() };
+      if (!includeCompleted) {
+        filter.completed = false;
+      }
+
+      const todos = await this.find(filter, { sort, limit });
+      return todos;
+    } catch (error) {
+      logger.error("할일 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 특정 할일 조회
+   */
+  async getTodo(userId, todoId) {
+    try {
+      const todo = await this.findOne({
+        _id: new ObjectId(todoId),
+        userId: userId.toString(),
+      });
+
+      return todo;
+    } catch (error) {
+      logger.error("할일 조회 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 할일 완료/미완료 토글
    */
   async toggleTodo(userId, todoId) {
-    userId = userId.toString();
-
     try {
-      const userTodos = await this.getUserTodos(userId);
-      const todoIndex = userTodos.findIndex((todo) => todo.id === todoId);
+      const todo = await this.getTodo(userId, todoId);
 
-      if (todoIndex === -1) {
-        return ResponseHelper.notFoundError("할일을 찾을 수 없습니다.");
+      if (!todo) {
+        return { success: false, message: "할일을 찾을 수 없습니다." };
       }
 
-      const todo = userTodos[todoIndex];
-      const wasCompleted = todo.completed;
+      const newCompleted = !todo.completed;
+      const updateData = {
+        completed: newCompleted,
+        completedAt: newCompleted ? new Date() : null,
+      };
 
-      // 상태 토글
-      todo.completed = !todo.completed;
-      todo.updatedAt = new Date();
-
-      // DB 업데이트 (비동기)
-      if (this.dbEnabled) {
-        this.updateTodoInDatabase(userId, todo).catch((error) => {
-          logger.error("할일 DB 업데이트 실패:", error);
-        });
-      }
-
-      // 백업 저장 (비동기)
-      this.saveToBackup();
-
-      const message = todo.completed
-        ? "✅ 할일을 완료했습니다!"
-        : "⏳ 할일을 미완료로 변경했습니다.";
-
-      return ResponseHelper.successWithData(
-        { todo: todo, previousState: wasCompleted },
-        { message: message }
+      await this.updateOne(
+        { _id: new ObjectId(todoId), userId: userId.toString() },
+        { $set: updateData }
       );
+
+      // 업데이트된 할일 반환
+      const updatedTodo = { ...todo, ...updateData };
+
+      logger.debug(`할일 토글: ${userId} - ${todoId} -> ${newCompleted}`);
+      return { success: true, todo: updatedTodo };
     } catch (error) {
-      logger.error("할일 토글 실패:", error);
-      return ResponseHelper.serverError("상태 변경 중 오류가 발생했습니다.");
+      logger.error("할일 토글 오류:", error);
+      throw error;
     }
   }
 
   /**
-   * 🗑️ 할일 삭제 (데이터 처리만)
+   * 할일 수정
+   */
+  async updateTodo(userId, todoId, text) {
+    try {
+      if (!text || text.trim().length === 0) {
+        throw new Error("할일 내용이 비어있습니다.");
+      }
+
+      const result = await this.updateOne(
+        { _id: new ObjectId(todoId), userId: userId.toString() },
+        { $set: { text: text.trim() } }
+      );
+
+      if (result.matchedCount === 0) {
+        return { success: false, message: "할일을 찾을 수 없습니다." };
+      }
+
+      logger.debug(`할일 수정: ${userId} - ${todoId}`);
+      return { success: true };
+    } catch (error) {
+      logger.error("할일 수정 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 할일 삭제
    */
   async deleteTodo(userId, todoId) {
-    userId = userId.toString();
-
     try {
-      const userTodos = await this.getUserTodos(userId);
-      const todoIndex = userTodos.findIndex((todo) => todo.id === todoId);
+      const result = await this.deleteOne({
+        _id: new ObjectId(todoId),
+        userId: userId.toString(),
+      });
 
-      if (todoIndex === -1) {
-        return ResponseHelper.notFoundError("할일을 찾을 수 없습니다.");
+      if (result.deletedCount === 0) {
+        return { success: false, message: "할일을 찾을 수 없습니다." };
       }
 
-      const deletedTodo = userTodos[todoIndex];
-
-      // 메모리에서 삭제
-      userTodos.splice(todoIndex, 1);
-
-      // DB에서 삭제 (비동기)
-      if (this.dbEnabled) {
-        this.deleteTodoFromDatabase(todoId).catch((error) => {
-          logger.error("할일 DB 삭제 실패:", error);
-        });
-      }
-
-      // 백업 저장 (비동기)
-      this.saveToBackup();
-
-      return ResponseHelper.successWithData(
-        { deletedTodo: deletedTodo },
-        { message: "할일이 삭제되었습니다." }
-      );
+      logger.debug(`할일 삭제: ${userId} - ${todoId}`);
+      return { success: true };
     } catch (error) {
-      logger.error("할일 삭제 실패:", error);
-      return ResponseHelper.serverError("삭제 중 오류가 발생했습니다.");
+      logger.error("할일 삭제 오류:", error);
+      throw error;
+    }
+  }
+
+  // ===== 통계 메서드 =====
+
+  /**
+   * 사용자 할일 개수
+   */
+  async getUserTodoCount(userId) {
+    try {
+      return await this.count({ userId: userId.toString() });
+    } catch (error) {
+      logger.error("할일 개수 조회 오류:", error);
+      throw error;
     }
   }
 
   /**
-   * 🔍 할일 검색 (데이터 처리만)
+   * 사용자 할일 기본 통계
    */
-  async searchTodos(userId, keyword) {
-    userId = userId.toString();
-
-    try {
-      if (!keyword || keyword.trim().length === 0) {
-        return ResponseHelper.validationError("검색어를 입력해주세요.");
-      }
-
-      const userTodos = await this.getUserTodos(userId);
-      const searchTerm = keyword.trim().toLowerCase();
-
-      const matchedTodos = userTodos.filter((todo) =>
-        todo.task.toLowerCase().includes(searchTerm)
-      );
-
-      return ResponseHelper.successWithData(
-        {
-          todos: matchedTodos,
-          keyword: keyword.trim(),
-          totalFound: matchedTodos.length,
-        },
-        {
-          message: `"${keyword.trim()}"로 ${
-            matchedTodos.length
-          }개의 할일을 찾았습니다.`,
-        }
-      );
-    } catch (error) {
-      logger.error("할일 검색 실패:", error);
-      return ResponseHelper.serverError("검색 중 오류가 발생했습니다.");
-    }
-  }
-
-  /**
-   * 📊 할일 통계 조회 (데이터 분석만)
-   */
-  async getTodoStats(userId) {
+  async getUserStats(userId) {
     try {
       const todos = await this.getUserTodos(userId);
 
-      // 🎯 직접 통계 객체 반환 (래핑하지 않음)
-      const stats = {
-        total: todos.length,
-        completed: todos.filter((t) => t.completed).length,
-        incomplete: todos.filter((t) => !t.completed).length,
-        pending: todos.filter((t) => !t.completed).length, // ← 중요: pending은 incomplete와 동일
-        highPriority: todos.filter((t) => t.priority === "high").length,
-        normalPriority: todos.filter((t) => t.priority === "normal").length,
-        lowPriority: todos.filter((t) => t.priority === "low").length,
-        completionRate:
-          todos.length > 0
-            ? Math.round(
-                (todos.filter((t) => t.completed).length / todos.length) * 100
-              )
-            : 0,
-      };
+      const total = todos.length;
+      const completed = todos.filter((t) => t.completed).length;
+      const pending = total - completed;
+      const completionRate =
+        total > 0 ? Math.round((completed / total) * 100) : 0;
 
-      logger.debug(`📊 사용자 ${userId} 통계:`, stats);
-      return stats; // ← ResponseHelper 없이 직접 반환
-    } catch (error) {
-      logger.error("할일 통계 조회 실패:", error);
-      // 에러 시에도 기본 구조 반환
       return {
-        total: 0,
-        completed: 0,
-        incomplete: 0,
-        pending: 0,
-        highPriority: 0,
-        normalPriority: 0,
-        lowPriority: 0,
-        completionRate: 0,
+        total,
+        completed,
+        pending,
+        completionRate,
       };
-    }
-  }
-  /**
-   * 📊 할일 통계 조회 (🌐 API용 래핑된 버전)
-   */
-  async getTodoStatsForAPI(userId) {
-    try {
-      const stats = await this.getTodoStats(userId);
-
-      // ✅ 표준 성공 응답 (API나 외부 호출용)
-      return ResponseHelper.successWithData(stats, {
-        message: "통계를 성공적으로 조회했습니다.",
-      });
     } catch (error) {
-      logger.error("할일 통계 조회 실패:", error);
-      return ResponseHelper.serverError("통계 조회 중 오류가 발생했습니다.");
+      logger.error("통계 조회 오류:", error);
+      throw error;
     }
   }
+
   /**
-   * 📤 할일 내보내기 (데이터 포맷팅만)
+   * 사용자 할일 상세 통계
    */
-  async exportTodos(userId) {
-    userId = userId.toString();
-
+  async getUserDetailedStats(userId) {
     try {
-      const userTodos = await this.getUserTodos(userId);
-      const stats = await this.getTodoStats(userId);
+      const todos = await this.getUserTodos(userId);
+      const now = new Date();
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
 
-      if (userTodos.length === 0) {
-        return ResponseHelper.validationError("내보낼 할일이 없습니다.");
+      const weekStart = new Date(now);
+      weekStart.setDate(now.getDate() - now.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      // 기본 통계
+      const stats = await this.getUserStats(userId);
+
+      // 오늘 추가된 할일
+      stats.todayAdded = todos.filter((t) => t.createdAt >= todayStart).length;
+
+      // 오늘 완료된 할일
+      stats.todayCompleted = todos.filter(
+        (t) => t.completed && t.completedAt >= todayStart
+      ).length;
+
+      // 이번주 완료된 할일
+      stats.weekCompleted = todos.filter(
+        (t) => t.completed && t.completedAt >= weekStart
+      ).length;
+
+      // 이번달 완료된 할일
+      stats.monthCompleted = todos.filter(
+        (t) => t.completed && t.completedAt >= monthStart
+      ).length;
+
+      // 평균 완료 시간 계산
+      const completedWithTime = todos.filter(
+        (t) => t.completed && t.completedAt && t.createdAt
+      );
+
+      if (completedWithTime.length > 0) {
+        const totalTime = completedWithTime.reduce((sum, todo) => {
+          return sum + (todo.completedAt - todo.createdAt);
+        }, 0);
+
+        const avgTime = totalTime / completedWithTime.length;
+        stats.avgCompletionTime = this.formatDuration(avgTime);
+      } else {
+        stats.avgCompletionTime = "데이터 없음";
       }
 
-      // 텍스트 형태로 포맷팅
-      let exportText = `📝 할일 목록 내보내기\n\n`;
-      exportText += `📊 통계:\n`;
-      exportText += `• 전체: ${stats.total}개\n`;
-      exportText += `• 완료: ${stats.completed}개\n`;
-      exportText += `• 미완료: ${stats.incomplete}개\n`;
-      exportText += `• 완료율: ${stats.completionRate}%\n\n`;
-
-      exportText += `📋 할일 목록:\n`;
-
-      userTodos.forEach((todo, index) => {
-        const status = todo.completed ? "✅" : "⏳";
-        const date = TimeHelper.formatDate(todo.createdAt);
-        exportText += `${index + 1}. ${status} ${todo.task} (${date})\n`;
-      });
-
-      exportText += `\n📅 내보내기 날짜: ${TimeHelper.getKoreaTimeString()}`;
-
-      return ResponseHelper.successWithData(
-        {
-          exportText: exportText,
-          todos: userTodos,
-          stats: stats,
-        },
-        {
-          exportDate: TimeHelper.getKoreaTimeString(),
-          totalExported: userTodos.length,
-          message: `${userTodos.length}개의 할일을 내보냈습니다.`,
-        }
-      );
+      return stats;
     } catch (error) {
-      logger.error("할일 내보내기 실패:", error);
-      return ResponseHelper.serverError("내보내기 중 오류가 발생했습니다.");
+      logger.error("상세 통계 조회 오류:", error);
+      throw error;
     }
   }
 
+  // ===== 일괄 작업 메서드 =====
+
   /**
-   * 🧹 완료된 할일 정리 (데이터 처리만)
+   * 완료된 할일 삭제
    */
   async clearCompletedTodos(userId) {
-    userId = userId.toString();
-
     try {
-      const userTodos = await this.getUserTodos(userId);
-      const completedTodos = userTodos.filter((todo) => todo.completed);
-
-      if (completedTodos.length === 0) {
-        return ResponseHelper.validationError("완료된 할일이 없습니다.");
-      }
-
-      // 미완료 할일만 남기기
-      const incompleteTodos = userTodos.filter((todo) => !todo.completed);
-      this.userTodos.set(userId, incompleteTodos);
-
-      // DB에서 완료된 할일들 삭제 (비동기)
-      if (this.dbEnabled) {
-        const completedIds = completedTodos.map((todo) => todo.id);
-        this.bulkDeleteTodosFromDatabase(completedIds).catch((error) => {
-          logger.error("완료된 할일 DB 삭제 실패:", error);
-        });
-      }
-
-      // 백업 저장 (비동기)
-      this.saveToBackup();
-
-      return ResponseHelper.successWithData(
-        {
-          clearedCount: completedTodos.length,
-          remainingCount: incompleteTodos.length,
-          clearedTodos: completedTodos,
-        },
-        {
-          message: `완료된 할일 ${completedTodos.length}개를 정리했습니다.`,
-        }
-      );
-    } catch (error) {
-      logger.error("완료된 할일 정리 실패:", error);
-      return ResponseHelper.serverError("정리 중 오류가 발생했습니다.");
-    }
-  }
-
-  // ========== 💾 데이터베이스 작업들 ==========
-
-  /**
-   * DB에 할일 저장 (비동기)
-   */
-  async saveTodoToDatabase(userId, todo) {
-    if (!this.dbEnabled || !this.collection) return;
-
-    try {
-      await this.collection.replaceOne(
-        { _id: todo.id },
-        {
-          _id: todo.id,
-          userId: userId,
-          ...todo,
-          syncedAt: new Date(),
-        },
-        { upsert: true }
-      );
-    } catch (error) {
-      logger.error("DB 저장 실패:", error);
-    }
-  }
-
-  /**
-   * DB에서 할일 업데이트 (비동기)
-   */
-  async updateTodoInDatabase(userId, todo) {
-    if (!this.dbEnabled || !this.collection) return;
-
-    try {
-      await this.collection.updateOne(
-        { _id: todo.id },
-        {
-          $set: {
-            ...todo,
-            userId: userId,
-            syncedAt: new Date(),
-          },
-        }
-      );
-    } catch (error) {
-      logger.error("DB 업데이트 실패:", error);
-    }
-  }
-
-  /**
-   * DB에서 할일 삭제 (비동기)
-   */
-  async deleteTodoFromDatabase(todoId) {
-    if (!this.dbEnabled || !this.collection) return;
-
-    try {
-      await this.collection.deleteOne({ _id: todoId });
-    } catch (error) {
-      logger.error("DB 삭제 실패:", error);
-    }
-  }
-
-  /**
-   * DB에서 여러 할일 일괄 삭제 (비동기)
-   */
-  async bulkDeleteTodosFromDatabase(todoIds) {
-    if (!this.dbEnabled || !this.collection) return;
-
-    try {
-      await this.collection.deleteMany({
-        _id: { $in: todoIds },
-      });
-    } catch (error) {
-      logger.error("DB 일괄 삭제 실패:", error);
-    }
-  }
-
-  /**
-   * 메모리 데이터를 DB로 전체 동기화
-   */
-  async syncToDatabase() {
-    if (!this.dbEnabled || !this.collection) return;
-
-    logger.debug("🔄 TodoService 동기화 시작...");
-
-    try {
-      const operations = [];
-
-      for (const [userId, todos] of this.userTodos.entries()) {
-        for (const todo of todos) {
-          operations.push({
-            replaceOne: {
-              filter: { _id: todo.id },
-              replacement: {
-                _id: todo.id,
-                userId,
-                ...todo,
-                syncedAt: new Date(),
-              },
-              upsert: true,
-            },
-          });
-        }
-      }
-
-      if (operations.length > 0) {
-        await this.collection.bulkWrite(operations);
-        logger.debug(`✅ ${operations.length}개 할일 동기화 완료`);
-      }
-    } catch (error) {
-      logger.error("TodoService 동기화 실패:", error);
-    }
-  }
-
-  // ========== 🔧 데이터 정리 및 복구 ==========
-
-  /**
-   * 🧹 손상된 데이터 정리 (개발/관리용)
-   */
-  async cleanupCorruptedData() {
-    if (!this.dbEnabled || !this.collection) {
-      logger.warn("DB가 비활성화되어 데이터 정리를 건너뜁니다.");
-      return { cleaned: 0, message: "DB 비활성화" };
-    }
-
-    try {
-      logger.info("🧹 손상된 할일 데이터 정리 시작...");
-
-      // 🔍 손상된 데이터 조회
-      const corruptedData = await this.collection
-        .find({
-          $or: [
-            { userId: { $exists: false } },
-            { userId: null },
-            { userId: "" },
-            { task: { $exists: false } },
-            { task: null },
-            { task: "" },
-          ],
-        })
-        .toArray();
-
-      if (corruptedData.length === 0) {
-        logger.info("✅ 정리할 손상된 데이터가 없습니다.");
-        return { cleaned: 0, message: "정리할 데이터 없음" };
-      }
-
-      // 🗑️ 손상된 데이터 삭제
-      const deleteResult = await this.collection.deleteMany({
-        $or: [
-          { userId: { $exists: false } },
-          { userId: null },
-          { userId: "" },
-          { task: { $exists: false } },
-          { task: null },
-          { task: "" },
-        ],
+      const result = await this.collection.deleteMany({
+        userId: userId.toString(),
+        completed: true,
       });
 
-      logger.success(
-        `🧹 ${deleteResult.deletedCount}개의 손상된 데이터를 정리했습니다.`
-      );
+      this.invalidateCache();
 
-      return {
-        cleaned: deleteResult.deletedCount,
-        message: `${deleteResult.deletedCount}개 정리 완료`,
-        corruptedData: corruptedData.map((d) => ({
-          id: d._id?.toString(),
-          userId: d.userId,
-          task: d.task,
-        })),
-      };
+      logger.debug(`완료 할일 삭제: ${userId} - ${result.deletedCount}개`);
+      return { deletedCount: result.deletedCount };
     } catch (error) {
-      logger.error("데이터 정리 실패:", error);
-      return { cleaned: 0, message: "정리 실패", error: error.message };
+      logger.error("완료 할일 삭제 오류:", error);
+      throw error;
     }
   }
 
   /**
-   * 🔄 데이터 구조 마이그레이션 (버전 업그레이드용)
+   * 모든 할일 삭제
    */
-  async migrateDataStructure() {
-    if (!this.dbEnabled || !this.collection) {
-      return { migrated: 0, message: "DB 비활성화" };
-    }
-
+  async clearAllTodos(userId) {
     try {
-      logger.info("🔄 데이터 구조 마이그레이션 시작...");
+      const result = await this.collection.deleteMany({
+        userId: userId.toString(),
+      });
 
-      // 마이그레이션 대상 조회 (예: priority 필드가 없는 데이터)
-      const oldFormatData = await this.collection
-        .find({
-          priority: { $exists: false },
-        })
+      this.invalidateCache();
+
+      logger.debug(`모든 할일 삭제: ${userId} - ${result.deletedCount}개`);
+      return { deletedCount: result.deletedCount };
+    } catch (error) {
+      logger.error("모든 할일 삭제 오류:", error);
+      throw error;
+    }
+  }
+
+  // ===== 검색 메서드 =====
+
+  /**
+   * 할일 검색
+   */
+  async searchTodos(userId, keyword) {
+    try {
+      if (!keyword || keyword.trim().length === 0) {
+        return [];
+      }
+
+      // 텍스트 검색 사용
+      const todos = await this.collection
+        .find(
+          {
+            userId: userId.toString(),
+            $text: { $search: keyword },
+          },
+          {
+            score: { $meta: "textScore" },
+          }
+        )
+        .sort({ score: { $meta: "textScore" } })
+        .limit(20)
         .toArray();
 
-      if (oldFormatData.length === 0) {
-        logger.info("✅ 마이그레이션할 데이터가 없습니다.");
-        return { migrated: 0, message: "마이그레이션 불필요" };
-      }
-
-      // 일괄 업데이트 작업 준비
-      const bulkOps = oldFormatData.map((todo) => ({
-        updateOne: {
-          filter: { _id: todo._id },
-          update: {
-            $set: {
-              priority: todo.priority || "normal",
-              updatedAt: todo.updatedAt || todo.createdAt || new Date(),
-              // 기타 필요한 필드 추가
-            },
-          },
-        },
-      }));
-
-      // 일괄 업데이트 실행
-      if (bulkOps.length > 0) {
-        const result = await this.collection.bulkWrite(bulkOps);
-        logger.success(`🔄 ${result.modifiedCount}개 데이터 마이그레이션 완료`);
-
-        return {
-          migrated: result.modifiedCount,
-          message: `${result.modifiedCount}개 마이그레이션 완료`,
-        };
-      }
+      return todos;
     } catch (error) {
-      logger.error("데이터 마이그레이션 실패:", error);
-      return {
-        migrated: 0,
-        message: "마이그레이션 실패",
-        error: error.message,
-      };
+      // 텍스트 인덱스가 없는 경우 정규식으로 폴백
+      try {
+        const regex = new RegExp(keyword, "i");
+        const todos = await this.find(
+          {
+            userId: userId.toString(),
+            text: regex,
+          },
+          { limit: 20 }
+        );
+
+        return todos;
+      } catch (fallbackError) {
+        logger.error("할일 검색 오류:", fallbackError);
+        throw fallbackError;
+      }
     }
   }
 
-  // ========== 🔄 백업 관련 ==========
+  // ===== 유틸리티 메서드 =====
 
   /**
-   * Railway 환경변수에 백업 저장 (비동기)
+   * 시간 간격 포맷팅
    */
-  async saveToBackup() {
-    // Railway 환경에서는 실시간 백업 저장이 어려우므로
-    // 주기적 백업이나 종료 시점 백업으로 대체
-    logger.debug("백업 저장 요청됨 (실제 저장은 주기적으로 수행)");
+  formatDuration(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days}일 ${hours % 24}시간`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes % 60}분`;
+    } else if (minutes > 0) {
+      return `${minutes}분`;
+    } else {
+      return "1분 미만";
+    }
+  }
+
+  /**
+   * 데이터 마이그레이션 (필요시)
+   */
+  async migrateData() {
+    try {
+      // 구버전 데이터 구조 마이그레이션
+      const result = await this.collection.updateMany(
+        { completedAt: { $exists: false } },
+        { $set: { completedAt: null } }
+      );
+
+      if (result.modifiedCount > 0) {
+        logger.info(
+          `📝 ${result.modifiedCount}개의 할일 데이터 마이그레이션 완료`
+        );
+      }
+    } catch (error) {
+      logger.error("데이터 마이그레이션 오류:", error);
+    }
   }
 }
 

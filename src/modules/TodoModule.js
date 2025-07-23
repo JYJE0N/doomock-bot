@@ -1,177 +1,149 @@
-// src/modules/TodoModule.js - 올바른 역할 분리
+// src/modules/TodoModule.js - 리팩토링된 할일 관리 모듈
+const BaseModule = require("../core/BaseModule");
+const TodoService = require("../services/TodoService");
+const logger = require("../utils/Logger");
+const { getUserName } = require("../utils/UserHelper");
+const TimeHelper = require("../utils/TimeHelper");
 
-const BaseModule = require("./BaseModule");
-// const TodoService = require("../services/TodoService");
-// const { getUserName } = require("../utils/UserHelper");
-// const TimeHelper = require("../utils/TimeHelper");
-// const logger = require("../utils/Logger");
-
+/**
+ * 할일 관리 모듈
+ * - UI/UX 담당
+ * - 사용자 상호작용 처리
+ * - TodoService를 통한 데이터 관리
+ */
 class TodoModule extends BaseModule {
-  constructor(bot, dependencies) {
+  constructor(bot, options = {}) {
     super("TodoModule", {
-      commands: ["todo", "할일", "add"],
-      callbacks: ["todo"],
-      features: ["list", "add", "search", "stats", "export", "import"],
+      bot,
+      db: options.db,
+      moduleManager: options.moduleManager,
     });
 
+    // TodoService 초기화
     this.todoService = null;
+
+    // UI 상태 관리
+    this.userStates = new Map();
+
+    // 페이지네이션 설정
     this.pageSize = 10;
-    this.userStates = new Map(); // 🎯 UI 상태만 관리
+
+    logger.info("📝 TodoModule 생성됨");
   }
 
-  async initialize() {
-    // 의존성 가져오기
-    this.todoService = this.getDependency("todoService");
-    this.logger = this.getDependency("logger");
-    this.userHelper = this.getDependency("userHelper");
-    this.timeHelper = this.getDependency("timeHelper");
-
-    // 서비스 초기화
-    await this.todoService.initialize();
-
-    this.logger.info("📝 TodoModule 초기화 완료");
-  }
-
-  // 🎯 모듈별 초기화 (UI 관련만)
+  /**
+   * 모듈 초기화
+   */
   async onInitialize() {
     try {
-      this.todoService = new TodoService(this.db);
+      this.todoService = new TodoService();
+      this.todoService.db = this.db; // DB 연결 전달
       await this.todoService.initialize();
+
       logger.info("📝 TodoService 연결 성공");
     } catch (error) {
-      logger.error("❌ TodoService 연결 실패:", error);
+      logger.error("❌ TodoService 초기화 실패:", error);
       throw error;
     }
   }
 
-  // 🎯 액션 등록 (UI 라우팅만)
-  // setupActions() {
-  //   this.registerActions({
-  //     menu: this.showMenu.bind(this),
-  //     list: this.showTodoList.bind(this),
-  //     add: this.handleAddFlow.bind(this), // 🔄 이름 변경
-  //     search: this.handleSearchFlow.bind(this), // 🔄 이름 변경
-  //     stats: this.showStats.bind(this), // 🔄 이름 변경
-  //     export: this.handleExport.bind(this), // 🔄 이름 변경
-  //     import: this.handleImport.bind(this), // 🔄 이름 변경
-  //     "clear:completed": this.handleClearCompleted.bind(this),
-  //     toggle: this.handleToggle.bind(this), // 🔄 새로 추가
-  //     delete: this.handleDelete.bind(this), // 🔄 새로 추가
-  //   });
-  // }
-
+  /**
+   * 액션 등록
+   */
   setupActions() {
     this.registerActions({
       menu: this.showMenu,
       list: this.showTodoList,
-      add: this.handleAddFlow, // 🔄 이름 변경
-      search: this.handleSearchFlow, // 🔄 이름 변경
-      stats: this.showStats, // 🔄 이름 변경
-      export: this.handleExport, // 🔄 이름 변경
-      import: this.handleImport, // 🔄 이름 변경
-      "clear:completed": this.handleClearCompleted,
-      toggle: this.handleToggle, // 🔄 새로 추가
-      delete: this.handleDelete, // 🔄 새로 추가
+      add: this.startAddTodo,
+      toggle: this.toggleTodo,
+      delete: this.deleteTodo,
+      search: this.startSearch,
+      stats: this.showStats,
+      clear: this.showClearMenu,
+      "clear:completed": this.clearCompleted,
+      "clear:all": this.clearAll,
+      "clear:all:confirm": this.confirmClearAll,
+      page: this.changePage,
     });
   }
 
-  // 🎯 메시지 처리 (UI 인터페이스만)
+  /**
+   * 메시지 처리
+   */
   async onHandleMessage(bot, msg) {
     const {
+      text,
       chat: { id: chatId },
       from: { id: userId },
-      text,
     } = msg;
-    const userName = getUserName(msg.from);
 
-    // 1️⃣ 명령어 파싱만 처리
-    if (text.startsWith("/todo") || text.startsWith("/할일")) {
-      return await this.showMenu(bot, msg);
-    }
+    if (!text) return false;
 
-    // 2️⃣ 사용자 입력 상태 확인
+    // 사용자 상태 확인
     const userState = this.userStates.get(userId);
-    if (!userState) return false;
 
-    try {
-      // 3️⃣ 상태별 입력 처리 (UI 플로우만)
-      switch (userState.action) {
-        case "adding_todo":
-          return await this.processAddInput(bot, msg, userState);
-
-        case "searching_todo":
-          return await this.processSearchInput(bot, msg, userState);
-
-        case "importing_data":
-          return await this.processImportInput(bot, msg, userState);
-
-        default:
-          this.clearUserState(userId);
-          return false;
-      }
-    } catch (error) {
-      logger.error(`TodoModule 메시지 처리 실패 (${userName}):`, error);
-      await bot.sendMessage(chatId, "❌ 처리 중 오류가 발생했습니다.");
-      this.clearUserState(userId);
+    // 할일 추가 대기 상태
+    if (userState?.action === "waiting_todo_input") {
+      await this.handleTodoInput(bot, chatId, userId, text);
       return true;
     }
+
+    // 검색 대기 상태
+    if (userState?.action === "waiting_search_input") {
+      await this.handleSearchInput(bot, chatId, userId, text);
+      return true;
+    }
+
+    // 명령어 처리
+    const command = text.toLowerCase().trim();
+    if (command === "/todo" || command === "할일") {
+      await this.sendTodoMenu(bot, chatId);
+      return true;
+    }
+
+    return false;
   }
 
-  // 🎯 콜백 처리 (UI 라우팅만)
-  async onHandleCallback(bot, callbackQuery, subAction, params, moduleManager) {
-    // actionMap을 통한 표준 라우팅 (중복 제거)
-    return await this.executeAction(
-      subAction,
-      bot,
-      callbackQuery,
-      params,
-      moduleManager
-    );
-  }
-
-  // ========== 🎨 UI 전용 메서드들 ==========
+  // ===== 메뉴 액션 =====
 
   /**
-   * 🏠 메뉴 표시 (UI만)
+   * 할일 메뉴 표시
    */
-  async showMenu(bot, callbackQuery, moduleManager) {
+  async showMenu(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
         chat: { id: chatId },
         message_id: messageId,
       },
-      from: { id: userId },
+      from,
     } = callbackQuery;
-
-    const userName = getUserName(callbackQuery.from);
+    const userName = getUserName(from);
 
     try {
-      // 🎯 직접 통계 객체 받기 (래핑되지 않은 데이터)
-      const stats = await this.todoService.getTodoStats(userId);
+      // 할일 통계 가져오기
+      const stats = await this.todoService.getUserStats(from.id);
 
-      const menuText =
-        `📝 **할일 관리**\n\n` +
-        `${userName}님의 할일 현황:\n` +
-        `• 전체: ${stats.total}개\n` +
-        `• 완료: ${stats.completed}개\n` +
-        `• 진행중: ${stats.pending}개\n` +
-        `• 완료율: ${stats.completionRate}%`;
+      const menuText = `📝 **할일 관리**
+
+${userName}님의 할일 현황:
+• 전체: ${stats.total}개
+• 완료: ${stats.completed}개
+• 진행중: ${stats.pending}개
+• 완료율: ${stats.completionRate}%
+
+무엇을 하시겠습니까?`;
 
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "📋 목록 보기", callback_data: "todo:list" },
+            { text: "📋 할일 목록", callback_data: "todo:list" },
             { text: "➕ 할일 추가", callback_data: "todo:add" },
           ],
           [
             { text: "🔍 검색", callback_data: "todo:search" },
             { text: "📊 통계", callback_data: "todo:stats" },
           ],
-          [
-            { text: "📤 내보내기", callback_data: "todo:export" },
-            { text: "📥 가져오기", callback_data: "todo:import" },
-          ],
-          [{ text: "🗑️ 정리", callback_data: "todo:clear:completed" }],
+          [{ text: "🗑️ 삭제 관리", callback_data: "todo:clear" }],
           [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
       };
@@ -179,286 +151,16 @@ class TodoModule extends BaseModule {
       await this.editMessage(bot, chatId, messageId, menuText, {
         reply_markup: keyboard,
       });
-
-      return true;
     } catch (error) {
-      logger.error("할일 메뉴 표시 실패:", error);
-      await this.sendError(bot, chatId, "메뉴를 불러올 수 없습니다.");
-      return true;
+      logger.error("할일 메뉴 표시 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
     }
   }
 
   /**
-   * 📋 할일 목록 표시 (UI + 페이징)
+   * 할일 목록 표시
    */
-  async showTodoList(bot, callbackQuery, page = 1) {
-    const {
-      message: {
-        chat: { id: chatId },
-      },
-      from: { id: userId },
-    } = callbackQuery;
-
-    // 🔄 서비스에서 데이터만 가져오기
-    const todos = await this.todoService.getUserTodos(userId);
-
-    if (todos.length === 0) {
-      const emptyText =
-        "📝 **할일 목록이 비어있습니다**\n\n➕ 새로운 할일을 추가해보세요!";
-      const keyboard = {
-        inline_keyboard: [
-          [{ text: "➕ 할일 추가", callback_data: "todo:add" }],
-          [{ text: "🔙 메뉴로", callback_data: "todo:menu" }],
-        ],
-      };
-
-      await bot.editMessageText(emptyText, {
-        chat_id: chatId,
-        message_id: callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: "Markdown",
-      });
-      return true;
-    }
-
-    // 🎨 UI 페이징 로직
-    const totalPages = Math.ceil(todos.length / this.pageSize);
-    const currentPage = Math.max(1, Math.min(page, totalPages));
-    const startIdx = (currentPage - 1) * this.pageSize;
-    const endIdx = Math.min(startIdx + this.pageSize, todos.length);
-    const pageTodos = todos.slice(startIdx, endIdx);
-
-    // 📝 할일 목록 포맷팅 (UI만 담당)
-    let listText = `📋 **할일 목록** (${currentPage}/${totalPages})\n\n`;
-
-    pageTodos.forEach((todo, index) => {
-      const globalIndex = startIdx + index;
-      const status = todo.completed ? "✅" : "⏳";
-      const task = todo.completed ? `~~${todo.task}~~` : todo.task;
-      listText += `${status} ${globalIndex + 1}. ${task}\n`;
-    });
-
-    listText += `\n📊 전체: ${todos.length}개`;
-
-    // 🎮 인터랙션 버튼 생성
-    const keyboard = this.buildListKeyboard(
-      currentPage,
-      totalPages,
-      startIdx,
-      pageTodos
-    );
-
-    await bot.editMessageText(listText, {
-      chat_id: chatId,
-      message_id: callbackQuery.message.message_id,
-      reply_markup: keyboard,
-      parse_mode: "Markdown",
-    });
-
-    return true;
-  }
-
-  // ========== 🔧 UI 플로우 핸들러들 ==========
-
-  /**
-   * ➕ 할일 추가 플로우 시작
-   */
-  async handleAddFlow(bot, callbackQuery) {
-    const {
-      message: {
-        chat: { id: chatId },
-      },
-      from: { id: userId },
-    } = callbackQuery;
-
-    // UI 상태 설정
-    this.userStates.set(userId, {
-      action: "adding_todo",
-      chatId: chatId,
-      messageId: callbackQuery.message.message_id,
-    });
-
-    const inputText = `
-➕ **할일 추가**
-
-새로운 할일을 입력해주세요:
-• 간단하고 명확하게 작성해주세요
-• 취소하려면 /cancel 입력
-
-예시: "회의 자료 준비하기"`;
-
-    const keyboard = {
-      inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
-    };
-
-    await bot.editMessageText(inputText, {
-      chat_id: chatId,
-      message_id: callbackQuery.message.message_id,
-      reply_markup: keyboard,
-      parse_mode: "Markdown",
-    });
-
-    return true;
-  }
-
-  /**
-   * ➕ 할일 추가 입력 처리
-   */
-  async processAddInput(bot, msg, userState) {
-    const {
-      chat: { id: chatId },
-      from: { id: userId },
-      text,
-    } = msg;
-
-    if (text === "/cancel" || text === "취소") {
-      this.clearUserState(userId);
-      return await this.showMenu(bot, msg);
-    }
-
-    try {
-      // 🎯 서비스를 통해 데이터 처리
-      const result = await this.todoService.addTodo(userId, text.trim());
-
-      this.clearUserState(userId);
-
-      if (result.success) {
-        await bot.sendMessage(
-          chatId,
-          `✅ 할일이 추가되었습니다!\n\n📝 "${text}"`
-        );
-        return await this.showMenu(bot, msg);
-      } else {
-        await bot.sendMessage(chatId, `❌ ${result.error}`);
-        return true;
-      }
-    } catch (error) {
-      logger.error("할일 추가 처리 실패:", error);
-      await bot.sendMessage(chatId, "❌ 할일 추가 중 오류가 발생했습니다.");
-      this.clearUserState(userId);
-      return true;
-    }
-  }
-
-  /**
-   * 🔄 할일 토글 처리
-   */
-  async handleToggle(bot, callbackQuery, todoIdx) {
-    const {
-      from: { id: userId },
-    } = callbackQuery;
-
-    try {
-      const idx = parseInt(todoIdx);
-      const todos = await this.todoService.getUserTodos(userId);
-
-      if (idx < 0 || idx >= todos.length) {
-        await bot.answerCallbackQuery(callbackQuery.id, {
-          text: "❌ 잘못된 할일 번호입니다.",
-          show_alert: true,
-        });
-        return true;
-      }
-
-      const todo = todos[idx];
-
-      // 🎯 서비스를 통해 토글 처리
-      const result = await this.todoService.toggleTodo(userId, todo.id);
-
-      if (result.success) {
-        await bot.answerCallbackQuery(callbackQuery.id, {
-          text: result.message,
-        });
-
-        const currentPage = Math.floor(idx / this.pageSize) + 1;
-        return await this.showTodoList(bot, callbackQuery, currentPage);
-      } else {
-        await bot.answerCallbackQuery(callbackQuery.id, {
-          text: result.error,
-          show_alert: true,
-        });
-        return true;
-      }
-    } catch (error) {
-      logger.error("할일 토글 실패:", error);
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "❌ 처리 실패",
-        show_alert: true,
-      });
-      return true;
-    }
-  }
-
-  // ========== 🛠️ UI 유틸리티들 ==========
-
-  /**
-   * 🎮 목록용 키보드 빌더
-   */
-  buildListKeyboard(currentPage, totalPages, startIdx, pageTodos) {
-    const keyboard = { inline_keyboard: [] };
-
-    // 할일 토글/삭제 버튼들
-    const todoButtons = [];
-    pageTodos.forEach((todo, index) => {
-      const globalIdx = startIdx + index;
-      todoButtons.push([
-        {
-          text: todo.completed ? "✅ 완료취소" : "⏳ 완료",
-          callback_data: `todo:toggle:${globalIdx}`,
-        },
-        {
-          text: "🗑️ 삭제",
-          callback_data: `todo:delete:${globalIdx}`,
-        },
-      ]);
-    });
-
-    keyboard.inline_keyboard.push(...todoButtons);
-
-    // 페이징 버튼
-    if (totalPages > 1) {
-      const pageButtons = [];
-      if (currentPage > 1) {
-        pageButtons.push({
-          text: "◀️ 이전",
-          callback_data: `todo:list:${currentPage - 1}`,
-        });
-      }
-
-      pageButtons.push({
-        text: `${currentPage}/${totalPages}`,
-        callback_data: "noop",
-      });
-
-      if (currentPage < totalPages) {
-        pageButtons.push({
-          text: "다음 ▶️",
-          callback_data: `todo:list:${currentPage + 1}`,
-        });
-      }
-
-      keyboard.inline_keyboard.push(pageButtons);
-    }
-
-    // 메뉴 버튼
-    keyboard.inline_keyboard.push([
-      { text: "➕ 추가", callback_data: "todo:add" },
-      { text: "🔙 메뉴", callback_data: "todo:menu" },
-    ]);
-
-    return keyboard;
-  }
-
-  /**
-   * 🧹 사용자 상태 정리
-   */
-  clearUserState(userId) {
-    this.userStates.delete(userId);
-  }
-  /**
-   * 📊 통계 표시 (🔧 직접 통계 접근)
-   */
-  async showTodoStats(bot, callbackQuery) {
+  async showTodoList(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -468,132 +170,457 @@ class TodoModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      // 🎯 직접 통계 객체 받기
-      const stats = await this.todoService.getTodoStats(userId);
+      // 페이지 번호 파싱
+      const page = params[0] ? parseInt(params[0]) : 1;
 
-      const statsText =
-        `📊 **할일 통계**\n\n` +
-        `📈 **전체 현황:**\n` +
-        `• 총 할일: ${stats.total}개\n` +
-        `• 완료: ${stats.completed}개\n` +
-        `• 진행중: ${stats.pending}개\n` +
-        `• 완료율: ${stats.completionRate}%\n\n` +
-        `🎯 **우선순위 별:**\n` +
-        `• 높음: ${stats.highPriority}개\n` +
-        `• 보통: ${stats.normalPriority}개\n` +
-        `• 낮음: ${stats.lowPriority}개\n\n` +
-        `📈 **진행률:**\n` +
-        this.generateProgressBar(stats.completionRate);
+      // 할일 목록 가져오기
+      const todos = await this.todoService.getUserTodos(userId);
+
+      if (todos.length === 0) {
+        await this.editMessage(
+          bot,
+          chatId,
+          messageId,
+          "📝 **할일 목록**\n\n아직 등록된 할일이 없습니다.\n할일을 추가해보세요!",
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "➕ 할일 추가", callback_data: "todo:add" }],
+                [{ text: "🔙 뒤로", callback_data: "todo:menu" }],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
+      // 페이지네이션 계산
+      const totalPages = Math.ceil(todos.length / this.pageSize);
+      const startIdx = (page - 1) * this.pageSize;
+      const endIdx = startIdx + this.pageSize;
+      const pageTodos = todos.slice(startIdx, endIdx);
+
+      // 할일 목록 텍스트 생성
+      let listText = `📝 **할일 목록** (${page}/${totalPages})\n\n`;
+
+      pageTodos.forEach((todo, idx) => {
+        const num = startIdx + idx + 1;
+        const status = todo.completed ? "✅" : "⬜";
+        const date = this.formatDate(todo.createdAt, "MM/DD HH:mm");
+        listText += `${num}. ${status} ${todo.text}\n   📅 ${date}\n\n`;
+      });
+
+      // 키보드 생성
+      const keyboard = this.createTodoListKeyboard(
+        pageTodos,
+        startIdx,
+        page,
+        totalPages
+      );
+
+      await this.editMessage(bot, chatId, messageId, listText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("할일 목록 표시 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
+    }
+  }
+
+  /**
+   * 할일 추가 시작
+   */
+  async startAddTodo(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    // 사용자 상태 설정
+    this.userStates.set(userId, {
+      action: "waiting_todo_input",
+      messageId: callbackQuery.message.message_id,
+    });
+
+    const inputText = `📝 **할일 추가**
+
+추가할 할일을 입력해주세요.
+(취소하려면 /cancel 입력)`;
+
+    await this.sendMessage(bot, chatId, inputText);
+  }
+
+  /**
+   * 할일 토글
+   */
+  async toggleTodo(bot, callbackQuery, params, moduleManager) {
+    const {
+      from: { id: userId },
+    } = callbackQuery;
+    const todoId = params[0];
+
+    if (!todoId) {
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: "❌ 할일 ID가 없습니다.",
+        show_alert: true,
+      });
+      return;
+    }
+
+    try {
+      const result = await this.todoService.toggleTodo(userId, todoId);
+
+      if (result.success) {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: result.todo.completed ? "✅ 완료!" : "⬜ 완료 취소!",
+          show_alert: false,
+        });
+
+        // 목록 새로고침
+        await this.showTodoList(bot, callbackQuery, [], moduleManager);
+      } else {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "❌ 할일을 찾을 수 없습니다.",
+          show_alert: true,
+        });
+      }
+    } catch (error) {
+      logger.error("할일 토글 오류:", error);
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: "❌ 처리 중 오류가 발생했습니다.",
+        show_alert: true,
+      });
+    }
+  }
+
+  /**
+   * 할일 삭제
+   */
+  async deleteTodo(bot, callbackQuery, params, moduleManager) {
+    const {
+      from: { id: userId },
+    } = callbackQuery;
+    const todoId = params[0];
+
+    if (!todoId) {
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: "❌ 할일 ID가 없습니다.",
+        show_alert: true,
+      });
+      return;
+    }
+
+    try {
+      const result = await this.todoService.deleteTodo(userId, todoId);
+
+      if (result.success) {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "🗑️ 삭제되었습니다.",
+          show_alert: false,
+        });
+
+        // 목록 새로고침
+        await this.showTodoList(bot, callbackQuery, [], moduleManager);
+      } else {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "❌ 할일을 찾을 수 없습니다.",
+          show_alert: true,
+        });
+      }
+    } catch (error) {
+      logger.error("할일 삭제 오류:", error);
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: "❌ 처리 중 오류가 발생했습니다.",
+        show_alert: true,
+      });
+    }
+  }
+
+  /**
+   * 통계 표시
+   */
+  async showStats(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from,
+    } = callbackQuery;
+
+    try {
+      const stats = await this.todoService.getUserDetailedStats(from.id);
+
+      const statsText = `📊 **할일 통계**
+
+**전체 현황**
+• 총 할일: ${stats.total}개
+• 완료: ${stats.completed}개
+• 진행중: ${stats.pending}개
+• 완료율: ${stats.completionRate}%
+
+**기간별 통계**
+• 오늘 추가: ${stats.todayAdded}개
+• 오늘 완료: ${stats.todayCompleted}개
+• 이번주 완료: ${stats.weekCompleted}개
+• 이번달 완료: ${stats.monthCompleted}개
+
+**평균 완료 시간**
+• ${stats.avgCompletionTime}
+
+최근 업데이트: ${this.formatDate(new Date())}`;
 
       const keyboard = {
         inline_keyboard: [
-          [
-            { text: "📋 목록 보기", callback_data: "todo:list" },
-            { text: "➕ 할일 추가", callback_data: "todo:add" },
-          ],
-          [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+          [{ text: "🔄 새로고침", callback_data: "todo:stats" }],
+          [{ text: "🔙 뒤로", callback_data: "todo:menu" }],
         ],
       };
 
       await this.editMessage(bot, chatId, messageId, statsText, {
         reply_markup: keyboard,
       });
-
-      return true;
     } catch (error) {
-      logger.error("통계 조회 실패:", error);
-      await this.sendError(bot, chatId, "통계를 불러올 수 없습니다.");
-      return true;
+      logger.error("통계 표시 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
     }
   }
 
+  // ===== 입력 처리 =====
+
   /**
-   * 📈 진행률 바 생성 유틸리티
+   * 할일 입력 처리
    */
-  generateProgressBar(percentage) {
-    const barLength = 10;
-    const filledLength = Math.round((percentage / 100) * barLength);
-    const emptyLength = barLength - filledLength;
+  async handleTodoInput(bot, chatId, userId, text) {
+    // 상태 초기화
+    const userState = this.userStates.get(userId);
+    this.userStates.delete(userId);
 
-    const filled = "🟩".repeat(filledLength);
-    const empty = "⬜".repeat(emptyLength);
-
-    return `${filled}${empty} ${percentage}%`;
-  }
-
-  // ========== 📊 나머지 UI 핸들러들 (간략화) ==========
-
-  async showStats(bot, callbackQuery) {
-    // 통계는 서비스에서 가져와서 UI만 담당
-    const stats = await this.todoService.getTodoStats(callbackQuery.from.id);
-    // ... UI 표시 로직
-    return true;
-  }
-
-  async handleExport(bot, callbackQuery) {
-    // 내보내기는 서비스에서 처리하고 UI만 담당
-    const result = await this.todoService.exportTodos(callbackQuery.from.id);
-    // ... UI 응답 처리
-    return true;
-  }
-
-  async handleSearchFlow(bot, callbackQuery) {
-    // 검색 UI 플로우만 담당
-    return true;
-  }
-
-  async handleImport(bot, callbackQuery) {
-    // 가져오기 UI 플로우만 담당
-    return true;
-  }
-
-  async clearCompletedTodos(bot, callbackQuery) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
+    // 취소 확인
+    if (text.toLowerCase() === "/cancel" || text === "취소") {
+      await this.sendMessage(bot, chatId, "✅ 할일 추가가 취소되었습니다.", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+          ],
+        },
+      });
+      return;
+    }
 
     try {
-      // ✅ 표준 응답 처리
-      const result = await this.todoService.clearCompleted(userId);
+      // 할일 추가
+      const todo = await this.todoService.addTodo(userId, text);
 
-      if (!result.success) {
-        await this.sendError(bot, chatId, result.error);
-        return true;
-      }
+      const successText = `✅ **할일이 추가되었습니다!**
 
-      // 정리 후 최신 통계 가져오기
-      const updatedStats = await this.todoService.getTodoStats(userId);
+"${todo.text}"
 
-      const clearedText =
-        `🗑️ **정리 완료**\n\n` +
-        `${result.message}\n\n` +
-        `📊 **현재 상황:**\n` +
-        `• 남은 할일: ${updatedStats.total}개\n` +
-        `• 진행중: ${updatedStats.pending}개`;
+총 ${await this.todoService.getUserTodoCount(userId)}개의 할일이 있습니다.`;
 
       const keyboard = {
         inline_keyboard: [
           [
-            { text: "📋 할일 목록", callback_data: "todo:list" },
-            { text: "📊 통계 보기", callback_data: "todo:stats" },
+            { text: "➕ 추가하기", callback_data: "todo:add" },
+            { text: "📋 목록보기", callback_data: "todo:list" },
           ],
           [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, clearedText, {
+      // 이전 메시지 삭제 시도
+      if (userState?.messageId) {
+        try {
+          await bot.deleteMessage(chatId, userState.messageId);
+        } catch (e) {
+          // 삭제 실패 무시
+        }
+      }
+
+      await this.sendMessage(bot, chatId, successText, {
         reply_markup: keyboard,
       });
-
-      return true;
     } catch (error) {
-      logger.error("할일 정리 실패:", error);
-      await this.sendError(bot, chatId, "할일 정리에 실패했습니다.");
-      return true;
+      logger.error("할일 추가 오류:", error);
+      await this.sendMessage(
+        bot,
+        chatId,
+        "❌ 할일 추가 중 오류가 발생했습니다.\n다시 시도해주세요.",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+            ],
+          },
+        }
+      );
+    }
+  }
+
+  // ===== 유틸리티 메서드 =====
+
+  /**
+   * 할일 목록 키보드 생성
+   */
+  createTodoListKeyboard(todos, startIdx, currentPage, totalPages) {
+    const keyboard = [];
+
+    // 할일 버튼들 (2열로 배치)
+    for (let i = 0; i < todos.length; i += 2) {
+      const row = [];
+
+      for (let j = 0; j < 2 && i + j < todos.length; j++) {
+        const todo = todos[i + j];
+        const num = startIdx + i + j + 1;
+        const icon = todo.completed ? "✅" : "⬜";
+
+        row.push({
+          text: `${icon} ${num}`,
+          callback_data: `todo:toggle:${todo._id}`,
+        });
+      }
+
+      keyboard.push(row);
+    }
+
+    // 페이지네이션
+    if (totalPages > 1) {
+      const pageRow = [];
+
+      if (currentPage > 1) {
+        pageRow.push({
+          text: "◀️ 이전",
+          callback_data: `todo:page:${currentPage - 1}`,
+        });
+      }
+
+      pageRow.push({
+        text: `${currentPage}/${totalPages}`,
+        callback_data: "todo:noop",
+      });
+
+      if (currentPage < totalPages) {
+        pageRow.push({
+          text: "다음 ▶️",
+          callback_data: `todo:page:${currentPage + 1}`,
+        });
+      }
+
+      keyboard.push(pageRow);
+    }
+
+    // 메뉴 버튼
+    keyboard.push([
+      { text: "➕ 추가", callback_data: "todo:add" },
+      { text: "🔙 메뉴", callback_data: "todo:menu" },
+    ]);
+
+    return { inline_keyboard: keyboard };
+  }
+
+  /**
+   * 페이지 변경
+   */
+  async changePage(bot, callbackQuery, params, moduleManager) {
+    const page = params[0] ? parseInt(params[0]) : 1;
+    await this.showTodoList(bot, callbackQuery, [page], moduleManager);
+  }
+
+  /**
+   * 명령어로 메뉴 전송
+   */
+  async sendTodoMenu(bot, chatId) {
+    const menuText = "📝 할일 관리 메뉴입니다.";
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "📝 할일 메뉴 열기", callback_data: "todo:menu" }],
+      ],
+    };
+
+    await this.sendMessage(bot, chatId, menuText, {
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * 검색 시작
+   */
+  async startSearch(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    this.userStates.set(userId, {
+      action: "waiting_search_input",
+      messageId: callbackQuery.message.message_id,
+    });
+
+    await this.sendMessage(
+      bot,
+      chatId,
+      "🔍 **할일 검색**\n\n검색할 키워드를 입력해주세요.\n(취소하려면 /cancel 입력)"
+    );
+  }
+
+  /**
+   * 삭제 메뉴
+   */
+  async showClearMenu(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    const clearText = `🗑️ **삭제 관리**
+
+어떤 할일을 삭제하시겠습니까?`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "✅ 완료된 할일 삭제",
+            callback_data: "todo:clear:completed",
+          },
+        ],
+        [{ text: "❌ 모든 할일 삭제", callback_data: "todo:clear:all" }],
+        [{ text: "🔙 뒤로", callback_data: "todo:menu" }],
+      ],
+    };
+
+    await this.editMessage(bot, chatId, messageId, clearText, {
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * 완료된 할일 삭제
+   */
+  async clearCompleted(bot, callbackQuery, params, moduleManager) {
+    const {
+      from: { id: userId },
+    } = callbackQuery;
+
+    try {
+      const result = await this.todoService.clearCompletedTodos(userId);
+
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: `✅ ${result.deletedCount}개의 완료된 할일이 삭제되었습니다.`,
+        show_alert: true,
+      });
+
+      await this.showMenu(bot, callbackQuery, params, moduleManager);
+    } catch (error) {
+      logger.error("완료 할일 삭제 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
     }
   }
 }

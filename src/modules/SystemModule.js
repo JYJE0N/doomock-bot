@@ -1,15 +1,22 @@
-// src/modules/SystemModule.js - 리팩토링된 깔끔한 버전
-
-const BaseModule = require("./BaseModule");
+// src/modules/SystemModule.js - 리팩토링된 시스템 모듈
+const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 
+/**
+ * 시스템 모듈
+ * - 메인 메뉴
+ * - 도움말
+ * - 시스템 상태
+ * - 설정 관리
+ */
 class SystemModule extends BaseModule {
   constructor(bot, options = {}) {
-    super("SystemModule");
-
-    this.bot = bot;
-    this.moduleManager = options.moduleManager;
+    super("SystemModule", {
+      bot,
+      db: options.db,
+      moduleManager: options.moduleManager,
+    });
 
     // 시스템 설정
     this.config = {
@@ -21,11 +28,12 @@ class SystemModule extends BaseModule {
     logger.info("🏠 SystemModule 생성됨");
   }
 
-  // 🎯 액션 설정
-  async setupActions() {
+  /**
+   * 액션 등록
+   */
+  setupActions() {
     this.registerActions({
-      main: this.showMainMenu,
-      menu: this.showMainMenu, // alias
+      menu: this.showMainMenu,
       help: this.showHelp,
       status: this.showStatus,
       settings: this.showSettings,
@@ -33,7 +41,9 @@ class SystemModule extends BaseModule {
     });
   }
 
-  // 🎯 메시지 처리
+  /**
+   * 메시지 처리
+   */
   async onHandleMessage(bot, msg) {
     const {
       text,
@@ -70,8 +80,11 @@ class SystemModule extends BaseModule {
     }
   }
 
-  // ===== 핵심 액션 메서드들 =====
+  // ===== 액션 핸들러 =====
 
+  /**
+   * 메인 메뉴 표시
+   */
   async showMainMenu(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
@@ -79,7 +92,6 @@ class SystemModule extends BaseModule {
         message_id: messageId,
       },
     } = callbackQuery;
-
     const userName = getUserName(callbackQuery.from);
 
     const text = `🏠 **메인 메뉴**
@@ -87,26 +99,26 @@ class SystemModule extends BaseModule {
 안녕하세요! ${userName}님!
 무엇을 도와드릴까요?
 
-아래 메뉴에서 원하는 기능을 선택해주세요:`;
+환경: ${this.config.isRailway ? "Railway" : "Local"}
+버전: v${this.config.version}`;
 
-    // 🎯 할일 관리를 최우선으로 배치
     const keyboard = {
       inline_keyboard: [
         [
           { text: "📝 할일 관리", callback_data: "todo:menu" },
+          { text: "⏰ 타이머", callback_data: "timer:menu" },
+        ],
+        [
+          { text: "🕐 근무시간", callback_data: "worktime:menu" },
+          { text: "🏖️ 휴가 관리", callback_data: "leave:menu" },
+        ],
+        [
+          { text: "🔔 리마인더", callback_data: "reminder:menu" },
           { text: "🔮 운세", callback_data: "fortune:menu" },
         ],
         [
           { text: "🌤️ 날씨", callback_data: "weather:menu" },
-          { text: "⏰ 타이머", callback_data: "timer:menu" },
-        ],
-        [
           { text: "🛠️ 유틸리티", callback_data: "utils:menu" },
-          { text: "📅 휴가 관리", callback_data: "leave:menu" },
-        ],
-        [
-          { text: "🕐 근무시간", callback_data: "worktime:menu" },
-          { text: "🔔 리마인더", callback_data: "reminder:menu" },
         ],
         [
           { text: "📊 시스템 상태", callback_data: "system:status" },
@@ -117,13 +129,12 @@ class SystemModule extends BaseModule {
 
     await this.editMessage(bot, chatId, messageId, text, {
       reply_markup: keyboard,
-      parse_mode: "Markdown",
     });
-
-    logger.info(`🏠 메인 메뉴 표시: ${userName} (${callbackQuery.from.id})`);
-    return true;
   }
 
+  /**
+   * 도움말 표시
+   */
   async showHelp(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
@@ -132,34 +143,38 @@ class SystemModule extends BaseModule {
       },
     } = callbackQuery;
 
-    const text = `❓ **도움말**
+    const helpText = `❓ **도움말**
 
-🤖 **두목봇 사용법**
+**사용 가능한 명령어:**
+• /start - 봇 시작
+• /help - 도움말 보기
+• /status - 시스템 상태 확인
+• /cancel - 현재 작업 취소
 
-**📱 기본 명령어:**
-• \`/start\` - 봇 시작 및 환영 메시지
-• \`/help\` - 이 도움말 표시
-• \`/status\` - 봇 상태 확인
-• \`/cancel\` - 현재 작업 취소
+**주요 기능:**
+📝 **할일 관리** - 할일 추가, 완료, 삭제
+⏰ **타이머** - 포모도로, 일반 타이머
+🕐 **근무시간** - 출퇴근 관리
+🏖️ **휴가 관리** - 휴가 사용 및 관리
+🔔 **리마인더** - 알림 설정
+🔮 **운세** - 오늘의 운세
+🌤️ **날씨** - 날씨 정보
+🛠️ **유틸리티** - TTS 등 도구
 
-**📝 주요 기능:**
-• 할 일 관리 - 작업 추가/완료/삭제
-• 운세 서비스 - 오늘의 운세 확인
-• 날씨 정보 - 현재 날씨 및 예보
-
-💡 **팁:** 메뉴 버튼을 사용하면 더 쉽게 기능에 접근할 수 있습니다!`;
+각 기능을 선택하면 상세 메뉴가 표시됩니다.`;
 
     const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔙 메인 메뉴로", callback_data: "system:main" }],
-      ],
+      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main:menu" }]],
     };
 
-    await this.editMessage(bot, chatId, messageId, text, {
+    await this.editMessage(bot, chatId, messageId, helpText, {
       reply_markup: keyboard,
     });
   }
 
+  /**
+   * 시스템 상태 표시
+   */
   async showStatus(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
@@ -168,38 +183,54 @@ class SystemModule extends BaseModule {
       },
     } = callbackQuery;
 
-    const uptime = process.uptime();
-    const memUsage = process.memoryUsage();
-    const memUsageMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+    // 로딩 메시지
+    await this.showLoading(bot, chatId, messageId, "시스템 상태 확인 중...");
 
-    const text = `📊 **봇 상태 정보**
+    try {
+      // 시스템 정보 수집
+      const uptime = process.uptime();
+      const memUsage = process.memoryUsage();
+      const moduleStatus = moduleManager.getStatus();
 
-🤖 **시스템 정보:**
-• 버전: \`v${this.config.version}\`
-• 환경: \`${this.config.environment}\`
-• 플랫폼: ${this.config.isRailway ? "☁️ Railway" : "💻 로컬"}
-• 가동 시간: \`${this.formatUptime(uptime)}\`
+      const statusText = `📊 **시스템 상태**
 
-💾 **리소스 사용량:**
-• 메모리 사용: \`${memUsageMB}MB\`
-• Node.js 버전: \`${process.version}\`
+**기본 정보:**
+• 버전: v${this.config.version}
+• 환경: ${this.config.isRailway ? "Railway" : "Local"}
+• 가동 시간: ${this.formatUptime(uptime)}
 
-⏰ **마지막 업데이트:** ${new Date().toLocaleString("ko-KR")}`;
+**메모리 사용량:**
+• Heap: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB / ${Math.round(memUsage.heapTotal / 1024 / 1024)}MB
+• RSS: ${Math.round(memUsage.rss / 1024 / 1024)}MB
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🔄 새로고침", callback_data: "system:status" },
-          { text: "🔙 메인 메뉴", callback_data: "system:main" },
+**모듈 상태:**
+• 전체 모듈: ${moduleStatus.totalModules}개
+• 활성 콜백: ${moduleStatus.activeCallbacks}개
+
+**데이터베이스:**
+• 상태: ${this.db ? "연결됨 ✅" : "연결 안됨 ❌"}
+
+마지막 업데이트: ${this.formatDate(new Date())}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔄 새로고침", callback_data: "system:status" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
         ],
-      ],
-    };
+      };
 
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: keyboard,
-    });
+      await this.editMessage(bot, chatId, messageId, statusText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("시스템 상태 확인 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
+    }
   }
 
+  /**
+   * 설정 메뉴
+   */
   async showSettings(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
@@ -208,36 +239,22 @@ class SystemModule extends BaseModule {
       },
     } = callbackQuery;
 
-    const text = `⚙️ **설정**
+    const settingsText = `⚙️ **설정**
 
-현재 사용 가능한 설정 옵션들입니다:
-
-🔹 **알림 설정** - 알림 ON/OFF
-🔹 **언어 설정** - 한국어/English  
-🔹 **시간대 설정** - 한국 표준시
-🔹 **데이터 관리** - 사용자 데이터 관리
-
-*주의: 일부 설정은 아직 개발 중입니다.*`;
+현재 설정 기능은 준비 중입니다.`;
 
     const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🔔 알림 설정", callback_data: "settings:notifications" },
-          { text: "🌐 언어 설정", callback_data: "settings:language" },
-        ],
-        [
-          { text: "🕒 시간대 설정", callback_data: "settings:timezone" },
-          { text: "🗂️ 데이터 관리", callback_data: "settings:data" },
-        ],
-        [{ text: "🔙 메인 메뉴로", callback_data: "system:main" }],
-      ],
+      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main:menu" }]],
     };
 
-    await this.editMessage(bot, chatId, messageId, text, {
+    await this.editMessage(bot, chatId, messageId, settingsText, {
       reply_markup: keyboard,
     });
   }
 
+  /**
+   * 취소 핸들러
+   */
   async handleCancel(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
@@ -246,129 +263,117 @@ class SystemModule extends BaseModule {
       },
     } = callbackQuery;
 
-    const text = "❌ 현재 작업이 취소되었습니다.";
+    await this.editMessage(
+      bot,
+      chatId,
+      messageId,
+      "✅ 작업이 취소되었습니다.",
+      {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+          ],
+        },
+      }
+    );
+  }
+
+  // ===== 메시지 핸들러 =====
+
+  /**
+   * /start 명령어 처리
+   */
+  async handleStart(bot, msg) {
+    const {
+      chat: { id: chatId },
+      from,
+    } = msg;
+    const userName = getUserName(from);
+
+    const welcomeText = `🎉 **환영합니다!**
+
+안녕하세요 ${userName}님!
+저는 당신의 업무를 도와드리는 봇입니다.
+
+아래 메뉴에서 원하는 기능을 선택해주세요.`;
+
     const keyboard = {
       inline_keyboard: [
-        [{ text: "📱 메인 메뉴로", callback_data: "system:main" }],
+        [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+        [{ text: "❓ 도움말", callback_data: "system:help" }],
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, text, {
+    await this.sendMessage(bot, chatId, welcomeText, {
       reply_markup: keyboard,
     });
   }
 
-  // ===== 메시지 전용 메서드들 =====
-
-  async handleStart(bot, msg) {
-    const userName = getUserName(msg.from);
-
-    const text = `🤖 **두목봇 v${this.config.version}에 오신 것을 환영합니다!**
-
-안녕하세요, ${userName}님! 👋
-
-🎯 **주요 기능:**
-• 📝 할 일 관리 (Todo)
-• 🔮 운세 확인 (Fortune)  
-• 🌤️ 날씨 조회 (Weather)
-• 📊 시스템 상태 확인
-
-📱 **시작하기:**
-아래 메뉴를 선택하거나 /help 명령어를 입력하세요.
-
-🚀 **환경:** ${this.config.environment}
-${
-  this.config.isRailway
-    ? "☁️ **Railway 클라우드에서 실행 중**"
-    : "💻 **로컬 환경에서 실행 중**"
-}`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📱 메인 메뉴", callback_data: "system:main" },
-          { text: "❓ 도움말", callback_data: "system:help" },
-        ],
-        [
-          { text: "📊 봇 상태", callback_data: "system:status" },
-          { text: "⚙️ 설정", callback_data: "system:settings" },
-        ],
-      ],
-    };
-
-    await this.sendMessage(bot, msg.chat.id, text, { reply_markup: keyboard });
-    logger.info(`✅ 환영 메시지 전송: ${userName} (${msg.from.id})`);
-  }
-
+  /**
+   * 도움말 메시지 전송
+   */
   async sendHelpMessage(bot, chatId) {
-    const text = `❓ **도움말**
+    const helpText = `❓ **도움말**
 
-🤖 **두목봇 사용법**
-
-**기본 명령어:**
-• /start - 봇 시작
-• /help - 도움말 보기
-• /status - 상태 확인
-• /cancel - 작업 취소`;
+사용 가능한 명령어와 기능은 아래 버튼을 눌러 확인하세요.`;
 
     const keyboard = {
       inline_keyboard: [
-        [{ text: "📱 메인 메뉴", callback_data: "system:main" }],
+        [{ text: "📖 상세 도움말", callback_data: "system:help" }],
       ],
     };
 
-    await this.sendMessage(bot, chatId, text, { reply_markup: keyboard });
+    await this.sendMessage(bot, chatId, helpText, {
+      reply_markup: keyboard,
+    });
   }
 
+  /**
+   * 상태 메시지 전송
+   */
   async sendStatusMessage(bot, chatId) {
-    const uptime = process.uptime();
-    const memUsageMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
-
-    const text = `📊 **봇 상태**
-
-• 버전: v${this.config.version}
-• 가동 시간: ${this.formatUptime(uptime)}
-• 메모리: ${memUsageMB}MB`;
+    const statusText = `📊 시스템 상태를 확인하려면 아래 버튼을 누르세요.`;
 
     const keyboard = {
       inline_keyboard: [
-        [
-          { text: "🔄 새로고침", callback_data: "system:status" },
-          { text: "📱 메인 메뉴", callback_data: "system:main" },
-        ],
+        [{ text: "📊 상태 확인", callback_data: "system:status" }],
       ],
     };
 
-    await this.sendMessage(bot, chatId, text, { reply_markup: keyboard });
+    await this.sendMessage(bot, chatId, statusText, {
+      reply_markup: keyboard,
+    });
   }
 
+  /**
+   * 취소 메시지 전송
+   */
   async sendCancelMessage(bot, chatId) {
-    const text = "❌ 현재 작업이 취소되었습니다.";
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "📱 메인 메뉴로", callback_data: "system:main" }],
-      ],
-    };
-
-    await this.sendMessage(bot, chatId, text, { reply_markup: keyboard });
+    await this.sendMessage(bot, chatId, "✅ 현재 작업이 취소되었습니다.", {
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+        ],
+      },
+    });
   }
 
   // ===== 유틸리티 메서드 =====
 
+  /**
+   * 가동 시간 포맷팅
+   */
   formatUptime(seconds) {
     const days = Math.floor(seconds / 86400);
     const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
 
     if (days > 0) {
       return `${days}일 ${hours}시간 ${minutes}분`;
     } else if (hours > 0) {
       return `${hours}시간 ${minutes}분`;
-    } else if (minutes > 0) {
-      return `${minutes}분 ${secs}초`;
     } else {
-      return `${secs}초`;
+      return `${minutes}분`;
     }
   }
 }
