@@ -142,7 +142,7 @@ class DoomockBot {
     try {
       logger.info("🧩 모듈 로딩 중...");
 
-      const ModuleManager = require("./src/managers/ModuleManager");
+      const ModuleManager = require("./src/core/ModuleManager");
 
       this.moduleManager = new ModuleManager(this.bot, {
         db: this.dbManager?.db || null,
