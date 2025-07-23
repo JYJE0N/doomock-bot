@@ -46,6 +46,7 @@ class MenuManager {
       leave: `📅 **${userName}님의 휴가 관리**\n\n휴가를 계획하고 관리하세요!`,
       weather: `🌤️ **날씨 정보**\n\n오늘의 날씨를 확인하세요!`,
       fortune: `🔮 **오늘의 운세**\n\n${userName}님의 운세를 확인하세요!`,
+      insight: `📊 **오늘의 지표로**\n\n${userName}님의 액션플랜을 확인하세요!`,
       timer: `⏰ **타이머 관리**\n\n시간을 효율적으로 관리하세요!`,
       utils: `🛠️ **유틸리티**\n\n다양한 편의 기능을 사용하세요!`,
       main: `🏠 **메인 메뉴**\n\n안녕하세요 ${userName}님!\n무엇을 도와드릴까요?`,
