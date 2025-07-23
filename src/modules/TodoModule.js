@@ -1,10 +1,10 @@
 // src/modules/TodoModule.js - 올바른 역할 분리
 
 const BaseModule = require("./BaseModule");
-const TodoService = require("../services/TodoService");
-const { getUserName } = require("../utils/UserHelper");
-const TimeHelper = require("../utils/TimeHelper");
-const logger = require("../utils/Logger");
+// const TodoService = require("../services/TodoService");
+// const { getUserName } = require("../utils/UserHelper");
+// const TimeHelper = require("../utils/TimeHelper");
+// const logger = require("../utils/Logger");
 
 class TodoModule extends BaseModule {
   constructor(bot, dependencies) {
@@ -17,6 +17,19 @@ class TodoModule extends BaseModule {
     this.todoService = null;
     this.pageSize = 10;
     this.userStates = new Map(); // 🎯 UI 상태만 관리
+  }
+
+  async initialize() {
+    // 의존성 가져오기
+    this.todoService = this.getDependency("todoService");
+    this.logger = this.getDependency("logger");
+    this.userHelper = this.getDependency("userHelper");
+    this.timeHelper = this.getDependency("timeHelper");
+
+    // 서비스 초기화
+    await this.todoService.initialize();
+
+    this.logger.info("📝 TodoModule 초기화 완료");
   }
 
   // 🎯 모듈별 초기화 (UI 관련만)

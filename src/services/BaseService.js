@@ -22,6 +22,21 @@ class BaseService {
     // 동기화 인터벌
     this.syncInterval = null;
   }
+  // 🎯 getDependency 메서드
+  getDependency(name) {
+    // DIContainer가 있으면 사용, 없으면 null
+    if (global.DIContainer || this.container) {
+      return (global.DIContainer || this.container).get(name);
+    }
+    return null;
+  }
+
+  // 🎯 선택적 getter 추가 (기존 logger와 충돌 안되게)
+  get timeHelper() {
+    // DI가 있으면 DI에서, 없으면 직접 require
+    const helper = this.getDependency("timeHelper");
+    return helper || require("../utils/TimeHelper");
+  }
 
   /**
    * 서비스 초기화
@@ -253,6 +268,19 @@ class BaseService {
       memoryCount: this.memoryStorage.size,
       collection: this.collectionName,
     };
+  }
+
+  // 🎯 logger getter (기존 require와 DI 둘 다 지원)
+  get logger() {
+    if (!this._logger) {
+      // DI 컨테이너가 있으면 거기서, 없으면 직접 require
+      if (this.container && this.container.has("logger")) {
+        this._logger = this.container.get("logger");
+      } else {
+        this._logger = require("../utils/Logger");
+      }
+    }
+    return this._logger;
   }
 }
 

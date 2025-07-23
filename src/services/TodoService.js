@@ -1,9 +1,9 @@
 // src/services/TodoService.js - 순수 데이터 서비스
 
 const BaseService = require("./BaseService");
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-const ResponseHelper = require("../utils/ResponseHelper");
+// const logger = require("../utils/Logger");
+// const TimeHelper = require("../utils/TimeHelper");
+// const ResponseHelper = require("../utils/ResponseHelper");
 
 class TodoService extends BaseService {
   constructor() {
@@ -32,6 +32,20 @@ class TodoService extends BaseService {
     } catch (error) {
       logger.error("❌ 데이터 정리 실패:", error);
     }
+  }
+
+  async initialize() {
+    // 의존성 가져오기
+    this.logger = this.getDependency("logger");
+    this.timeHelper = this.getDependency("timeHelper");
+    this.db = this.getDependency("dbManager");
+
+    // DB 연결 확인
+    if (this.db && this.db.isConnected()) {
+      await this.loadFromDatabase();
+    }
+
+    this.logger.info("✅ TodoService 초기화 완료");
   }
 
   /**

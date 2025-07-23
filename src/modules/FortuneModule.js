@@ -1,8 +1,8 @@
 // src/modules/FortuneModule.js - BaseModule 표준 완전 호환
 
 const BaseModule = require("./BaseModule");
-const { getUserName } = require("../utils/UserHelper");
-const FortuneService = require("../services/FortuneService");
+// const { getUserName } = require("../utils/UserHelper");
+// const FortuneService = require("../services/FortuneService");
 
 // ✅ BaseModule과 동일한 logger 방식 사용 (getLogger 함수 삭제됨)
 const logger = require("../utils/Logger");
@@ -28,7 +28,7 @@ class FortuneModule extends BaseModule {
 
     // FortuneService 초기화
     try {
-      this.fortuneService = new FortuneService();
+      // this.fortuneService = new FortuneService();
       logger.info("🔮 FortuneService 초기화 성공");
     } catch (error) {
       logger.error("❌ FortuneService 초기화 실패:", error);

@@ -7,7 +7,7 @@ const TimeHelper = require("../utils/TimeHelper");
 class ModuleManager {
   constructor(bot, options = {}) {
     this.bot = bot;
-    this.db = options.dbManager || null;
+    this.container = options.container || require("../core/DIContainer");
     this.moduleInstances = new Map();
     this.isInitialized = false;
 
@@ -56,11 +56,9 @@ class ModuleManager {
       try {
         const ModuleClass = require(config.path);
         const moduleInstance = new ModuleClass(this.bot, {
-          dbManager: this.db,
-          moduleManager: this,
+          container: this.container,
         });
 
-        // 모듈 초기화
         if (moduleInstance.initialize) {
           await moduleInstance.initialize();
         }
