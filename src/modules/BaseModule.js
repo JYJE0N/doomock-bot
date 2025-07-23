@@ -1,13 +1,14 @@
-// src/core/BaseModule.js - 모든 모듈의 표준 부모 클래스
+// src/modules/BaseModule.js - 표준화된 모든 모듈의 부모 클래스
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 
 /**
- * 모든 모듈의 기본 클래스
+ * 🏗️ 모든 모듈의 기본 클래스
  * - 표준화된 콜백 처리
  * - actionMap 기반 라우팅
  * - 공통 유틸리티 메서드
+ * - 사용자 상태 관리
  */
 class BaseModule {
   constructor(name, options = {}) {
@@ -16,8 +17,9 @@ class BaseModule {
     this.db = options.db || null;
     this.moduleManager = options.moduleManager || null;
 
-    // 액션 맵 초기화
+    // 🎯 표준 프로퍼티 초기화 (핵심!)
     this.actionMap = new Map();
+    this.userStates = new Map(); // ✅ userStates 초기화 추가
 
     // 공통 설정
     this.config = {
@@ -36,7 +38,7 @@ class BaseModule {
   }
 
   /**
-   * 모듈 초기화 (비동기)
+   * 🎯 모듈 초기화 (비동기)
    */
   async initialize() {
     if (this.isInitialized) {
@@ -56,7 +58,14 @@ class BaseModule {
   }
 
   /**
-   * 액션 등록 메서드
+   * 🎯 자식 클래스에서 오버라이드할 초기화 메서드
+   */
+  async onInitialize() {
+    // 자식 클래스에서 구현
+  }
+
+  /**
+   * 🎯 액션 등록 메서드 (자식 클래스에서 구현)
    */
   setupActions() {
     // 자식 클래스에서 구현
@@ -64,7 +73,7 @@ class BaseModule {
   }
 
   /**
-   * 액션 등록
+   * 🎯 액션 등록
    */
   registerAction(name, handler) {
     if (typeof handler !== "function") {
@@ -75,7 +84,7 @@ class BaseModule {
   }
 
   /**
-   * 여러 액션 한번에 등록
+   * 🎯 여러 액션 한번에 등록
    */
   registerActions(actions) {
     for (const [name, handler] of Object.entries(actions)) {
@@ -84,7 +93,24 @@ class BaseModule {
   }
 
   /**
-   * 표준 콜백 처리 메서드
+   * ✅ 명령어 추출 유틸리티 (WeatherModule 오류 해결)
+   */
+  extractCommand(text) {
+    if (!text || typeof text !== "string") {
+      return null;
+    }
+
+    // "/command" 형태 처리
+    if (text.startsWith("/")) {
+      return text.substring(1).split(" ")[0].toLowerCase();
+    }
+
+    // 일반 텍스트에서 명령어 추출
+    return text.toLowerCase().trim();
+  }
+
+  /**
+   * 🎯 표준 콜백 처리 메서드
    * @param {Object} bot - 텔레그램 봇 인스턴스
    * @param {Object} callbackQuery - 콜백 쿼리 객체
    * @param {string} subAction - 서브 액션 (예: 'menu', 'list')
@@ -110,29 +136,48 @@ class BaseModule {
       return true;
     } catch (error) {
       logger.error(`${this.name} 콜백 처리 오류:`, error);
-      await this.handleError(bot, callbackQuery, error);
+
+      // 에러 응답
+      try {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "❌ 처리 중 오류가 발생했습니다.",
+          show_alert: true,
+        });
+      } catch (answerError) {
+        logger.error("콜백 응답 실패:", answerError);
+      }
+
       return false;
     }
   }
 
   /**
-   * 메시지 처리 메서드
+   * 🎯 표준 메시지 처리 메서드
+   * @param {Object} bot - 텔레그램 봇 인스턴스
+   * @param {Object} msg - 메시지 객체
    */
   async handleMessage(bot, msg) {
     try {
-      // 자식 클래스에서 구현
+      // 자식 클래스의 메시지 처리 로직 호출
       return await this.onHandleMessage(bot, msg);
     } catch (error) {
       logger.error(`${this.name} 메시지 처리 오류:`, error);
-      await this.sendError(bot, msg.chat.id, error);
       return false;
     }
   }
 
-  // ===== 공통 유틸리티 메서드 =====
+  /**
+   * 🎯 자식 클래스에서 오버라이드할 메시지 처리 메서드
+   */
+  async onHandleMessage(bot, msg) {
+    // 자식 클래스에서 구현
+    return false;
+  }
+
+  // ===== 🛠️ 공통 유틸리티 메서드 =====
 
   /**
-   * 메시지 전송 (래퍼)
+   * 메시지 전송
    */
   async sendMessage(bot, chatId, text, options = {}) {
     try {
@@ -141,13 +186,13 @@ class BaseModule {
         ...options,
       });
     } catch (error) {
-      logger.error("메시지 전송 실패:", error);
+      logger.error(`메시지 전송 실패: ${error.message}`);
       throw error;
     }
   }
 
   /**
-   * 메시지 수정 (래퍼)
+   * 메시지 수정
    */
   async editMessage(bot, chatId, messageId, text, options = {}) {
     try {
@@ -158,108 +203,93 @@ class BaseModule {
         ...options,
       });
     } catch (error) {
-      logger.error("메시지 수정 실패:", error);
+      logger.error(`메시지 수정 실패: ${error.message}`);
       throw error;
-    }
-  }
-
-  /**
-   * 에러 처리
-   */
-  async handleError(bot, callbackQuery, error) {
-    const errorMessage =
-      "⚠️ 처리 중 오류가 발생했습니다.\\n잠시 후 다시 시도해주세요.";
-
-    if (callbackQuery.message) {
-      await this.editMessage(
-        bot,
-        callbackQuery.message.chat.id,
-        callbackQuery.message.message_id,
-        errorMessage,
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🔙 돌아가기", callback_data: "main:menu" }],
-            ],
-          },
-        }
-      );
     }
   }
 
   /**
    * 에러 메시지 전송
    */
-  async sendError(bot, chatId, error) {
-    const errorMessage =
-      "⚠️ 처리 중 오류가 발생했습니다.\\n잠시 후 다시 시도해주세요.";
-    await this.sendMessage(bot, chatId, errorMessage);
+  async sendError(bot, chatId, errorText = "오류가 발생했습니다.") {
+    try {
+      await this.sendMessage(bot, chatId, `❌ ${errorText}`);
+    } catch (error) {
+      logger.error(`에러 메시지 전송 실패: ${error.message}`);
+    }
   }
 
   /**
-   * 로딩 메시지 표시
+   * 사용자 상태 설정
    */
-  async showLoading(bot, chatId, messageId, text = "처리 중...") {
-    return await this.editMessage(bot, chatId, messageId, `⏳ ${text}`);
+  setUserState(userId, state) {
+    this.userStates.set(userId, {
+      ...state,
+      timestamp: Date.now(),
+      moduleId: this.name,
+    });
+    logger.debug(`사용자 상태 설정: ${userId} -> ${JSON.stringify(state)}`);
   }
 
   /**
-   * 사용자 이름 가져오기 (헬퍼)
+   * 사용자 상태 가져오기
    */
-  getUserName(from) {
-    return getUserName(from);
+  getUserState(userId) {
+    return this.userStates.get(userId);
   }
 
   /**
-   * 현재 한국 시간 가져오기 (헬퍼)
+   * 사용자 상태 삭제
    */
-  getKoreanTime() {
-    return TimeHelper.getKoreanTime();
+  clearUserState(userId) {
+    const cleared = this.userStates.delete(userId);
+    if (cleared) {
+      logger.debug(`사용자 상태 삭제: ${userId}`);
+    }
+    return cleared;
   }
 
   /**
-   * 날짜 포맷팅 (헬퍼)
+   * 한국 시간 포맷팅
    */
-  formatDate(date, format = "YYYY-MM-DD HH:mm") {
-    return TimeHelper.formatDate(date, format);
-  }
-
-  // ===== 자식 클래스에서 구현할 메서드 =====
-
-  /**
-   * 모듈별 초기화 로직
-   */
-  async onInitialize() {
-    // 자식 클래스에서 구현
+  formatKoreanTime(date = new Date()) {
+    return TimeHelper.formatKoreanTime(date);
   }
 
   /**
-   * 메시지 처리 로직
+   * 현재 시간 가져오기
    */
-  async onHandleMessage(bot, msg) {
-    // 자식 클래스에서 구현
-    return false;
+  getCurrentTime() {
+    return TimeHelper.getCurrentTime();
   }
 
   /**
-   * 모듈 정리
+   * 사용자 이름 가져오기
    */
-  async cleanup() {
-    logger.info(`🧹 ${this.name} 정리 중...`);
-    this.actionMap.clear();
-    this.isInitialized = false;
+  getUserDisplayName(user) {
+    return getUserName(user);
   }
 
+  // ===== 🔧 메타 정보 =====
+
   /**
-   * 모듈 상태 조회
+   * 모듈 정보 반환
    */
-  getStatus() {
+  getModuleInfo() {
     return {
       name: this.name,
-      initialized: this.isInitialized,
-      actions: Array.from(this.actionMap.keys()),
+      isInitialized: this.isInitialized,
       actionCount: this.actionMap.size,
+      userStateCount: this.userStates.size,
+      actions: Array.from(this.actionMap.keys()),
     };
+  }
+
+  /**
+   * 모듈 상태 확인
+   */
+  isReady() {
+    return this.isInitialized && this.actionMap.size > 0;
   }
 }
 

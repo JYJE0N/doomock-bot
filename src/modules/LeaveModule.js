@@ -1,4 +1,4 @@
-// src/modules/LeaveModule.js - 표준화된 휴가 관리 모듈
+// src/modules/LeaveModule.js - 표준화된 휴가 관리 모듈 (수정됨)
 
 const BaseModule = require("./BaseModule");
 const LeaveService = require("../services/LeaveService");
@@ -15,6 +15,7 @@ class LeaveModule extends BaseModule {
     });
 
     this.leaveService = null;
+    // ✅ userStates는 BaseModule에서 초기화되므로 제거
   }
 
   // 🎯 모듈별 초기화
@@ -44,14 +45,18 @@ class LeaveModule extends BaseModule {
     });
   }
 
-  // 🎯 메시지 처리
+  // 🎯 메시지 처리 (수정됨)
   async onHandleMessage(bot, msg) {
     const {
       chat: { id: chatId },
       from: { id: userId },
       text,
     } = msg;
-    const userState = this.userStates.get(userId);
+
+    if (!text) return false;
+
+    // ✅ BaseModule의 getUserState 사용
+    const userState = this.getUserState(userId);
 
     // 사용자 상태에 따른 처리
     if (userState) {
@@ -107,13 +112,14 @@ class LeaveModule extends BaseModule {
     };
 
     await this.editMessage(bot, chatId, messageId, menuText, {
-      parse_mode: "Markdown",
       reply_markup: keyboard,
     });
+
+    return true;
   }
 
-  // 📊 휴가 현황 표시
-  async showLeaveStatus(bot, callbackQuery, params) {
+  // 📊 휴가 현황 조회
+  async showLeaveStatus(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -123,16 +129,18 @@ class LeaveModule extends BaseModule {
     } = callbackQuery;
 
     try {
-      const leaveData = await this.leaveService.getUserLeaveData(userId);
+      const leaveData = await this.leaveService.getLeaveStatus(userId);
       const userName = getUserName(callbackQuery.from);
 
       const statusText =
-        `📊 **휴가 현황**\n\n` +
-        `👤 ${userName}님\n` +
-        `📅 총 휴가: ${leaveData.totalDays}일\n` +
-        `✅ 사용: ${leaveData.usedDays}일\n` +
-        `📌 잔여: ${leaveData.remainingDays}일\n\n` +
-        `_마지막 업데이트: ${leaveData.lastUpdate}_`;
+        `📊 **${userName}님의 휴가 현황**\n\n` +
+        `🏖️ 잔여 연차: **${leaveData.remaining}일**\n` +
+        `✅ 사용 연차: **${leaveData.used}일**\n` +
+        `📅 총 연차: **${leaveData.total}일**\n\n` +
+        `📈 사용률: **${((leaveData.used / leaveData.total) * 100).toFixed(
+          1
+        )}%**\n\n` +
+        `⏰ ${timeHelper.getCurrentTime()}`;
 
       const keyboard = {
         inline_keyboard: [
@@ -140,111 +148,24 @@ class LeaveModule extends BaseModule {
             { text: "✅ 휴가 사용", callback_data: "leave:use" },
             { text: "📜 사용 내역", callback_data: "leave:history" },
           ],
-          [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
+          [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
         ],
       };
 
-      if (messageId) {
-        await this.editMessage(bot, chatId, messageId, statusText, {
-          reply_markup: keyboard,
-        });
-      } else {
-        await this.sendMessage(bot, chatId, statusText, {
-          reply_markup: keyboard,
-        });
-      }
+      await this.editMessage(bot, chatId, messageId, statusText, {
+        reply_markup: keyboard,
+      });
 
       return true;
     } catch (error) {
       logger.error("휴가 현황 조회 실패:", error);
-      await this.sendError(bot, chatId, "휴가 현황을 조회할 수 없습니다.");
+      await this.sendError(bot, chatId, "휴가 현황을 가져올 수 없습니다.");
       return true;
     }
   }
-  // 📜 휴가 사용 내역 보기
-  async showLeaveHistory(bot, callbackQuery) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
-
-    const history = await this.leaveService.getLeaveHistory(userId); // 서비스에 메서드가 필요
-
-    const message =
-      history.length > 0
-        ? "📜 **휴가 사용 내역**\n\n" +
-          history.map((h) => `• ${h.date}: ${h.days}일 사용`).join("\n")
-        : "📭 사용 내역이 없습니다.";
-
-    await this.editMessage(bot, chatId, messageId, message, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
-        ],
-      },
-    });
-  }
-
-  // ⚙️ 휴가 설정 보기
-  async showLeaveSetting(bot, callbackQuery) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
-
-    const leaveData = await this.leaveService.getUserLeaveData(userId);
-
-    const message =
-      `⚙️ **휴가 설정**\n\n` +
-      `총 휴가: ${leaveData.totalDays}일\n` +
-      `사용 가능: ${leaveData.remainingDays}일\n` +
-      `_설정 변경은 관리자에게 문의하세요._`;
-
-    await this.editMessage(bot, chatId, messageId, message, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
-        ],
-      },
-    });
-  }
-
-  // ❓ 도움말
-  async showLeaveHelp(bot, callbackQuery) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = callbackQuery;
-
-    const text =
-      "❓ *휴가 기능 안내*\n\n" +
-      "• `잔여 휴가`로 남은 일수 확인\n" +
-      "• `휴가 사용`으로 원하는 일수 선택\n" +
-      "• `사용 내역`에서 기록 확인\n\n" +
-      "휴가를 효율적으로 관리하세요!";
-
-    await this.editMessage(bot, chatId, messageId, text, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
-        ],
-      },
-    });
-  }
 
   // ✅ 휴가 사용 메뉴
-  async showLeaveUseMenu(bot, callbackQuery) {
+  async showLeaveUseMenu(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -252,7 +173,10 @@ class LeaveModule extends BaseModule {
       },
     } = callbackQuery;
 
-    const menuText = `✅ **휴가 사용**\n\n` + `사용할 휴가 일수를 선택하세요:`;
+    const menuText =
+      `✅ **휴가 사용**\n\n` +
+      `사용하실 휴가 일수를 선택해주세요.\n` +
+      `연차는 0.5일 단위로 사용 가능합니다.`;
 
     const keyboard = {
       inline_keyboard: [
@@ -261,7 +185,7 @@ class LeaveModule extends BaseModule {
           { text: "0.5일", callback_data: "leave:use:0.5" },
         ],
         [{ text: "🔢 직접 입력", callback_data: "leave:use:custom" }],
-        [{ text: "🔙 돌아가기", callback_data: "leave:menu" }],
+        [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
       ],
     };
 
@@ -273,16 +197,174 @@ class LeaveModule extends BaseModule {
   }
 
   // 1일 휴가 사용
-  async useOneDay(bot, callbackQuery) {
+  async useOneDay(bot, callbackQuery, params, moduleManager) {
     return await this.processLeaveUsage(bot, callbackQuery, 1);
   }
 
   // 0.5일 휴가 사용
-  async useHalfDay(bot, callbackQuery) {
+  async useHalfDay(bot, callbackQuery, params, moduleManager) {
     return await this.processLeaveUsage(bot, callbackQuery, 0.5);
   }
 
-  // 휴가 사용 처리
+  // 🔢 사용자 정의 휴가 일수 입력 시작
+  async startCustomInput(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    // ✅ BaseModule의 setUserState 사용
+    this.setUserState(userId, {
+      action: "waiting_leave_input",
+      messageId: messageId,
+    });
+
+    const inputText =
+      `🔢 **휴가 일수 입력**\n\n` +
+      `사용하실 휴가 일수를 입력해주세요.\n` +
+      `(예: 1, 1.5, 2, 2.5)\n\n` +
+      `❌ 취소하시려면 /cancel 을 입력하세요.`;
+
+    await this.editMessage(bot, chatId, messageId, inputText, {
+      reply_markup: { inline_keyboard: [] },
+    });
+
+    return true;
+  }
+
+  // 📜 휴가 사용 내역
+  async showLeaveHistory(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    try {
+      const history = await this.leaveService.getLeaveHistory(userId);
+      const userName = getUserName(callbackQuery.from);
+
+      let historyText = `📜 **${userName}님의 휴가 사용 내역**\n\n`;
+
+      if (history.length === 0) {
+        historyText += `아직 사용한 휴가가 없습니다.`;
+      } else {
+        history.slice(0, 10).forEach((record, index) => {
+          historyText += `**${index + 1}.** ${record.days}일 (${
+            record.date
+          })\n`;
+          if (record.reason) {
+            historyText += `   사유: ${record.reason}\n`;
+          }
+          historyText += `\n`;
+        });
+
+        if (history.length > 10) {
+          historyText += `... 외 ${history.length - 10}건 더`;
+        }
+      }
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
+        ],
+      };
+
+      await this.editMessage(bot, chatId, messageId, historyText, {
+        reply_markup: keyboard,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("휴가 내역 조회 실패:", error);
+      await this.sendError(bot, chatId, "휴가 내역을 가져올 수 없습니다.");
+      return true;
+    }
+  }
+
+  // ⚙️ 휴가 설정
+  async showLeaveSetting(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    try {
+      const settings = await this.leaveService.getLeaveSettings(userId);
+
+      const settingText =
+        `⚙️ **휴가 설정**\n\n` +
+        `📅 연간 총 휴가: **${settings.totalLeave}일**\n` +
+        `🔔 알림 설정: **${settings.notifications ? "켜짐" : "꺼짐"}**\n` +
+        `📊 월말 알림: **${settings.monthlyAlert ? "켜짐" : "꺼짐"}**`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📅 총 휴가 변경", callback_data: "leave:setting:total" },
+            { text: "🔔 알림 토글", callback_data: "leave:setting:alert" },
+          ],
+          [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
+        ],
+      };
+
+      await this.editMessage(bot, chatId, messageId, settingText, {
+        reply_markup: keyboard,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("휴가 설정 조회 실패:", error);
+      await this.sendError(bot, chatId, "휴가 설정을 가져올 수 없습니다.");
+      return true;
+    }
+  }
+
+  // ❓ 휴가 도움말
+  async showLeaveHelp(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    const helpText =
+      `❓ **휴가 관리 도움말**\n\n` +
+      `🏖️ **제공 기능:**\n` +
+      `• 잔여 휴가 조회\n` +
+      `• 휴가 사용 신청\n` +
+      `• 사용 내역 확인\n` +
+      `• 휴가 설정 관리\n\n` +
+      `💡 **사용 방법:**\n` +
+      `/leave - 휴가 메뉴 열기\n\n` +
+      `📝 **주의사항:**\n` +
+      `• 휴가는 0.5일 단위로 사용 가능\n` +
+      `• 사용된 휴가는 취소 불가\n` +
+      `• 잔여 휴가가 부족하면 사용 불가`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
+      ],
+    };
+
+    await this.editMessage(bot, chatId, messageId, helpText, {
+      reply_markup: keyboard,
+    });
+
+    return true;
+  }
+
+  // 🛠️ 휴가 사용 처리
   async processLeaveUsage(bot, callbackQuery, days) {
     const {
       message: {
@@ -294,76 +376,118 @@ class LeaveModule extends BaseModule {
 
     try {
       const result = await this.leaveService.useLeave(userId, days);
+      const userName = getUserName(callbackQuery.from);
 
       if (result.success) {
         const successText =
           `✅ **휴가 사용 완료**\n\n` +
-          `사용: ${days}일\n` +
-          `잔여: ${result.remaining}일`;
+          `${userName}님의 휴가 **${days}일**이 사용되었습니다.\n\n` +
+          `🏖️ 잔여 휴가: **${result.remaining}일**\n` +
+          `⏰ ${timeHelper.getCurrentTime()}`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [
+              { text: "📊 현황 보기", callback_data: "leave:status" },
+              { text: "📜 내역 보기", callback_data: "leave:history" },
+            ],
+            [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
+          ],
+        };
 
         await this.editMessage(bot, chatId, messageId, successText, {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
-            ],
-          },
+          reply_markup: keyboard,
         });
       } else {
-        await this.sendError(bot, chatId, result.message);
+        const errorText =
+          `❌ **휴가 사용 실패**\n\n` +
+          `${result.message || "휴가 사용 중 오류가 발생했습니다."}\n\n` +
+          `🏖️ 현재 잔여 휴가: **${result.remaining || 0}일**`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: "🔙 휴가 메뉴", callback_data: "leave:menu" }],
+          ],
+        };
+
+        await this.editMessage(bot, chatId, messageId, errorText, {
+          reply_markup: keyboard,
+        });
       }
 
       return true;
     } catch (error) {
       logger.error("휴가 사용 처리 실패:", error);
-      await this.sendError(bot, chatId, "휴가 사용 처리에 실패했습니다.");
+      await this.sendError(
+        bot,
+        chatId,
+        "휴가 사용 처리 중 오류가 발생했습니다."
+      );
       return true;
     }
   }
 
-  // 사용자 입력 시작
-  async startCustomInput(bot, callbackQuery) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
-
-    // 사용자 상태 설정
-    this.userStates.set(userId, {
-      action: "waiting_leave_input",
-      messageId: messageId,
-    });
-
-    const inputText =
-      `🔢 **휴가 일수 입력**\n\n` +
-      `사용할 휴가 일수를 입력해주세요.\n` +
-      `(예: 2, 1.5, 0.5)`;
-
-    await this.sendMessage(bot, chatId, inputText);
-    return true;
-  }
-
-  // 사용자 입력 처리
+  // 🔢 사용자 입력 휴가 일수 처리
   async handleLeaveInput(bot, chatId, userId, text) {
-    const days = parseFloat(text);
+    try {
+      const days = parseFloat(text);
 
-    if (isNaN(days) || days <= 0) {
-      await this.sendError(bot, chatId, "올바른 숫자를 입력해주세요.");
+      if (isNaN(days) || days <= 0) {
+        await this.sendMessage(
+          bot,
+          chatId,
+          "❌ 올바른 숫자를 입력해주세요. (예: 1, 1.5, 2)"
+        );
+        return true;
+      }
+
+      if (days % 0.5 !== 0) {
+        await this.sendMessage(
+          bot,
+          chatId,
+          "❌ 휴가는 0.5일 단위로만 사용 가능합니다."
+        );
+        return true;
+      }
+
+      // ✅ BaseModule의 clearUserState 사용
+      this.clearUserState(userId);
+
+      // 가상의 콜백쿼리 객체 생성
+      const fakeCallback = {
+        message: { chat: { id: chatId } },
+        from: { id: userId },
+      };
+
+      return await this.processLeaveUsage(bot, fakeCallback, days);
+    } catch (error) {
+      logger.error("휴가 입력 처리 오류:", error);
+      await this.sendError(bot, chatId, "입력 처리 중 오류가 발생했습니다.");
       return true;
     }
+  }
 
-    // 상태 초기화
-    this.userStates.delete(userId);
+  // ⚙️ 휴가 설정 입력 처리
+  async handleLeaveSetting(bot, chatId, userId, text) {
+    try {
+      // 설정 처리 로직
+      const result = await this.leaveService.updateLeaveSetting(userId, text);
 
-    // 가상의 콜백쿼리 객체 생성
-    const fakeCallback = {
-      message: { chat: { id: chatId } },
-      from: { id: userId },
-    };
+      // ✅ BaseModule의 clearUserState 사용
+      this.clearUserState(userId);
 
-    return await this.processLeaveUsage(bot, fakeCallback, days);
+      if (result.success) {
+        await this.sendMessage(bot, chatId, "✅ 설정이 업데이트되었습니다.");
+      } else {
+        await this.sendMessage(bot, chatId, "❌ 설정 업데이트에 실패했습니다.");
+      }
+
+      return true;
+    } catch (error) {
+      logger.error("휴가 설정 처리 오류:", error);
+      await this.sendError(bot, chatId, "설정 처리 중 오류가 발생했습니다.");
+      return true;
+    }
   }
 }
 
