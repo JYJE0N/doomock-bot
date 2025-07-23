@@ -34,7 +34,7 @@ class TodoModule extends BaseModule {
   /**
    * 모듈 초기화
    */
-  async onInitialize() {
+  async initialize() {
     try {
       this.todoService = new TodoService();
       this.todoService.db = this.db; // DB 연결 전달

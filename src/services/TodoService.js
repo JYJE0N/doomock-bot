@@ -23,6 +23,16 @@ class TodoService extends BaseService {
     logger.info("📝 TodoService 생성됨");
   }
 
+  async initialize() {
+    try {
+      this.logger.info("✅ TodoService 초기화 성공");
+      return true;
+    } catch (error) {
+      this.logger.error("❌ TodoService 초기화 실패:", error);
+      return false;
+    }
+  }
+
   /**
    * 인덱스 생성
    */
