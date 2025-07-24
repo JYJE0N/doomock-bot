@@ -87,7 +87,7 @@ class TimerModule extends BaseModule {
         message_id: messageId,
       },
     } = callbackQuery;
-    await this.editMessage(bot, chatId, messageId, text, options);
+    await this.editMessage(bot, chatId, messageId, menuText, options);
 
     try {
       // BaseModule의 표준 handleCallback 호출
@@ -134,7 +134,7 @@ class TimerModule extends BaseModule {
       bot,
       chatId,
       messageId,
-      text,
+      menuText,
       options,
       "🍅 **포모도로 시작**\n\n" +
         "25분 동안 집중할 작업을 입력해주세요!\n\n" +
@@ -177,7 +177,7 @@ class TimerModule extends BaseModule {
   }
 
   // ⭐ 포모도로 작업명 입력 처리
-  async handlePomodoroTaskInput(bot, chatId, userId, text, userState) {
+  async handlePomodoroTaskInput(bot, chatId, userId, menuText, userState) {
     try {
       this.userStates.delete(userId);
 
@@ -273,7 +273,7 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, text, options, {
+      await this.editMessage(bot, chatId, messageId, menuText, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -285,7 +285,7 @@ class TimerModule extends BaseModule {
         bot,
         chatId,
         messageId,
-        text,
+        menuText,
         options,
         `❌ ${result.error}`,
         {

@@ -125,8 +125,8 @@ class TodoModule extends BaseModule {
         chat: { id: chatId },
         message_id: messageId,
       },
+      from: { id: userId },
     } = callbackQuery;
-    await this.editMessage(bot, chatId, messageId, text, options);
 
     const userName = getUserName(callbackQuery.from);
     const stats = await this.todoService.getUserStats(userId);
@@ -155,7 +155,7 @@ ${userName}님의 할일 현황:
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, text, options, {
+    await this.editMessage(bot, chatId, messageId, menuText, {
       reply_markup: keyboard,
     });
   }
@@ -204,8 +204,8 @@ ${userName}님의 할일 현황:
         chat: { id: chatId },
         message_id: messageId,
       },
+      from: { id: userId },
     } = callbackQuery;
-    await this.editMessage(bot, chatId, messageId, text, options);
 
     // 사용자 상태 설정
     this.setUserState(userId, {
@@ -275,8 +275,8 @@ ${userName}님의 할일 현황:
         chat: { id: chatId },
         message_id: messageId,
       },
+      from: { id: userId },
     } = callbackQuery;
-    await this.editMessage(bot, chatId, messageId, text, options);
 
     try {
       const todos = await this.todoService.getUserTodos(userId);
@@ -294,7 +294,7 @@ ${userName}님의 할일 현황:
           ],
         };
 
-        await this.editMessage(bot, chatId, messageId, text, {
+        await this.editMessage(bot, chatId, messageId, emptyText, {
           reply_markup: keyboard,
         });
         return;
@@ -325,7 +325,7 @@ ${todoList}
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, text, {
+      await this.editMessage(bot, chatId, messageId, listText, {
         reply_markup: keyboard,
       });
     } catch (error) {
@@ -343,8 +343,8 @@ ${todoList}
         chat: { id: chatId },
         message_id: messageId,
       },
+      from: { id: userId },
     } = callbackQuery;
-    await this.editMessage(bot, chatId, messageId, text, options);
 
     try {
       const todos = await this.todoService.getUserTodos(userId, false);
@@ -361,7 +361,7 @@ ${todoList}
           ],
         };
 
-        await this.editMessage(bot, chatId, messageId, text, {
+        await this.editMessage(bot, chatId, messageId, emptyText, {
           reply_markup: keyboard,
         });
         return;
@@ -410,8 +410,8 @@ ${todoList}
         chat: { id: chatId },
         message_id: messageId,
       },
+      from: { id: userId },
     } = callbackQuery;
-    await this.editMessage(bot, chatId, messageId, text, options);
 
     try {
       const todos = await this.todoService.getUserTodos(userId);
@@ -428,7 +428,7 @@ ${todoList}
           ],
         };
 
-        await this.editMessage(bot, chatId, messageId, text, {
+        await this.editMessage(bot, chatId, messageId, emptyText, {
           reply_markup: keyboard,
         });
         return;
@@ -578,6 +578,57 @@ ${todoList}
         chatId,
         "❌ 할일 삭제 중 오류가 발생했습니다."
       );
+    }
+  }
+
+  /**
+   * 통계 표시
+   */
+  async showStats(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    try {
+      const stats = await this.todoService.getUserDetailedStats(userId);
+
+      const statsText = `📊 **할일 통계**
+
+**전체 현황**
+• 전체: ${stats.total}개
+• 완료: ${stats.completed}개 (${stats.completionRate}%)
+• 진행중: ${stats.pending}개
+
+**오늘 활동**
+• 추가: ${stats.todayAdded}개
+• 완료: ${stats.todayCompleted}개
+
+**이번 주**
+• 완료: ${stats.weekCompleted}개
+
+**이번 달**
+• 완료: ${stats.monthCompleted}개
+
+**평균 완료 시간**
+• ${stats.avgCompletionTime}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "📝 할일 메뉴", callback_data: "todo:menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+        ],
+      };
+
+      await this.editMessage(bot, chatId, messageId, statsText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("통계 표시 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
     }
   }
 

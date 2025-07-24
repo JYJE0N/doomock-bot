@@ -473,39 +473,44 @@ class FortuneModule extends BaseModule {
 
   // ========== 메시지 처리 (BaseModule onHandleMessage 구현) ==========
 
-  async onHandleMessage(bot, msg) {
-    const {
-      chat: { id: chatId },
-      from: { id: userId },
-      text,
-    } = msg;
+  // FortuneModule의 handleMessage 메서드 수정
+  async handleMessage(bot, msg) {
+    // msg에서 필요한 정보 추출
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const text = msg.text;
 
-    if (text && text.startsWith("/fortune")) {
-      await this.handleFortuneCommand(bot, msg);
+    if (!text) return false;
+
+    // 운세 명령어 처리
+    const fortuneMatch = text.match(/^\/?(fortune|운세)(?:\s+(.+))?/i);
+    if (fortuneMatch) {
+      await this.handleFortuneCommand(bot, msg, fortuneMatch[2]);
       return true;
     }
 
     return false;
   }
 
-  async handleFortuneCommand(bot, msg) {
-    try {
-      const {
-        chat: { id: chatId },
-        from,
-        text,
-      } = msg;
-      const userName = getUserName(from);
-      const args = text.split(" ");
-      const subCommand = args[1];
+  async handleFortuneCommand(bot, msg, subCommand) {
+    // msg 대신 개별 변수 사용
+    const chatId = msg.chat.id;
+    const userId = msg.from.id;
+    const userName = getUserName(msg.from);
 
-      if (!subCommand) {
-        // 기본: 운세 메뉴 표시
-        const menuData = this.getMenuData(userName);
-        await bot.sendMessage(chatId, menuData.text, {
-          parse_mode: "Markdown",
-          reply_markup: menuData.keyboard,
-        });
+    // if (!subCommand) {
+    //   // 기본: 운세 메뉴 표시
+    //   const menuData = this.getMenuData(userName);
+    //   await bot.sendMessage(chatId, menuData.text, {
+    //     parse_mode: "Markdown",
+    //     reply_markup: menuData.keyboard,
+    //   });
+    //   return;
+    // }
+
+    try {
+      if (!this.fortuneService) {
+        await bot.sendMessage(chatId, "❌ 운세 서비스를 사용할 수 없습니다.");
         return;
       }
 
