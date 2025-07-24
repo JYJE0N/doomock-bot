@@ -1,4 +1,4 @@
-// src/modules/BaseModule.js - 리팩토링된 기본 모듈 클래스
+// src/core/BaseModule.js - 리팩토링된 기본 모듈 클래스
 const logger = require("../utils/Logger");
 
 /**
@@ -176,10 +176,30 @@ class BaseModule {
    */
   async editMessage(bot, chatId, messageId, text, options = {}) {
     try {
+      // chatId가 객체인 경우 처리 (callbackQuery 객체가 전달된 경우)
+      if (typeof chatId === "object" && chatId !== null) {
+        logger.warn(
+          `${this.name} editMessage: chatId가 객체로 전달됨. 올바른 값으로 변환 시도.`
+        );
+        // callbackQuery.message.chat.id를 찾아보기
+        if (chatId.message && chatId.message.chat && chatId.message.chat.id) {
+          chatId = chatId.message.chat.id;
+        } else if (chatId.chat && chatId.chat.id) {
+          chatId = chatId.chat.id;
+        } else if (chatId.id) {
+          chatId = chatId.id;
+        } else {
+          throw new Error(
+            `올바른 chat ID를 찾을 수 없습니다: ${JSON.stringify(chatId)}`
+          );
+        }
+      }
+
       const defaultOptions = {
         parse_mode: "Markdown",
         ...options,
       };
+
       return await bot.editMessageText(text, {
         chat_id: chatId,
         message_id: messageId,
