@@ -5,9 +5,12 @@ const logger = require("../utils/Logger");
 
 class BotCommandsRegistry {
   constructor() {
-    this.commands = new Map();
     this.moduleCommands = new Map();
+    this.quickCommands = new Map();
     this.adminCommands = new Map();
+    this.setupModuleCommands();
+    this.setupQuickCommands();
+    this.setupAdminCommands();
 
     this.setupStandardCommands();
     logger.info("📋 BotCommandsRegistry 초기화 완료");
@@ -103,13 +106,72 @@ class BotCommandsRegistry {
 
     this.moduleCommands.set("leave", {
       command: "leave",
-      description: "휴가 관리 (연차/병가 신청)",
+      description: "통합 휴가 관리 (연차/월차/반차/반반차/병가)",
       module: "LeaveModule",
       category: "work",
       isPublic: true,
       handler: "LeaveModule.handleMessage",
       params: "(bot, callbackQuery, subAction, params, moduleManager)",
-      quickActions: ["status", "request", "history"],
+      quickActions: ["status", "use", "history", "statistics"],
+      features: {
+        leaveTypes: [
+          {
+            type: "ANNUAL",
+            name: "연차",
+            emoji: "🏖️",
+            allowedDays: [1, 0.5, 0.25],
+            description: "1년간 사용할 수 있는 유급휴가",
+          },
+          {
+            type: "MONTHLY",
+            name: "월차",
+            emoji: "📅",
+            allowedDays: [1, 0.5, 0.25],
+            description: "매월 1일씩 자동 지급되는 휴가",
+          },
+          {
+            type: "HALF_DAY",
+            name: "반차",
+            emoji: "🌅",
+            allowedDays: [0.5],
+            description: "반나절 휴가 (오전/오후)",
+          },
+          {
+            type: "QUARTER_DAY",
+            name: "반반차",
+            emoji: "⏰",
+            allowedDays: [0.25],
+            description: "2시간 단위 휴가",
+          },
+          {
+            type: "SICK",
+            name: "병가",
+            emoji: "🤒",
+            allowedDays: [1, 0.5, 0.25],
+            description: "질병으로 인한 휴가 (연차 차감 없음)",
+          },
+        ],
+        usageUnits: {
+          1: {
+            name: "1일",
+            display: "하루종일",
+            timeRange: "09:00-18:00",
+            description: "전일 휴가",
+          },
+          0.5: {
+            name: "0.5일",
+            display: "반나절",
+            timeRange: "09:00-13:00 또는 14:00-18:00",
+            description: "반일 휴가",
+          },
+          0.25: {
+            name: "0.25일",
+            display: "반반나절",
+            timeRange: "09:00-11:00 또는 16:00-18:00",
+            description: "2시간 휴가",
+          },
+        },
+      },
     });
 
     this.moduleCommands.set("insight", {
