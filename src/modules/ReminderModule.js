@@ -208,6 +208,44 @@ ${listText}
     }
   }
 
+  // removeReminder 메서드가 없다면 추가
+  async removeReminder(bot, callbackQuery, params, menuManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    try {
+      // 리마인더 삭제 로직
+      const reminderId = params.id;
+      if (!reminderId) {
+        throw new Error("리마인더 ID가 필요합니다");
+      }
+
+      // DB에서 삭제
+      await this.deleteReminder(reminderId);
+
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        "✅ 리마인더가 삭제되었습니다",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 목록으로", callback_data: "reminder:list" }],
+            ],
+          },
+        }
+      );
+    } catch (error) {
+      this.logger.error("removeReminder 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
+    }
+  }
+
   /**
    * 도움말 표시
    */

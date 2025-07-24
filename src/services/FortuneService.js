@@ -11,7 +11,6 @@ class FortuneService {
   }
 
   async initialize() {
-    // DB 연결이 필요하다면 여기서 처리
     this.logger.info("FortuneService 초기화 완료");
   }
 

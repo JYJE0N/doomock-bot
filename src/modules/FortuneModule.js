@@ -13,6 +13,7 @@ class FortuneModule extends BaseModule {
     });
 
     this.fortuneService = null;
+    this.logger = Logger.getInstance(); // ✅ logger 인스턴스 생성
 
     logger.info("🔮 FortuneModule 생성됨");
   }
@@ -33,7 +34,7 @@ class FortuneModule extends BaseModule {
 
       this.logger.info("✅ FortuneModule 초기화 완료");
     } catch (error) {
-      this.logger.error("❌ FortuneModule 초기화 실패:", error);
+      this.logger.error("❌ FortuneModule 초기화 실패:", error); // ✅ this.logger 사용
       this.fortuneService = null;
     }
   }
