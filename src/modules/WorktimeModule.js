@@ -487,7 +487,10 @@ class WorktimeModule extends BaseModule {
         chat: { id: chatId },
         message_id: messageId,
       },
+      from,
     } = callbackQuery;
+
+    const userName = getUserName(from);
 
     const text =
       `⚙️ **근무시간 설정**\n\n` +

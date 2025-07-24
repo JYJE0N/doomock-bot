@@ -69,6 +69,103 @@ class WorktimeService extends BaseService {
       return null;
     }
   }
+  // WorktimeService에 추가할 메서드
+  async getRecentHistory(userId, days = 7) {
+    try {
+      // DB 모드
+      if (this.collection) {
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        startDate.setHours(0, 0, 0, 0);
+
+        const records = await this.collection
+          .find({
+            userId: userId,
+            date: {
+              $gte: startDate,
+              $lte: endDate,
+            },
+          })
+          .sort({ date: -1 })
+          .toArray();
+
+        return records;
+      }
+      // 메모리 모드
+      else {
+        const records = [];
+        const endDate = new Date();
+
+        for (let i = 0; i < days; i++) {
+          const date = new Date();
+          date.setDate(date.getDate() - i);
+          const key = `${userId}_${date.toDateString()}`;
+          const record = this.memoryStorage.get(key);
+          if (record) {
+            records.push(record);
+          }
+        }
+
+        return records;
+      }
+    } catch (error) {
+      logger.error("근무 기록 조회 실패:", error);
+      return [];
+    }
+  }
+
+  // 주간 통계 조회 메서드
+  async getWeeklyStats(userId) {
+    try {
+      const records = await this.getRecentHistory(userId, 7);
+
+      let totalMinutes = 0;
+      let workDays = 0;
+      let avgCheckIn = 0;
+      let avgCheckOut = 0;
+
+      records.forEach((record) => {
+        if (record.checkIn) {
+          workDays++;
+          totalMinutes += record.totalMinutes || 0;
+
+          const checkInHour = new Date(record.checkIn).getHours();
+          const checkInMinute = new Date(record.checkIn).getMinutes();
+          avgCheckIn += checkInHour + checkInMinute / 60;
+
+          if (record.checkOut) {
+            const checkOutHour = new Date(record.checkOut).getHours();
+            const checkOutMinute = new Date(record.checkOut).getMinutes();
+            avgCheckOut += checkOutHour + checkOutMinute / 60;
+          }
+        }
+      });
+
+      if (workDays > 0) {
+        avgCheckIn = avgCheckIn / workDays;
+        avgCheckOut = avgCheckOut / workDays;
+      }
+
+      return {
+        totalMinutes,
+        workDays,
+        avgCheckIn: this.formatTime(avgCheckIn),
+        avgCheckOut: this.formatTime(avgCheckOut),
+        avgWorkHours: Math.round((totalMinutes / workDays / 60) * 10) / 10,
+      };
+    } catch (error) {
+      logger.error("주간 통계 조회 실패:", error);
+      return null;
+    }
+  }
+
+  // 시간 포맷 헬퍼
+  formatTime(decimalHours) {
+    const hours = Math.floor(decimalHours);
+    const minutes = Math.round((decimalHours - hours) * 60);
+    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+  }
 
   // 🎯 주간 근무 기록 조회
   async getWeeklyHistory(userId) {
