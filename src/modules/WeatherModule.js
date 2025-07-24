@@ -1,313 +1,220 @@
-// src/modules/WeatherModule.js - 완전 리팩토링된 날씨 모듈
+// src/modules/WeatherModule.js - 표준화된 날씨 모듈
+
 const BaseModule = require("./BaseModule");
 const WeatherService = require("../services/WeatherService");
-const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
-const TimeHelper = require("../utils/TimeHelper");
+const logger = require("../utils/Logger");
 
-/**
- * 날씨 정보 모듈
- * - UI/UX 담당
- * - 사용자 상호작용 처리
- * - WeatherService를 통한 날씨 API 연동
- * - 화성/동탄 지역 특화 서비스
- * - 표준 매개변수 체계 완벽 준수
- */
 class WeatherModule extends BaseModule {
-  constructor(bot, options = {}) {
+  constructor() {
     super("WeatherModule", {
-      bot,
-      db: options.db,
-      moduleManager: options.moduleManager,
+      commands: ["weather", "날씨"],
+      callbacks: ["weather"],
+      features: ["current", "forecast", "location", "clothing"],
     });
 
-    // WeatherService 초기화
-    this.weatherService = null;
+    this.weatherService = new WeatherService();
+    this.userStates = new Map();
 
-    // 화성/동탄 특화 설정
-    this.dongtan = {
-      defaultCity: process.env.DEFAULT_CITY || "화성",
-      specialLocations: ["동탄", "화성", "수원", "성남", "용인", "오산"],
-      timeZone: "Asia/Seoul",
-    };
-
-    // 날씨 이모지 매핑
+    // 날씨 이모지
     this.weatherEmojis = {
-      sunny: "☀️",
-      partlyCloudy: "🌤️",
-      cloudy: "☁️",
-      overcast: "🌫️",
+      clear: "☀️",
+      clouds: "☁️",
       rain: "🌧️",
-      shower: "🌦️",
-      thunderstorm: "⛈️",
-      snow: "🌨️",
+      snow: "❄️",
       mist: "🌫️",
-      fog: "🌫️",
-      hot: "🌡️",
-      cold: "🥶",
+      thunderstorm: "⛈️",
+      drizzle: "🌦️",
     };
-
-    // 도시 추천 리스트
-    this.recommendedCities = [
-      { name: "화성", display: "🏡 화성 (기본)", priority: 1 },
-      { name: "동탄", display: "🏢 동탄 신도시", priority: 2 },
-      { name: "수원", display: "🏰 수원", priority: 3 },
-      { name: "서울", display: "🌃 서울", priority: 4 },
-      { name: "성남", display: "🌆 성남", priority: 5 },
-      { name: "용인", display: "🌿 용인", priority: 6 },
-    ];
 
     logger.info("🌤️ WeatherModule 생성됨");
   }
 
-  /**
-   * 🎯 모듈 초기화 (표준 onInitialize 패턴)
-   */
-  async onInitialize() {
-    try {
-      this.weatherService = new WeatherService();
-      await this.weatherService.initialize();
-
-      // API 키 상태 확인
-      const status = await this.weatherService.checkStatus();
-      if (status.status === "error") {
-        logger.warn(`⚠️ WeatherService 상태: ${status.message}`);
-      }
-
-      logger.info("🌤️ WeatherService 연결 성공");
-    } catch (error) {
-      logger.error("❌ WeatherService 초기화 실패:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 🎯 액션 등록 (표준 setupActions 패턴)
-   */
+  // ✅ 표준 액션 등록
   setupActions() {
     this.registerActions({
-      menu: this.showMenu,
-      current: this.showCurrentWeather,
-      forecast: this.showForecast,
-      search: this.startCitySearch,
-
-      // 도시별 날씨 (빠른 선택)
-      "city:화성": this.showCityWeather,
-      "city:동탄": this.showCityWeather,
-      "city:수원": this.showCityWeather,
-      "city:서울": this.showCityWeather,
-      "city:성남": this.showCityWeather,
-      "city:용인": this.showCityWeather,
-
-      // 기능별 액션
-      refresh: this.refreshWeather,
-      help: this.showHelp,
-      settings: this.showSettings,
+      menu: this.showWeatherMenu.bind(this),
+      current: this.showCurrentWeather.bind(this),
+      forecast: this.showForecast.bind(this),
+      location: this.changeLocation.bind(this),
+      clothing: this.getClothingAdvice.bind(this),
+      help: this.showWeatherHelp.bind(this),
     });
   }
 
-  /**
-   * 🎯 메시지 처리 (표준 onHandleMessage 패턴)
-   */
+  // ✅ 메시지 처리
   async onHandleMessage(bot, msg) {
     const {
-      text,
       chat: { id: chatId },
       from: { id: userId },
+      text,
     } = msg;
 
     if (!text) return false;
 
     // 사용자 상태 확인
     const userState = this.getUserState(userId);
-
-    // 도시 검색 대기 상태
-    if (userState?.action === "waiting_city_input") {
-      await this.handleCityInput(bot, chatId, userId, text);
-      return true;
+    if (userState?.action === "waiting_location") {
+      return await this.handleLocationInput(bot, chatId, userId, text);
     }
 
     // 명령어 처리
     const command = this.extractCommand(text);
 
-    // 날씨 명령어들
-    if (command === "weather" || command === "날씨") {
-      await this.sendWeatherMenu(bot, chatId);
-      return true;
-    }
-
-    // 빠른 날씨 조회 (도시명 포함)
-    if (command === "weather" && text.split(" ").length > 1) {
-      const cityName = text.split(" ").slice(1).join(" ");
-      await this.showQuickWeather(bot, chatId, cityName);
-      return true;
-    }
-
-    // 도시명만으로 날씨 조회
-    if (this.isKnownCity(text.trim())) {
-      await this.showQuickWeather(bot, chatId, text.trim());
+    if (command === "weather" || text === "날씨") {
+      await this.showCurrentWeather(bot, {
+        message: { chat: { id: chatId } },
+        from: { id: userId },
+      });
       return true;
     }
 
     return false;
   }
 
-  // ===== 🌤️ 날씨 정보 액션들 (표준 매개변수 준수) =====
+  // ==================== 액션 핸들러 ====================
 
   /**
    * 날씨 메뉴 표시
    */
-  async showMenu(bot, callbackQuery, params, moduleManager) {
+  async showWeatherMenu(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
         chat: { id: chatId },
         message_id: messageId,
       },
-      from,
+      from: { id: userId },
     } = callbackQuery;
 
-    const userName = getUserName(from);
+    const userName = getUserName(callbackQuery.from);
 
-    try {
-      // 기본 도시(화성) 현재 날씨 미리보기
-      const weatherPreview = await this.weatherService.getCurrentWeather(
-        this.dongtan.defaultCity
-      );
+    const menuText = `🌤️ **날씨 정보**\n\n${userName}님, 어떤 날씨 정보를 확인하시겠어요?`;
 
-      let previewText = "";
-      if (weatherPreview.success) {
-        const data = weatherPreview.data;
-        previewText = `\n🌡️ **${data.city} 현재**: ${data.icon} ${data.temperature}°C, ${data.description}`;
-      }
-
-      const menuText = `🌤️ **${userName}님의 날씨 정보**
-
-📅 ${TimeHelper.formatDateTime()}${previewText}
-
-🏡 **화성/동탄 지역 특화 서비스**
-• 화성시 날씨 우선 제공
-• 동탄 신도시 맞춤 정보
-• 경기 남부 지역 특화
-
-어떤 날씨 정보를 확인하시겠습니까?`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "🌡️ 현재 날씨", callback_data: "weather:current" },
-            { text: "📅 일기예보", callback_data: "weather:forecast" },
-          ],
-          [
-            { text: "🏡 화성", callback_data: "weather:city:화성" },
-            { text: "🏢 동탄", callback_data: "weather:city:동탄" },
-          ],
-          [
-            { text: "🏰 수원", callback_data: "weather:city:수원" },
-            { text: "🌃 서울", callback_data: "weather:city:서울" },
-          ],
-          [
-            { text: "🔍 도시 검색", callback_data: "weather:search" },
-            { text: "❓ 도움말", callback_data: "weather:help" },
-          ],
-          [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🌡️ 현재 날씨", callback_data: "weather:current" },
+          { text: "📅 예보", callback_data: "weather:forecast" },
         ],
-      };
+        [
+          { text: "📍 지역 변경", callback_data: "weather:location" },
+          { text: "👕 의상 추천", callback_data: "weather:clothing" },
+        ],
+        [
+          { text: "❓ 도움말", callback_data: "weather:help" },
+          { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+        ],
+      ],
+    };
 
-      await this.editMessage(bot, chatId, messageId, menuText, {
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("날씨 메뉴 표시 오류:", error);
-      await this.handleError(bot, callbackQuery, error);
-    }
+    await this.editMessage(bot, chatId, messageId, menuText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
   }
 
   /**
    * 현재 날씨 표시
    */
   async showCurrentWeather(bot, callbackQuery, params, moduleManager) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = callbackQuery;
-
-    const cityName = params[0] || this.dongtan.defaultCity;
+    const chatId = callbackQuery.message?.chat?.id || callbackQuery.chat?.id;
+    const userId = callbackQuery.from?.id;
 
     try {
-      const weatherResult = await this.weatherService.getCurrentWeather(
-        cityName
-      );
-
-      if (!weatherResult.success) {
+      // 로딩 메시지 (콜백인 경우)
+      if (callbackQuery.message) {
         await this.editMessage(
           bot,
           chatId,
-          messageId,
-          `❌ **날씨 정보 오류**\n\n${weatherResult.error}\n\n기본 정보로 대체됩니다.`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: "🔄 다시 시도",
-                    callback_data: `weather:current:${cityName}`,
-                  },
-                ],
-                [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
-              ],
-            },
-          }
+          callbackQuery.message.message_id,
+          "🌤️ 날씨 정보를 가져오는 중..."
         );
+      }
+
+      // 날씨 데이터 가져오기
+      const weatherData = await this.weatherService.getCurrentWeather("Seoul");
+
+      if (!weatherData.success) {
+        const errorText =
+          "❌ 날씨 정보를 가져올 수 없습니다.\n잠시 후 다시 시도해주세요.";
+
+        if (callbackQuery.message) {
+          await this.editMessage(
+            bot,
+            chatId,
+            callbackQuery.message.message_id,
+            errorText
+          );
+        } else {
+          await this.sendMessage(bot, chatId, errorText);
+        }
         return;
       }
 
-      const data = weatherResult.data;
-      const cached = weatherResult.cached ? " (캐시됨)" : "";
+      const weather = weatherData.data;
+      const emoji = this.getWeatherEmoji(weather.main);
 
-      const weatherText = `🌤️ **${data.city} 현재 날씨**
+      const weatherText = `🌤️ **현재 날씨 - 서울**
 
-${data.icon} **${data.temperature}°C**
-📝 **상태**: ${data.description}
-💧 **습도**: ${data.humidity}%
-💨 **바람**: ${data.windDirection} ${data.windSpeed}m/s
+${emoji} **${weather.description}**
 
-🕐 **업데이트**: ${data.timestamp}${cached}
+🌡️ **온도**: ${weather.temp}°C (체감 ${weather.feels_like}°C)
+💧 **습도**: ${weather.humidity}%
+💨 **바람**: ${weather.wind_speed}m/s
+👁️ **가시거리**: ${(weather.visibility / 1000).toFixed(1)}km
 
-${this.getWeatherAdvice(data)}`;
+📅 **업데이트**: ${new Date().toLocaleString("ko-KR")}`;
 
       const keyboard = {
         inline_keyboard: [
           [
-            {
-              text: "🔄 새로고침",
-              callback_data: `weather:refresh:${cityName}`,
-            },
-            {
-              text: "📅 일기예보",
-              callback_data: `weather:forecast:${cityName}`,
-            },
+            { text: "📅 예보 보기", callback_data: "weather:forecast" },
+            { text: "👕 의상 추천", callback_data: "weather:clothing" },
           ],
           [
-            { text: "🏡 화성", callback_data: "weather:city:화성" },
-            { text: "🏢 동탄", callback_data: "weather:city:동탄" },
+            { text: "🔄 새로고침", callback_data: "weather:current" },
+            { text: "🏠 메인 메뉴", callback_data: "main:menu" },
           ],
-          [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, weatherText, {
-        reply_markup: keyboard,
-      });
+      if (callbackQuery.message) {
+        await this.editMessage(
+          bot,
+          chatId,
+          callbackQuery.message.message_id,
+          weatherText,
+          {
+            parse_mode: "Markdown",
+            reply_markup: keyboard,
+          }
+        );
+      } else {
+        await this.sendMessage(bot, chatId, weatherText, {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+      }
     } catch (error) {
       logger.error("현재 날씨 표시 오류:", error);
-      await this.handleError(bot, callbackQuery, error);
+
+      const errorText = "❌ 날씨 정보 처리 중 오류가 발생했습니다.";
+
+      if (callbackQuery.message) {
+        await this.editMessage(
+          bot,
+          chatId,
+          callbackQuery.message.message_id,
+          errorText
+        );
+      } else {
+        await this.sendMessage(bot, chatId, errorText);
+      }
     }
   }
 
   /**
-   * 일기예보 표시
+   * 날씨 예보 표시
    */
   async showForecast(bot, callbackQuery, params, moduleManager) {
     const {
@@ -317,507 +224,101 @@ ${this.getWeatherAdvice(data)}`;
       },
     } = callbackQuery;
 
-    const cityName = params[0] || this.dongtan.defaultCity;
+    await this.editMessage(
+      bot,
+      chatId,
+      messageId,
+      "📅 **5일 날씨 예보**\n\n🔜 곧 지원 예정입니다!",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
+          ],
+        },
+      }
+    );
+  }
+
+  /**
+   * 지역 변경
+   */
+  async changeLocation(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    await this.editMessage(
+      bot,
+      chatId,
+      messageId,
+      "📍 **지역 변경**\n\n🔜 곧 지원 예정입니다!\n현재는 서울 날씨만 제공됩니다.",
+      {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
+          ],
+        },
+      }
+    );
+  }
+
+  /**
+   * 의상 추천
+   */
+  async getClothingAdvice(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
 
     try {
-      const forecastResult = await this.weatherService.getForecast(cityName);
+      const weatherData = await this.weatherService.getCurrentWeather("Seoul");
 
-      if (!forecastResult.success) {
+      if (!weatherData.success) {
         await this.editMessage(
           bot,
           chatId,
           messageId,
-          `❌ **일기예보 오류**\n\n${forecastResult.error}\n\n기본 예보로 대체됩니다.`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: "🔄 다시 시도",
-                    callback_data: `weather:forecast:${cityName}`,
-                  },
-                ],
-                [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
-              ],
-            },
-          }
+          "❌ 날씨 정보를 가져올 수 없어 의상 추천이 어렵습니다."
         );
         return;
       }
 
-      const data = forecastResult.data;
-      const cached = forecastResult.cached ? " (캐시됨)" : "";
+      const temp = weatherData.data.temp;
+      const weather = weatherData.data.main;
 
-      let forecastText = `📅 **${data.city} 5일 예보**\n\n`;
+      let advice = this.getClothingAdviceText(temp, weather);
 
-      data.forecast.forEach((day, index) => {
-        const dayName =
-          index === 0
-            ? "오늘"
-            : index === 1
-            ? "내일"
-            : index === 2
-            ? "모레"
-            : day.date;
-
-        forecastText += `**${dayName}**: ${day.icon} ${day.temp} - ${day.desc}\n`;
-      });
-
-      forecastText += `\n🕐 **업데이트**: ${data.timestamp}${cached}`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text: "🔄 새로고침",
-              callback_data: `weather:forecast:${cityName}`,
-            },
-            {
-              text: "🌡️ 현재 날씨",
-              callback_data: `weather:current:${cityName}`,
-            },
-          ],
-          [
-            { text: "🏡 화성", callback_data: "weather:city:화성" },
-            { text: "🏢 동탄", callback_data: "weather:city:동탄" },
-          ],
-          [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
-        ],
-      };
-
-      await this.editMessage(bot, chatId, messageId, forecastText, {
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("일기예보 표시 오류:", error);
-      await this.handleError(bot, callbackQuery, error);
-    }
-  }
-
-  /**
-   * 도시별 날씨 표시
-   */
-  async showCityWeather(bot, callbackQuery, params, moduleManager) {
-    // params[0]에서 도시명 추출 또는 콜백 데이터에서 파싱
-    const cityName = params[0] || callbackQuery.data.split(":")[2];
-
-    if (!cityName) {
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "❌ 도시명을 찾을 수 없습니다.",
-        show_alert: true,
-      });
-      return;
-    }
-
-    // 현재 날씨를 해당 도시로 표시
-    await this.showCurrentWeather(
-      bot,
-      callbackQuery,
-      [cityName],
-      moduleManager
-    );
-  }
-
-  /**
-   * 도시 검색 시작
-   */
-  async startCitySearch(bot, callbackQuery, params, moduleManager) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from: { id: userId },
-    } = callbackQuery;
-
-    // 사용자 상태 설정
-    this.setUserState(userId, { action: "waiting_city_input" });
-
-    const searchText = `🔍 **도시 검색**
-
-날씨를 확인할 도시명을 입력해주세요.
-
-💡 **지원 도시:**
-• 전국 주요 도시 (한글/영문)
-• 해외 주요 도시 (영문)
-
-📝 **입력 예시:**
-• 한국: 화성, 동탄, 수원, 서울, 부산, 대구...
-• 해외: New York, Tokyo, London...
-
-취소하려면 "/cancel" 또는 "취소"를 입력하세요.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🏡 화성", callback_data: "weather:city:화성" },
-          { text: "🏢 동탄", callback_data: "weather:city:동탄" },
-        ],
-        [
-          { text: "🏰 수원", callback_data: "weather:city:수원" },
-          { text: "🌃 서울", callback_data: "weather:city:서울" },
-        ],
-        [{ text: "❌ 취소", callback_data: "weather:menu" }],
-      ],
-    };
-
-    await this.editMessage(bot, chatId, messageId, searchText, {
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 새로고침
-   */
-  async refreshWeather(bot, callbackQuery, params, moduleManager) {
-    const cityName = params[0] || this.dongtan.defaultCity;
-
-    // 캐시 무효화
-    this.weatherService.clearCache();
-
-    await bot.answerCallbackQuery(callbackQuery.id, {
-      text: "🔄 날씨 정보를 새로고침합니다...",
-      show_alert: false,
-    });
-
-    // 현재 날씨 다시 표시
-    await this.showCurrentWeather(
-      bot,
-      callbackQuery,
-      [cityName],
-      moduleManager
-    );
-  }
-
-  /**
-   * 도움말 표시
-   */
-  async showHelp(bot, callbackQuery, params, moduleManager) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = callbackQuery;
-
-    const helpText = `🌤️ **날씨 모듈 사용법**
-
-📅 ${TimeHelper.formatDateTime()}
-
-🌡️ **현재 날씨**
-• 실시간 온도, 습도, 바람 정보
-• 10분마다 캐시 업데이트
-• 날씨 상태별 조언 제공
-
-📅 **일기예보**
-• 5일간 날씨 예보
-• 간단한 날씨 상태 요약
-• 계획 수립에 도움
-
-🏡 **화성/동탄 특화**
-• 화성시를 기본 도시로 설정
-• 동탄 신도시 날씨 우선 제공
-• 경기 남부 지역 특화 서비스
-
-🔍 **도시 검색**
-• 전국 주요 도시 지원
-• 해외 주요 도시 지원 (영문)
-• 한글/영문 도시명 모두 인식
-
-⚡ **빠른 명령어**
-• /weather 또는 "날씨" - 날씨 메뉴
-• 도시명 직접 입력 - 해당 도시 날씨
-• "화성", "동탄", "수원" 등
-
-🔄 **자동 업데이트**
-• 10분마다 캐시 갱신
-• 실시간 정보 제공
-• Railway 서버에서 24/7 운영`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🌡️ 현재 날씨", callback_data: "weather:current" },
-          { text: "📅 일기예보", callback_data: "weather:forecast" },
-        ],
-        [
-          { text: "🔙 날씨 메뉴", callback_data: "weather:menu" },
-          { text: "🏠 메인 메뉴", callback_data: "main:menu" },
-        ],
-      ],
-    };
-
-    await this.editMessage(bot, chatId, messageId, helpText, {
-      reply_markup: keyboard,
-    });
-  }
-
-  // ===== 🎯 입력 처리 메서드들 =====
-
-  /**
-   * 도시 입력 처리
-   */
-  async handleCityInput(bot, chatId, userId, text) {
-    // 상태 초기화
-    this.clearUserState(userId);
-
-    // 취소 확인
-    if (text.toLowerCase() === "/cancel" || text === "취소") {
-      await this.sendMessage(bot, chatId, "✅ 도시 검색이 취소되었습니다.", {
+      await this.editMessage(bot, chatId, messageId, advice, {
+        parse_mode: "Markdown",
         reply_markup: {
           inline_keyboard: [
             [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
           ],
         },
       });
-      return;
-    }
-
-    try {
-      const cityName = text.trim();
-
-      // 입력 검증
-      if (!cityName || cityName.length < 2) {
-        await this.sendError(bot, chatId, "도시명을 올바르게 입력해주세요.");
-        return;
-      }
-
-      // 날씨 정보 조회
-      const weatherResult = await this.weatherService.getCurrentWeather(
-        cityName
-      );
-
-      if (!weatherResult.success) {
-        await this.sendMessage(
-          bot,
-          chatId,
-          `❌ **"${cityName}" 날씨 정보를 찾을 수 없습니다**\n\n${weatherResult.error}\n\n다른 도시명으로 다시 시도해보세요.`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "🔍 다시 검색", callback_data: "weather:search" }],
-                [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
-              ],
-            },
-          }
-        );
-        return;
-      }
-
-      const data = weatherResult.data;
-
-      const weatherText = `🌤️ **${data.city} 날씨 검색 결과**
-
-${data.icon} **${data.temperature}°C**
-📝 **상태**: ${data.description}
-💧 **습도**: ${data.humidity}%
-💨 **바람**: ${data.windDirection} ${data.windSpeed}m/s
-
-🕐 **검색 시간**: ${data.timestamp}
-
-${this.getWeatherAdvice(data)}`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text: "🔄 새로고침",
-              callback_data: `weather:refresh:${cityName}`,
-            },
-            {
-              text: "📅 일기예보",
-              callback_data: `weather:forecast:${cityName}`,
-            },
-          ],
-          [
-            { text: "🔍 다른 도시", callback_data: "weather:search" },
-            { text: "🔙 날씨 메뉴", callback_data: "weather:menu" },
-          ],
-        ],
-      };
-
-      await this.sendMessage(bot, chatId, weatherText, {
-        reply_markup: keyboard,
-      });
     } catch (error) {
-      logger.error("도시 입력 처리 오류:", error);
-      await this.sendError(bot, chatId, "도시 검색 중 오류가 발생했습니다.");
-    }
-  }
-
-  // ===== 🛠️ 유틸리티 메서드들 =====
-
-  /**
-   * 빠른 날씨 조회 (명령어용)
-   */
-  async showQuickWeather(bot, chatId, cityName) {
-    try {
-      const weatherResult = await this.weatherService.getCurrentWeather(
-        cityName
+      logger.error("의상 추천 오류:", error);
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        "❌ 의상 추천 처리 중 오류가 발생했습니다."
       );
-
-      if (!weatherResult.success) {
-        await this.sendMessage(
-          bot,
-          chatId,
-          `❌ **"${cityName}" 날씨 정보를 찾을 수 없습니다**\n\n${weatherResult.error}`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "🔍 도시 검색", callback_data: "weather:search" }],
-                [{ text: "🌤️ 날씨 메뉴", callback_data: "weather:menu" }],
-              ],
-            },
-          }
-        );
-        return;
-      }
-
-      const data = weatherResult.data;
-
-      const quickText = `🌤️ **${data.city} 날씨**
-
-${data.icon} **${data.temperature}°C** - ${data.description}
-💧 습도 ${data.humidity}% | 💨 ${data.windDirection} ${data.windSpeed}m/s
-
-🕐 ${data.timestamp}`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text: "📅 일기예보",
-              callback_data: `weather:forecast:${cityName}`,
-            },
-            {
-              text: "🔄 새로고침",
-              callback_data: `weather:refresh:${cityName}`,
-            },
-          ],
-          [{ text: "🌤️ 날씨 메뉴", callback_data: "weather:menu" }],
-        ],
-      };
-
-      await this.sendMessage(bot, chatId, quickText, {
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("빠른 날씨 조회 오류:", error);
-      await this.sendError(bot, chatId, "날씨 조회 중 오류가 발생했습니다.");
     }
   }
 
   /**
-   * 날씨 메뉴 전송 (명령어용)
+   * 도움말 표시
    */
-  async sendWeatherMenu(bot, chatId) {
-    try {
-      // 기본 도시 날씨 미리보기
-      const weatherPreview = await this.weatherService.getCurrentWeather(
-        this.dongtan.defaultCity
-      );
-
-      let previewText = "";
-      if (weatherPreview.success) {
-        const data = weatherPreview.data;
-        previewText = `\n🌡️ **${data.city} 현재**: ${data.icon} ${data.temperature}°C, ${data.description}`;
-      }
-
-      const text = `🌤️ **날씨 정보**
-
-📅 ${TimeHelper.formatDateTime()}${previewText}
-
-🏡 **화성/동탄 지역 특화 서비스**
-• 실시간 날씨 정보
-• 5일 일기예보
-• 전국 도시 검색 지원
-
-어떤 날씨 정보를 확인하시겠습니까?`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "🌡️ 현재 날씨", callback_data: "weather:current" },
-            { text: "📅 일기예보", callback_data: "weather:forecast" },
-          ],
-          [
-            { text: "🏡 화성", callback_data: "weather:city:화성" },
-            { text: "🏢 동탄", callback_data: "weather:city:동탄" },
-          ],
-          [
-            { text: "🔍 도시 검색", callback_data: "weather:search" },
-            { text: "❓ 도움말", callback_data: "weather:help" },
-          ],
-          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
-        ],
-      };
-
-      await this.sendMessage(bot, chatId, text, {
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("날씨 메뉴 전송 오류:", error);
-      await this.sendError(bot, chatId, "메뉴 표시 중 오류가 발생했습니다.");
-    }
-  }
-
-  /**
-   * 알려진 도시인지 확인
-   */
-  isKnownCity(text) {
-    const knownCities = [
-      "화성",
-      "동탄",
-      "수원",
-      "서울",
-      "부산",
-      "대구",
-      "인천",
-      "광주",
-      "대전",
-      "울산",
-      "제주",
-      "성남",
-      "용인",
-      "고양",
-      "안산",
-      "안양",
-      "남양주",
-      "의정부",
-    ];
-
-    return (
-      knownCities.includes(text) || this.dongtan.specialLocations.includes(text)
-    );
-  }
-
-  /**
-   * 날씨별 조언 생성
-   */
-  getWeatherAdvice(weatherData) {
-    const temp = weatherData.temperature;
-    const desc = weatherData.description.toLowerCase();
-
-    // 온도별 조언
-    if (temp >= 30) {
-      return "🔥 **매우 더워요!** 충분한 수분 섭취와 시원한 곳에서 휴식하세요.";
-    } else if (temp >= 25) {
-      return "☀️ **따뜻한 날씨예요!** 가벼운 옷차림이 좋겠어요.";
-    } else if (temp >= 20) {
-      return "🌤️ **쾌적한 날씨예요!** 외출하기 좋은 날씨네요.";
-    } else if (temp >= 10) {
-      return "🧥 **조금 쌀쌀해요.** 얇은 겉옷을 준비하세요.";
-    } else if (temp >= 0) {
-      return "🧣 **추워요!** 따뜻하게 입고 나가세요.";
-    } else {
-      return "🥶 **매우 추워요!** 보온에 각별히 신경 쓰세요.";
-    }
-  }
-
-  /**
-   * 에러 처리
-   */
-  async handleError(bot, callbackQuery, error) {
+  async showWeatherHelp(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
         chat: { id: chatId },
@@ -825,24 +326,112 @@ ${data.icon} **${data.temperature}°C** - ${data.description}
       },
     } = callbackQuery;
 
-    try {
-      await this.editMessage(
-        bot,
-        chatId,
-        messageId,
-        "❌ **오류 발생**\n\n날씨 정보 처리 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.",
-        {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🔄 다시 시도", callback_data: "weather:menu" }],
-              [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
-            ],
-          },
-        }
-      );
-    } catch (editError) {
-      logger.error("에러 메시지 표시 실패:", editError);
+    const helpText = `❓ **날씨 모듈 도움말**
+
+**명령어:**
+• \`/weather\` 또는 "날씨" - 현재 날씨 확인
+
+**기능:**
+🌡️ **현재 날씨** - 실시간 날씨 정보
+📅 **예보** - 5일 날씨 예보 (준비 중)
+📍 **지역 변경** - 다른 지역 날씨 (준비 중)
+👕 **의상 추천** - 날씨별 의상 가이드
+
+**사용법:**
+1. /weather 명령어 입력
+2. 버튼을 눌러 원하는 정보 선택
+3. 실시간으로 업데이트된 정보 확인`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
+      ],
+    };
+
+    await this.editMessage(bot, chatId, messageId, helpText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
+  // ==================== 유틸리티 메서드 ====================
+
+  /**
+   * 날씨 이모지 가져오기
+   */
+  getWeatherEmoji(weatherMain) {
+    const main = weatherMain.toLowerCase();
+    return this.weatherEmojis[main] || "🌤️";
+  }
+
+  /**
+   * 의상 추천 텍스트 생성
+   */
+  getClothingAdviceText(temp, weather) {
+    let advice = "👕 **의상 추천**\n\n";
+
+    if (temp >= 28) {
+      advice += "🌞 **매우 더움** (28°C 이상)\n";
+      advice += "• 민소매, 반팔, 반바지\n";
+      advice += "• 린넨 소재 추천\n";
+      advice += "• 모자, 선글라스 필수";
+    } else if (temp >= 23) {
+      advice += "☀️ **더움** (23-27°C)\n";
+      advice += "• 반팔, 얇은 셔츠\n";
+      advice += "• 면 소재 추천\n";
+      advice += "• 가벼운 외투 준비";
+    } else if (temp >= 20) {
+      advice += "🌤️ **적당함** (20-22°C)\n";
+      advice += "• 긴팔, 얇은 니트\n";
+      advice += "• 가디건, 얇은 재킷\n";
+      advice += "• 편안한 복장";
+    } else if (temp >= 15) {
+      advice += "🍂 **선선함** (15-19°C)\n";
+      advice += "• 얇은 니트, 자켓\n";
+      advice += "• 트렌치코트\n";
+      advice += "• 레이어드 룩";
+    } else if (temp >= 10) {
+      advice += "🧥 **쌀쌀함** (10-14°C)\n";
+      advice += "• 두꺼운 니트, 코트\n";
+      advice += "• 스카프 추천\n";
+      advice += "• 따뜻한 외투";
+    } else if (temp >= 5) {
+      advice += "❄️ **추움** (5-9°C)\n";
+      advice += "• 패딩, 두꺼운 코트\n";
+      advice += "• 목도리, 장갑\n";
+      advice += "• 히트텍 착용";
+    } else {
+      advice += "🥶 **매우 추움** (5°C 미만)\n";
+      advice += "• 두꺼운 패딩, 롱코트\n";
+      advice += "• 목도리, 장갑, 모자 필수\n";
+      advice += "• 겹겹이 입기";
     }
+
+    // 날씨별 추가 조언
+    if (weather.includes("rain")) {
+      advice += "\n\n🌧️ **비 예보**\n• 우산 또는 우비 필수\n• 방수 신발 추천";
+    } else if (weather.includes("snow")) {
+      advice += "\n\n❄️ **눈 예보**\n• 미끄럽지 않은 신발\n• 두꺼운 외투 필수";
+    } else if (weather.includes("wind")) {
+      advice += "\n\n💨 **바람**\n• 바람막이 추천\n• 모자 고정 필요";
+    }
+
+    return advice;
+  }
+
+  /**
+   * 위치 입력 처리
+   */
+  async handleLocationInput(bot, chatId, userId, text) {
+    this.clearUserState(userId);
+
+    await this.sendMessage(
+      bot,
+      chatId,
+      `📍 "${text}" 지역은 아직 지원되지 않습니다.\n현재는 서울 날씨만 제공됩니다.`
+    );
+
+    return true;
   }
 }
 
