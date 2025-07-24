@@ -1,25 +1,22 @@
-// src/modules/BaseModule.js - 표준화된 모든 모듈의 부모 클래스
+// src/core/BaseModule.js - 리팩토링된 기본 모듈 클래스
 const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-const { getUserName } = require("../utils/UserHelper");
 
 /**
- * 🏗️ 모든 모듈의 기본 클래스
- * - 표준화된 콜백 처리
- * - actionMap 기반 라우팅
- * - 공통 유틸리티 메서드
- * - 사용자 상태 관리
+ * 기본 모듈 클래스
+ * - 모든 모듈이 상속받는 베이스 클래스
+ * - 표준화된 인터페이스 제공
+ * - 공통 기능 구현
  */
 class BaseModule {
   constructor(name, options = {}) {
     this.name = name;
-    this.bot = options.bot || null;
+    this.bot = options.bot;
     this.db = options.db || null;
     this.moduleManager = options.moduleManager || null;
 
-    // 🎯 표준 프로퍼티 초기화 (핵심!)
+    // 액션 맵
     this.actionMap = new Map();
-    this.userStates = new Map(); // ✅ userStates 초기화 추가
+    this.userStates = new Map();
 
     // 공통 설정
     this.config = {
@@ -30,6 +27,7 @@ class BaseModule {
 
     // 초기화 플래그
     this.isInitialized = false;
+    this.isActive = true;
 
     // 액션 설정 (자식 클래스에서 구현)
     this.setupActions();
@@ -93,20 +91,14 @@ class BaseModule {
   }
 
   /**
-   * ✅ 명령어 추출 유틸리티 (WeatherModule 오류 해결)
+   * 🎯 메시지 처리 메서드
+   * @param {Object} bot - 텔레그램 봇 인스턴스
+   * @param {Object} msg - 메시지 객체
+   * @returns {boolean} - 처리 여부
    */
-  extractCommand(text) {
-    if (!text || typeof text !== "string") {
-      return null;
-    }
-
-    // "/command" 형태 처리
-    if (text.startsWith("/")) {
-      return text.substring(1).split(" ")[0].toLowerCase();
-    }
-
-    // 일반 텍스트에서 명령어 추출
-    return text.toLowerCase().trim();
+  async handleMessage(bot, msg) {
+    // 자식 클래스에서 오버라이드
+    return false;
   }
 
   /**
@@ -143,8 +135,8 @@ class BaseModule {
           text: "❌ 처리 중 오류가 발생했습니다.",
           show_alert: true,
         });
-      } catch (answerError) {
-        logger.error("콜백 응답 실패:", answerError);
+      } catch (err) {
+        logger.error("콜백 응답 실패:", err);
       }
 
       return false;
@@ -152,144 +144,168 @@ class BaseModule {
   }
 
   /**
-   * 🎯 표준 메시지 처리 메서드
-   * @param {Object} bot - 텔레그램 봇 인스턴스
-   * @param {Object} msg - 메시지 객체
-   */
-  async handleMessage(bot, msg) {
-    try {
-      // 자식 클래스의 메시지 처리 로직 호출
-      return await this.onHandleMessage(bot, msg);
-    } catch (error) {
-      logger.error(`${this.name} 메시지 처리 오류:`, error);
-      return false;
-    }
-  }
-
-  /**
-   * 🎯 자식 클래스에서 오버라이드할 메시지 처리 메서드
-   */
-  async onHandleMessage(bot, msg) {
-    // 자식 클래스에서 구현
-    return false;
-  }
-
-  // ===== 🛠️ 공통 유틸리티 메서드 =====
-
-  /**
-   * 메시지 전송
+   * 🎯 메시지 전송 헬퍼
    */
   async sendMessage(bot, chatId, text, options = {}) {
     try {
-      return await bot.sendMessage(chatId, text, {
+      const defaultOptions = {
         parse_mode: "Markdown",
         ...options,
-      });
+      };
+      return await bot.sendMessage(chatId, text, defaultOptions);
     } catch (error) {
-      logger.error(`메시지 전송 실패: ${error.message}`);
+      logger.error(`${this.name} 메시지 전송 오류:`, error);
+
+      // Markdown 파싱 오류시 일반 텍스트로 재시도
+      if (error.code === "ETELEGRAM" && error.description?.includes("parse")) {
+        try {
+          const fallbackOptions = { ...options };
+          delete fallbackOptions.parse_mode;
+          return await bot.sendMessage(chatId, text, fallbackOptions);
+        } catch (fallbackError) {
+          logger.error(`${this.name} 메시지 재전송 실패:`, fallbackError);
+          throw fallbackError;
+        }
+      }
       throw error;
     }
   }
 
   /**
-   * 메시지 수정
+   * 🎯 메시지 수정 헬퍼
    */
   async editMessage(bot, chatId, messageId, text, options = {}) {
     try {
+      const defaultOptions = {
+        parse_mode: "Markdown",
+        ...options,
+      };
       return await bot.editMessageText(text, {
         chat_id: chatId,
         message_id: messageId,
-        parse_mode: "Markdown",
-        ...options,
+        ...defaultOptions,
       });
     } catch (error) {
-      logger.error(`메시지 수정 실패: ${error.message}`);
+      logger.error(`${this.name} 메시지 수정 오류:`, error);
+
+      // Markdown 파싱 오류시 일반 텍스트로 재시도
+      if (error.code === "ETELEGRAM" && error.description?.includes("parse")) {
+        try {
+          const fallbackOptions = { ...options };
+          delete fallbackOptions.parse_mode;
+          return await bot.editMessageText(text, {
+            chat_id: chatId,
+            message_id: messageId,
+            ...fallbackOptions,
+          });
+        } catch (fallbackError) {
+          logger.error(`${this.name} 메시지 수정 재시도 실패:`, fallbackError);
+          throw fallbackError;
+        }
+      }
       throw error;
     }
   }
 
   /**
-   * 에러 메시지 전송
+   * 🎯 에러 처리 헬퍼
    */
-  async sendError(bot, chatId, errorText = "오류가 발생했습니다.") {
+  async handleError(bot, callbackQuery, error) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    logger.error(`${this.name} 오류:`, error);
+
+    const errorText = `❌ **오류 발생**
+
+처리 중 오류가 발생했습니다.
+잠시 후 다시 시도해주세요.`;
+
+    const keyboard = {
+      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main:menu" }]],
+    };
+
     try {
-      await this.sendMessage(bot, chatId, `❌ ${errorText}`);
-    } catch (error) {
-      logger.error(`에러 메시지 전송 실패: ${error.message}`);
+      await this.editMessage(bot, chatId, messageId, errorText, {
+        reply_markup: keyboard,
+      });
+    } catch (editError) {
+      logger.error("에러 메시지 전송 실패:", editError);
     }
   }
 
   /**
-   * 사용자 상태 설정
-   */
-  setUserState(userId, state) {
-    this.userStates.set(userId, {
-      ...state,
-      timestamp: Date.now(),
-      moduleId: this.name,
-    });
-    logger.debug(`사용자 상태 설정: ${userId} -> ${JSON.stringify(state)}`);
-  }
-
-  /**
-   * 사용자 상태 가져오기
+   * 🎯 사용자 상태 관리
    */
   getUserState(userId) {
     return this.userStates.get(userId);
   }
 
-  /**
-   * 사용자 상태 삭제
-   */
+  setUserState(userId, state) {
+    this.userStates.set(userId, state);
+  }
+
   clearUserState(userId) {
-    const cleared = this.userStates.delete(userId);
-    if (cleared) {
-      logger.debug(`사용자 상태 삭제: ${userId}`);
+    this.userStates.delete(userId);
+  }
+
+  /**
+   * 🎯 모듈 활성화/비활성화
+   */
+  setActive(active) {
+    this.isActive = active;
+    logger.info(`${this.name} 모듈 ${active ? "활성화" : "비활성화"}`);
+  }
+
+  /**
+   * 🎯 모듈 정리
+   */
+  async cleanup() {
+    try {
+      logger.info(`🧹 ${this.name} 모듈 정리 중...`);
+
+      // 사용자 상태 초기화
+      this.userStates.clear();
+
+      // 액션 맵 초기화
+      this.actionMap.clear();
+
+      // 자식 클래스의 정리 로직 호출
+      await this.onCleanup();
+
+      this.isInitialized = false;
+      logger.info(`✅ ${this.name} 모듈 정리 완료`);
+    } catch (error) {
+      logger.error(`❌ ${this.name} 모듈 정리 실패:`, error);
     }
-    return cleared;
   }
 
   /**
-   * 한국 시간 포맷팅
+   * 🎯 자식 클래스에서 오버라이드할 정리 메서드
    */
-  formatKoreanTime(date = new Date()) {
-    return TimeHelper.formatKoreanTime(date);
+  async onCleanup() {
+    // 자식 클래스에서 구현
   }
 
   /**
-   * 현재 시간 가져오기
+   * ✅ 명령어 추출 유틸리티
    */
-  getCurrentTime() {
-    return TimeHelper.getCurrentTime();
-  }
+  extractCommand(text) {
+    if (!text || typeof text !== "string") {
+      return null;
+    }
 
-  /**
-   * 사용자 이름 가져오기
-   */
-  getUserDisplayName(user) {
-    return getUserName(user);
-  }
+    // "/command" 형태 처리
+    if (text.startsWith("/")) {
+      return text.substring(1).split(" ")[0].toLowerCase();
+    }
 
-  // ===== 🔧 메타 정보 =====
-
-  /**
-   * 모듈 정보 반환
-   */
-  getModuleInfo() {
-    return {
-      name: this.name,
-      isInitialized: this.isInitialized,
-      actionCount: this.actionMap.size,
-      userStateCount: this.userStates.size,
-      actions: Array.from(this.actionMap.keys()),
-    };
-  }
-
-  /**
-   * 모듈 상태 확인
-   */
-  isReady() {
-    return this.isInitialized && this.actionMap.size > 0;
+    // 일반 텍스트에서 명령어 추출
+    return text.toLowerCase().trim();
   }
 }
 
