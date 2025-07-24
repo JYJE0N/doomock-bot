@@ -402,6 +402,186 @@ ${todoList}
   }
 
   /**
+   * 할일 삭제 처리
+   */
+  async handleDelete(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+      from: { id: userId },
+    } = callbackQuery;
+
+    try {
+      const todos = await this.todoService.getUserTodos(userId);
+
+      if (todos.length === 0) {
+        const emptyText = `🗑️ **할일 삭제**
+
+삭제할 할일이 없습니다.`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: "➕ 할일 추가", callback_data: "todo:add" }],
+            [{ text: "📝 할일 메뉴", callback_data: "todo:menu" }],
+          ],
+        };
+
+        await this.editMessage(bot, chatId, messageId, emptyText, {
+          reply_markup: keyboard,
+        });
+        return;
+      }
+
+      // 할일 목록 표시
+      const todoList = todos
+        .map((todo, index) => {
+          const status = todo.completed ? "✅" : "⏳";
+          return `${index + 1}. ${status} ${todo.text}`;
+        })
+        .join("\n");
+
+      const text = `🗑️ **할일 삭제**
+
+삭제할 할일의 번호를 입력해주세요:
+
+${todoList}
+
+(취소하려면 /cancel 입력)`;
+
+      // 사용자 상태 설정
+      this.setUserState(userId, {
+        module: "todo",
+        action: "deleting",
+        todos: todos,
+        messageId: messageId,
+      });
+
+      const keyboard = {
+        inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
+      };
+
+      await this.editMessage(bot, chatId, messageId, text, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("할일 삭제 처리 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
+    }
+  }
+
+  /**
+   * 할일 완료 처리 (실제)
+   */
+  async processTodoComplete(bot, chatId, userId, text) {
+    try {
+      const userState = this.getUserState(userId);
+      const todos = userState.todos;
+      const index = parseInt(text) - 1;
+
+      if (isNaN(index) || index < 0 || index >= todos.length) {
+        await this.sendMessage(bot, chatId, "❌ 올바른 번호를 입력해주세요.");
+        return;
+      }
+
+      const todoToComplete = todos[index];
+      const result = await this.todoService.toggleTodo(
+        userId,
+        todoToComplete._id
+      );
+
+      if (!result.success) {
+        await this.sendMessage(bot, chatId, `❌ ${result.message}`);
+        return;
+      }
+
+      // 상태 초기화
+      this.clearUserState(userId);
+
+      const successText = `✅ 할일을 완료했습니다!
+
+"${todoToComplete.text}"`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "✅ 더 완료하기", callback_data: "todo:complete" },
+            { text: "📋 목록 보기", callback_data: "todo:list" },
+          ],
+          [{ text: "📝 할일 메뉴", callback_data: "todo:menu" }],
+        ],
+      };
+
+      await this.sendMessage(bot, chatId, successText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("할일 완료 오류:", error);
+      await this.sendMessage(
+        bot,
+        chatId,
+        "❌ 할일 완료 중 오류가 발생했습니다."
+      );
+    }
+  }
+
+  /**
+   * 할일 삭제 처리 (실제)
+   */
+  async processTodoDelete(bot, chatId, userId, text) {
+    try {
+      const userState = this.getUserState(userId);
+      const todos = userState.todos;
+      const index = parseInt(text) - 1;
+
+      if (isNaN(index) || index < 0 || index >= todos.length) {
+        await this.sendMessage(bot, chatId, "❌ 올바른 번호를 입력해주세요.");
+        return;
+      }
+
+      const todoToDelete = todos[index];
+      const result = await this.todoService.deleteTodo(
+        userId,
+        todoToDelete._id
+      );
+
+      if (!result.success) {
+        await this.sendMessage(bot, chatId, `❌ ${result.message}`);
+        return;
+      }
+
+      // 상태 초기화
+      this.clearUserState(userId);
+
+      const successText = `✅ 할일이 삭제되었습니다!
+
+"${todoToDelete.text}"`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🗑️ 더 삭제하기", callback_data: "todo:remove" },
+            { text: "📋 목록 보기", callback_data: "todo:list" },
+          ],
+          [{ text: "📝 할일 메뉴", callback_data: "todo:menu" }],
+        ],
+      };
+
+      await this.sendMessage(bot, chatId, successText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("할일 삭제 오류:", error);
+      await this.sendMessage(
+        bot,
+        chatId,
+        "❌ 할일 삭제 중 오류가 발생했습니다."
+      );
+    }
+  }
+
+  /**
    * 뒤로가기 처리
    */
   async handleBack(bot, callbackQuery, params, moduleManager) {
