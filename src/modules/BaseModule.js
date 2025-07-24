@@ -1,4 +1,4 @@
-// src/core/BaseModule.js - 리팩토링된 기본 모듈 클래스
+// src/modules/BaseModule.js - 리팩토링된 기본 모듈 클래스
 const logger = require("../utils/Logger");
 
 /**

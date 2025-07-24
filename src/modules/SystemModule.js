@@ -1,5 +1,5 @@
 // src/modules/SystemModule.js - 리팩토링된 시스템 모듈
-const BaseModule = require("../core/BaseModule");
+const BaseModule = require("./BaseModule");
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 
