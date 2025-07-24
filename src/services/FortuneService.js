@@ -11,7 +11,7 @@ class FortuneService {
   }
 
   async initialize() {
-    this.logger.info("FortuneService 초기화 완료");
+    logger.info("FortuneService 초기화 완료");
   }
 
   initializeMessages() {
