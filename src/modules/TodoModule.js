@@ -125,8 +125,8 @@ class TodoModule extends BaseModule {
         chat: { id: chatId },
         message_id: messageId,
       },
-      from: { id: userId },
     } = callbackQuery;
+    await this.editMessage(bot, chatId, messageId, text, options);
 
     const userName = getUserName(callbackQuery.from);
     const stats = await this.todoService.getUserStats(userId);
@@ -155,7 +155,7 @@ ${userName}님의 할일 현황:
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, menuText, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       reply_markup: keyboard,
     });
   }
@@ -204,8 +204,8 @@ ${userName}님의 할일 현황:
         chat: { id: chatId },
         message_id: messageId,
       },
-      from: { id: userId },
     } = callbackQuery;
+    await this.editMessage(bot, chatId, messageId, text, options);
 
     // 사용자 상태 설정
     this.setUserState(userId, {
@@ -275,8 +275,8 @@ ${userName}님의 할일 현황:
         chat: { id: chatId },
         message_id: messageId,
       },
-      from: { id: userId },
     } = callbackQuery;
+    await this.editMessage(bot, chatId, messageId, text, options);
 
     try {
       const todos = await this.todoService.getUserTodos(userId);
@@ -294,7 +294,7 @@ ${userName}님의 할일 현황:
           ],
         };
 
-        await this.editMessage(bot, chatId, messageId, emptyText, {
+        await this.editMessage(bot, chatId, messageId, text, {
           reply_markup: keyboard,
         });
         return;
@@ -325,7 +325,7 @@ ${todoList}
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, listText, {
+      await this.editMessage(bot, chatId, messageId, text, {
         reply_markup: keyboard,
       });
     } catch (error) {
@@ -343,8 +343,8 @@ ${todoList}
         chat: { id: chatId },
         message_id: messageId,
       },
-      from: { id: userId },
     } = callbackQuery;
+    await this.editMessage(bot, chatId, messageId, text, options);
 
     try {
       const todos = await this.todoService.getUserTodos(userId, false);
@@ -361,7 +361,7 @@ ${todoList}
           ],
         };
 
-        await this.editMessage(bot, chatId, messageId, emptyText, {
+        await this.editMessage(bot, chatId, messageId, text, {
           reply_markup: keyboard,
         });
         return;
@@ -410,8 +410,8 @@ ${todoList}
         chat: { id: chatId },
         message_id: messageId,
       },
-      from: { id: userId },
     } = callbackQuery;
+    await this.editMessage(bot, chatId, messageId, text, options);
 
     try {
       const todos = await this.todoService.getUserTodos(userId);
@@ -428,7 +428,7 @@ ${todoList}
           ],
         };
 
-        await this.editMessage(bot, chatId, messageId, emptyText, {
+        await this.editMessage(bot, chatId, messageId, text, {
           reply_markup: keyboard,
         });
         return;

@@ -101,7 +101,12 @@ class FortuneModule extends BaseModule {
   }
   // 🎴 운세 메뉴
   async showMenu(bot, chatId, messageId, from) {
-    const userName = from?.first_name || "사용자";
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
     const text = `🔮 *${userName}님의 운세 메뉴*\n\n오늘의 운세를 확인해보세요!`;
     const keyboard = {
       inline_keyboard: [
@@ -111,7 +116,7 @@ class FortuneModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, text, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });

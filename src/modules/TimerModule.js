@@ -86,9 +86,8 @@ class TimerModule extends BaseModule {
         chat: { id: chatId },
         message_id: messageId,
       },
-      from: { id: userId },
     } = callbackQuery;
-    const userName = getUserName(callbackQuery.from);
+    await this.editMessage(bot, chatId, messageId, text, options);
 
     try {
       // BaseModule의 표준 handleCallback 호출
@@ -135,6 +134,8 @@ class TimerModule extends BaseModule {
       bot,
       chatId,
       messageId,
+      text,
+      options,
       "🍅 **포모도로 시작**\n\n" +
         "25분 동안 집중할 작업을 입력해주세요!\n\n" +
         `💡 **예시**: ${randomExample}\n\n` +
@@ -272,7 +273,7 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, startText, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -280,13 +281,21 @@ class TimerModule extends BaseModule {
       // ⭐ 자동 새로고침 시작
       this.startAutoRefresh(bot, chatId, messageId, userId);
     } else {
-      await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
-          ],
-        },
-      });
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        text,
+        options,
+        `❌ ${result.error}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
+            ],
+          },
+        }
+      );
     }
   }
 
@@ -338,7 +347,7 @@ class TimerModule extends BaseModule {
           ],
     };
 
-    await this.editMessage(bot, chatId, messageId, message, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -365,7 +374,7 @@ class TimerModule extends BaseModule {
       "스트레칭, 물 마시기, 눈 운동 등을 추천합니다!\n\n" +
       "휴식도 생산성의 일부입니다. 🌱";
 
-    await this.editMessage(bot, chatId, messageId, breakText, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: {
         inline_keyboard: [
@@ -381,13 +390,21 @@ class TimerModule extends BaseModule {
     const status = this.timerService.getStatus(userId);
 
     if (!status.success) {
-      await this.editMessage(bot, chatId, messageId, `❌ ${status.error}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
-          ],
-        },
-      });
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        text,
+        options,
+        `❌ ${status.error}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
+            ],
+          },
+        }
+      );
       return;
     }
 
@@ -413,6 +430,8 @@ class TimerModule extends BaseModule {
         bot,
         chatId,
         messageId,
+        text,
+        options,
         `❌ ${pomodoroStatus.error}`,
         {
           reply_markup: {
@@ -468,7 +487,7 @@ class TimerModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, statusText, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -506,7 +525,7 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, completeText, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -590,7 +609,7 @@ class TimerModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, statsText + badgeText, {
+    await this.editMessage(bot, chatId, messageId, text, options + badgeText, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -690,18 +709,26 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, stopMessage, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
     } else {
-      await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
-          ],
-        },
-      });
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        text,
+        options,
+        `❌ ${result.error}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
+            ],
+          },
+        }
+      );
     }
   }
 
@@ -739,6 +766,8 @@ class TimerModule extends BaseModule {
       bot,
       chatId,
       messageId,
+      text,
+      options,
       "⏱️ **일반 타이머 시작**\n\n" +
         "측정할 작업명을 입력해주세요!\n\n" +
         `💡 **예시**: ${randomExample}\n\n` +
@@ -789,7 +818,7 @@ class TimerModule extends BaseModule {
           ],
         };
 
-        await this.editMessage(bot, chatId, userState.messageId, startText, {
+        await this.editMessage(bot, chatId, messageId, text, options, {
           parse_mode: "Markdown",
           reply_markup: keyboard,
         });
@@ -797,7 +826,9 @@ class TimerModule extends BaseModule {
         await this.editMessage(
           bot,
           chatId,
-          userState.messageId,
+          messageId,
+          text,
+          options,
           `❌ ${result.error}`,
           {
             reply_markup: {
@@ -840,7 +871,7 @@ class TimerModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, statusText, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -886,7 +917,7 @@ class TimerModule extends BaseModule {
     };
 
     if (messageId) {
-      await this.editMessage(bot, chatId, messageId, helpText, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -950,6 +981,8 @@ class TimerModule extends BaseModule {
       bot,
       chatId,
       messageId,
+      text,
+      options,
       "🍅 **포모도로 시작**\n\n" +
         "25분 동안 집중할 작업을 입력해주세요!\n\n" +
         `💡 **예시**: ${randomExample}\n\n` +
@@ -1087,7 +1120,7 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, startText, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -1095,13 +1128,21 @@ class TimerModule extends BaseModule {
       // ⭐ 자동 새로고침 시작
       this.startAutoRefresh(bot, chatId, messageId, userId);
     } else {
-      await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
-          ],
-        },
-      });
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        text,
+        options,
+        `❌ ${result.error}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
+            ],
+          },
+        }
+      );
     }
   }
 
@@ -1153,7 +1194,7 @@ class TimerModule extends BaseModule {
           ],
     };
 
-    await this.editMessage(bot, chatId, messageId, message, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -1168,13 +1209,21 @@ class TimerModule extends BaseModule {
     const status = this.timerService.getStatus(userId);
 
     if (!status.success) {
-      await this.editMessage(bot, chatId, messageId, `❌ ${status.error}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
-          ],
-        },
-      });
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        text,
+        options,
+        `❌ ${status.error}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
+            ],
+          },
+        }
+      );
       return;
     }
 
@@ -1200,6 +1249,8 @@ class TimerModule extends BaseModule {
         bot,
         chatId,
         messageId,
+        text,
+        options,
         `❌ ${pomodoroStatus.error}`,
         {
           reply_markup: {
@@ -1255,7 +1306,7 @@ class TimerModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, statusText, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -1293,7 +1344,7 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, completeText, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -1309,6 +1360,8 @@ class TimerModule extends BaseModule {
         bot,
         chatId,
         messageId,
+        text,
+        options,
         "📊 **아직 통계가 없어요**\n\n" +
           "포모도로를 시작해서 나만의 생산성 기록을 만들어보세요!\n\n" +
           "🎯 첫 번째 포모도로를 시작해보시겠어요?",
@@ -1377,7 +1430,7 @@ class TimerModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, statsText + badgeText, {
+    await this.editMessage(bot, chatId, messageId, text, options + badgeText, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -1477,18 +1530,34 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, stopMessage, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        text,
+        options,
+        stopMessage,
+        {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        }
+      );
     } else {
-      await this.editMessage(bot, chatId, messageId, `❌ ${result.error}`, {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
-          ],
-        },
-      });
+      await this.editMessage(
+        bot,
+        chatId,
+        messageId,
+        text,
+        options,
+        `❌ ${result.error}`,
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 타이머 메뉴", callback_data: "timer:menu" }],
+            ],
+          },
+        }
+      );
     }
   }
 
@@ -1526,6 +1595,8 @@ class TimerModule extends BaseModule {
       bot,
       chatId,
       messageId,
+      text,
+      options,
       "⏱️ **일반 타이머 시작**\n\n" +
         "측정할 작업명을 입력해주세요!\n\n" +
         `💡 **예시**: ${randomExample}\n\n` +
@@ -1576,7 +1647,7 @@ class TimerModule extends BaseModule {
           ],
         };
 
-        await this.editMessage(bot, chatId, userState.messageId, startText, {
+        await this.editMessage(bot, chatId, messageId, text, options, {
           parse_mode: "Markdown",
           reply_markup: keyboard,
         });
@@ -1584,7 +1655,9 @@ class TimerModule extends BaseModule {
         await this.editMessage(
           bot,
           chatId,
-          userState.messageId,
+          messageId,
+          text,
+          options,
           `❌ ${result.error}`,
           {
             reply_markup: {
@@ -1627,7 +1700,7 @@ class TimerModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, statusText, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -1673,7 +1746,7 @@ class TimerModule extends BaseModule {
     };
 
     if (messageId) {
-      await this.editMessage(bot, chatId, messageId, helpText, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -1706,7 +1779,7 @@ class TimerModule extends BaseModule {
   // 도우미: messageId가 있으면 edit, 없으면 send
   async editOrSend(bot, chatId, messageId, text) {
     if (messageId) {
-      await this.editMessage(bot, chatId, messageId, text, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
       });
     } else {
@@ -1803,7 +1876,7 @@ class TimerModule extends BaseModule {
           ],
     };
 
-    await this.editMessage(bot, chatId, messageId, menuText, {
+    await this.editMessage(bot, chatId, messageId, text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });

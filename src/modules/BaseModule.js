@@ -231,12 +231,9 @@ class BaseModule {
    * 🎯 에러 처리 헬퍼
    */
   async handleError(bot, callbackQuery, error) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = callbackQuery;
+    // callbackQuery에서 필요한 정보 추출
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
 
     logger.error(`${this.name} 오류:`, error);
 

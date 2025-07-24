@@ -98,9 +98,11 @@ class InsightModule extends BaseModule {
 
   async handleInsightCommand(bot, msg) {
     const {
-      chat: { id: chatId },
-      from,
-    } = msg;
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
     const userName = getUserName(from);
 
     await this.showInsightMenu(bot, chatId, null, userName);
@@ -134,7 +136,7 @@ class InsightModule extends BaseModule {
     };
 
     if (messageId) {
-      await this.editMessage(bot, chatId, messageId, menuText, {
+      await this.editMessage(bot, chatId, messageId, text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -148,7 +150,12 @@ class InsightModule extends BaseModule {
 
   async showFullInsight(bot, chatId, messageId, from) {
     try {
-      const userName = getUserName(from);
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+      } = callbackQuery;
       const insights = await this.insightService.generateFullInsight(userName);
 
       const keyboard = {
@@ -164,7 +171,7 @@ class InsightModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, insights, {
+      await this.editMessage(bot, chatId, messageId, text, options, insights, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -178,7 +185,12 @@ class InsightModule extends BaseModule {
   }
 
   async showQuickInsight(bot, chatId, messageId, from) {
-    const userName = getUserName(from);
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
     const insight = await this.insightService.generateQuickInsight(userName);
     const keyboard = {
       inline_keyboard: [
@@ -191,7 +203,7 @@ class InsightModule extends BaseModule {
     };
 
     if (messageId) {
-      await this.editMessage(bot, chatId, messageId, insight, {
+      await this.editMessage(bot, chatId, messageId, text, options, insight, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });

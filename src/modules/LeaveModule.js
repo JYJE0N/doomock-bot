@@ -48,10 +48,12 @@ class LeaveModule extends BaseModule {
   // 🎯 메시지 처리 (수정됨)
   async onHandleMessage(bot, msg) {
     const {
-      chat: { id: chatId },
-      from: { id: userId },
-      text,
-    } = msg;
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+    await this.editMessage(bot, chatId, messageId, text, options);
 
     if (!text) return false;
 
@@ -87,7 +89,6 @@ class LeaveModule extends BaseModule {
         chat: { id: chatId },
         message_id: messageId,
       },
-      from, // from 객체 직접 가져오기
     } = callbackQuery;
 
     // getUserName에 from 객체 전달
@@ -111,7 +112,7 @@ class LeaveModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, menuText, {
+    await this.editMessage(bot, chatId, messageId, text, options, menuText, {
       reply_markup: keyboard,
     });
 
