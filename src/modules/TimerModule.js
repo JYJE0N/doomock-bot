@@ -104,7 +104,7 @@ class TimerModule extends BaseModule {
         message_id: messageId,
       },
     } = callbackQuery;
-    await this.editMessage(bot, chatId, messageId, menuText, options);
+    await this.editMessage(bot, chatId, messageId, Text, options);
 
     try {
       // BaseModule의 표준 handleCallback 호출
@@ -151,7 +151,7 @@ class TimerModule extends BaseModule {
       bot,
       chatId,
       messageId,
-      menuText,
+      Text,
       options,
       "🍅 **포모도로 시작**\n\n" +
         "25분 동안 집중할 작업을 입력해주세요!\n\n" +
@@ -194,7 +194,7 @@ class TimerModule extends BaseModule {
   }
 
   // ⭐ 포모도로 작업명 입력 처리
-  async handlePomodoroTaskInput(bot, chatId, userId, menuText, userState) {
+  async handlePomodoroTaskInput(bot, chatId, userId, Text, userState) {
     try {
       this.userStates.delete(userId);
 
@@ -290,7 +290,7 @@ class TimerModule extends BaseModule {
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, menuText, options, {
+      await this.editMessage(bot, chatId, messageId, Text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -302,7 +302,7 @@ class TimerModule extends BaseModule {
         bot,
         chatId,
         messageId,
-        menuText,
+        Text,
         options,
         `❌ ${result.error}`,
         {
@@ -1717,7 +1717,7 @@ class TimerModule extends BaseModule {
       ],
     };
 
-    await this.editMessage(bot, chatId, messageId, text, options, {
+    await this.editMessage(bot, chatId, messageId, Text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
@@ -1763,7 +1763,7 @@ class TimerModule extends BaseModule {
     };
 
     if (messageId) {
-      await this.editMessage(bot, chatId, messageId, text, options, {
+      await this.editMessage(bot, chatId, messageId, Text, options, {
         parse_mode: "Markdown",
         reply_markup: keyboard,
       });
@@ -1857,7 +1857,7 @@ class TimerModule extends BaseModule {
       }
     }
 
-    const menuText =
+    const Text =
       `${this.emojis.timer} **${userName}님의 타이머** \n` +
       `📅 ${currentTime}${statusInfo}${statsPreview}\n\n` +
       "🍅 **포모도로**: 과학적으로 검증된 25분 집중법\n" +
@@ -1893,7 +1893,7 @@ class TimerModule extends BaseModule {
           ],
     };
 
-    await this.editMessage(bot, chatId, messageId, text, options, {
+    await this.editMessage(bot, chatId, messageId, Text, options, {
       parse_mode: "Markdown",
       reply_markup: keyboard,
     });
