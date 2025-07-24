@@ -1,5 +1,5 @@
 // src/modules/TodoModule.js - 리팩토링된 할일 모듈
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 
@@ -49,7 +49,7 @@ class TodoModule extends BaseModule {
       add: this.handleAdd,
       list: this.showList,
       complete: this.handleComplete,
-      delete: this.handleDelete,
+      remove: this.handleDelete, // delete 대신 remove 사용
       stats: this.showStats,
       back: this.handleBack,
     });
@@ -148,7 +148,7 @@ ${userName}님의 할일 현황:
         ],
         [
           { text: "✅ 완료하기", callback_data: "todo:complete" },
-          { text: "🗑️ 삭제하기", callback_data: "todo:delete" },
+          { text: "🗑️ 삭제하기", callback_data: "todo:remove" }, // delete → remove
         ],
         [{ text: "📊 통계 보기", callback_data: "todo:stats" }],
         [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
@@ -183,7 +183,7 @@ ${userName}님의 할일 현황:
         ],
         [
           { text: "✅ 완료하기", callback_data: "todo:complete" },
-          { text: "🗑️ 삭제하기", callback_data: "todo:delete" },
+          { text: "🗑️ 삭제하기", callback_data: "todo:remove" }, // delete → remove
         ],
         [{ text: "📊 통계 보기", callback_data: "todo:stats" }],
         [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
