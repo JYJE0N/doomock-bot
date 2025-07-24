@@ -46,12 +46,26 @@ class WorktimeModule extends BaseModule {
   // ✅ 서비스 초기화
   async onInitialize() {
     try {
-      this.worktimeService = new WorktimeService(this.db);
+      // WorktimeService 초기화 (db 전달 중요!)
+      const WorktimeService = require("../services/WorktimeService");
+      this.worktimeService = new WorktimeService(this.db); // ✅ this.db 전달
+
+      // 초기화
       await this.worktimeService.initialize();
-      logger.info("🕐 WorktimeService 초기화 성공");
+
+      // 서비스 상태 확인
+      if (!this.worktimeService.collection && this.db) {
+        logger.warn(
+          "⚠️ WorktimeModule: 데이터베이스 연결됨에도 collection이 없음"
+        );
+      }
+
+      logger.info("✅ WorktimeModule 초기화 성공");
     } catch (error) {
-      logger.error("❌ WorktimeService 초기화 실패:", error);
-      throw error;
+      logger.error("❌ WorktimeModule 초기화 실패:", error);
+      // 서비스 없이도 기본 기능은 동작하도록
+      this.worktimeService = null;
+      logger.warn("⚠️ WorktimeModule이 제한된 기능으로 실행됩니다");
     }
   }
 

@@ -100,25 +100,22 @@ class FortuneModule extends BaseModule {
     };
   }
   // 🎴 운세 메뉴
-  async showMenu(bot, chatId, messageId, from) {
+  async showMenu(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
         chat: { id: chatId },
         message_id: messageId,
       },
+      from,
     } = callbackQuery;
-    const text = `🔮 *${userName}님의 운세 메뉴*\n\n오늘의 운세를 확인해보세요!`;
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🎴 운세 뽑기", callback_data: "fortune:draw" }],
-        [{ text: "❓ 도움말", callback_data: "fortune:help" }],
-        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
-      ],
-    };
 
-    await this.editMessage(bot, chatId, messageId, text, options, {
+    const userName = getUserName(from);
+
+    const menuData = this.getMenuData(userName); // 메뉴 데이터 가져오기
+
+    await this.editMessage(bot, chatId, messageId, menuData.text, {
       parse_mode: "Markdown",
-      reply_markup: keyboard,
+      reply_markup: menuData.keyboard,
     });
   }
 

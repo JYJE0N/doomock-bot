@@ -3,35 +3,67 @@ const TimeHelper = require("../utils/TimeHelper");
 const BaseService = require("./BaseService");
 
 class WorktimeService extends BaseService {
-  constructor() {
-    super("worktime_records");
-    this.schedule = {
-      start: "08:30",
-      lunch: "11:30 ~ 13:00",
-      end: "17:30",
-      total: "7시간 30분",
+  constructor(db) {
+    super("worktime", {
+      db: db, // ✅ db를 options 객체에 포함
+      enableCache: true,
+      cacheTimeout: 60000,
+    });
+
+    // 설정
+    this.workHours = {
+      start: 9, // 9시
+      end: 18, // 18시
+      lunchStart: 12,
+      lunchEnd: 13,
     };
+
+    logger.info("🕐 WorktimeService 생성됨");
   }
 
+  async initialize() {
+    try {
+      // BaseService의 initialize 호출 (중요!)
+      await super.initialize();
+
+      // collection 확인
+      if (!this.collection) {
+        logger.warn(
+          "⚠️ WorktimeService: collection이 없습니다. DB 연결 확인 필요"
+        );
+      }
+
+      logger.info("✅ WorktimeService 초기화 성공");
+      return true;
+    } catch (error) {
+      logger.error("❌ WorktimeService 초기화 실패:", error);
+      return false;
+    }
+  }
   // 🎯 오늘 근무 기록 조회
   async getTodayRecord(userId) {
     try {
-      const today = TimeHelper.getKoreaTime();
-      const startOfDay = new Date(today);
-      startOfDay.setHours(0, 0, 0, 0);
+      // collection 체크
+      if (!this.collection) {
+        logger.error("WorktimeService: collection이 초기화되지 않음");
+        return null;
+      }
 
-      const endOfDay = new Date(today);
-      endOfDay.setHours(23, 59, 59, 999);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
 
-      const records = await this.db.collection("worktime_records").findOne({
+      const tomorrow = new Date(today);
+      tomorrow.setDate(tomorrow.getDate() + 1);
+
+      const record = await this.collection.findOne({
         userId: userId,
         date: {
-          $gte: startOfDay,
-          $lte: endOfDay,
+          $gte: today,
+          $lt: tomorrow,
         },
       });
 
-      return records;
+      return record;
     } catch (error) {
       logger.error("오늘 근무 기록 조회 실패:", error);
       return null;
