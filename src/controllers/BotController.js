@@ -1,4 +1,4 @@
-// src/controllers/BotController.js - 콜백 처리 수정 버전
+// src/controllers/BotController.js - 콜백 처리 로직 수정
 
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
@@ -15,6 +15,7 @@ class BotController {
     this.bot = bot;
     this.dbManager = options.dbManager || null;
     this.moduleManager = options.moduleManager || null;
+    this.commandsRegistry = options.commandsRegistry || null;
 
     // 중복 처리 방지를 위한 Set
     this.processingMessages = new Set();
@@ -160,7 +161,7 @@ class BotController {
   }
 
   /**
-   * 콜백 쿼리 처리 (수정된 버전)
+   * 콜백 쿼리 처리 (✅ 수정된 버전)
    */
   async handleCallbackQuery(callbackQuery) {
     // ✅ 콜백 데이터 유효성 검사를 가장 먼저 수행
@@ -171,6 +172,17 @@ class BotController {
 
     if (!callbackQuery.data) {
       logger.error("❌ callbackQuery.data가 없습니다");
+      // ✅ 빈 콜백이라도 응답해주기
+      if (callbackQuery.id) {
+        try {
+          await this.bot.answerCallbackQuery(callbackQuery.id, {
+            text: "⚠️ 잘못된 요청입니다.",
+            show_alert: false,
+          });
+        } catch (error) {
+          logger.error("빈 콜백 응답 실패:", error);
+        }
+      }
       return;
     }
 
@@ -184,6 +196,15 @@ class BotController {
     // 중복 처리 방지
     if (this.processingCallbacks.has(callbackKey)) {
       logger.debug("🔁 중복 콜백 무시:", callbackKey);
+      // ✅ 중복 콜백도 응답해주기
+      try {
+        await this.bot.answerCallbackQuery(callbackQuery.id, {
+          text: "⏳ 처리 중입니다...",
+          show_alert: false,
+        });
+      } catch (error) {
+        logger.error("중복 콜백 응답 실패:", error);
+      }
       return;
     }
 
@@ -195,35 +216,35 @@ class BotController {
       const userName = getUserName(callbackQuery.from);
       logger.info(`🔘 콜백 수신: "${callbackQuery.data}" (${userName})`);
 
-      // ✅ 콜백 데이터를 변수에 미리 저장 (데이터 보존)
-      const callbackData = callbackQuery.data;
-      const callbackFrom = callbackQuery.from;
-      const callbackMessage = callbackQuery.message;
-
-      // 모듈 매니저로 전달 (콜백 응답 전에 처리)
+      // ✅ 모듈 매니저로 전달 (콜백 응답은 ModuleManager에서 처리)
       let handled = false;
       if (this.moduleManager) {
-        // ✅ 원본 callbackQuery 객체 그대로 전달
         handled = await this.moduleManager.handleCallback(callbackQuery);
       }
 
       // 처리되지 않은 콜백
       if (!handled) {
-        logger.warn(`⚠️ 처리되지 않은 시스템 콜백: ${callbackData}`);
+        logger.warn(`⚠️ 처리되지 않은 시스템 콜백: ${callbackQuery.data}`);
         await this.handleUnknownCallback(callbackQuery);
       }
     } catch (error) {
-      logger.error("콜백 처리 오류:", error);
+      logger.error("콜백 처리 중 오류:", error);
       this.stats.errorsCount++;
 
-      // 에러 응답
+      // ✅ 에러 응답 (ModuleManager에서 이미 응답했을 수도 있으니 조심스럽게)
       try {
         await this.bot.answerCallbackQuery(callbackQuery.id, {
           text: "❌ 처리 중 오류가 발생했습니다.",
-          show_alert: true,
+          show_alert: false,
         });
       } catch (answerError) {
-        logger.error("콜백 에러 응답 실패:", answerError);
+        // 이미 응답했을 수 있으니 에러 무시
+        logger.debug("콜백 에러 응답 실패 (이미 응답됨):", answerError.message);
+      }
+
+      // ✅ 사용자에게 에러 메시지 표시
+      if (callbackQuery.message && callbackQuery.message.chat) {
+        await this.sendErrorMessage(callbackQuery.message.chat.id, error);
       }
     } finally {
       // 타임아웃 후 제거
@@ -278,7 +299,7 @@ class BotController {
    */
   async handleUnknownCommand(msg) {
     const command = msg.text.split(" ")[0];
-    logger.info(`🎯 명령어 실행: ${command} (system)`);
+    logger.info(`🎯 알 수 없는 명령어: ${command}`);
 
     const helpText = `❓ **알 수 없는 명령어**
 
@@ -313,11 +334,13 @@ class BotController {
    */
   async handleUnknownCallback(callbackQuery) {
     try {
+      // ✅ 콜백 응답 먼저
       await this.bot.answerCallbackQuery(callbackQuery.id, {
         text: "❌ 처리할 수 없는 요청입니다.",
         show_alert: false,
       });
 
+      // ✅ 메시지 업데이트
       if (callbackQuery.message) {
         await this.bot.editMessageText(
           "❌ **알 수 없는 요청**\n\n처리할 수 없는 요청입니다.\n메인 메뉴로 돌아가세요.",
@@ -347,7 +370,11 @@ class BotController {
 처리 중 문제가 발생했습니다.
 잠시 후 다시 시도해주세요.
 
-오류가 계속 발생하면 관리자에게 문의하세요.`;
+**해결 방법:**
+• 잠시 후 다시 시도해주세요
+• 문제가 지속되면 /start 명령어를 사용하세요
+
+⏰ ${TimeHelper.getCurrentTime()}`;
 
     try {
       await this.bot.sendMessage(chatId, errorText, {

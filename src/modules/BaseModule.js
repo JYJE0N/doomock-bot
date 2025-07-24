@@ -1,4 +1,4 @@
-// src/core/BaseModule.js - 리팩토링된 기본 모듈 클래스
+// src/modules/BaseModule.js - 리팩토링된 기본 모듈 클래스 (로거 오류 수정)
 const logger = require("../utils/Logger");
 
 /**
@@ -97,8 +97,16 @@ class BaseModule {
    * @returns {boolean} - 처리 여부
    */
   async handleMessage(bot, msg) {
-    // 자식 클래스에서 오버라이드
-    return false;
+    try {
+      // 자식 클래스에서 onHandleMessage 구현
+      if (this.onHandleMessage) {
+        return await this.onHandleMessage(bot, msg);
+      }
+      return false;
+    } catch (error) {
+      logger.error(`${this.name} 메시지 처리 오류:`, error);
+      return false;
+    }
   }
 
   /**
@@ -109,33 +117,91 @@ class BaseModule {
    * @param {Array} params - 추가 매개변수
    * @param {Object} moduleManager - 모듈 매니저
    */
-  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     try {
+      // ✅ null/undefined 체크 강화
+      if (!callbackQuery) {
+        logger.error(`${this.name}: callbackQuery가 null 또는 undefined입니다`);
+        return false;
+      }
+
+      if (!subAction) {
+        logger.warn(`${this.name}: subAction이 없습니다. 'menu'로 대체합니다.`);
+        subAction = "menu";
+      }
+
       const action = this.actionMap.get(subAction);
 
       if (!action) {
-        this.logger.warn(
-          `알 수 없는 액션: ${this.constructor.name}.${subAction}`
-        );
+        logger.warn(`${this.name}: 알 수 없는 액션 - ${subAction}`);
+
+        // 사용자에게 친화적인 메시지 전송
+        if (callbackQuery.message && callbackQuery.message.chat) {
+          await this.sendMessage(
+            bot,
+            callbackQuery.message.chat.id,
+            `⚠️ 요청하신 기능(${subAction})을 찾을 수 없습니다.`
+          );
+        }
+
         return false;
       }
 
       // 표준 매개변수로 액션 실행
-      await action.call(this, bot, callbackQuery, params, menuManager);
+      await action.call(this, bot, callbackQuery, params, moduleManager);
       return true;
     } catch (error) {
-      this.logger.error(`${this.constructor.name} 콜백 처리 오류:`, error);
+      // ✅ logger 직접 사용 (this.logger가 아닌!)
+      logger.error(`${this.name} 콜백 처리 오류:`, error);
 
       // 에러 시 사용자에게 알림
-      const {
-        message: {
-          chat: { id: chatId },
-        },
-      } = callbackQuery;
-      await this.sendMessage(bot, chatId, "❌ 처리 중 오류가 발생했습니다.");
+      try {
+        if (
+          callbackQuery &&
+          callbackQuery.message &&
+          callbackQuery.message.chat
+        ) {
+          const chatId = callbackQuery.message.chat.id;
+          await this.sendMessage(
+            bot,
+            chatId,
+            "❌ 처리 중 오류가 발생했습니다."
+          );
+        }
+      } catch (sendError) {
+        logger.error(`${this.name} 에러 메시지 전송 실패:`, sendError);
+      }
 
       return false;
     }
+  }
+
+  /**
+   * 🎯 자식 클래스에서 오버라이드할 메시지 처리 메서드
+   */
+  async onHandleMessage(bot, msg) {
+    // 자식 클래스에서 구현
+    return false;
+  }
+
+  /**
+   * 🎯 사용자 상태 관리
+   */
+  setUserState(userId, state) {
+    this.userStates.set(userId, {
+      ...state,
+      timestamp: Date.now(),
+    });
+    logger.debug(`${this.name}: 사용자 상태 설정 - ${userId}`);
+  }
+
+  getUserState(userId) {
+    return this.userStates.get(userId);
+  }
+
+  clearUserState(userId) {
+    this.userStates.delete(userId);
+    logger.debug(`${this.name}: 사용자 상태 삭제 - ${userId}`);
   }
 
   /**
@@ -143,25 +209,12 @@ class BaseModule {
    */
   async sendMessage(bot, chatId, text, options = {}) {
     try {
-      const defaultOptions = {
+      return await bot.sendMessage(chatId, text, {
         parse_mode: "Markdown",
         ...options,
-      };
-      return await bot.sendMessage(chatId, text, defaultOptions);
+      });
     } catch (error) {
-      logger.error(`${this.name} 메시지 전송 오류:`, error);
-
-      // Markdown 파싱 오류시 일반 텍스트로 재시도
-      if (error.code === "ETELEGRAM" && error.description?.includes("parse")) {
-        try {
-          const fallbackOptions = { ...options };
-          delete fallbackOptions.parse_mode;
-          return await bot.sendMessage(chatId, text, fallbackOptions);
-        } catch (fallbackError) {
-          logger.error(`${this.name} 메시지 재전송 실패:`, fallbackError);
-          throw fallbackError;
-        }
-      }
+      logger.error(`${this.name} 메시지 전송 실패:`, error);
       throw error;
     }
   }
@@ -171,153 +224,57 @@ class BaseModule {
    */
   async editMessage(bot, chatId, messageId, text, options = {}) {
     try {
-      // chatId가 객체인 경우 처리 (callbackQuery 객체가 전달된 경우)
-      if (typeof chatId === "object" && chatId !== null) {
-        logger.warn(
-          `${this.name} editMessage: chatId가 객체로 전달됨. 올바른 값으로 변환 시도.`
-        );
-        // callbackQuery.message.chat.id를 찾아보기
-        if (chatId.message && chatId.message.chat && chatId.message.chat.id) {
-          chatId = chatId.message.chat.id;
-        } else if (chatId.chat && chatId.chat.id) {
-          chatId = chatId.chat.id;
-        } else if (chatId.id) {
-          chatId = chatId.id;
-        } else {
-          throw new Error(
-            `올바른 chat ID를 찾을 수 없습니다: ${JSON.stringify(chatId)}`
-          );
-        }
-      }
-
-      const defaultOptions = {
-        parse_mode: "Markdown",
-        ...options,
-      };
-
       return await bot.editMessageText(text, {
         chat_id: chatId,
         message_id: messageId,
-        ...defaultOptions,
+        parse_mode: "Markdown",
+        ...options,
       });
     } catch (error) {
-      logger.error(`${this.name} 메시지 수정 오류:`, error);
-
-      // Markdown 파싱 오류시 일반 텍스트로 재시도
-      if (error.code === "ETELEGRAM" && error.description?.includes("parse")) {
-        try {
-          const fallbackOptions = { ...options };
-          delete fallbackOptions.parse_mode;
-          return await bot.editMessageText(text, {
-            chat_id: chatId,
-            message_id: messageId,
-            ...fallbackOptions,
-          });
-        } catch (fallbackError) {
-          logger.error(`${this.name} 메시지 수정 재시도 실패:`, fallbackError);
-          throw fallbackError;
-        }
-      }
+      logger.error(`${this.name} 메시지 수정 실패:`, error);
       throw error;
     }
   }
 
   /**
-   * 🎯 에러 처리 헬퍼
+   * 🎯 키보드 생성 헬퍼
    */
-  async handleError(bot, callbackQuery, error) {
-    // callbackQuery에서 필요한 정보 추출
-    const chatId = callbackQuery.message.chat.id;
-    const messageId = callbackQuery.message.message_id;
-
-    logger.error(`${this.name} 오류:`, error);
-
-    const errorText = `❌ **오류 발생**
-
-처리 중 오류가 발생했습니다.
-잠시 후 다시 시도해주세요.`;
-
-    const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main:menu" }]],
+  createInlineKeyboard(buttons) {
+    return {
+      inline_keyboard: buttons,
     };
-
-    try {
-      await this.editMessage(bot, chatId, messageId, errorText, {
-        reply_markup: keyboard,
-      });
-    } catch (editError) {
-      logger.error("에러 메시지 전송 실패:", editError);
-    }
   }
 
   /**
-   * 🎯 사용자 상태 관리
+   * 🎯 모듈 상태 확인
    */
-  getUserState(userId) {
-    return this.userStates.get(userId);
-  }
-
-  setUserState(userId, state) {
-    this.userStates.set(userId, state);
-  }
-
-  clearUserState(userId) {
-    this.userStates.delete(userId);
+  isModuleActive() {
+    return this.isActive && this.isInitialized;
   }
 
   /**
-   * 🎯 모듈 활성화/비활성화
+   * 🎯 모듈 비활성화
    */
-  setActive(active) {
-    this.isActive = active;
-    logger.info(`${this.name} 모듈 ${active ? "활성화" : "비활성화"}`);
+  deactivate() {
+    this.isActive = false;
+    logger.info(`${this.name} 모듈 비활성화됨`);
   }
 
   /**
-   * 🎯 모듈 정리
+   * 🎯 모듈 활성화
+   */
+  activate() {
+    this.isActive = true;
+    logger.info(`${this.name} 모듈 활성화됨`);
+  }
+
+  /**
+   * 🎯 정리 메서드 (종료 시 호출)
    */
   async cleanup() {
-    try {
-      logger.info(`🧹 ${this.name} 모듈 정리 중...`);
-
-      // 사용자 상태 초기화
-      this.userStates.clear();
-
-      // 액션 맵 초기화
-      this.actionMap.clear();
-
-      // 자식 클래스의 정리 로직 호출
-      await this.onCleanup();
-
-      this.isInitialized = false;
-      logger.info(`✅ ${this.name} 모듈 정리 완료`);
-    } catch (error) {
-      logger.error(`❌ ${this.name} 모듈 정리 실패:`, error);
-    }
-  }
-
-  /**
-   * 🎯 자식 클래스에서 오버라이드할 정리 메서드
-   */
-  async onCleanup() {
-    // 자식 클래스에서 구현
-  }
-
-  /**
-   * ✅ 명령어 추출 유틸리티
-   */
-  extractCommand(text) {
-    if (!text || typeof text !== "string") {
-      return null;
-    }
-
-    // "/command" 형태 처리
-    if (text.startsWith("/")) {
-      return text.substring(1).split(" ")[0].toLowerCase();
-    }
-
-    // 일반 텍스트에서 명령어 추출
-    return text.toLowerCase().trim();
+    this.userStates.clear();
+    this.actionMap.clear();
+    logger.info(`${this.name} 모듈 정리 완료`);
   }
 }
 
