@@ -25,10 +25,17 @@ class TodoService extends BaseService {
 
   async initialize() {
     try {
-      this.logger.info("✅ TodoService 초기화 성공");
+      // BaseService의 initialize 호출 (필요한 경우)
+      if (super.initialize) {
+        await super.initialize();
+      }
+
+      // this.logger가 아닌 전역 logger 사용!
+      logger.info("✅ TodoService 초기화 성공");
       return true;
     } catch (error) {
-      this.logger.error("❌ TodoService 초기화 실패:", error);
+      // this.logger가 아닌 전역 logger 사용!
+      logger.error("❌ TodoService 초기화 실패:", error);
       return false;
     }
   }
