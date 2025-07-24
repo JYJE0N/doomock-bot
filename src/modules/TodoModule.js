@@ -1,5 +1,5 @@
 // src/modules/TodoModule.js - 리팩토링된 할일 모듈
-const BaseModule = require("../core/BaseModule");
+const BaseModule = require("./BaseModule");
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 
