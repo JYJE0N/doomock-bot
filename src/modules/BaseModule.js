@@ -109,35 +109,30 @@ class BaseModule {
    * @param {Array} params - 추가 매개변수
    * @param {Object} moduleManager - 모듈 매니저
    */
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
     try {
-      // 액션 찾기
       const action = this.actionMap.get(subAction);
 
       if (!action) {
-        logger.warn(`알 수 없는 액션: ${this.name}.${subAction}`);
+        this.logger.warn(
+          `알 수 없는 액션: ${this.constructor.name}.${subAction}`
+        );
         return false;
       }
 
-      // 콜백 응답
-      await bot.answerCallbackQuery(callbackQuery.id);
-
-      // 액션 실행 (표준 매개변수 전달)
-      await action(bot, callbackQuery, params, moduleManager);
-
+      // 표준 매개변수로 액션 실행
+      await action.call(this, bot, callbackQuery, params, menuManager);
       return true;
     } catch (error) {
-      logger.error(`${this.name} 콜백 처리 오류:`, error);
+      this.logger.error(`${this.constructor.name} 콜백 처리 오류:`, error);
 
-      // 에러 응답
-      try {
-        await bot.answerCallbackQuery(callbackQuery.id, {
-          text: "❌ 처리 중 오류가 발생했습니다.",
-          show_alert: true,
-        });
-      } catch (err) {
-        logger.error("콜백 응답 실패:", err);
-      }
+      // 에러 시 사용자에게 알림
+      const {
+        message: {
+          chat: { id: chatId },
+        },
+      } = callbackQuery;
+      await this.sendMessage(bot, chatId, "❌ 처리 중 오류가 발생했습니다.");
 
       return false;
     }

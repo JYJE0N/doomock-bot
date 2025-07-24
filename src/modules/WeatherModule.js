@@ -54,11 +54,13 @@ class WeatherModule extends BaseModule {
   }
 
   // 🎯 액션 등록
-  registerActions() {
-    this.actionMap.set("current", this.showCurrentWeather);
-    this.actionMap.set("forecast", this.showWeatherForecast);
-    this.actionMap.set("city", this.selectCity);
-    this.actionMap.set("help", this.showWeatherHelp);
+  setupActions() {
+    this.registerActions({
+      menu: this.showMenu, // ✅ menu 액션 추가
+      current: this.showCurrentWeather,
+      forecast: this.showForecast,
+      help: this.showWeatherHelp,
+    });
   }
 
   // 🎯 메시지 처리
@@ -89,35 +91,28 @@ class WeatherModule extends BaseModule {
   }
 
   // 📋 날씨 메뉴
-  async showMenu(bot, chatId, messageId) {
-    const menuText =
-      `🌤️ **날씨 정보**\n\n` + `어떤 날씨 정보를 확인하시겠습니까?`;
+  async showMenu(bot, callbackQuery, params, moduleManager) {
+    const {
+      message: {
+        chat: { id: chatId },
+        message_id: messageId,
+      },
+    } = callbackQuery;
+
+    const text = "🌤️ **날씨 메뉴**\n\n어떤 정보를 확인하시겠어요?";
 
     const keyboard = {
       inline_keyboard: [
-        [
-          { text: "☀️ 현재 날씨", callback_data: "weather:current" },
-          { text: "📅 일기예보", callback_data: "weather:forecast" },
-        ],
-        [
-          { text: "🏙️ 도시 선택", callback_data: "weather:city" },
-          { text: "❓ 도움말", callback_data: "weather:help" },
-        ],
+        [{ text: "🌡️ 현재 날씨", callback_data: "weather:current" }],
+        [{ text: "📅 일기 예보", callback_data: "weather:forecast" }],
         [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
       ],
     };
 
-    if (messageId) {
-      await this.editMessage(bot, chatId, messageId, menuText, {
-        reply_markup: keyboard,
-      });
-    } else {
-      await this.sendMessage(bot, chatId, menuText, {
-        reply_markup: keyboard,
-      });
-    }
-
-    return true;
+    await this.editMessage(bot, chatId, messageId, text, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
   }
 
   // 📍 현재 날씨
