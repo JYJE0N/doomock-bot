@@ -23,15 +23,17 @@ class FortuneModule extends BaseModule {
   async onInitialize() {
     try {
       const FortuneService = require("../services/FortuneService");
-      this.fortuneService = new FortuneService();
+
+      // DB 풀이 있다면 전달
+      this.fortuneService = new FortuneService(this.db);
 
       if (this.fortuneService.initialize) {
         await this.fortuneService.initialize();
       }
 
-      logger.info("✅ FortuneModule 초기화 완료");
+      this.logger.info("✅ FortuneModule 초기화 완료");
     } catch (error) {
-      logger.error("❌ FortuneModule 초기화 실패:", error);
+      this.logger.error("❌ FortuneModule 초기화 실패:", error);
       this.fortuneService = null;
     }
   }

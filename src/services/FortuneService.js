@@ -2,12 +2,17 @@ const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
-class FortuneService extends BaseService {
+class FortuneService {
   constructor() {
-    super("fortune_history");
+    this.logger = Logger.getInstance(); // Logger 통일
     this.initializeMessages();
     this.initializeTarotCards();
     this.initializeLuckyItems();
+  }
+
+  async initialize() {
+    // DB 연결이 필요하다면 여기서 처리
+    this.logger.info("FortuneService 초기화 완료");
   }
 
   initializeMessages() {
@@ -978,7 +983,8 @@ class FortuneService extends BaseService {
     }
   }
 
-  getFortune(userId, type) {
+  getFortune(params) {
+    const { userId, type } = params;
     return this.getRandomMessage(this.messages[type], userId, "type");
   }
 
