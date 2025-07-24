@@ -1,27 +1,20 @@
-// src/controllers/BotController.js - BotCommandsRegistry 통합된 봇 컨트롤러
+// src/controllers/BotController.js - 콜백 처리 수정 버전
 
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
-
-// ⭐ BotCommandsRegistry 참조 추가
-const botCommandsRegistry = require("../config/BotCommandsRegistry");
 
 /**
  * 봇 컨트롤러
  * - 텔레그램 이벤트 수신 및 라우팅
  * - 중복 처리 방지
  * - 에러 처리 및 사용자 피드백
- * - BotFather 명령어 관리
  */
 class BotController {
   constructor(bot, options = {}) {
     this.bot = bot;
     this.dbManager = options.dbManager || null;
     this.moduleManager = options.moduleManager || null;
-
-    // ⭐ BotCommandsRegistry 인스턴스 참조
-    this.commandsRegistry = options.commandsRegistry || botCommandsRegistry;
 
     // 중복 처리 방지를 위한 Set
     this.processingMessages = new Set();
@@ -32,7 +25,6 @@ class BotController {
       messagesReceived: 0,
       callbacksReceived: 0,
       errorsCount: 0,
-      commandsExecuted: 0,
       startTime: Date.now(),
     };
 
@@ -66,11 +58,6 @@ class BotController {
       // 에러 핸들러 설정
       this.setupErrorHandlers();
 
-      // ⭐ BotFather 명령어 등록 (선택적)
-      if (this.config.autoRegisterCommands !== false) {
-        await this.registerBotCommands();
-      }
-
       this.isInitialized = true;
       logger.success("✅ BotController 초기화 완료");
     } catch (error) {
@@ -80,66 +67,25 @@ class BotController {
   }
 
   /**
-   * 🎯 BotFather 명령어 등록
-   */
-  async registerBotCommands() {
-    try {
-      logger.info("📋 BotFather 명령어 등록 중...");
-
-      const success = await this.commandsRegistry.setBotFatherCommands(
-        this.bot
-      );
-
-      if (success) {
-        const stats = this.commandsRegistry.getCommandStats();
-        logger.success(
-          `✅ BotFather 명령어 등록 완료 (${stats.publicCommands}개)`
-        );
-      } else {
-        logger.warn("⚠️ BotFather 명령어 등록 실패");
-      }
-
-      return success;
-    } catch (error) {
-      logger.error("❌ BotFather 명령어 등록 중 오류:", error);
-      return false;
-    }
-  }
-
-  /**
    * 봇 이벤트 핸들러 설정
    */
   setupBotHandlers() {
     // 메시지 핸들러
     this.bot.on("message", async (msg) => {
-      try {
-        await this.handleMessage(msg);
-      } catch (error) {
-        logger.error("메시지 처리 오류:", error);
-        this.stats.errorsCount++;
-      }
+      await this.handleMessage(msg);
     });
 
     // 콜백 쿼리 핸들러
     this.bot.on("callback_query", async (callbackQuery) => {
-      try {
-        await this.handleCallbackQuery(callbackQuery);
-      } catch (error) {
-        logger.error("콜백 처리 오류:", error);
-        this.stats.errorsCount++;
-      }
+      await this.handleCallbackQuery(callbackQuery);
     });
 
-    // 인라인 쿼리 핸들러 (선택적)
+    // 인라인 쿼리 핸들러 (필요시)
     this.bot.on("inline_query", async (query) => {
-      try {
-        await this.handleInlineQuery(query);
-      } catch (error) {
-        logger.error("인라인 쿼리 처리 오류:", error);
-      }
+      await this.handleInlineQuery(query);
     });
 
-    logger.info("🎯 봇 이벤트 핸들러 설정 완료");
+    logger.debug("📡 봇 이벤트 핸들러 설정 완료");
   }
 
   /**
@@ -148,30 +94,26 @@ class BotController {
   setupErrorHandlers() {
     // 폴링 에러
     this.bot.on("polling_error", (error) => {
-      logger.error("폴링 에러:", error);
+      logger.error("❌ 폴링 에러:", error);
       this.stats.errorsCount++;
     });
 
     // 웹훅 에러
     this.bot.on("webhook_error", (error) => {
-      logger.error("웹훅 에러:", error);
+      logger.error("❌ 웹훅 에러:", error);
       this.stats.errorsCount++;
     });
-
-    logger.info("🛡️ 에러 핸들러 설정 완료");
   }
 
   /**
    * 메시지 처리
    */
   async handleMessage(msg) {
-    if (!msg || !msg.from) return;
-
-    const messageKey = `${msg.from.id}-${msg.message_id}`;
+    const messageKey = `${msg.chat.id}-${msg.message_id}`;
 
     // 중복 처리 방지
     if (this.processingMessages.has(messageKey)) {
-      logger.debug("중복 메시지 무시:", messageKey);
+      logger.debug("🔁 중복 메시지 무시:", messageKey);
       return;
     }
 
@@ -179,40 +121,36 @@ class BotController {
     this.stats.messagesReceived++;
 
     try {
-      const {
-        chat: { id: chatId },
-        from: { id: userId },
-        text,
-      } = msg;
-
+      // 메시지 로깅
       const userName = getUserName(msg.from);
-      logger.info(`💬 메시지 수신: "${text}" (${userName})`);
+      logger.info(
+        `💬 메시지 수신: "${msg.text || "[비텍스트]"}" (${userName})`
+      );
 
-      // ⭐ 명령어 검증 및 처리
-      if (text && text.startsWith("/")) {
-        const commandName = text.split(" ")[0].substring(1);
-        const isValidCommand = await this.validateAndExecuteCommand(
-          msg,
-          commandName
-        );
-
-        if (isValidCommand) {
-          this.stats.commandsExecuted++;
-          return;
-        }
+      // 메시지 유효성 검사
+      if (!this.isValidMessage(msg)) {
+        return;
       }
 
-      // 모듈 메시지 처리
+      // 봇 멘션 또는 개인 채팅인 경우만 처리
+      if (!this.shouldProcessMessage(msg)) {
+        return;
+      }
+
+      // 모듈 매니저로 전달
+      let handled = false;
       if (this.moduleManager) {
-        const handled = await this.moduleManager.handleMessage?.(this.bot, msg);
-        if (handled) return;
+        handled = await this.moduleManager.handleMessage(this.bot, msg);
       }
 
-      // 일반 메시지 처리 (TTS 등)
-      await this.handleGeneralMessage(msg);
+      // 처리되지 않은 명령어
+      if (!handled && msg.text?.startsWith("/")) {
+        await this.handleUnknownCommand(msg);
+      }
     } catch (error) {
-      logger.error("메시지 처리 실패:", error);
-      await this.sendErrorMessage(msg.chat?.id, error);
+      logger.error("메시지 처리 오류:", error);
+      this.stats.errorsCount++;
+      await this.sendErrorMessage(msg.chat.id, error);
     } finally {
       // 타임아웃 후 제거
       setTimeout(() => {
@@ -222,239 +160,30 @@ class BotController {
   }
 
   /**
-   * ⭐ 명령어 검증 및 실행
-   */
-  async validateAndExecuteCommand(msg, commandName) {
-    try {
-      const {
-        chat: { id: chatId },
-        from: { id: userId },
-      } = msg;
-
-      // 명령어 찾기
-      const commandConfig = this.commandsRegistry.findCommand(commandName);
-
-      if (!commandConfig) {
-        // 알 수 없는 명령어
-        await this.bot.sendMessage(
-          chatId,
-          `❓ '/${commandName}' 는 알 수 없는 명령어입니다.\n💡 /help 를 입력하여 사용 가능한 명령어를 확인하세요.`
-        );
-        return true; // 처리됨으로 표시
-      }
-
-      // 권한 확인 (관리자 명령어)
-      if (commandConfig.category === "admin") {
-        const isAdmin = await this.checkAdminPermission(userId);
-        if (!isAdmin) {
-          await this.bot.sendMessage(chatId, "❌ 관리자 권한이 필요합니다.");
-          return true;
-        }
-      }
-
-      // 명령어 실행
-      logger.info(
-        `🎯 명령어 실행: /${commandName} (${commandConfig.module || "system"})`
-      );
-
-      if (commandConfig.module) {
-        // 모듈 명령어
-        const handled = await this.moduleManager?.handleCommand?.(
-          this.bot,
-          msg,
-          commandName
-        );
-        return handled || false;
-      } else {
-        // 시스템 명령어
-        return await this.executeSystemCommand(msg, commandName, commandConfig);
-      }
-    } catch (error) {
-      logger.error(`명령어 처리 실패 [${commandName}]:`, error);
-      await this.sendErrorMessage(msg.chat?.id, error);
-      return true; // 에러도 처리됨으로 표시
-    }
-  }
-
-  /**
-   * 시스템 명령어 실행
-   */
-  async executeSystemCommand(msg, commandName, commandConfig) {
-    const {
-      chat: { id: chatId },
-      from,
-    } = msg;
-    const userName = getUserName(from);
-
-    switch (commandName) {
-      case "start":
-        await this.handleStartCommand(msg);
-        return true;
-
-      case "help":
-        await this.handleHelpCommand(msg);
-        return true;
-
-      case "status":
-        await this.handleStatusCommand(msg);
-        return true;
-
-      case "cancel":
-        await this.handleCancelCommand(msg);
-        return true;
-
-      default:
-        logger.warn(`처리되지 않은 시스템 명령어: ${commandName}`);
-        return false;
-    }
-  }
-
-  /**
-   * /start 명령어 처리
-   */
-  async handleStartCommand(msg) {
-    const {
-      chat: { id: chatId },
-      from,
-    } = msg;
-    const userName = getUserName(from);
-
-    const welcomeText = `안녕하세요 ${userName}님! 👋
-
-🤖 **두목봇 v3.0.1**에 오신 것을 환영합니다.
-
-아래 메뉴에서 원하는 기능을 선택해주세요.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🏖️ 휴가 관리", callback_data: "leave:menu" }],
-        [{ text: "📝 할일 관리", callback_data: "todo:menu" }],
-        [{ text: "⏰ 타이머", callback_data: "timer:menu" }],
-        [{ text: "❓ 도움말", callback_data: "system:help" }],
-      ],
-    };
-
-    await this.bot.sendMessage(chatId, welcomeText, {
-      reply_markup: keyboard,
-      parse_mode: "Markdown",
-    });
-  }
-
-  /**
-   * /help 명령어 처리
-   */
-  async handleHelpCommand(msg) {
-    const {
-      chat: { id: chatId },
-    } = msg;
-
-    // ⭐ BotCommandsRegistry를 활용한 도움말 생성
-    const stats = this.commandsRegistry.getCommandStats();
-
-    const helpText = `📖 **두목봇 도움말**
-
-**🎯 사용 가능한 명령어**: ${stats.publicCommands}개
-
-**🏛️ 시스템 명령어**
-• /start - 봇 시작 및 메인 메뉴
-• /help - 도움말 보기
-• /status - 봇 상태 확인
-• /cancel - 현재 작업 취소
-
-**📦 모듈 명령어**
-• /leave - 휴가 관리 (연차/월차/반차/반반차)
-• /todo - 할일 관리
-• /timer - 타이머 및 뽀모도로
-• /weather - 날씨 정보
-• /fortune - 오늘의 운세
-
-**💡 팁**
-각 모듈을 선택한 후 도움말 버튼을 누르거나
-\`/help [모듈이름]\` 명령어를 사용하세요.
-
-**🆘 문의**
-문제가 있으시면 관리자에게 연락주세요.`;
-
-    await this.bot.sendMessage(chatId, helpText, {
-      parse_mode: "Markdown",
-      disable_web_page_preview: true,
-    });
-  }
-
-  /**
-   * /status 명령어 처리
-   */
-  async handleStatusCommand(msg) {
-    const {
-      chat: { id: chatId },
-    } = msg;
-
-    const uptime = process.uptime();
-    const stats = this.commandsRegistry.getCommandStats();
-
-    const statusText = `📊 **봇 상태**
-
-**⏱️ 운영 정보**
-• 가동 시간: ${this.formatUptime(uptime)}
-• 시작 시간: ${TimeHelper.formatDateTime(new Date(this.stats.startTime))}
-
-**📈 사용 통계**
-• 메시지 처리: ${this.stats.messagesReceived}개
-• 콜백 처리: ${this.stats.callbacksReceived}개  
-• 명령어 실행: ${this.stats.commandsExecuted}개
-• 오류 발생: ${this.stats.errorsCount}회
-
-**📋 명령어 현황**
-• 등록된 명령어: ${stats.totalCommands}개
-• 공개 명령어: ${stats.publicCommands}개
-• 모듈: ${stats.moduleCommands}개
-
-**🛡️ 시스템 상태**
-• 데이터베이스: ${this.dbManager ? "연결됨" : "비연결"}
-• 모듈 매니저: ${this.moduleManager ? "활성" : "비활성"}
-• 환경: ${process.env.NODE_ENV || "development"}
-
-✅ 모든 시스템이 정상 작동 중입니다.`;
-
-    await this.bot.sendMessage(chatId, statusText, {
-      parse_mode: "Markdown",
-    });
-  }
-
-  /**
-   * /cancel 명령어 처리
-   */
-  async handleCancelCommand(msg) {
-    const {
-      chat: { id: chatId },
-      from: { id: userId },
-    } = msg;
-
-    // 모듈에 취소 알림
-    if (this.moduleManager) {
-      await this.moduleManager.cancelUserAction?.(userId);
-    }
-
-    await this.bot.sendMessage(chatId, "✅ 현재 작업이 취소되었습니다.", {
-      reply_markup: {
-        inline_keyboard: [
-          [{ text: "🏠 메인 메뉴", callback_data: "system:start" }],
-        ],
-      },
-    });
-  }
-
-  /**
-   * 콜백 쿼리 처리
+   * 콜백 쿼리 처리 (수정된 버전)
    */
   async handleCallbackQuery(callbackQuery) {
-    if (!callbackQuery || !callbackQuery.from) return;
+    // ✅ 콜백 데이터 유효성 검사를 가장 먼저 수행
+    if (!callbackQuery) {
+      logger.error("❌ callbackQuery가 null 또는 undefined입니다");
+      return;
+    }
 
-    const callbackKey = `${callbackQuery.from.id}-${callbackQuery.id}`;
+    if (!callbackQuery.data) {
+      logger.error("❌ callbackQuery.data가 없습니다");
+      return;
+    }
+
+    if (!callbackQuery.id) {
+      logger.error("❌ callbackQuery.id가 없습니다");
+      return;
+    }
+
+    const callbackKey = callbackQuery.id;
 
     // 중복 처리 방지
     if (this.processingCallbacks.has(callbackKey)) {
-      logger.debug("중복 콜백 무시:", callbackKey);
+      logger.debug("🔁 중복 콜백 무시:", callbackKey);
       return;
     }
 
@@ -462,26 +191,40 @@ class BotController {
     this.stats.callbacksReceived++;
 
     try {
+      // ✅ 콜백 로깅 (사용자 이름 포함)
       const userName = getUserName(callbackQuery.from);
       logger.info(`🔘 콜백 수신: "${callbackQuery.data}" (${userName})`);
 
-      // 콜백 응답 (로딩 표시 제거)
-      await this.bot.answerCallbackQuery(callbackQuery.id);
+      // ✅ 콜백 데이터를 변수에 미리 저장 (데이터 보존)
+      const callbackData = callbackQuery.data;
+      const callbackFrom = callbackQuery.from;
+      const callbackMessage = callbackQuery.message;
 
-      // 모듈 콜백 처리
+      // 모듈 매니저로 전달 (콜백 응답 전에 처리)
+      let handled = false;
       if (this.moduleManager) {
-        const handled = await this.moduleManager.handleCallback?.(
-          this.bot,
-          callbackQuery
-        );
-        if (handled) return;
+        // ✅ 원본 callbackQuery 객체 그대로 전달
+        handled = await this.moduleManager.handleCallback(callbackQuery);
       }
 
-      // 시스템 콜백 처리
-      await this.handleSystemCallback(callbackQuery);
+      // 처리되지 않은 콜백
+      if (!handled) {
+        logger.warn(`⚠️ 처리되지 않은 시스템 콜백: ${callbackData}`);
+        await this.handleUnknownCallback(callbackQuery);
+      }
     } catch (error) {
-      logger.error("콜백 처리 실패:", error);
-      await this.sendErrorCallback(callbackQuery);
+      logger.error("콜백 처리 오류:", error);
+      this.stats.errorsCount++;
+
+      // 에러 응답
+      try {
+        await this.bot.answerCallbackQuery(callbackQuery.id, {
+          text: "❌ 처리 중 오류가 발생했습니다.",
+          show_alert: true,
+        });
+      } catch (answerError) {
+        logger.error("콜백 에러 응답 실패:", answerError);
+      }
     } finally {
       // 타임아웃 후 제거
       setTimeout(() => {
@@ -491,69 +234,127 @@ class BotController {
   }
 
   /**
-   * 시스템 콜백 처리
+   * 인라인 쿼리 처리
    */
-  async handleSystemCallback(callbackQuery) {
-    const { data } = callbackQuery;
-
-    if (data === "system:start") {
-      // /start와 동일한 메뉴 표시
-      await this.handleStartCommand({
-        chat: callbackQuery.message.chat,
-        from: callbackQuery.from,
-      });
-    } else if (data === "system:help") {
-      // /help와 동일한 도움말 표시
-      await this.handleHelpCommand({
-        chat: callbackQuery.message.chat,
-        from: callbackQuery.from,
-      });
-    } else {
-      logger.warn(`처리되지 않은 시스템 콜백: ${data}`);
+  async handleInlineQuery(query) {
+    try {
+      // 기본적인 인라인 쿼리 응답
+      await this.bot.answerInlineQuery(query.id, []);
+    } catch (error) {
+      logger.error("인라인 쿼리 처리 오류:", error);
     }
   }
 
   /**
-   * 일반 메시지 처리 (TTS 등)
+   * 메시지 유효성 검사
    */
-  async handleGeneralMessage(msg) {
-    // TTS나 기타 자동 기능 처리
-    // 구현은 필요에 따라 추가
+  isValidMessage(msg) {
+    return msg && msg.chat && msg.from && msg.message_id && !msg.from.is_bot;
   }
 
   /**
-   * 인라인 쿼리 처리
+   * 메시지 처리 여부 결정
    */
-  async handleInlineQuery(query) {
-    // 인라인 쿼리 처리 로직
-    await this.bot.answerInlineQuery(query.id, []);
+  shouldProcessMessage(msg) {
+    // 개인 채팅은 항상 처리
+    if (msg.chat.type === "private") {
+      return true;
+    }
+
+    // 그룹 채팅에서는 봇 멘션이나 명령어만 처리
+    if (msg.chat.type === "group" || msg.chat.type === "supergroup") {
+      return (
+        msg.text?.startsWith("/") ||
+        msg.text?.includes(`@${this.bot.options.username}`) ||
+        (msg.reply_to_message && msg.reply_to_message.from.is_bot)
+      );
+    }
+
+    return false;
   }
 
   /**
-   * 관리자 권한 확인
+   * 알 수 없는 명령어 처리
    */
-  async checkAdminPermission(userId) {
-    const adminIds = process.env.ADMIN_IDS?.split(",") || [];
-    return adminIds.includes(userId.toString());
+  async handleUnknownCommand(msg) {
+    const command = msg.text.split(" ")[0];
+    logger.info(`🎯 명령어 실행: ${command} (system)`);
+
+    const helpText = `❓ **알 수 없는 명령어**
+
+\`${command}\` 명령어를 찾을 수 없습니다.
+
+**사용 가능한 명령어:**
+• \`/start\` - 시작하기
+• \`/help\` - 도움말
+• \`/todo\` - 할일 관리
+• \`/timer\` - 타이머
+• \`/fortune\` - 운세
+• \`/weather\` - 날씨
+• \`/leave\` - 휴가 관리
+
+자세한 사용법은 \`/help\` 명령어를 입력해주세요.`;
+
+    await this.bot.sendMessage(msg.chat.id, helpText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [
+            { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+            { text: "❓ 도움말", callback_data: "system:help" },
+          ],
+        ],
+      },
+    });
+  }
+
+  /**
+   * 알 수 없는 콜백 처리
+   */
+  async handleUnknownCallback(callbackQuery) {
+    try {
+      await this.bot.answerCallbackQuery(callbackQuery.id, {
+        text: "❌ 처리할 수 없는 요청입니다.",
+        show_alert: false,
+      });
+
+      if (callbackQuery.message) {
+        await this.bot.editMessageText(
+          "❌ **알 수 없는 요청**\n\n처리할 수 없는 요청입니다.\n메인 메뉴로 돌아가세요.",
+          {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+              ],
+            },
+          }
+        );
+      }
+    } catch (error) {
+      logger.error("알 수 없는 콜백 처리 오류:", error);
+    }
   }
 
   /**
    * 에러 메시지 전송
    */
   async sendErrorMessage(chatId, error) {
-    try {
-      const errorMessage = `❌ **오류 발생**
+    const errorText = `❌ **오류 발생**
 
 처리 중 문제가 발생했습니다.
 잠시 후 다시 시도해주세요.
 
-오류가 계속되면 관리자에게 문의하세요.`;
+오류가 계속 발생하면 관리자에게 문의하세요.`;
 
-      await this.bot.sendMessage(chatId, errorMessage, {
+    try {
+      await this.bot.sendMessage(chatId, errorText, {
         parse_mode: "Markdown",
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🏠 메인 메뉴", callback_data: "system:start" }],
+            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
           ],
         },
       });
@@ -563,56 +364,26 @@ class BotController {
   }
 
   /**
-   * 콜백 에러 처리
+   * 상태 조회
    */
-  async sendErrorCallback(callbackQuery) {
-    try {
-      await this.bot.editMessageText("❌ 처리 중 오류가 발생했습니다.", {
-        chat_id: callbackQuery.message.chat.id,
-        message_id: callbackQuery.message.message_id,
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🏠 메인 메뉴", callback_data: "system:start" }],
-          ],
-        },
-      });
-    } catch (error) {
-      logger.error("콜백 에러 메시지 전송 실패:", error);
-    }
-  }
-
-  /**
-   * 가동 시간 포맷팅
-   */
-  formatUptime(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    if (days > 0) {
-      return `${days}일 ${hours}시간 ${minutes}분`;
-    } else if (hours > 0) {
-      return `${hours}시간 ${minutes}분`;
-    } else {
-      return `${minutes}분`;
-    }
-  }
-
-  /**
-   * 통계 조회
-   */
-  getStats() {
+  getStatus() {
     const uptime = Date.now() - this.stats.startTime;
-    const commandStats = this.commandsRegistry.getCommandStats();
 
     return {
-      ...this.stats,
-      uptime: Math.floor(uptime / 1000), // 초 단위
-      messagesPerMinute: this.stats.messagesReceived / (uptime / 60000),
-      errorRate:
-        this.stats.errorsCount /
-          (this.stats.messagesReceived + this.stats.callbacksReceived) || 0,
-      commands: commandStats,
+      initialized: this.isInitialized,
+      uptime: Math.round(uptime / 1000), // 초 단위
+      stats: {
+        ...this.stats,
+        averageResponseTime:
+          this.stats.messagesReceived > 0
+            ? Math.round(uptime / this.stats.messagesReceived)
+            : 0,
+      },
+      processing: {
+        messages: this.processingMessages.size,
+        callbacks: this.processingCallbacks.size,
+      },
+      moduleManager: this.moduleManager?.getStatus() || null,
     };
   }
 
@@ -622,17 +393,16 @@ class BotController {
   async cleanup() {
     logger.info("🧹 BotController 정리 시작...");
 
-    // 처리 중인 작업 대기
-    const waitTime = Math.max(
-      this.config.messageTimeout,
-      this.config.callbackTimeout
-    );
-    await new Promise((resolve) => setTimeout(resolve, waitTime));
-
-    // 큐 정리
+    // 처리 중인 작업 정리
     this.processingMessages.clear();
     this.processingCallbacks.clear();
 
+    // 봇 이벤트 리스너 제거
+    if (this.bot) {
+      this.bot.removeAllListeners();
+    }
+
+    this.isInitialized = false;
     logger.info("✅ BotController 정리 완료");
   }
 }
