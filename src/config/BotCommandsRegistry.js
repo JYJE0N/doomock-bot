@@ -1,24 +1,19 @@
 // src/config/BotCommandsRegistry.js - BotFather 명령어 표준 레지스트리
-// Railway 환경 v3.0.1 리팩토링 표준
-
 const logger = require("../utils/Logger");
 
 class BotCommandsRegistry {
   constructor() {
+    this.commands = new Map();
     this.moduleCommands = new Map();
-    this.quickCommands = new Map();
     this.adminCommands = new Map();
-    this.setupModuleCommands();
-    this.setupQuickCommands();
-    this.setupAdminCommands();
 
     this.setupStandardCommands();
     logger.info("📋 BotCommandsRegistry 초기화 완료");
   }
 
-  // 🏛️ 표준 명령어 설정 (BotFather setCommands용)
+  // 🏛️ 표준 명령어 설정 (기존 구조 유지)
   setupStandardCommands() {
-    // ======= 시스템 핵심 명령어 =======
+    // ======= 시스템 핵심 명령어 ======= (기존 유지)
     this.commands.set("start", {
       command: "start",
       description: "봇 시작 및 메인 메뉴",
@@ -104,6 +99,7 @@ class BotCommandsRegistry {
       quickActions: ["start", "stop", "pomodoro"],
     });
 
+    // 🏖️ 휴가 관리 모듈 (업데이트된 버전)
     this.moduleCommands.set("leave", {
       command: "leave",
       description: "통합 휴가 관리 (연차/월차/반차/반반차/병가)",
@@ -113,64 +109,13 @@ class BotCommandsRegistry {
       handler: "LeaveModule.handleMessage",
       params: "(bot, callbackQuery, subAction, params, moduleManager)",
       quickActions: ["status", "use", "history", "statistics"],
-      features: {
-        leaveTypes: [
-          {
-            type: "ANNUAL",
-            name: "연차",
-            emoji: "🏖️",
-            allowedDays: [1, 0.5, 0.25],
-            description: "1년간 사용할 수 있는 유급휴가",
-          },
-          {
-            type: "MONTHLY",
-            name: "월차",
-            emoji: "📅",
-            allowedDays: [1, 0.5, 0.25],
-            description: "매월 1일씩 자동 지급되는 휴가",
-          },
-          {
-            type: "HALF_DAY",
-            name: "반차",
-            emoji: "🌅",
-            allowedDays: [0.5],
-            description: "반나절 휴가 (오전/오후)",
-          },
-          {
-            type: "QUARTER_DAY",
-            name: "반반차",
-            emoji: "⏰",
-            allowedDays: [0.25],
-            description: "2시간 단위 휴가",
-          },
-          {
-            type: "SICK",
-            name: "병가",
-            emoji: "🤒",
-            allowedDays: [1, 0.5, 0.25],
-            description: "질병으로 인한 휴가 (연차 차감 없음)",
-          },
-        ],
-        usageUnits: {
-          1: {
-            name: "1일",
-            display: "하루종일",
-            timeRange: "09:00-18:00",
-            description: "전일 휴가",
-          },
-          0.5: {
-            name: "0.5일",
-            display: "반나절",
-            timeRange: "09:00-13:00 또는 14:00-18:00",
-            description: "반일 휴가",
-          },
-          0.25: {
-            name: "0.25일",
-            display: "반반나절",
-            timeRange: "09:00-11:00 또는 16:00-18:00",
-            description: "2시간 휴가",
-          },
-        },
+      // 🎯 휴가 타입별 상세 정보
+      leaveTypes: {
+        ANNUAL: { name: "연차", emoji: "🏖️", allowedDays: [1, 0.5, 0.25] },
+        MONTHLY: { name: "월차", emoji: "📅", allowedDays: [1, 0.5, 0.25] },
+        HALF_DAY: { name: "반차", emoji: "🌅", allowedDays: [0.5] },
+        QUARTER_DAY: { name: "반반차", emoji: "⏰", allowedDays: [0.25] },
+        SICK: { name: "병가", emoji: "🤒", allowedDays: [1, 0.5, 0.25] },
       },
     });
 
@@ -194,17 +139,6 @@ class BotCommandsRegistry {
       handler: "UtilsModule.handleMessage",
       params: "(bot, callbackQuery, subAction, params, moduleManager)",
       quickActions: ["tts", "voice", "file"],
-    });
-
-    this.moduleCommands.set("worktime", {
-      command: "worktime",
-      description: "근무시간 관리 (출퇴근 체크)",
-      module: "WorktimeModule",
-      category: "work",
-      isPublic: true,
-      handler: "WorktimeModule.handleMessage",
-      params: "(bot, callbackQuery, subAction, params, moduleManager)",
-      quickActions: ["checkin", "checkout", "status"],
     });
 
     // ======= 관리자 명령어 =======
@@ -293,17 +227,14 @@ class BotCommandsRegistry {
     return mapping;
   }
 
-  // 📋 모듈별 명령어 가져오기
-  getModuleCommands(moduleName) {
-    const moduleCommands = [];
+  // 🏖️ 휴가 관련 특수 메서드들 (새로 추가)
+  getLeaveCommand() {
+    return this.moduleCommands.get("leave");
+  }
 
-    for (const [key, cmd] of this.moduleCommands) {
-      if (cmd.module === moduleName) {
-        moduleCommands.push(cmd);
-      }
-    }
-
-    return moduleCommands;
+  getLeaveTypes() {
+    const leaveCommand = this.getLeaveCommand();
+    return leaveCommand?.leaveTypes || {};
   }
 
   // 🔍 명령어 검색
@@ -383,8 +314,44 @@ class BotCommandsRegistry {
     }
     return false;
   }
-}
 
+  // 🏖️ 휴가 도움말 생성 (새로 추가)
+  generateLeaveHelpText() {
+    const leaveCommand = this.getLeaveCommand();
+    if (!leaveCommand) {
+      return "휴가 명령어를 찾을 수 없습니다.";
+    }
+
+    let helpText = "🏖️ **휴가 관리 시스템 도움말**\n\n";
+
+    helpText += "**📋 기본 명령어**\n";
+    helpText += "• /leave - 휴가 관리 메인 메뉴\n\n";
+
+    if (leaveCommand.leaveTypes) {
+      helpText += "**🏖️ 휴가 종류**\n";
+      Object.entries(leaveCommand.leaveTypes).forEach(([type, config]) => {
+        helpText += `${config.emoji} **${
+          config.name
+        }**: ${config.allowedDays.join("일, ")}일 사용 가능\n`;
+      });
+      helpText += "\n";
+    }
+
+    helpText += "**⏰ 사용 단위**\n";
+    helpText += "• 1일: 하루종일 (09:00-18:00)\n";
+    helpText += "• 0.5일: 반나절 (오전/오후 선택)\n";
+    helpText += "• 0.25일: 반반나절 (2시간)\n\n";
+
+    helpText += "**📊 활용 팁**\n";
+    helpText += "• 연차는 1일, 0.5일, 0.25일 단위로 사용 가능\n";
+    helpText += "• 월차는 매월 자동으로 1일씩 지급\n";
+    helpText += "• 반차는 오전/오후 선택 가능\n";
+    helpText += "• 반반차는 출퇴근 시간 활용\n";
+    helpText += "• 병가는 연차에서 차감되지 않음";
+
+    return helpText;
+  }
+}
 // 싱글톤 인스턴스
 const botCommandsRegistry = new BotCommandsRegistry();
 

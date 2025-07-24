@@ -1,4 +1,4 @@
-// doomock_bot.js - 리팩토링된 Railway 봇 v3.0.1
+// doomock_bot.js - BotCommandsRegistry 통합 추가
 
 // 1. 환경변수 최우선 로드
 require("dotenv").config();
@@ -9,11 +9,11 @@ const logger = require("./src/utils/Logger");
 const TimeHelper = require("./src/utils/TimeHelper");
 const AppConfig = require("./src/config/AppConfig");
 
+// ⭐ BotCommandsRegistry 추가
+const botCommandsRegistry = require("./src/config/BotCommandsRegistry");
+
 /**
  * 두목봇 메인 클래스
- * - 싱글톤 패턴
- * - 의존성 주입 제거 (불필요한 복잡성)
- * - 직접적이고 명확한 초기화
  */
 class DoomockBot {
   constructor() {
@@ -29,6 +29,9 @@ class DoomockBot {
     this.moduleManager = null;
     this.botController = null;
     this.isInitialized = false;
+
+    // ⭐ BotCommandsRegistry 인스턴스 참조
+    this.commandsRegistry = botCommandsRegistry;
 
     // 설정
     this.config = AppConfig;
@@ -64,6 +67,10 @@ class DoomockBot {
       await this.initializeDatabase();
       await this.initializeModules();
       await this.initializeController();
+
+      // 🎯 BotFather 명령어 등록 (새로 추가)
+      await this.registerBotCommands();
+
       await this.startPolling();
       await this.sendStartupNotification();
 
@@ -146,6 +153,8 @@ class DoomockBot {
 
       this.moduleManager = new ModuleManager(this.bot, {
         db: this.dbManager?.db || null,
+        // ⭐ CommandsRegistry를 ModuleManager에 전달
+        commandsRegistry: this.commandsRegistry,
       });
 
       await this.moduleManager.initialize();
@@ -171,6 +180,8 @@ class DoomockBot {
       this.botController = new BotController(this.bot, {
         dbManager: this.dbManager,
         moduleManager: this.moduleManager,
+        // ⭐ CommandsRegistry를 BotController에 전달
+        commandsRegistry: this.commandsRegistry,
       });
 
       await this.botController.initialize();
@@ -178,7 +189,38 @@ class DoomockBot {
       logger.success("✅ 컨트롤러 초기화 완료");
     } catch (error) {
       logger.error("❌ 컨트롤러 초기화 실패:", error);
-      throw error; // 컨트롤러는 필수
+      throw error;
+    }
+  }
+
+  /**
+   * 🎯 BotFather 명령어 등록 (새로 추가)
+   */
+  async registerBotCommands() {
+    try {
+      logger.info("📋 BotFather 명령어 등록 중...");
+
+      // BotCommandsRegistry를 통한 명령어 등록
+      const success = await this.commandsRegistry.setBotFatherCommands(
+        this.bot
+      );
+
+      if (success) {
+        const stats = this.commandsRegistry.getCommandStats();
+        logger.success(`✅ BotFather 명령어 등록 완료`);
+        logger.info(
+          `   📊 총 ${stats.totalCommands}개 명령어 (공개: ${stats.publicCommands}개)`
+        );
+        logger.info(`   🏛️ 시스템: ${stats.systemCommands}개`);
+        logger.info(`   📦 모듈: ${stats.moduleCommands}개`);
+        logger.info(`   🔧 관리자: ${stats.adminCommands}개`);
+      } else {
+        logger.warn("⚠️ BotFather 명령어 등록 실패 - 계속 진행");
+      }
+    } catch (error) {
+      logger.error("❌ BotFather 명령어 등록 중 오류:", error);
+      logger.warn("⚠️ 명령어 등록 실패했지만 봇은 정상 동작합니다");
+      // 명령어 등록 실패해도 봇은 계속 실행
     }
   }
 
@@ -187,16 +229,15 @@ class DoomockBot {
    */
   async startPolling() {
     try {
-      logger.info("📡 폴링 시작...");
+      logger.info("📡 폴링 시작 중...");
 
-      const pollingOptions = {
-        interval: this.config.TELEGRAM.POLLING_INTERVAL || 300,
-        params: {
-          timeout: this.config.TELEGRAM.POLLING_TIMEOUT || 10,
+      await this.bot.startPolling({
+        restart: true,
+        polling: {
+          interval: 1000,
+          autoStart: false,
         },
-      };
-
-      await this.bot.startPolling(pollingOptions);
+      });
 
       logger.success("✅ 폴링 시작됨");
     } catch (error) {
@@ -210,37 +251,31 @@ class DoomockBot {
    */
   async sendStartupNotification() {
     try {
-      // 관리자 ID가 설정된 경우만
-      if (!this.config.ADMIN_USER_ID) {
+      if (!this.config.ADMIN_USER_ID || !this.bot) {
         return;
       }
 
-      const uptime = process.uptime();
-      const memUsage = process.memoryUsage();
-
+      const stats = this.commandsRegistry.getCommandStats();
       const startupMessage = `🚀 **봇 시작됨**
 
-**환경 정보:**
 • 버전: v${this.config.VERSION}
 • 환경: ${this.config.RAILWAY.ENVIRONMENT || "Local"}
-• Node: ${process.version}
-• 시작 시간: ${TimeHelper.formatDate(new Date())}
+• 시작 시간: ${TimeHelper.formatDateTime(new Date())}
 
-**시스템 정보:**
-• 메모리: ${Math.round(memUsage.heapUsed / 1024 / 1024)}MB
-• 데이터베이스: ${this.dbManager ? "연결됨 ✅" : "미연결 ❌"}
-• 모듈: ${this.moduleManager?.moduleInstances.size || 0}개
+📋 **명령어 현황**
+• 총 명령어: ${stats.totalCommands}개
+• 공개 명령어: ${stats.publicCommands}개
+• 시스템: ${stats.systemCommands}개
+• 모듈: ${stats.moduleCommands}개
+• 관리자: ${stats.adminCommands}개
 
-정상적으로 시작되었습니다!`;
+✅ 모든 시스템이 정상 작동 중입니다.`;
 
       await this.bot.sendMessage(this.config.ADMIN_USER_ID, startupMessage, {
         parse_mode: "Markdown",
       });
-
-      logger.info("📮 시작 알림 전송 완료");
     } catch (error) {
       logger.warn("시작 알림 전송 실패:", error.message);
-      // 알림 실패는 무시
     }
   }
 
@@ -249,37 +284,34 @@ class DoomockBot {
    */
   async cleanup() {
     try {
-      logger.info("🧹 정리 작업 시작...");
+      logger.info("🧹 DoomockBot 정리 시작...");
 
-      // 종료 알림 전송 시도
+      // 종료 알림 전송
       await this.sendShutdownNotification();
 
       // 폴링 중지
       if (this.bot) {
-        logger.debug("📡 폴링 중지...");
         await this.bot.stopPolling();
+        logger.info("📡 폴링 중지됨");
       }
 
       // 컨트롤러 정리
       if (this.botController) {
-        logger.debug("🎮 컨트롤러 정리...");
-        await this.botController.cleanup();
+        await this.botController.cleanup?.();
       }
 
       // 모듈 정리
       if (this.moduleManager) {
-        logger.debug("🧩 모듈 정리...");
-        await this.moduleManager.cleanup();
+        await this.moduleManager.cleanup?.();
       }
 
       // 데이터베이스 연결 해제
       if (this.dbManager) {
-        logger.debug("🗄️ 데이터베이스 연결 해제...");
-        await this.dbManager.disconnect();
+        await this.dbManager.disconnect?.();
+        logger.info("🗄️ 데이터베이스 연결 해제됨");
       }
 
-      this.isInitialized = false;
-      logger.success("✅ 정리 작업 완료");
+      logger.success("✅ DoomockBot 정리 완료");
     } catch (error) {
       logger.error("❌ 정리 작업 중 오류:", error);
     }
@@ -304,7 +336,7 @@ class DoomockBot {
 • 처리 콜백: ${this.stats.callbacksReceived}개
 • 오류 발생: ${this.stats.errorsCount}회
 
-종료 시간: ${TimeHelper.formatDate(new Date())}`;
+종료 시간: ${TimeHelper.formatDateTime(new Date())}`;
 
       await this.bot.sendMessage(this.config.ADMIN_USER_ID, shutdownMessage, {
         parse_mode: "Markdown",
@@ -342,6 +374,7 @@ class DoomockBot {
       modules: this.moduleManager?.getStatus(),
       database: this.dbManager?.isConnected() || false,
       environment: this.config.RAILWAY.ENVIRONMENT || "Local",
+      commands: this.commandsRegistry.getCommandStats(),
     };
   }
 }

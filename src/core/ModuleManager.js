@@ -1,106 +1,67 @@
-// src/core/ModuleManager.js - 중앙 모듈 관리자 (리팩토링)
+// src/core/ModuleManager.js - BotCommandsRegistry 통합된 표준화된 콜백 처리
+
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
 
-/**
- * 중앙 모듈 관리자
- * - 모든 모듈의 생명주기 관리
- * - 콜백 라우팅 중앙 처리
- * - 중복 처리 방지
- */
+// ⭐ BotCommandsRegistry 참조 추가
+const botCommandsRegistry = require("../config/BotCommandsRegistry");
+
 class ModuleManager {
   constructor(bot, options = {}) {
     this.bot = bot;
-    this.db = options.db || null;
+    this.db = options.dbManager || null;
     this.moduleInstances = new Map();
     this.isInitialized = false;
 
-    // 중복 처리 방지를 위한 Set
-    this.processingCallbacks = new Set();
+    // ⭐ BotCommandsRegistry 인스턴스 참조
+    this.commandsRegistry = options.commandsRegistry || botCommandsRegistry;
 
-    // 모듈 레지스트리
-    this.moduleRegistry = {
-      system: {
-        class: "SystemModule",
-        path: "../modules/SystemModule",
-        name: "시스템",
-        icon: "🏠",
-        description: "메인 메뉴 및 시스템 기능",
-        commands: ["/start", "/help", "/status"],
-      },
-      todo: {
-        class: "TodoModule",
-        path: "../modules/TodoModule",
-        name: "할일 관리",
-        icon: "📝",
-        description: "할일을 추가하고 관리합니다",
-        commands: ["/todo"],
-      },
-      timer: {
-        class: "TimerModule",
-        path: "../modules/TimerModule",
-        name: "타이머",
-        icon: "⏰",
-        description: "포모도로 타이머를 사용합니다",
-        commands: ["/timer"],
-      },
-      worktime: {
-        class: "WorktimeModule",
-        path: "../modules/WorktimeModule",
-        name: "근무시간",
-        icon: "🕐",
-        description: "출퇴근 시간을 관리합니다",
-        commands: ["/worktime", "/출근", "/퇴근"],
-      },
-      leave: {
-        class: "LeaveModule",
-        path: "../modules/LeaveModule",
-        name: "휴가관리",
-        icon: "🏖️",
-        description: "휴가를 신청하고 관리합니다",
-        commands: ["/leave", "/휴가"],
-      },
-      reminder: {
-        class: "ReminderModule",
-        path: "../modules/ReminderModule",
-        name: "리마인더",
-        icon: "📅",
-        description: "알림을 설정합니다",
-        commands: ["/reminder"],
-      },
-      fortune: {
-        class: "FortuneModule",
-        path: "../modules/FortuneModule",
-        name: "운세",
-        icon: "🔮",
-        description: "오늘의 운세를 확인합니다",
-        commands: ["/fortune", "/운세"],
-      },
-      weather: {
-        class: "WeatherModule",
-        path: "../modules/WeatherModule",
-        name: "날씨",
-        icon: "☁️",
-        description: "현재 날씨를 확인합니다",
-        commands: ["/weather", "/날씨"],
-      },
-      utils: {
-        class: "UtilsModule",
-        path: "../modules/UtilsModule",
-        name: "유틸리티",
-        icon: "🔧",
-        description: "TTS 등 유용한 도구를 사용합니다",
-        commands: ["/tts"],
-      },
-    };
+    // 중복 처리 방지
+    this.processingCallbacks = new Set();
+    this.processingMessages = new Set();
+
+    // ⭐ Registry 기반 모듈 레지스트리 (동적 생성)
+    this.moduleRegistry = this.buildModuleRegistry();
 
     logger.info("🔧 ModuleManager 생성됨");
   }
 
   /**
-   * 모듈 매니저 초기화
+   * ⭐ BotCommandsRegistry 기반 모듈 레지스트리 생성
    */
+  buildModuleRegistry() {
+    const registry = {};
+
+    // CommandsRegistry에서 모듈 정보 추출
+    for (const [commandName, commandConfig] of this.commandsRegistry
+      .moduleCommands) {
+      const moduleName = commandConfig.module;
+      const moduleKey = commandName; // leave, todo, timer 등
+
+      registry[moduleKey] = {
+        class: moduleName,
+        path: `../modules/${moduleName}`,
+        command: commandName,
+        description: commandConfig.description,
+        category: commandConfig.category,
+        quickActions: commandConfig.quickActions || [],
+      };
+    }
+
+    // 시스템 모듈 추가
+    registry.system = {
+      class: "SystemModule",
+      path: "../modules/SystemModule",
+      command: "system",
+      description: "시스템 관리",
+      category: "system",
+    };
+
+    logger.info(`📋 ${Object.keys(registry).length}개 모듈 레지스트리 구성`);
+    return registry;
+  }
+
   async initialize() {
     if (this.isInitialized) {
       logger.warn("ModuleManager 이미 초기화됨");
@@ -109,10 +70,7 @@ class ModuleManager {
 
     try {
       logger.info("⚙️ ModuleManager 초기화 시작...");
-
-      // 모든 모듈 로드
       await this.loadModules();
-
       this.isInitialized = true;
       logger.success(
         `✅ ModuleManager 초기화 완료 (${this.moduleInstances.size}개 모듈)`
@@ -123,40 +81,89 @@ class ModuleManager {
     }
   }
 
-  /**
-   * 모든 모듈 로드
-   */
   async loadModules() {
     for (const [key, config] of Object.entries(this.moduleRegistry)) {
-      await this.loadModule(key, config);
+      try {
+        const ModuleClass = require(config.path);
+        const moduleInstance = new ModuleClass(this.bot, {
+          dbManager: this.db,
+          moduleManager: this, // 자신의 참조 전달
+          // ⭐ CommandsRegistry 정보 전달
+          commandConfig: this.commandsRegistry.moduleCommands.get(key),
+          commandsRegistry: this.commandsRegistry,
+        });
+
+        // 모듈 초기화
+        if (moduleInstance.initialize) {
+          await moduleInstance.initialize();
+        }
+
+        this.moduleInstances.set(config.class, moduleInstance);
+        logger.debug(`✅ ${config.class} 로드 완료`);
+      } catch (error) {
+        logger.error(`❌ ${config.class} 로드 실패:`, error);
+      }
     }
   }
 
   /**
-   * 단일 모듈 로드
+   * ⭐ 명령어 처리 (Registry 기반)
    */
-  async loadModule(key, config) {
+  async handleCommand(bot, msg, commandName) {
     try {
-      logger.debug(`📦 ${config.class} 로드 중...`);
+      const messageKey = `${msg.from.id}-${msg.message_id}`;
 
-      const ModuleClass = require(config.path);
-      const moduleInstance = new ModuleClass(this.bot, {
-        db: this.db,
-        moduleManager: this,
-      });
+      // 중복 처리 방지
+      if (this.processingMessages.has(messageKey)) {
+        return false;
+      }
+      this.processingMessages.add(messageKey);
 
-      // 모듈 초기화
-      if (moduleInstance.initialize) {
-        await moduleInstance.initialize();
+      // Registry에서 명령어 정보 조회
+      const commandConfig = this.commandsRegistry.findCommand(commandName);
+
+      if (!commandConfig || !commandConfig.module) {
+        logger.warn(`처리할 수 없는 명령어: ${commandName}`);
+        return false;
       }
 
-      this.moduleInstances.set(config.class, moduleInstance);
-      logger.debug(`✅ ${config.class} 로드 완료`);
+      // 모듈 찾기
+      const moduleInstance = this.moduleInstances.get(commandConfig.module);
 
-      return true;
+      if (!moduleInstance) {
+        logger.error(`모듈 인스턴스를 찾을 수 없음: ${commandConfig.module}`);
+        return false;
+      }
+
+      // 모듈의 handleMessage 호출
+      let handled = false;
+      if (moduleInstance.handleMessage) {
+        handled = await moduleInstance.handleMessage(bot, msg);
+      }
+
+      // 처리되지 않은 경우 기본 메뉴 표시
+      if (!handled && moduleInstance.showMenu) {
+        const fakeCallback = {
+          message: { chat: msg.chat, message_id: null },
+          from: msg.from,
+        };
+        await moduleInstance.showMenu(bot, fakeCallback, [], this);
+        handled = true;
+      }
+
+      logger.debug(
+        `🎯 명령어 ${commandName} 처리 결과: ${handled ? "성공" : "실패"}`
+      );
+      return handled;
     } catch (error) {
-      logger.error(`❌ ${config.class} 로드 실패:`, error);
+      logger.error(`명령어 처리 실패 [${commandName}]:`, error);
       return false;
+    } finally {
+      // 처리 완료 후 제거
+      setTimeout(() => {
+        const messageKey = `${msg.from.id}-${msg.message_id}`;
+        this.processingMessages.delete(messageKey);
+      }, 5000);
     }
   }
 
@@ -178,17 +185,45 @@ class ModuleManager {
     try {
       logger.info(`📨 콜백 데이터 수신: ${callbackData}`);
 
+      // ⭐ 메인 메뉴 특별 처리
+      if (callbackData === "main:menu") {
+        return await this.handleMainMenu(callbackQuery);
+      }
+
       // 콜백 데이터 파싱 (형식: "module:action:param1:param2")
       const [targetModule, subAction, ...params] = callbackData.split(":");
+
+      // 파싱 검증
+      if (!targetModule) {
+        logger.warn(`⚠️ 잘못된 콜백 형식: ${callbackData}`);
+        await this.sendErrorMessage(callbackQuery);
+        return false;
+      }
+
+      // ⭐ Registry를 통한 모듈 유효성 검증
+      const isValidModule = this.isValidModuleCallback(targetModule);
+      if (!isValidModule) {
+        logger.warn(`⚠️ 등록되지 않은 모듈: ${targetModule}`);
+        await this.sendModuleNotFoundMessage(callbackQuery);
+        return false;
+      }
+
+      logger.info(`🔔 콜백 라우팅: ${targetModule} → ${subAction || "menu"}`);
 
       // 특별 처리: main:menu는 system 모듈로 라우팅
       const moduleKey = targetModule === "main" ? "system" : targetModule;
 
       // 모듈 찾기
-      const module = this.getModule(moduleKey);
-      if (!module) {
+      const moduleClass = this.findModuleClass(moduleKey);
+      if (!moduleClass) {
         logger.warn(`모듈을 찾을 수 없음: ${moduleKey}`);
         await this.sendModuleNotFoundMessage(callbackQuery);
+        return false;
+      }
+
+      const module = this.moduleInstances.get(moduleClass);
+      if (!module) {
+        logger.error(`모듈 인스턴스가 없음: ${moduleClass}`);
         return false;
       }
 
@@ -196,15 +231,15 @@ class ModuleManager {
       const handled = await module.handleCallback(
         this.bot,
         callbackQuery,
-        subAction || "menu",
+        subAction || "menu", // 기본값 "menu"
         params,
         this
       );
 
       if (handled) {
-        logger.debug(`✅ ${module.name}에서 콜백 처리 완료`);
+        logger.debug(`✅ ${moduleClass}에서 콜백 처리 완료`);
       } else {
-        logger.warn(`❌ ${module.name}에서 콜백 처리 실패`);
+        logger.warn(`❌ ${moduleClass}에서 콜백 처리 실패`);
       }
 
       return handled;
@@ -221,245 +256,283 @@ class ModuleManager {
   }
 
   /**
+   * ⭐ Registry 기반 모듈 유효성 검증
+   */
+  isValidModuleCallback(moduleKey) {
+    // 시스템 모듈들
+    const systemModules = ["main", "system", "help", "admin"];
+    if (systemModules.includes(moduleKey)) {
+      return true;
+    }
+
+    // Registry에 등록된 모듈들
+    return this.commandsRegistry.moduleCommands.has(moduleKey);
+  }
+
+  /**
    * 메시지 핸들러 (모든 모듈에 전달)
    */
   async handleMessage(bot, msg) {
-    // 모든 모듈에게 메시지 전달 (우선순위 순)
-    const moduleOrder = [
-      "system",
-      "todo",
-      "timer",
-      "worktime",
-      "leave",
-      "reminder",
-      "fortune",
-      "weather",
-      "utils",
-    ];
+    try {
+      // ⭐ Registry 기반 모듈 순서 결정
+      const moduleOrder = this.getModuleProcessingOrder();
 
-    for (const moduleKey of moduleOrder) {
-      const module = this.getModule(moduleKey);
-      if (module && module.handleMessage) {
-        try {
-          const handled = await module.handleMessage(bot, msg);
-          if (handled) {
-            logger.debug(`📬 메시지가 ${module.name}에서 처리됨`);
-            return true;
+      for (const moduleKey of moduleOrder) {
+        const moduleClass = this.moduleRegistry[moduleKey]?.class;
+        if (!moduleClass) continue;
+
+        const module = this.moduleInstances.get(moduleClass);
+        if (module && module.handleMessage) {
+          try {
+            const handled = await module.handleMessage(bot, msg);
+            if (handled) {
+              logger.debug(`📬 메시지가 ${moduleClass}에서 처리됨`);
+              return true;
+            }
+          } catch (error) {
+            logger.error(`${moduleClass} 메시지 처리 오류:`, error);
           }
-        } catch (error) {
-          logger.error(`${module.name} 메시지 처리 오류:`, error);
         }
       }
-    }
 
-    return false;
+      return false;
+    } catch (error) {
+      logger.error("메시지 처리 중 전체 오류:", error);
+      return false;
+    }
   }
 
   /**
-   * 특정 모듈 가져오기
-   * @param {string} moduleKeyOrClass - 모듈 키 또는 클래스 이름
-   * @returns {Object|null} 모듈 인스턴스
+   * ⭐ Registry 기반 모듈 처리 순서 결정
    */
-  getModule(moduleKeyOrClass) {
-    // 클래스 이름으로 직접 검색
-    if (this.moduleInstances.has(moduleKeyOrClass)) {
-      return this.moduleInstances.get(moduleKeyOrClass);
-    }
+  getModuleProcessingOrder() {
+    // 카테고리별 우선순위 정의
+    const categoryPriority = {
+      system: 1,
+      productivity: 2,
+      work: 3,
+      entertainment: 4,
+      info: 5,
+      tools: 6,
+      business: 7,
+    };
 
-    // 키로 검색
-    const config = this.moduleRegistry[moduleKeyOrClass];
-    if (config) {
-      return this.moduleInstances.get(config.class);
-    }
+    // Registry에서 모듈 정보 가져와서 우선순위 정렬
+    const modules = Object.keys(this.moduleRegistry);
 
-    return null;
+    return modules.sort((a, b) => {
+      const configA = this.commandsRegistry.moduleCommands.get(a);
+      const configB = this.commandsRegistry.moduleCommands.get(b);
+
+      const priorityA = categoryPriority[configA?.category] || 999;
+      const priorityB = categoryPriority[configB?.category] || 999;
+
+      return priorityA - priorityB;
+    });
   }
 
   /**
-   * 로드된 모듈 목록 반환
-   * @returns {Array} 로드된 모듈 정보 배열
+   * 🏠 메인 메뉴 처리 (Registry 기반 동적 생성)
    */
-  getLoadedModules() {
-    const modules = [];
-
+  async handleMainMenu(callbackQuery) {
     try {
+      const keyboard = this.createMainMenuKeyboard();
+      const userName = getUserName(callbackQuery.from);
+
+      const stats = this.commandsRegistry.getCommandStats();
+
+      const menuText = `🏠 **메인 메뉴**
+
+안녕하세요 ${userName}님!
+무엇을 도와드릴까요?
+
+📋 **사용 가능한 기능**: ${stats.moduleCommands}개`;
+
+      await this.bot.editMessageText(menuText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 메인 메뉴 처리 오류:", error);
+      return false;
+    }
+  }
+
+  /**
+   * ⭐ Registry 기반 동적 메인 메뉴 키보드 생성
+   */
+  createMainMenuKeyboard() {
+    const keyboard = { inline_keyboard: [] };
+
+    // Registry에서 공개 모듈 명령어 가져오기
+    const publicModules = Array.from(
+      this.commandsRegistry.moduleCommands.values()
+    )
+      .filter((cmd) => cmd.isPublic)
+      .sort((a, b) => {
+        // 카테고리별 정렬
+        const categoryOrder = {
+          work: 1,
+          productivity: 2,
+          entertainment: 3,
+          info: 4,
+          tools: 5,
+        };
+        return (
+          (categoryOrder[a.category] || 999) -
+          (categoryOrder[b.category] || 999)
+        );
+      });
+
+    // 주요 모듈들 (2개씩 한 줄)
+    const mainModules = publicModules.slice(0, 8); // 최대 8개
+
+    for (let i = 0; i < mainModules.length; i += 2) {
+      const row = [];
+
+      const module1 = mainModules[i];
+      if (module1) {
+        row.push({
+          text: `${this.getModuleEmoji(module1.command)} ${this.getModuleName(
+            module1.command
+          )}`,
+          callback_data: `${module1.command}:menu`,
+        });
+      }
+
+      const module2 = mainModules[i + 1];
+      if (module2) {
+        row.push({
+          text: `${this.getModuleEmoji(module2.command)} ${this.getModuleName(
+            module2.command
+          )}`,
+          callback_data: `${module2.command}:menu`,
+        });
+      }
+
+      keyboard.inline_keyboard.push(row);
+    }
+
+    // 시스템 메뉴
+    keyboard.inline_keyboard.push([
+      { text: "❓ 도움말", callback_data: "system:help" },
+      { text: "📊 상태", callback_data: "system:status" },
+    ]);
+
+    return keyboard;
+  }
+
+  /**
+   * 모듈 이모지 매핑
+   */
+  getModuleEmoji(command) {
+    const emojiMap = {
+      leave: "🏖️",
+      todo: "📝",
+      timer: "⏰",
+      weather: "🌤️",
+      fortune: "🔮",
+      worktime: "💼",
+      utils: "🛠️",
+      insight: "📊",
+    };
+    return emojiMap[command] || "📦";
+  }
+
+  /**
+   * 모듈 이름 매핑
+   */
+  getModuleName(command) {
+    const nameMap = {
+      leave: "휴가 관리",
+      todo: "할일 관리",
+      timer: "타이머",
+      weather: "날씨",
+      fortune: "운세",
+      worktime: "근무시간",
+      utils: "유틸리티",
+      insight: "인사이트",
+    };
+    return nameMap[command] || command;
+  }
+
+  /**
+   * 모듈 클래스 이름 찾기
+   */
+  findModuleClass(moduleKey) {
+    return this.moduleRegistry[moduleKey]?.class || null;
+  }
+
+  /**
+   * ⭐ 사용자 액션 취소 (Registry 기반)
+   */
+  async cancelUserAction(userId) {
+    try {
+      // 모든 모듈에 취소 알림
       for (const [moduleClass, moduleInstance] of this.moduleInstances) {
-        // moduleRegistry에서 해당 모듈의 정보 찾기
-        let moduleInfo = null;
-        for (const [key, config] of Object.entries(this.moduleRegistry)) {
-          if (config.class === moduleClass) {
-            moduleInfo = { key, ...config };
-            break;
-          }
+        if (moduleInstance.clearUserState) {
+          await moduleInstance.clearUserState(userId);
         }
-
-        modules.push({
-          key: moduleInfo?.key,
-          name: moduleInstance.name,
-          class: moduleClass,
-          isActive: moduleInstance.isActive !== false,
-          isInitialized: moduleInstance.isInitialized || false,
-          hasActions: moduleInstance.actionMap?.size > 0,
-          actionCount: moduleInstance.actionMap?.size || 0,
-          instance: moduleInstance,
-          config: moduleInfo,
-        });
       }
 
-      logger.debug(`📦 로드된 모듈 수: ${modules.length}`);
-      return modules;
-    } catch (error) {
-      logger.error("로드된 모듈 목록 조회 오류:", error);
-      return [];
-    }
-  }
-
-  /**
-   * 활성화된 모듈 목록 반환
-   * @returns {Array} 활성화된 모듈 정보 배열
-   */
-  getActiveModules() {
-    return this.getLoadedModules().filter((module) => module.isActive);
-  }
-
-  /**
-   * 사용 가능한 모듈 목록 반환 (사용자에게 표시용)
-   * @returns {Array} 사용 가능한 모듈 정보
-   */
-  async getAvailableModules() {
-    const modules = this.getActiveModules();
-    const availableModules = [];
-
-    for (const module of modules) {
-      // 시스템 모듈은 제외
-      if (module.key === "system") continue;
-
-      if (module.config) {
-        availableModules.push({
-          key: module.key,
-          name: module.config.name,
-          icon: module.config.icon,
-          description: module.config.description,
-          commands: module.config.commands,
-          isActive: module.isActive,
-        });
-      }
-    }
-
-    return availableModules;
-  }
-
-  /**
-   * 모듈 상태 정보 반환
-   * @returns {Object} 모듈 상태 정보
-   */
-  getModuleStatus() {
-    const modules = this.getLoadedModules();
-
-    return {
-      totalModules: modules.length,
-      activeModules: modules.filter((m) => m.isActive).length,
-      initializedModules: modules.filter((m) => m.isInitialized).length,
-      activeCallbacks: this.processingCallbacks.size,
-      modules: modules.map((m) => ({
-        name: m.name,
-        key: m.key,
-        isActive: m.isActive,
-        isInitialized: m.isInitialized,
-        actionCount: m.actionCount,
-      })),
-    };
-  }
-
-  /**
-   * 전체 상태 조회 (기존 getStatus 개선)
-   */
-  getStatus() {
-    const moduleStatus = this.getModuleStatus();
-
-    return {
-      initialized: this.isInitialized,
-      totalModules: moduleStatus.totalModules,
-      activeModules: moduleStatus.activeModules,
-      activeCallbacks: moduleStatus.activeCallbacks,
-      modules: moduleStatus.modules,
-    };
-  }
-
-  /**
-   * 모듈 리로드
-   * @param {string} moduleKey - 리로드할 모듈 키
-   */
-  async reloadModule(moduleKey) {
-    try {
-      logger.info(`🔄 ${moduleKey} 모듈 리로드 시작...`);
-
-      const config = this.moduleRegistry[moduleKey];
-      if (!config) {
-        throw new Error(`모듈 설정을 찾을 수 없음: ${moduleKey}`);
-      }
-
-      // 기존 모듈 언로드
-      await this.unloadModule(moduleKey);
-
-      // 모듈 다시 로드
-      await this.loadModule(moduleKey, config);
-
-      logger.info(`✅ ${moduleKey} 모듈 리로드 완료`);
+      logger.info(`🚫 사용자 ${userId} 액션 취소 완료`);
       return true;
     } catch (error) {
-      logger.error(`❌ ${moduleKey} 모듈 리로드 실패:`, error);
+      logger.error("사용자 액션 취소 실패:", error);
       return false;
     }
   }
 
   /**
-   * 모듈 언로드
-   * @param {string} moduleKey - 언로드할 모듈 키
+   * ⭐ Registry 기반 사용 가능한 모듈 목록 조회
    */
-  async unloadModule(moduleKey) {
-    try {
-      const config = this.moduleRegistry[moduleKey];
-      if (!config) {
-        logger.warn(`언로드할 모듈을 찾을 수 없음: ${moduleKey}`);
-        return false;
-      }
-
-      const module = this.moduleInstances.get(config.class);
-      if (module) {
-        // 모듈 정리
-        if (typeof module.cleanup === "function") {
-          await module.cleanup();
-        }
-
-        // 인스턴스 제거
-        this.moduleInstances.delete(config.class);
-        logger.info(`✅ ${moduleKey} 모듈 언로드 완료`);
-      }
-
-      return true;
-    } catch (error) {
-      logger.error(`❌ ${moduleKey} 모듈 언로드 실패:`, error);
-      return false;
-    }
+  getAvailableModules() {
+    return Array.from(this.commandsRegistry.moduleCommands.values())
+      .filter((cmd) => cmd.isPublic)
+      .map((cmd) => ({
+        command: cmd.command,
+        description: cmd.description,
+        category: cmd.category,
+        emoji: this.getModuleEmoji(cmd.command),
+        name: this.getModuleName(cmd.command),
+        quickActions: cmd.quickActions || [],
+      }));
   }
 
   /**
-   * 모든 모듈에 이벤트 브로드캐스트
-   * @param {string} event - 이벤트 이름
-   * @param {any} data - 전달할 데이터
+   * ⭐ 특정 모듈의 도움말 조회
    */
-  async broadcastToModules(event, data) {
-    const modules = this.getLoadedModules();
+  async getModuleHelp(moduleName) {
+    try {
+      // Registry에서 모듈 정보 조회
+      const moduleConfig = this.commandsRegistry.moduleCommands.get(moduleName);
 
-    for (const module of modules) {
-      try {
-        if (module.instance && typeof module.instance.onEvent === "function") {
-          await module.instance.onEvent(event, data);
-        }
-      } catch (error) {
-        logger.error(`${module.name} 이벤트 처리 오류:`, error);
+      if (!moduleConfig) {
+        return null;
       }
+
+      // 특별한 도움말 처리 (LeaveModule)
+      if (moduleName === "leave") {
+        return this.commandsRegistry.generateLeaveHelpText();
+      }
+
+      // 일반 모듈 도움말 생성
+      let helpText = `📖 **${moduleConfig.description}**\n\n`;
+      helpText += `**명령어**: /${moduleConfig.command}\n`;
+      helpText += `**카테고리**: ${moduleConfig.category}\n`;
+
+      if (moduleConfig.quickActions && moduleConfig.quickActions.length > 0) {
+        helpText += `**빠른 액션**: ${moduleConfig.quickActions.join(", ")}\n`;
+      }
+
+      return helpText;
+    } catch (error) {
+      logger.error(`모듈 도움말 조회 실패 [${moduleName}]:`, error);
+      return null;
     }
   }
 
@@ -474,8 +547,11 @@ class ModuleManager {
       });
 
       if (callbackQuery.message) {
+        const availableCount =
+          this.commandsRegistry.getCommandStats().moduleCommands;
+
         await this.bot.editMessageText(
-          "⚠️ **기능을 찾을 수 없음**\n\n요청하신 기능이 현재 비활성화되어 있거나 존재하지 않습니다.",
+          `⚠️ **기능을 찾을 수 없음**\n\n요청하신 기능이 현재 비활성화되어 있거나 존재하지 않습니다.\n\n📋 현재 ${availableCount}개의 기능이 사용 가능합니다.`,
           {
             chat_id: callbackQuery.message.chat.id,
             message_id: callbackQuery.message.message_id,
@@ -483,6 +559,7 @@ class ModuleManager {
             reply_markup: {
               inline_keyboard: [
                 [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+                [{ text: "❓ 도움말", callback_data: "system:help" }],
               ],
             },
           }
@@ -524,51 +601,45 @@ class ModuleManager {
   }
 
   /**
-   * 디버그 정보 출력
+   * ⭐ Registry 기반 모듈 상태 조회
    */
-  debugInfo() {
-    const status = this.getStatus();
+  getStatus() {
+    const registryStats = this.commandsRegistry.getCommandStats();
 
-    logger.info("=== ModuleManager 디버그 정보 ===");
-    logger.info(`초기화 상태: ${this.isInitialized}`);
-    logger.info(`전체 모듈: ${status.totalModules}`);
-    logger.info(`활성 모듈: ${status.activeModules}`);
-    logger.info(`활성 콜백: ${status.activeCallbacks}`);
-
-    logger.info("--- 모듈 상세 정보 ---");
-    status.modules.forEach((module) => {
-      logger.info(`${module.key}: ${module.name}`);
-      logger.info(`  - 활성화: ${module.isActive}`);
-      logger.info(`  - 초기화: ${module.isInitialized}`);
-      logger.info(`  - 액션 수: ${module.actionCount}`);
-    });
-
-    logger.info("=== 디버그 정보 끝 ===");
+    return {
+      initialized: this.isInitialized,
+      loadedModules: this.moduleInstances.size,
+      registeredCommands: registryStats.moduleCommands,
+      totalCommands: registryStats.totalCommands,
+      publicCommands: registryStats.publicCommands,
+      modules: Array.from(this.moduleInstances.keys()),
+      processingCallbacks: this.processingCallbacks.size,
+      processingMessages: this.processingMessages.size,
+    };
   }
 
   /**
    * 정리 작업
    */
   async cleanup() {
-    logger.info("🧹 ModuleManager 정리 시작...");
+    try {
+      logger.info("🧹 ModuleManager 정리 시작...");
 
-    // 모든 모듈 정리
-    for (const [name, module] of this.moduleInstances) {
-      try {
-        if (module.cleanup) {
-          await module.cleanup();
+      // 모든 모듈 정리
+      for (const [moduleClass, moduleInstance] of this.moduleInstances) {
+        if (moduleInstance.cleanup) {
+          await moduleInstance.cleanup();
         }
-        logger.debug(`✅ ${name} 정리 완료`);
-      } catch (error) {
-        logger.error(`❌ ${name} 정리 실패:`, error);
       }
+
+      // 처리 중인 작업 정리
+      this.processingCallbacks.clear();
+      this.processingMessages.clear();
+
+      logger.info("✅ ModuleManager 정리 완료");
+    } catch (error) {
+      logger.error("❌ ModuleManager 정리 중 오류:", error);
     }
-
-    this.moduleInstances.clear();
-    this.processingCallbacks.clear();
-    this.isInitialized = false;
-
-    logger.info("✅ ModuleManager 정리 완료");
   }
 }
 
