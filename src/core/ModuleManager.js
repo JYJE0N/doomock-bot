@@ -1,4 +1,4 @@
-// src/core/ModuleManager.js - 안전한 콜백 처리 강화
+// src/core/ModuleManager.js - 타이머 이벤트 처리 추가
 
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
@@ -9,6 +9,7 @@ const TimeHelper = require("../utils/TimeHelper");
  * - 모든 모듈의 생명주기 관리
  * - 콜백 라우팅 중앙 처리
  * - 중복 처리 방지
+ * - ✅ 타이머 이벤트 처리 추가
  */
 class ModuleManager {
   constructor(bot, options = {}) {
@@ -19,6 +20,13 @@ class ModuleManager {
 
     // 중복 처리 방지를 위한 Set
     this.processingCallbacks = new Set();
+
+    // ✅ 서비스 인스턴스 참조 저장
+    this.services = {
+      timerService: null,
+      reminderService: null,
+      // 다른 서비스들...
+    };
 
     // 모듈 레지스트리
     this.moduleRegistry = {
@@ -51,6 +59,9 @@ class ModuleManager {
       // 모든 모듈 로드
       await this.loadModules();
 
+      // ✅ 서비스 이벤트 리스너 설정
+      this.setupServiceEventListeners();
+
       this.isInitialized = true;
       logger.success(
         `✅ ModuleManager 초기화 완료 (${this.moduleInstances.size}개 모듈)`
@@ -79,6 +90,19 @@ class ModuleManager {
         }
 
         this.moduleInstances.set(config.class, moduleInstance);
+
+        // ✅ 타이머 모듈의 서비스 참조 저장
+        if (config.class === "TimerModule" && moduleInstance.timerService) {
+          this.services.timerService = moduleInstance.timerService;
+          logger.debug("✅ TimerService 참조 저장됨");
+        }
+
+        // ✅ 리마인더 모듈의 서비스 참조 저장
+        if (config.class === "ReminderModule" && moduleInstance.reminderService) {
+          this.services.reminderService = moduleInstance.reminderService;
+          logger.debug("✅ ReminderService 참조 저장됨");
+        }
+
         logger.debug(`✅ ${config.class} 로드 완료`);
       } catch (error) {
         logger.error(`❌ ${config.class} 로드 실패:`, error);
@@ -87,70 +111,187 @@ class ModuleManager {
   }
 
   /**
-   * 중앙 콜백 처리 (표준 매개변수 사용)
+   * ✅ 서비스 이벤트 리스너 설정 (핵심 해결책!)
+   */
+  setupServiceEventListeners() {
+    // 🎯 타이머 완료 이벤트 처리
+    if (this.services.timerService) {
+      this.services.timerService.onTimerComplete(async (completionData) => {
+        await this.handleTimerCompletion(completionData);
+      });
+
+      this.services.timerService.onPomodoroComplete(async (completionData) => {
+        await this.handlePomodoroCompletion(completionData);
+      });
+
+      logger.success("🎯 타이머 이벤트 리스너 설정 완료");
+    }
+
+    // 📅 리마인더 완료 이벤트 처리 (향후 확장)
+    if (this.services.reminderService) {
+      // 리마인더 서비스도 이벤트 기반으로 확장 가능
+      logger.debug("📅 리마인더 이벤트 리스너 준비됨");
+    }
+  }
+
+  /**
+   * 🎯 일반 타이머 완료 처리 (사용자에게 알림 전송)
+   */
+  async handleTimerCompletion(completionData) {
+    try {
+      const { userId, taskName, plannedDuration, actualDuration, startTime, endTime } = completionData;
+
+      const completionText = `🎉 **타이머 완료!**
+
+✅ **작업**: ${taskName}
+⏱️ **계획 시간**: ${plannedDuration}분
+📊 **실제 시간**: ${actualDuration}분
+🕐 **시작**: ${TimeHelper.formatTime(startTime)}
+🕕 **완료**: ${TimeHelper.formatTime(endTime)}
+
+${actualDuration >= plannedDuration 
+  ? "👏 계획된 시간을 모두 채우셨네요!" 
+  : "⚡ 계획보다 일찍 완료하셨습니다!"}
+
+수고하셨습니다! 🎊`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "⏰ 새 타이머", callback_data: "timer:start:prompt" },
+            { text: "🍅 뽀모도로", callback_data: "timer:pomodoro:start" },
+          ],
+          [
+            { text: "📊 통계 보기", callback_data: "timer:stats" },
+            { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+          ],
+        ],
+      };
+
+      // 🔔 사용자에게 완료 알림 전송
+      await this.bot.sendMessage(userId, completionText, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      logger.info(`🎯 타이머 완료 알림 전송: 사용자 ${userId}, 작업 "${taskName}"`);
+
+    } catch (error) {
+      logger.error("타이머 완료 알림 전송 실패:", error);
+    }
+  }
+
+  /**
+   * 🍅 포모도로 완료 처리 (사용자에게 단계별 알림 전송)
+   */
+  async handlePomodoroCompletion(completionData) {
+    try {
+      const {
+        userId,
+        completedMode,
+        completedTask,
+        actualDuration,
+        nextMode,
+        nextDuration,
+        sessionCount,
+        totalWorkTime,
+        totalBreakTime,
+        message,
+      } = completionData;
+
+      let completionText;
+      let keyboard;
+
+      if (completedMode === "work") {
+        // 작업 완료 → 휴식 시간 안내
+        completionText = `🍅 **포모도로 완료!**
+
+${message}
+
+📊 **현재 세션 정보:**
+• 완료된 포모도로: ${sessionCount}개
+• 총 작업 시간: ${totalWorkTime}분
+• 총 휴식 시간: ${totalBreakTime}분
+
+잠시 휴식을 취하세요! ☕`;
+
+        keyboard = {
+          inline_keyboard: [
+            [
+              { text: `☕ 휴식 시작 (${nextDuration}분)`, callback_data: `timer:pomodoro:break:${nextDuration === 15 ? 'long' : 'short'}` },
+            ],
+            [
+              { text: "⏹️ 세션 종료", callback_data: "timer:stop" },
+              { text: "📊 통계", callback_data: "timer:stats" },
+            ],
+            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+          ],
+        };
+
+      } else {
+        // 휴식 완료 → 다음 작업 준비
+        completionText = `☕ **휴식 완료!**
+
+${message}
+
+📊 **현재 세션 정보:**
+• 완료된 포모도로: ${sessionCount}개
+• 총 작업 시간: ${totalWorkTime}분
+• 총 휴식 시간: ${totalBreakTime}분
+
+다음 포모도로를 시작하세요! 💪`;
+
+        keyboard = {
+          inline_keyboard: [
+            [
+              { text: `🍅 포모도로 시작 (${nextDuration}분)`, callback_data: "timer:pomodoro:start" },
+            ],
+            [
+              { text: "⏹️ 세션 종료", callback_data: "timer:stop" },
+              { text: "📊 통계", callback_data: "timer:stats" },
+            ],
+            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+          ],
+        };
+      }
+
+      // 🔔 사용자에게 완료 알림 전송
+      await this.bot.sendMessage(userId, completionText, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      logger.info(`🍅 포모도로 완료 알림 전송: 사용자 ${userId}, ${completedMode} → ${nextMode}, 세션 ${sessionCount}`);
+
+    } catch (error) {
+      logger.error("포모도로 완료 알림 전송 실패:", error);
+    }
+  }
+
+  /**
+   * 콜백 처리 (기존 로직 유지)
    */
   async handleCallback(callbackQuery) {
-    // ✅ 강화된 null/undefined 체크
-    if (!callbackQuery) {
-      logger.error("❌ callbackQuery가 null 또는 undefined입니다");
-      return false;
-    }
-
-    if (!callbackQuery.data) {
-      logger.error("❌ callbackQuery.data가 없습니다");
-      // 빈 콜백이라도 응답은 해주기
-      try {
-        if (callbackQuery.id) {
-          await this.bot.answerCallbackQuery(callbackQuery.id, {
-            text: "⚠️ 잘못된 요청입니다.",
-            show_alert: false,
-          });
-        }
-      } catch (error) {
-        logger.error("콜백 응답 실패:", error);
-      }
-      return false;
-    }
-
-    if (!callbackQuery.id) {
-      logger.error("❌ callbackQuery.id가 없습니다");
-      return false;
-    }
-
-    const callbackData = callbackQuery.data;
-    const userId = callbackQuery.from?.id || "unknown";
-    const callbackKey = `${userId}-${callbackData}`;
+    const callbackKey = `${callbackQuery.from.id}-${callbackQuery.id}`;
 
     // 중복 처리 방지
     if (this.processingCallbacks.has(callbackKey)) {
-      logger.debug("🔁 중복 콜백 무시:", callbackData);
-      try {
-        await this.bot.answerCallbackQuery(callbackQuery.id, {
-          text: "⏳ 처리 중입니다...",
-          show_alert: false,
-        });
-      } catch (error) {
-        logger.error("중복 콜백 응답 실패:", error);
-      }
+      logger.debug("🔁 중복 콜백 무시:", callbackKey);
       return false;
     }
 
     this.processingCallbacks.add(callbackKey);
 
     try {
-      logger.info(`📨 콜백 데이터 수신: ${callbackData}`);
+      const userName = getUserName(callbackQuery.from);
+      logger.info(`🔔 콜백 수신: "${callbackQuery.data}" (${userName})`);
 
-      // 콜백 데이터 파싱 (형식: "module:action:param1:param2")
-      const parts = callbackData.split(":");
-      if (parts.length === 0) {
-        logger.error("❌ 콜백 데이터 형식이 잘못됨:", callbackData);
-        await this.sendInvalidCallbackResponse(callbackQuery);
-        return false;
-      }
+      // 콜백 데이터 파싱
+      const callbackData = callbackQuery.data;
+      const [targetModule, subAction, ...paramArray] = callbackData.split(":");
+      const params = paramArray;
 
-      const [targetModule, subAction, ...params] = parts;
-
-      // 특별 처리: main:menu는 system 모듈로 라우팅
+      // main 콜백은 system 모듈로 라우팅
       const moduleKey = targetModule === "main" ? "system" : targetModule;
 
       // 모듈 찾기
@@ -197,7 +338,7 @@ class ModuleManager {
       await this.sendErrorMessage(callbackQuery);
       return false;
     } finally {
-      // 처리 완료 후 제거 (1초 후)
+      // 처리 완료 후 제거
       setTimeout(() => {
         this.processingCallbacks.delete(callbackKey);
       }, 1000);
@@ -250,22 +391,6 @@ class ModuleManager {
   }
 
   /**
-   * 잘못된 콜백 데이터 응답
-   */
-  async sendInvalidCallbackResponse(callbackQuery) {
-    try {
-      if (callbackQuery && callbackQuery.id) {
-        await this.bot.answerCallbackQuery(callbackQuery.id, {
-          text: "⚠️ 잘못된 요청 형식입니다.",
-          show_alert: false,
-        });
-      }
-    } catch (error) {
-      logger.error("잘못된 콜백 응답 실패:", error);
-    }
-  }
-
-  /**
    * 모듈을 찾을 수 없을 때 메시지
    */
   async sendModuleNotFoundMessage(callbackQuery) {
@@ -281,16 +406,21 @@ class ModuleManager {
       // ✅ 메시지 수정 시 안전 체크
       if (callbackQuery && callbackQuery.message) {
         await this.bot.editMessageText(
-          "⚠️ **기능을 찾을 수 없음**\n\n요청하신 기능이 현재 비활성화되어 있거나 존재하지 않습니다.\n\n🏠 /start 명령어로 메인 메뉴로 돌아가세요.",
+          "⚠️ **기능을 찾을 수 없음**\n\n요청하신 기능이 현재 비활성화되어 있거나 존재하지 않습니다.",
           {
             chat_id: callbackQuery.message.chat.id,
             message_id: callbackQuery.message.message_id,
             parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+              ],
+            },
           }
         );
       }
     } catch (error) {
-      logger.error("모듈 찾을 수 없음 메시지 전송 실패:", error);
+      logger.error("모듈 없음 메시지 전송 실패:", error);
     }
   }
 
@@ -303,18 +433,23 @@ class ModuleManager {
       if (callbackQuery && callbackQuery.id) {
         await this.bot.answerCallbackQuery(callbackQuery.id, {
           text: "❌ 처리 중 오류가 발생했습니다.",
-          show_alert: false,
+          show_alert: true,
         });
       }
 
       // ✅ 메시지 수정 시 안전 체크
       if (callbackQuery && callbackQuery.message) {
         await this.bot.editMessageText(
-          `❌ **처리 중 오류 발생**\n\n시스템에서 일시적인 오류가 발생했습니다.\n\n**해결 방법:**\n• 잠시 후 다시 시도해주세요\n• 문제가 지속되면 /start 명령어를 사용하세요\n\n⏰ ${TimeHelper.getCurrentTime()}`,
+          "❌ **오류 발생**\n\n처리 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.",
           {
             chat_id: callbackQuery.message.chat.id,
             message_id: callbackQuery.message.message_id,
             parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+              ],
+            },
           }
         );
       }
@@ -324,55 +459,69 @@ class ModuleManager {
   }
 
   /**
-   * 특정 모듈 인스턴스 반환
+   * 특정 모듈 가져오기
    */
-  getModule(moduleClass) {
-    return this.moduleInstances.get(moduleClass);
+  getModule(moduleName) {
+    return this.moduleInstances.get(moduleName);
   }
 
   /**
-   * 모든 모듈 인스턴스 반환
+   * 모듈 존재 여부 확인
    */
-  getAllModules() {
-    return this.moduleInstances;
+  hasModule(moduleName) {
+    return this.moduleInstances.has(moduleName);
   }
 
   /**
-   * 모듈 상태 확인
+   * 전체 상태 조회
    */
-  getModuleStatus() {
-    const status = {};
-    for (const [className, module] of this.moduleInstances) {
-      status[className] = {
-        initialized: module.isInitialized || false,
-        active: module.isActive !== false,
-        actionCount: module.actionMap?.size || 0,
-      };
+  getStatus() {
+    const moduleStatuses = {};
+
+    for (const [name, module] of this.moduleInstances) {
+      moduleStatuses[name] = module.getStatus ? module.getStatus() : { active: true };
     }
-    return status;
+
+    return {
+      initialized: this.isInitialized,
+      totalModules: this.moduleInstances.size,
+      activeCallbacks: this.processingCallbacks.size,
+      modules: moduleStatuses,
+      services: {
+        timer: this.services.timerService ? "활성" : "비활성",
+        reminder: this.services.reminderService ? "활성" : "비활성",
+      },
+    };
   }
 
   /**
-   * 정리 메서드 (종료 시 호출)
+   * 정리 작업
    */
   async cleanup() {
     logger.info("🧹 ModuleManager 정리 시작...");
 
-    for (const [className, module] of this.moduleInstances) {
+    // 서비스 정리
+    if (this.services.timerService) {
+      await this.services.timerService.cleanup();
+    }
+
+    // 모든 모듈 정리
+    for (const [name, module] of this.moduleInstances) {
       try {
         if (module.cleanup) {
           await module.cleanup();
-          logger.debug(`✅ ${className} 정리 완료`);
         }
+        logger.debug(`✅ ${name} 정리 완료`);
       } catch (error) {
-        logger.error(`❌ ${className} 정리 실패:`, error);
+        logger.error(`❌ ${name} 정리 실패:`, error);
       }
     }
 
     this.moduleInstances.clear();
     this.processingCallbacks.clear();
+    this.isInitialized = false;
 
-    logger.info("🧹 ModuleManager 정리 완료");
+    logger.info("✅ ModuleManager 정리 완료");
   }
 }
 
