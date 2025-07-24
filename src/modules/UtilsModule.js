@@ -421,7 +421,7 @@ class UtilsModule extends BaseModule {
     }
   }
 
-  async initialize() {
+  async onInitialize() {
     try {
       // TTS 진단 실행 (안전하게)
       if (this.ttsService) {
@@ -431,10 +431,12 @@ class UtilsModule extends BaseModule {
           logger.info("✅ TTS 진단 완료");
         } catch (diagError) {
           logger.warn("⚠️ TTS 진단 실패:", diagError.message);
+          // TTS 실패해도 계속 진행
         }
       }
 
-      await super.initialize();
+      // ❌ await super.initialize(); 제거! - 무한 재귀 방지
+
       logger.success("✅ UtilsModule 초기화 완료");
     } catch (error) {
       logger.error("❌ UtilsModule 초기화 실패:", error);

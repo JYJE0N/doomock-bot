@@ -46,6 +46,23 @@ class TimerModule extends BaseModule {
     });
   }
 
+  async onInitialize() {
+    try {
+      // TimerService 초기화
+      const TimerService = require("../services/TimerService");
+      this.timerService = new TimerService(this.db);
+
+      if (this.timerService.initialize) {
+        await this.timerService.initialize();
+      }
+
+      logger.info("✅ TimerModule 초기화 완료");
+    } catch (error) {
+      logger.error("❌ TimerModule 초기화 실패:", error);
+      throw error;
+    }
+  }
+
   async handleMessage(bot, msg) {
     const {
       chat: { id: chatId },
