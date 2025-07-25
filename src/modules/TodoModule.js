@@ -439,7 +439,6 @@ ${userName}님의 할일 현황:
     // 상태 초기화
     this.clearUserState(userId);
 
-    // 취소 확인
     if (text.toLowerCase() === "/cancel" || text === "취소") {
       await this.sendMessage(bot, chatId, "✅ 할일 추가가 취소되었습니다.", {
         reply_markup: {
@@ -455,6 +454,7 @@ ${userName}님의 할일 현황:
       // 할일 추가
       const todo = await this.todoService.addTodo(userId, text);
 
+      // ✅ TimeHelper를 직접 사용하도록 수정
       const successText = `✅ **할일이 추가되었습니다!**
 
 📝 **${todo.text}**
@@ -482,7 +482,8 @@ ${userName}님의 할일 현황:
         errorMessage = `❌ ${error.message}`;
       }
 
-      await this.sendError(bot, chatId, errorMessage);
+      // ✅ sendError 대신 sendMessage 사용
+      await this.sendMessage(bot, chatId, errorMessage);
     }
   }
 
