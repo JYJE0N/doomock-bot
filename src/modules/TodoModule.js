@@ -1,5 +1,5 @@
 // src/modules/TodoModule.js - ServiceBuilder 연동 리팩토링 v3.0.1
-const BaseModule = require("../core/BaseModule");
+const BaseModule = require("./BaseModule");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
@@ -240,28 +240,8 @@ class TodoModule extends BaseModule {
 
 원하는 기능을 선택해주세요.`;
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "📋 목록 보기", callback_data: "todo:list" },
-            { text: "➕ 새 할일", callback_data: "todo:add" },
-          ],
-          [
-            { text: "🔍 검색", callback_data: "todo:search" },
-            { text: "📊 통계", callback_data: "todo:stats" },
-          ],
-          [
-            { text: "⚙️ 설정", callback_data: "todo:settings" },
-            { text: "❓ 도움말", callback_data: "todo:help" },
-          ],
-          [{ text: "🧹 완료된 할일 정리", callback_data: "todo:clear" }],
-          [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-        ],
-      };
-
-      await this.editMessage(bot, chatId, messageId, menuText, {
-        reply_markup: keyboard,
-      });
+      // ✅ 순수하게 텍스트만 반환 (NavigationHandler가 키보드 생성)
+      await this.editMessage(bot, chatId, messageId, menuText);
 
       return true;
     } catch (error) {
@@ -305,13 +285,8 @@ class TodoModule extends BaseModule {
 • 최대 할일: ${this.config.maxTodos}개
 • 알림: ${this.config.enableNotifications ? "활성" : "비활성"}`;
 
-    const keyboard = {
-      inline_keyboard: [[{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }]],
-    };
-
-    await this.editMessage(bot, chatId, messageId, helpText, {
-      reply_markup: keyboard,
-    });
+    // ✅ 순수하게 텍스트만 반환 (NavigationHandler가 키보드 생성)
+    await this.editMessage(bot, chatId, messageId, helpText);
 
     return true;
   }
@@ -379,82 +354,8 @@ class TodoModule extends BaseModule {
         listText += `📊 전체 ${totalCount}개 할일`;
       }
 
-      // 키보드 구성
-      const keyboard = { inline_keyboard: [] };
-
-      // 할일 조작 버튼들
-      if (items.length > 0) {
-        const todoButtons = [];
-        items.forEach((todo, index) => {
-          const toggleText = todo.completed ? "↩️" : "✅";
-          todoButtons.push({
-            text: `${index + 1}${toggleText}`,
-            callback_data: `todo:toggle:${todo._id}`,
-          });
-        });
-
-        // 할일 버튼들을 3개씩 나누어 배치
-        for (let i = 0; i < todoButtons.length; i += 3) {
-          keyboard.inline_keyboard.push(todoButtons.slice(i, i + 3));
-        }
-      }
-
-      // 페이지네이션
-      if (totalPages > 1) {
-        const paginationRow = [];
-
-        if (currentPage > 1) {
-          paginationRow.push({
-            text: "⬅️ 이전",
-            callback_data: `todo:list:${currentPage - 1}:${filter}`,
-          });
-        }
-
-        paginationRow.push({
-          text: `${currentPage}/${totalPages}`,
-          callback_data: "todo:list:1",
-        });
-
-        if (currentPage < totalPages) {
-          paginationRow.push({
-            text: "다음 ➡️",
-            callback_data: `todo:list:${currentPage + 1}:${filter}`,
-          });
-        }
-
-        keyboard.inline_keyboard.push(paginationRow);
-      }
-
-      // 필터 버튼들
-      const filterRow = [
-        {
-          text: filter === "all" ? "🔵 전체" : "⚪ 전체",
-          callback_data: `todo:list:1:all`,
-        },
-        {
-          text: filter === "active" ? "🔵 진행중" : "⚪ 진행중",
-          callback_data: `todo:list:1:active`,
-        },
-        {
-          text: filter === "completed" ? "🔵 완료" : "⚪ 완료",
-          callback_data: `todo:list:1:completed`,
-        },
-      ];
-      keyboard.inline_keyboard.push(filterRow);
-
-      // 기능 버튼들
-      keyboard.inline_keyboard.push([
-        { text: "➕ 새 할일", callback_data: "todo:add" },
-        { text: "🔍 검색", callback_data: "todo:search" },
-      ]);
-
-      keyboard.inline_keyboard.push([
-        { text: "🔙 할일 메뉴", callback_data: "todo:menu" },
-      ]);
-
-      await this.editMessage(bot, chatId, messageId, listText, {
-        reply_markup: keyboard,
-      });
+      // ✅ 순수하게 텍스트만 반환 (NavigationHandler가 키보드 생성)
+      await this.editMessage(bot, chatId, messageId, listText);
 
       return true;
     } catch (error) {
@@ -495,13 +396,8 @@ class TodoModule extends BaseModule {
 
 ❌ 취소하려면 /cancel 을 입력하세요.`;
 
-      const keyboard = {
-        inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
-      };
-
-      await this.editMessage(bot, chatId, messageId, addText, {
-        reply_markup: keyboard,
-      });
+      // ✅ 순수하게 텍스트만 반환 (NavigationHandler가 키보드 생성)
+      await this.editMessage(bot, chatId, messageId, addText);
 
       return true;
     } catch (error) {
@@ -628,19 +524,8 @@ ${stats.priorities
 • 오늘 완료: ${stats.todayCompleted}개
 • 마지막 활동: ${TimeHelper.format(stats.lastActivity, "relative")}`;
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "📈 상세 분석", callback_data: "todo:analytics" },
-            { text: "📋 목록 보기", callback_data: "todo:list" },
-          ],
-          [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
-        ],
-      };
-
-      await this.editMessage(bot, chatId, messageId, statsText, {
-        reply_markup: keyboard,
-      });
+      // ✅ 순수하게 텍스트만 반환 (NavigationHandler가 키보드 생성)
+      await this.editMessage(bot, chatId, messageId, statsText);
 
       return true;
     } catch (error) {
@@ -848,22 +733,8 @@ ${stats.priorities
 
 버튼을 클릭해서 더 많은 기능을 사용하세요.`;
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "📋 목록 보기", callback_data: "todo:list" },
-            { text: "➕ 새 할일", callback_data: "todo:add" },
-          ],
-          [
-            { text: "📊 통계", callback_data: "todo:stats" },
-            { text: "❓ 도움말", callback_data: "todo:help" },
-          ],
-        ],
-      };
-
-      await this.sendMessage(bot, chatId, menuText, {
-        reply_markup: keyboard,
-      });
+      // ✅ 순수하게 텍스트만 반환 (NavigationHandler가 키보드 생성)
+      await this.sendMessage(bot, chatId, menuText);
     } catch (error) {
       logger.error("❌ 할일 메뉴 전송 실패:", error);
       await this.sendMessage(bot, chatId, "❌ 메뉴를 불러올 수 없습니다.");
