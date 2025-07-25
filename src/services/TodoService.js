@@ -299,6 +299,53 @@ class TodoService extends BaseService {
     }
   }
 
+  async getUserDetailedStats(userId) {
+    try {
+      if (!this.collection) {
+        return {
+          success: false,
+          error: "데이터베이스 연결이 없습니다",
+          stats: this.getDefaultStats(),
+        };
+      }
+
+      const totalCount = await this.collection.countDocuments({ userId });
+      const completedCount = await this.collection.countDocuments({
+        userId,
+        completed: true,
+      });
+      const activeCount = totalCount - completedCount;
+
+      return {
+        success: true,
+        stats: {
+          total: totalCount,
+          completed: completedCount,
+          active: activeCount,
+          completionRate:
+            totalCount > 0
+              ? Math.round((completedCount / totalCount) * 100)
+              : 0,
+        },
+      };
+    } catch (error) {
+      logger.error("통계 조회 오류:", error);
+      return {
+        success: false,
+        error: error.message,
+        stats: this.getDefaultStats(),
+      };
+    }
+  }
+
+  getDefaultStats() {
+    return {
+      total: 0,
+      completed: 0,
+      active: 0,
+      completionRate: 0,
+    };
+  }
   // ===== 통계 메서드 =====
 
   /**

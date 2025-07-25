@@ -3,6 +3,7 @@
 const axios = require("axios");
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 
 class WeatherService extends BaseService {
   constructor() {
@@ -41,7 +42,7 @@ class WeatherService extends BaseService {
       };
 
       // 매핑된 도시명 사용
-      const mappedCity = cityMap[city] || city;
+      const mappedCity = this.cityMapping[city] || city;
 
       const cacheKey = `current_${city}`;
       const cached = this.getFromCache(cacheKey);
@@ -61,10 +62,10 @@ class WeatherService extends BaseService {
 
       const url = `${this.baseUrl}/weather`;
       const params = {
-        q: mappedCity, // ✅ 매핑된 도시명 사용
+        q: mappedCity,
         appid: this.apiKey,
-        lang: this.language,
-        units: this.units,
+        units: "metric",
+        lang: "kr",
       };
 
       logger.debug(`날씨 API 요청: ${city} → ${mappedCity}`);

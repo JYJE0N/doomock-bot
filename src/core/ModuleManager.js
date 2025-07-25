@@ -130,20 +130,30 @@ class ModuleManager {
   setupServiceEventListeners() {
     // 🎯 타이머 완료 이벤트 처리
     if (this.services.timerService) {
-      this.services.timerService.onTimerComplete(async (completionData) => {
-        await this.handleTimerCompletion(completionData);
-      });
+      // 메서드가 존재하는지 확인
+      if (typeof this.services.timerService.onTimerComplete === "function") {
+        this.services.timerService.onTimerComplete(async (completionData) => {
+          await this.handleTimerCompletion(completionData);
+        });
+      } else {
+        logger.warn("⚠️ TimerService에 onTimerComplete 메서드가 없습니다");
+      }
 
-      this.services.timerService.onPomodoroComplete(async (completionData) => {
-        await this.handlePomodoroCompletion(completionData);
-      });
+      if (typeof this.services.timerService.onPomodoroComplete === "function") {
+        this.services.timerService.onPomodoroComplete(
+          async (completionData) => {
+            await this.handlePomodoroCompletion(completionData);
+          }
+        );
+      } else {
+        logger.warn("⚠️ TimerService에 onPomodoroComplete 메서드가 없습니다");
+      }
 
-      logger.success("🎯 타이머 이벤트 리스너 설정 완료");
+      logger.info("🎯 타이머 이벤트 리스너 설정 시도 완료");
     }
 
     // 📅 리마인더 완료 이벤트 처리 (향후 확장)
     if (this.services.reminderService) {
-      // 리마인더 서비스도 이벤트 기반으로 확장 가능
       logger.debug("📅 리마인더 이벤트 리스너 준비됨");
     }
   }

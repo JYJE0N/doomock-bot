@@ -824,6 +824,19 @@ ${userName}님의 할일 현황:
     }
   }
 
+  // 에러 메시지
+  async sendError(chatId, errorMessage = "처리 중 오류가 발생했습니다.") {
+    try {
+      // bot이 cyclic object일 수 있으므로 직접 사용
+      await this.bot.sendMessage(chatId, `❌ ${errorMessage}`, {
+        parse_mode: "Markdown",
+      });
+    } catch (error) {
+      logger.error(`${this.name} 에러 메시지 전송 실패:`, error.message);
+      // 에러 객체 전체를 로깅하지 않고 메시지만 로깅
+    }
+  }
+
   /**
    * 모든 할일 삭제 확인
    */

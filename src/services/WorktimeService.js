@@ -219,7 +219,7 @@ class WorktimeService extends BaseService {
   // 🎯 출근 처리
   async checkIn(userId, checkInTime) {
     try {
-      const today = TimeHelper.getKoreaTime();
+      const today = new Date();
       today.setHours(0, 0, 0, 0);
 
       // 이미 출근했는지 확인
