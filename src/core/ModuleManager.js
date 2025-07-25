@@ -304,7 +304,7 @@ ${message}
   }
 
   /**
-   * 콜백 처리 (기존 로직 유지)
+   * 콜백 처리 (기존 로직 유지) / 중앙 라우터
    */
   async handleCallback(callbackQuery) {
     const callbackKey = `${callbackQuery.from.id}-${callbackQuery.id}`;
@@ -326,8 +326,15 @@ ${message}
       const [targetModule, subAction, ...paramArray] = callbackData.split(":");
       const params = paramArray;
 
-      // main 콜백은 system 모듈로 라우팅
-      const moduleKey = targetModule === "main" ? "system" : targetModule;
+      // ✅ main 콜백은 system 모듈로 라우팅
+      let moduleKey = targetModule;
+      let actualSubAction = subAction;
+
+      if (targetModule === "main") {
+        moduleKey = "system";
+        // main:menu → system 모듈의 showMainMenu 액션으로 변환
+        actualSubAction = subAction === "menu" ? "menu" : subAction;
+      }
 
       // 모듈 찾기
       const moduleClass = this.findModuleClass(moduleKey);
@@ -353,10 +360,14 @@ ${message}
       }
 
       // 모듈의 handleCallback 호출 (표준 매개변수 전달)
+      logger.debug(
+        `🎯 ${moduleClass}.handleCallback 호출: action=${actualSubAction || "menu"}`
+      );
+
       const handled = await module.handleCallback(
         this.bot,
         callbackQuery,
-        subAction || "menu", // subAction이 없으면 기본값 "menu"
+        actualSubAction || "menu", // subAction이 없으면 기본값 "menu"
         params,
         this
       );
@@ -464,15 +475,6 @@ ${message}
    */
   async sendErrorMessage(callbackQuery) {
     try {
-      // ✅ 안전한 콜백 응답
-      if (callbackQuery && callbackQuery.id) {
-        await this.bot.answerCallbackQuery(callbackQuery.id, {
-          text: "❌ 처리 중 오류가 발생했습니다.",
-          show_alert: true,
-        });
-      }
-
-      // ✅ 메시지 수정 시 안전 체크
       if (callbackQuery && callbackQuery.message) {
         await this.bot.editMessageText(
           "❌ **오류 발생**\n\n처리 중 문제가 발생했습니다.\n잠시 후 다시 시도해주세요.",

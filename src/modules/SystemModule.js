@@ -96,34 +96,64 @@ class SystemModule extends BaseModule {
 
       const userName = getUserName(callbackQuery.from);
 
-      const menuText = `🏠 **메인 메뉴**
+      const text = `🏠 **메인 메뉴**
 
 안녕하세요! ${userName}님!
 무엇을 도와드릴까요?
 
-환경: ${this.config.isRailway ? "Railway" : "로컬"}
+환경: ${this.config.isRailway ? "Railway" : "Local"}
 버전: v${this.config.version}`;
 
-      const keyboard = this.createMainMenuKeyboard(moduleManager);
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📝 할일 관리", callback_data: "todo:menu" },
+            { text: "⏰ 타이머", callback_data: "timer:menu" },
+          ],
+          [
+            { text: "🕐 근무시간", callback_data: "worktime:menu" },
+            { text: "🏖️ 휴가관리", callback_data: "leave:menu" },
+          ],
+          [
+            { text: "📅 리마인더", callback_data: "reminder:menu" },
+            { text: "🔮 운세", callback_data: "fortune:menu" },
+          ],
+          [
+            { text: "☁️ 날씨", callback_data: "weather:menu" },
+            { text: "🔧 유틸리티", callback_data: "utils:menu" },
+          ],
+          [
+            { text: "⚙️ 설정", callback_data: "system:settings" },
+            { text: "❓ 도움말", callback_data: "system:help" },
+          ],
+        ],
+      };
 
-      await this.editMessage(bot, chatId, messageId, menuText, {
+      await this.editMessage(bot, chatId, messageId, text, {
         reply_markup: keyboard,
       });
+
+      return true; // 처리 성공
     } catch (error) {
       logger.error("메인 메뉴 표시 오류:", error);
 
-      // 에러 발생 시 새 메시지로 전송
-      try {
-        const chatId =
-          callbackQuery.message?.chat?.id || callbackQuery.chat?.id;
-        await this.sendMessage(bot, chatId, "🏠 메인 메뉴로 돌아갑니다.", {
-          reply_markup: this.createMainMenuKeyboard(moduleManager),
-        });
-      } catch (sendError) {
-        logger.error("메인 메뉴 전송 실패:", sendError);
+      // 에러 발생시 안전한 처리
+      if (callbackQuery && callbackQuery.message) {
+        try {
+          await this.sendMessage(
+            bot,
+            callbackQuery.message.chat.id,
+            "❌ 메인 메뉴를 표시하는 중 오류가 발생했습니다."
+          );
+        } catch (sendError) {
+          logger.error("에러 메시지 전송 실패:", sendError);
+        }
       }
+
+      return false;
     }
   }
+
   // 메인 메뉴 키보드 생성 메서드 추가
   createMainMenuKeyboard(moduleManager) {
     return {
@@ -161,15 +191,14 @@ class SystemModule extends BaseModule {
     } = msg;
     const userName = getUserName(from);
 
-    const welcomeText = `🎉 **환영합니다!**
+    const welcomeText = `🏠 **두목봇 v${this.config.version}**
 
 안녕하세요 ${userName}님!
 저는 당신의 업무를 도와드리는 두목봇입니다.
 
 아래 메뉴에서 원하는 기능을 선택해주세요.
 
-환경: ${this.config.isRailway ? "Railway" : "Local"}
-버전: v${this.config.version}`;
+환경: ${this.config.isRailway ? "Railway" : "Local"}`;
 
     const keyboard = {
       inline_keyboard: [
@@ -200,7 +229,6 @@ class SystemModule extends BaseModule {
       reply_markup: keyboard,
     });
   }
-
   /**
    * 도움말 표시
    */
