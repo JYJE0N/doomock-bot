@@ -1,9 +1,9 @@
-// src/core/ValidationManager.js - v3.0.1 중앙 검증 시스템
+// src/utils/ValidationHelper.js - v3.0.1 수정된 중앙 검증 시스템
 const logger = require("./Logger");
 const TimeHelper = require("./TimeHelper");
 
 /**
- * 🛡️ 중앙 검증 시스템 v3.0.1
+ * 🛡️ 중앙 검증 시스템 v3.0.1 (callbackData 스키마 추가)
  *
  * 🎯 핵심 개념:
  * - 모든 검증을 한곳에서 중앙 집중식 관리
@@ -12,17 +12,10 @@ const TimeHelper = require("./TimeHelper");
  * - 재사용 가능한 검증 규칙
  * - Railway 환경 최적화
  *
- * 📊 장점:
- * - 중복 코드 완전 제거
- * - 일관된 검증 로직
- * - 성능 향상 (캐싱)
- * - 유지보수성 극대화
- * - 확장성 보장
- *
- * 🔧 사용법:
- * ValidationManager.validate('todo', data) // 스키마 기반
- * ValidationManager.validateBatch(requests) // 배치 처리
- * ValidationManager.addSchema(name, schema) // 스키마 추가
+ * ✅ 수정 사항:
+ * - callbackData 스키마 추가 (누락된 스키마)
+ * - 더 안전한 에러 처리
+ * - 기본 스키마 완성
  */
 class ValidationManager {
   constructor(options = {}) {
@@ -57,16 +50,108 @@ class ValidationManager {
     // 🌍 Railway 환경 최적화 제한값
     this.railwayLimits = this.getRailwayOptimizedLimits();
 
+    // 🛡️ 기본 검증 규칙들
+    this.validators = this.createValidators();
+
     // 📝 기본 스키마 등록
     this.registerDefaultSchemas();
 
-    logger.info("🛡️ ValidationManager v3.0.1 초기화됨");
+    logger.info(
+      "🛡️ ValidationManager v3.0.1 초기화됨 (callbackData 스키마 포함)"
+    );
   }
 
   /**
-   * 📝 기본 스키마 등록
+   * 🌍 Railway 환경 최적화 제한값
+   */
+  getRailwayOptimizedLimits() {
+    const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+
+    return {
+      maxTodoLength: isRailway ? 500 : 1000,
+      maxDescriptionLength: isRailway ? 1000 : 2000,
+      maxTagsCount: isRailway ? 5 : 10,
+      maxTagLength: isRailway ? 20 : 50,
+      minSearchLength: 1,
+      maxSearchLength: isRailway ? 100 : 200,
+      maxCallbackDataLength: 64, // Telegram 제한
+    };
+  }
+
+  /**
+   * 🛡️ 기본 검증 규칙 생성
+   */
+  createValidators() {
+    return {
+      // 텍스트 내용 의미성 검사
+      meaningfulContent: (value) => {
+        if (typeof value !== "string") return true;
+        const meaningfulPattern = /[가-힣a-zA-Z0-9]/;
+        return meaningfulPattern.test(value) || "의미있는 내용을 입력해주세요.";
+      },
+
+      // 과도한 반복 방지
+      noExcessiveRepetition: (value) => {
+        if (typeof value !== "string") return true;
+        const repetitionPattern = /(.)\1{4,}/;
+        return (
+          !repetitionPattern.test(value) || "과도한 반복은 허용되지 않습니다."
+        );
+      },
+
+      // 금지된 단어 체크
+      noForbiddenWords: (value) => {
+        if (typeof value !== "string") return true;
+        const forbiddenWords = ["spam", "test123", "테스트123"];
+        const lowerValue = value.toLowerCase();
+        const hasForbidden = forbiddenWords.some((word) =>
+          lowerValue.includes(word)
+        );
+        return !hasForbidden || "부적절한 내용이 포함되어 있습니다.";
+      },
+
+      // 악성 컨텐츠 방지
+      noMaliciousContent: (value) => {
+        if (typeof value !== "string") return true;
+        const maliciousPatterns = [/<script/i, /javascript:/i, /on\w+\s*=/i];
+        const hasMalicious = maliciousPatterns.some((pattern) =>
+          pattern.test(value)
+        );
+        return !hasMalicious || "보안 위험 요소가 감지되었습니다.";
+      },
+    };
+  }
+
+  /**
+   * 📝 기본 스키마 등록 (callbackData 포함)
    */
   registerDefaultSchemas() {
+    // 🔹 콜백 데이터 스키마 (누락된 중요 스키마!)
+    this.addSchema("callbackData", {
+      data: {
+        type: "text",
+        required: true,
+        minLength: 1,
+        maxLength: this.railwayLimits.maxCallbackDataLength,
+        pattern: /^[a-zA-Z0-9_:.-]+$/, // 안전한 콜백 데이터 패턴
+        customValidators: [
+          (value) => {
+            // 콜백 데이터 형식 검증: "module:action" 또는 "module:action:params"
+            const validPattern =
+              /^[a-zA-Z0-9_]+:[a-zA-Z0-9_]+(?::[a-zA-Z0-9_.-]*)?$/;
+            return (
+              validPattern.test(value) ||
+              "올바르지 않은 콜백 데이터 형식입니다."
+            );
+          },
+        ],
+      },
+      userId: {
+        type: "number",
+        required: false,
+      },
+    });
+
     // 🔹 할일(Todo) 스키마
     this.addSchema("todo", {
       text: {
@@ -133,6 +218,10 @@ class ValidationManager {
         maxLength: 1000,
         customValidators: [this.validators.noMaliciousContent],
       },
+      userId: {
+        type: "number",
+        required: false,
+      },
     });
 
     // 🔹 검색 스키마
@@ -175,7 +264,9 @@ class ValidationManager {
     });
 
     this.stats.schemaCount = this.schemas.size;
-    logger.debug(`📝 기본 스키마 등록 완료 (${this.stats.schemaCount}개)`);
+    logger.debug(
+      `📝 기본 스키마 등록 완료 (${this.stats.schemaCount}개, callbackData 포함)`
+    );
   }
 
   /**
@@ -239,72 +330,6 @@ class ValidationManager {
   }
 
   /**
-   * 🔄 배치 검증 (여러 데이터 동시 처리)
-   */
-  async validateBatch(requests) {
-    const results = [];
-    const startTime = Date.now();
-
-    try {
-      logger.debug(`🔄 배치 검증 시작 (${requests.length}개)`);
-
-      // 병렬 처리로 성능 최적화
-      const promises = requests.map(async (request, index) => {
-        try {
-          const result = await this.validate(request.schema, request.data, {
-            ...request.options,
-            batchIndex: index,
-          });
-          return { index, result };
-        } catch (error) {
-          return {
-            index,
-            result: {
-              isValid: false,
-              errors: [`배치 검증 오류: ${error.message}`],
-              data: {},
-            },
-          };
-        }
-      });
-
-      const batchResults = await Promise.all(promises);
-
-      // 결과 정렬 (원래 순서 유지)
-      batchResults.sort((a, b) => a.index - b.index);
-
-      for (const { result } of batchResults) {
-        results.push(result);
-      }
-
-      const totalTime = Date.now() - startTime;
-      logger.debug(`✅ 배치 검증 완료 (${totalTime}ms)`);
-
-      return {
-        results,
-        summary: {
-          total: requests.length,
-          valid: results.filter((r) => r.isValid).length,
-          invalid: results.filter((r) => !r.isValid).length,
-          processingTime: totalTime,
-        },
-      };
-    } catch (error) {
-      logger.error("❌ 배치 검증 실패:", error);
-      return {
-        results: [],
-        summary: {
-          total: requests.length,
-          valid: 0,
-          invalid: requests.length,
-          processingTime: Date.now() - startTime,
-          error: error.message,
-        },
-      };
-    }
-  }
-
-  /**
    * 🔧 실제 검증 수행
    */
   async performValidation(schema, data, options = {}) {
@@ -337,20 +362,6 @@ class ValidationManager {
       }
     }
 
-    // 전체 데이터 검증 (필드 간 관계 체크)
-    if (overallValid && schema._globalValidators) {
-      const globalResult = await this.runGlobalValidators(
-        schema._globalValidators,
-        validatedData,
-        options
-      );
-
-      if (!globalResult.isValid) {
-        overallValid = false;
-        allErrors._global = globalResult.errors;
-      }
-    }
-
     return {
       isValid: overallValid,
       errors: allErrors,
@@ -368,531 +379,268 @@ class ValidationManager {
    * 🔍 개별 필드 검증
    */
   async validateField(fieldName, value, fieldSchema, options = {}) {
+    const errors = [];
+    let processedValue = value;
+
     // 기본값 처리
     if (
       (value === undefined || value === null) &&
       fieldSchema.defaultValue !== undefined
     ) {
-      value = fieldSchema.defaultValue;
+      processedValue = fieldSchema.defaultValue;
     }
 
     // 필수 필드 체크
     if (
       fieldSchema.required &&
-      (value === undefined || value === null || value === "")
+      (processedValue === undefined ||
+        processedValue === null ||
+        processedValue === "")
     ) {
-      return {
-        isValid: false,
-        errors: [`${fieldName}은(는) 필수 입력 항목입니다.`],
-        value: null,
-      };
+      errors.push(`${fieldName}은(는) 필수 항목입니다.`);
+      return { isValid: false, errors, value: processedValue };
     }
 
-    // 선택적 필드가 비어있으면 통과
+    // 값이 없으면 더 이상 검증하지 않음
     if (
-      !fieldSchema.required &&
-      (value === undefined || value === null || value === "")
+      processedValue === undefined ||
+      processedValue === null ||
+      processedValue === ""
     ) {
-      return {
-        isValid: true,
-        errors: [],
-        value: fieldSchema.defaultValue || null,
-      };
+      return { isValid: true, errors: [], value: processedValue };
     }
 
     // 타입별 검증
     switch (fieldSchema.type) {
       case "text":
-        return this.validateText(value, fieldSchema, fieldName);
+        const textResult = this.validateText(processedValue, fieldSchema);
+        if (!textResult.isValid) {
+          errors.push(...textResult.errors);
+        }
+        processedValue = textResult.value;
+        break;
 
-      case "category":
-        return this.validateCategory(value, fieldSchema, fieldName);
-
+      case "number":
       case "range":
-        return this.validateRange(value, fieldSchema, fieldName);
-
-      case "tags":
-        return this.validateTags(value, fieldSchema, fieldName);
-
-      case "date":
-        return this.validateDate(value, fieldSchema, fieldName);
+        const numberResult = this.validateNumber(processedValue, fieldSchema);
+        if (!numberResult.isValid) {
+          errors.push(...numberResult.errors);
+        }
+        processedValue = numberResult.value;
+        break;
 
       case "boolean":
-        return this.validateBoolean(value, fieldSchema, fieldName);
+        const boolResult = this.validateBoolean(processedValue, fieldSchema);
+        if (!boolResult.isValid) {
+          errors.push(...boolResult.errors);
+        }
+        processedValue = boolResult.value;
+        break;
 
+      case "category":
       case "choice":
-        return this.validateChoice(value, fieldSchema, fieldName);
+        const choiceResult = this.validateChoice(processedValue, fieldSchema);
+        if (!choiceResult.isValid) {
+          errors.push(...choiceResult.errors);
+        }
+        processedValue = choiceResult.value;
+        break;
 
-      case "object":
-        return this.validateObject(value, fieldSchema, fieldName, options);
+      case "date":
+        const dateResult = this.validateDate(processedValue, fieldSchema);
+        if (!dateResult.isValid) {
+          errors.push(...dateResult.errors);
+        }
+        processedValue = dateResult.value;
+        break;
+
+      case "tags":
+        const tagsResult = this.validateTags(processedValue, fieldSchema);
+        if (!tagsResult.isValid) {
+          errors.push(...tagsResult.errors);
+        }
+        processedValue = tagsResult.value;
+        break;
 
       default:
-        logger.warn(`알 수 없는 검증 타입: ${fieldSchema.type}`);
-        return {
-          isValid: true,
-          errors: [],
-          value,
-        };
+        logger.warn(`알 수 없는 필드 타입: ${fieldSchema.type}`);
     }
+
+    // 커스텀 검증자 실행
+    if (
+      fieldSchema.customValidators &&
+      Array.isArray(fieldSchema.customValidators)
+    ) {
+      for (const validator of fieldSchema.customValidators) {
+        try {
+          const result = validator(processedValue);
+          if (result !== true) {
+            errors.push(
+              typeof result === "string" ? result : `${fieldName} 검증 실패`
+            );
+          }
+        } catch (error) {
+          errors.push(`커스텀 검증 오류: ${error.message}`);
+        }
+      }
+    }
+
+    // 패턴 검증
+    if (fieldSchema.pattern && typeof processedValue === "string") {
+      if (!fieldSchema.pattern.test(processedValue)) {
+        errors.push(`${fieldName}의 형식이 올바르지 않습니다.`);
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      value: processedValue,
+    };
   }
 
   /**
    * 📝 텍스트 검증
    */
-  validateText(value, schema, fieldName) {
+  validateText(value, schema) {
     const errors = [];
+    let processedValue = String(value);
 
-    if (typeof value !== "string") {
-      return {
-        isValid: false,
-        errors: [`${fieldName}은(는) 텍스트여야 합니다.`],
-        value: null,
-      };
+    // 길이 검증
+    if (schema.minLength && processedValue.length < schema.minLength) {
+      errors.push(`최소 ${schema.minLength}글자 이상 입력해주세요.`);
     }
 
-    const trimmed = value.trim();
-
-    // 길이 체크
-    if (schema.minLength && trimmed.length < schema.minLength) {
-      errors.push(
-        `${fieldName}은(는) 최소 ${schema.minLength}자 이상이어야 합니다.`
-      );
-    }
-
-    if (schema.maxLength && trimmed.length > schema.maxLength) {
-      errors.push(
-        `${fieldName}은(는) 최대 ${schema.maxLength}자까지 입력 가능합니다.`
-      );
-    }
-
-    // 줄바꿈 체크
-    if (!schema.allowLineBreaks && /\n|\r/.test(trimmed)) {
-      errors.push(`${fieldName}에는 줄바꿈을 사용할 수 없습니다.`);
-    }
-
-    // 이모지 체크
-    if (!schema.allowEmoji && this.containsEmoji(trimmed)) {
-      errors.push(`${fieldName}에는 이모지를 사용할 수 없습니다.`);
-    }
-
-    // HTML 태그 체크 (보안)
-    if (this.containsHtmlTags(trimmed)) {
-      errors.push(`${fieldName}에는 HTML 태그를 사용할 수 없습니다.`);
-    }
-
-    // 커스텀 검증자 실행
-    if (schema.customValidators) {
-      for (const validator of schema.customValidators) {
-        const customResult = validator(trimmed, fieldName);
-        if (!customResult.isValid) {
-          errors.push(...customResult.errors);
-        }
-      }
+    if (schema.maxLength && processedValue.length > schema.maxLength) {
+      errors.push(`최대 ${schema.maxLength}글자까지 입력 가능합니다.`);
     }
 
     return {
       isValid: errors.length === 0,
       errors,
-      value: trimmed,
+      value: processedValue,
     };
   }
 
   /**
-   * 🏷️ 카테고리 검증
+   * 🔢 숫자 검증
    */
-  validateCategory(value, schema, fieldName) {
-    if (typeof value !== "string") {
-      return {
-        isValid: false,
-        errors: [`${fieldName}은(는) 문자열이어야 합니다.`],
-        value: null,
-      };
-    }
-
-    const normalized = value.trim().toLowerCase();
-
-    // 허용된 값 체크
-    if (schema.allowedValues && !schema.allowedValues.includes(normalized)) {
-      return {
-        isValid: false,
-        errors: [`허용된 ${fieldName}: ${schema.allowedValues.join(", ")}`],
-        value: null,
-      };
-    }
-
-    return {
-      isValid: true,
-      errors: [],
-      value: normalized,
-    };
-  }
-
-  /**
-   * 🔢 범위 검증
-   */
-  validateRange(value, schema, fieldName) {
-    const num = parseInt(value);
-
-    if (isNaN(num)) {
-      return {
-        isValid: false,
-        errors: [`${fieldName}은(는) 숫자여야 합니다.`],
-        value: null,
-      };
-    }
-
+  validateNumber(value, schema) {
     const errors = [];
+    let processedValue = Number(value);
 
-    if (schema.min !== undefined && num < schema.min) {
-      errors.push(`${fieldName}은(는) ${schema.min} 이상이어야 합니다.`);
+    if (isNaN(processedValue)) {
+      errors.push("유효한 숫자를 입력해주세요.");
+      return { isValid: false, errors, value: processedValue };
     }
 
-    if (schema.max !== undefined && num > schema.max) {
-      errors.push(`${fieldName}은(는) ${schema.max} 이하여야 합니다.`);
+    if (schema.min !== undefined && processedValue < schema.min) {
+      errors.push(`최소값은 ${schema.min}입니다.`);
+    }
+
+    if (schema.max !== undefined && processedValue > schema.max) {
+      errors.push(`최대값은 ${schema.max}입니다.`);
     }
 
     return {
       isValid: errors.length === 0,
       errors,
-      value: num,
-    };
-  }
-
-  /**
-   * 🏷️ 태그 검증
-   */
-  validateTags(value, schema, fieldName) {
-    if (!Array.isArray(value)) {
-      return {
-        isValid: false,
-        errors: [`${fieldName}은(는) 배열이어야 합니다.`],
-        value: null,
-      };
-    }
-
-    const errors = [];
-    const validTags = [];
-
-    // 개수 체크
-    if (schema.maxCount && value.length > schema.maxCount) {
-      errors.push(
-        `${fieldName}은(는) 최대 ${schema.maxCount}개까지 가능합니다.`
-      );
-    }
-
-    // 각 태그 검증
-    for (const tag of value) {
-      if (typeof tag !== "string") {
-        errors.push("태그는 문자열이어야 합니다.");
-        continue;
-      }
-
-      const trimmed = tag.trim();
-
-      if (trimmed.length === 0) {
-        continue; // 빈 태그 무시
-      }
-
-      if (schema.maxTagLength && trimmed.length > schema.maxTagLength) {
-        errors.push(`태그는 최대 ${schema.maxTagLength}자까지 가능합니다.`);
-        continue;
-      }
-
-      if (!/^[a-zA-Z0-9가-힣\s_-]+$/.test(trimmed)) {
-        errors.push(
-          `태그에 허용되지 않은 문자가 포함되어 있습니다: ${trimmed}`
-        );
-        continue;
-      }
-
-      validTags.push(trimmed);
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      value: validTags,
-    };
-  }
-
-  /**
-   * 📅 날짜 검증
-   */
-  validateDate(value, schema, fieldName) {
-    if (!value) {
-      return {
-        isValid: true,
-        errors: [],
-        value: null,
-      };
-    }
-
-    const date = new Date(value);
-
-    if (isNaN(date.getTime())) {
-      return {
-        isValid: false,
-        errors: [`${fieldName}이(가) 올바른 날짜 형식이 아닙니다.`],
-        value: null,
-      };
-    }
-
-    const errors = [];
-    const now = new Date();
-
-    // 미래 날짜만 허용
-    if (schema.futureOnly && date <= now) {
-      errors.push(`${fieldName}은(는) 미래 날짜여야 합니다.`);
-    }
-
-    // 과거 날짜만 허용
-    if (schema.pastOnly && date >= now) {
-      errors.push(`${fieldName}은(는) 과거 날짜여야 합니다.`);
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-      value: date,
+      value: processedValue,
     };
   }
 
   /**
    * ✅ 불린 검증
    */
-  validateBoolean(value, schema, fieldName) {
-    if (typeof value === "boolean") {
-      return {
-        isValid: true,
-        errors: [],
-        value,
-      };
-    }
-
-    // 문자열을 불린으로 변환 시도
-    if (typeof value === "string") {
-      const lower = value.toLowerCase().trim();
-      if (["true", "1", "yes", "on", "예", "참"].includes(lower)) {
-        return {
-          isValid: true,
-          errors: [],
-          value: true,
-        };
-      }
-      if (["false", "0", "no", "off", "아니오", "거짓"].includes(lower)) {
-        return {
-          isValid: true,
-          errors: [],
-          value: false,
-        };
-      }
-    }
-
-    return {
-      isValid: false,
-      errors: [`${fieldName}은(는) 참/거짓 값이어야 합니다.`],
-      value: null,
-    };
-  }
-
-  /**
-   * 🎯 선택 검증
-   */
-  validateChoice(value, schema, fieldName) {
-    if (typeof value !== "string") {
-      return {
-        isValid: false,
-        errors: [`${fieldName}은(는) 문자열이어야 합니다.`],
-        value: null,
-      };
-    }
-
-    const trimmed = value.trim();
-
-    if (!schema.allowedValues || !schema.allowedValues.includes(trimmed)) {
-      return {
-        isValid: false,
-        errors: [
-          `허용된 ${fieldName}: ${schema.allowedValues?.join(", ") || "없음"}`,
-        ],
-        value: null,
-      };
-    }
+  validateBoolean(value, schema) {
+    const errors = [];
+    let processedValue = Boolean(value);
 
     return {
       isValid: true,
-      errors: [],
-      value: trimmed,
+      errors,
+      value: processedValue,
     };
   }
 
   /**
-   * 📦 객체 검증 (중첩 구조)
+   * 🏷️ 선택값 검증
    */
-  async validateObject(value, schema, fieldName, options) {
-    if (typeof value !== "object" || value === null) {
-      return {
-        isValid: false,
-        errors: [`${fieldName}은(는) 객체여야 합니다.`],
-        value: null,
-      };
+  validateChoice(value, schema) {
+    const errors = [];
+    let processedValue = String(value);
+
+    if (
+      schema.allowedValues &&
+      !schema.allowedValues.includes(processedValue)
+    ) {
+      errors.push(`허용된 값: ${schema.allowedValues.join(", ")}`);
     }
 
-    if (!schema.properties) {
-      return {
-        isValid: true,
-        errors: [],
-        value,
-      };
+    return {
+      isValid: errors.length === 0,
+      errors,
+      value: processedValue,
+    };
+  }
+
+  /**
+   * 📅 날짜 검증
+   */
+  validateDate(value, schema) {
+    const errors = [];
+    let processedValue = new Date(value);
+
+    if (isNaN(processedValue.getTime())) {
+      errors.push("유효한 날짜를 입력해주세요.");
+      return { isValid: false, errors, value: processedValue };
     }
 
-    const validatedObject = {};
-    const allErrors = {};
-    let isValid = true;
+    if (schema.futureOnly && processedValue < new Date()) {
+      errors.push("미래 날짜만 선택 가능합니다.");
+    }
 
-    // 객체의 각 속성 검증
-    for (const [propName, propSchema] of Object.entries(schema.properties)) {
-      const propValue = value[propName];
-      const propResult = await this.validateField(
-        propName,
-        propValue,
-        propSchema,
-        options
-      );
+    return {
+      isValid: errors.length === 0,
+      errors,
+      value: processedValue,
+    };
+  }
 
-      if (!propResult.isValid) {
-        isValid = false;
-        allErrors[propName] = propResult.errors;
-      } else {
-        validatedObject[propName] = propResult.value;
+  /**
+   * 🏷️ 태그 검증
+   */
+  validateTags(value, schema) {
+    const errors = [];
+    let processedValue = Array.isArray(value) ? value : [];
+
+    if (schema.maxCount && processedValue.length > schema.maxCount) {
+      errors.push(`태그는 최대 ${schema.maxCount}개까지 가능합니다.`);
+    }
+
+    if (schema.maxTagLength) {
+      for (const tag of processedValue) {
+        if (String(tag).length > schema.maxTagLength) {
+          errors.push(
+            `각 태그는 최대 ${schema.maxTagLength}글자까지 가능합니다.`
+          );
+          break;
+        }
       }
     }
 
     return {
-      isValid,
-      errors: isValid ? [] : [allErrors],
-      value: validatedObject,
+      isValid: errors.length === 0,
+      errors,
+      value: processedValue,
     };
-  }
-
-  // ===== 🧰 유틸리티 메서드들 =====
-
-  /**
-   * 🧰 커스텀 검증자 정의
-   */
-  get validators() {
-    return {
-      // 과도한 반복 체크
-      noExcessiveRepetition: (text, fieldName) => {
-        const repetitionRegex = /(.)\1{4,}/; // 같은 문자 5번 이상 반복
-        if (repetitionRegex.test(text)) {
-          return {
-            isValid: false,
-            errors: [`${fieldName}에 같은 문자가 과도하게 반복되었습니다.`],
-          };
-        }
-        return { isValid: true, errors: [] };
-      },
-
-      // 의미 있는 내용 체크
-      meaningfulContent: (text, fieldName) => {
-        // 너무 짧거나 의미 없는 내용 체크
-        const meaninglessPatterns = [
-          /^[.,;:!?\s]+$/, // 구두점만
-          /^[0-9\s]+$/, // 숫자만
-          /^[ㅋㅎㅠㅜㅠㅠㅠㅎㅎㅎ\s]+$/, // 한글 자음/모음만
-        ];
-
-        for (const pattern of meaninglessPatterns) {
-          if (pattern.test(text)) {
-            return {
-              isValid: false,
-              errors: [`${fieldName}에 의미 있는 내용을 입력해주세요.`],
-            };
-          }
-        }
-
-        return { isValid: true, errors: [] };
-      },
-
-      // 금지된 단어 체크
-      noForbiddenWords: (text, fieldName) => {
-        const forbiddenWords = [
-          "test",
-          "테스트",
-          "ㅁㄴㅇㄹ",
-          "asdf",
-          "qwer",
-          "스팸",
-          "광고",
-          "홍보",
-        ];
-
-        const foundWords = forbiddenWords.filter((word) =>
-          text.toLowerCase().includes(word.toLowerCase())
-        );
-
-        if (foundWords.length > 0) {
-          return {
-            isValid: false,
-            errors: [
-              `${fieldName}에 사용할 수 없는 단어가 포함되어 있습니다: ${foundWords.join(
-                ", "
-              )}`,
-            ],
-          };
-        }
-
-        return { isValid: true, errors: [] };
-      },
-
-      // 악성 콘텐츠 체크
-      noMaliciousContent: (text, fieldName) => {
-        const maliciousPatterns = [
-          /<script/i,
-          /javascript:/i,
-          /on\w+\s*=/i,
-          /eval\s*\(/i,
-        ];
-
-        for (const pattern of maliciousPatterns) {
-          if (pattern.test(text)) {
-            return {
-              isValid: false,
-              errors: [`${fieldName}에 악성 콘텐츠가 감지되었습니다.`],
-            };
-          }
-        }
-
-        return { isValid: true, errors: [] };
-      },
-    };
-  }
-
-  /**
-   * 🎨 이모지 감지
-   */
-  containsEmoji(text) {
-    const emojiRegex =
-      /[\u{1F600}-\u{1F64F}]|[\u{1F300}-\u{1F5FF}]|[\u{1F680}-\u{1F6FF}]|[\u{1F1E0}-\u{1F1FF}]|[\u{2600}-\u{26FF}]|[\u{2700}-\u{27BF}]/u;
-    return emojiRegex.test(text);
-  }
-
-  /**
-   * 🏷️ HTML 태그 감지
-   */
-  containsHtmlTags(text) {
-    const htmlRegex = /<[^>]*>/;
-    return htmlRegex.test(text);
   }
 
   /**
    * 💾 캐시 관련 메서드들
    */
   getCachedResult(schemaName, data) {
-    if (!this.config.enableCache) return null;
-
-    const cacheKey = this.generateCacheKey(schemaName, data);
+    const cacheKey = this.getCacheKey(schemaName, data);
     const expiry = this.cacheExpiry.get(cacheKey);
 
     if (expiry && Date.now() > expiry) {
@@ -901,67 +649,24 @@ class ValidationManager {
       return null;
     }
 
-    return this.cache.get(cacheKey) || null;
+    return this.cache.get(cacheKey);
   }
 
   cacheResult(schemaName, data, result) {
-    if (!this.config.enableCache) return;
-
-    // 캐시 크기 제한
     if (this.cache.size >= this.config.maxCacheSize) {
-      this.clearOldestCacheEntries();
+      // LRU: 가장 오래된 항목 제거
+      const firstKey = this.cache.keys().next().value;
+      this.cache.delete(firstKey);
+      this.cacheExpiry.delete(firstKey);
     }
 
-    const cacheKey = this.generateCacheKey(schemaName, data);
-    const expiry = Date.now() + this.config.cacheTimeout;
-
+    const cacheKey = this.getCacheKey(schemaName, data);
     this.cache.set(cacheKey, result);
-    this.cacheExpiry.set(cacheKey, expiry);
+    this.cacheExpiry.set(cacheKey, Date.now() + this.config.cacheTimeout);
   }
 
-  generateCacheKey(schemaName, data) {
-    return `${schemaName}:${JSON.stringify(data)}`;
-  }
-
-  clearOldestCacheEntries() {
-    const entriesToRemove = Math.floor(this.config.maxCacheSize * 0.2); // 20% 제거
-    let removed = 0;
-
-    for (const [key, expiry] of this.cacheExpiry.entries()) {
-      if (removed >= entriesToRemove) break;
-
-      this.cache.delete(key);
-      this.cacheExpiry.delete(key);
-      removed++;
-    }
-  }
-
-  /**
-   * 🌍 Railway 환경 최적화 제한값
-   */
-  getRailwayOptimizedLimits() {
-    const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
-
-    const baseLimits = {
-      maxTodoLength: parseInt(process.env.TODO_MAX_TEXT_LENGTH) || 500,
-      maxDescriptionLength:
-        parseInt(process.env.TODO_MAX_DESCRIPTION_LENGTH) || 1000,
-      maxTagLength: parseInt(process.env.TODO_MAX_TAG_LENGTH) || 20,
-      maxTagsCount: parseInt(process.env.TODO_MAX_TAGS_COUNT) || 10,
-      minSearchLength: parseInt(process.env.TODO_MIN_SEARCH_LENGTH) || 2,
-      maxSearchLength: parseInt(process.env.TODO_MAX_SEARCH_LENGTH) || 100,
-    };
-
-    if (isRailway) {
-      return {
-        ...baseLimits,
-        maxTodoLength: Math.min(baseLimits.maxTodoLength, 400),
-        maxDescriptionLength: Math.min(baseLimits.maxDescriptionLength, 800),
-        maxTagsCount: Math.min(baseLimits.maxTagsCount, 8),
-      };
-    }
-
-    return baseLimits;
+  getCacheKey(schemaName, data) {
+    return `${schemaName}_${JSON.stringify(data)}`;
   }
 
   /**
@@ -974,20 +679,19 @@ class ValidationManager {
       this.stats.errorCount++;
     }
 
-    // 평균 검증 시간 계산
-    const totalTime =
-      this.stats.averageValidationTime * (this.stats.totalValidations - 1) +
-      validationTime;
+    // 평균 검증 시간 업데이트
     this.stats.averageValidationTime = Math.round(
-      totalTime / this.stats.totalValidations
+      (this.stats.averageValidationTime * (this.stats.totalValidations - 1) +
+        validationTime) /
+        this.stats.totalValidations
     );
   }
 
   /**
-   * 📝 검증 결과 로깅
+   * 📋 로깅
    */
   logValidationResult(schemaName, result, validationTime) {
-    if (process.env.NODE_ENV === "development") {
+    if (this.config.enableLogging) {
       const logLevel = result.isValid ? "debug" : "warn";
       const message = result.isValid ? "검증 성공" : "검증 실패";
 
