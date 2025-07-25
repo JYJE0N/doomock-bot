@@ -334,8 +334,8 @@ class HealthChecker {
       const issues = [];
       let severity = "healthy";
 
-      // 연결 상태 확인
-      if (!dbManager.isConnected || !dbManager.isConnected()) {
+      // ✅ 수정: isConnected는 속성이므로 함수 호출 제거
+      if (!dbManager.isConnected) {
         issues.push("데이터베이스 연결 끊김");
         severity = "critical";
       }
@@ -346,39 +346,33 @@ class HealthChecker {
         severity = "critical";
       }
 
-      // 통계 확인 (있는 경우)
-      if (dbManager.stats) {
-        const {
-          operations = {},
-          connectionCount = 0,
-          avgResponseTime = 0,
-        } = dbManager.stats;
-
-        // 응답 시간 체크
-        if (avgResponseTime > 5000) {
-          issues.push(`느린 DB 응답: ${avgResponseTime}ms`);
-          severity = avgResponseTime > 10000 ? "critical" : "warning";
+      // ✅ 추가: 실제 연결 상태 핑 테스트
+      try {
+        const pingResult = await dbManager.checkConnection();
+        if (!pingResult) {
+          issues.push("DB 핑 테스트 실패");
+          severity = "critical";
         }
+      } catch (pingError) {
+        issues.push(`DB 연결 테스트 실패: ${pingError.message}`);
+        severity = "critical";
+      }
 
-        // 연결 수 체크
-        if (connectionCount > 100) {
-          issues.push(`높은 연결 수: ${connectionCount}`);
-          severity = connectionCount > 200 ? "critical" : "warning";
-        }
+      // DB 상태 정보 가져오기
+      const dbStatus = dbManager.getStatus();
 
-        // 오퍼레이션 에러율
-        if (operations && operations.total > 0) {
-          const errorRate = operations.errors / operations.total;
-          if (errorRate > 0.05) {
-            issues.push(`높은 DB 에러율: ${Math.round(errorRate * 100)}%`);
-            severity = errorRate > 0.15 ? "critical" : "warning";
-          }
-        }
+      // 연결 시도 횟수가 많으면 경고
+      if (dbStatus.connectionAttempts > 1) {
+        issues.push(`DB 재연결 시도: ${dbStatus.connectionAttempts}회`);
+        severity = severity === "healthy" ? "warning" : severity;
       }
 
       return this.createHealthResult(severity, issues.join(", ") || "정상", {
-        connected: dbManager.isConnected ? dbManager.isConnected() : false,
-        stats: dbManager.stats || {},
+        connected: dbManager.isConnected,
+        database: dbStatus.database,
+        railway: dbStatus.railway,
+        connectionAttempts: dbStatus.connectionAttempts,
+        hasMongoUrl: dbStatus.mongoUrl === "SET",
       });
     } catch (error) {
       logger.error("❌ DatabaseManager 상태 체크 실패:", error);
