@@ -864,10 +864,11 @@ _최근 업데이트: ${TimeHelper.formatDateTime()}_`;
       from: { id: userId },
     } = callbackQuery;
 
-    // 사용자 상태 설정
-    this.setUserState(userId, { action: "waiting_search_input" });
+    try {
+      // 사용자 상태 설정
+      this.setUserState(userId, { action: "waiting_search_input" });
 
-    const searchText = `🔍 **할일 검색**
+      const searchText = `🔍 **할일 검색**
 
 검색할 키워드를 입력해주세요.
 
@@ -875,13 +876,96 @@ _최근 업데이트: ${TimeHelper.formatDateTime()}_`;
 • 할일 내용에서 키워드를 찾습니다
 • 취소하려면 "/cancel" 또는 "취소"를 입력하세요`;
 
-    const keyboard = {
-      inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
-    };
+      const keyboard = {
+        inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
+      };
 
-    await this.editMessage(bot, chatId, messageId, searchText, {
-      reply_markup: keyboard,
-    });
+      await this.editMessage(bot, chatId, messageId, searchText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("검색 시작 오류:", error);
+      await this.handleError(bot, callbackQuery, error);
+    }
+  }
+
+  /**
+   * 검색 입력 처리
+   */
+  async handleSearchInput(bot, chatId, userId, text) {
+    // 상태 초기화
+    this.clearUserState(userId);
+
+    // 취소 확인
+    if (text.toLowerCase() === "/cancel" || text === "취소") {
+      await this.sendMessage(bot, chatId, "✅ 검색이 취소되었습니다.", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+          ],
+        },
+      });
+      return;
+    }
+
+    try {
+      // 할일 검색
+      const results = await this.todoService.searchTodos(userId, text);
+
+      if (results.length === 0) {
+        await this.sendMessage(
+          bot,
+          chatId,
+          `🔍 **검색 결과**\n\n"${text}"에 대한 검색 결과가 없습니다.`,
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔍 다시 검색", callback_data: "todo:search" }],
+                [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+              ],
+            },
+          }
+        );
+        return;
+      }
+
+      // 검색 결과 표시
+      let resultText = `🔍 **검색 결과** (${results.length}개)\n\n검색어: "${text}"\n\n`;
+
+      results.forEach((todo, idx) => {
+        const status = todo.completed ? "✅" : "⬜";
+        const date = this.formatDate(todo.createdAt);
+        resultText += `${idx + 1}. ${status} ${todo.text}\n`;
+        resultText += `   📅 ${date}\n\n`;
+      });
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔍 다시 검색", callback_data: "todo:search" }],
+          [{ text: "📋 전체 목록", callback_data: "todo:list" }],
+          [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+        ],
+      };
+
+      await this.sendMessage(bot, chatId, resultText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("검색 입력 처리 오류:", error);
+
+      await this.sendMessage(
+        bot,
+        chatId,
+        "❌ 검색 중 오류가 발생했습니다.\n다시 시도해주세요.",
+        {
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+            ],
+          },
+        }
+      );
+    }
   }
 
   /**

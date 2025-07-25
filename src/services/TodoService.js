@@ -299,41 +299,103 @@ class TodoService extends BaseService {
     }
   }
 
+  /**
+   * 상세 통계 조회 (TodoModule에서 사용)
+   */
   async getUserDetailedStats(userId) {
     try {
-      if (!this.collection) {
-        return {
-          success: false,
-          error: "데이터베이스 연결이 없습니다",
-          stats: this.getDefaultStats(),
-        };
+      const todos = await this.getUserTodos(userId);
+      const now = TimeHelper.getKoreaTime();
+
+      // 기본 통계
+      const stats = {
+        total: todos.length,
+        completed: todos.filter((todo) => todo.completed).length,
+        pending: todos.filter((todo) => !todo.completed).length,
+        completionRate: 0,
+      };
+
+      if (stats.total > 0) {
+        stats.completionRate = Math.round(
+          (stats.completed / stats.total) * 100
+        );
       }
 
-      const totalCount = await this.collection.countDocuments({ userId });
-      const completedCount = await this.collection.countDocuments({
-        userId,
-        completed: true,
-      });
-      const activeCount = totalCount - completedCount;
+      // 오늘 통계
+      const todayStart = new Date(now);
+      todayStart.setHours(0, 0, 0, 0);
 
-      return {
-        success: true,
-        stats: {
-          total: totalCount,
-          completed: completedCount,
-          active: activeCount,
-          completionRate:
-            totalCount > 0
-              ? Math.round((completedCount / totalCount) * 100)
-              : 0,
-        },
-      };
+      const todayTodos = todos.filter(
+        (todo) => new Date(todo.createdAt) >= todayStart
+      );
+
+      const todayCompletedTodos = todos.filter(
+        (todo) =>
+          todo.completed &&
+          todo.completedAt &&
+          new Date(todo.completedAt) >= todayStart
+      );
+
+      stats.todayAdded = todayTodos.length;
+      stats.todayCompleted = todayCompletedTodos.length;
+
+      // 이번주 통계
+      const weekStart = new Date(now);
+      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      weekStart.setHours(0, 0, 0, 0);
+
+      const weekCompletedTodos = todos.filter(
+        (todo) =>
+          todo.completed &&
+          todo.completedAt &&
+          new Date(todo.completedAt) >= weekStart
+      );
+
+      stats.weekCompleted = weekCompletedTodos.length;
+
+      // 이번달 통계
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+
+      const monthCompletedTodos = todos.filter(
+        (todo) =>
+          todo.completed &&
+          todo.completedAt &&
+          new Date(todo.completedAt) >= monthStart
+      );
+
+      stats.monthCompleted = monthCompletedTodos.length;
+
+      // 평균 완료 시간 계산
+      const completedWithTime = todos.filter(
+        (todo) => todo.completed && todo.completedAt && todo.createdAt
+      );
+
+      if (completedWithTime.length > 0) {
+        const totalTime = completedWithTime.reduce((sum, todo) => {
+          const completedAt = new Date(todo.completedAt);
+          const createdAt = new Date(todo.createdAt);
+          return sum + (completedAt.getTime() - createdAt.getTime());
+        }, 0);
+
+        const avgTime = totalTime / completedWithTime.length;
+        stats.avgCompletionTime = this.formatDuration(avgTime);
+      } else {
+        stats.avgCompletionTime = "데이터 없음";
+      }
+
+      return stats;
     } catch (error) {
-      logger.error("통계 조회 오류:", error);
+      logger.error("상세 통계 조회 오류:", error);
       return {
-        success: false,
-        error: error.message,
-        stats: this.getDefaultStats(),
+        total: 0,
+        completed: 0,
+        pending: 0,
+        completionRate: 0,
+        todayAdded: 0,
+        todayCompleted: 0,
+        weekCompleted: 0,
+        monthCompleted: 0,
+        avgCompletionTime: "데이터 없음",
       };
     }
   }

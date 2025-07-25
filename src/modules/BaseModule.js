@@ -253,6 +253,50 @@ class BaseModule {
   }
 
   /**
+   * 한국 시간 포맷팅 (현재 시간)
+   */
+  formatKoreanTime(date = null) {
+    try {
+      const targetDate = date ? new Date(date) : TimeHelper.getKoreaTime();
+      return TimeHelper.formatDateTime(targetDate);
+    } catch (error) {
+      logger.error("한국 시간 포맷팅 오류:", error);
+      return "시간 포맷 오류";
+    }
+  }
+
+  /**
+   * 날짜 포맷팅 (커스텀 포맷)
+   */
+  formatDate(date, format = "MM/DD HH:mm") {
+    if (!date) return "날짜 없음";
+
+    try {
+      const targetDate = typeof date === "string" ? new Date(date) : date;
+
+      // TimeHelper에 formatDate 메서드가 없으면 간단한 포맷팅 구현
+      const year = targetDate.getFullYear();
+      const month = String(targetDate.getMonth() + 1).padStart(2, "0");
+      const day = String(targetDate.getDate()).padStart(2, "0");
+      const hours = String(targetDate.getHours()).padStart(2, "0");
+      const minutes = String(targetDate.getMinutes()).padStart(2, "0");
+
+      // 포맷에 따라 문자열 생성
+      let formatted = format;
+      formatted = formatted.replace("YYYY", year);
+      formatted = formatted.replace("MM", month);
+      formatted = formatted.replace("DD", day);
+      formatted = formatted.replace("HH", hours);
+      formatted = formatted.replace("mm", minutes);
+
+      return formatted;
+    } catch (error) {
+      logger.error("날짜 포맷팅 오류:", error);
+      return "날짜 포맷 오류";
+    }
+  }
+
+  /**
    * 🎯 메시지 전송 헬퍼
    */
   async sendMessage(bot, chatId, text, options = {}) {
