@@ -453,40 +453,80 @@ class ServiceBuilder {
    */
   async autoRegisterServices() {
     try {
-      const serviceConfigs = {
-        todo: {
-          ServiceClass: require("../services/TodoService"),
-          options: { priority: 1, required: true },
+      const serviceConfigs = {};
+
+      // 안전한 서비스 등록 (파일 존재 확인)
+      const serviceList = [
+        {
+          name: "todo",
+          path: "../services/TodoService",
+          priority: 1,
+          required: true,
         },
-        timer: {
-          ServiceClass: require("../services/TimerService"),
-          options: { priority: 2, required: true },
+        {
+          name: "timer",
+          path: "../services/TimerService",
+          priority: 2,
+          required: true,
         },
-        worktime: {
-          ServiceClass: require("../services/WorktimeService"),
-          options: { priority: 3, required: true },
+        {
+          name: "worktime",
+          path: "../services/WorktimeService",
+          priority: 3,
+          required: true,
         },
-        leave: {
-          ServiceClass: require("../services/LeaveService"),
-          options: { priority: 4, required: true },
+        {
+          name: "leave",
+          path: "../services/LeaveService",
+          priority: 4,
+          required: true,
         },
-        reminder: {
-          ServiceClass: require("../services/ReminderService"),
-          options: { priority: 5, required: false },
+        {
+          name: "reminder",
+          path: "../services/ReminderService",
+          priority: 5,
+          required: false,
         },
-        fortune: {
-          ServiceClass: require("../services/FortuneService"),
-          options: { priority: 6, required: false },
+        {
+          name: "fortune",
+          path: "../services/FortuneService",
+          priority: 6,
+          required: false,
         },
-        weather: {
-          ServiceClass: require("../services/WeatherService"),
-          options: { priority: 7, required: false },
+        {
+          name: "weather",
+          path: "../services/WeatherService",
+          priority: 7,
+          required: false,
         },
-        tts: {
-          ServiceClass: require("../services/TTSService"),
-          options: { priority: 8, required: false },
+        {
+          name: "tts",
+          path: "../services/TTSService",
+          priority: 8,
+          required: false,
         },
-      };
+      ];
+
+      for (const service of serviceList) {
+        try {
+          const ServiceClass = require(service.path);
+          serviceConfigs[service.name] = {
+            ServiceClass,
+            options: {
+              priority: service.priority,
+              required: service.required,
+            },
+          };
+          logger.debug(`✅ 서비스 등록 성공: ${service.name}`);
+        } catch (error) {
+          logger.warn(
+            `⚠️ 서비스 등록 실패: ${service.name} - ${error.message}`
+          );
+          if (service.required) {
+            throw new Error(`필수 서비스 로드 실패: ${service.name}`);
+          }
+        }
+      }
 
       const results = this.registerBatch(serviceConfigs);
 

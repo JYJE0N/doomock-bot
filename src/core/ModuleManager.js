@@ -170,7 +170,8 @@ class ModuleManager {
   async discoverAndRegisterModules() {
     logger.info("🔍 모듈 자동 감지 시작...");
 
-    const moduleConfigs = [
+    // 안전한 모듈 등록 (파일 존재 확인)
+    const moduleList = [
       {
         key: "system",
         name: "시스템 모듈",
@@ -192,7 +193,7 @@ class ModuleManager {
         name: "타이머 모듈",
         path: "../modules/TimerModule",
         priority: 3,
-        required: true,
+        required: false,
         features: ["timer", "pomodoro", "notifications"],
       },
       {
@@ -200,7 +201,7 @@ class ModuleManager {
         name: "근무시간 관리 모듈",
         path: "../modules/WorktimeModule",
         priority: 4,
-        required: true,
+        required: false,
         features: ["worktime", "statistics", "reports"],
       },
       {
@@ -208,7 +209,7 @@ class ModuleManager {
         name: "휴가 관리 모듈",
         path: "../modules/LeaveModule",
         priority: 5,
-        required: true,
+        required: false,
         features: ["leave", "calendar", "approval"],
       },
       {
@@ -244,6 +245,22 @@ class ModuleManager {
         features: ["tts", "audio", "voice"],
       },
     ];
+
+    const moduleConfigs = [];
+
+    // 파일 존재 확인하고 등록
+    for (const module of moduleList) {
+      try {
+        require.resolve(module.path);
+        moduleConfigs.push(module);
+        logger.debug(`✅ 모듈 발견: ${module.name}`);
+      } catch (error) {
+        logger.warn(`⚠️ 모듈 파일 없음: ${module.name} (${module.path})`);
+        if (module.required) {
+          throw new Error(`필수 모듈 파일을 찾을 수 없음: ${module.name}`);
+        }
+      }
+    }
 
     // 모듈 등록
     for (const config of moduleConfigs) {
