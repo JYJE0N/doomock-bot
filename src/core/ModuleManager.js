@@ -371,6 +371,313 @@ class ModuleManager {
       }
     }
   }
+
+  // src/core/ModuleManager.js - 핵심 누락 메서드 추가
+// 기존 클래스에 아래 메서드들을 추가하세요!
+
+/**
+ * 🎯 콜백 처리 (핵심 누락 메서드!)
+ * - NavigationHandler에서 호출됨
+ * - 표준 매개변수 체계 준수
+ * - 모듈별 액션 위임
+ */
+async handleCallback(bot, callbackQuery, moduleKey, action, params = []) {
+  const startTime = Date.now();
+  const userId = callbackQuery.from?.id;
+  const callbackId = callbackQuery.id;
+  const uniqueKey = `${userId}-${callbackId}-${moduleKey}-${action}`;
+
+  try {
+    // 중복 처리 방지
+    if (this.processingCallbacks.has(uniqueKey)) {
+      logger.debug(`🚫 중복 콜백 무시: ${uniqueKey}`);
+      return false;
+    }
+
+    // 처리 시작 표시
+    this.processingCallbacks.set(uniqueKey, Date.now());
+    this.stats.callbacksHandled++;
+
+    logger.debug(`🎯 ModuleManager.handleCallback: ${moduleKey}.${action}(${params.join(', ')})`);
+
+    // 모듈 존재 확인
+    if (!this.hasModule(moduleKey)) {
+      logger.warn(`❓ 모듈을 찾을 수 없음: ${moduleKey}`);
+      await this.sendModuleNotFound(bot, callbackQuery, moduleKey);
+      return false;
+    }
+
+    // 모듈 인스턴스 가져오기
+    const moduleInstance = this.getModule(moduleKey);
+    if (!moduleInstance) {
+      logger.error(`❌ 모듈 인스턴스가 없음: ${moduleKey}`);
+      await this.sendModuleError(bot, callbackQuery, moduleKey);
+      return false;
+    }
+
+    // 모듈 초기화 확인
+    if (!moduleInstance.isInitialized) {
+      logger.warn(`⚠️ 모듈이 초기화되지 않음: ${moduleKey}`);
+      await this.sendModuleNotInitialized(bot, callbackQuery, moduleKey);
+      return false;
+    }
+
+    // 모듈의 handleCallback 메서드 호출 (표준 매개변수!)
+    if (typeof moduleInstance.handleCallback === 'function') {
+      const result = await moduleInstance.handleCallback(
+        bot,
+        callbackQuery, 
+        action,        // subAction
+        params,        // params 배열
+        this          // moduleManager (this)
+      );
+
+      if (result) {
+        logger.debug(`✅ ${moduleKey}.${action} 처리 성공`);
+        return true;
+      } else {
+        logger.warn(`❓ ${moduleKey}.${action} 처리 실패 또는 미처리`);
+        await this.sendActionNotFound(bot, callbackQuery, moduleKey, action);
+        return false;
+      }
+    } else {
+      logger.error(`❌ ${moduleKey}에 handleCallback 메서드가 없음`);
+      await this.sendMethodNotFound(bot, callbackQuery, moduleKey);
+      return false;
+    }
+
+  } catch (error) {
+    logger.error(`❌ ModuleManager 콜백 처리 오류 [${moduleKey}.${action}]:`, error);
+    this.stats.errorsCount++;
+    
+    await this.sendCallbackError(bot, callbackQuery, moduleKey, action, error.message);
+    return false;
+    
+  } finally {
+    // 처리 완료 정리
+    this.processingCallbacks.delete(uniqueKey);
+    
+    // 응답 시간 통계 업데이트
+    const responseTime = Date.now() - startTime;
+    this.updateCallbackStats(responseTime);
+  }
+}
+
+/**
+ * 🎯 메시지 처리 (기존에 있을 수도 있지만 보완)
+ */
+async handleMessage(bot, msg) {
+  try {
+    const { text, from: { id: userId } } = msg;
+    
+    logger.debug(`📨 ModuleManager 메시지 처리: ${text?.substring(0, 50)}...`);
+
+    // 모든 활성 모듈에게 메시지 처리 기회 제공
+    for (const [moduleKey, moduleInstance] of this.moduleInstances) {
+      if (!moduleInstance.isInitialized) continue;
+
+      try {
+        // 모듈의 handleMessage 메서드 호출
+        if (typeof moduleInstance.handleMessage === 'function') {
+          const handled = await moduleInstance.handleMessage(bot, msg);
+          
+          if (handled) {
+            logger.debug(`✅ ${moduleKey}가 메시지 처리함`);
+            return true;
+          }
+        }
+      } catch (error) {
+        logger.error(`❌ ${moduleKey} 메시지 처리 오류:`, error);
+        // 한 모듈의 오류가 다른 모듈에 영향을 주지 않도록 계속 진행
+      }
+    }
+
+    logger.debug("❓ 어떤 모듈도 메시지를 처리하지 않음");
+    return false;
+    
+  } catch (error) {
+    logger.error("❌ ModuleManager 메시지 처리 오류:", error);
+    return false;
+  }
+}
+
+// ===== 🛠️ 에러 처리 헬퍼 메서드들 =====
+
+/**
+ * 모듈을 찾을 수 없음 알림
+ */
+async sendModuleNotFound(bot, callbackQuery, moduleKey) {
+  try {
+    const errorText = `❓ **모듈을 찾을 수 없습니다**\n\n` +
+                     `요청한 모듈: \`${moduleKey}\`\n` +
+                     `메인 메뉴로 돌아가세요.`;
+    
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
+      ]
+    };
+
+    await bot.editMessageText(errorText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      reply_markup: keyboard,
+      parse_mode: 'Markdown'
+    });
+  } catch (error) {
+    logger.error("모듈 없음 알림 전송 실패:", error);
+  }
+}
+
+/**
+ * 모듈 에러 알림
+ */
+async sendModuleError(bot, callbackQuery, moduleKey) {
+  try {
+    const errorText = `❌ **모듈 오류**\n\n` +
+                     `\`${moduleKey}\` 모듈에 문제가 있습니다.\n` +
+                     `잠시 후 다시 시도해주세요.`;
+    
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔄 다시 시도", callback_data: `${moduleKey}:menu` }],
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
+      ]
+    };
+
+    await bot.editMessageText(errorText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      reply_markup: keyboard,
+      parse_mode: 'Markdown'
+    });
+  } catch (error) {
+    logger.error("모듈 에러 알림 전송 실패:", error);
+  }
+}
+
+/**
+ * 모듈 초기화되지 않음 알림
+ */
+async sendModuleNotInitialized(bot, callbackQuery, moduleKey) {
+  try {
+    const errorText = `⚠️ **모듈 초기화 중**\n\n` +
+                     `\`${moduleKey}\` 모듈이 아직 준비되지 않았습니다.\n` +
+                     `잠시 후 다시 시도해주세요.`;
+    
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔄 다시 시도", callback_data: `${moduleKey}:menu` }],
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
+      ]
+    };
+
+    await bot.editMessageText(errorText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      reply_markup: keyboard,
+      parse_mode: 'Markdown'
+    });
+  } catch (error) {
+    logger.error("초기화 알림 전송 실패:", error);
+  }
+}
+
+/**
+ * 액션을 찾을 수 없음 알림
+ */
+async sendActionNotFound(bot, callbackQuery, moduleKey, action) {
+  try {
+    const errorText = `❓ **기능을 찾을 수 없습니다**\n\n` +
+                     `모듈: \`${moduleKey}\`\n` +
+                     `기능: \`${action}\`\n\n` +
+                     `해당 모듈의 메뉴로 돌아가세요.`;
+    
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: `📱 ${moduleKey} 메뉴`, callback_data: `${moduleKey}:menu` }],
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
+      ]
+    };
+
+    await bot.editMessageText(errorText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      reply_markup: keyboard,
+      parse_mode: 'Markdown'
+    });
+  } catch (error) {
+    logger.error("액션 없음 알림 전송 실패:", error);
+  }
+}
+
+/**
+ * 메서드를 찾을 수 없음 알림  
+ */
+async sendMethodNotFound(bot, callbackQuery, moduleKey) {
+  try {
+    const errorText = `🔧 **모듈 구성 오류**\n\n` +
+                     `\`${moduleKey}\` 모듈이 올바르게 구성되지 않았습니다.\n` +
+                     `개발자에게 문의하세요.`;
+    
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
+      ]
+    };
+
+    await bot.editMessageText(errorText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      reply_markup: keyboard,
+      parse_mode: 'Markdown'
+    });
+  } catch (error) {
+    logger.error("메서드 없음 알림 전송 실패:", error);
+  }
+}
+
+/**
+ * 콜백 처리 오류 알림
+ */
+async sendCallbackError(bot, callbackQuery, moduleKey, action, errorMessage) {
+  try {
+    const errorText = `❌ **처리 중 오류 발생**\n\n` +
+                     `모듈: \`${moduleKey}\`\n` +
+                     `기능: \`${action}\`\n` +
+                     `오류: \`${errorMessage.substring(0, 100)}...\`\n\n` +
+                     `잠시 후 다시 시도해주세요.`;
+    
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔄 다시 시도", callback_data: `${moduleKey}:${action}` }],
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
+      ]
+    };
+
+    await bot.editMessageText(errorText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      reply_markup: keyboard,
+      parse_mode: 'Markdown'
+    });
+  } catch (error) {
+    logger.error("콜백 에러 알림 전송 실패:", error);
+  }
+}
+
+/**
+ * 콜백 통계 업데이트
+ */
+updateCallbackStats(responseTime) {
+  // 평균 응답 시간 계산 (지수 평활법)
+  if (this.stats.averageCallbackTime === 0) {
+    this.stats.averageCallbackTime = responseTime;
+  } else {
+    this.stats.averageCallbackTime = 
+      this.stats.averageCallbackTime * 0.9 + responseTime * 0.1;
+  }
+}
   // ===== 추가: 짧은 업타임 경고 해결 =====
 
   // HealthChecker.js의 checkSystemResources 메서드 수정
