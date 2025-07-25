@@ -1,6 +1,6 @@
 // src/modules/TimerModule.js - 이벤트 기반 TimerService 연동
 
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const TimerService = require("../services/TimerService");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");

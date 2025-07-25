@@ -1,6 +1,6 @@
 // src/modules/FortuneModule.js - 표준화된 운세 모듈
 
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const { getUserName } = require("../utils/UserHelper");
 const FortuneService = require("../services/FortuneService");
 const logger = require("../utils/Logger"); // ✅ 소문자 logger로 통일

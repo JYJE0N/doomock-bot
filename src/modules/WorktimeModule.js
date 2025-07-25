@@ -1,5 +1,5 @@
 // src/modules/WorktimeModule.js - TimeHelper 메서드 수정 부분
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const WorktimeService = require("../services/WorktimeService");
 const { getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");

@@ -1,5 +1,5 @@
 // src/modules/ReminderModule.js - 완전 리팩토링된 리마인더 모듈
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const ReminderService = require("../services/ReminderService");
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");

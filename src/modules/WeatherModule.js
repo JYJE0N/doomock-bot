@@ -1,6 +1,6 @@
 // src/modules/WeatherModule.js - 표준화된 날씨 모듈
 
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const WeatherService = require("../services/WeatherService");
 const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");

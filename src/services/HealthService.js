@@ -1,5 +1,5 @@
 // src/services/HealthService.js - 완전 수정 버전
-const AppConfig = require("../config/AppConfig");
+
 const logger = require("../utils/Logger");
 const BaseService = require("./BaseService");
 

@@ -1,6 +1,6 @@
 // src/modules/InsightModule.js - 미세먼지 기반 마케팅 인사이트 모듈
 
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const InsightService = require("../services/InsightService");
 const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");

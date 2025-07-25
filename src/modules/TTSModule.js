@@ -1,5 +1,5 @@
 // src/modules/TTSModule.js
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const TTSService = require("../services/TTSService");
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");

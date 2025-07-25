@@ -1,5 +1,10 @@
 // ✅ 중앙 관리 체제에 맞는 TodoModule 구조
 // 모듈은 데이터 처리만, UI는 ModuleManager가 담당
+const BaseModule = require("../core/BaseModule");
+const TimerService = require("../services/TimerService");
+const TimeHelper = require("../utils/TimeHelper");
+const { getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/Logger");
 
 /**
  * 📝 TodoModule - 중앙 관리 체제 버전

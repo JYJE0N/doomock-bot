@@ -1,6 +1,6 @@
 // src/modules/LeaveModule.js - 연차/월차/반차/반반차 통합 관리 모듈
 
-const BaseModule = require("./BaseModule");
+const BaseModule = require("../core/BaseModule");
 const LeaveService = require("../services/LeaveService");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
