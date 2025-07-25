@@ -1,102 +1,149 @@
-// src/core/BaseModule.js - 모든 모듈의 부모 클래스 v3.0.1
+// src/modules/BaseModule.js - ServiceBuilder 연동 리팩토링 v3.0.1
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 
 /**
- * 🏗️ 베이스 모듈 - 모든 모듈의 부모 클래스
+ * 🏗️ 베이스 모듈 v3.0.1 - ServiceBuilder 연동 리팩토링
+ *
+ * 🎯 주요 변경사항:
+ * - ServiceBuilder를 통한 서비스 요청 시스템
+ * - 서비스 의존성 자동 해결
+ * - 느슨한 결합 (Loose Coupling) 구현
  * - 표준 매개변수 체계 준수
- * - actionMap 방식 사용 (switch문 금지)
- * - 공통 기능 제공
+ * - actionMap 방식 사용
  * - Railway 환경 최적화
- * - 중앙 집중식 의존성 관리
+ *
+ * 🔧 ServiceBuilder 활용:
+ * - this.getService('todo') - 서비스 요청
+ * - this.requireService('timer') - 필수 서비스 요청
+ * - this.hasService('weather') - 서비스 존재 확인
  */
 class BaseModule {
   constructor(moduleName, options = {}) {
-    if (!moduleName) {
-      throw new Error("모듈명이 필요합니다");
-    }
-
-    // 🎯 기본 속성 설정
     this.moduleName = moduleName;
     this.bot = options.bot;
-    this.db = options.db;
-    this.moduleManager = options.moduleManager;
-    this.validationManager = options.validationManager; // 🛡️ 검증 매니저
-    this.config = options.config || {};
 
-    // 🎯 액션 맵 (핵심!) - switch문 대신 사용
+    // 🏗️ ServiceBuilder 연동 (핵심!)
+    this.serviceBuilder = options.serviceBuilder;
+    this.moduleManager = options.moduleManager;
+
+    // 📋 모듈 메타데이터
+    this.moduleKey = options.moduleKey;
+    this.moduleConfig = options.moduleConfig;
+
+    // ⚙️ 설정 (Railway 환경변수 기반)
+    this.config = {
+      timeout: parseInt(process.env.MODULE_TIMEOUT) || 30000,
+      maxRetries: parseInt(process.env.MODULE_MAX_RETRIES) || 3,
+      cacheEnabled: process.env.MODULE_CACHE_ENABLED !== "false",
+      enableMetrics: process.env.MODULE_METRICS_ENABLED === "true",
+      enableHealthCheck: process.env.MODULE_HEALTH_CHECK !== "false",
+      ...options.config,
+    };
+
+    // 🎯 액션 맵 (핵심!)
     this.actionMap = new Map();
 
-    // 📊 사용자 상태 관리 (메모리 기반)
+    // 📊 사용자 상태 관리
     this.userStates = new Map();
+
+    // 🔧 서비스 캐시 (성능 최적화)
+    this.serviceCache = new Map();
+    this.serviceCacheTimestamps = new Map();
 
     // 📊 모듈 통계
     this.stats = {
       callbacksHandled: 0,
       messagesHandled: 0,
       errorsCount: 0,
+      serviceRequests: 0,
+      serviceCacheHits: 0,
+      serviceCacheMisses: 0,
+      averageResponseTime: 0,
       lastActivity: null,
-      initializeTime: null,
+      createdAt: TimeHelper.getTimestamp(),
+      totalResponseTime: 0,
     };
 
-    // ⏱️ 기본 설정 (Railway 환경 최적화)
-    this.config = {
-      timeout: parseInt(process.env.MODULE_TIMEOUT) || 30000,
-      maxRetries: parseInt(process.env.MODULE_MAX_RETRIES) || 3,
-      cacheEnabled: process.env.MODULE_CACHE_ENABLED !== "false",
-      enableDebugLogs: process.env.NODE_ENV === "development",
-      ...options.config,
-    };
-
-    // 🏗️ 초기화 상태
+    // 🔄 초기화 상태
     this.isInitialized = false;
-    this.initializeStartTime = Date.now();
+    this.initializationInProgress = false;
 
-    logger.info(`🏗️ ${moduleName} 베이스 모듈 생성됨`);
+    // 🏥 헬스체크 상태
+    this.healthStatus = {
+      healthy: true,
+      lastCheck: null,
+      errors: [],
+      services: {},
+    };
+
+    // Railway 환경 체크
+    this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+
+    logger.info(`🏗️ ${moduleName} 베이스 모듈 생성됨 (ServiceBuilder 연동)`);
   }
 
   /**
    * 🎯 모듈 초기화 (표준 패턴)
-   * - onInitialize -> setupActions 순서 보장
-   * - 예외 발생 시 롤백 처리
    */
   async initialize() {
-    if (this.isInitialized) {
-      logger.warn(`${this.moduleName} 이미 초기화됨`);
+    if (this.initializationInProgress || this.isInitialized) {
+      logger.debug(`${this.moduleName} 이미 초기화됨`);
       return;
     }
+
+    this.initializationInProgress = true;
+    const startTime = Date.now();
 
     try {
       logger.info(`🎯 ${this.moduleName} 초기화 시작...`);
 
-      // 1단계: 자식 클래스 초기화 로직
-      if (this.onInitialize && typeof this.onInitialize === "function") {
-        await this.onInitialize();
-      }
+      // ServiceBuilder 연결 확인
+      await this.validateServiceBuilder();
 
-      // 2단계: 액션 설정
-      if (this.setupActions && typeof this.setupActions === "function") {
-        this.setupActions();
-      }
+      // 자식 클래스의 초기화 로직
+      await this.onInitialize();
 
-      // 3단계: 기본 액션 등록 (모든 모듈 공통)
-      this.registerDefaultActions();
+      // 액션 설정
+      this.setupActions();
 
-      // 초기화 완료
+      // 초기 헬스체크
+      await this.performHealthCheck();
+
       this.isInitialized = true;
-      this.stats.initializeTime = Date.now() - this.initializeStartTime;
+      this.stats.lastActivity = TimeHelper.getLogTimeString();
 
-      logger.success(
-        `✅ ${this.moduleName} 초기화 완료 (${this.stats.initializeTime}ms)`
-      );
+      const initTime = Date.now() - startTime;
+      logger.success(`✅ ${this.moduleName} 초기화 완료 (${initTime}ms)`);
     } catch (error) {
       logger.error(`❌ ${this.moduleName} 초기화 실패:`, error);
-
-      // 롤백 처리
-      await this.rollbackInitialization();
+      this.stats.errorsCount++;
+      this.healthStatus.healthy = false;
+      this.healthStatus.errors.push({
+        type: "initialization",
+        message: error.message,
+        timestamp: TimeHelper.getTimestamp(),
+      });
       throw error;
+    } finally {
+      this.initializationInProgress = false;
     }
+  }
+
+  /**
+   * 🏗️ ServiceBuilder 연결 확인
+   */
+  async validateServiceBuilder() {
+    if (!this.serviceBuilder) {
+      throw new Error(`${this.moduleName}: ServiceBuilder가 필요합니다`);
+    }
+
+    if (!this.serviceBuilder.isInitialized) {
+      logger.warn(`⚠️ ${this.moduleName}: ServiceBuilder가 초기화되지 않음`);
+    }
+
+    logger.debug(`✅ ${this.moduleName}: ServiceBuilder 연결 확인됨`);
   }
 
   /**
@@ -104,7 +151,8 @@ class BaseModule {
    */
   async onInitialize() {
     // 자식 클래스에서 구현
-    // 예: 서비스 연결, DB 초기화 등
+    // 예: 필요한 서비스들 요청
+    // this.todoService = await this.requireService('todo');
   }
 
   /**
@@ -115,53 +163,183 @@ class BaseModule {
     // 예: this.registerActions({ menu: this.showMenu, ... });
   }
 
+  // ===== 🔧 ServiceBuilder 연동 메서드들 =====
+
   /**
-   * 🎯 기본 액션 등록 (모든 모듈 공통)
+   * 🔧 서비스 요청 (캐싱 지원)
    */
-  registerDefaultActions() {
-    this.registerActions({
-      // 공통 액션들
-      cancel: this.handleCancel,
-      back: this.handleBack,
-      refresh: this.handleRefresh,
-    });
+  async getService(serviceName, forceRefresh = false) {
+    try {
+      this.stats.serviceRequests++;
+
+      // 캐시 확인 (강제 새로고침이 아닌 경우)
+      if (
+        !forceRefresh &&
+        this.config.cacheEnabled &&
+        this.serviceCache.has(serviceName)
+      ) {
+        if (this.isServiceCacheValid(serviceName)) {
+          this.stats.serviceCacheHits++;
+          logger.debug(
+            `📦 ${this.moduleName}: 캐시된 서비스 반환 - ${serviceName}`
+          );
+          return this.serviceCache.get(serviceName);
+        } else {
+          // 만료된 캐시 제거
+          this.serviceCache.delete(serviceName);
+          this.serviceCacheTimestamps.delete(serviceName);
+        }
+      }
+
+      this.stats.serviceCacheMisses++;
+
+      // ServiceBuilder를 통해 서비스 요청
+      const service = await this.serviceBuilder.create(serviceName);
+
+      if (!service) {
+        logger.warn(
+          `⚠️ ${this.moduleName}: 서비스를 찾을 수 없음 - ${serviceName}`
+        );
+        return null;
+      }
+
+      // 캐시에 저장
+      if (this.config.cacheEnabled) {
+        this.serviceCache.set(serviceName, service);
+        this.serviceCacheTimestamps.set(serviceName, Date.now());
+      }
+
+      // 헬스 상태 업데이트
+      this.healthStatus.services[serviceName] = {
+        connected: true,
+        lastAccess: TimeHelper.getTimestamp(),
+      };
+
+      logger.debug(`🔧 ${this.moduleName}: 서비스 요청 성공 - ${serviceName}`);
+      return service;
+    } catch (error) {
+      logger.error(
+        `❌ ${this.moduleName}: 서비스 요청 실패 - ${serviceName}`,
+        error
+      );
+
+      // 헬스 상태 업데이트
+      this.healthStatus.services[serviceName] = {
+        connected: false,
+        error: error.message,
+        lastError: TimeHelper.getTimestamp(),
+      };
+
+      this.stats.errorsCount++;
+      return null;
+    }
   }
 
   /**
-   * 🎯 액션 등록 헬퍼 (actionMap 방식 강제)
+   * 🔧 필수 서비스 요청 (실패 시 예외 발생)
    */
-  registerActions(actions) {
-    if (!actions || typeof actions !== "object") {
-      logger.warn(`${this.moduleName}: 잘못된 액션 객체`);
-      return;
+  async requireService(serviceName) {
+    const service = await this.getService(serviceName);
+
+    if (!service) {
+      const error = new Error(
+        `${this.moduleName}: 필수 서비스를 찾을 수 없음 - ${serviceName}`
+      );
+      this.healthStatus.healthy = false;
+      this.healthStatus.errors.push({
+        type: "required_service_missing",
+        message: error.message,
+        timestamp: TimeHelper.getTimestamp(),
+      });
+      throw error;
     }
 
-    for (const [actionName, actionHandler] of Object.entries(actions)) {
-      if (typeof actionHandler === "function") {
-        this.actionMap.set(actionName, actionHandler);
+    return service;
+  }
 
-        if (this.config.enableDebugLogs) {
-          logger.debug(`🎯 ${this.moduleName}: 액션 등록 - ${actionName}`);
+  /**
+   * 🔍 서비스 존재 확인
+   */
+  hasService(serviceName) {
+    try {
+      // 캐시 확인
+      if (
+        this.serviceCache.has(serviceName) &&
+        this.isServiceCacheValid(serviceName)
+      ) {
+        return true;
+      }
+
+      // ServiceBuilder에서 확인
+      const service = this.serviceBuilder.get(serviceName);
+      return !!service;
+    } catch (error) {
+      logger.debug(
+        `🔍 ${this.moduleName}: 서비스 존재 확인 실패 - ${serviceName}`,
+        error
+      );
+      return false;
+    }
+  }
+
+  /**
+   * 🔄 서비스 캐시 새로고침
+   */
+  async refreshService(serviceName) {
+    logger.debug(
+      `🔄 ${this.moduleName}: 서비스 캐시 새로고침 - ${serviceName}`
+    );
+
+    // 캐시에서 제거
+    this.serviceCache.delete(serviceName);
+    this.serviceCacheTimestamps.delete(serviceName);
+
+    // 새로운 인스턴스 요청
+    return await this.getService(serviceName, true);
+  }
+
+  /**
+   * 📦 여러 서비스 한번에 요청
+   */
+  async getServices(serviceNames, required = false) {
+    const services = {};
+    const errors = [];
+
+    for (const serviceName of serviceNames) {
+      try {
+        const service = required
+          ? await this.requireService(serviceName)
+          : await this.getService(serviceName);
+
+        services[serviceName] = service;
+      } catch (error) {
+        errors.push({ serviceName, error: error.message });
+
+        if (required) {
+          throw new Error(
+            `${this.moduleName}: 필수 서비스 요청 실패 - ${serviceName}: ${error.message}`
+          );
         }
-      } else {
-        logger.warn(
-          `${this.moduleName}: 잘못된 액션 핸들러 - ${actionName} (함수가 아님)`
-        );
       }
     }
 
-    logger.debug(
-      `🎯 ${this.moduleName}: 총 ${this.actionMap.size}개 액션 등록됨`
-    );
+    if (errors.length > 0 && !required) {
+      logger.warn(`⚠️ ${this.moduleName}: 일부 서비스 요청 실패`, errors);
+    }
+
+    return services;
   }
+
+  // ===== 🎯 표준 콜백/메시지 처리 =====
 
   /**
    * 🎯 표준 콜백 처리 (핵심!)
-   * 매개변수: (bot, callbackQuery, subAction, params, moduleManager)
    */
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const startTime = Date.now();
+
     try {
-      // 🛡️ 매개변수 검증
+      // 매개변수 검증
       if (
         !this.validateCallbackParams(
           bot,
@@ -174,11 +352,11 @@ class BaseModule {
         return false;
       }
 
-      // 📊 통계 업데이트
+      // 통계 업데이트
       this.stats.callbacksHandled++;
-      this.stats.lastActivity = TimeHelper.getCurrentTime("log");
+      this.stats.lastActivity = TimeHelper.getLogTimeString();
 
-      // 🎯 액션 실행
+      // 액션 실행
       const action = this.actionMap.get(subAction);
       if (!action) {
         logger.warn(`${this.moduleName}: 알 수 없는 액션 - ${subAction}`);
@@ -189,11 +367,25 @@ class BaseModule {
       // 표준 매개변수로 액션 실행
       await action.call(this, bot, callbackQuery, params, moduleManager);
 
-      logger.debug(`✅ ${this.moduleName}.${subAction} 처리 완료`);
+      // 응답 시간 통계 업데이트
+      const responseTime = Date.now() - startTime;
+      this.updateResponseTimeStats(responseTime);
+
+      logger.debug(
+        `✅ ${this.moduleName}.${subAction} 처리 완료 (${responseTime}ms)`
+      );
       return true;
     } catch (error) {
       logger.error(`❌ ${this.moduleName} 콜백 처리 오류:`, error);
       this.stats.errorsCount++;
+
+      // 헬스 상태 업데이트
+      this.healthStatus.errors.push({
+        type: "callback_error",
+        action: subAction,
+        message: error.message,
+        timestamp: TimeHelper.getTimestamp(),
+      });
 
       await this.sendError(bot, callbackQuery, "처리 중 오류가 발생했습니다.");
       return false;
@@ -201,295 +393,349 @@ class BaseModule {
   }
 
   /**
-   * 🎯 표준 메시지 처리 (자식 클래스에서 구현)
-   * 매개변수: (bot, msg)
+   * 🎯 표준 메시지 처리
    */
   async handleMessage(bot, msg) {
-    try {
-      this.stats.messagesHandled++;
-      this.stats.lastActivity = TimeHelper.getCurrentTime("log");
+    const startTime = Date.now();
 
-      // 자식 클래스에서 구현
-      if (this.onHandleMessage && typeof this.onHandleMessage === "function") {
-        return await this.onHandleMessage(bot, msg);
+    try {
+      // 메시지 검증
+      if (!this.validateMessageParams(bot, msg)) {
+        return false;
       }
 
-      return false;
+      // 통계 업데이트
+      this.stats.messagesHandled++;
+      this.stats.lastActivity = TimeHelper.getLogTimeString();
+
+      // 자식 클래스의 메시지 처리 로직
+      const handled = await this.onHandleMessage(bot, msg);
+
+      if (handled) {
+        const responseTime = Date.now() - startTime;
+        this.updateResponseTimeStats(responseTime);
+        logger.debug(
+          `✅ ${this.moduleName} 메시지 처리 완료 (${responseTime}ms)`
+        );
+      }
+
+      return handled;
     } catch (error) {
       logger.error(`❌ ${this.moduleName} 메시지 처리 오류:`, error);
       this.stats.errorsCount++;
+
+      // 헬스 상태 업데이트
+      this.healthStatus.errors.push({
+        type: "message_error",
+        message: error.message,
+        timestamp: TimeHelper.getTimestamp(),
+      });
+
       return false;
     }
   }
 
   /**
-   * 🎯 자식 클래스에서 구현할 메시지 처리 메서드
+   * 🎯 자식 클래스에서 구현할 메시지 처리
    */
   async onHandleMessage(bot, msg) {
     // 자식 클래스에서 구현
     return false;
   }
 
-  // ===== 🛡️ 검증 메서드들 =====
+  // ===== 🛠️ 유틸리티 메서드들 =====
 
   /**
-   * 콜백 매개변수 검증
+   * 📊 서비스 캐시 유효성 확인
+   */
+  isServiceCacheValid(serviceName) {
+    if (!this.serviceCacheTimestamps.has(serviceName)) {
+      return false;
+    }
+
+    const timestamp = this.serviceCacheTimestamps.get(serviceName);
+    const age = Date.now() - timestamp;
+    const maxAge = parseInt(process.env.SERVICE_CACHE_TIMEOUT) || 300000; // 5분
+
+    return age < maxAge;
+  }
+
+  /**
+   * 📊 응답 시간 통계 업데이트
+   */
+  updateResponseTimeStats(responseTime) {
+    this.stats.totalResponseTime += responseTime;
+
+    if (this.stats.averageResponseTime === 0) {
+      this.stats.averageResponseTime = responseTime;
+    } else {
+      // 지수 평활법으로 평균 계산
+      this.stats.averageResponseTime =
+        this.stats.averageResponseTime * 0.9 + responseTime * 0.1;
+    }
+  }
+
+  /**
+   * 🏥 헬스체크 수행
+   */
+  async performHealthCheck() {
+    try {
+      this.healthStatus.lastCheck = TimeHelper.getTimestamp();
+
+      // 기본 상태 체크
+      const isHealthy =
+        this.isInitialized && this.actionMap.size > 0 && !!this.serviceBuilder;
+
+      // 서비스 상태 체크
+      const serviceHealth = {};
+      for (const [serviceName, service] of this.serviceCache) {
+        try {
+          // 서비스 헬스체크
+          if (service.getStatus && typeof service.getStatus === "function") {
+            const status = service.getStatus();
+            serviceHealth[serviceName] = {
+              healthy: !!status && status.isConnected !== false,
+              status: status,
+            };
+          } else {
+            serviceHealth[serviceName] = { healthy: !!service };
+          }
+        } catch (error) {
+          serviceHealth[serviceName] = {
+            healthy: false,
+            error: error.message,
+          };
+        }
+      }
+
+      // 전체 상태 업데이트
+      this.healthStatus.healthy = isHealthy;
+      this.healthStatus.services = serviceHealth;
+
+      // 오래된 에러 정리 (24시간 이상)
+      const dayAgo = Date.now() - 86400000;
+      this.healthStatus.errors = this.healthStatus.errors.filter(
+        (error) => error.timestamp > dayAgo
+      );
+
+      return this.healthStatus;
+    } catch (error) {
+      logger.error(`❌ ${this.moduleName} 헬스체크 실패:`, error);
+      this.healthStatus.healthy = false;
+      return this.healthStatus;
+    }
+  }
+
+  /**
+   * 액션 등록
+   */
+  registerAction(name, handler) {
+    if (typeof handler !== "function") {
+      throw new Error(`핸들러는 함수여야 합니다: ${name}`);
+    }
+    this.actionMap.set(name, handler.bind(this));
+    logger.debug(`🎯 ${this.moduleName}.${name} 액션 등록됨`);
+  }
+
+  /**
+   * 여러 액션 한번에 등록
+   */
+  registerActions(actions) {
+    for (const [name, handler] of Object.entries(actions)) {
+      this.registerAction(name, handler);
+    }
+  }
+
+  /**
+   * 매개변수 검증 - 콜백
    */
   validateCallbackParams(bot, callbackQuery, subAction, params, moduleManager) {
-    if (!bot) {
-      logger.error(`${this.moduleName}: bot 매개변수가 없습니다`);
+    if (!bot || !callbackQuery) {
+      logger.error(`${this.moduleName}: 필수 매개변수 누락`);
       return false;
     }
 
-    if (!callbackQuery) {
-      logger.error(`${this.moduleName}: callbackQuery 매개변수가 없습니다`);
+    if (!callbackQuery.message || !callbackQuery.from) {
+      logger.error(`${this.moduleName}: callbackQuery 구조 오류`);
       return false;
     }
 
-    if (!subAction) {
-      logger.error(`${this.moduleName}: subAction 매개변수가 없습니다`);
-      return false;
-    }
-
-    // params는 선택적, moduleManager는 선택적 (self-contained 모듈을 위해)
     return true;
   }
 
-  // ===== 📤 공통 응답 메서드들 =====
-
   /**
-   * 에러 메시지 전송
+   * 매개변수 검증 - 메시지
    */
-  async sendError(bot, callbackQuery, message = "오류가 발생했습니다.") {
-    try {
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: `❌ ${message}`,
-        show_alert: true,
-      });
-    } catch (error) {
-      logger.error(`${this.moduleName}: 에러 메시지 전송 실패:`, error);
+  validateMessageParams(bot, msg) {
+    if (!bot || !msg) {
+      logger.error(`${this.moduleName}: 필수 매개변수 누락`);
+      return false;
     }
-  }
 
-  /**
-   * 성공 메시지 전송
-   */
-  async sendSuccess(bot, callbackQuery, message = "완료되었습니다.") {
-    try {
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: `✅ ${message}`,
-        show_alert: false,
-      });
-    } catch (error) {
-      logger.error(`${this.moduleName}: 성공 메시지 전송 실패:`, error);
+    if (!msg.chat || !msg.from) {
+      logger.error(`${this.moduleName}: msg 구조 오류`);
+      return false;
     }
+
+    return true;
   }
 
   /**
-   * 액션을 찾을 수 없음 메시지
-   */
-  async sendActionNotFound(bot, callbackQuery, actionName) {
-    await this.sendError(
-      bot,
-      callbackQuery,
-      `알 수 없는 작업입니다: ${actionName}`
-    );
-  }
-
-  // ===== 🎯 기본 액션 핸들러들 =====
-
-  /**
-   * 취소 액션 (모든 모듈 공통)
-   */
-  async handleCancel(bot, callbackQuery, params, moduleManager) {
-    try {
-      const userId = callbackQuery.from.id;
-
-      // 사용자 상태 초기화
-      this.userStates.delete(userId);
-
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "🚫 작업이 취소되었습니다.",
-        show_alert: false,
-      });
-
-      // 메인 메뉴로 돌아가기
-      if (moduleManager) {
-        return await moduleManager.handleCallback(
-          bot,
-          callbackQuery,
-          "system:menu"
-        );
-      }
-    } catch (error) {
-      logger.error(`${this.moduleName}: 취소 처리 오류:`, error);
-      await this.sendError(
-        bot,
-        callbackQuery,
-        "취소 처리 중 오류가 발생했습니다."
-      );
-    }
-  }
-
-  /**
-   * 뒤로가기 액션 (모든 모듈 공통)
-   */
-  async handleBack(bot, callbackQuery, params, moduleManager) {
-    try {
-      await bot.answerCallbackQuery(callbackQuery.id);
-
-      // 이전 메뉴로 돌아가기 (기본적으로 해당 모듈 메뉴)
-      return await this.handleCallback(
-        bot,
-        callbackQuery,
-        "menu",
-        params,
-        moduleManager
-      );
-    } catch (error) {
-      logger.error(`${this.moduleName}: 뒤로가기 처리 오류:`, error);
-      await this.sendError(
-        bot,
-        callbackQuery,
-        "뒤로가기 처리 중 오류가 발생했습니다."
-      );
-    }
-  }
-
-  /**
-   * 새로고침 액션 (모든 모듈 공통)
-   */
-  async handleRefresh(bot, callbackQuery, params, moduleManager) {
-    try {
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "🔄 새로고침 중...",
-        show_alert: false,
-      });
-
-      // 현재 메뉴 다시 로드
-      return await this.handleCallback(
-        bot,
-        callbackQuery,
-        "menu",
-        params,
-        moduleManager
-      );
-    } catch (error) {
-      logger.error(`${this.moduleName}: 새로고침 처리 오류:`, error);
-      await this.sendError(
-        bot,
-        callbackQuery,
-        "새로고침 처리 중 오류가 발생했습니다."
-      );
-    }
-  }
-
-  // ===== 🔧 유틸리티 메서드들 =====
-
-  /**
-   * 명령어 추출 헬퍼
+   * 명령어 추출 유틸리티
    */
   extractCommand(text) {
-    if (!text) return null;
+    if (!text || typeof text !== "string") return null;
 
     const trimmed = text.trim().toLowerCase();
+
+    // /명령어 형태
     if (trimmed.startsWith("/")) {
       return trimmed.substring(1);
     }
+
+    // 일반 텍스트
     return trimmed;
   }
 
   /**
-   * 사용자 상태 설정
+   * 사용자 상태 관리
    */
   setUserState(userId, state) {
-    this.userStates.set(userId, {
-      ...state,
+    this.userStates.set(userId.toString(), {
+      state,
       timestamp: Date.now(),
-      module: this.moduleName,
+      moduleId: this.moduleName,
     });
   }
 
-  /**
-   * 사용자 상태 조회
-   */
   getUserState(userId) {
-    return this.userStates.get(userId) || null;
+    return this.userStates.get(userId.toString());
   }
 
-  /**
-   * 사용자 상태 삭제
-   */
   clearUserState(userId) {
-    return this.userStates.delete(userId);
+    this.userStates.delete(userId.toString());
   }
 
-  // ===== 📊 상태 및 통계 =====
+  /**
+   * 안전한 메시지 전송
+   */
+  async sendMessage(bot, chatId, text, options = {}) {
+    try {
+      return await bot.sendMessage(chatId, text, {
+        parse_mode: "Markdown",
+        ...options,
+      });
+    } catch (error) {
+      logger.error(`${this.moduleName}: 메시지 전송 실패`, error);
+      throw error;
+    }
+  }
 
   /**
-   * 모듈 상태 조회
+   * 안전한 메시지 수정
+   */
+  async editMessage(bot, chatId, messageId, text, options = {}) {
+    try {
+      return await bot.editMessageText(text, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        ...options,
+      });
+    } catch (error) {
+      logger.error(`${this.moduleName}: 메시지 수정 실패`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * 에러 메시지 전송
+   */
+  async sendError(bot, callbackQuery, message) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+        },
+      } = callbackQuery;
+
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: `❌ ${message}`,
+        show_alert: false,
+      });
+    } catch (error) {
+      logger.error(`${this.moduleName}: 에러 메시지 전송 실패`, error);
+    }
+  }
+
+  /**
+   * 액션 없음 메시지
+   */
+  async sendActionNotFound(bot, callbackQuery, action) {
+    await this.sendError(bot, callbackQuery, `알 수 없는 명령: ${action}`);
+  }
+
+  /**
+   * 📊 상태 조회
    */
   getStatus() {
     return {
       moduleName: this.moduleName,
-      isInitialized: this.isInitialized,
-      stats: { ...this.stats },
+      moduleKey: this.moduleKey,
+      initialized: this.isInitialized,
+      healthy: this.healthStatus.healthy,
+      stats: this.stats,
       config: {
         timeout: this.config.timeout,
-        maxRetries: this.config.maxRetries,
         cacheEnabled: this.config.cacheEnabled,
+        enableMetrics: this.config.enableMetrics,
       },
-      actionCount: this.actionMap.size,
-      userStateCount: this.userStates.size,
-      uptime: this.isInitialized ? Date.now() - this.stats.initializeTime : 0,
+      services: {
+        cached: Array.from(this.serviceCache.keys()),
+        health: this.healthStatus.services,
+      },
+      actions: Array.from(this.actionMap.keys()),
+      lastActivity: this.stats.lastActivity,
+      healthStatus: this.healthStatus,
     };
   }
 
-  // ===== 🧹 정리 작업 =====
-
   /**
-   * 모듈 정리 (애플리케이션 종료 시)
+   * 🧹 정리
    */
   async cleanup() {
     try {
       logger.info(`🧹 ${this.moduleName} 정리 시작...`);
 
-      // 자식 클래스 정리 로직
-      if (this.onCleanup && typeof this.onCleanup === "function") {
-        await this.onCleanup();
-      }
-
-      // 기본 정리 작업
+      // 사용자 상태 정리
       this.userStates.clear();
+
+      // 서비스 캐시 정리
+      this.serviceCache.clear();
+      this.serviceCacheTimestamps.clear();
+
+      // 액션 맵 정리
       this.actionMap.clear();
+
+      // 통계 초기화
+      this.stats = {
+        callbacksHandled: 0,
+        messagesHandled: 0,
+        errorsCount: 0,
+        serviceRequests: 0,
+        serviceCacheHits: 0,
+        serviceCacheMisses: 0,
+        averageResponseTime: 0,
+        lastActivity: null,
+        createdAt: TimeHelper.getTimestamp(),
+        totalResponseTime: 0,
+      };
 
       this.isInitialized = false;
 
       logger.info(`✅ ${this.moduleName} 정리 완료`);
     } catch (error) {
       logger.error(`❌ ${this.moduleName} 정리 실패:`, error);
-    }
-  }
-
-  /**
-   * 자식 클래스에서 구현할 정리 메서드
-   */
-  async onCleanup() {
-    // 자식 클래스에서 구현
-  }
-
-  /**
-   * 초기화 실패 시 롤백
-   */
-  async rollbackInitialization() {
-    try {
-      this.actionMap.clear();
-      this.userStates.clear();
-      this.isInitialized = false;
-
-      logger.debug(`🔄 ${this.moduleName} 초기화 롤백 완료`);
-    } catch (error) {
-      logger.error(`❌ ${this.moduleName} 롤백 실패:`, error);
     }
   }
 }
