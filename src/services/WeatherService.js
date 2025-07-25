@@ -27,8 +27,9 @@ class WeatherService extends BaseService {
   async getCurrentWeather(city = this.defaultCity) {
     try {
       // 🎯 한국 도시명 → 영어명 매핑
-      const cityMap = {
+      const cityMapping = {
         서울: "Seoul,KR",
+        화성: "Hwaseong,KR",
         부산: "Busan,KR",
         대구: "Daegu,KR",
         인천: "Incheon,KR",
@@ -36,9 +37,6 @@ class WeatherService extends BaseService {
         대전: "Daejeon,KR",
         울산: "Ulsan,KR",
         제주: "Jeju,KR",
-        화성: "Hwaseong,KR",
-        Seoul: "Seoul,KR",
-        Busan: "Busan,KR",
       };
 
       // 매핑된 도시명 사용

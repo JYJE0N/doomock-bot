@@ -412,7 +412,7 @@ ${userName}님의 할일 현황:
 **평균 완료 시간**
 • ${stats.avgCompletionTime}
 
-최근 업데이트: ${this.formatKoreanTime()}`;
+최근 업데이트: ${this.formatDateTime()}`;
 
       const keyboard = {
         inline_keyboard: [
@@ -459,7 +459,7 @@ ${userName}님의 할일 현황:
 
 📝 **${todo.text}**
 
-📅 등록일: ${this.formatKoreanTime(todo.createdAt)}`;
+📅 등록일: ${TimeHelper.formatDateTime(todo.createdAt)}`;
 
       const keyboard = {
         inline_keyboard: [
