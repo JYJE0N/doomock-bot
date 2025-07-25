@@ -151,8 +151,14 @@ class DoomockBot {
       const { getInstance } = require("./src/database/DatabaseManager");
       this.dbManager = getInstance();
 
-      await this.dbManager.connect();
-      logger.success("✅ 데이터베이스 연결 완료");
+      // 연결 완료까지 대기
+      const connected = await this.dbManager.connect();
+
+      if (connected) {
+        logger.success("✅ 데이터베이스 연결 완료");
+      } else {
+        throw new Error("데이터베이스 연결에 실패했습니다");
+      }
     } catch (error) {
       logger.error("❌ 데이터베이스 연결 실패:", error);
       logger.warn("⚠️ 데이터베이스 없이 계속 진행");
