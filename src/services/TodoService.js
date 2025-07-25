@@ -301,6 +301,7 @@ class TodoService extends BaseService {
 
   /**
    * 상세 통계 조회 (TodoModule에서 사용)
+   * getDetailedStats 메서드명을 getUserDetailedStats로 변경
    */
   async getUserDetailedStats(userId) {
     try {
@@ -321,47 +322,51 @@ class TodoService extends BaseService {
         );
       }
 
-      // 오늘 통계
+      // 오늘 날짜 계산
       const todayStart = new Date(now);
       todayStart.setHours(0, 0, 0, 0);
 
-      const todayTodos = todos.filter(
-        (todo) => new Date(todo.createdAt) >= todayStart
-      );
+      // 오늘 추가된 할일
+      const todayAddedTodos = todos.filter((todo) => {
+        const createdDate = new Date(todo.createdAt);
+        return createdDate >= todayStart;
+      });
 
-      const todayCompletedTodos = todos.filter(
-        (todo) =>
-          todo.completed &&
-          todo.completedAt &&
-          new Date(todo.completedAt) >= todayStart
-      );
+      // 오늘 완료된 할일
+      const todayCompletedTodos = todos.filter((todo) => {
+        if (!todo.completed || !todo.completedAt) return false;
+        const completedDate = new Date(todo.completedAt);
+        return completedDate >= todayStart;
+      });
 
-      stats.todayAdded = todayTodos.length;
+      stats.todayAdded = todayAddedTodos.length;
       stats.todayCompleted = todayCompletedTodos.length;
 
-      // 이번주 통계
+      // 이번주 시작일 계산 (일요일 기준)
       const weekStart = new Date(now);
-      weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+      const dayOfWeek = weekStart.getDay();
+      weekStart.setDate(weekStart.getDate() - dayOfWeek);
       weekStart.setHours(0, 0, 0, 0);
 
-      const weekCompletedTodos = todos.filter(
-        (todo) =>
-          todo.completed &&
-          todo.completedAt &&
-          new Date(todo.completedAt) >= weekStart
-      );
+      // 이번주 완료된 할일
+      const weekCompletedTodos = todos.filter((todo) => {
+        if (!todo.completed || !todo.completedAt) return false;
+        const completedDate = new Date(todo.completedAt);
+        return completedDate >= weekStart;
+      });
 
       stats.weekCompleted = weekCompletedTodos.length;
 
-      // 이번달 통계
+      // 이번달 시작일
       const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+      monthStart.setHours(0, 0, 0, 0);
 
-      const monthCompletedTodos = todos.filter(
-        (todo) =>
-          todo.completed &&
-          todo.completedAt &&
-          new Date(todo.completedAt) >= monthStart
-      );
+      // 이번달 완료된 할일
+      const monthCompletedTodos = todos.filter((todo) => {
+        if (!todo.completed || !todo.completedAt) return false;
+        const completedDate = new Date(todo.completedAt);
+        return completedDate >= monthStart;
+      });
 
       stats.monthCompleted = monthCompletedTodos.length;
 
@@ -371,11 +376,12 @@ class TodoService extends BaseService {
       );
 
       if (completedWithTime.length > 0) {
-        const totalTime = completedWithTime.reduce((sum, todo) => {
+        let totalTime = 0;
+        completedWithTime.forEach((todo) => {
           const completedAt = new Date(todo.completedAt);
           const createdAt = new Date(todo.createdAt);
-          return sum + (completedAt.getTime() - createdAt.getTime());
-        }, 0);
+          totalTime += completedAt.getTime() - createdAt.getTime();
+        });
 
         const avgTime = totalTime / completedWithTime.length;
         stats.avgCompletionTime = this.formatDuration(avgTime);
@@ -383,9 +389,11 @@ class TodoService extends BaseService {
         stats.avgCompletionTime = "데이터 없음";
       }
 
+      logger.debug(`📊 상세 통계 조회 완료: userId=${userId}`, stats);
       return stats;
     } catch (error) {
       logger.error("상세 통계 조회 오류:", error);
+      // 에러 발생시 기본값 반환
       return {
         total: 0,
         completed: 0,
