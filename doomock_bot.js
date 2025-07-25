@@ -144,8 +144,12 @@ class DoomockBot {
       }
 
       // ✅ 구조 분해 할당으로 DatabaseManager 가져오기
-      const { DatabaseManager } = require("./src/database/DatabaseManager");
-      this.dbManager = new DatabaseManager(this.config.database.uri);
+      // const { DatabaseManager } = require("./src/database/DatabaseManager");
+      // this.dbManager = new DatabaseManager(this.config.database.uri);
+
+      // ✅ 싱글톤 인스턴스 사용
+      const { getInstance } = require("./src/database/DatabaseManager");
+      this.dbManager = getInstance();
 
       await this.dbManager.connect();
       logger.success("✅ 데이터베이스 연결 완료");
