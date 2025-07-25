@@ -157,6 +157,59 @@ ${userName}님의 할일 현황:
   }
 
   /**
+   * 사용자의 모든 할일 조회 (페이지네이션 지원)
+   */
+  async getUserTodos(userId, page = 1, pageSize = 10) {
+    try {
+      // 컬렉션 확인
+      if (!this.collection) {
+        return {
+          success: false,
+          error: "데이터베이스 연결이 없습니다",
+          todos: [],
+          total: 0,
+          totalPages: 0,
+        };
+      }
+
+      const filter = { userId: userId.toString() };
+
+      // 전체 개수 조회
+      const total = await this.collection.countDocuments(filter);
+
+      // 페이지 계산
+      const totalPages = Math.ceil(total / pageSize);
+      const skip = (page - 1) * pageSize;
+
+      // 할일 목록 조회
+      const todos = await this.collection
+        .find(filter)
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .toArray();
+
+      return {
+        success: true,
+        todos,
+        total,
+        totalPages,
+        currentPage: page,
+        pageSize,
+      };
+    } catch (error) {
+      logger.error("할일 목록 조회 오류:", error);
+      return {
+        success: false,
+        error: error.message,
+        todos: [],
+        total: 0,
+        totalPages: 0,
+      };
+    }
+  }
+
+  /**
    * 할일 목록 표시
    */
   async showTodoList(bot, callbackQuery, params, moduleManager) {
@@ -178,7 +231,20 @@ ${userName}님의 할일 현황:
       );
 
       if (!result.success) {
-        throw new Error(result.error || "할일 목록을 가져올 수 없습니다");
+        // 에러 메시지 표시
+        const errorText = `❌ **오류**\n\n${result.error || "할일 목록을 가져올 수 없습니다"}`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: "🔄 다시 시도", callback_data: "todo:list" }],
+            [{ text: "🔙 뒤로", callback_data: "todo:menu" }],
+          ],
+        };
+
+        await this.editMessage(bot, chatId, messageId, errorText, {
+          reply_markup: keyboard,
+        });
+        return;
       }
 
       const { todos, total, totalPages } = result;
