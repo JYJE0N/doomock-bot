@@ -87,6 +87,23 @@ class BaseModule {
     }
   }
 
+  //에러
+  async handleError(bot, callbackQuery, error) {
+    logger.error(`${this.name} 에러:`, error);
+
+    try {
+      // 콜백 응답
+      if (callbackQuery.id) {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: "❌ 처리 중 오류가 발생했습니다.",
+          show_alert: true,
+        });
+      }
+    } catch (answerError) {
+      logger.error("콜백 응답 실패:", answerError);
+    }
+  }
+
   /**
    * 🎯 액션 등록 메서드 (자식 클래스에서 구현)
    */
