@@ -300,6 +300,7 @@ class DooMockBot {
       bot: this.bot,
       db: db,
       config: this.config,
+      validationManager: this.validationManager, // ✅ 반드시 있어야 함
     });
 
     await this.moduleManager.initialize();
