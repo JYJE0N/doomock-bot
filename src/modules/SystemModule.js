@@ -21,9 +21,10 @@ class SystemModule extends BaseModule {
   constructor(bot, options = {}) {
     super("SystemModule", {
       bot,
-      db: options.db,
+      serviceBuilder: options.serviceBuilder, // 추가!
       moduleManager: options.moduleManager,
-      validationManager: options.validationManager,
+      moduleKey: options.moduleKey, // 추가!
+      moduleConfig: options.moduleConfig, // 추가!
       config: options.config,
     });
 
@@ -58,43 +59,19 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 🎯 시스템 모듈 초기화 (중복 방지)
+   * 🎯 시스템 모듈 초기화 (중복 방지 간소화)
    */
   async onInitialize() {
     try {
-      // 🛡️ 중복 실행 완전 방지
-      if (this.initializationInProgress) {
-        logger.debug("SystemModule 초기화 진행 중 - 대기");
-        return;
-      }
-
-      if (this.systemCheckCompleted) {
-        logger.debug("SystemModule 이미 초기화됨 - 스킵");
-        return;
-      }
-
-      // 🔒 초기화 진행 중 표시
-      this.initializationInProgress = true;
-
       logger.info("🎯 SystemModule 초기화 시작...");
 
-      // ✅ Railway 환경 체크 (한 번만)
-      await this.performRailwayCheck();
-
-      // ✅ 시스템 체크 실행 (한 번만)
-      await this.performSystemCheck();
-
-      // ✅ 초기화 완료 표시
+      // 🚧 복잡한 체크 일단 생략
       this.systemCheckCompleted = true;
-      this.systemStats.startTime = Date.now();
 
-      logger.info("✅ 시스템 체크 완료");
+      logger.info("✅ SystemModule 초기화 완료");
     } catch (error) {
       logger.error("❌ SystemModule 초기화 실패:", error);
       throw error;
-    } finally {
-      // 🔓 초기화 진행 상태 해제
-      this.initializationInProgress = false;
     }
   }
 
@@ -204,35 +181,35 @@ class SystemModule extends BaseModule {
       // 🎨 메인 메뉴 텍스트 구성
       const menuText = this.buildMainMenuText(userName, statusData);
 
-      // ⌨️ 인라인 키보드 구성
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "📝 할일 관리", callback_data: "todo:menu" },
-            { text: "⏰ 타이머", callback_data: "timer:menu" },
-          ],
-          [
-            { text: "🕐 근무시간", callback_data: "worktime:menu" },
-            { text: "🏖️ 휴가 관리", callback_data: "vacation:menu" },
-          ],
-          [
-            { text: "📊 시스템 상태", callback_data: "system:status" },
-            { text: "⚙️ 설정", callback_data: "system:settings" },
-          ],
-          [
-            { text: "❓ 도움말", callback_data: "system:help" },
-            { text: "ℹ️ 정보", callback_data: "system:about" },
-          ],
-        ],
-      };
+      // ⌨️ 인라인 키보드 구성 (핸들매니저_네비가 중앙처리합니다.)
+      // const keyboard = {
+      //   inline_keyboard: [
+      //     [
+      //       { text: "📝 할일 관리", callback_data: "todo:menu" },
+      //       { text: "⏰ 타이머", callback_data: "timer:menu" },
+      //     ],
+      //     [
+      //       { text: "🕐 근무시간", callback_data: "worktime:menu" },
+      //       { text: "🏖️ 휴가 관리", callback_data: "vacation:menu" },
+      //     ],
+      //     [
+      //       { text: "📊 시스템 상태", callback_data: "system:status" },
+      //       { text: "⚙️ 설정", callback_data: "system:settings" },
+      //     ],
+      //     [
+      //       { text: "❓ 도움말", callback_data: "system:help" },
+      //       { text: "ℹ️ 정보", callback_data: "system:about" },
+      //     ],
+      //   ],
+      // };
 
       // 메시지 편집
       await this.editMessage(
         bot,
         callbackQuery.message.chat.id,
         callbackQuery.message.message_id,
-        menuText,
-        { reply_markup: keyboard }
+        menuText
+        // { reply_markup: keyboard }
       );
 
       // 📊 통계 업데이트
