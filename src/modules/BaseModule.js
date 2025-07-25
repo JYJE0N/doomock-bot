@@ -55,11 +55,31 @@ class BaseModule {
     }
   }
 
-  /**
-   * 🎯 자식 클래스에서 오버라이드할 초기화 메서드
-   */
-  async onInitialize() {
-    // 자식 클래스에서 구현
+  // 명령어 추출 메서드
+  extractCommand(text) {
+    if (!text || typeof text !== "string") return null;
+
+    // 슬래시 명령어 처리
+    if (text.startsWith("/")) {
+      const parts = text.split(" ");
+      return {
+        command: parts[0].substring(1),
+        args: parts.slice(1).join(" "),
+      };
+    }
+
+    return null;
+  }
+
+  // 에러 전송 메서드 추가
+  async sendError(chatId, errorMessage = "처리 중 오류가 발생했습니다.") {
+    try {
+      await this.bot.sendMessage(chatId, `❌ ${errorMessage}`, {
+        parse_mode: "HTML",
+      });
+    } catch (error) {
+      this.logger.error("에러 메시지 전송 실패:", error);
+    }
   }
 
   /**
@@ -174,6 +194,12 @@ class BaseModule {
 
       return false;
     }
+  }
+  /**
+   * 🎯 자식 클래스에서 오버라이드할 초기화 메서드
+   */
+  async onInitialize() {
+    // 자식 클래스에서 구현
   }
 
   /**
