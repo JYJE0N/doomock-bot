@@ -30,7 +30,7 @@ class BaseModule {
     this.isActive = true;
 
     // 액션 설정 (자식 클래스에서 구현)
-    this.setupActions();
+    // this.setupActions();
 
     logger.info(`📦 ${this.name} 모듈 생성됨`);
   }
@@ -45,6 +45,11 @@ class BaseModule {
     }
 
     try {
+      // ✅ setupActions를 여기서 호출
+      if (typeof this.setupActions === "function") {
+        this.setupActions();
+      }
+
       // 자식 클래스의 초기화 로직 호출
       await this.onInitialize();
       this.isInitialized = true;
@@ -75,10 +80,10 @@ class BaseModule {
   async sendError(chatId, errorMessage = "처리 중 오류가 발생했습니다.") {
     try {
       await this.bot.sendMessage(chatId, `❌ ${errorMessage}`, {
-        parse_mode: "HTML",
+        parse_mode: "Markdown",
       });
     } catch (error) {
-      this.logger.error("에러 메시지 전송 실패:", error);
+      logger.error(`${this.name} 에러 메시지 전송 실패:`, error);
     }
   }
 

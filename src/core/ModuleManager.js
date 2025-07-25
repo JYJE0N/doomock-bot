@@ -78,18 +78,21 @@ class ModuleManager {
   async loadModules() {
     for (const [key, config] of Object.entries(this.moduleRegistry)) {
       try {
+        logger.info(`📦 ${config.class} 모듈 생성 중...`);
+
         const ModuleClass = require(config.path);
         const moduleInstance = new ModuleClass(this.bot, {
-          db: this.db,
+          db: this.db, // ✅ this.db를 직접 전달
           moduleManager: this,
         });
 
-        // 모듈 초기화
-        if (moduleInstance.initialize) {
-          await moduleInstance.initialize();
+        // ✅ DB가 있으면 모듈에 설정
+        if (this.db && moduleInstance) {
+          moduleInstance.db = this.db;
         }
 
-        this.moduleInstances.set(config.class, moduleInstance);
+        // 모듈 초기화
+        await moduleInstance.initialize();
 
         // ✅ 타이머 모듈의 서비스 참조 저장
         if (config.class === "TimerModule" && moduleInstance.timerService) {
@@ -98,12 +101,16 @@ class ModuleManager {
         }
 
         // ✅ 리마인더 모듈의 서비스 참조 저장
-        if (config.class === "ReminderModule" && moduleInstance.reminderService) {
+        if (
+          config.class === "ReminderModule" &&
+          moduleInstance.reminderService
+        ) {
           this.services.reminderService = moduleInstance.reminderService;
           logger.debug("✅ ReminderService 참조 저장됨");
         }
 
-        logger.debug(`✅ ${config.class} 로드 완료`);
+        this.moduleInstances.set(key, moduleInstance);
+        logger.info(`✅ ${config.class} 로드 완료`);
       } catch (error) {
         logger.error(`❌ ${config.class} 로드 실패:`, error);
       }
@@ -139,7 +146,14 @@ class ModuleManager {
    */
   async handleTimerCompletion(completionData) {
     try {
-      const { userId, taskName, plannedDuration, actualDuration, startTime, endTime } = completionData;
+      const {
+        userId,
+        taskName,
+        plannedDuration,
+        actualDuration,
+        startTime,
+        endTime,
+      } = completionData;
 
       const completionText = `🎉 **타이머 완료!**
 
@@ -149,9 +163,11 @@ class ModuleManager {
 🕐 **시작**: ${TimeHelper.formatTime(startTime)}
 🕕 **완료**: ${TimeHelper.formatTime(endTime)}
 
-${actualDuration >= plannedDuration 
-  ? "👏 계획된 시간을 모두 채우셨네요!" 
-  : "⚡ 계획보다 일찍 완료하셨습니다!"}
+${
+  actualDuration >= plannedDuration
+    ? "👏 계획된 시간을 모두 채우셨네요!"
+    : "⚡ 계획보다 일찍 완료하셨습니다!"
+}
 
 수고하셨습니다! 🎊`;
 
@@ -174,8 +190,9 @@ ${actualDuration >= plannedDuration
         reply_markup: keyboard,
       });
 
-      logger.info(`🎯 타이머 완료 알림 전송: 사용자 ${userId}, 작업 "${taskName}"`);
-
+      logger.info(
+        `🎯 타이머 완료 알림 전송: 사용자 ${userId}, 작업 "${taskName}"`
+      );
     } catch (error) {
       logger.error("타이머 완료 알림 전송 실패:", error);
     }
@@ -218,7 +235,10 @@ ${message}
         keyboard = {
           inline_keyboard: [
             [
-              { text: `☕ 휴식 시작 (${nextDuration}분)`, callback_data: `timer:pomodoro:break:${nextDuration === 15 ? 'long' : 'short'}` },
+              {
+                text: `☕ 휴식 시작 (${nextDuration}분)`,
+                callback_data: `timer:pomodoro:break:${nextDuration === 15 ? "long" : "short"}`,
+              },
             ],
             [
               { text: "⏹️ 세션 종료", callback_data: "timer:stop" },
@@ -227,7 +247,6 @@ ${message}
             [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
           ],
         };
-
       } else {
         // 휴식 완료 → 다음 작업 준비
         completionText = `☕ **휴식 완료!**
@@ -244,7 +263,10 @@ ${message}
         keyboard = {
           inline_keyboard: [
             [
-              { text: `🍅 포모도로 시작 (${nextDuration}분)`, callback_data: "timer:pomodoro:start" },
+              {
+                text: `🍅 포모도로 시작 (${nextDuration}분)`,
+                callback_data: "timer:pomodoro:start",
+              },
             ],
             [
               { text: "⏹️ 세션 종료", callback_data: "timer:stop" },
@@ -261,8 +283,9 @@ ${message}
         reply_markup: keyboard,
       });
 
-      logger.info(`🍅 포모도로 완료 알림 전송: 사용자 ${userId}, ${completedMode} → ${nextMode}, 세션 ${sessionCount}`);
-
+      logger.info(
+        `🍅 포모도로 완료 알림 전송: 사용자 ${userId}, ${completedMode} → ${nextMode}, 세션 ${sessionCount}`
+      );
     } catch (error) {
       logger.error("포모도로 완료 알림 전송 실패:", error);
     }
@@ -479,7 +502,9 @@ ${message}
     const moduleStatuses = {};
 
     for (const [name, module] of this.moduleInstances) {
-      moduleStatuses[name] = module.getStatus ? module.getStatus() : { active: true };
+      moduleStatuses[name] = module.getStatus
+        ? module.getStatus()
+        : { active: true };
     }
 
     return {
