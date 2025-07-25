@@ -4,7 +4,7 @@ const logger = require("./src/utils/Logger");
 const TimeHelper = require("./src/utils/TimeHelper");
 
 // 🏗️ 핵심 시스템들
-const { DatabaseManager } = require("./src/database/DatabaseManager");
+const DatabaseManager = require("./src/database/DatabaseManager");
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
@@ -82,9 +82,15 @@ class DooMockBot {
       await this.initializeTelegrafBot();
       await this.initializeDatabaseManager();
       await this.initializeValidationManager();
-      await this.initializeHealthChecker();
+      await this.initializeHealthChecker(); // 생성만 함, start()는 나중에
       await this.initializeModuleManager();
       await this.initializeBotController();
+
+      // 🏥 모든 컴포넌트가 초기화된 후 헬스체커 시작
+      if (this.healthChecker && this.config.enableHealthCheck) {
+        await this.healthChecker.start();
+        logger.info("🏥 헬스체커 시작됨");
+      }
 
       // 봇 시작
       await this.startBot();
@@ -227,6 +233,9 @@ class DooMockBot {
   async initializeDatabaseManager() {
     logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
 
+    // DatabaseManager를 올바르게 import
+    const { DatabaseManager } = require("./src/database/DatabaseManager");
+
     // 직접 인스턴스 생성 (mongoUrl만 전달)
     this.dbManager = new DatabaseManager(this.config.mongoUri);
 
@@ -255,7 +264,7 @@ class DooMockBot {
   }
 
   /**
-   * 🏥 헬스체커 초기화
+   * 🏥 헬스체커 초기화 (start()는 나중에)
    */
   async initializeHealthChecker() {
     if (!this.config.enableHealthCheck) {
@@ -268,14 +277,14 @@ class DooMockBot {
     this.healthChecker = new HealthChecker({
       checkInterval: this.config.isRailway ? 120000 : 60000,
       components: {
-        database: this.dbManager,
+        database: () => this.dbManager,
         moduleManager: () => this.moduleManager,
         botController: () => this.botController,
-        validationManager: this.validationManager,
+        validationManager: () => this.validationManager,
       },
     });
 
-    await this.healthChecker.start();
+    // 여기서는 start()를 호출하지 않음!
     logger.debug("✅ 헬스체커 초기화 완료");
   }
 
@@ -285,7 +294,8 @@ class DooMockBot {
   async initializeModuleManager() {
     logger.info("📦 모듈 매니저 초기화 중...");
 
-    const db = await this.dbManager.getDb();
+    // dbManager.db 직접 접근
+    const db = this.dbManager.db;
 
     this.moduleManager = new ModuleManager({
       bot: this.bot,
@@ -302,8 +312,6 @@ class DooMockBot {
    */
   async initializeBotController() {
     logger.info("🎮 봇 컨트롤러 초기화 중...");
-
-    const db = await this.dbManager.getDb();
 
     this.botController = new BotController({
       bot: this.bot,
