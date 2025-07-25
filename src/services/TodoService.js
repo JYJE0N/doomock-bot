@@ -12,10 +12,13 @@ const { ObjectId } = require("mongodb");
  * - MongoDB 네이티브 드라이버 사용
  */
 class TodoService extends BaseService {
-  constructor() {
+  constructor(options = {}) {
+    // BaseService에 올바른 options 전달
     super("todos", {
+      db: options.db,
       enableCache: true,
       cacheTimeout: 60000, // 1분
+      ...options, // 추가 옵션 병합
     });
 
     // 설정
@@ -29,6 +32,14 @@ class TodoService extends BaseService {
       // 부모 클래스 초기화 (인덱스 생성 포함)
       await super.initialize();
 
+      // collection 확인
+      if (!this.collection) {
+        logger.error("❌ TodoService: collection이 초기화되지 않음");
+        logger.debug("db 상태:", this.db ? "있음" : "없음");
+        logger.debug("collectionName:", this.collectionName);
+        throw new Error("Database collection not initialized");
+      }
+
       // 추가 인덱스 생성 (안전하게)
       await this.createIndexesSafely();
 
@@ -36,9 +47,14 @@ class TodoService extends BaseService {
       return true;
     } catch (error) {
       logger.error("❌ TodoService 초기화 실패:", error);
-      // 초기화 실패해도 서비스는 동작하도록
       return false;
     }
+  }
+
+  // BaseService에서 호출하는 메서드
+  async onInitialize() {
+    // 추가 초기화 로직이 필요한 경우
+    logger.debug("📝 TodoService onInitialize 호출됨");
   }
 
   /**

@@ -34,9 +34,19 @@ class TodoModule extends BaseModule {
    */
   async onInitialize() {
     try {
+      // TodoService에 db 전달하여 생성
       this.todoService = new TodoService();
-      this.todoService.db = this.db; // DB 연결 전달
+
+      // BaseService가 db를 받을 수 있도록 직접 설정
+      this.todoService.db = this.db;
+
+      // 초기화 실행
       await this.todoService.initialize();
+
+      // 초기화 성공 확인
+      if (!this.todoService.collection) {
+        throw new Error("TodoService collection이 초기화되지 않음");
+      }
 
       logger.info("📝 TodoService 연결 성공");
     } catch (error) {

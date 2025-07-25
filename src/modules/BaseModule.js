@@ -39,23 +39,36 @@ class BaseModule {
    * 🎯 모듈 초기화 (비동기)
    */
   async initialize() {
-    if (this.isInitialized) {
-      logger.warn(`${this.name} 이미 초기화됨`);
-      return;
-    }
-
     try {
-      // ✅ setupActions를 여기서 호출
-      if (typeof this.setupActions === "function") {
-        this.setupActions();
+      // db가 options에서 왔는지 확인
+      if (!this.db && this.options && this.options.db) {
+        this.db = this.options.db;
+        logger.debug(`${this.constructor.name}: options에서 db 설정`);
       }
 
-      // 자식 클래스의 초기화 로직 호출
-      await this.onInitialize();
-      this.isInitialized = true;
-      logger.info(`✅ ${this.name} 초기화 완료`);
+      // db와 collectionName이 있을 때만 collection 설정
+      if (this.db && this.collectionName) {
+        this.collection = this.db.collection(this.collectionName);
+        logger.debug(
+          `${this.constructor.name}: collection 설정 완료 - ${this.collectionName}`
+        );
+
+        // 인덱스 생성 (자식 클래스에서 정의)
+        await this.createIndexes();
+      } else {
+        logger.warn(
+          `${this.constructor.name}: DB 연결 없음 - 메모리 모드로 동작`
+        );
+      }
+
+      // 자식 클래스의 초기화 로직
+      if (typeof this.onInitialize === "function") {
+        await this.onInitialize();
+      }
+
+      logger.info(`✅ ${this.constructor.name} 초기화 완료`);
     } catch (error) {
-      logger.error(`❌ ${this.name} 초기화 실패:`, error);
+      logger.error(`❌ ${this.constructor.name} 초기화 실패:`, error);
       throw error;
     }
   }

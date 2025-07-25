@@ -286,6 +286,83 @@ class BaseService {
   }
 
   /**
+   * 여러 문서 조회
+   */
+  async find(filter = {}, options = {}) {
+    try {
+      // collection이 없으면 빈 배열 반환
+      if (!this.collection) {
+        logger.error(`${this.constructor.name}: collection이 초기화되지 않음`);
+        return [];
+      }
+
+      const { sort = { createdAt: -1 }, limit = 100, skip = 0 } = options;
+
+      const documents = await this.collection
+        .find(filter)
+        .sort(sort)
+        .skip(skip)
+        .limit(limit)
+        .toArray();
+
+      return documents;
+    } catch (error) {
+      logger.error(`${this.constructor.name} 목록 조회 오류:`, error);
+      // 에러 발생시에도 빈 배열 반환하여 서비스 중단 방지
+      return [];
+    }
+  }
+
+  /**
+   * 문서 조회 (findOne도 안전하게)
+   */
+  async findOne(filter, options = {}) {
+    try {
+      if (!this.collection) {
+        logger.error(`${this.constructor.name}: collection이 초기화되지 않음`);
+        return null;
+      }
+
+      // 캐시 확인
+      const cacheKey = JSON.stringify({ filter, options });
+      if (this.config.enableCache && this.cache.has(cacheKey)) {
+        if (this.isCacheValid(cacheKey)) {
+          return this.cache.get(cacheKey);
+        }
+      }
+
+      const document = await this.collection.findOne(filter, options);
+
+      // 캐시 저장
+      if (this.config.enableCache && document) {
+        this.setCache(cacheKey, document);
+      }
+
+      return document;
+    } catch (error) {
+      logger.error(`${this.constructor.name} 조회 오류:`, error);
+      return null;
+    }
+  }
+
+  /**
+   * 카운트 (안전한 버전)
+   */
+  async count(filter = {}) {
+    try {
+      if (!this.collection) {
+        logger.error(`${this.constructor.name}: collection이 초기화되지 않음`);
+        return 0;
+      }
+
+      return await this.collection.countDocuments(filter);
+    } catch (error) {
+      logger.error(`${this.constructor.name} 카운트 오류:`, error);
+      return 0;
+    }
+  }
+
+  /**
    * 서비스 상태 조회
    */
   getStatus() {
