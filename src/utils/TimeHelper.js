@@ -1,199 +1,271 @@
-// src/utils/TimeHelper.js - 한국 시간 헬퍼
+// src/utils/TimeHelper.js - 호환성 수정된 시간 헬퍼
 const moment = require("moment-timezone");
 
 /**
- * ⏰ TimeHelper - 한국 시간 헬퍼
- *
- * 비유: 세계 시계를 한국 시간으로 맞춰주는 시계 수리공
- * - 어떤 시간대에서도 정확한 한국 시간을 보여주고
- * - 날짜와 시간을 읽기 쉽게 변환하며
- * - 시간 계산을 쉽게 해줍니다
- *
- * 특징:
- * - 한국 표준시(KST) 자동 변환
- * - 다양한 포맷 지원
- * - 상대적 시간 표현
+ * 🕐 시간 헬퍼 - 한국 시간 전용
+ * - 모든 시간은 KST (Asia/Seoul) 기준
  * - Railway 환경 최적화
+ * - 다양한 형식 지원
+ * - 업무 시간 계산 특화
  */
 class TimeHelper {
   constructor() {
-    // 기본 시간대를 한국으로 설정
     this.timezone = "Asia/Seoul";
+
+    // 한국어 로케일 설정
+    moment.locale("ko");
     moment.tz.setDefault(this.timezone);
 
-    // 자주 사용하는 포맷
+    // 기본 형식들
     this.formats = {
-      full: "YYYY년 MM월 DD일 HH시 mm분 ss초",
-      date: "YYYY년 MM월 DD일",
-      time: "HH시 mm분",
-      short: "MM/DD HH:mm",
-      file: "YYYY-MM-DD_HHmmss",
+      full: "YYYY년 MM월 DD일 dddd HH:mm:ss",
+      date: "YYYY-MM-DD",
+      time: "HH:mm:ss",
+      short: "MM-DD HH:mm",
       log: "YYYY-MM-DD HH:mm:ss",
-      day: "YYYY년 MM월 DD일 (ddd)",
-      month: "YYYY년 MM월",
-      year: "YYYY년",
+      display: "MM월 DD일 (ddd) HH:mm",
+      korean: "YYYY년 MM월 DD일",
+      timestamp: "YYMMDDHHmm",
     };
-
-    // 요일 한글 설정
-    moment.locale("ko", {
-      weekdays: [
-        "일요일",
-        "월요일",
-        "화요일",
-        "수요일",
-        "목요일",
-        "금요일",
-        "토요일",
-      ],
-      weekdaysShort: ["일", "월", "화", "수", "목", "금", "토"],
-      months: [
-        "1월",
-        "2월",
-        "3월",
-        "4월",
-        "5월",
-        "6월",
-        "7월",
-        "8월",
-        "9월",
-        "10월",
-        "11월",
-        "12월",
-      ],
-    });
   }
 
+  // ===== 현재 시간 =====
+
   /**
-   * 현재 한국 시간 가져오기
+   * 현재 KST 시간 (moment 객체)
    */
   now() {
-    return moment().tz(this.timezone);
+    return moment.tz(this.timezone);
   }
 
   /**
-   * Date 객체를 한국 시간으로 변환
+   * 현재 시간을 다양한 형식으로 반환
+   */
+  getCurrentTime(format = "log") {
+    const now = this.now();
+
+    switch (format) {
+      case "full":
+        return now.format(this.formats.full);
+      case "date":
+        return now.format(this.formats.date);
+      case "time":
+        return now.format(this.formats.time);
+      case "short":
+        return now.format(this.formats.short);
+      case "log":
+        return now.format(this.formats.log);
+      case "display":
+        return now.format(this.formats.display);
+      case "korean":
+        return now.format(this.formats.korean);
+      case "timestamp":
+        return now.format(this.formats.timestamp);
+      default:
+        return now.format(format);
+    }
+  }
+
+  /**
+   * 로그용 시간 문자열 (호환성)
+   */
+  getLogTimeString() {
+    return this.getCurrentTime("log");
+  }
+
+  /**
+   * 짧은 시간 문자열 (호환성)
+   */
+  getShortTimeString() {
+    return this.getCurrentTime("short");
+  }
+
+  /**
+   * 타임스탬프 (호환성)
+   */
+  getTimestamp() {
+    return this.now().valueOf(); // 밀리초 단위 타임스탬프
+  }
+
+  // ===== 포맷팅 =====
+
+  /**
+   * 날짜를 지정된 형식으로 포맷
+   */
+  format(date, format = "log") {
+    const momentDate = this.toKST(date);
+
+    if (this.formats[format]) {
+      return momentDate.format(this.formats[format]);
+    }
+
+    return momentDate.format(format);
+  }
+
+  /**
+   * 임의의 시간을 KST로 변환
    */
   toKST(date) {
-    return moment(date).tz(this.timezone);
+    if (!date) return this.now();
+
+    if (moment.isMoment(date)) {
+      return date.tz(this.timezone);
+    }
+
+    return moment.tz(date, this.timezone);
   }
 
   /**
-   * 포맷된 현재 시간 문자열
-   */
-  getCurrentTime(format = "full") {
-    const fmt = this.formats[format] || format;
-    return this.now().format(fmt);
-  }
-
-  /**
-   * 날짜 포맷팅
-   */
-  format(date, format = "full") {
-    const fmt = this.formats[format] || format;
-    return this.toKST(date).format(fmt);
-  }
-
-  /**
-   * 상대적 시간 표현 (예: 3분 전, 2시간 후)
-   */
-  fromNow(date) {
-    return this.toKST(date).fromNow();
-  }
-
-  /**
-   * 두 날짜 사이의 차이
-   */
-  diff(date1, date2, unit = "days") {
-    const d1 = this.toKST(date1);
-    const d2 = this.toKST(date2);
-    return d1.diff(d2, unit);
-  }
-
-  /**
-   * 날짜 더하기/빼기
-   */
-  add(date, amount, unit) {
-    return this.toKST(date).add(amount, unit);
-  }
-
-  subtract(date, amount, unit) {
-    return this.toKST(date).subtract(amount, unit);
-  }
-
-  /**
-   * 오늘 날짜 (시간 제외)
+   * 오늘 날짜 (00:00:00)
    */
   today() {
     return this.now().startOf("day");
   }
 
   /**
-   * 이번 주 시작일 (월요일)
+   * 어제 날짜
    */
-  startOfWeek() {
+  yesterday() {
+    return this.now().subtract(1, "day").startOf("day");
+  }
+
+  /**
+   * 내일 날짜
+   */
+  tomorrow() {
+    return this.now().add(1, "day").startOf("day");
+  }
+
+  /**
+   * 이번 주 시작 (월요일)
+   */
+  thisWeekStart() {
     return this.now().startOf("isoWeek");
   }
 
   /**
-   * 이번 달 시작일
+   * 이번 달 시작
    */
-  startOfMonth() {
+  thisMonthStart() {
     return this.now().startOf("month");
   }
 
+  // ===== 시간 계산 =====
+
   /**
-   * 날짜가 오늘인지 확인
+   * 두 시간 사이의 차이 계산
    */
-  isToday(date) {
-    return this.toKST(date).isSame(this.today(), "day");
+  diff(startTime, endTime, unit = "minutes") {
+    const start = this.toKST(startTime);
+    const end = this.toKST(endTime);
+
+    return end.diff(start, unit);
   }
 
   /**
-   * 날짜가 이번 주인지 확인
+   * 시간 더하기
    */
-  isThisWeek(date) {
-    const weekStart = this.startOfWeek();
-    const weekEnd = weekStart.clone().endOf("isoWeek");
-    const targetDate = this.toKST(date);
-    return targetDate.isBetween(weekStart, weekEnd, "day", "[]");
+  add(date, amount, unit = "minutes") {
+    return this.toKST(date).add(amount, unit);
   }
 
   /**
-   * 날짜가 이번 달인지 확인
+   * 시간 빼기
    */
-  isThisMonth(date) {
-    return this.toKST(date).isSame(this.now(), "month");
+  subtract(date, amount, unit = "minutes") {
+    return this.toKST(date).subtract(amount, unit);
   }
 
   /**
-   * 영업일 계산 (주말 제외)
+   * 업무 시간 계산 (점심시간 제외)
    */
-  addBusinessDays(date, days) {
-    let current = this.toKST(date);
-    let added = 0;
+  calculateWorkHours(checkIn, checkOut, lunchMinutes = 60) {
+    const start = this.toKST(checkIn);
+    const end = this.toKST(checkOut);
 
-    while (added < days) {
-      current = current.add(1, "day");
-      // 주말이 아니면 카운트
-      if (current.day() !== 0 && current.day() !== 6) {
-        added++;
-      }
-    }
+    // 총 근무 시간 (분)
+    const totalMinutes = end.diff(start, "minutes");
 
-    return current;
+    // 점심시간 제외
+    const workMinutes = Math.max(0, totalMinutes - lunchMinutes);
+
+    const hours = Math.floor(workMinutes / 60);
+    const minutes = workMinutes % 60;
+
+    return {
+      hours,
+      minutes,
+      totalMinutes: workMinutes,
+      formatted: `${hours}시간 ${minutes}분`,
+    };
+  }
+
+  // ===== 업무 관련 =====
+
+  /**
+   * 업무일인지 확인 (월~금)
+   */
+  isWorkday(date = null) {
+    const d = date ? this.toKST(date) : this.now();
+    const dayOfWeek = d.day();
+    return dayOfWeek >= 1 && dayOfWeek <= 5; // 1=월요일, 5=금요일
   }
 
   /**
-   * 두 날짜 사이의 영업일 수
+   * 주말인지 확인
    */
-  businessDaysBetween(startDate, endDate) {
+  isWeekend(date = null) {
+    return !this.isWorkday(date);
+  }
+
+  /**
+   * 업무 시간대인지 확인
+   */
+  isWorkTime(date = null, startHour = 9, endHour = 18) {
+    const d = date ? this.toKST(date) : this.now();
+    const hour = d.hour();
+
+    return this.isWorkday(d) && hour >= startHour && hour < endHour;
+  }
+
+  /**
+   * 다음 업무일 찾기
+   */
+  nextWorkday(date = null) {
+    let d = date ? this.toKST(date) : this.now();
+
+    do {
+      d = d.add(1, "day");
+    } while (!this.isWorkday(d));
+
+    return d;
+  }
+
+  /**
+   * 이전 업무일 찾기
+   */
+  previousWorkday(date = null) {
+    let d = date ? this.toKST(date) : this.now();
+
+    do {
+      d = d.subtract(1, "day");
+    } while (!this.isWorkday(d));
+
+    return d;
+  }
+
+  /**
+   * 특정 기간의 업무일 수 계산
+   */
+  countWorkdays(startDate, endDate) {
     const start = this.toKST(startDate);
     const end = this.toKST(endDate);
+
     let count = 0;
     let current = start.clone();
 
     while (current.isSameOrBefore(end, "day")) {
-      if (current.day() !== 0 && current.day() !== 6) {
+      if (this.isWorkday(current)) {
         count++;
       }
       current.add(1, "day");
@@ -202,12 +274,23 @@ class TimeHelper {
     return count;
   }
 
+  // ===== 상대 시간 =====
+
+  /**
+   * 상대 시간 표시 (예: "3분 전", "2시간 후")
+   */
+  fromNow(date) {
+    return this.toKST(date).fromNow();
+  }
+
   /**
    * 시간을 읽기 쉬운 형태로 변환
    */
   humanize(duration, unit = "milliseconds") {
     return moment.duration(duration, unit).humanize();
   }
+
+  // ===== 파싱 =====
 
   /**
    * 날짜 파싱 (다양한 형식 지원)
@@ -227,9 +310,68 @@ class TimeHelper {
       "YYYY-MM-DD HH:mm",
       "MM/DD/YYYY",
       "MM-DD-YYYY",
+      "HH:mm",
+      "HH:mm:ss",
     ];
 
     return moment.tz(dateString, formats, this.timezone);
+  }
+
+  /**
+   * 시간 문자열을 분으로 변환 (예: "09:30" -> 570)
+   */
+  timeToMinutes(timeString) {
+    const [hours, minutes] = timeString.split(":").map(Number);
+    return hours * 60 + (minutes || 0);
+  }
+
+  /**
+   * 분을 시간 문자열로 변환 (예: 570 -> "09:30")
+   */
+  minutesToTime(minutes) {
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours.toString().padStart(2, "0")}:${mins
+      .toString()
+      .padStart(2, "0")}`;
+  }
+
+  // ===== 특수 계산 =====
+
+  /**
+   * D-Day 계산
+   */
+  getDDay(targetDate) {
+    const target = this.toKST(targetDate).startOf("day");
+    const today = this.today();
+    const diff = target.diff(today, "days");
+
+    if (diff === 0) return "D-Day";
+    if (diff > 0) return `D-${diff}`;
+    return `D+${Math.abs(diff)}`;
+  }
+
+  /**
+   * 나이 계산
+   */
+  getAge(birthDate) {
+    return this.now().diff(this.toKST(birthDate), "years");
+  }
+
+  /**
+   * 월의 마지막 날
+   */
+  lastDayOfMonth(date = null) {
+    const d = date ? this.toKST(date) : this.now();
+    return d.endOf("month").date();
+  }
+
+  /**
+   * 주차 계산
+   */
+  getWeekNumber(date = null) {
+    const d = date ? this.toKST(date) : this.now();
+    return d.isoWeek();
   }
 
   /**
@@ -261,40 +403,106 @@ class TimeHelper {
     return next;
   }
 
+  // ===== 검증 =====
+
   /**
-   * 나이 계산
+   * 유효한 날짜인지 확인
    */
-  getAge(birthDate) {
-    return this.now().diff(this.toKST(birthDate), "years");
+  isValid(date) {
+    return moment(date).isValid();
   }
 
   /**
-   * D-Day 계산
+   * 오늘인지 확인
    */
-  getDDay(targetDate) {
-    const target = this.toKST(targetDate).startOf("day");
-    const today = this.today();
-    const diff = target.diff(today, "days");
-
-    if (diff === 0) return "D-Day";
-    if (diff > 0) return `D-${diff}`;
-    return `D+${Math.abs(diff)}`;
+  isToday(date) {
+    return this.toKST(date).isSame(this.today(), "day");
   }
 
   /**
-   * 월의 마지막 날
+   * 어제인지 확인
    */
-  lastDayOfMonth(date = null) {
-    const d = date ? this.toKST(date) : this.now();
-    return d.endOf("month").date();
+  isYesterday(date) {
+    return this.toKST(date).isSame(this.yesterday(), "day");
   }
 
   /**
-   * 주차 계산
+   * 내일인지 확인
    */
-  getWeekNumber(date = null) {
-    const d = date ? this.toKST(date) : this.now();
-    return d.isoWeek();
+  isTomorrow(date) {
+    return this.toKST(date).isSame(this.tomorrow(), "day");
+  }
+
+  /**
+   * 과거인지 확인
+   */
+  isPast(date) {
+    return this.toKST(date).isBefore(this.now());
+  }
+
+  /**
+   * 미래인지 확인
+   */
+  isFuture(date) {
+    return this.toKST(date).isAfter(this.now());
+  }
+
+  // ===== 형식 시간 (새로 추가된 호환성 메서드들) =====
+
+  /**
+   * Date 객체를 한국 시간 문자열로 포맷 (호환성)
+   */
+  formatTime(date) {
+    return this.format(date, "log");
+  }
+
+  /**
+   * 현재 시간을 표시용으로 포맷 (호환성)
+   */
+  getDisplayTime() {
+    return this.getCurrentTime("display");
+  }
+
+  /**
+   * 간단한 날짜 형식 (호환성)
+   */
+  getSimpleDate() {
+    return this.getCurrentTime("date");
+  }
+
+  /**
+   * 현재 시간만 (HH:mm 형식)
+   */
+  getCurrentTimeOnly() {
+    return this.now().format("HH:mm");
+  }
+
+  // ===== 디버그 및 정보 =====
+
+  /**
+   * 현재 설정 정보
+   */
+  getInfo() {
+    return {
+      timezone: this.timezone,
+      currentTime: this.getCurrentTime("full"),
+      formats: this.formats,
+      locale: moment.locale(),
+    };
+  }
+
+  /**
+   * 시간대 목록
+   */
+  getTimezones() {
+    return moment.tz.names();
+  }
+
+  /**
+   * 로케일 목록
+   */
+  getLocales() {
+    return moment.locales();
   }
 }
 

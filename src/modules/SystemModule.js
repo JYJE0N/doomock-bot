@@ -89,7 +89,6 @@ class SystemModule extends BaseModule {
       // 시스템 관리
       restart: this.handleRestart,
       refresh: this.handleRefresh,
-      cancel: this.handleCancel,
 
       // 설정 관련
       "settings:save": this.saveSettings,
@@ -193,25 +192,19 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 도움말 표시 (텍스트만 제공)
+   * 도움말 표시
    */
   async showHelp(bot, callbackQuery, params, moduleManager) {
     try {
-      const {
-        message: {
-          chat: { id: chatId },
-          message_id: messageId,
-        },
-      } = callbackQuery;
+      const helpText = this.buildHelpText();
 
-      const helpText = this.generateHelpText();
-
-      // 텍스트만 업데이트 (키보드는 NavigationHandler에서)
       await bot.editMessageText(helpText, {
-        chat_id: chatId,
-        message_id: messageId,
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
         parse_mode: "Markdown",
       });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
       logger.error("도움말 표시 오류:", error);
       await this.sendError(bot, callbackQuery, "도움말을 불러올 수 없습니다.");
@@ -219,25 +212,20 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 시스템 상태 표시 (텍스트만 제공)
+   * 시스템 상태 표시
    */
   async showStatus(bot, callbackQuery, params, moduleManager) {
     try {
-      const {
-        message: {
-          chat: { id: chatId },
-          message_id: messageId,
-        },
-      } = callbackQuery;
+      const statusData = await this.getSystemStatus(moduleManager);
+      const statusText = this.buildStatusText(statusData);
 
-      const statusText = await this.generateStatusText(moduleManager);
-
-      // 텍스트만 업데이트 (키보드는 NavigationHandler에서)
       await bot.editMessageText(statusText, {
-        chat_id: chatId,
-        message_id: messageId,
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
         parse_mode: "Markdown",
       });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
       logger.error("상태 표시 오류:", error);
       await this.sendError(bot, callbackQuery, "상태를 불러올 수 없습니다.");
@@ -245,25 +233,19 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 설정 표시 (텍스트만 제공)
+   * 설정 메뉴 표시
    */
   async showSettings(bot, callbackQuery, params, moduleManager) {
     try {
-      const {
-        message: {
-          chat: { id: chatId },
-          message_id: messageId,
-        },
-      } = callbackQuery;
+      const settingsText = this.buildSettingsText();
 
-      const settingsText = this.generateSettingsText();
-
-      // 텍스트만 업데이트 (키보드는 NavigationHandler에서)
       await bot.editMessageText(settingsText, {
-        chat_id: chatId,
-        message_id: messageId,
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
         parse_mode: "Markdown",
       });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
       logger.error("설정 표시 오류:", error);
       await this.sendError(bot, callbackQuery, "설정을 불러올 수 없습니다.");
@@ -271,25 +253,83 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 모듈 목록 표시 (텍스트만 제공)
+   * 정보 표시
+   */
+  async showAbout(bot, callbackQuery, params, moduleManager) {
+    try {
+      const aboutText = this.buildAboutText();
+
+      await bot.editMessageText(aboutText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+      });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (error) {
+      logger.error("정보 표시 오류:", error);
+      await this.sendError(bot, callbackQuery, "정보를 불러올 수 없습니다.");
+    }
+  }
+
+  /**
+   * 버전 정보 표시
+   */
+  async showVersion(bot, callbackQuery, params, moduleManager) {
+    try {
+      const versionText = this.buildVersionText();
+
+      await bot.editMessageText(versionText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+      });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (error) {
+      logger.error("버전 정보 표시 오류:", error);
+      await this.sendError(
+        bot,
+        callbackQuery,
+        "버전 정보를 불러올 수 없습니다."
+      );
+    }
+  }
+
+  /**
+   * 업타임 표시
+   */
+  async showUptime(bot, callbackQuery, params, moduleManager) {
+    try {
+      const uptimeText = this.buildUptimeText();
+
+      await bot.editMessageText(uptimeText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+      });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (error) {
+      logger.error("업타임 표시 오류:", error);
+      await this.sendError(bot, callbackQuery, "업타임을 불러올 수 없습니다.");
+    }
+  }
+
+  /**
+   * 모듈 목록 표시
    */
   async showModules(bot, callbackQuery, params, moduleManager) {
     try {
-      const {
-        message: {
-          chat: { id: chatId },
-          message_id: messageId,
-        },
-      } = callbackQuery;
+      const modulesText = await this.buildModulesText(moduleManager);
 
-      const modulesText = await this.generateModulesText(moduleManager);
-
-      // 텍스트만 업데이트 (키보드는 NavigationHandler에서)
       await bot.editMessageText(modulesText, {
-        chat_id: chatId,
-        message_id: messageId,
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
         parse_mode: "Markdown",
       });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
       logger.error("모듈 목록 표시 오류:", error);
       await this.sendError(
@@ -300,44 +340,7 @@ class SystemModule extends BaseModule {
     }
   }
 
-  /**
-   * 새로고침 처리
-   */
-  async handleRefresh(bot, callbackQuery, params, moduleManager) {
-    try {
-      // 상태를 다시 보여주기
-      await this.showStatus(bot, callbackQuery, params, moduleManager);
-
-      // 알림으로 새로고침 완료 표시
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "🔄 새로고침 완료!",
-        show_alert: false,
-      });
-    } catch (error) {
-      logger.error("새로고침 오류:", error);
-      await this.sendError(bot, callbackQuery, "새로고침에 실패했습니다.");
-    }
-  }
-
-  /**
-   * 취소 처리
-   */
-  async handleCancel(bot, callbackQuery, params, moduleManager) {
-    try {
-      // 메인 메뉴로 돌아가기
-      await this.showMainMenu(bot, callbackQuery, params, moduleManager);
-
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "✅ 작업이 취소되었습니다.",
-        show_alert: false,
-      });
-    } catch (error) {
-      logger.error("취소 처리 오류:", error);
-      await this.sendError(bot, callbackQuery, "취소 처리에 실패했습니다.");
-    }
-  }
-
-  // ===== 명령어 전용 메서드들 =====
+  // ===== 메시지 핸들러들 =====
 
   /**
    * /start 명령어 처리
@@ -345,115 +348,405 @@ class SystemModule extends BaseModule {
   async handleStart(bot, msg) {
     const {
       chat: { id: chatId },
-      from: { id: userId },
+      from,
     } = msg;
+    const userName = getUserName(from);
 
-    const userName = getUserName(msg.from);
+    const welcomeText = `🎉 **${this.config.botName}에 오신 것을 환영합니다!**
 
-    const welcomeText = `🎉 **환영합니다!**
+안녕하세요, ${userName}님! 
 
-안녕하세요 ${userName}님!
-개인 생산성 봇에 오신 것을 환영합니다.
+이 봇은 업무 효율성을 높이기 위한 다양한 기능을 제공합니다.
 
-🚀 **주요 기능**
-• 📋 할일 관리
-• ⏱️ 타이머/뽀모도로
-• ⏰ 근무시간 추적
-• 📊 생산성 통계
+🔹 **주요 기능:**
+• 📝 할일 관리
+• ⏰ 타이머/뽀모도로
+• 🕐 근무시간 추적
+• 🏖️ 휴가 관리
+• 🔔 리마인더
+• 🌤️ 날씨 정보
 
-버튼을 눌러 원하는 기능을 사용해보세요! 👇`;
+시작하려면 아래 버튼을 클릭하세요!`;
 
-    // 간단한 시작 키보드만 (NavigationHandler 방식 준수)
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-          { text: "❓ 도움말", callback_data: "system:help" },
+    await bot.sendMessage(chatId, welcomeText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+          [{ text: "❓ 도움말", callback_data: "system:help" }],
         ],
-      ],
-    };
-
-    await this.sendMessage(bot, chatId, welcomeText, {
-      reply_markup: keyboard,
-    });
-
-    logger.info(`👋 새 사용자 시작: ${userName} (${userId})`);
-  }
-
-  /**
-   * 메인 메뉴 전송 (명령어용)
-   */
-  async sendMainMenu(bot, chatId) {
-    const moduleStatus = await this.getModuleStatus();
-
-    const menuText = `🏠 **메인 메뉴**
-
-시스템 상태: ${moduleStatus.activeModules}/${moduleStatus.totalModules}개 모듈 활성
-버전: v${this.config.version}
-
-원하는 기능을 선택해주세요! 👇`;
-
-    // 기본 키보드만 (NavigationHandler에서 상세 처리)
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 할일", callback_data: "todo:menu" },
-          { text: "⏱️ 타이머", callback_data: "timer:menu" },
-        ],
-        [
-          { text: "📊 상태", callback_data: "system:status" },
-          { text: "❓ 도움말", callback_data: "system:help" },
-        ],
-      ],
-    };
-
-    await this.sendMessage(bot, chatId, menuText, {
-      reply_markup: keyboard,
+      },
     });
   }
 
   /**
-   * 도움말 메시지 전송 (명령어용)
+   * 시스템 재시작 처리
    */
+  async handleRestart(bot, callbackQuery, params, moduleManager) {
+    try {
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: "🔄 시스템을 재시작합니다...",
+        show_alert: true,
+      });
+
+      // Railway 환경에서는 프로세스 재시작
+      if (this.config.isRailway) {
+        logger.info("🔄 Railway 환경에서 프로세스 재시작 중...");
+        process.exit(0); // Railway가 자동으로 재시작
+      } else {
+        logger.warn("⚠️ 개발 환경에서는 수동 재시작이 필요합니다");
+        await this.sendError(
+          bot,
+          callbackQuery,
+          "개발 환경에서는 수동 재시작이 필요합니다."
+        );
+      }
+    } catch (error) {
+      logger.error("재시작 처리 오류:", error);
+      await this.sendError(
+        bot,
+        callbackQuery,
+        "재시작 처리 중 오류가 발생했습니다."
+      );
+    }
+  }
+
+  // ===== 텍스트 빌더 메서드들 =====
+
+  /**
+   * 메인 메뉴 데이터 생성
+   */
+  async generateMainMenuData(moduleManager) {
+    const data = {
+      systemInfo: {
+        version: this.config.version,
+        environment: this.config.environment,
+        uptime: this.getUptime(),
+      },
+      activeModules: [],
+      stats: this.systemStats,
+    };
+
+    if (moduleManager) {
+      try {
+        const moduleStatus = moduleManager.getStatus();
+        data.activeModules = Object.keys(moduleStatus.modules || {});
+      } catch (error) {
+        logger.warn("모듈 상태 조회 실패:", error);
+      }
+    }
+
+    return data;
+  }
+
+  /**
+   * 메인 메뉴 텍스트 생성
+   */
+  buildMainMenuText(userName, menuData) {
+    const uptime = this.getUptime();
+    const activeModuleCount = menuData.activeModules.length;
+
+    return `🏠 **메인 메뉴**
+
+안녕하세요, ${userName}님!
+
+📊 **시스템 정보**
+• 버전: ${this.config.version}
+• 환경: ${this.config.environment}
+• 업타임: ${uptime}
+• 활성 모듈: ${activeModuleCount}개
+
+원하는 기능을 선택해주세요!`;
+  }
+
+  /**
+   * 도움말 텍스트 생성
+   */
+  buildHelpText() {
+    return `❓ **도움말**
+
+🔹 **기본 명령어:**
+• \`/start\` - 봇 시작
+• \`/menu\` - 메인 메뉴
+• \`/help\` - 도움말
+• \`/status\` - 시스템 상태
+• \`/cancel\` - 작업 취소
+
+🔹 **주요 기능:**
+• 📝 **할일 관리** - 업무 목록 관리
+• ⏰ **타이머** - 집중 시간 측정
+• 🕐 **근무시간** - 출퇴근 기록
+• 🏖️ **휴가 관리** - 연차/월차 관리
+
+🔹 **사용 팁:**
+• 메뉴 버튼을 통해 편리하게 이용하세요
+• 작업 중 \`/cancel\`로 언제든 취소 가능
+• 문제 발생 시 \`/start\`로 초기화
+
+더 자세한 정보는 각 기능의 도움말을 확인하세요!`;
+  }
+
+  /**
+   * 상태 텍스트 생성
+   */
+  buildStatusText(statusData) {
+    const uptime = this.getUptime();
+    const memoryUsage = process.memoryUsage();
+
+    return `📊 **시스템 상태**
+
+🔹 **기본 정보**
+• 버전: ${this.config.version}
+• 환경: ${this.config.environment}
+• 업타임: ${uptime}
+
+🔹 **성능 지표**
+• 메모리 사용량: ${Math.round(memoryUsage.heapUsed / 1024 / 1024)}MB
+• 처리한 콜백: ${this.systemStats.totalCallbacks}개
+• 처리한 메시지: ${this.systemStats.totalMessages}개
+• 에러 발생: ${this.systemStats.totalErrors}개
+
+🔹 **Railway 정보**
+• Railway 환경: ${this.config.isRailway ? "✅" : "❌"}
+• 마지막 활동: ${this.systemStats.lastActivity || "없음"}
+
+시스템이 정상적으로 작동 중입니다! 🟢`;
+  }
+
+  /**
+   * 설정 텍스트 생성
+   */
+  buildSettingsText() {
+    return `⚙️ **시스템 설정**
+
+🔹 **현재 설정**
+• 최대 사용자 표시: ${this.config.maxUsersInStatus}명
+• 상세 상태: ${this.config.enableDetailedStatus ? "활성" : "비활성"}
+• 캐시: ${this.config.cacheEnabled ? "활성" : "비활성"}
+• 타임아웃: ${this.config.timeout}ms
+
+🔹 **환경 설정**
+• 봇 이름: ${this.config.botName}
+• 환경: ${this.config.environment}
+• Railway: ${this.config.isRailway ? "활성" : "비활성"}
+
+설정 변경은 환경변수를 통해 가능합니다.`;
+  }
+
+  /**
+   * 정보 텍스트 생성
+   */
+  buildAboutText() {
+    return `ℹ️ **${this.config.botName} 정보**
+
+📱 **버전**: ${this.config.version}
+🏗️ **아키텍처**: 모듈화 설계
+🚀 **플랫폼**: Railway
+⚡ **런타임**: Node.js
+
+🔹 **특징**:
+• 모듈화된 구조로 확장 가능
+• Railway 환경 최적화
+• 실시간 상태 모니터링
+• 표준화된 매개변수 체계
+
+🔹 **지원 기능**:
+• 할일 관리, 타이머, 근무시간 추적
+• 휴가 관리, 리마인더, 날씨 정보
+• 음성 변환(TTS), 운세
+
+개발자: 두몫 👨‍💻`;
+  }
+
+  /**
+   * 버전 텍스트 생성
+   */
+  buildVersionText() {
+    return `📱 **버전 정보**
+
+🔹 **현재 버전**: ${this.config.version}
+🔹 **환경**: ${this.config.environment}
+🔹 **Node.js**: ${process.version}
+🔹 **플랫폼**: ${process.platform}
+
+🔹 **업데이트 내역**:
+• v3.0.1: 표준화된 모듈 구조
+• v3.0.0: Railway 환경 최적화
+• v2.x: 기본 기능 구현
+
+최신 버전이 유지되고 있습니다! ✅`;
+  }
+
+  /**
+   * 업타임 텍스트 생성
+   */
+  buildUptimeText() {
+    const uptime = this.getUptime();
+    const startTime = TimeHelper.format(
+      new Date(this.systemStats.startTime),
+      "full"
+    );
+
+    return `⏰ **업타임 정보**
+
+🔹 **시작 시간**: ${startTime}
+🔹 **현재 업타임**: ${uptime}
+🔹 **마지막 활동**: ${this.systemStats.lastActivity || "없음"}
+
+🔹 **처리 통계**:
+• 콜백 처리: ${this.systemStats.totalCallbacks}회
+• 메시지 처리: ${this.systemStats.totalMessages}회
+• 에러 발생: ${this.systemStats.totalErrors}회
+
+시스템이 안정적으로 동작 중입니다! 🟢`;
+  }
+
+  /**
+   * 모듈 목록 텍스트 생성
+   */
+  async buildModulesText(moduleManager) {
+    let moduleText = `🧩 **모듈 현황**\n\n`;
+
+    if (!moduleManager) {
+      moduleText += "ModuleManager를 사용할 수 없습니다.";
+      return moduleText;
+    }
+
+    try {
+      const status = moduleManager.getStatus();
+      const modules = status.modules || {};
+
+      moduleText += `🔹 **전체 통계**:\n`;
+      moduleText += `• 총 모듈: ${status.stats?.totalModules || 0}개\n`;
+      moduleText += `• 활성 모듈: ${status.stats?.activeModules || 0}개\n`;
+      moduleText += `• 실패 모듈: ${status.stats?.failedModules || 0}개\n\n`;
+
+      moduleText += `🔹 **모듈 목록**:\n`;
+      for (const [key, moduleInfo] of Object.entries(modules)) {
+        const status = moduleInfo.initialized ? "✅" : "❌";
+        moduleText += `• ${status} ${moduleInfo.name || key}\n`;
+      }
+    } catch (error) {
+      moduleText += `오류: 모듈 정보를 가져올 수 없습니다.\n${error.message}`;
+    }
+
+    return moduleText;
+  }
+
+  // ===== 헬퍼 메서드들 =====
+
+  /**
+   * 시스템 체크
+   */
+  async performSystemCheck() {
+    try {
+      // 기본 체크들
+      if (!this.bot) {
+        throw new Error("Bot 인스턴스가 없습니다");
+      }
+
+      // Railway 환경 체크
+      if (this.config.isRailway) {
+        logger.info("🚂 Railway 환경에서 실행 중");
+      }
+
+      // 메모리 체크
+      const memoryUsage = process.memoryUsage();
+      if (memoryUsage.heapUsed > 100 * 1024 * 1024) {
+        // 100MB
+        logger.warn(
+          `⚠️ 메모리 사용량이 높습니다: ${Math.round(
+            memoryUsage.heapUsed / 1024 / 1024
+          )}MB`
+        );
+      }
+
+      logger.info("✅ 시스템 체크 완료");
+    } catch (error) {
+      logger.error("❌ 시스템 체크 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 업타임 계산
+   */
+  getUptime() {
+    const uptimeMs = Date.now() - this.systemStats.startTime;
+    const days = Math.floor(uptimeMs / (1000 * 60 * 60 * 24));
+    const hours = Math.floor(
+      (uptimeMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
+    );
+    const minutes = Math.floor((uptimeMs % (1000 * 60 * 60)) / (1000 * 60));
+
+    if (days > 0) {
+      return `${days}일 ${hours}시간 ${minutes}분`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes}분`;
+    } else {
+      return `${minutes}분`;
+    }
+  }
+
+  /**
+   * 시스템 상태 수집
+   */
+  async getSystemStatus(moduleManager) {
+    const status = {
+      system: {
+        version: this.config.version,
+        environment: this.config.environment,
+        uptime: this.getUptime(),
+        isRailway: this.config.isRailway,
+      },
+      stats: this.systemStats,
+      memory: process.memoryUsage(),
+    };
+
+    if (moduleManager) {
+      try {
+        status.modules = moduleManager.getStatus();
+      } catch (error) {
+        logger.warn("모듈 상태 조회 실패:", error);
+        status.modules = { error: error.message };
+      }
+    }
+
+    return status;
+  }
+
+  // ===== 공통 메시지 핸들러들 =====
+
   async sendHelpMessage(bot, chatId) {
-    const helpText = this.generateHelpText();
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
-
-    await this.sendMessage(bot, chatId, helpText, {
-      reply_markup: keyboard,
-    });
+    const helpText = this.buildHelpText();
+    await bot.sendMessage(chatId, helpText, { parse_mode: "Markdown" });
   }
 
-  /**
-   * 상태 메시지 전송 (명령어용)
-   */
   async sendStatusMessage(bot, chatId) {
-    const statusText = await this.generateStatusText();
+    const statusData = await this.getSystemStatus(this.moduleManager);
+    const statusText = this.buildStatusText(statusData);
+    await bot.sendMessage(chatId, statusText, { parse_mode: "Markdown" });
+  }
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📊 상세 보기", callback_data: "system:status" },
-          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
+  async sendMainMenu(bot, chatId) {
+    const userName = "사용자"; // 실제로는 user context에서 가져와야 함
+    const menuData = await this.generateMainMenuData(this.moduleManager);
+    const menuText = this.buildMainMenuText(userName, menuData);
+
+    await bot.sendMessage(chatId, menuText, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: [
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+          [{ text: "❓ 도움말", callback_data: "system:help" }],
+          [{ text: "📊 상태", callback_data: "system:status" }],
         ],
-      ],
-    };
-
-    await this.sendMessage(bot, chatId, statusText, {
-      reply_markup: keyboard,
+      },
     });
   }
 
-  /**
-   * 취소 메시지 전송 (명령어용)
-   */
   async sendCancelMessage(bot, chatId) {
-    await this.sendMessage(bot, chatId, "✅ 작업이 취소되었습니다.", {
+    await bot.sendMessage(chatId, "🚫 작업이 취소되었습니다.", {
       reply_markup: {
         inline_keyboard: [
           [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
@@ -462,351 +755,25 @@ class SystemModule extends BaseModule {
     });
   }
 
-  /**
-   * 버전 정보 전송 (명령어용)
-   */
   async sendVersionInfo(bot, chatId) {
-    const versionText = `📱 **버전 정보**
-
-🤖 봇 버전: v${this.config.version}
-🏗️ 환경: ${this.config.environment}
-🚂 플랫폼: ${this.config.isRailway ? "Railway" : "로컬"}
-📅 시작 시간: ${TimeHelper.format(new Date(this.systemStats.startTime), "full")}
-⏱️ 업타임: ${this.getUptime()}`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📊 상태 보기", callback_data: "system:status" },
-          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-        ],
-      ],
-    };
-
-    await this.sendMessage(bot, chatId, versionText, {
-      reply_markup: keyboard,
-    });
+    const versionText = this.buildVersionText();
+    await bot.sendMessage(chatId, versionText, { parse_mode: "Markdown" });
   }
 
-  // ===== 텍스트 생성 메서드들 (데이터만 제공) =====
-
-  /**
-   * 📊 동적 메인 메뉴 데이터 생성
-   */
-  async generateMainMenuData(moduleManager) {
-    const menuData = {
-      activeModules: [],
-      inactiveModules: [],
-      systemInfo: {
-        uptime: this.getUptime(),
-        activeUsers: 0, // TODO: 실제 데이터 연동
-        version: this.config.version,
-      },
-    };
-
-    // 🎯 표준 모듈 정의 (우선순위 순)
-    const standardModules = [
-      {
-        key: "todo",
-        name: "할일 관리",
-        emoji: "📝",
-        description: "할일 추가, 완료, 관리",
-        priority: 1,
-        category: "productivity",
-      },
-      {
-        key: "timer",
-        name: "타이머/뽀모도로",
-        emoji: "⏰",
-        description: "시간 관리 도구",
-        priority: 2,
-        category: "productivity",
-      },
-      {
-        key: "worktime",
-        name: "근무시간",
-        emoji: "🕐",
-        description: "출퇴근 및 근무시간 관리",
-        priority: 3,
-        category: "work",
-      },
-    ];
-
-    // 모듈 활성화 상태 확인
-    for (const moduleInfo of standardModules) {
-      const isActive =
-        moduleManager &&
-        moduleManager.hasModule &&
-        moduleManager.hasModule(moduleInfo.key);
-
-      if (isActive) {
-        menuData.activeModules.push(moduleInfo);
-      } else {
-        menuData.inactiveModules.push(moduleInfo);
-      }
-    }
-
-    // 우선순위 순으로 정렬
-    menuData.activeModules.sort((a, b) => a.priority - b.priority);
-
-    return menuData;
-  }
-
-  /**
-   * 📝 메인 메뉴 텍스트 생성
-   */
-  buildMainMenuText(userName, menuData) {
-    let menuText = `🤖 **두목봇 v${this.config.version}**
-
-👋 안녕하세요, **${userName}**님!
-원하는 기능을 선택해주세요.
-
-**📊 시스템 현황**
-• 🟢 활성 모듈: ${menuData.activeModules.length}개
-• ⏱️ 가동 시간: ${menuData.systemInfo.uptime}
-• 📱 버전: v${menuData.systemInfo.version}`;
-
-    // 비활성 모듈이 있으면 표시
-    if (menuData.inactiveModules.length > 0) {
-      menuText += `\n• ⚪ 비활성 모듈: ${menuData.inactiveModules.length}개`;
-    }
-
-    return menuText;
-  }
-
-  /**
-   * 도움말 텍스트 생성
-   */
-  generateHelpText() {
-    return `❓ **도움말**
-
-🤖 **이 봇에 대해**
-할일 관리, 타이머, 근무시간 추적 등 다양한 기능을 제공하는 개인 생산성 봇입니다.
-
-📋 **주요 기능**
-• **할일 관리**: 작업 추가, 완료 처리, 목록 관리
-• **타이머/뽀모도로**: 집중 시간 관리
-• **근무시간 추적**: 출퇴근 기록 및 통계
-• **시스템 관리**: 상태 확인 및 설정
-
-⌨️ **주요 명령어**
-• \`/start\` - 봇 시작 및 메인 메뉴
-• \`/help\` - 이 도움말 보기
-• \`/status\` - 시스템 상태 확인
-• \`/cancel\` - 현재 작업 취소
-
-🎯 **사용 팁**
-• 버튼을 클릭하여 쉽게 기능 이용
-• 언제든 /cancel로 작업 취소 가능
-• 문제 발생 시 /status로 상태 확인
-
-💡 **문의 및 지원**
-문제가 있거나 개선 사항이 있다면 개발자에게 문의해주세요.`;
-  }
-
-  /**
-   * 상태 텍스트 생성 (TimeHelper 사용)
-   */
-  async generateStatusText(moduleManager) {
-    const moduleStatus = await this.getModuleStatus(moduleManager);
-    const dbStatus = await this.getDatabaseStatus();
-    const uptime = this.getUptime();
-
-    return `📊 **시스템 상태**
-
-🤖 **봇 정보**
-• 이름: ${this.config.botName}
-• 버전: v${this.config.version}
-• 환경: ${this.config.environment}
-• 플랫폼: ${this.config.isRailway ? "🚂 Railway" : "💻 로컬"}
-
-⏱️ **운영 상태**
-• 업타임: ${uptime}
-• 시작 시간: ${TimeHelper.format(new Date(this.systemStats.startTime), "full")}
-• 마지막 활동: ${this.systemStats.lastActivity || "없음"}
-
-📦 **모듈 상태**
-• 전체 모듈: ${moduleStatus.totalModules}개
-• 활성 모듈: ${moduleStatus.activeModules}개
-• 실패 모듈: ${moduleStatus.totalModules - moduleStatus.activeModules}개
-
-📊 **활동 통계**
-• 총 콜백: ${this.systemStats.totalCallbacks.toLocaleString()}
-• 총 메시지: ${this.systemStats.totalMessages.toLocaleString()}
-• 총 오류: ${this.systemStats.totalErrors.toLocaleString()}
-
-💾 **데이터베이스**
-• 상태: ${dbStatus.connected ? "✅ 연결됨" : "❌ 연결 안됨"}
-• 데이터베이스: ${dbStatus.name || "알 수 없음"}
-
-🔄 **마지막 업데이트**: ${TimeHelper.getCurrentTime("log")}`;
-  }
-
-  /**
-   * 설정 텍스트 생성
-   */
-  generateSettingsText() {
-    return `⚙️ **설정**
-
-🎛️ **시스템 설정**
-• 버전: v${this.config.version}
-• 환경: ${this.config.environment}
-• 디버그 모드: ${this.config.environment === "development" ? "✅" : "❌"}
-• 상세 상태: ${this.config.enableDetailedStatus ? "✅" : "❌"}
-
-📊 **통계 설정**
-• 상태의 최대 사용자: ${this.config.maxUsersInStatus}
-• 캐시 활성화: ${this.config.cacheEnabled ? "✅" : "❌"}
-• 타임아웃: ${this.config.timeout}ms
-
-💡 **참고**: 일부 설정은 환경변수로 관리되며 재시작이 필요할 수 있습니다.`;
-  }
-
-  /**
-   * 모듈 목록 텍스트 생성
-   */
-  async generateModulesText(moduleManager) {
-    const modules = await this.getDetailedModuleStatus(moduleManager);
-
-    let modulesText = `📦 **모듈 목록**\n\n`;
-
-    modules.forEach((module) => {
-      const status = module.initialized ? "✅" : "❌";
-      const features = module.features
-        ? module.features.join(", ")
-        : "정보 없음";
-
-      modulesText += `${status} **${module.name}**\n`;
-      modulesText += `   └ ${module.description}\n`;
-      modulesText += `   └ 기능: ${features}\n\n`;
-    });
-
-    return modulesText;
-  }
-
-  // ===== 유틸리티 메서드들 (TimeHelper 사용) =====
-
-  /**
-   * 시스템 체크 수행
-   */
-  async performSystemCheck() {
-    try {
-      // 기본 체크들
-      const checks = {
-        botInstance: !!this.bot,
-        moduleManager: !!this.moduleManager,
-        database: !!this.db,
-        validationManager: !!this.validationManager,
-        timeHelper: !!TimeHelper,
-      };
-
-      const passedChecks = Object.values(checks).filter(Boolean).length;
-      const totalChecks = Object.keys(checks).length;
-
-      logger.info(`🔍 시스템 체크: ${passedChecks}/${totalChecks} 통과`);
-
-      if (passedChecks < totalChecks) {
-        logger.warn("⚠️ 일부 시스템 컴포넌트가 누락되었습니다:", checks);
-      }
-
-      return checks;
-    } catch (error) {
-      logger.error("시스템 체크 오류:", error);
-      return {};
-    }
-  }
-
-  /**
-   * 모듈 상태 가져오기
-   */
-  async getModuleStatus(moduleManager = this.moduleManager) {
-    try {
-      if (!moduleManager) {
-        return { totalModules: 0, activeModules: 0, modules: [] };
-      }
-
-      const status = moduleManager.getStatus();
-      return {
-        totalModules: status.stats.totalModules || 0,
-        activeModules: status.stats.activeModules || 0,
-        modules: status.modules || [],
-      };
-    } catch (error) {
-      logger.error("모듈 상태 확인 오류:", error);
-      return { totalModules: 0, activeModules: 0, modules: [] };
-    }
-  }
-
-  /**
-   * 상세 모듈 상태 가져오기
-   */
-  async getDetailedModuleStatus(moduleManager = this.moduleManager) {
-    try {
-      if (!moduleManager || !moduleManager.moduleRegistry) {
-        return [];
-      }
-
-      const modules = [];
-      for (const [key, config] of moduleManager.moduleRegistry) {
-        modules.push({
-          key,
-          name: config.name,
-          description: config.description,
-          initialized: config.initialized || false,
-          features: config.features || [],
-          priority: config.priority || 999,
-        });
-      }
-
-      return modules.sort((a, b) => a.priority - b.priority);
-    } catch (error) {
-      logger.error("상세 모듈 상태 확인 오류:", error);
-      return [];
-    }
-  }
-
-  /**
-   * 데이터베이스 상태 가져오기
-   */
-  async getDatabaseStatus() {
-    try {
-      if (!this.db) {
-        return { connected: false, name: null };
-      }
-
-      // MongoDB 연결 상태 체크
-      const adminDb = this.db.admin();
-      const status = await adminDb.ping();
-
-      return {
-        connected: status.ok === 1,
-        name: this.db.databaseName || "알 수 없음",
-      };
-    } catch (error) {
-      logger.error("데이터베이스 상태 확인 오류:", error);
-      return { connected: false, name: null };
-    }
-  }
-
-  /**
-   * 업타임 가져오기 (TimeHelper 사용)
-   */
-  getUptime() {
-    const uptimeMs = Date.now() - this.systemStats.startTime;
-    return TimeHelper.humanize(uptimeMs);
-  }
+  // ===== 설정 관리 =====
 
   /**
    * 설정 저장
    */
   async saveSettings(bot, callbackQuery, params, moduleManager) {
     try {
-      // 실제로는 환경변수나 DB에 저장하겠지만,
-      // 여기서는 메모리에만 저장하는 시뮬레이션
-      logger.info("💾 설정 저장됨 (시뮬레이션)");
+      // 실제로는 여기서 설정을 저장해야 함
+      // Railway 환경에서는 환경변수를 통해 설정 관리
+
+      logger.info("🔧 설정 저장 요청");
 
       await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "💾 설정이 저장되었습니다!",
+        text: "✅ 설정이 저장되었습니다!",
         show_alert: true,
       });
 

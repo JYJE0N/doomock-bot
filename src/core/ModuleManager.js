@@ -1,4 +1,4 @@
-// src/core/ModuleManager.js - ValidationManager 연동 업데이트
+// src/core/ModuleManager.js - ValidationManager 연동 업데이트 // 의존성 주입
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
