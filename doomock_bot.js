@@ -212,6 +212,11 @@ class DooMockBot {
 
     await this.dbManager.connect();
     logger.debug("✅ 데이터베이스 매니저 초기화 완료");
+
+    console.log("🔍 MONGO_URL:", process.env.MONGO_URL ? "있음" : "없음");
+    console.log("🔍 config.mongoUri:", this.config.mongoUri);
+    console.log("🔍 dbManager 생성 후:", !!this.dbManager);
+    console.log("🔍 연결 시도 후:", this.dbManager.isConnected);
   }
 
   /**
