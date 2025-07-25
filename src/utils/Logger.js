@@ -180,28 +180,13 @@ class AdvancedLogger {
   }
 
   /**
-   * 🚛 Transport 생성
+   * 🚛 Transport 생성 (중복 로깅 방지)
    */
   createTransports() {
     const transports = [];
 
-    // 🖥️ 콘솔 Transport
-    if (this.isDevelopment) {
-      // 개발 환경: 색상 있는 포맷
-      transports.push(
-        new winston.transports.Console({
-          format: winston.format.combine(
-            winston.format.colorize({ all: true }),
-            winston.format.printf(({ timestamp, level, message, ...meta }) => {
-              return `${timestamp} [${level}] ${message} ${
-                Object.keys(meta).length ? JSON.stringify(meta) : ""
-              }`;
-            })
-          ),
-          silent: false,
-        })
-      );
-    } else if (this.isRailway) {
+    // 🖥️ 콘솔 Transport (중복 방지: 개발환경에서는 Winston 콘솔 비활성화)
+    if (!this.isDevelopment && this.isRailway) {
       // Railway 환경: 간소화된 JSON 포맷
       transports.push(
         new winston.transports.Console({
@@ -266,14 +251,12 @@ class AdvancedLogger {
   }
 
   /**
-   * 🕐 한국 시간 문자열 생성
+   * 🕐 한국 시간 문자열 생성 (시간대 중복 적용 수정)
    */
   getKSTTimeString() {
+    // 단순히 현재 로컬 시간 사용 (서버가 이미 KST로 설정됨)
     const now = new Date();
-    const koreaTime = new Date(
-      now.getTime() + 9 * 60 * 60 * 1000 - now.getTimezoneOffset() * 60 * 1000
-    );
-    return koreaTime.toLocaleString("ko-KR", {
+    return now.toLocaleString("ko-KR", {
       year: "numeric",
       month: "2-digit",
       day: "2-digit",
@@ -292,7 +275,7 @@ class AdvancedLogger {
   }
 
   /**
-   * 🎯 핵심 로그 메서드 (기존 코드 호환성)
+   * 🎯 핵심 로그 메서드 (중복 출력 방지)
    */
   _log(level, ...args) {
     // 레벨 체크
@@ -319,7 +302,7 @@ class AdvancedLogger {
       }
     });
 
-    // 🎨 개발 환경에서만 컬러풀한 출력
+    // 🎨 개발 환경에서만 컬러풀한 출력 (Winston 비활성화하여 중복 방지)
     if (this.isDevelopment) {
       const timestampStr = this.colors.timestamp(`[${timestamp}]`);
       const levelStr = color(level.toUpperCase().padEnd(7));
@@ -344,10 +327,10 @@ class AdvancedLogger {
       }
 
       console.log(`${emoji} ${timestampStr} ${levelStr} ${message}${metaStr}`);
+    } else {
+      // 프로덕션/Railway에서는 Winston만 사용
+      this.winston.log(level === "success" ? "info" : level, message, meta);
     }
-
-    // Winston에도 기록
-    this.winston.log(level === "success" ? "info" : level, message, meta);
   }
 
   // ===== 🎯 기본 로그 메서드들 (100% 호환) =====
