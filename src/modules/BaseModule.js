@@ -279,7 +279,25 @@ class BaseModule {
         ...options,
       });
     } catch (error) {
-      logger.error(`${this.name} 메시지 수정 실패:`, error);
+      // 메시지가 변경되지 않은 경우 무시
+      if (
+        error.response?.body?.error_code === 400 &&
+        error.response?.body?.description?.includes("message is not modified")
+      ) {
+        logger.debug("메시지 내용이 동일하여 수정하지 않음");
+
+        // 콜백 쿼리가 있다면 응답만 보냄
+        if (this.lastCallbackQuery) {
+          try {
+            await bot.answerCallbackQuery(this.lastCallbackQuery.id);
+          } catch (e) {}
+        }
+
+        return null;
+      }
+
+      // 다른 에러는 재시도 또는 로깅
+      logger.error(`${this.name} 메시지 수정 실패:`, error.message);
       throw error;
     }
   }

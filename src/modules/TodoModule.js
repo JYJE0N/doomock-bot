@@ -221,6 +221,11 @@ ${userName}님의 할일 현황:
       from: { id: userId },
     } = callbackQuery;
 
+    // 콜백 응답 먼저 보내기 (중요!)
+    try {
+      await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (e) {}
+
     try {
       // 페이지 처리
       const page = parseInt(params[0]) || 1;
