@@ -702,11 +702,16 @@ _최근 업데이트: ${TimeHelper.formatDateTime()}_`;
   formatDate(date, format = "MM/DD HH:mm") {
     if (!date) return "날짜 없음";
 
-    if (typeof date === "string") {
-      date = new Date(date);
-    }
-
-    return TimeHelper.formatDate(date, format);
+    // TimeHelper를 사용해서 한국 시간으로 표시
+    return TimeHelper.formatDateTime(date, {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Asia/Seoul",
+    });
   }
 
   /**

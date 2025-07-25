@@ -130,26 +130,27 @@ class ModuleManager {
   setupServiceEventListeners() {
     // 🎯 타이머 완료 이벤트 처리
     if (this.services.timerService) {
-      // 메서드가 존재하는지 확인
-      if (typeof this.services.timerService.onTimerComplete === "function") {
-        this.services.timerService.onTimerComplete(async (completionData) => {
+      // EventEmitter의 on 메서드 사용
+      this.services.timerService.on(
+        "timerCompleted",
+        async (completionData) => {
           await this.handleTimerCompletion(completionData);
-        });
-      } else {
-        logger.warn("⚠️ TimerService에 onTimerComplete 메서드가 없습니다");
-      }
+        }
+      );
 
-      if (typeof this.services.timerService.onPomodoroComplete === "function") {
-        this.services.timerService.onPomodoroComplete(
-          async (completionData) => {
-            await this.handlePomodoroCompletion(completionData);
-          }
-        );
-      } else {
-        logger.warn("⚠️ TimerService에 onPomodoroComplete 메서드가 없습니다");
-      }
+      this.services.timerService.on(
+        "pomodoroCompleted",
+        async (completionData) => {
+          await this.handlePomodoroCompletion(completionData);
+        }
+      );
 
-      logger.info("🎯 타이머 이벤트 리스너 설정 시도 완료");
+      // 에러 이벤트도 처리
+      this.services.timerService.on("timerError", (errorData) => {
+        logger.error("타이머 에러:", errorData);
+      });
+
+      logger.info("🎯 타이머 이벤트 리스너 설정 완료");
     }
 
     // 📅 리마인더 완료 이벤트 처리 (향후 확장)
@@ -186,32 +187,25 @@ ${
     : "⚡ 계획보다 일찍 완료하셨습니다!"
 }
 
-수고하셨습니다! 🎊`;
+수고하셨습니다!`;
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "⏰ 새 타이머", callback_data: "timer:start:prompt" },
-            { text: "🍅 뽀모도로", callback_data: "timer:pomodoro:start" },
-          ],
-          [
-            { text: "📊 통계 보기", callback_data: "timer:stats" },
-            { text: "🏠 메인 메뉴", callback_data: "main:menu" },
-          ],
-        ],
-      };
-
-      // 🔔 사용자에게 완료 알림 전송
-      await this.bot.sendMessage(userId, completionText, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
-
-      logger.info(
-        `🎯 타이머 완료 알림 전송: 사용자 ${userId}, 작업 "${taskName}"`
-      );
+      // 사용자에게 메시지 전송
+      if (this.bot && userId) {
+        await this.bot.sendMessage(userId, completionText, {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "⏰ 새 타이머", callback_data: "timer:menu" },
+                { text: "📊 통계", callback_data: "timer:stats" },
+              ],
+              [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+            ],
+          },
+        });
+      }
     } catch (error) {
-      logger.error("타이머 완료 알림 전송 실패:", error);
+      logger.error("타이머 완료 처리 중 오류:", error);
     }
   }
 
@@ -231,6 +225,7 @@ ${
         totalWorkTime,
         totalBreakTime,
         message,
+        completionData: data,
       } = completionData;
 
       let completionText;
