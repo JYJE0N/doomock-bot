@@ -1,10 +1,9 @@
 // doomock_bot.js - v3.0.1 Telegraf 마이그레이션 버전
 const { Telegraf } = require("telegraf");
 const logger = require("./src/utils/Logger");
-const TimeHelper = require("./src/utils/TimeHelper");
 
 // 🏗️ 핵심 시스템들
-const DatabaseManager = require("./src/database/DatabaseManager");
+// const DatabaseManager = require("./src/database/DatabaseManager");
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
