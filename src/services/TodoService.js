@@ -482,6 +482,25 @@ class TodoService {
     }
   }
 
+  async createIndexes() {
+    try {
+      // 기존 인덱스 확인
+      const existingIndexes = await this.collection.listIndexes().toArray();
+      const hasTextIndex = existingIndexes.some(
+        (idx) => idx.key && Object.values(idx.key).includes("text")
+      );
+
+      if (!hasTextIndex) {
+        await this.collection.createIndex(
+          { title: "text", description: "text" },
+          { background: true }
+        );
+      }
+    } catch (error) {
+      logger.debug("인덱스는 이미 존재합니다:", error.message);
+    }
+  }
+
   // ===== 💾 캐시 관리 메서드들 =====
 
   /**

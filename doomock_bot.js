@@ -288,7 +288,7 @@ class DooMockBot {
       logger.debug("🔧 ValidationManager 등록됨");
     }
 
-    // TodoService는 ModuleManager를 통해 접근
+    // ✅ 개선: TodoService 등록 방식 개선
     if (this.moduleManager && this.moduleManager.moduleInstances) {
       const todoModule = this.moduleManager.moduleInstances.get("TodoModule");
       if (todoModule && todoModule.todoService) {
@@ -297,6 +297,28 @@ class DooMockBot {
           todoModule.todoService
         );
         logger.debug("🔧 TodoService 등록됨");
+      } else {
+        logger.warn("⚠️ TodoModule 또는 TodoService를 찾을 수 없음");
+      }
+
+      // 다른 서비스들도 등록
+      const timerModule = this.moduleManager.moduleInstances.get("TimerModule");
+      if (timerModule && timerModule.timerService) {
+        this.healthChecker.registerComponent(
+          "timerService",
+          timerModule.timerService
+        );
+        logger.debug("🔧 TimerService 등록됨");
+      }
+
+      const worktimeModule =
+        this.moduleManager.moduleInstances.get("WorktimeModule");
+      if (worktimeModule && worktimeModule.worktimeService) {
+        this.healthChecker.registerComponent(
+          "worktimeService",
+          worktimeModule.worktimeService
+        );
+        logger.debug("🔧 WorktimeService 등록됨");
       }
     }
 

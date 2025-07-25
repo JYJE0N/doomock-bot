@@ -287,9 +287,13 @@ class HealthChecker {
       const issues = [];
       let severity = "healthy";
 
-      // 초기화 상태 확인
-      if (!moduleManager.initialized) {
-        issues.push("ModuleManager가 초기화되지 않음");
+      // ✅ 수정: 더 정확한 초기화 상태 확인
+      const isFullyInitialized = moduleManager.isFullyInitialized
+        ? moduleManager.isFullyInitialized()
+        : moduleManager.initialized;
+
+      if (!isFullyInitialized) {
+        issues.push("ModuleManager가 완전히 초기화되지 않음");
         severity = "warning";
       }
 
@@ -297,19 +301,41 @@ class HealthChecker {
       const moduleCount = moduleManager.moduleInstances?.size || 0;
       if (moduleCount === 0) {
         issues.push("등록된 모듈이 없음");
+        severity = "critical";
+      }
+
+      // ✅ 추가: 실패한 모듈 확인
+      if (moduleManager.stats && moduleManager.stats.failedModules > 0) {
+        issues.push(`${moduleManager.stats.failedModules}개 모듈 로드 실패`);
         severity = severity === "critical" ? "critical" : "warning";
       }
 
-      // 실패한 모듈 확인
-      if (moduleManager.stats && moduleManager.stats.failedModules > 0) {
-        issues.push(`${moduleManager.stats.failedModules}개 모듈 로드 실패`);
-        severity = "warning";
+      // ✅ 추가: 모듈 상세 정보 확인
+      let moduleDetails = {};
+      if (moduleManager.getModuleInitializationDetails) {
+        moduleDetails = moduleManager.getModuleInitializationDetails();
+
+        // 초기화되지 않은 모듈 찾기
+        const uninitializedModules = Object.entries(moduleDetails)
+          .filter(
+            ([key, detail]) =>
+              !detail.configInitialized || !detail.instanceInitialized
+          )
+          .map(([key]) => key);
+
+        if (uninitializedModules.length > 0) {
+          issues.push(
+            `초기화되지 않은 모듈: ${uninitializedModules.join(", ")}`
+          );
+          severity = severity === "critical" ? "critical" : "warning";
+        }
       }
 
       return this.createHealthResult(severity, issues.join(", ") || "정상", {
-        initialized: moduleManager.initialized,
+        initialized: isFullyInitialized,
         moduleCount: moduleCount,
         stats: moduleManager.stats || {},
+        moduleDetails: moduleDetails,
       });
     } catch (error) {
       logger.error("❌ ModuleManager 상태 체크 실패:", error);
@@ -385,7 +411,22 @@ class HealthChecker {
    */
   async checkTodoService() {
     try {
-      const todoService = this.getComponent("todoService");
+      // ✅ 수정: ModuleManager를 통해 TodoService 찾기
+      const moduleManager = this.getComponent("moduleManager");
+      let todoService = this.getComponent("todoService");
+
+      // 직접 등록된 TodoService가 없으면 ModuleManager에서 찾기
+      if (!todoService && moduleManager && moduleManager.findService) {
+        todoService = moduleManager.findService("TodoService");
+      }
+
+      // 그래도 없으면 ModuleManager를 통해 직접 찾기
+      if (!todoService && moduleManager && moduleManager.moduleInstances) {
+        const todoModule = moduleManager.moduleInstances.get("TodoModule");
+        if (todoModule && todoModule.todoService) {
+          todoService = todoModule.todoService;
+        }
+      }
 
       if (!todoService) {
         return this.createHealthResult(
@@ -398,50 +439,41 @@ class HealthChecker {
       let severity = "healthy";
 
       // 초기화 상태 확인
-      if (!todoService.collection) {
-        issues.push("TodoService 컬렉션이 초기화되지 않음");
+      if (todoService.initialized === false) {
+        issues.push("TodoService가 초기화되지 않음");
         severity = "warning";
       }
 
-      // 통계 확인
-      if (todoService.stats) {
-        const {
-          errorCount = 0,
-          operationsCount = 0,
-          averageResponseTime = 0,
-          cacheHits = 0,
-          cacheMisses = 0,
-        } = todoService.stats;
+      // DB 컬렉션 확인
+      if (!todoService.collection) {
+        issues.push("TodoService 컬렉션이 연결되지 않음");
+        severity = "critical";
+      }
 
-        // 에러율 체크
-        if (operationsCount > 0) {
-          const errorRate = errorCount / operationsCount;
-          if (errorRate > 0.1) {
-            issues.push(
-              `높은 TodoService 에러율: ${Math.round(errorRate * 100)}%`
-            );
-            severity = errorRate > 0.25 ? "critical" : "warning";
+      // 캐시 상태 확인 (있는 경우)
+      if (todoService.cache && todoService.cache.size > 1000) {
+        issues.push(`큰 캐시 크기: ${todoService.cache.size}개`);
+        severity = severity === "critical" ? "critical" : "warning";
+      }
+
+      // 헬스체크 실행 (메서드가 있는 경우)
+      if (typeof todoService.healthCheck === "function") {
+        try {
+          const healthResult = await todoService.healthCheck();
+          if (!healthResult.healthy) {
+            issues.push(`서비스 헬스체크 실패: ${healthResult.message}`);
+            severity = "critical";
           }
-        }
-
-        // 응답 시간 체크
-        if (averageResponseTime > 2000) {
-          issues.push(`느린 TodoService 응답: ${averageResponseTime}ms`);
-          severity = severity === "critical" ? "critical" : "warning";
-        }
-
-        // 캐시 효율성 체크
-        const totalCacheOps = cacheHits + cacheMisses;
-        if (totalCacheOps > 0) {
-          const cacheHitRate = cacheHits / totalCacheOps;
-          if (cacheHitRate < 0.3) {
-            issues.push(`낮은 캐시 적중률: ${Math.round(cacheHitRate * 100)}%`);
-          }
+        } catch (healthError) {
+          issues.push(`헬스체크 실행 실패: ${healthError.message}`);
+          severity = "warning";
         }
       }
 
       return this.createHealthResult(severity, issues.join(", ") || "정상", {
-        initialized: !!todoService.collection,
+        initialized: todoService.initialized !== false,
+        hasCollection: !!todoService.collection,
+        cacheSize: todoService.cache?.size || 0,
         stats: todoService.stats || {},
       });
     } catch (error) {

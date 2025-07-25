@@ -586,6 +586,117 @@ class ModuleManager {
   }
 
   /**
+   * 🏥 HealthChecker용 초기화 상태 체크 메서드 (ModuleManager.js에 추가)
+   */
+  isFullyInitialized() {
+    // 단순히 this.isInitialized만 체크하는 것이 아니라
+    // 실제 모듈들이 모두 초기화되었는지 확인
+    if (!this.isInitialized) {
+      return false;
+    }
+
+    // 모든 활성 모듈이 초기화되었는지 확인
+    for (const [moduleKey, moduleInstance] of this.moduleInstances) {
+      const moduleConfig = this.moduleRegistry.get(moduleKey);
+
+      if (!moduleConfig.initialized || !moduleInstance.isInitialized) {
+        logger.debug(`❓ ${moduleKey} 모듈이 완전히 초기화되지 않음`);
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * 🔍 특정 서비스 찾기 메서드 (HealthChecker용)
+   */
+  findService(serviceName) {
+    for (const [moduleKey, moduleInstance] of this.moduleInstances) {
+      // TodoService 찾기
+      if (serviceName === "TodoService" && moduleInstance.todoService) {
+        return moduleInstance.todoService;
+      }
+
+      // 다른 서비스들 찾기
+      const serviceProperty =
+        serviceName.toLowerCase().replace("service", "") + "Service";
+      if (moduleInstance[serviceProperty]) {
+        return moduleInstance[serviceProperty];
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * 🏥 HealthChecker용 상태 정보 (기존 getStatus 메서드 개선)
+   */
+  getHealthStatus() {
+    const baseStatus = this.getStatus();
+
+    return {
+      ...baseStatus,
+      fullyInitialized: this.isFullyInitialized(),
+      moduleDetails: this.getModuleInitializationDetails(),
+      availableServices: this.getAvailableServices(),
+    };
+  }
+
+  /**
+   * 📊 모듈 초기화 상세 정보
+   */
+  getModuleInitializationDetails() {
+    const details = {};
+
+    for (const [moduleKey, moduleInstance] of this.moduleInstances) {
+      const moduleConfig = this.moduleRegistry.get(moduleKey);
+
+      details[moduleKey] = {
+        configInitialized: moduleConfig.initialized,
+        instanceInitialized: moduleInstance.isInitialized,
+        hasSetupActions: typeof moduleInstance.setupActions === "function",
+        actionCount: moduleInstance.actionMap
+          ? moduleInstance.actionMap.size
+          : 0,
+        priority: moduleConfig.priority,
+      };
+    }
+
+    return details;
+  }
+
+  /**
+   * 🔍 사용 가능한 서비스 목록
+   */
+  getAvailableServices() {
+    const services = [];
+
+    for (const [moduleKey, moduleInstance] of this.moduleInstances) {
+      // 각 모듈에서 서비스 찾기
+      const moduleServices = [];
+
+      if (moduleInstance.todoService) moduleServices.push("TodoService");
+      if (moduleInstance.timerService) moduleServices.push("TimerService");
+      if (moduleInstance.worktimeService)
+        moduleServices.push("WorktimeService");
+      if (moduleInstance.leaveService) moduleServices.push("LeaveService");
+      if (moduleInstance.reminderService)
+        moduleServices.push("ReminderService");
+      if (moduleInstance.fortuneService) moduleServices.push("FortuneService");
+
+      if (moduleServices.length > 0) {
+        services.push({
+          module: moduleKey,
+          services: moduleServices,
+        });
+      }
+    }
+
+    return services;
+  }
+
+  /**
    * 🧹 정리
    */
   async cleanup() {
