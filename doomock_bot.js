@@ -288,7 +288,7 @@ class DooMockBot {
       logger.debug("🔧 ValidationManager 등록됨");
     }
 
-    // ✅ 개선: 모든 가능한 모듈 키로 TodoService 찾기
+    // ✅ 수정: ModuleManager의 실제 등록 키 사용
     if (this.moduleManager && this.moduleManager.moduleInstances) {
       logger.debug(
         `🔍 등록된 모듈 수: ${this.moduleManager.moduleInstances.size}`
@@ -298,8 +298,8 @@ class DooMockBot {
       const moduleKeys = Array.from(this.moduleManager.moduleInstances.keys());
       logger.debug(`🔍 등록된 모듈 키들: ${moduleKeys.join(", ")}`);
 
-      // TodoModule/TodoService 찾기 (여러 가능한 키로 시도)
-      const possibleTodoKeys = ["TodoModule", "todoModule", "todo", "Todo"];
+      // ✅ TodoModule/TodoService 찾기 - "todo" 키로 수정
+      const possibleTodoKeys = ["todo", "TodoModule", "todoModule", "Todo"];
       let todoModule = null;
       let foundKey = null;
 
@@ -341,11 +341,11 @@ class DooMockBot {
         }
       }
 
-      // TimerModule/TimerService 찾기
+      // ✅ TimerModule/TimerService 찾기 - "timer" 키로 수정
       const possibleTimerKeys = [
+        "timer",
         "TimerModule",
         "timerModule",
-        "timer",
         "Timer",
       ];
       let timerModule = null;
@@ -363,11 +363,11 @@ class DooMockBot {
         }
       }
 
-      // WorktimeModule/WorktimeService 찾기
+      // ✅ WorktimeModule/WorktimeService 찾기 - "worktime" 키로 수정
       const possibleWorktimeKeys = [
+        "worktime",
         "WorktimeModule",
         "worktimeModule",
-        "worktime",
         "Worktime",
       ];
       let worktimeModule = null;
@@ -383,6 +383,74 @@ class DooMockBot {
           worktimeModule = module;
           break;
         }
+      }
+
+      // ✅ LeaveModule/LeaveService 찾기 - "leave" 키로 수정
+      const possibleLeaveKeys = [
+        "leave",
+        "LeaveModule",
+        "leaveModule",
+        "Leave",
+      ];
+      let leaveModule = null;
+
+      for (const key of possibleLeaveKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.leaveService) {
+          this.healthChecker.registerComponent(
+            "leaveService",
+            module.leaveService
+          );
+          logger.debug(`🔧 LeaveService 등록됨 (키: ${key})`);
+          leaveModule = module;
+          break;
+        }
+      }
+
+      // ✅ ReminderModule/ReminderService 찾기 - "reminder" 키로 수정
+      const possibleReminderKeys = [
+        "reminder",
+        "ReminderModule",
+        "reminderModule",
+        "Reminder",
+      ];
+      let reminderModule = null;
+
+      for (const key of possibleReminderKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.reminderService) {
+          this.healthChecker.registerComponent(
+            "reminderService",
+            module.reminderService
+          );
+          logger.debug(`🔧 ReminderService 등록됨 (키: ${key})`);
+          reminderModule = module;
+          break;
+        }
+      }
+
+      // ✅ 등록 못 찾은 모듈들 요약 로깅
+      const searchedModules = [
+        { name: "TodoModule", found: !!todoModule },
+        { name: "TimerModule", found: !!timerModule },
+        { name: "WorktimeModule", found: !!worktimeModule },
+        { name: "LeaveModule", found: !!leaveModule },
+        { name: "ReminderModule", found: !!reminderModule },
+      ];
+
+      const foundCount = searchedModules.filter((m) => m.found).length;
+      const totalCount = searchedModules.length;
+
+      logger.info(
+        `🔧 HealthChecker 서비스 등록 완료: ${foundCount}/${totalCount}개 모듈 서비스 발견`
+      );
+
+      // 못 찾은 모듈들 요약
+      const notFound = searchedModules
+        .filter((m) => !m.found)
+        .map((m) => m.name);
+      if (notFound.length > 0) {
+        logger.debug(`⚠️ 서비스를 찾지 못한 모듈: ${notFound.join(", ")}`);
       }
     } else {
       logger.warn("⚠️ ModuleManager 또는 moduleInstances가 없음");
