@@ -1,39 +1,40 @@
-// src/services/TTSService.js - google-tts-api 버전
+// src/services/TTSService.js - Google Cloud TTS API 수정
 const BaseService = require("./BaseService");
-const googleTTS = require("google-tts-api");
-const axios = require("axios");
+const textToSpeech = require("@google-cloud/text-to-speech");
 const fs = require("fs").promises;
 const path = require("path");
 const TimeHelper = require("../utils/TimeHelper");
 const logger = require("../utils/Logger");
 
 /**
- * 🎤 TTS 서비스 - google-tts-api 버전
- * - 무료 Google TTS 사용
- * - 200자 제한 (분할 처리)
+ * 🔊 TTS 서비스 - Google Cloud Text-to-Speech API 사용
  * - Railway 환경 최적화
+ * - @google-cloud/text-to-speech 사용
  */
 class TTSService extends BaseService {
   constructor() {
     super();
+
+    // Google Cloud TTS 클라이언트 초기화
+    this.ttsClient = new textToSpeech.TextToSpeechClient();
 
     // 사용자별 설정
     this.userModes = new Map();
     this.userLanguages = new Map();
     this.activeRequests = new Map();
 
-    // 지원 언어 목록
+    // 지원 언어 목록 (Google Cloud TTS 기준)
     this.supportedLanguages = {
-      ko: "한국어",
-      en: "English",
-      ja: "日本語",
-      zh: "中文",
-      es: "Español",
-      fr: "Français",
-      de: "Deutsch",
-      it: "Italiano",
-      pt: "Português",
-      ru: "Русский",
+      ko: { name: "한국어", code: "ko-KR", voice: "ko-KR-Standard-A" },
+      en: { name: "English", code: "en-US", voice: "en-US-Standard-A" },
+      ja: { name: "日本語", code: "ja-JP", voice: "ja-JP-Standard-A" },
+      zh: { name: "中文", code: "zh-CN", voice: "zh-CN-Standard-A" },
+      es: { name: "Español", code: "es-ES", voice: "es-ES-Standard-A" },
+      fr: { name: "Français", code: "fr-FR", voice: "fr-FR-Standard-A" },
+      de: { name: "Deutsch", code: "de-DE", voice: "de-DE-Standard-A" },
+      it: { name: "Italiano", code: "it-IT", voice: "it-IT-Standard-A" },
+      pt: { name: "Português", code: "pt-BR", voice: "pt-BR-Standard-A" },
+      ru: { name: "Русский", code: "ru-RU", voice: "ru-RU-Standard-A" },
     };
 
     // Railway 환경 최적화
@@ -43,7 +44,7 @@ class TTSService extends BaseService {
     // 설정
     this.TTS_TIMEOUT = 30000; // 30초
     this.MAX_RETRIES = 3;
-    this.MAX_TEXT_LENGTH = 200; // google-tts-api 제한
+    this.MAX_TEXT_LENGTH = 5000; // Google Cloud TTS는 더 긴 텍스트 지원
   }
 
   /**
@@ -68,7 +69,7 @@ class TTSService extends BaseService {
   }
 
   /**
-   * 🎯 TTS 변환 (google-tts-api 사용)
+   * 🎯 TTS 변환 (Google Cloud Text-to-Speech 사용)
    */
   async convertTextToSpeech(text, language = "ko", userId = null) {
     let retries = 0;
@@ -85,15 +86,13 @@ class TTSService extends BaseService {
           language = "ko";
         }
 
-        // 텍스트 분할 (200자 제한)
-        const chunks = this.splitText(text, this.MAX_TEXT_LENGTH);
+        const languageConfig = this.supportedLanguages[language];
 
-        if (chunks.length > 3) {
+        // 텍스트 길이 확인
+        if (text.length > this.MAX_TEXT_LENGTH) {
           return {
             success: false,
-            message: `텍스트가 너무 깁니다. (최대 ${
-              this.MAX_TEXT_LENGTH * 3
-            }자)`,
+            message: `텍스트가 너무 깁니다. (최대 ${this.MAX_TEXT_LENGTH}자)`,
           };
         }
 
@@ -115,28 +114,34 @@ class TTSService extends BaseService {
           });
         }
 
-        logger.info(`🔄 TTS 변환 시작 (google-tts-api):`, {
+        logger.info(`🔄 TTS 변환 시작 (Google Cloud):`, {
           userId,
           language,
           textLength: text.length,
-          chunks: chunks.length,
+          voice: languageConfig.voice,
         });
 
-        // 청크별로 처리
-        const audioUrls = [];
+        // Google Cloud TTS 요청 구성
+        const request = {
+          input: { text: text },
+          voice: {
+            languageCode: languageConfig.code,
+            name: languageConfig.voice,
+            ssmlGender: "NEUTRAL",
+          },
+          audioConfig: {
+            audioEncoding: "MP3",
+            speakingRate: 1.0,
+            pitch: 0.0,
+            volumeGainDb: 0.0,
+          },
+        };
 
-        for (const chunk of chunks) {
-          const url = await googleTTS.getAudioUrl(chunk, {
-            lang: language,
-            slow: false,
-            host: "https://translate.google.com",
-            timeout: 10000,
-          });
-          audioUrls.push(url);
-        }
+        // TTS 변환 실행
+        const [response] = await this.ttsClient.synthesizeSpeech(request);
 
-        // 오디오 다운로드 및 병합
-        await this.downloadAndMergeAudio(audioUrls, filePath);
+        // 오디오 파일 저장
+        await fs.writeFile(filePath, response.audioContent, "binary");
 
         // 파일 생성 검증
         const fileExists = await this.verifyFileCreation(filePath);
@@ -153,13 +158,15 @@ class TTSService extends BaseService {
             userId,
             language,
             filePath,
-            chunks: chunks.length,
+            voice: languageConfig.voice,
           });
 
           return {
             success: true,
             filePath,
             language,
+            languageCode: languageConfig.code,
+            voice: languageConfig.voice,
             text,
             fileName,
             size: await this.getFileSize(filePath),
@@ -194,88 +201,6 @@ class TTSService extends BaseService {
           retries,
         };
       }
-    }
-  }
-
-  /**
-   * 텍스트 분할 (200자 제한)
-   */
-  splitText(text, maxLength) {
-    const chunks = [];
-    const sentences = text.match(/[^.!?]+[.!?]+/g) || [text];
-
-    let currentChunk = "";
-
-    for (const sentence of sentences) {
-      if ((currentChunk + sentence).length <= maxLength) {
-        currentChunk += sentence + " ";
-      } else {
-        if (currentChunk) {
-          chunks.push(currentChunk.trim());
-        }
-        currentChunk = sentence + " ";
-      }
-    }
-
-    if (currentChunk) {
-      chunks.push(currentChunk.trim());
-    }
-
-    return chunks;
-  }
-
-  /**
-   * 오디오 다운로드 및 병합
-   */
-  async downloadAndMergeAudio(urls, outputPath) {
-    const tempFiles = [];
-
-    try {
-      // 각 URL에서 오디오 다운로드
-      for (let i = 0; i < urls.length; i++) {
-        const tempFile = path.join(this.tempDir, `temp_${Date.now()}_${i}.mp3`);
-
-        const response = await axios.get(urls[i], {
-          responseType: "stream",
-          timeout: 10000,
-        });
-
-        const writer = fs.createWriteStream(tempFile);
-        response.data.pipe(writer);
-
-        await new Promise((resolve, reject) => {
-          writer.on("finish", resolve);
-          writer.on("error", reject);
-        });
-
-        tempFiles.push(tempFile);
-      }
-
-      // 단일 파일인 경우 그냥 이동
-      if (tempFiles.length === 1) {
-        await fs.rename(tempFiles[0], outputPath);
-      } else {
-        // 여러 파일인 경우 병합 (간단한 방법)
-        const buffers = [];
-        for (const file of tempFiles) {
-          const buffer = await fs.readFile(file);
-          buffers.push(buffer);
-        }
-
-        const combined = Buffer.concat(buffers);
-        await fs.writeFile(outputPath, combined);
-
-        // 임시 파일 삭제
-        for (const file of tempFiles) {
-          await this.cleanupFile(file);
-        }
-      }
-    } catch (error) {
-      // 에러 시 임시 파일 정리
-      for (const file of tempFiles) {
-        await this.cleanupFile(file);
-      }
-      throw error;
     }
   }
 
@@ -327,6 +252,13 @@ class TTSService extends BaseService {
       return "🌐 네트워크 연결에 문제가 있습니다. 잠시 후 다시 시도해주세요.";
     } else if (errorMsg.includes("invalid") || errorMsg.includes("language")) {
       return "🔤 지원하지 않는 언어이거나 텍스트에 문제가 있습니다.";
+    } else if (errorMsg.includes("quota") || errorMsg.includes("limit")) {
+      return "📊 일일 사용량이 초과되었습니다. 내일 다시 시도해주세요.";
+    } else if (
+      errorMsg.includes("authentication") ||
+      errorMsg.includes("credentials")
+    ) {
+      return "🔐 인증에 문제가 있습니다. 관리자에게 문의하세요.";
     } else {
       return "❌ TTS 변환 중 오류가 발생했습니다. 다시 시도해주세요.";
     }
@@ -354,12 +286,25 @@ class TTSService extends BaseService {
     return {
       success: true,
       language,
-      languageName: this.supportedLanguages[language],
+      languageName: this.supportedLanguages[language].name,
+      voice: this.supportedLanguages[language].voice,
     };
   }
 
   getUserLanguage(userId) {
     return this.userLanguages.get(userId.toString()) || "ko";
+  }
+
+  getSupportedLanguages() {
+    const languages = {};
+    for (const [code, config] of Object.entries(this.supportedLanguages)) {
+      languages[code] = {
+        name: config.name,
+        voice: config.voice,
+        languageCode: config.code,
+      };
+    }
+    return languages;
   }
 
   async stopTTS(userId) {
@@ -419,6 +364,7 @@ class TTSService extends BaseService {
       maxRetries: this.MAX_RETRIES,
       maxTextLength: this.MAX_TEXT_LENGTH,
       environment: process.env.RAILWAY_ENVIRONMENT ? "Railway" : "Local",
+      apiType: "Google Cloud Text-to-Speech",
     };
   }
 
