@@ -169,54 +169,106 @@ ${userName}님의 할일 현황:
     } = callbackQuery;
 
     try {
-      // 페이지 번호 파싱
-      const page = params[0] ? parseInt(params[0]) : 1;
+      // 페이지 처리
+      const page = parseInt(params[0]) || 1;
+      const result = await this.todoService.getUserTodos(
+        userId,
+        page,
+        this.pageSize
+      );
 
-      // 할일 목록 가져오기
-      const todos = await this.todoService.getUserTodos(userId);
+      if (!result.success) {
+        throw new Error(result.error || "할일 목록을 가져올 수 없습니다");
+      }
+
+      const { todos, total, totalPages } = result;
 
       if (todos.length === 0) {
-        await this.editMessage(
-          bot,
-          chatId,
-          messageId,
-          "📝 **할일 목록**\n\n아직 등록된 할일이 없습니다.\n할일을 추가해보세요!",
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "➕ 할일 추가", callback_data: "todo:add" }],
-                [{ text: "🔙 뒤로", callback_data: "todo:menu" }],
-              ],
-            },
-          }
-        );
+        const emptyText = `📝 **할일 목록**
+
+아직 등록된 할일이 없습니다.
+새로운 할일을 추가해보세요! 💪`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [{ text: "➕ 할일 추가", callback_data: "todo:add" }],
+            [{ text: "🔙 뒤로", callback_data: "todo:menu" }],
+          ],
+        };
+
+        await this.editMessage(bot, chatId, messageId, emptyText, {
+          reply_markup: keyboard,
+        });
         return;
       }
 
-      // 페이지네이션 계산
-      const totalPages = Math.ceil(todos.length / this.pageSize);
+      // ✅ 개선된 목록 표시
+      let listText = `📝 **할일 목록** (${todos.filter((t) => !t.completed).length}/${total})\n\n`;
+
       const startIdx = (page - 1) * this.pageSize;
-      const endIdx = startIdx + this.pageSize;
-      const pageTodos = todos.slice(startIdx, endIdx);
-
-      // 할일 목록 텍스트 생성
-      let listText = `📝 **할일 목록** (${page}/${totalPages})\n\n`;
-
-      pageTodos.forEach((todo, idx) => {
+      todos.forEach((todo, idx) => {
         const num = startIdx + idx + 1;
         const status = todo.completed ? "✅" : "⬜";
-        const date = this.formatDate(todo.createdAt);
-        listText += `${num}. ${status} ${todo.text}\n`;
-        listText += `   📅 ${date}\n\n`;
+        const date = TimeHelper.formatDate(todo.createdAt);
+
+        // 완료된 항목은 취소선 추가
+        const todoText = todo.completed ? `~${todo.text}~` : todo.text;
+
+        listText += `${num}. ${status} **${todoText}**\n`;
+        listText += `    📅 ${date}\n\n`;
       });
 
-      // 키보드 생성
-      const keyboard = this.buildListKeyboard(
-        pageTodos,
-        page,
-        totalPages,
-        startIdx
-      );
+      // ✅ 개선된 키보드 레이아웃
+      const keyboard = { inline_keyboard: [] };
+
+      // 할일 토글/삭제 버튼 (2열로 정리)
+      for (let i = 0; i < todos.length; i++) {
+        const todo = todos[i];
+        const idx = startIdx + i + 1;
+
+        keyboard.inline_keyboard.push([
+          {
+            text: `${todo.completed ? "✅" : "⬜"} ${idx}`,
+            callback_data: `todo:toggle:${todo._id}`,
+          },
+          {
+            text: "🗑️",
+            callback_data: `todo:delete:${todo._id}`,
+          },
+        ]);
+      }
+
+      // 페이지네이션 (필요한 경우만)
+      if (totalPages > 1) {
+        const pageRow = [];
+
+        // 이전 페이지
+        pageRow.push({
+          text: page > 1 ? "◀️" : "　",
+          callback_data: page > 1 ? `todo:page:${page - 1}` : "noop",
+        });
+
+        // 페이지 정보
+        pageRow.push({
+          text: `${page}/${totalPages}`,
+          callback_data: "noop",
+        });
+
+        // 다음 페이지
+        pageRow.push({
+          text: page < totalPages ? "▶️" : "　",
+          callback_data: page < totalPages ? `todo:page:${page + 1}` : "noop",
+        });
+
+        keyboard.inline_keyboard.push(pageRow);
+      }
+
+      // 하단 메뉴 (3개씩 배치)
+      keyboard.inline_keyboard.push([
+        { text: "➕ 추가", callback_data: "todo:add" },
+        { text: "📊 통계", callback_data: "todo:stats" },
+        { text: "🔙 뒤로", callback_data: "todo:menu" },
+      ]);
 
       await this.editMessage(bot, chatId, messageId, listText, {
         reply_markup: keyboard,
@@ -383,6 +435,13 @@ ${userName}님의 할일 현황:
   /**
    * 통계 표시
    */
+  // 진행률 바 생성 헬퍼
+  createProgressBar(percentage) {
+    const filled = Math.floor(percentage / 10);
+    const empty = 10 - filled;
+    return "▓".repeat(filled) + "░".repeat(empty);
+  }
+
   async showStats(bot, callbackQuery, params, moduleManager) {
     const {
       message: {
@@ -395,28 +454,33 @@ ${userName}님의 할일 현황:
     try {
       const stats = await this.todoService.getUserDetailedStats(from.id);
 
+      // 진행률 바 생성
+      const progressBar = this.createProgressBar(stats.stats.completionRate);
+
       const statsText = `📊 **할일 통계**
 
-**전체 현황**
-• 총 할일: ${stats.total}개
-• 완료: ${stats.completed}개
-• 진행중: ${stats.pending}개  
-• 완료율: ${stats.completionRate}%
+${progressBar} ${stats.stats.completionRate}%
 
-**기간별 통계**
-• 오늘 추가: ${stats.todayAdded}개
-• 오늘 완료: ${stats.todayCompleted}개
-• 이번주 완료: ${stats.weekCompleted}개
-• 이번달 완료: ${stats.monthCompleted}개
+📋 **전체 현황**
+├ 총 할일: **${stats.stats.total}**개
+├ 완료: **${stats.stats.completed}**개
+└ 진행중: **${stats.stats.active}**개
 
-**평균 완료 시간**
-• ${stats.avgCompletionTime}
+📅 **오늘 활동**
+├ 추가: **${stats.stats.todayAdded || 0}**개
+└ 완료: **${stats.stats.todayCompleted || 0}**개
 
-최근 업데이트: ${this.formatDateTime()}`;
+⏱️ **이번주 성과**
+└ 완료: **${stats.stats.weekCompleted || 0}**개
+
+_최근 업데이트: ${TimeHelper.formatDateTime()}_`;
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🔄 새로고침", callback_data: "todo:stats" }],
+          [
+            { text: "🔄 새로고침", callback_data: "todo:stats" },
+            { text: "🗑️ 정리하기", callback_data: "todo:clear" },
+          ],
           [{ text: "🔙 뒤로", callback_data: "todo:menu" }],
         ],
       };
