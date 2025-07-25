@@ -1,21 +1,28 @@
-// src/handlers/CommandHandler.js - 명령어 전용 핸들러
+// src/handlers/CommandHandler.js - 순수 명령어 처리 전용 v3.0.1
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 
 /**
- * ⌨️ 커맨드 핸들러 - 명령어 전용
- * - 모든 /명령어 처리
- * - BotFather 명령어 연동
- * - 텍스트 입력 상태 관리
- * - 표준 매개변수 체계 준수
+ * ⌨️ CommandHandler v3.0.1 - 순수 명령어 처리 전용
+ *
+ * 🎯 올바른 역할:
+ * - 명령어 파싱 및 검증
+ * - 적절한 핸들러로 라우팅
+ * - 사용자 상태 관리
+ * - 권한 검증
+ *
+ * ❌ 하면 안 되는 일:
+ * - 인라인키보드 생성 (NavigationHandler 담당)
+ * - 메시지 텍스트 구성 (NavigationHandler 담당)
+ * - UI 렌더링 (NavigationHandler 담당)
  */
 class CommandHandler {
   constructor(bot, options = {}) {
     this.bot = bot;
     this.moduleManager = options.moduleManager;
     this.commandsRegistry = options.commandsRegistry;
-    this.navigationHandler = options.navigationHandler;
+    this.navigationHandler = options.navigationHandler; // ✅ NavigationHandler 참조
 
     // 📊 사용자 입력 상태 관리
     this.userStates = new Map();
@@ -27,12 +34,13 @@ class CommandHandler {
       failedCommands: 0,
       unknownCommands: 0,
       averageResponseTime: 0,
+      totalResponseTime: 0,
     };
 
     // ⏱️ 상태 정리 스케줄러
     this.startStateCleanupScheduler();
 
-    logger.info("⌨️ CommandHandler 생성됨");
+    logger.info("⌨️ CommandHandler v3.0.1 생성됨 (순수 명령어 처리)");
   }
 
   /**
@@ -50,7 +58,6 @@ class CommandHandler {
       logger.info(
         `⌨️ 명령어 처리: /${command} ${args.join(" ")} (${userName})`
       );
-
       this.stats.commandsProcessed++;
 
       // 🏛️ 시스템 명령어 (직접 처리)
@@ -90,7 +97,7 @@ class CommandHandler {
   }
 
   /**
-   * 🏛️ 시스템 명령어 처리
+   * 🏛️ 시스템 명령어 처리 (NavigationHandler로 위임)
    */
   async handleSystemCommand(bot, msg, command, args) {
     const {
@@ -119,14 +126,14 @@ class CommandHandler {
   }
 
   /**
-   * 🚀 /start 명령어 처리
+   * 🚀 /start 명령어 처리 (NavigationHandler로 완전 위임)
    */
   async handleStartCommand(bot, msg, args) {
     const {
       chat: { id: chatId },
       from,
     } = msg;
-    const userName = getUserName(from);
+    const userName = getUserName(msg);
 
     try {
       logger.info(`🚀 Start 명령어: ${userName}`);
@@ -134,20 +141,23 @@ class CommandHandler {
       // 사용자 상태 초기화
       this.clearUserState(from.id);
 
-      // NavigationHandler로 메인 메뉴 표시 위임
-      const welcomeText = `👋 **안녕하세요, ${userName}님!**
-
-🤖 **두목봇 v3.0.1**에 오신 것을 환영합니다.
-
-아래 메뉴에서 원하는 기능을 선택해주세요.`;
-
-      // 동적 메인 메뉴 키보드 생성
-      const keyboard = await this.generateMainMenuKeyboard();
-
-      await bot.sendMessage(chatId, welcomeText, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
+      // ✅ NavigationHandler로 완전 위임 - 메인 메뉴 표시
+      if (
+        this.navigationHandler &&
+        this.navigationHandler.showMainMenuFromCommand
+      ) {
+        await this.navigationHandler.showMainMenuFromCommand(
+          bot,
+          chatId,
+          userName
+        );
+      } else {
+        // 폴백 - 간단한 환영 메시지만 전송
+        await bot.sendMessage(
+          chatId,
+          `👋 안녕하세요, ${userName}님!\n\n🤖 두목봇 v3.0.1에 오신 것을 환영합니다.`
+        );
+      }
 
       logger.info(`✅ Start 명령어 처리 완료: ${userName}`);
       return true;
@@ -162,7 +172,7 @@ class CommandHandler {
   }
 
   /**
-   * ❓ /help 명령어 처리
+   * ❓ /help 명령어 처리 (NavigationHandler로 위임)
    */
   async handleHelpCommand(bot, msg, args) {
     const {
@@ -178,16 +188,16 @@ class CommandHandler {
         return await this.handleModuleHelp(bot, chatId, moduleName);
       }
 
-      // 전체 도움말
-      const helpData = await this.generateHelpData();
-      const helpText = this.buildHelpText(helpData);
-      const keyboard = this.buildHelpKeyboard(helpData);
-
-      await bot.sendMessage(chatId, helpText, {
-        parse_mode: "Markdown",
-        disable_web_page_preview: true,
-        reply_markup: keyboard,
-      });
+      // ✅ NavigationHandler로 위임 - 전체 도움말 표시
+      if (
+        this.navigationHandler &&
+        this.navigationHandler.showHelpFromCommand
+      ) {
+        await this.navigationHandler.showHelpFromCommand(bot, chatId);
+      } else {
+        // 폴백 - 기본 도움말 텍스트만 전송
+        await bot.sendMessage(chatId, this.getBasicHelpText());
+      }
 
       return true;
     } catch (error) {
@@ -201,7 +211,7 @@ class CommandHandler {
   }
 
   /**
-   * 📊 /status 명령어 처리
+   * 📊 /status 명령어 처리 (NavigationHandler로 위임)
    */
   async handleStatusCommand(bot, msg, args) {
     const {
@@ -211,14 +221,16 @@ class CommandHandler {
     try {
       logger.info("📊 Status 명령어 처리");
 
-      const statusData = await this.generateStatusData();
-      const statusText = this.buildStatusText(statusData);
-      const keyboard = this.buildStatusKeyboard();
-
-      await bot.sendMessage(chatId, statusText, {
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
+      // ✅ NavigationHandler로 위임 - 상태 정보 표시
+      if (
+        this.navigationHandler &&
+        this.navigationHandler.showStatusFromCommand
+      ) {
+        await this.navigationHandler.showStatusFromCommand(bot, chatId);
+      } else {
+        // 폴백 - 기본 상태 정보만 전송
+        await bot.sendMessage(chatId, this.getBasicStatusText());
+      }
 
       return true;
     } catch (error) {
@@ -229,7 +241,7 @@ class CommandHandler {
   }
 
   /**
-   * ❌ /cancel 명령어 처리
+   * ❌ /cancel 명령어 처리 (순수 로직만)
    */
   async handleCancelCommand(bot, msg, args) {
     const {
@@ -245,32 +257,18 @@ class CommandHandler {
       const userState = this.getUserState(userId);
 
       if (!userState || !userState.action) {
-        await bot.sendMessage(chatId, "취소할 작업이 없습니다.", {
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-            ],
-          },
-        });
+        await bot.sendMessage(chatId, "취소할 작업이 없습니다.");
         return true;
       }
 
       // 상태 초기화
+      const canceledAction = userState.action;
       this.clearUserState(userId);
 
+      // ✅ 간단한 확인 메시지만 전송 (키보드는 NavigationHandler에서)
       await bot.sendMessage(
         chatId,
-        `✅ **작업이 취소되었습니다.**
-
-이전에 진행 중이던 "${userState.action}" 작업을 취소했습니다.`,
-        {
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-            ],
-          },
-        }
+        `✅ "${canceledAction}" 작업이 취소되었습니다.`
       );
 
       return true;
@@ -282,7 +280,7 @@ class CommandHandler {
   }
 
   /**
-   * 📱 모듈 명령어 처리
+   * 📱 모듈 명령어 처리 (ModuleManager로 위임)
    */
   async handleModuleCommand(bot, msg, command, args) {
     try {
@@ -305,8 +303,13 @@ class CommandHandler {
       // 직접 모듈명으로 시도 (예: /todo, /timer 등)
       const moduleInstance = this.moduleManager.getModule(command);
       if (moduleInstance) {
+        if (moduleInstance.onHandleMessage) {
+          // 표준 메시지 핸들러로 처리
+          return await moduleInstance.onHandleMessage(bot, msg);
+        }
+
         if (moduleInstance.handleMessage) {
-          // 일반 메시지 핸들러로 처리
+          // 레거시 메시지 핸들러로 처리
           return await moduleInstance.handleMessage(bot, msg);
         }
 
@@ -324,259 +327,27 @@ class CommandHandler {
   }
 
   /**
-   * 🗄️ 동적 메인 메뉴 키보드 생성
+   * 🔍 모듈 도움말 처리
    */
-  async generateMainMenuKeyboard() {
+  async handleModuleHelp(bot, chatId, moduleName) {
     try {
-      const keyboard = { inline_keyboard: [] };
+      const moduleInstance = this.moduleManager.getModule(moduleName);
 
-      // 활성 모듈 버튼들
-      const moduleButtons = [];
-
-      if (this.moduleManager) {
-        const moduleList = this.moduleManager.getModuleList();
-
-        // 표준 모듈 순서
-        const moduleOrder = [
-          { key: "todo", name: "📝 할일 관리" },
-          { key: "timer", name: "⏰ 타이머" },
-          { key: "worktime", name: "🕐 근무시간" },
-          { key: "leave", name: "🏖️ 휴가 관리" },
-          { key: "reminder", name: "🔔 리마인더" },
-          { key: "fortune", name: "🔮 운세" },
-          { key: "weather", name: "🌤️ 날씨" },
-          { key: "tts", name: "🎤 음성 변환" },
-        ];
-
-        for (const moduleInfo of moduleOrder) {
-          if (moduleList.includes(moduleInfo.key)) {
-            moduleButtons.push({
-              text: moduleInfo.name,
-              callback_data: `${moduleInfo.key}:menu`,
-            });
-          }
-        }
+      if (moduleInstance && moduleInstance.sendHelp) {
+        await moduleInstance.sendHelp(bot, chatId);
+        return true;
       }
 
-      // 2개씩 묶어서 행 생성
-      for (let i = 0; i < moduleButtons.length; i += 2) {
-        const row = [moduleButtons[i]];
-        if (i + 1 < moduleButtons.length) {
-          row.push(moduleButtons[i + 1]);
-        }
-        keyboard.inline_keyboard.push(row);
-      }
-
-      // 시스템 메뉴
-      keyboard.inline_keyboard.push([
-        { text: "📊 상태", callback_data: "system:status" },
-        { text: "❓ 도움말", callback_data: "system:help" },
-      ]);
-
-      return keyboard;
-    } catch (error) {
-      logger.error("❌ 메인 메뉴 키보드 생성 오류:", error);
-
-      // 폴백 키보드
-      return {
-        inline_keyboard: [
-          [
-            { text: "📝 할일", callback_data: "todo:menu" },
-            { text: "⏰ 타이머", callback_data: "timer:menu" },
-          ],
-          [
-            { text: "📊 상태", callback_data: "system:status" },
-            { text: "❓ 도움말", callback_data: "system:help" },
-          ],
-        ],
-      };
-    }
-  }
-
-  /**
-   * 📊 도움말 데이터 생성
-   */
-  async generateHelpData() {
-    const helpData = {
-      systemCommands: [
-        { command: "start", description: "봇 시작 및 메인 메뉴" },
-        { command: "help", description: "도움말 보기" },
-        { command: "status", description: "시스템 상태 확인" },
-        { command: "cancel", description: "현재 작업 취소" },
-      ],
-      moduleCommands: [],
-      stats: this.commandsRegistry
-        ? this.commandsRegistry.getCommandStats()
-        : {
-            totalCommands: 0,
-            publicCommands: 0,
-            systemCommands: 4,
-            moduleCommands: 0,
-          },
-    };
-
-    // 모듈 명령어 수집
-    if (this.commandsRegistry) {
-      const publicCommands = this.commandsRegistry.getBotFatherCommands();
-      helpData.moduleCommands = publicCommands.filter(
-        (cmd) =>
-          !helpData.systemCommands.some((sys) => sys.command === cmd.command)
+      // 모듈이 없는 경우
+      await bot.sendMessage(
+        chatId,
+        `❓ "${moduleName}" 모듈을 찾을 수 없습니다.\n\n/help 명령어로 전체 도움말을 확인하세요.`
       );
+      return false;
+    } catch (error) {
+      logger.error(`❌ 모듈 도움말 처리 오류 (${moduleName}):`, error);
+      return false;
     }
-
-    return helpData;
-  }
-
-  /**
-   * 📝 도움말 텍스트 구성
-   */
-  buildHelpText(helpData) {
-    let helpText = `📖 **두목봇 도움말**
-버전: v3.0.1
-
-**📊 명령어 현황**
-- 총 명령어: ${helpData.stats.totalCommands}개
-- 시스템: ${helpData.stats.systemCommands}개  
-- 모듈: ${helpData.stats.moduleCommands}개
-
-**🏛️ 시스템 명령어**`;
-
-    // 시스템 명령어 나열
-    for (const cmd of helpData.systemCommands) {
-      helpText += `\n• \`/${cmd.command}\` - ${cmd.description}`;
-    }
-
-    if (helpData.moduleCommands.length > 0) {
-      helpText += `\n\n**📱 모듈 명령어**`;
-
-      // 모듈 명령어 나열 (최대 8개까지만)
-      const displayCommands = helpData.moduleCommands.slice(0, 8);
-      for (const cmd of displayCommands) {
-        helpText += `\n• \`/${cmd.command}\` - ${cmd.description}`;
-      }
-
-      if (helpData.moduleCommands.length > 8) {
-        helpText += `\n• ... 외 ${helpData.moduleCommands.length - 8}개`;
-      }
-    }
-
-    helpText += `\n\n**💡 사용 팁**
-- 버튼 클릭으로 쉽게 이동 가능
-- \`/help [모듈명]\`으로 상세 도움말 확인
-- \`/cancel\`로 언제든 작업 취소 가능
-
-**🆘 문제 해결**
-문제가 있으시면 \`/start\` 명령어를 입력하거나
-관리자에게 연락해주세요.`;
-
-    return helpText;
-  }
-
-  /**
-   * ⌨️ 도움말 키보드 구성
-   */
-  buildHelpKeyboard(helpData) {
-    const keyboard = { inline_keyboard: [] };
-
-    // 주요 모듈 도움말 버튼들
-    const helpButtons = [
-      { text: "📝 할일 도움말", callback_data: "help:todo" },
-      { text: "⏰ 타이머 도움말", callback_data: "help:timer" },
-      { text: "🏖️ 휴가 도움말", callback_data: "help:leave" },
-      { text: "🌤️ 날씨 도움말", callback_data: "help:weather" },
-    ];
-
-    // 2개씩 묶어서 행 생성
-    for (let i = 0; i < helpButtons.length; i += 2) {
-      const row = [helpButtons[i]];
-      if (i + 1 < helpButtons.length) {
-        row.push(helpButtons[i + 1]);
-      }
-      keyboard.inline_keyboard.push(row);
-    }
-
-    // 하단 메뉴
-    keyboard.inline_keyboard.push([
-      { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-    ]);
-
-    return keyboard;
-  }
-
-  /**
-   * 📊 상태 데이터 생성
-   */
-  async generateStatusData() {
-    const uptime = process.uptime();
-    const memUsage = process.memoryUsage();
-
-    return {
-      uptime: this.formatUptime(uptime),
-      memory: `${Math.round(memUsage.heapUsed / 1024 / 1024)}MB`,
-      environment: process.env.RAILWAY_ENVIRONMENT ? "Railway" : "Local",
-      version: "3.0.1",
-      commandStats: this.stats,
-      moduleStats: this.moduleManager
-        ? this.moduleManager.getModuleStats()
-        : {
-            total: 0,
-            active: 0,
-            failed: 0,
-          },
-      userSessions: this.userStates.size,
-      database: "연결됨", // TODO: 실제 확인
-      railway: process.env.RAILWAY_ENVIRONMENT ? "활성" : "미사용",
-    };
-  }
-
-  /**
-   * 📊 상태 텍스트 구성
-   */
-  buildStatusText(statusData) {
-    return `📊 **시스템 상태**
-
-**⚡ 기본 정보**
-- 🟢 상태: 정상 동작 중
-- ⏱️ 가동시간: ${statusData.uptime}
-- 💾 메모리: ${statusData.memory}
-- 🌍 환경: ${statusData.environment}
-- 📱 버전: v${statusData.version}
-
-**📈 명령어 처리 통계**
-- 처리된 명령어: ${statusData.commandStats.commandsProcessed}개
-- 성공: ${statusData.commandStats.successfulCommands}개
-- 실패: ${statusData.commandStats.failedCommands}개
-- 알 수 없음: ${statusData.commandStats.unknownCommands}개
-- 평균 응답: ${statusData.commandStats.averageResponseTime}ms
-
-**📱 모듈 현황**
-- 활성 모듈: ${statusData.moduleStats.active}개
-- 총 모듈: ${statusData.moduleStats.total}개
-- 실패 모듈: ${statusData.moduleStats.failed}개
-
-**🔗 연결 상태**
-- 활성 세션: ${statusData.userSessions}개
-- 데이터베이스: ${statusData.database}
-- Railway: ${statusData.railway}
-
-✅ 모든 시스템이 정상 작동 중입니다.
-
-마지막 업데이트: ${TimeHelper.getLogTimeString()}`;
-  }
-
-  /**
-   * ⌨️ 상태 키보드 구성
-   */
-  buildStatusKeyboard() {
-    return {
-      inline_keyboard: [
-        [
-          { text: "🔄 새로고침", callback_data: "system:status" },
-          { text: "📋 상세 로그", callback_data: "system:detailed_logs" },
-        ],
-        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
   }
 
   /**
@@ -590,82 +361,125 @@ class CommandHandler {
 
     logger.warn(`❓ 알 수 없는 명령어: /${command} (${userName})`);
 
-    const errorText = `❓ **알 수 없는 명령어**
+    // ✅ 간단한 오류 메시지만 전송 (키보드는 NavigationHandler에서)
+    const errorText = `❓ 알 수 없는 명령어: /${command}
 
-\`/${command}\` 명령어를 찾을 수 없습니다.
+사용 가능한 명령어:
+• /start - 봇 시작
+• /help - 도움말 보기  
+• /status - 상태 확인
+• /cancel - 작업 취소
 
-**사용 가능한 명령어:**
-- \`/start\` - 봇 시작
-- \`/help\` - 도움말 보기  
-- \`/status\` - 상태 확인
-- \`/cancel\` - 작업 취소
-
-**모듈 명령어:**
-- \`/todo\` - 할일 관리
-- \`/timer\` - 타이머/뽀모도로
-- \`/weather\` - 날씨 정보
-- \`/fortune\` - 운세
-
-\`/help\` 명령어로 전체 목록을 확인하세요.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📖 도움말", callback_data: "system:help" },
-          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-        ],
-      ],
-    };
+/help 명령어로 전체 목록을 확인하세요.`;
 
     await bot.sendMessage(chatId, errorText, {
-      parse_mode: "Markdown",
-      reply_markup: keyboard,
       reply_to_message_id: msg.message_id,
     });
   }
 
   /**
-   * ❌ 명령어 에러 전송
+   * ❌ 명령어 에러 전송 (단순화)
    */
   async sendCommandError(bot, chatId, message) {
     try {
-      await bot.sendMessage(chatId, `❌ ${message}`, {
-        parse_mode: "HTML",
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-          ],
-        },
-      });
+      await bot.sendMessage(chatId, `❌ ${message}`);
     } catch (error) {
       logger.error("❌ 명령어 에러 메시지 전송 실패:", error);
     }
   }
 
+  // ===== 🛡️ 폴백 텍스트들 (UI 없는 순수 텍스트만) =====
+
+  /**
+   * 📖 기본 도움말 텍스트 (폴백용)
+   */
+  getBasicHelpText() {
+    return `📖 두목봇 도움말
+
+기본 명령어:
+• /start - 봇 시작
+• /help - 도움말
+• /status - 상태 확인
+• /cancel - 작업 취소
+
+모듈 명령어:
+• /todo - 할일 관리
+• /timer - 타이머
+• /weather - 날씨 정보
+
+더 자세한 정보는 /start 명령어로 메인 메뉴를 확인하세요.`;
+  }
+
+  /**
+   * 📊 기본 상태 텍스트 (폴백용)
+   */
+  getBasicStatusText() {
+    const uptime = this.formatUptime(process.uptime());
+    const memoryMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+
+    return `📊 시스템 상태
+
+기본 정보:
+• 상태: 정상 동작 중
+• 가동시간: ${uptime}
+• 메모리: ${memoryMB}MB
+• 환경: ${process.env.RAILWAY_ENVIRONMENT ? "Railway" : "Local"}
+
+명령어 통계:
+• 처리된 명령어: ${this.stats.commandsProcessed}개
+• 성공: ${this.stats.successfulCommands}개
+• 실패: ${this.stats.failedCommands}개
+
+마지막 업데이트: ${TimeHelper.getLogTimeString()}`;
+  }
+
   // ===== 📊 사용자 상태 관리 =====
 
   /**
-   * 사용자 상태 설정
+   * 📝 사용자 상태 설정
    */
   setUserState(userId, state) {
     this.userStates.set(userId.toString(), {
       ...state,
       timestamp: Date.now(),
     });
+
+    logger.debug(
+      `📝 사용자 상태 설정: ${userId} -> ${state.action || "unknown"}`
+    );
   }
 
   /**
-   * 사용자 상태 조회
+   * 🔍 사용자 상태 조회
    */
   getUserState(userId) {
     return this.userStates.get(userId.toString()) || null;
   }
 
   /**
-   * 사용자 상태 삭제
+   * 🗑️ 사용자 상태 삭제
    */
   clearUserState(userId) {
-    this.userStates.delete(userId.toString());
+    const existed = this.userStates.delete(userId.toString());
+    if (existed) {
+      logger.debug(`🗑️ 사용자 상태 삭제: ${userId}`);
+    }
+  }
+
+  /**
+   * 🗑️ 모든 사용자 상태 삭제
+   */
+  clearAllUserStates() {
+    const count = this.userStates.size;
+    this.userStates.clear();
+    logger.info(`🗑️ 모든 사용자 상태 삭제: ${count}개`);
+  }
+
+  /**
+   * 📊 활성 사용자 상태 수
+   */
+  getActiveUserStatesCount() {
+    return this.userStates.size;
   }
 
   /**
@@ -675,23 +489,33 @@ class CommandHandler {
     setInterval(() => {
       const now = Date.now();
       const timeout = 30 * 60 * 1000; // 30분
+      let cleanedCount = 0;
 
       for (const [userId, state] of this.userStates.entries()) {
         if (now - state.timestamp > timeout) {
           this.userStates.delete(userId);
-          logger.debug(`🧹 사용자 상태 정리: ${userId}`);
+          cleanedCount++;
         }
       }
-    }, 5 * 60 * 1000); // 5분마다
+
+      if (cleanedCount > 0) {
+        logger.debug(`🧹 만료된 사용자 상태 정리: ${cleanedCount}개`);
+      }
+    }, 5 * 60 * 1000); // 5분마다 실행
   }
+
+  // ===== 📊 통계 및 유틸리티 =====
 
   /**
    * 📊 응답 시간 통계 업데이트
    */
   updateResponseTimeStats(responseTime) {
+    this.stats.totalResponseTime += responseTime;
+
     if (this.stats.averageResponseTime === 0) {
       this.stats.averageResponseTime = responseTime;
     } else {
+      // 지수 이동 평균 (새로운 값에 10% 가중치)
       this.stats.averageResponseTime =
         this.stats.averageResponseTime * 0.9 + responseTime * 0.1;
     }
@@ -701,10 +525,13 @@ class CommandHandler {
    * ⏱️ 업타임 포맷팅
    */
   formatUptime(seconds) {
-    const hours = Math.floor(seconds / 3600);
+    const days = Math.floor(seconds / 86400);
+    const hours = Math.floor((seconds % 86400) / 3600);
     const minutes = Math.floor((seconds % 3600) / 60);
 
-    if (hours > 0) {
+    if (days > 0) {
+      return `${days}일 ${hours}시간 ${minutes}분`;
+    } else if (hours > 0) {
       return `${hours}시간 ${minutes}분`;
     } else {
       return `${minutes}분`;
@@ -712,14 +539,53 @@ class CommandHandler {
   }
 
   /**
-   * 📊 통계 조회
+   * 📊 상세 통계 조회
    */
-  getStats() {
+  getDetailedStats() {
     return {
       ...this.stats,
       averageResponseTime: Math.round(this.stats.averageResponseTime),
       activeUserStates: this.userStates.size,
+      successRate:
+        this.stats.commandsProcessed > 0
+          ? Math.round(
+              (this.stats.successfulCommands / this.stats.commandsProcessed) *
+                100
+            )
+          : 0,
+      uptime: this.formatUptime(process.uptime()),
+      memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
     };
+  }
+
+  /**
+   * 📊 기본 통계 조회
+   */
+  getStats() {
+    return {
+      commandsProcessed: this.stats.commandsProcessed,
+      successfulCommands: this.stats.successfulCommands,
+      failedCommands: this.stats.failedCommands,
+      unknownCommands: this.stats.unknownCommands,
+      averageResponseTime: Math.round(this.stats.averageResponseTime),
+      activeUserStates: this.userStates.size,
+    };
+  }
+
+  /**
+   * 🔄 통계 초기화
+   */
+  resetStats() {
+    this.stats = {
+      commandsProcessed: 0,
+      successfulCommands: 0,
+      failedCommands: 0,
+      unknownCommands: 0,
+      averageResponseTime: 0,
+      totalResponseTime: 0,
+    };
+
+    logger.info("🔄 CommandHandler 통계 초기화됨");
   }
 
   /**
@@ -730,16 +596,10 @@ class CommandHandler {
       logger.info("🧹 CommandHandler 정리 시작...");
 
       // 사용자 상태 정리
-      this.userStates.clear();
+      this.clearAllUserStates();
 
       // 통계 초기화
-      this.stats = {
-        commandsProcessed: 0,
-        successfulCommands: 0,
-        failedCommands: 0,
-        unknownCommands: 0,
-        averageResponseTime: 0,
-      };
+      this.resetStats();
 
       logger.info("✅ CommandHandler 정리 완료");
     } catch (error) {
