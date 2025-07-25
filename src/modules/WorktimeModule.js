@@ -352,7 +352,7 @@ class WorktimeModule extends BaseModule {
   }
   // 근무 상태 계산
   async calculateWorktimeStatus() {
-    const now = TimeHelper.getKoreaTime(); // ✅ Date 객체로 받음
+    const now = TimeHelper.formatTime(date); // ✅ Date 객체로 받음
     const dayOfWeek = now.getDay();
 
     // 주말 체크
