@@ -86,23 +86,47 @@ class SystemModule extends BaseModule {
    * 메인 메뉴 표시
    */
   async showMainMenu(bot, callbackQuery, params, moduleManager) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = callbackQuery;
-    const userName = getUserName(callbackQuery.from);
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+      } = callbackQuery;
 
-    const text = `🏠 **메인 메뉴**
+      const userName = getUserName(callbackQuery.from);
+
+      const menuText = `🏠 **메인 메뉴**
 
 안녕하세요! ${userName}님!
 무엇을 도와드릴까요?
 
-환경: ${this.config.isRailway ? "Railway" : "Local"}
+환경: ${this.config.isRailway ? "Railway" : "로컬"}
 버전: v${this.config.version}`;
 
-    const keyboard = {
+      const keyboard = this.createMainMenuKeyboard(moduleManager);
+
+      await this.editMessage(bot, chatId, messageId, menuText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("메인 메뉴 표시 오류:", error);
+
+      // 에러 발생 시 새 메시지로 전송
+      try {
+        const chatId =
+          callbackQuery.message?.chat?.id || callbackQuery.chat?.id;
+        await this.sendMessage(bot, chatId, "🏠 메인 메뉴로 돌아갑니다.", {
+          reply_markup: this.createMainMenuKeyboard(moduleManager),
+        });
+      } catch (sendError) {
+        logger.error("메인 메뉴 전송 실패:", sendError);
+      }
+    }
+  }
+  // 메인 메뉴 키보드 생성 메서드 추가
+  createMainMenuKeyboard(moduleManager) {
+    return {
       inline_keyboard: [
         [
           { text: "📝 할일 관리", callback_data: "todo:menu" },
@@ -126,12 +150,7 @@ class SystemModule extends BaseModule {
         ],
       ],
     };
-
-    await this.editMessage(bot, chatId, messageId, text, {
-      reply_markup: keyboard,
-    });
   }
-
   /**
    * /start 명령어 처리
    */
