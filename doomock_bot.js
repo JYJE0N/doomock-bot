@@ -4,7 +4,7 @@ const logger = require("./src/utils/Logger");
 const TimeHelper = require("./src/utils/TimeHelper");
 
 // 🏗️ 핵심 시스템들
-const DatabaseManager = require("./src/database/DatabaseManager");
+const { DatabaseManager } = require("./src/database/DatabaseManager");
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
@@ -227,16 +227,8 @@ class DooMockBot {
   async initializeDatabaseManager() {
     logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
 
-    this.dbManager = new DatabaseManager({
-      uri: this.config.mongoUri,
-      dbName: this.config.dbName,
-      options: {
-        maxPoolSize: this.config.isRailway ? 5 : 10,
-        serverSelectionTimeoutMS: 5000,
-        socketTimeoutMS: 45000,
-        family: 4,
-      },
-    });
+    // 직접 인스턴스 생성 (mongoUrl만 전달)
+    this.dbManager = new DatabaseManager(this.config.mongoUri);
 
     await this.dbManager.connect();
     logger.debug("✅ 데이터베이스 매니저 초기화 완료");
