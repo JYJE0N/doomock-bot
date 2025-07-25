@@ -173,7 +173,7 @@ class ModuleManager {
     // 안전한 모듈 등록 (파일 존재 확인)
     const moduleList = [
       {
-        key: "system",
+        key: "SystemModule",
         name: "시스템 모듈",
         path: "../modules/SystemModule",
         priority: 1,
@@ -181,7 +181,7 @@ class ModuleManager {
         features: ["system", "navigation", "help"],
       },
       {
-        key: "todo",
+        key: "TodoModule",
         name: "할일 관리 모듈",
         path: "../modules/TodoModule",
         priority: 2,
@@ -189,7 +189,7 @@ class ModuleManager {
         features: ["crud", "pagination", "search"],
       },
       {
-        key: "timer",
+        key: "TimerModule",
         name: "타이머 모듈",
         path: "../modules/TimerModule",
         priority: 3,
@@ -197,7 +197,7 @@ class ModuleManager {
         features: ["timer", "pomodoro", "notifications"],
       },
       {
-        key: "worktime",
+        key: "WorktimeModule",
         name: "근무시간 관리 모듈",
         path: "../modules/WorktimeModule",
         priority: 4,
@@ -205,7 +205,7 @@ class ModuleManager {
         features: ["worktime", "statistics", "reports"],
       },
       {
-        key: "leave",
+        key: "LeaveModule",
         name: "휴가 관리 모듈",
         path: "../modules/LeaveModule",
         priority: 5,
@@ -213,7 +213,7 @@ class ModuleManager {
         features: ["leave", "calendar", "approval"],
       },
       {
-        key: "reminder",
+        key: "ReminderModule",
         name: "리마인더 모듈",
         path: "../modules/ReminderModule",
         priority: 6,
@@ -221,7 +221,7 @@ class ModuleManager {
         features: ["reminder", "scheduling", "notifications"],
       },
       {
-        key: "fortune",
+        key: "FortuneModule",
         name: "운세 모듈",
         path: "../modules/FortuneModule",
         priority: 7,
@@ -229,7 +229,7 @@ class ModuleManager {
         features: ["fortune", "entertainment"],
       },
       {
-        key: "weather",
+        key: "WeatherModule",
         name: "날씨 모듈",
         path: "../modules/WeatherModule",
         priority: 8,
@@ -237,7 +237,7 @@ class ModuleManager {
         features: ["weather", "api", "location"],
       },
       {
-        key: "tts",
+        key: "TTSModule",
         name: "TTS 모듈",
         path: "../modules/TTSModule",
         priority: 9,

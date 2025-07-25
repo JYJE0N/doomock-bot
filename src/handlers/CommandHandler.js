@@ -44,7 +44,7 @@ class CommandHandler {
       chat: { id: chatId },
       from: { id: userId },
     } = msg;
-    const userName = getUserName(msg.from);
+    const userName = getUserName(msg);
 
     try {
       logger.info(
@@ -236,7 +236,7 @@ class CommandHandler {
       chat: { id: chatId },
       from: { id: userId },
     } = msg;
-    const userName = getUserName(msg.from);
+    const userName = getUserName(msg);
 
     try {
       logger.info(`❌ Cancel 명령어: ${userName}`);
@@ -586,7 +586,7 @@ class CommandHandler {
     const {
       chat: { id: chatId },
     } = msg;
-    const userName = getUserName(msg.from);
+    const userName = getUserName(msg);
 
     logger.warn(`❓ 알 수 없는 명령어: /${command} (${userName})`);
 
