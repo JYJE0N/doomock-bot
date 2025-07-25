@@ -128,7 +128,7 @@ class WorktimeModule extends BaseModule {
           { text: "📜 근무 기록", callback_data: "worktime:history" },
           { text: "⚙️ 설정", callback_data: "worktime:settings" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
       ],
     };
 

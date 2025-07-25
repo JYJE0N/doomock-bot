@@ -201,7 +201,7 @@ class HealthService extends BaseService {
       status: "railway",
       deploymentId: AppConfig.RAILWAY?.DEPLOYMENT_ID,
       environment: AppConfig.RAILWAY?.ENVIRONMENT,
-      publicDomain: AppConfig.RAILWAY?.PUBLIC_DOMAIN,
+      publicDosystem: AppConfig.RAILWAY?.PUBLIC_DOMAIN,
       gitCommit: AppConfig.RAILWAY?.GIT_COMMIT_SHA?.slice(0, 7),
       gitBranch: AppConfig.RAILWAY?.GIT_BRANCH,
     };

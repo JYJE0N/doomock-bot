@@ -102,7 +102,7 @@ class WeatherModule extends BaseModule {
         ],
         [
           { text: "❓ 도움말", callback_data: "weather:help" },
-          { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
         ],
       ],
     };
@@ -173,7 +173,7 @@ ${emoji} **${weather.description}**
           ],
           [
             { text: "🔄 새로고침", callback_data: "weather:current" },
-            { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+            { text: "🏠 메인 메뉴", callback_data: "system:menu" },
           ],
         ],
       };

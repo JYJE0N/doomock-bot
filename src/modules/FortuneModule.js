@@ -128,7 +128,7 @@ class FortuneModule extends BaseModule {
         ],
         [
           { text: "❓ 도움말", callback_data: "fortune:help" },
-          { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
         ],
       ],
     };

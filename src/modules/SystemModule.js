@@ -261,7 +261,7 @@ class SystemModule extends BaseModule {
 버전: v${this.config.version}`;
 
     const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main:menu" }]],
+      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]],
     };
 
     await this.editMessage(bot, chatId, messageId, helpText, {
@@ -294,7 +294,7 @@ class SystemModule extends BaseModule {
 버전: v${this.config.version}`;
 
     const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main:menu" }]],
+      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]],
     };
 
     await this.sendMessage(bot, chatId, helpText, {
@@ -343,7 +343,7 @@ class SystemModule extends BaseModule {
       const keyboard = {
         inline_keyboard: [
           [{ text: "🔄 새로고침", callback_data: "system:status" }],
-          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
         ],
       };
 
@@ -384,7 +384,7 @@ class SystemModule extends BaseModule {
 
       const keyboard = {
         inline_keyboard: [
-          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
         ],
       };
 
@@ -417,7 +417,7 @@ class SystemModule extends BaseModule {
 현재 설정 기능은 준비 중입니다.`;
 
     const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main:menu" }]],
+      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]],
     };
 
     await this.editMessage(bot, chatId, messageId, settingsText, {
@@ -444,7 +444,7 @@ class SystemModule extends BaseModule {
       {
         reply_markup: {
           inline_keyboard: [
-            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+            [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
           ],
         },
       }
@@ -458,7 +458,7 @@ class SystemModule extends BaseModule {
     await this.sendMessage(bot, chatId, "✅ 작업이 취소되었습니다.", {
       reply_markup: {
         inline_keyboard: [
-          [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
         ],
       },
     });

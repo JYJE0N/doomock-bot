@@ -227,7 +227,7 @@ class ReminderModule extends BaseModule {
             { text: "❓ 도움말", callback_data: "reminder:help" },
             { text: "⚙️ 설정", callback_data: "reminder:settings" },
           ],
-          [{ text: "🔙 메인 메뉴", callback_data: "main:menu" }],
+          [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
         ],
       };
 
@@ -853,7 +853,7 @@ class ReminderModule extends BaseModule {
         ],
         [
           { text: "🔙 리마인더 메뉴", callback_data: "reminder:menu" },
-          { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
         ],
       ],
     };
@@ -1019,7 +1019,7 @@ ${reminderData.message}`;
               { text: "📋 목록 보기", callback_data: "reminder:list" },
               { text: "➕ 추가 설정", callback_data: "reminder:create" },
             ],
-            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+            [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
           ],
         };
 
@@ -1127,7 +1127,7 @@ ${reminderData.message}`;
           ],
           [
             { text: "❓ 도움말", callback_data: "reminder:help" },
-            { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+            { text: "🏠 메인 메뉴", callback_data: "system:menu" },
           ],
         ],
       };
@@ -1162,7 +1162,7 @@ ${reminderData.message}`;
           reply_markup: {
             inline_keyboard: [
               [{ text: "🔄 다시 시도", callback_data: "reminder:menu" }],
-              [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+              [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
             ],
           },
         }

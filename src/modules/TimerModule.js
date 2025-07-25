@@ -209,7 +209,7 @@ class TimerModule extends BaseModule {
               ],
               [
                 { text: "❓ 도움말", callback_data: "timer:help" },
-                { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+                { text: "🏠 메인 메뉴", callback_data: "system:menu" },
               ],
             ]
           : [
@@ -224,7 +224,7 @@ class TimerModule extends BaseModule {
                 { text: "📈 내 통계", callback_data: "timer:stats" },
                 { text: "❓ 도움말", callback_data: "timer:help" },
               ],
-              [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+              [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
             ],
     };
 

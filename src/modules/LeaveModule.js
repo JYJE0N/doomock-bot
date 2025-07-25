@@ -153,7 +153,7 @@ class LeaveModule extends BaseModule {
           { text: "⚙️ 설정", callback_data: "leave:setting" },
           { text: "❓ 도움말", callback_data: "leave:help" },
         ],
-        [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
       ],
     };
 
@@ -549,7 +549,7 @@ class LeaveModule extends BaseModule {
               { text: "📊 현황 보기", callback_data: "leave:status" },
               { text: "📜 내역 보기", callback_data: "leave:history" },
             ],
-            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
+            [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
           ],
         };
 
