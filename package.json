@@ -30,12 +30,14 @@
     "url": "https://github.com/JYJE0N/doomock-bot.git"
   },
   "dependencies": {
+    "@google-cloud/text-to-speech": "^6.2.0",
     "axios": "^1.6.2",
+    "chalk": "^4.1.2",
     "dotenv": "^16.3.1",
     "form-data": "^4.0.0",
-    "gtts": "^0.2.1",
     "mongodb": "^6.3.0",
-    "node-telegram-bot-api": "^0.66.0"
+    "telegraf": "^4.15.3",
+    "winston": "^3.17.0"
   },
   "devDependencies": {
     "nodemon": "^3.0.2"

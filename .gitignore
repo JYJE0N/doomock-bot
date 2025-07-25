@@ -4,7 +4,7 @@ node_modules/
 # env
 .env
 
-# logs
+# 로그 파일 제외
 logs/
 *.log
 
