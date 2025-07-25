@@ -1,701 +1,741 @@
-// doomock_bot.js - 메인 엔트리 포인트 v3.0.1 (완전 표준화 리팩토링)
-
-/**
- * 🚀 Doomock Bot v3.0.1 - 메인 엔트리 포인트
- * - 완전 표준화된 초기화 프로세스
- * - Railway 환경 완벽 최적화
- * - BaseModule 상속 구조 지원
- * - ModuleManager 중앙집중식 관리
- * - 견고한 에러 처리 및 복구
- * - 한국 표준시 적용
- */
-
-const path = require("path");
-
-// 핵심 클래스들
+// app.js - v3.0.1 중앙화 통합 시스템
 const TelegramBot = require("node-telegram-bot-api");
 const logger = require("./src/utils/Logger");
-const { AppConfig } = require("./src/config/AppConfig");
 const TimeHelper = require("./src/utils/TimeHelper");
 
-/**
- * 🤖 Doomock Bot 메인 클래스
- * - 표준화된 7단계 초기화 프로세스
- * - Railway 환경 완벽 지원
- * - 중앙집중식 의존성 주입
- * - 완벽한 정리 작업
- */
-class DoomockBot {
-  constructor() {
-    // 🎯 핵심 컴포넌트들
-    this.config = null;
-    this.bot = null;
-    this.dbManager = null;
-    this.moduleManager = null;
-    this.botController = null;
-    this.commandsRegistry = null;
+// 🏗️ 핵심 시스템들
+const DatabaseManager = require("./src/database/DatabaseManager");
+const BotController = require("./src/controllers/BotController");
+const ModuleManager = require("./src/core/ModuleManager");
 
-    // 🎛️ 상태 관리
+// 🛡️ 중앙 시스템들
+const ValidationManager = require("./src/core/ValidationManager");
+const HealthChecker = require("./src/utils/HealthChecker");
+
+/**
+ * 🚀 메인 애플리케이션 v3.0.1 - 완전 중앙화
+ *
+ * 🎯 핵심 개선사항:
+ * - ValidationManager 중앙 검증 시스템
+ * - HealthChecker 통합 모니터링
+ * - 모든 중복 코드 제거
+ * - 의존성 주입으로 깔끔한 연결
+ * - Railway 환경 완벽 최적화
+ *
+ * 📊 시스템 아키텍처:
+ * App → BotController → ModuleManager → Modules → Services
+ *  ↓
+ * ValidationManager (중앙 검증)
+ * HealthChecker (중앙 모니터링)
+ * DatabaseManager (데이터 관리)
+ */
+class DooMockBot {
+  constructor() {
+    // 🤖 텔레그램 봇
+    this.bot = null;
+
+    // 🏗️ 핵심 매니저들
+    this.dbManager = null;
+    this.botController = null;
+    this.moduleManager = null;
+
+    // 🛡️ 중앙 시스템들
+    this.validationManager = null;
+    this.healthChecker = null;
+
+    // ⚙️ 설정
+    this.config = {
+      // 봇 설정
+      botToken: process.env.BOT_TOKEN,
+      environment: process.env.NODE_ENV || "development",
+
+      // 데이터베이스 설정
+      mongoUri: process.env.MONGODB_URI,
+      dbName: process.env.DB_NAME || "DooMockBot",
+
+      // Railway 최적화
+      isRailway: !!process.env.RAILWAY_ENVIRONMENT,
+      port: process.env.PORT || 3000,
+
+      // 헬스체크 설정
+      enableHealthCheck: process.env.ENABLE_HEALTH_CHECK !== "false",
+      healthCheckInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 30000,
+
+      // 검증 설정
+      enableValidation: process.env.ENABLE_VALIDATION !== "false",
+      validationCacheEnabled: process.env.VALIDATION_CACHE_ENABLED !== "false",
+
+      // 성능 설정
+      maxConcurrentRequests:
+        parseInt(process.env.MAX_CONCURRENT_REQUESTS) || 50,
+      requestTimeout: parseInt(process.env.REQUEST_TIMEOUT) || 30000,
+    };
+
+    // 📊 앱 상태
     this.isInitialized = false;
     this.isRunning = false;
-    this.startTime = TimeHelper.getTimestamp();
+    this.startTime = Date.now();
 
-    // 📊 시스템 통계
-    this.stats = {
-      startTime: this.startTime,
-      initializationTime: null,
-      uptime: 0,
-      memoryUsage: {},
-      environmentInfo: {},
-    };
+    // 🔧 Graceful shutdown 핸들러
+    this.setupGracefulShutdown();
 
-    // 🚫 초기화 단계별 타임아웃
-    this.initTimeouts = {
-      config: 5000,
-      bot: 10000,
-      database: 30000,
-      modules: 45000,
-      controller: 15000,
-      commands: 20000,
-      polling: 10000,
-    };
-
-    logger.info("🤖 DoomockBot v3.0.1 인스턴스 생성됨");
+    logger.info("🚀 DooMockBot v3.0.1 애플리케이션 생성됨");
   }
 
   /**
-   * 🚀 봇 시작 (완전 표준화 프로세스)
+   * 🎯 애플리케이션 초기화 (완전 중앙화)
    */
-  async start() {
-    const overallTimer = TimeHelper.createTimer();
+  async initialize() {
+    if (this.isInitialized) {
+      logger.warn("애플리케이션이 이미 초기화됨");
+      return;
+    }
 
     try {
-      this.printStartupBanner();
+      logger.info("🚀 DooMockBot v3.0.1 초기화 시작...");
 
-      // ✅ 7단계 초기화 프로세스 (표준)
-      await this.executeInitializationSequence();
+      // 1️⃣ 환경 검증
+      await this.validateEnvironment();
 
-      // ✅ 시스템 준비 완료
-      await this.finalizeStartup(overallTimer);
-    } catch (error) {
-      await this.handleStartupFailure(error);
-    }
-  }
+      // 2️⃣ 텔레그램 봇 초기화
+      await this.initializeTelegramBot();
 
-  /**
-   * 🎨 시작 배너 출력
-   */
-  printStartupBanner() {
-    const banner = `
-============================================
-🚀 Doomock Bot v3.0.1 시작
-============================================
-⏰ 시작 시간: ${TimeHelper.getLogTimeString()}
-🌍 환경: ${process.env.NODE_ENV || "development"}
-🚂 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "활성" : "비활성"}
-📦 Node.js: ${process.version}
-🎯 PID: ${process.pid}
-============================================`;
+      // 3️⃣ 데이터베이스 매니저 초기화
+      await this.initializeDatabaseManager();
 
-    logger.info(banner);
-  }
+      // 4️⃣ 중앙 검증 시스템 초기화
+      await this.initializeValidationManager();
 
-  /**
-   * 🔄 초기화 시퀀스 실행 (7단계)
-   */
-  async executeInitializationSequence() {
-    const sequence = [
-      {
-        name: "설정 로드",
-        method: "loadConfig",
-        timeout: this.initTimeouts.config,
-      },
-      {
-        name: "텔레그램 봇 초기화",
-        method: "initializeBot",
-        timeout: this.initTimeouts.bot,
-      },
-      {
-        name: "데이터베이스 연결",
-        method: "initializeDatabase",
-        timeout: this.initTimeouts.database,
-      },
-      {
-        name: "명령어 레지스트리 초기화",
-        method: "initializeCommandsRegistry",
-        timeout: this.initTimeouts.commands,
-      },
-      {
-        name: "모듈 매니저 초기화",
-        method: "initializeModules",
-        timeout: this.initTimeouts.modules,
-      },
-      {
-        name: "봇 컨트롤러 초기화",
-        method: "initializeController",
-        timeout: this.initTimeouts.controller,
-      },
-      {
-        name: "봇 폴링 시작",
-        method: "startPolling",
-        timeout: this.initTimeouts.polling,
-      },
-    ];
+      // 5️⃣ 모듈 매니저 초기화
+      await this.initializeModuleManager();
 
-    for (let i = 0; i < sequence.length; i++) {
-      const step = sequence[i];
-      const stepTimer = TimeHelper.createTimer();
+      // 6️⃣ 봇 컨트롤러 초기화
+      await this.initializeBotController();
 
-      try {
-        logger.info(`📋 ${i + 1}/7단계: ${step.name} 중...`);
+      // 7️⃣ 중앙 헬스체커 초기화
+      await this.initializeHealthChecker();
 
-        // 타임아웃과 함께 실행
-        await this.executeWithTimeout(
-          this[step.method].bind(this),
-          step.timeout
-        );
-
-        const duration = stepTimer.end();
-        logger.success(`✅ ${step.name} 완료 (${duration}ms)`);
-      } catch (error) {
-        const duration = stepTimer.end();
-        logger.error(`❌ ${step.name} 실패 (${duration}ms):`, error);
-
-        // 중요하지 않은 단계는 경고만 출력하고 계속 진행
-        if (this.isOptionalStep(step.method)) {
-          logger.warn(`⚠️ ${step.name} 실패했지만 계속 진행`);
-          continue;
-        }
-
-        throw new Error(`${step.name} 실패: ${error.message}`);
+      // 8️⃣ Railway 환경 최적화
+      if (this.config.isRailway) {
+        await this.applyRailwayOptimizations();
       }
+
+      this.isInitialized = true;
+
+      logger.success(`✅ DooMockBot v3.0.1 초기화 완료! 🎉`);
+      logger.info(`🌍 환경: ${this.config.environment}`);
+      logger.info(`🚂 Railway: ${this.config.isRailway ? "활성" : "비활성"}`);
+      logger.info(
+        `🛡️ 검증 시스템: ${this.config.enableValidation ? "활성" : "비활성"}`
+      );
+      logger.info(
+        `🏥 헬스체커: ${this.config.enableHealthCheck ? "활성" : "비활성"}`
+      );
+    } catch (error) {
+      logger.error("❌ 애플리케이션 초기화 실패:", error);
+      await this.handleInitializationFailure(error);
+      throw error;
     }
   }
 
   /**
-   * ⏱️ 타임아웃과 함께 메서드 실행
+   * 🔍 환경 검증
    */
-  async executeWithTimeout(method, timeout) {
-    return new Promise((resolve, reject) => {
-      const timeoutId = setTimeout(() => {
-        reject(new Error(`초기화 타임아웃 (${timeout}ms 초과)`));
-      }, timeout);
+  async validateEnvironment() {
+    logger.info("🔍 환경 변수 검증 중...");
 
-      method()
-        .then((result) => {
-          clearTimeout(timeoutId);
-          resolve(result);
-        })
-        .catch((error) => {
-          clearTimeout(timeoutId);
-          reject(error);
+    const requiredEnvVars = ["BOT_TOKEN", "MONGODB_URI"];
+
+    const missingVars = requiredEnvVars.filter(
+      (varName) => !process.env[varName]
+    );
+
+    if (missingVars.length > 0) {
+      throw new Error(`필수 환경 변수 누락: ${missingVars.join(", ")}`);
+    }
+
+    // 토큰 형식 검증
+    if (!this.config.botToken.includes(":")) {
+      throw new Error("올바르지 않은 BOT_TOKEN 형식");
+    }
+
+    // MongoDB URI 검증
+    if (!this.config.mongoUri.startsWith("mongodb")) {
+      throw new Error("올바르지 않은 MONGODB_URI 형식");
+    }
+
+    logger.debug("✅ 환경 변수 검증 완료");
+  }
+
+  /**
+   * 🤖 텔레그램 봇 초기화
+   */
+  async initializeTelegramBot() {
+    logger.info("🤖 텔레그램 봇 초기화 중...");
+
+    // 봇 인스턴스 생성
+    this.bot = new TelegramBot(this.config.botToken, {
+      polling: {
+        interval: 1000,
+        autoStart: false,
+        params: {
+          timeout: 10,
+        },
+      },
+    });
+
+    // 봇 정보 확인
+    try {
+      const botInfo = await this.bot.getMe();
+      logger.info(`🤖 봇 연결됨: @${botInfo.username} (${botInfo.first_name})`);
+    } catch (error) {
+      throw new Error(`봇 연결 실패: ${error.message}`);
+    }
+
+    logger.debug("✅ 텔레그램 봇 초기화 완료");
+  }
+
+  /**
+   * 🗄️ 데이터베이스 매니저 초기화
+   */
+  async initializeDatabaseManager() {
+    logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
+
+    this.dbManager = new DatabaseManager({
+      uri: this.config.mongoUri,
+      dbName: this.config.dbName,
+      options: {
+        maxPoolSize: this.config.isRailway ? 5 : 10,
+        serverSelectionTimeoutMS: 5000,
+        socketTimeoutMS: 45000,
+        family: 4, // IPv4 강제 사용
+      },
+    });
+
+    await this.dbManager.connect();
+    logger.debug("✅ 데이터베이스 매니저 초기화 완료");
+  }
+
+  /**
+   * 🛡️ 중앙 검증 시스템 초기화
+   */
+  async initializeValidationManager() {
+    if (!this.config.enableValidation) {
+      logger.info("🛡️ 검증 시스템 비활성화됨");
+      return;
+    }
+
+    logger.info("🛡️ 중앙 검증 시스템 초기화 중...");
+
+    this.validationManager = new ValidationManager({
+      enableCache: this.config.validationCacheEnabled,
+      cacheTimeout: 300000, // 5분
+      maxCacheSize: this.config.isRailway ? 500 : 1000,
+      enableLogging: this.config.environment === "development",
+      strictMode: this.config.environment === "production",
+    });
+
+    // 커스텀 스키마 추가 (필요시)
+    await this.addCustomValidationSchemas();
+
+    logger.debug("✅ 중앙 검증 시스템 초기화 완료");
+  }
+
+  /**
+   * 🎛️ 모듈 매니저 초기화
+   */
+  async initializeModuleManager() {
+    logger.info("🎛️ 모듈 매니저 초기화 중...");
+
+    this.moduleManager = new ModuleManager(this.bot, {
+      db: this.dbManager,
+      validationManager: this.validationManager, // ValidationManager 전달
+      config: {
+        moduleTimeout: 30000,
+        maxRetries: 3,
+        autoReload: this.config.environment === "development",
+      },
+    });
+
+    await this.moduleManager.initialize();
+    logger.debug("✅ 모듈 매니저 초기화 완료");
+  }
+
+  /**
+   * 🎮 봇 컨트롤러 초기화
+   */
+  async initializeBotController() {
+    logger.info("🎮 봇 컨트롤러 초기화 중...");
+
+    this.botController = new BotController(this.bot, {
+      moduleManager: this.moduleManager,
+      dbManager: this.dbManager,
+      validationManager: this.validationManager,
+      healthChecker: this.healthChecker, // HealthChecker 전달
+      config: {
+        messageTimeout: this.config.requestTimeout,
+        callbackTimeout: 5000,
+        maxRetries: 3,
+        rateLimitEnabled: true,
+        maxRequestsPerMinute: this.config.isRailway ? 20 : 30,
+        maxConcurrentRequests: this.config.maxConcurrentRequests,
+      },
+    });
+
+    await this.botController.initialize();
+    logger.debug("✅ 봇 컨트롤러 초기화 완료");
+  }
+
+  /**
+   * 🏥 중앙 헬스체커 초기화
+   */
+  async initializeHealthChecker() {
+    if (!this.config.enableHealthCheck) {
+      logger.info("🏥 헬스체커 비활성화됨");
+      return;
+    }
+
+    logger.info("🏥 중앙 헬스체커 초기화 중...");
+
+    this.healthChecker = new HealthChecker({
+      botController: this.botController,
+      moduleManager: this.moduleManager,
+      dbManager: this.dbManager,
+      validationManager: this.validationManager,
+      config: {
+        normalCheckInterval: this.config.healthCheckInterval,
+        criticalCheckInterval: 5000,
+        memoryThreshold: this.config.isRailway ? 300 : 500, // Railway는 더 보수적
+        responseTimeThreshold: 3000,
+        errorRateThreshold: 0.1,
+        autoRecovery: true,
+        maxRecoveryAttempts: 3,
+        enableAlerts: this.config.environment === "production",
+      },
+    });
+
+    // 모든 컴포넌트를 헬스체커에 등록
+    this.healthChecker.registerComponent("bot", this.bot);
+    this.healthChecker.registerComponent("database", this.dbManager);
+    this.healthChecker.registerComponent("modules", this.moduleManager);
+    this.healthChecker.registerComponent("validation", this.validationManager);
+
+    await this.healthChecker.start();
+    logger.debug("✅ 중앙 헬스체커 초기화 완료");
+  }
+
+  /**
+   * 🚂 Railway 환경 최적화
+   */
+  async applyRailwayOptimizations() {
+    logger.info("🚂 Railway 환경 최적화 적용 중...");
+
+    // 1. 메모리 사용량 모니터링 강화
+    setInterval(() => {
+      const memUsage = process.memoryUsage();
+      const usedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+
+      if (usedMB > 400) {
+        // 400MB 임계값
+        logger.warn(`⚠️ 높은 메모리 사용량: ${usedMB}MB`);
+
+        // 강제 가비지 컬렉션
+        if (global.gc) {
+          global.gc();
+          logger.debug("🧹 가비지 컬렉션 실행됨");
+        }
+      }
+    }, 60000); // 1분마다
+
+    // 2. 연결 상태 주기적 체크
+    setInterval(async () => {
+      try {
+        if (this.dbManager && !this.dbManager.isConnected()) {
+          logger.warn("🔄 데이터베이스 재연결 시도...");
+          await this.dbManager.reconnect();
+        }
+      } catch (error) {
+        logger.error("❌ 데이터베이스 재연결 실패:", error);
+      }
+    }, 300000); // 5분마다
+
+    // 3. 캐시 정리 작업 스케줄링
+    setInterval(() => {
+      if (this.validationManager) {
+        this.validationManager.cleanup();
+      }
+    }, 600000); // 10분마다
+
+    logger.debug("✅ Railway 환경 최적화 완료");
+  }
+
+  /**
+   * 📋 커스텀 검증 스키마 추가
+   */
+  async addCustomValidationSchemas() {
+    if (!this.validationManager) return;
+
+    // 애플리케이션별 커스텀 스키마들을 여기에 추가
+    // 기본 스키마는 ValidationManager에서 자동 등록됨
+
+    logger.debug("📋 커스텀 검증 스키마 추가 완료");
+  }
+
+  /**
+   * 🚀 애플리케이션 시작
+   */
+  async start() {
+    if (!this.isInitialized) {
+      throw new Error("애플리케이션이 초기화되지 않았습니다.");
+    }
+
+    if (this.isRunning) {
+      logger.warn("애플리케이션이 이미 실행 중입니다.");
+      return;
+    }
+
+    try {
+      logger.info("🚀 DooMockBot v3.0.1 시작 중...");
+
+      // 봇 폴링 시작
+      await this.bot.startPolling();
+
+      // Railway 웹 서버 시작 (필요한 경우)
+      if (this.config.isRailway) {
+        await this.startWebServer();
+      }
+
+      this.isRunning = true;
+
+      const uptime = TimeHelper.formatDuration(Date.now() - this.startTime);
+      logger.success(`🎉 DooMockBot v3.0.1 실행됨! (시작 시간: ${uptime})`);
+
+      // 상태 요약 출력
+      await this.printSystemStatus();
+    } catch (error) {
+      logger.error("❌ 애플리케이션 시작 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🌐 웹 서버 시작 (Railway용)
+   */
+  async startWebServer() {
+    const express = require("express");
+    const app = express();
+
+    // 헬스 체크 엔드포인트
+    app.get("/health", async (req, res) => {
+      try {
+        const status = this.healthChecker
+          ? this.healthChecker.getStatus()
+          : { overall: { health: "unknown" } };
+
+        res.status(status.overall.health === "healthy" ? 200 : 503).json({
+          status: status.overall.health,
+          timestamp: TimeHelper.getLogTimeString(),
+          uptime: Date.now() - this.startTime,
+          version: "3.0.1",
+          environment: this.config.environment,
+          components: status.components || {},
         });
+      } catch (error) {
+        res.status(500).json({
+          status: "error",
+          error: error.message,
+          timestamp: TimeHelper.getLogTimeString(),
+        });
+      }
+    });
+
+    // 상태 엔드포인트
+    app.get("/status", async (req, res) => {
+      try {
+        const systemStatus = await this.getSystemStatus();
+        res.json(systemStatus);
+      } catch (error) {
+        res.status(500).json({
+          error: error.message,
+          timestamp: TimeHelper.getLogTimeString(),
+        });
+      }
+    });
+
+    // 기본 엔드포인트
+    app.get("/", (req, res) => {
+      res.json({
+        name: "DooMockBot",
+        version: "3.0.1",
+        status: "running",
+        timestamp: TimeHelper.getLogTimeString(),
+      });
+    });
+
+    app.listen(this.config.port, () => {
+      logger.info(`🌐 웹 서버 시작됨: 포트 ${this.config.port}`);
     });
   }
 
   /**
-   * 🔍 선택적 단계 여부 확인
+   * 📊 시스템 상태 조회
    */
-  isOptionalStep(methodName) {
-    const optionalSteps = [
-      "initializeCommandsRegistry", // 명령어 레지스트리는 선택적
-    ];
-    return optionalSteps.includes(methodName);
-  }
+  async getSystemStatus() {
+    const uptime = Date.now() - this.startTime;
+    const memUsage = process.memoryUsage();
 
-  /**
-   * 📄 1단계: 설정 로드 (표준)
-   */
-  async loadConfig() {
-    try {
-      this.config = AppConfig.getConfig();
-
-      // 설정 유효성 검증
-      const validation = this.config.validateConfig();
-      if (!validation.isValid) {
-        throw new Error(`설정 검증 실패: ${validation.issues.join(", ")}`);
-      }
-
-      // 환경 정보 저장
-      this.stats.environmentInfo = this.config.getEnvironmentInfo();
-
-      logger.info(
-        `   🌍 환경: ${this.config.isRailwayEnvironment() ? "Railway" : "로컬"}`
-      );
-      logger.info(
-        `   🔐 토큰: ${this.config.get("bot.token") ? "✅ 설정됨" : "❌ 없음"}`
-      );
-      logger.info(
-        `   💾 DB: ${this.config.get("database.url") ? "✅ 연결됨" : "❌ 없음"}`
-      );
-    } catch (error) {
-      throw new Error(`설정 로드 실패: ${error.message}`);
-    }
-  }
-
-  /**
-   * 🤖 2단계: 텔레그램 봇 초기화 (표준)
-   */
-  async initializeBot() {
-    try {
-      const botToken = this.config.get("bot.token");
-      if (!botToken) {
-        throw new Error("BOT_TOKEN이 설정되지 않음");
-      }
-
-      // Railway 환경에 최적화된 봇 옵션
-      const botOptions = {
-        polling: this.config.get("bot.polling.enabled", true)
-          ? {
-              interval: this.config.get("bot.polling.interval", 300),
-              autoStart: false, // 수동으로 시작할 예정
-              params: {
-                timeout: this.config.get("bot.polling.timeout", 10),
-              },
-            }
-          : false,
-        webHook: this.config.get("bot.webhook.enabled", false)
-          ? {
-              port: this.config.get("bot.webhook.port", 3000),
-              host: "0.0.0.0", // Railway 요구사항
-            }
-          : false,
-        onlyFirstMatch: true,
-        baseApiUrl: "https://api.telegram.org",
-      };
-
-      this.bot = new TelegramBot(botToken, botOptions);
-
-      // 봇 정보 확인
-      const botInfo = await this.bot.getMe();
-      logger.info(`   🤖 봇: @${botInfo.username} (${botInfo.first_name})`);
-    } catch (error) {
-      throw new Error(`텔레그램 봇 초기화 실패: ${error.message}`);
-    }
-  }
-
-  /**
-   * 💾 3단계: 데이터베이스 연결 (표준)
-   */
-  async initializeDatabase() {
-    try {
-      const DatabaseManager = require("./src/core/DatabaseManager");
-
-      this.dbManager = new DatabaseManager({
-        url: this.config.get("database.url"),
-        name: this.config.get("database.name"),
-        options: {
-          maxPoolSize: this.config.get("database.poolSize", 10),
-          serverSelectionTimeoutMS: this.config.get("database.timeout", 30000),
-          retryWrites: this.config.get("database.retryWrites", true),
-        },
-      });
-
-      await this.dbManager.connect();
-
-      const dbStatus = this.dbManager.getStatus();
-      logger.info(`   💾 DB: ${dbStatus.name} (${dbStatus.status})`);
-    } catch (error) {
-      throw new Error(`데이터베이스 연결 실패: ${error.message}`);
-    }
-  }
-
-  /**
-   * 📋 4단계: 명령어 레지스트리 초기화 (선택적)
-   */
-  async initializeCommandsRegistry() {
-    try {
-      const BotCommandsRegistry = require("./src/config/BotCommandsRegistry");
-      this.commandsRegistry = new BotCommandsRegistry();
-
-      logger.info("   📋 명령어 레지스트리 준비됨");
-    } catch (error) {
-      logger.warn(
-        "⚠️ 명령어 레지스트리 초기화 실패, 기본 기능만 사용:",
-        error.message
-      );
-      this.commandsRegistry = null;
-    }
-  }
-
-  /**
-   * 📦 5단계: 모듈 매니저 초기화 (핵심)
-   */
-  async initializeModules() {
-    try {
-      const ModuleManager = require("./src/core/ModuleManager");
-
-      this.moduleManager = new ModuleManager(this.bot, {
-        db: this.dbManager,
-        config: this.config,
-        environment: this.stats.environmentInfo,
-      });
-
-      await this.moduleManager.initialize();
-
-      const moduleStats = this.moduleManager.getInitializationStats();
-      logger.info(
-        `   📦 모듈: ${moduleStats.activeModules}/${moduleStats.totalModules}개 활성화`
-      );
-
-      if (moduleStats.failedModules > 0) {
-        logger.warn(`   ⚠️ 실패한 모듈: ${moduleStats.failedModules}개`);
-      }
-    } catch (error) {
-      throw new Error(`모듈 매니저 초기화 실패: ${error.message}`);
-    }
-  }
-
-  /**
-   * 🎮 6단계: 봇 컨트롤러 초기화 (핵심)
-   */
-  async initializeController() {
-    try {
-      const BotController = require("./src/controllers/BotController");
-
-      this.botController = new BotController(this.bot, {
-        dbManager: this.dbManager,
-        moduleManager: this.moduleManager,
-        commandsRegistry: this.commandsRegistry,
-        config: {
-          messageTimeout: this.config.get("performance.messageTimeout", 5000),
-          callbackTimeout: this.config.get("performance.callbackTimeout", 1000),
-          maxRetries: this.config.get("performance.maxRetries", 3),
-          healthCheckInterval: this.config.get(
-            "performance.healthCheckInterval",
-            60000
-          ),
-          cleanupInterval: this.config.get(
-            "performance.cleanupInterval",
-            300000
-          ),
-        },
-      });
-
-      await this.botController.initialize();
-
-      logger.info("   🎮 컨트롤러 준비됨");
-    } catch (error) {
-      throw new Error(`봇 컨트롤러 초기화 실패: ${error.message}`);
-    }
-  }
-
-  /**
-   * 🚀 7단계: 봇 폴링 시작 (최종)
-   */
-  async startPolling() {
-    try {
-      if (this.config.get("bot.webhook.enabled", false)) {
-        // 웹훅 모드
-        const webhookPort = this.config.get("bot.webhook.port", 3000);
-        await this.bot.setWebHook(this.config.get("bot.webhook.url"), {
-          max_connections: 40,
-          drop_pending_updates: false,
-        });
-
-        logger.info(`   🌐 웹훅 활성화 (포트: ${webhookPort})`);
-      } else {
-        // 폴링 모드 (기본값)
-        await this.bot.startPolling({
-          restart: true,
-          polling: {
-            interval: this.config.get("bot.polling.interval", 300),
-            params: {
-              timeout: this.config.get("bot.polling.timeout", 10),
-            },
-          },
-        });
-
-        logger.info("   🔄 폴링 활성화");
-      }
-
-      // BotFather 명령어 등록 (비동기로)
-      this.registerBotCommandsAsync();
-    } catch (error) {
-      throw new Error(`봇 폴링 시작 실패: ${error.message}`);
-    }
-  }
-
-  /**
-   * 📋 BotFather 명령어 등록 (비동기)
-   */
-  async registerBotCommandsAsync() {
-    if (!this.commandsRegistry) {
-      return;
-    }
-
-    try {
-      logger.info("📋 BotFather 명령어 등록 중...");
-
-      const success = await this.commandsRegistry.setBotFatherCommands(
-        this.bot
-      );
-
-      if (success) {
-        const commandCount = this.commandsRegistry.getCommandCount();
-        logger.success(`✅ ${commandCount}개 명령어 등록 완료`);
-      } else {
-        logger.warn("⚠️ 명령어 등록 부분 실패");
-      }
-    } catch (error) {
-      logger.warn("⚠️ BotFather 명령어 등록 실패:", error.message);
-    }
-  }
-
-  /**
-   * ✅ 시작 완료 처리
-   */
-  async finalizeStartup(overallTimer) {
-    const totalTime = overallTimer.end();
-    this.stats.initializationTime = totalTime;
-    this.isInitialized = true;
-    this.isRunning = true;
-
-    // 메모리 사용량 기록
-    this.stats.memoryUsage = process.memoryUsage();
-
-    const successBanner = `
-============================================
-✅ Doomock Bot v3.0.1 시작 완료!
-============================================
-⏱️ 초기화 시간: ${totalTime}ms
-💾 메모리 사용량: ${Math.round(this.stats.memoryUsage.heapUsed / 1024 / 1024)}MB
-🔗 모듈: ${this.moduleManager?.stats?.activeModules || 0}개 활성
-🎯 상태: 정상 운영
-============================================`;
-
-    logger.success(successBanner);
-
-    // Railway 환경에서 헬스체크 시작
-    if (this.config.isRailwayEnvironment()) {
-      this.startRailwayHealthCheck();
-    }
-  }
-
-  /**
-   * 💥 시작 실패 처리
-   */
-  async handleStartupFailure(error) {
-    logger.error("💥 봇 시작 실패:", error);
-
-    // 정리 작업 수행
-    await this.performEmergencyCleanup();
-
-    // Railway 환경에서는 재시도
-    if (this.config?.isRailwayEnvironment()) {
-      logger.info("🔄 Railway 환경에서 5초 후 재시도...");
-      setTimeout(() => {
-        process.exit(1); // Railway가 자동 재시작
-      }, 5000);
-    } else {
-      process.exit(1);
-    }
-  }
-
-  /**
-   * 🚑 긴급 정리 작업
-   */
-  async performEmergencyCleanup() {
-    try {
-      logger.info("🚑 긴급 정리 작업 시작...");
-
-      // 봇 정지
-      if (this.bot) {
-        try {
-          await this.bot.stopPolling();
-        } catch (e) {
-          logger.debug("봇 폴링 정지 무시:", e.message);
-        }
-      }
-
-      // 데이터베이스 연결 종료
-      if (this.dbManager) {
-        try {
-          await this.dbManager.disconnect();
-        } catch (e) {
-          logger.debug("DB 연결 종료 무시:", e.message);
-        }
-      }
-
-      logger.info("✅ 긴급 정리 완료");
-    } catch (error) {
-      logger.error("❌ 긴급 정리 실패:", error);
-    }
-  }
-
-  /**
-   * 🏥 Railway 헬스체크 시작
-   */
-  startRailwayHealthCheck() {
-    const healthCheckInterval = this.config.get(
-      "performance.healthCheckInterval",
-      60000
-    );
-
-    setInterval(() => {
-      this.performHealthCheck();
-    }, healthCheckInterval);
-
-    logger.info(`🏥 헬스체크 활성화 (${healthCheckInterval / 1000}초 간격)`);
-  }
-
-  /**
-   * 🔍 헬스체크 수행
-   */
-  async performHealthCheck() {
-    try {
-      const health = {
-        status: "healthy",
-        uptime: Math.round(process.uptime()),
+    return {
+      app: {
+        name: "DooMockBot",
+        version: "3.0.1",
+        environment: this.config.environment,
+        isRailway: this.config.isRailway,
+        uptime,
+        uptimeFormatted: TimeHelper.formatDuration(uptime),
+      },
+      system: {
         memory: {
-          used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-          total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+          used: Math.round(memUsage.heapUsed / 1024 / 1024),
+          total: Math.round(memUsage.heapTotal / 1024 / 1024),
+          external: Math.round(memUsage.external / 1024 / 1024),
         },
-        database: this.dbManager?.isConnected() || false,
-        modules: this.moduleManager?.stats?.activeModules || 0,
-        timestamp: TimeHelper.getLogTimeString(),
-      };
+        process: {
+          pid: process.pid,
+          nodeVersion: process.version,
+          platform: process.platform,
+        },
+      },
+      components: {
+        bot: this.botController ? this.botController.getStatus() : null,
+        database: this.dbManager ? this.dbManager.getStatus() : null,
+        modules: this.moduleManager ? this.moduleManager.getStatus() : null,
+        validation: this.validationManager
+          ? this.validationManager.getStatus()
+          : null,
+        health: this.healthChecker ? this.healthChecker.getStatus() : null,
+      },
+      timestamp: TimeHelper.getLogTimeString(),
+    };
+  }
 
-      // 메모리 임계값 체크
-      const memoryThreshold = this.config.get(
-        "performance.memoryThreshold",
-        400
+  /**
+   * 📊 시스템 상태 출력
+   */
+  async printSystemStatus() {
+    try {
+      const status = await this.getSystemStatus();
+
+      logger.info("📊 === 시스템 상태 요약 ===");
+      logger.info(`🚀 앱: ${status.app.name} v${status.app.version}`);
+      logger.info(`🌍 환경: ${status.app.environment}`);
+      logger.info(`⏱️ 업타임: ${status.app.uptimeFormatted}`);
+      logger.info(
+        `💾 메모리: ${status.system.memory.used}MB / ${status.system.memory.total}MB`
       );
-      if (health.memory.used > memoryThreshold) {
-        logger.warn(
-          `⚠️ 메모리 사용량 높음: ${health.memory.used}MB (임계값: ${memoryThreshold}MB)`
+
+      if (status.components.bot) {
+        logger.info(
+          `🤖 봇: ${status.components.bot.initialized ? "활성" : "비활성"}`
         );
       }
 
-      logger.debug(
-        `🏥 헬스체크: 정상 (메모리: ${health.memory.used}MB, 업타임: ${health.uptime}초)`
-      );
+      if (status.components.database) {
+        logger.info(
+          `🗄️ DB: ${
+            status.components.database.connected ? "연결됨" : "연결 안됨"
+          }`
+        );
+      }
+
+      if (status.components.modules) {
+        logger.info(
+          `🎛️ 모듈: ${
+            status.components.modules.stats?.activeModules || 0
+          }개 활성`
+        );
+      }
+
+      if (status.components.validation) {
+        logger.info(
+          `🛡️ 검증: ${
+            status.components.validation.stats?.totalValidations || 0
+          }회 수행`
+        );
+      }
+
+      if (status.components.health) {
+        logger.info(
+          `🏥 헬스: ${status.components.health.overall?.health || "unknown"}`
+        );
+      }
+
+      logger.info("📊 ========================");
     } catch (error) {
-      logger.error("❌ 헬스체크 실패:", error);
+      logger.error("❌ 시스템 상태 출력 실패:", error);
     }
   }
 
   /**
-   * 🛑 봇 정지 (정리 작업 포함)
+   * 🚫 Graceful shutdown 설정
    */
-  async stop() {
+  setupGracefulShutdown() {
+    const shutdownSignals = ["SIGTERM", "SIGINT", "SIGUSR2"];
+
+    shutdownSignals.forEach((signal) => {
+      process.on(signal, async () => {
+        logger.info(`🚫 ${signal} 신호 수신됨. Graceful shutdown 시작...`);
+        await this.shutdown();
+        process.exit(0);
+      });
+    });
+
+    // 처리되지 않은 예외 처리
+    process.on("uncaughtException", async (error) => {
+      logger.error("💥 처리되지 않은 예외:", error);
+      await this.shutdown();
+      process.exit(1);
+    });
+
+    process.on("unhandledRejection", async (reason, promise) => {
+      logger.error("💥 처리되지 않은 Promise 거부:", reason);
+      await this.shutdown();
+      process.exit(1);
+    });
+  }
+
+  /**
+   * 🚫 애플리케이션 종료
+   */
+  async shutdown() {
     if (!this.isRunning) {
-      logger.info("봇이 이미 정지됨");
+      logger.info("애플리케이션이 이미 종료됨");
       return;
     }
 
     try {
-      logger.info("🛑 Doomock Bot 정지 시작...");
-      this.isRunning = false;
+      logger.info("🚫 DooMockBot v3.0.1 종료 중...");
 
-      // 1. 모듈 매니저 정리
-      if (this.moduleManager) {
-        await this.moduleManager.cleanup();
+      // 1. 헬스체커 정지
+      if (this.healthChecker) {
+        await this.healthChecker.cleanup();
+        logger.debug("✅ 헬스체커 정지됨");
       }
 
-      // 2. 봇 컨트롤러 정리
+      // 2. 봇 폴링 정지
+      if (this.bot) {
+        await this.bot.stopPolling();
+        logger.debug("✅ 봇 폴링 정지됨");
+      }
+
+      // 3. 봇 컨트롤러 정리
+      if (this.botController) {
+        await this.botController.cleanup();
+        logger.debug("✅ 봇 컨트롤러 정리됨");
+      }
+
+      // 4. 모듈 매니저 정리
+      if (this.moduleManager) {
+        await this.moduleManager.cleanup();
+        logger.debug("✅ 모듈 매니저 정리됨");
+      }
+
+      // 5. 검증 매니저 정리
+      if (this.validationManager) {
+        this.validationManager.cleanup();
+        logger.debug("✅ 검증 매니저 정리됨");
+      }
+
+      // 6. 데이터베이스 연결 종료
+      if (this.dbManager) {
+        await this.dbManager.disconnect();
+        logger.debug("✅ 데이터베이스 연결 종료됨");
+      }
+
+      this.isRunning = false;
+      this.isInitialized = false;
+
+      const totalUptime = TimeHelper.formatDuration(
+        Date.now() - this.startTime
+      );
+      logger.success(
+        `✅ DooMockBot v3.0.1 정상 종료됨 (총 실행 시간: ${totalUptime})`
+      );
+    } catch (error) {
+      logger.error("❌ 애플리케이션 종료 중 오류:", error);
+    }
+  }
+
+  /**
+   * ❌ 초기화 실패 처리
+   */
+  async handleInitializationFailure(error) {
+    logger.error("💥 초기화 실패로 인한 정리 작업 시작...");
+
+    try {
+      // 부분적으로 초기화된 컴포넌트들 정리
+      if (this.healthChecker) {
+        await this.healthChecker.cleanup();
+      }
+
       if (this.botController) {
         await this.botController.cleanup();
       }
 
-      // 3. 봇 폴링 정지
-      if (this.bot) {
-        await this.bot.stopPolling();
-        logger.info("   ✅ 봇 폴링 정지됨");
+      if (this.moduleManager) {
+        await this.moduleManager.cleanup();
       }
 
-      // 4. 데이터베이스 연결 종료
       if (this.dbManager) {
         await this.dbManager.disconnect();
-        logger.info("   ✅ 데이터베이스 연결 종료됨");
       }
 
-      const runtime = Math.round(process.uptime());
-      logger.success(`✅ Doomock Bot 정지 완료 (런타임: ${runtime}초)`);
-    } catch (error) {
-      logger.error("❌ 봇 정지 중 오류:", error);
+      if (this.bot) {
+        await this.bot.stopPolling();
+      }
+
+      logger.info("✅ 초기화 실패 정리 작업 완료");
+    } catch (cleanupError) {
+      logger.error("❌ 초기화 실패 정리 중 추가 오류:", cleanupError);
     }
   }
-
-  /**
-   * 📊 봇 상태 조회
-   */
-  getStatus() {
-    return {
-      isInitialized: this.isInitialized,
-      isRunning: this.isRunning,
-      startTime: this.startTime,
-      uptime: Math.round(process.uptime()),
-      stats: this.stats,
-      environment: this.stats.environmentInfo,
-      components: {
-        config: !!this.config,
-        bot: !!this.bot,
-        database: this.dbManager?.isConnected() || false,
-        modules: this.moduleManager?.stats?.activeModules || 0,
-        controller: !!this.botController,
-      },
-    };
-  }
 }
+
+// ===== 🚀 애플리케이션 시작점 =====
 
 /**
- * 🚀 메인 실행 함수 (Railway 최적화)
+ * 메인 실행 함수
  */
 async function main() {
-  // 환경 체크
-  if (!process.env.BOT_TOKEN) {
-    console.error("❌ BOT_TOKEN 환경변수가 설정되지 않았습니다.");
+  // 시작 시간 기록
+  const startTime = Date.now();
+
+  logger.info("🌟 ====================================");
+  logger.info("🚀 DooMockBot v3.0.1 시작");
+  logger.info(`🕐 시작 시간: ${TimeHelper.getLogTimeString()}`);
+  logger.info("🌟 ====================================");
+
+  try {
+    // 애플리케이션 인스턴스 생성
+    const app = new DooMockBot();
+
+    // 초기화 및 시작
+    await app.initialize();
+    await app.start();
+
+    const initTime = Date.now() - startTime;
+    logger.success(`🎉 완전 시작 완료! (${initTime}ms)`);
+  } catch (error) {
+    logger.error("💥 애플리케이션 시작 실패:", error);
     process.exit(1);
   }
-
-  const bot = new DoomockBot();
-
-  // 프로세스 종료 신호 처리 (Railway 환경 고려)
-  const gracefulShutdown = async (signal) => {
-    logger.info(`🛑 ${signal} 신호 수신 - 정리 시작`);
-
-    try {
-      await bot.stop();
-      logger.info("✅ 정리 완료");
-      process.exit(0);
-    } catch (error) {
-      logger.error("❌ 정리 중 오류:", error);
-      process.exit(1);
-    }
-  };
-
-  process.on("SIGINT", () => gracefulShutdown("SIGINT"));
-  process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
-
-  // 처리되지 않은 예외 처리 (Railway 환경에서 중요)
-  process.on("unhandledRejection", (reason, promise) => {
-    logger.error("💥 처리되지 않은 Promise 거부:", reason);
-    logger.error("   위치:", promise);
-
-    // Railway 환경에서는 재시작 유도
-    if (process.env.RAILWAY_ENVIRONMENT) {
-      setTimeout(() => process.exit(1), 1000);
-    }
-  });
-
-  process.on("uncaughtException", (error) => {
-    logger.error("💥 처리되지 않은 예외:", error);
-
-    // 긴급 정리 후 종료
-    bot.performEmergencyCleanup().finally(() => process.exit(1));
-  });
-
-  // 봇 시작
-  await bot.start();
 }
 
-// 직접 실행시만 main 함수 호출
+// 🚀 실행!
 if (require.main === module) {
   main().catch((error) => {
-    console.error("💥 메인 함수 실행 실패:", error);
+    logger.error("💥 메인 함수 실행 실패:", error);
     process.exit(1);
   });
 }
 
-module.exports = DoomockBot;
+module.exports = DooMockBot;

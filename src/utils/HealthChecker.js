@@ -1,1031 +1,803 @@
-// src/utils/HealthCheck.js - 헬스체크 유틸리티
-
+// src/utils/HealthChecker.js - v3.0.1 완전 통합 시스템
 const logger = require("./Logger");
 const TimeHelper = require("./TimeHelper");
 
 /**
- * 🏥 헬스체크 유틸리티 - 시스템 상태 모니터링
- * - Railway 환경 완벽 지원
- * - 자동 복구 시스템
- * - 상세 진단 정보
- * - 메모리 최적화
- * - 알림 시스템
+ * 🏥 헬스체커 v3.0.1 - 중앙 집중식 건강 관리 시스템
+ *
+ * 🎯 핵심 기능:
+ * - 모든 컴포넌트의 건강 상태 중앙 관리
+ * - 실시간 모니터링 및 자동 복구
+ * - Railway 환경 최적화
+ * - 메모리 누수 방지
+ * - 성능 병목 지점 감지
+ *
+ * 📊 모니터링 대상:
+ * - BotController (봇 응답성, 에러율)
+ * - ModuleManager (모듈 상태, 로딩 상태)
+ * - TodoService (DB 연결, 쿼리 성능)
+ * - 시스템 리소스 (메모리, CPU, 네트워크)
  */
-class HealthCheck {
+class HealthChecker {
   constructor(options = {}) {
-    this.controller = options.controller;
-    this.dbManager = options.dbManager;
-    this.moduleManager = options.moduleManager;
+    // 💡 중앙 집중식 구성 - 모든 컴포넌트를 한곳에서 관리
+    this.components = {
+      botController: options.botController || null,
+      moduleManager: options.moduleManager || null,
+      dbManager: options.dbManager || null,
+      todoService: options.todoService || null,
+    };
 
-    // 설정
+    // ⚙️ Railway 환경 최적화 설정
     this.config = {
-      // 체크 간격
-      interval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 60000, // 1분
-      criticalInterval: parseInt(process.env.CRITICAL_CHECK_INTERVAL) || 10000, // 10초
+      // 체크 주기 (Railway 리소스 고려)
+      normalCheckInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 30000, // 30초
+      criticalCheckInterval:
+        parseInt(process.env.CRITICAL_CHECK_INTERVAL) || 5000, // 5초
 
-      // 임계값 설정
-      memoryThreshold: parseInt(process.env.MEMORY_THRESHOLD) || 400, // MB
+      // 임계값
+      memoryThreshold: parseInt(process.env.MEMORY_THRESHOLD) || 400, // 400MB
       responseTimeThreshold:
-        parseInt(process.env.RESPONSE_TIME_THRESHOLD) || 5000, // ms
-      errorThreshold: parseInt(process.env.ERROR_THRESHOLD) || 10, // 1분당 에러 수
+        parseInt(process.env.RESPONSE_TIME_THRESHOLD) || 3000, // 3초
+      errorRateThreshold: parseFloat(process.env.ERROR_RATE_THRESHOLD) || 0.1, // 10%
 
       // 복구 설정
-      autoRestart: process.env.AUTO_RESTART_ENABLED === "true",
-      maxRestartAttempts: parseInt(process.env.MAX_RESTART_ATTEMPTS) || 3,
-      restartCooldown: parseInt(process.env.RESTART_COOLDOWN) || 300000, // 5분
+      autoRecovery: process.env.AUTO_RECOVERY !== "false",
+      maxRecoveryAttempts: parseInt(process.env.MAX_RECOVERY_ATTEMPTS) || 3,
+      recoveryDelay: parseInt(process.env.RECOVERY_DELAY) || 10000, // 10초
 
       // 알림 설정
-      alertEnabled: process.env.HEALTH_ALERT_ENABLED !== "false",
-      alertThreshold: parseInt(process.env.ALERT_THRESHOLD) || 3, // 연속 실패 횟수
+      enableAlerts: process.env.ENABLE_HEALTH_ALERTS !== "false",
+      alertCooldown: parseInt(process.env.ALERT_COOLDOWN) || 300000, // 5분
 
-      // Railway 특화 설정
-      railwayOptimizations: process.env.RAILWAY_ENVIRONMENT ? true : false,
-      healthEndpoint: process.env.HEALTH_ENDPOINT || "/health",
-
-      ...options,
+      ...options.config,
     };
 
-    // 상태 추적
-    this.status = {
-      overall: "healthy", // healthy, warning, critical, error
+    // 📊 통합 상태 관리
+    this.overallStatus = {
+      health: "unknown", // healthy, warning, critical, unknown
       lastCheck: null,
-      lastHealthyCheck: null,
-      consecutiveFailures: 0,
+      uptime: Date.now(),
       totalChecks: 0,
-
-      // 컴포넌트별 상태
-      components: {
-        bot: { status: "unknown", lastCheck: null, details: {} },
-        database: { status: "unknown", lastCheck: null, details: {} },
-        modules: { status: "unknown", lastCheck: null, details: {} },
-        memory: { status: "unknown", lastCheck: null, details: {} },
-        performance: { status: "unknown", lastCheck: null, details: {} },
-      },
+      issues: [],
+      alerts: [],
     };
 
-    // 히스토리 (최근 100개)
-    this.history = [];
-    this.maxHistorySize = 100;
+    // 🔧 개별 컴포넌트 상태
+    this.componentStatus = new Map();
 
-    // 복구 추적
-    this.restartAttempts = 0;
-    this.lastRestartTime = null;
+    // ⏰ 체크 스케줄러
+    this.normalInterval = null;
+    this.criticalInterval = null;
+    this.isRunning = false;
 
-    // 타이머들
-    this.healthCheckTimer = null;
-    this.criticalCheckTimer = null;
+    // 📈 성능 메트릭
+    this.metrics = {
+      checkDuration: [],
+      memoryUsage: [],
+      responseTime: [],
+      errorCounts: new Map(),
+    };
 
-    // Railway 환경 감지
-    this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+    // 🚨 알림 관리
+    this.alertHistory = new Map();
+    this.recoveryAttempts = new Map();
 
-    this.isInitialized = false;
-
-    logger.info("🏥 HealthCheck 유틸리티 생성됨", {
-      interval: this.config.interval,
-      railway: this.isRailway,
-      autoRestart: this.config.autoRestart,
-    });
+    logger.info("🏥 HealthChecker v3.0.1 초기화됨");
   }
 
   /**
-   * 🎯 헬스체크 시스템 초기화
+   * 🎯 헬스체커 시작
    */
-  async initialize() {
-    if (this.isInitialized) {
-      logger.warn("HealthCheck 이미 초기화됨");
+  async start() {
+    if (this.isRunning) {
+      logger.warn("HealthChecker 이미 실행 중");
       return;
     }
 
     try {
-      logger.info("🏥 HealthCheck 시스템 초기화 시작...");
+      logger.info("🏥 HealthChecker v3.0.1 시작...");
 
-      // 초기 헬스체크 수행
-      await this.performHealthCheck();
+      // 초기 상태 체크
+      await this.performFullHealthCheck();
 
-      // 정기 헬스체크 시작
-      this.startRegularHealthChecks();
+      // 정상 주기 스케줄러 시작
+      this.startNormalScheduler();
 
-      // Railway 환경에서는 크리티컬 체크도 시작
-      if (this.isRailway) {
-        this.startCriticalHealthChecks();
+      // 상태에 따라 크리티컬 스케줄러도 시작
+      if (this.overallStatus.health === "critical") {
+        this.startCriticalScheduler();
       }
 
-      // HTTP 헬스체크 엔드포인트 설정 (Railway용)
-      if (this.isRailway) {
-        this.setupHealthEndpoint();
-      }
-
-      this.isInitialized = true;
-      logger.success("✅ HealthCheck 시스템 초기화 완료");
+      this.isRunning = true;
+      logger.success("✅ HealthChecker v3.0.1 실행됨");
     } catch (error) {
-      logger.error("❌ HealthCheck 초기화 실패:", error);
+      logger.error("❌ HealthChecker 시작 실패:", error);
       throw error;
     }
   }
 
   /**
-   * 🔄 정기 헬스체크 시작
+   * 🏥 전체 헬스체크 수행
    */
-  startRegularHealthChecks() {
-    this.healthCheckTimer = setInterval(async () => {
-      await this.performHealthCheck();
-    }, this.config.interval);
-
-    logger.debug(
-      `🔄 정기 헬스체크 시작 (${this.config.interval / 1000}초 간격)`
-    );
-  }
-
-  /**
-   * ⚡ 크리티컬 헬스체크 시작 (Railway 환경)
-   */
-  startCriticalHealthChecks() {
-    this.criticalCheckTimer = setInterval(async () => {
-      await this.performCriticalHealthCheck();
-    }, this.config.criticalInterval);
-
-    logger.debug(
-      `⚡ 크리티컬 헬스체크 시작 (${
-        this.config.criticalInterval / 1000
-      }초 간격)`
-    );
-  }
-
-  /**
-   * 🌐 HTTP 헬스체크 엔드포인트 설정
-   */
-  setupHealthEndpoint() {
-    // Railway에서 HTTP 헬스체크를 위한 간단한 서버
-    // 이는 별도의 Express 서버가 필요할 수 있음
-    // 여기서는 로그만 남기고 실제 구현은 메인 앱에서 처리
-    logger.info(`🌐 헬스체크 엔드포인트 준비: ${this.config.healthEndpoint}`);
-  }
-
-  /**
-   * 🏥 메인 헬스체크 수행
-   */
-  async performHealthCheck() {
-    const checkStartTime = Date.now();
+  async performFullHealthCheck() {
+    const checkStart = Date.now();
     const timestamp = TimeHelper.getLogTimeString();
 
     try {
-      logger.debug("🏥 헬스체크 수행 중...");
+      logger.debug("🔍 전체 헬스체크 수행 중...");
 
-      // 각 컴포넌트 체크
-      const botHealth = await this.checkBotHealth();
-      const dbHealth = await this.checkDatabaseHealth();
-      const moduleHealth = await this.checkModuleHealth();
-      const memoryHealth = await this.checkMemoryHealth();
-      const performanceHealth = await this.checkPerformanceHealth();
+      // 🎮 BotController 상태 체크
+      const botHealth = await this.checkBotController();
 
-      // 전체 상태 결정
-      const overallStatus = this.calculateOverallStatus([
+      // 🎛️ ModuleManager 상태 체크
+      const moduleHealth = await this.checkModuleManager();
+
+      // 🗄️ DatabaseManager 상태 체크
+      const dbHealth = await this.checkDatabaseManager();
+
+      // 🔧 TodoService 상태 체크
+      const todoHealth = await this.checkTodoService();
+
+      // 🖥️ 시스템 리소스 체크
+      const systemHealth = await this.checkSystemResources();
+
+      // 📊 결과 통합 및 분석
+      const allChecks = [
         botHealth,
-        dbHealth,
         moduleHealth,
-        memoryHealth,
-        performanceHealth,
-      ]);
+        dbHealth,
+        todoHealth,
+        systemHealth,
+      ];
+      const overallHealth = this.calculateOverallHealth(allChecks);
 
       // 상태 업데이트
-      this.updateHealthStatus({
-        overall: overallStatus,
-        timestamp,
-        checkDuration: Date.now() - checkStartTime,
+      this.updateOverallStatus({
+        health: overallHealth.status,
+        lastCheck: timestamp,
+        issues: overallHealth.issues,
+        checkDuration: Date.now() - checkStart,
         components: {
           bot: botHealth,
-          database: dbHealth,
           modules: moduleHealth,
-          memory: memoryHealth,
-          performance: performanceHealth,
+          database: dbHealth,
+          todo: todoHealth,
+          system: systemHealth,
         },
       });
 
-      // 문제 감지 시 대응
-      if (overallStatus !== "healthy") {
-        await this.handleHealthIssue(overallStatus);
+      // 🚨 문제 감지 시 대응
+      if (overallHealth.status !== "healthy") {
+        await this.handleHealthIssues(overallHealth);
+      }
+
+      // 📈 메트릭 업데이트
+      this.updateMetrics(Date.now() - checkStart);
+
+      this.overallStatus.totalChecks++;
+
+      logger.debug(
+        `🏥 헬스체크 완료 (${Date.now() - checkStart}ms) - 상태: ${
+          overallHealth.status
+        }`
+      );
+    } catch (error) {
+      logger.error("❌ 전체 헬스체크 실패:", error);
+      await this.handleCheckFailure(error);
+    }
+  }
+
+  /**
+   * 🎮 BotController 상태 체크
+   */
+  async checkBotController() {
+    try {
+      if (!this.components.botController) {
+        return this.createHealthResult(
+          "error",
+          "BotController가 등록되지 않음"
+        );
+      }
+
+      const controller = this.components.botController;
+      const issues = [];
+      let severity = "healthy";
+
+      // 초기화 상태 확인
+      if (!controller.isInitialized || !controller.isRunning) {
+        issues.push("봇이 초기화되지 않았거나 실행되지 않음");
+        severity = "critical";
+      }
+
+      // 통계 데이터 확인
+      if (controller.stats) {
+        const {
+          errorsCount = 0,
+          messagesReceived = 0,
+          callbacksReceived = 0,
+          averageResponseTime = 0,
+        } = controller.stats;
+
+        // 에러율 체크
+        const totalRequests = messagesReceived + callbacksReceived;
+        const errorRate = totalRequests > 0 ? errorsCount / totalRequests : 0;
+
+        if (errorRate > this.config.errorRateThreshold) {
+          issues.push(`높은 에러율: ${Math.round(errorRate * 100)}%`);
+          severity = errorRate > 0.25 ? "critical" : "warning";
+        }
+
+        // 응답 시간 체크
+        if (averageResponseTime > this.config.responseTimeThreshold) {
+          issues.push(`느린 응답시간: ${averageResponseTime}ms`);
+          severity = severity === "critical" ? "critical" : "warning";
+        }
+
+        // 처리 중인 요청 수 체크
+        const activeRequests =
+          (controller.processingMessages?.size || 0) +
+          (controller.processingCallbacks?.size || 0);
+
+        if (activeRequests > 50) {
+          issues.push(`과도한 대기 요청: ${activeRequests}개`);
+          severity = activeRequests > 100 ? "critical" : "warning";
+        }
+      }
+
+      return this.createHealthResult(severity, issues.join(", ") || "정상", {
+        initialized: controller.isInitialized,
+        running: controller.isRunning,
+        stats: controller.stats || {},
+      });
+    } catch (error) {
+      logger.error("❌ BotController 상태 체크 실패:", error);
+      return this.createHealthResult("error", `체크 실패: ${error.message}`);
+    }
+  }
+
+  /**
+   * 🎛️ ModuleManager 상태 체크
+   */
+  async checkModuleManager() {
+    try {
+      if (!this.components.moduleManager) {
+        return this.createHealthResult(
+          "error",
+          "ModuleManager가 등록되지 않음"
+        );
+      }
+
+      const moduleManager = this.components.moduleManager;
+      const issues = [];
+      let severity = "healthy";
+
+      // 초기화 상태 확인
+      if (!moduleManager.isInitialized) {
+        issues.push("ModuleManager가 초기화되지 않음");
+        severity = "critical";
+      }
+
+      // 모듈 상태 확인
+      if (moduleManager.stats) {
+        const {
+          activeModules = 0,
+          totalModules = 0,
+          failedModules = 0,
+        } = moduleManager.stats;
+
+        // 실패한 모듈 체크
+        if (failedModules > 0) {
+          issues.push(`실패한 모듈: ${failedModules}개`);
+          severity = failedModules >= totalModules / 2 ? "critical" : "warning";
+        }
+
+        // 활성 모듈 비율 체크
+        const activeRatio = totalModules > 0 ? activeModules / totalModules : 0;
+        if (activeRatio < 0.8) {
+          issues.push(`낮은 모듈 활성화율: ${Math.round(activeRatio * 100)}%`);
+          severity = activeRatio < 0.5 ? "critical" : "warning";
+        }
+      }
+
+      return this.createHealthResult(severity, issues.join(", ") || "정상", {
+        initialized: moduleManager.isInitialized,
+        stats: moduleManager.stats || {},
+      });
+    } catch (error) {
+      logger.error("❌ ModuleManager 상태 체크 실패:", error);
+      return this.createHealthResult("error", `체크 실패: ${error.message}`);
+    }
+  }
+
+  /**
+   * 🗄️ DatabaseManager 상태 체크
+   */
+  async checkDatabaseManager() {
+    try {
+      if (!this.components.dbManager) {
+        return this.createHealthResult(
+          "error",
+          "DatabaseManager가 등록되지 않음"
+        );
+      }
+
+      const dbManager = this.components.dbManager;
+      const issues = [];
+      let severity = "healthy";
+
+      // 연결 상태 확인
+      if (!dbManager.isConnected()) {
+        issues.push("데이터베이스 연결 끊어짐");
+        severity = "critical";
       } else {
-        // 정상 상태로 복구됨
-        if (this.consecutiveFailures > 0) {
-          logger.success("✅ 시스템 상태 정상으로 복구됨");
-          this.consecutiveFailures = 0;
+        // 연결 테스트
+        try {
+          const pingResult = await dbManager.db.admin().ping();
+          if (!pingResult.ok) {
+            issues.push("데이터베이스 ping 실패");
+            severity = "warning";
+          }
+        } catch (pingError) {
+          issues.push(`데이터베이스 ping 오류: ${pingError.message}`);
+          severity = "critical";
         }
       }
 
-      this.status.totalChecks++;
-      this.status.lastCheck = timestamp;
+      // 통계 확인
+      if (dbManager.stats) {
+        const { connectionPool, operations } = dbManager.stats;
 
-      if (overallStatus === "healthy") {
-        this.status.lastHealthyCheck = timestamp;
+        // 커넥션 풀 상태
+        if (connectionPool) {
+          const poolUsage =
+            connectionPool.active /
+            (connectionPool.active + connectionPool.available);
+          if (poolUsage > 0.9) {
+            issues.push(
+              `높은 커넥션 풀 사용률: ${Math.round(poolUsage * 100)}%`
+            );
+            severity = severity === "critical" ? "critical" : "warning";
+          }
+        }
+
+        // 오퍼레이션 에러율
+        if (operations && operations.total > 0) {
+          const errorRate = operations.errors / operations.total;
+          if (errorRate > 0.05) {
+            issues.push(`높은 DB 에러율: ${Math.round(errorRate * 100)}%`);
+            severity = errorRate > 0.15 ? "critical" : "warning";
+          }
+        }
       }
+
+      return this.createHealthResult(severity, issues.join(", ") || "정상", {
+        connected: dbManager.isConnected(),
+        stats: dbManager.stats || {},
+      });
     } catch (error) {
-      logger.error("❌ 헬스체크 수행 실패:", error);
-      this.handleHealthCheckFailure(error);
+      logger.error("❌ DatabaseManager 상태 체크 실패:", error);
+      return this.createHealthResult("error", `체크 실패: ${error.message}`);
     }
   }
 
   /**
-   * ⚡ 크리티컬 헬스체크 (간단한 생존 확인)
+   * 🔧 TodoService 상태 체크
    */
-  async performCriticalHealthCheck() {
+  async checkTodoService() {
     try {
-      const memUsage = process.memoryUsage();
-      const usedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-
-      // 메모리 크리티컬 체크
-      if (usedMB > this.config.memoryThreshold * 1.5) {
-        // 150% 초과시 크리티컬
-        logger.error(
-          `🚨 크리티컬: 메모리 사용량 ${usedMB}MB (임계값: ${this.config.memoryThreshold}MB)`
-        );
-
-        if (this.config.autoRestart && this.canRestart()) {
-          await this.performEmergencyRestart("memory_critical");
-        }
-      }
-
-      // 봇 응답성 체크
-      if (this.controller && this.controller.stats) {
-        const { processingMessages, processingCallbacks } =
-          this.controller.stats;
-        const totalProcessing =
-          (processingMessages || 0) + (processingCallbacks || 0);
-
-        if (totalProcessing > 100) {
-          // 100개 이상 대기 중
-          logger.warn(`⚠️ 크리티컬: 처리 대기 중인 요청 ${totalProcessing}개`);
-        }
-      }
-    } catch (error) {
-      logger.error("❌ 크리티컬 헬스체크 실패:", error);
-    }
-  }
-
-  /**
-   * 🤖 봇 상태 체크
-   */
-  async checkBotHealth() {
-    try {
-      if (!this.controller) {
-        return { status: "error", message: "Controller 없음", details: {} };
-      }
-
-      const controllerStatus = this.controller.getStatus();
-      const issues = [];
-
-      // 초기화 상태 체크
-      if (!controllerStatus.initialized || !controllerStatus.running) {
-        issues.push("봇이 초기화되지 않음");
-      }
-
-      // 에러율 체크
-      const { errorsCount, messagesReceived, callbacksReceived } =
-        controllerStatus.activity || {};
-      const totalRequests = (messagesReceived || 0) + (callbacksReceived || 0);
-      const errorRate =
-        totalRequests > 0 ? (errorsCount || 0) / totalRequests : 0;
-
-      if (errorRate > 0.1) {
-        // 10% 이상 에러율
-        issues.push(`높은 에러율: ${Math.round(errorRate * 100)}%`);
-      }
-
-      // 응답 시간 체크
-      const avgResponseTime =
-        controllerStatus.performance?.averageResponseTime || 0;
-      if (avgResponseTime > this.config.responseTimeThreshold) {
-        issues.push(`느린 응답: ${avgResponseTime}ms`);
-      }
-
-      return {
-        status:
-          issues.length === 0
-            ? "healthy"
-            : issues.length > 2
-            ? "critical"
-            : "warning",
-        message: issues.length > 0 ? issues.join(", ") : "Bot 정상",
-        details: {
-          initialized: controllerStatus.initialized,
-          running: controllerStatus.running,
-          errorRate: Math.round(errorRate * 100),
-          avgResponseTime,
-          activeRequests:
-            (controllerStatus.processing?.activeMessages || 0) +
-            (controllerStatus.processing?.activeCallbacks || 0),
-        },
-      };
-    } catch (error) {
-      return {
-        status: "error",
-        message: `Bot 체크 실패: ${error.message}`,
-        details: { error: error.message },
-      };
-    }
-  }
-
-  /**
-   * 💾 데이터베이스 상태 체크
-   */
-  async checkDatabaseHealth() {
-    try {
-      if (!this.dbManager) {
-        return { status: "warning", message: "DB Manager 없음", details: {} };
-      }
-
-      const dbStatus = this.dbManager.getStatus();
-      const issues = [];
-
-      // 연결 상태 체크
-      if (!dbStatus.connected) {
-        issues.push("DB 연결 끊어짐");
-      }
-
-      // 연결 풀 상태 체크 (가능한 경우)
-      if (
-        dbStatus.poolSize !== undefined &&
-        dbStatus.activeConnections !== undefined
-      ) {
-        const poolUsage = dbStatus.activeConnections / dbStatus.poolSize;
-        if (poolUsage > 0.9) {
-          // 90% 이상 사용
-          issues.push(`높은 연결 풀 사용률: ${Math.round(poolUsage * 100)}%`);
-        }
-      }
-
-      // 간단한 ping 테스트 (가능한 경우)
-      if (this.dbManager.ping) {
-        const pingStart = Date.now();
-        await this.dbManager.ping();
-        const pingTime = Date.now() - pingStart;
-
-        if (pingTime > 1000) {
-          // 1초 이상
-          issues.push(`느린 DB 응답: ${pingTime}ms`);
-        }
-      }
-
-      return {
-        status:
-          issues.length === 0
-            ? "healthy"
-            : issues.length > 1
-            ? "critical"
-            : "warning",
-        message: issues.length > 0 ? issues.join(", ") : "Database 정상",
-        details: {
-          connected: dbStatus.connected,
-          database: dbStatus.database,
-          poolUsage: dbStatus.poolSize
-            ? Math.round(
-                ((dbStatus.activeConnections || 0) / dbStatus.poolSize) * 100
-              )
-            : null,
-        },
-      };
-    } catch (error) {
-      return {
-        status: "error",
-        message: `DB 체크 실패: ${error.message}`,
-        details: { error: error.message },
-      };
-    }
-  }
-
-  /**
-   * 📦 모듈 상태 체크
-   */
-  async checkModuleHealth() {
-    try {
-      if (!this.moduleManager) {
-        return {
-          status: "warning",
-          message: "Module Manager 없음",
-          details: {},
-        };
-      }
-
-      const moduleStatus = this.moduleManager.getStatus();
-      const issues = [];
-
-      // 모듈 로드 상태 체크
-      const { activeModules, totalModules, failedModules } = moduleStatus;
-
-      if (failedModules > 0) {
-        issues.push(`실패한 모듈: ${failedModules}개`);
-      }
-
-      const moduleSuccessRate =
-        totalModules > 0 ? activeModules / totalModules : 0;
-      if (moduleSuccessRate < 0.8) {
-        // 80% 미만
-        issues.push(
-          `낮은 모듈 성공률: ${Math.round(moduleSuccessRate * 100)}%`
+      if (!this.components.todoService) {
+        return this.createHealthResult(
+          "warning",
+          "TodoService가 등록되지 않음"
         );
       }
 
-      // 모듈 에러 체크
-      if (moduleStatus.errorsCount > this.config.errorThreshold) {
-        issues.push(`높은 모듈 에러: ${moduleStatus.errorsCount}개`);
+      const todoService = this.components.todoService;
+      const issues = [];
+      let severity = "healthy";
+
+      // 초기화 상태 확인
+      if (!todoService.collection) {
+        issues.push("TodoService 컬렉션이 초기화되지 않음");
+        severity = "warning";
       }
 
-      return {
-        status:
-          issues.length === 0
-            ? "healthy"
-            : issues.length > 1
-            ? "critical"
-            : "warning",
-        message: issues.length > 0 ? issues.join(", ") : "Modules 정상",
-        details: {
-          activeModules,
-          totalModules,
-          failedModules,
-          successRate: Math.round(moduleSuccessRate * 100),
-          errorsCount: moduleStatus.errorsCount,
-        },
-      };
+      // 통계 확인
+      if (todoService.stats) {
+        const {
+          errorCount = 0,
+          operationsCount = 0,
+          averageResponseTime = 0,
+          cacheHits = 0,
+          cacheMisses = 0,
+        } = todoService.stats;
+
+        // 에러율 체크
+        if (operationsCount > 0) {
+          const errorRate = errorCount / operationsCount;
+          if (errorRate > 0.1) {
+            issues.push(
+              `높은 TodoService 에러율: ${Math.round(errorRate * 100)}%`
+            );
+            severity = errorRate > 0.25 ? "critical" : "warning";
+          }
+        }
+
+        // 응답 시간 체크
+        if (averageResponseTime > 2000) {
+          issues.push(`느린 TodoService 응답: ${averageResponseTime}ms`);
+          severity = severity === "critical" ? "critical" : "warning";
+        }
+
+        // 캐시 효율성 체크
+        const totalCacheOps = cacheHits + cacheMisses;
+        if (totalCacheOps > 0) {
+          const cacheHitRate = cacheHits / totalCacheOps;
+          if (cacheHitRate < 0.3) {
+            issues.push(`낮은 캐시 적중률: ${Math.round(cacheHitRate * 100)}%`);
+          }
+        }
+      }
+
+      return this.createHealthResult(severity, issues.join(", ") || "정상", {
+        initialized: !!todoService.collection,
+        stats: todoService.stats || {},
+      });
     } catch (error) {
-      return {
-        status: "error",
-        message: `Module 체크 실패: ${error.message}`,
-        details: { error: error.message },
-      };
+      logger.error("❌ TodoService 상태 체크 실패:", error);
+      return this.createHealthResult("error", `체크 실패: ${error.message}`);
     }
   }
 
   /**
-   * 💾 메모리 상태 체크
+   * 🖥️ 시스템 리소스 상태 체크
    */
-  checkMemoryHealth() {
+  async checkSystemResources() {
     try {
+      const issues = [];
+      let severity = "healthy";
+
+      // 메모리 사용량 체크
       const memUsage = process.memoryUsage();
       const usedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
       const totalMB = Math.round(memUsage.heapTotal / 1024 / 1024);
-      const externalMB = Math.round(memUsage.external / 1024 / 1024);
 
-      const issues = [];
-
-      // 메모리 사용량 체크
       if (usedMB > this.config.memoryThreshold) {
-        issues.push(`높은 메모리 사용: ${usedMB}MB`);
+        issues.push(`높은 메모리 사용량: ${usedMB}MB`);
+        severity =
+          usedMB > this.config.memoryThreshold * 1.5 ? "critical" : "warning";
       }
 
-      // 메모리 사용률 체크
-      const memoryUsageRate = usedMB / totalMB;
-      if (memoryUsageRate > 0.9) {
-        // 90% 이상
-        issues.push(
-          `높은 메모리 사용률: ${Math.round(memoryUsageRate * 100)}%`
-        );
-      }
-
-      // Railway 환경에서는 더 엄격하게
-      if (this.isRailway && usedMB > 450) {
-        // Railway 512MB 제한
-        issues.push("Railway 메모리 제한 근접");
-      }
-
-      let status = "healthy";
-      if (usedMB > this.config.memoryThreshold * 1.2) {
-        status = "critical";
-      } else if (usedMB > this.config.memoryThreshold) {
-        status = "warning";
-      }
-
-      return {
-        status,
-        message: issues.length > 0 ? issues.join(", ") : "Memory 정상",
-        details: {
-          usedMB,
-          totalMB,
-          externalMB,
-          usageRate: Math.round(memoryUsageRate * 100),
-          threshold: this.config.memoryThreshold,
-          railway: this.isRailway,
-        },
-      };
-    } catch (error) {
-      return {
-        status: "error",
-        message: `Memory 체크 실패: ${error.message}`,
-        details: { error: error.message },
-      };
-    }
-  }
-
-  /**
-   * 📊 성능 상태 체크
-   */
-  checkPerformanceHealth() {
-    try {
-      const uptime = Math.round(process.uptime());
-      const issues = [];
-
-      // 업타임 체크 (너무 자주 재시작되는지)
-      if (uptime < 300 && this.restartAttempts > 0) {
-        // 5분 미만이고 재시작 이력 있음
-        issues.push("자주 재시작됨");
-      }
-
-      // CPU 사용률 체크 (가능한 경우)
-      const cpuUsage = process.cpuUsage();
-      if (cpuUsage.user > 1000000 || cpuUsage.system > 1000000) {
-        // 1초 이상
-        issues.push("높은 CPU 사용");
-      }
-
-      // 컨트롤러 성능 체크
-      if (this.controller && this.controller.stats) {
-        const avgResponseTime = this.controller.stats.averageResponseTime || 0;
-        if (avgResponseTime > this.config.responseTimeThreshold) {
-          issues.push(`느린 응답: ${avgResponseTime}ms`);
-        }
-      }
-
-      return {
-        status:
-          issues.length === 0
-            ? "healthy"
-            : issues.length > 1
-            ? "warning"
-            : "warning",
-        message: issues.length > 0 ? issues.join(", ") : "Performance 정상",
-        details: {
-          uptime,
-          restartAttempts: this.restartAttempts,
-          cpuUser: Math.round(cpuUsage.user / 1000), // ms
-          cpuSystem: Math.round(cpuUsage.system / 1000), // ms
-          platform: process.platform,
-          nodeVersion: process.version,
-        },
-      };
-    } catch (error) {
-      return {
-        status: "error",
-        message: `Performance 체크 실패: ${error.message}`,
-        details: { error: error.message },
-      };
-    }
-  }
-
-  /**
-   * 📊 전체 상태 계산
-   */
-  calculateOverallStatus(componentHealths) {
-    const statuses = componentHealths.map((h) => h.status);
-
-    if (statuses.includes("error") || statuses.includes("critical")) {
-      return "critical";
-    }
-
-    if (statuses.includes("warning")) {
-      return "warning";
-    }
-
-    return "healthy";
-  }
-
-  /**
-   * 📝 헬스 상태 업데이트
-   */
-  updateHealthStatus(healthData) {
-    // 이전 상태 저장
-    const previousStatus = this.status.overall;
-
-    // 새 상태 적용
-    this.status.overall = healthData.overall;
-    this.status.components = healthData.components;
-
-    // 연속 실패 카운트 업데이트
-    if (healthData.overall !== "healthy") {
-      this.status.consecutiveFailures++;
-    } else {
-      this.status.consecutiveFailures = 0;
-    }
-
-    // 히스토리에 추가
-    this.addToHistory({
-      timestamp: healthData.timestamp,
-      status: healthData.overall,
-      checkDuration: healthData.checkDuration,
-      components: Object.fromEntries(
-        Object.entries(healthData.components).map(([key, comp]) => [
-          key,
-          comp.status,
-        ])
-      ),
-    });
-
-    // 상태 변화 로깅
-    if (previousStatus !== healthData.overall) {
-      const statusEmoji = {
-        healthy: "✅",
-        warning: "⚠️",
-        critical: "🚨",
-        error: "❌",
-      };
-
-      logger.info(
-        `${
-          statusEmoji[healthData.overall]
-        } 시스템 상태 변경: ${previousStatus} → ${healthData.overall}`
+      // 업타임 체크
+      const uptimeHours = Math.round(
+        (Date.now() - this.overallStatus.uptime) / (1000 * 60 * 60)
       );
-    }
 
-    // 상세 로깅 (디버그 모드)
-    if (process.env.LOG_LEVEL === "debug") {
-      logger.debug("🏥 헬스체크 결과:", {
-        status: healthData.overall,
-        duration: healthData.checkDuration,
-        components: Object.fromEntries(
-          Object.entries(healthData.components).map(([key, comp]) => [
-            key,
-            {
-              status: comp.status,
-              message: comp.message,
-            },
-          ])
-        ),
+      // Railway 환경에서는 24시간 이상 실행을 권장하지 않음
+      if (process.env.RAILWAY_ENVIRONMENT && uptimeHours > 24) {
+        issues.push(`긴 업타임: ${uptimeHours}시간 (재시작 권장)`);
+        severity = severity === "critical" ? "critical" : "warning";
+      }
+
+      // 이벤트 루프 지연 체크 (간단한 방법)
+      const start = Date.now();
+      await new Promise((resolve) => setImmediate(resolve));
+      const eventLoopDelay = Date.now() - start;
+
+      if (eventLoopDelay > 100) {
+        issues.push(`이벤트 루프 지연: ${eventLoopDelay}ms`);
+        severity = eventLoopDelay > 500 ? "critical" : "warning";
+      }
+
+      return this.createHealthResult(severity, issues.join(", ") || "정상", {
+        memory: {
+          used: usedMB,
+          total: totalMB,
+          usage: Math.round((usedMB / totalMB) * 100),
+        },
+        uptime: uptimeHours,
+        eventLoopDelay,
       });
+    } catch (error) {
+      logger.error("❌ 시스템 리소스 체크 실패:", error);
+      return this.createHealthResult("error", `체크 실패: ${error.message}`);
     }
   }
 
   /**
-   * 🚨 헬스 문제 처리
+   * 📊 전체 건강 상태 계산
    */
-  async handleHealthIssue(status) {
-    this.status.consecutiveFailures++;
+  calculateOverallHealth(checks) {
+    const severityOrder = ["healthy", "warning", "critical", "error"];
+    let worstSeverity = "healthy";
+    const allIssues = [];
 
-    logger.warn(
-      `🚨 헬스 문제 감지: ${status} (연속 실패: ${this.status.consecutiveFailures})`
-    );
+    for (const check of checks) {
+      const currentSeverityIndex = severityOrder.indexOf(check.status);
+      const worstSeverityIndex = severityOrder.indexOf(worstSeverity);
 
-    // 알림 발송
-    if (
-      this.config.alertEnabled &&
-      this.status.consecutiveFailures >= this.config.alertThreshold
-    ) {
-      await this.sendHealthAlert(status);
+      if (currentSeverityIndex > worstSeverityIndex) {
+        worstSeverity = check.status;
+      }
+
+      if (check.message && check.message !== "정상") {
+        allIssues.push(check.message);
+      }
+    }
+
+    return {
+      status: worstSeverity,
+      issues: allIssues,
+    };
+  }
+
+  /**
+   * 🚨 건강 문제 처리
+   */
+  async handleHealthIssues(healthResult) {
+    const { status, issues } = healthResult;
+
+    // 크리티컬 상태인 경우 긴급 스케줄러 시작
+    if (status === "critical" && !this.criticalInterval) {
+      this.startCriticalScheduler();
+    }
+
+    // 알림 전송 (쿨다운 체크)
+    if (this.config.enableAlerts && this.shouldSendAlert(status)) {
+      await this.sendHealthAlert(status, issues);
     }
 
     // 자동 복구 시도
-    if (status === "critical" && this.config.autoRestart && this.canRestart()) {
-      await this.performEmergencyRestart("health_critical");
+    if (this.config.autoRecovery && status === "critical") {
+      await this.attemptAutoRecovery(issues);
     }
 
-    // 메모리 정리 시도
-    if (this.status.components.memory?.status === "critical") {
-      await this.performMemoryCleanup();
-    }
+    logger.warn(
+      `⚠️ 건강 문제 감지 - 상태: ${status}, 문제: ${issues.join(", ")}`
+    );
   }
 
   /**
-   * 🔄 긴급 재시작 수행
+   * 🔧 자동 복구 시도
    */
-  async performEmergencyRestart(reason) {
-    try {
-      logger.warn(`🔄 긴급 재시작 시작: ${reason}`);
+  async attemptAutoRecovery(issues) {
+    const recoveryKey = "general";
+    const attempts = this.recoveryAttempts.get(recoveryKey) || 0;
 
-      this.restartAttempts++;
-      this.lastRestartTime = Date.now();
-
-      // Railway 환경에서는 프로세스 종료로 재시작 유도
-      if (this.isRailway) {
-        logger.warn("🚂 Railway 환경에서 자동 재시작 유도...");
-
-        // 정리 작업 후 종료
-        setTimeout(() => {
-          process.exit(1);
-        }, 2000);
-      } else {
-        // 로컬 환경에서는 컴포넌트 재시작 시도
-        logger.warn("🔄 컴포넌트 재시작 시도...");
-
-        if (this.controller && this.controller.cleanup) {
-          await this.controller.cleanup();
-          await this.controller.initialize();
-        }
-      }
-    } catch (error) {
-      logger.error("❌ 긴급 재시작 실패:", error);
+    if (attempts >= this.config.maxRecoveryAttempts) {
+      logger.error(
+        `❌ 최대 복구 시도 횟수 초과 (${attempts}/${this.config.maxRecoveryAttempts})`
+      );
+      return;
     }
-  }
 
-  /**
-   * 🧹 메모리 정리 수행
-   */
-  async performMemoryCleanup() {
     try {
-      logger.warn("🧹 메모리 정리 시작...");
+      logger.info(
+        `🔧 자동 복구 시도 ${attempts + 1}/${
+          this.config.maxRecoveryAttempts
+        }...`
+      );
 
-      // 컨트롤러 메모리 정리
-      if (this.controller && this.controller.performMemoryCleanup) {
-        this.controller.performMemoryCleanup();
-      }
-
-      // 히스토리 정리
-      if (this.history.length > this.maxHistorySize / 2) {
-        this.history = this.history.slice(-this.maxHistorySize / 2);
-      }
-
-      // 가비지 컬렉션 요청
+      // 메모리 정리
       if (global.gc) {
         global.gc();
+        logger.debug("🧹 가비지 컬렉션 실행됨");
       }
 
-      logger.info("✅ 메모리 정리 완료");
-    } catch (error) {
-      logger.error("❌ 메모리 정리 실패:", error);
-    }
-  }
+      // 캐시 정리
+      if (this.components.todoService && this.components.todoService.cache) {
+        this.components.todoService.cache.clear();
+        this.components.todoService.cacheTimestamps.clear();
+        logger.debug("🧹 TodoService 캐시 정리됨");
+      }
 
-  /**
-   * 📧 헬스 알림 발송
-   */
-  async sendHealthAlert(status) {
-    try {
-      const alertData = {
-        status,
-        consecutiveFailures: this.status.consecutiveFailures,
-        timestamp: TimeHelper.getLogTimeString(),
-        environment: this.isRailway ? "Railway" : "Local",
-        components: this.status.components,
-      };
+      // 연결 상태 복구 시도
+      if (
+        this.components.dbManager &&
+        !this.components.dbManager.isConnected()
+      ) {
+        await this.components.dbManager.reconnect();
+        logger.debug("🔗 데이터베이스 재연결 시도됨");
+      }
 
-      // 로그로 일단 출력 (나중에 텔레그램/이메일 등으로 확장 가능)
-      logger.warn("🚨 헬스 알림:", alertData);
+      this.recoveryAttempts.set(recoveryKey, attempts + 1);
 
-      // TODO: 텔레그램 관리자 알림, 이메일, 슬랙 등 구현
-    } catch (error) {
-      logger.error("❌ 헬스 알림 발송 실패:", error);
-    }
-  }
-
-  /**
-   * 🔍 재시작 가능 여부 확인
-   */
-  canRestart() {
-    // 최대 재시작 횟수 체크
-    if (this.restartAttempts >= this.config.maxRestartAttempts) {
-      logger.warn(
-        `⚠️ 최대 재시작 횟수 초과: ${this.restartAttempts}/${this.config.maxRestartAttempts}`
+      // 복구 지연
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.config.recoveryDelay)
       );
-      return false;
+
+      logger.info("✅ 자동 복구 시도 완료");
+    } catch (error) {
+      logger.error("❌ 자동 복구 실패:", error);
+      this.recoveryAttempts.set(recoveryKey, attempts + 1);
+    }
+  }
+
+  /**
+   * 🚨 건강 알림 전송
+   */
+  async sendHealthAlert(status, issues) {
+    const alertKey = `${status}_${issues.join(",")}`;
+    const lastAlert = this.alertHistory.get(alertKey);
+    const now = Date.now();
+
+    // 쿨다운 체크
+    if (lastAlert && now - lastAlert < this.config.alertCooldown) {
+      return;
     }
 
-    // 재시작 쿨다운 체크
-    if (this.lastRestartTime) {
-      const timeSinceRestart = Date.now() - this.lastRestartTime;
-      if (timeSinceRestart < this.config.restartCooldown) {
-        const remainingTime = Math.round(
-          (this.config.restartCooldown - timeSinceRestart) / 1000
-        );
-        logger.warn(`⚠️ 재시작 쿨다운 중: ${remainingTime}초 남음`);
-        return false;
+    try {
+      const emoji = status === "critical" ? "🚨" : "⚠️";
+      const alertMessage = `${emoji} 헬스체크 알림\n상태: ${status}\n문제: ${issues.join(
+        ", "
+      )}\n시간: ${TimeHelper.getLogTimeString()}`;
+
+      logger.warn(alertMessage);
+
+      // 여기에 실제 알림 전송 로직 추가 가능 (텔레그램, 슬랙 등)
+
+      this.alertHistory.set(alertKey, now);
+      this.overallStatus.alerts.push({
+        status,
+        issues,
+        timestamp: TimeHelper.getLogTimeString(),
+      });
+
+      // 알림 히스토리 크기 제한
+      if (this.overallStatus.alerts.length > 50) {
+        this.overallStatus.alerts = this.overallStatus.alerts.slice(-25);
       }
-    }
-
-    return true;
-  }
-
-  /**
-   * 📝 히스토리에 추가
-   */
-  addToHistory(healthRecord) {
-    this.history.push(healthRecord);
-
-    // 최대 크기 유지
-    if (this.history.length > this.maxHistorySize) {
-      this.history = this.history.slice(-this.maxHistorySize);
+    } catch (error) {
+      logger.error("❌ 건강 알림 전송 실패:", error);
     }
   }
 
   /**
-   * ❌ 헬스체크 실패 처리
+   * ⏰ 정상 스케줄러 시작
    */
-  handleHealthCheckFailure(error) {
-    this.status.consecutiveFailures++;
-    this.status.overall = "error";
+  startNormalScheduler() {
+    if (this.normalInterval) {
+      clearInterval(this.normalInterval);
+    }
 
-    logger.error(
-      `❌ 헬스체크 실패 (연속 ${this.status.consecutiveFailures}회):`,
-      error
+    this.normalInterval = setInterval(async () => {
+      if (this.isRunning) {
+        await this.performFullHealthCheck();
+      }
+    }, this.config.normalCheckInterval);
+
+    logger.debug(
+      `⏰ 정상 헬스체크 스케줄러 시작됨 (${this.config.normalCheckInterval}ms)`
     );
+  }
 
-    // 크리티컬 실패시 긴급 대응
-    if (this.status.consecutiveFailures >= 5) {
-      logger.error("🚨 크리티컬: 헬스체크 연속 실패");
+  /**
+   * 🚨 크리티컬 스케줄러 시작
+   */
+  startCriticalScheduler() {
+    if (this.criticalInterval) {
+      return; // 이미 실행 중
+    }
 
-      if (this.config.autoRestart && this.canRestart()) {
-        setTimeout(async () => {
-          await this.performEmergencyRestart("healthcheck_failure");
-        }, 5000);
+    this.criticalInterval = setInterval(async () => {
+      if (this.isRunning && this.overallStatus.health === "critical") {
+        await this.performFullHealthCheck();
+      } else if (this.overallStatus.health === "healthy") {
+        // 정상 상태로 복구됨 - 크리티컬 스케줄러 중지
+        this.stopCriticalScheduler();
+      }
+    }, this.config.criticalCheckInterval);
+
+    logger.warn(
+      `🚨 크리티컬 헬스체크 스케줄러 시작됨 (${this.config.criticalCheckInterval}ms)`
+    );
+  }
+
+  /**
+   * 🛑 크리티컬 스케줄러 중지
+   */
+  stopCriticalScheduler() {
+    if (this.criticalInterval) {
+      clearInterval(this.criticalInterval);
+      this.criticalInterval = null;
+      logger.info("✅ 크리티컬 헬스체크 스케줄러 중지됨");
+    }
+  }
+
+  /**
+   * 📊 상태 업데이트
+   */
+  updateOverallStatus(status) {
+    Object.assign(this.overallStatus, status);
+
+    // 컴포넌트별 상태 저장
+    if (status.components) {
+      for (const [name, componentStatus] of Object.entries(status.components)) {
+        this.componentStatus.set(name, {
+          ...componentStatus,
+          lastUpdated: TimeHelper.getLogTimeString(),
+        });
       }
     }
   }
 
   /**
-   * 📊 상태 조회 (완전판)
+   * 📈 메트릭 업데이트
+   */
+  updateMetrics(checkDuration) {
+    // 체크 소요 시간
+    this.metrics.checkDuration.push(checkDuration);
+    if (this.metrics.checkDuration.length > 100) {
+      this.metrics.checkDuration = this.metrics.checkDuration.slice(-50);
+    }
+
+    // 메모리 사용량
+    const memUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    this.metrics.memoryUsage.push(memUsage);
+    if (this.metrics.memoryUsage.length > 100) {
+      this.metrics.memoryUsage = this.metrics.memoryUsage.slice(-50);
+    }
+  }
+
+  /**
+   * 🏥 건강 결과 생성 헬퍼
+   */
+  createHealthResult(status, message, details = {}) {
+    return {
+      status,
+      message,
+      details,
+      timestamp: TimeHelper.getLogTimeString(),
+    };
+  }
+
+  /**
+   * 🚨 알림 전송 여부 확인
+   */
+  shouldSendAlert(status) {
+    if (status === "healthy") return false;
+
+    // 크리티컬은 항상 알림, 워닝은 연속 3회 이상일 때만
+    if (status === "critical") return true;
+
+    // 워닝 연속 체크 로직
+    const recentChecks = this.overallStatus.alerts.slice(-3);
+    return (
+      recentChecks.length >= 3 &&
+      recentChecks.every((alert) => alert.status === "warning")
+    );
+  }
+
+  /**
+   * 📊 전체 상태 조회
    */
   getStatus() {
-    const recentHistory = this.history.slice(-10); // 최근 10개
-    const uptime = Math.round(process.uptime());
-
     return {
-      // 기본 정보
-      overall: this.status.overall,
-      consecutiveFailures: this.status.consecutiveFailures,
-      totalChecks: this.status.totalChecks,
-      lastCheck: this.status.lastCheck,
-      lastHealthyCheck: this.status.lastHealthyCheck,
-
-      // 환경 정보
-      environment: {
-        railway: this.isRailway,
-        uptime,
-        nodeVersion: process.version,
-        platform: process.platform,
-      },
-
-      // 설정 정보
-      config: {
-        interval: this.config.interval,
-        memoryThreshold: this.config.memoryThreshold,
-        autoRestart: this.config.autoRestart,
-        alertEnabled: this.config.alertEnabled,
-      },
-
-      // 컴포넌트 상태
-      components: this.status.components,
-
-      // 복구 정보
-      recovery: {
-        restartAttempts: this.restartAttempts,
-        maxRestartAttempts: this.config.maxRestartAttempts,
-        lastRestartTime: this.lastRestartTime,
-        canRestart: this.canRestart(),
-      },
-
-      // 최근 히스토리
-      recentHistory: recentHistory.map((h) => ({
-        timestamp: h.timestamp,
-        status: h.status,
-        duration: h.checkDuration,
-      })),
-
-      // 통계
-      statistics: this.calculateStatistics(),
-    };
-  }
-
-  /**
-   * 📈 통계 계산
-   */
-  calculateStatistics() {
-    if (this.history.length === 0) {
-      return null;
-    }
-
-    const last24Hours = this.history.filter((h) => {
-      const checkTime = new Date(h.timestamp).getTime();
-      const now = Date.now();
-      return now - checkTime <= 24 * 60 * 60 * 1000; // 24시간
-    });
-
-    const statusCounts = last24Hours.reduce((acc, h) => {
-      acc[h.status] = (acc[h.status] || 0) + 1;
-      return acc;
-    }, {});
-
-    const totalChecks = last24Hours.length;
-    const healthyChecks = statusCounts.healthy || 0;
-    const uptime = totalChecks > 0 ? (healthyChecks / totalChecks) * 100 : 0;
-
-    const avgCheckDuration =
-      last24Hours.length > 0
-        ? last24Hours.reduce((sum, h) => sum + (h.checkDuration || 0), 0) /
-          last24Hours.length
-        : 0;
-
-    return {
-      period: "24h",
-      totalChecks,
-      uptimePercentage: Math.round(uptime * 100) / 100,
-      statusDistribution: statusCounts,
-      averageCheckDuration: Math.round(avgCheckDuration),
-      healthyChecks,
-      issues: totalChecks - healthyChecks,
-    };
-  }
-
-  /**
-   * 🏥 온디맨드 헬스체크 (외부 요청용)
-   */
-  async performOnDemandHealthCheck() {
-    logger.info("🏥 온디맨드 헬스체크 요청됨");
-    await this.performHealthCheck();
-    return this.getStatus();
-  }
-
-  /**
-   * 🔄 재시작 카운터 리셋
-   */
-  resetRestartCounter() {
-    const previousAttempts = this.restartAttempts;
-    this.restartAttempts = 0;
-    this.lastRestartTime = null;
-
-    if (previousAttempts > 0) {
-      logger.info(`🔄 재시작 카운터 리셋: ${previousAttempts} → 0`);
-    }
-  }
-
-  /**
-   * 📊 상세 진단 보고서 생성
-   */
-  generateDiagnosticReport() {
-    const memUsage = process.memoryUsage();
-    const cpuUsage = process.cpuUsage();
-
-    return {
-      timestamp: TimeHelper.getLogTimeString(),
-
-      // 시스템 정보
-      system: {
-        platform: process.platform,
-        arch: process.arch,
-        nodeVersion: process.version,
-        uptime: Math.round(process.uptime()),
-        pid: process.pid,
-      },
-
-      // 메모리 상세 정보
-      memory: {
-        heap: {
-          used: Math.round(memUsage.heapUsed / 1024 / 1024),
-          total: Math.round(memUsage.heapTotal / 1024 / 1024),
-          usage: Math.round((memUsage.heapUsed / memUsage.heapTotal) * 100),
-        },
-        external: Math.round(memUsage.external / 1024 / 1024),
-        rss: Math.round(memUsage.rss / 1024 / 1024),
-        arrayBuffers: Math.round(memUsage.arrayBuffers / 1024 / 1024),
-      },
-
-      // CPU 정보
-      cpu: {
-        user: Math.round(cpuUsage.user / 1000), // ms
-        system: Math.round(cpuUsage.system / 1000), // ms
-      },
-
-      // 환경변수 (민감정보 제외)
-      environment: {
-        nodeEnv: process.env.NODE_ENV,
-        railway: !!process.env.RAILWAY_ENVIRONMENT,
-        railwayService: process.env.RAILWAY_SERVICE_NAME,
-        railwayRegion: process.env.RAILWAY_REGION,
-      },
-
-      // 헬스체크 상태
-      healthCheck: this.getStatus(),
-
-      // 컴포넌트 진단
-      components: {
-        controller: this.controller?.getStatus() || null,
-        database: this.dbManager?.getStatus() || null,
-        modules: this.moduleManager?.getStatus() || null,
-      },
-    };
-  }
-
-  /**
-   * 🌐 HTTP 헬스체크 응답 생성 (Railway용)
-   */
-  generateHealthResponse() {
-    const status = this.getStatus();
-    const httpStatus = {
-      healthy: 200,
-      warning: 200, // 경고는 여전히 정상으로 처리
-      critical: 503,
-      error: 503,
-    };
-
-    return {
-      status: httpStatus[status.overall],
-      body: {
-        status: status.overall,
-        timestamp: TimeHelper.getLogTimeString(),
-        uptime: Math.round(process.uptime()),
-        version: "3.0.1",
-        environment: this.isRailway ? "railway" : "local",
-        components: Object.fromEntries(
-          Object.entries(status.components).map(([key, comp]) => [
-            key,
-            { status: comp.status, message: comp.message },
-          ])
+      overall: this.overallStatus,
+      components: Object.fromEntries(this.componentStatus),
+      metrics: {
+        avgCheckDuration:
+          this.metrics.checkDuration.length > 0
+            ? Math.round(
+                this.metrics.checkDuration.reduce((a, b) => a + b, 0) /
+                  this.metrics.checkDuration.length
+              )
+            : 0,
+        avgMemoryUsage:
+          this.metrics.memoryUsage.length > 0
+            ? Math.round(
+                this.metrics.memoryUsage.reduce((a, b) => a + b, 0) /
+                  this.metrics.memoryUsage.length
+              )
+            : 0,
+        currentMemoryUsage: Math.round(
+          process.memoryUsage().heapUsed / 1024 / 1024
         ),
-        statistics: status.statistics,
       },
+      config: this.config,
+      isRunning: this.isRunning,
     };
   }
 
@@ -1034,30 +806,54 @@ class HealthCheck {
    */
   async cleanup() {
     try {
-      logger.info("🧹 HealthCheck 정리 시작...");
+      logger.info("🧹 HealthChecker 정리 시작...");
 
-      // 타이머 정리
-      if (this.healthCheckTimer) {
-        clearInterval(this.healthCheckTimer);
-        this.healthCheckTimer = null;
+      this.isRunning = false;
+
+      // 스케줄러 정리
+      if (this.normalInterval) {
+        clearInterval(this.normalInterval);
+        this.normalInterval = null;
       }
 
-      if (this.criticalCheckTimer) {
-        clearInterval(this.criticalCheckTimer);
-        this.criticalCheckTimer = null;
+      if (this.criticalInterval) {
+        clearInterval(this.criticalInterval);
+        this.criticalInterval = null;
       }
 
-      // 상태 초기화
-      this.status.overall = "unknown";
-      this.history = [];
+      // 메트릭 정리
+      this.metrics.checkDuration.length = 0;
+      this.metrics.memoryUsage.length = 0;
+      this.metrics.responseTime.length = 0;
+      this.metrics.errorCounts.clear();
 
-      this.isInitialized = false;
+      // 알림 히스토리 정리
+      this.alertHistory.clear();
+      this.recoveryAttempts.clear();
+      this.componentStatus.clear();
 
-      logger.info("✅ HealthCheck 정리 완료");
+      logger.info("✅ HealthChecker 정리 완료");
     } catch (error) {
-      logger.error("❌ HealthCheck 정리 실패:", error);
+      logger.error("❌ HealthChecker 정리 실패:", error);
     }
+  }
+
+  /**
+   * 🔧 컴포넌트 등록
+   */
+  registerComponent(name, component) {
+    this.components[name] = component;
+    logger.debug(`🔧 컴포넌트 등록됨: ${name}`);
+  }
+
+  /**
+   * 🔧 컴포넌트 등록 해제
+   */
+  unregisterComponent(name) {
+    delete this.components[name];
+    this.componentStatus.delete(name);
+    logger.debug(`🔧 컴포넌트 등록 해제됨: ${name}`);
   }
 }
 
-module.exports = HealthCheck;
+module.exports = HealthChecker;
