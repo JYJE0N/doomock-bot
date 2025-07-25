@@ -81,14 +81,18 @@ class ModuleManager {
         logger.info(`📦 ${config.class} 모듈 생성 중...`);
 
         const ModuleClass = require(config.path);
+
+        // ✅ DatabaseManager가 있으면 db 프로퍼티를 전달
+        const dbToPass = this.db?.db || this.db;
+
         const moduleInstance = new ModuleClass(this.bot, {
-          db: this.db, // ✅ this.db를 직접 전달
+          db: dbToPass, // MongoDB db 객체 직접 전달
           moduleManager: this,
         });
 
-        // ✅ DB가 있으면 모듈에 설정
-        if (this.db && moduleInstance) {
-          moduleInstance.db = this.db;
+        // 모듈에도 설정
+        if (dbToPass && moduleInstance) {
+          moduleInstance.db = dbToPass;
         }
 
         // 모듈 초기화
