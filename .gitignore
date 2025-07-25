@@ -1,0 +1,28 @@
+# node_modules
+node_modules/
+
+# env
+.env
+
+# logs
+logs/
+*.log
+
+# backups
+*_bak.*
+*.bak.js
+
+# docs
+docs/
+
+# temp
+temp/
+# OS-specific
+.DS_Store
+Thumbs.db
+
+# IDE/editor
+.vscode/
+.idea/
+*.swp
+*.swo

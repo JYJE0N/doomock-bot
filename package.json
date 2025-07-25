@@ -1,0 +1,59 @@
+{
+  "name": "doomock-bot",
+  "version": "3.0.1",
+  "description": "두목봇 - 직장인을 위한 텔레그램 어시스턴트",
+  "main": "doomock_bot.js",
+  "scripts": {
+    "start": "node doomock_bot.js",
+    "dev": "NODE_ENV=development nodemon doomock_bot.js",
+    "railway:start": "NODE_ENV=production node doomock_bot.js",
+    "railway:build": "echo 'Build complete'",
+    "test": "echo 'Tests will be added later'",
+    "cleanup": "pkill -f 'node doomock_bot.js' || true",
+    "restart": "npm run cleanup && sleep 5 && npm start"
+  },
+  "keywords": [
+    "telegram",
+    "bot",
+    "productivity",
+    "korean",
+    "railway"
+  ],
+  "author": "DoomockBro",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JYJE0N/doomock-bot.git"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "form-data": "^4.0.0",
+    "gtts": "^0.2.1",
+    "mongodb": "^6.3.0",
+    "node-telegram-bot-api": "^0.66.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.2"
+  },
+  "optionalDependencies": {
+    "fluent-ffmpeg": "^2.1.2"
+  },
+  "railway": {
+    "build": {
+      "command": "npm ci --only=production"
+    },
+    "start": {
+      "command": "npm run railway:start"
+    },
+    "healthcheck": {
+      "path": "/health",
+      "interval": 30000,
+      "timeout": 10000
+    }
+  }
+}
