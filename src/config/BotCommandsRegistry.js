@@ -2,6 +2,14 @@
 const logger = require("../utils/Logger");
 
 class BotCommandsRegistry {
+  static instance = null;
+
+  static getInstance() {
+    if (!this.instance) {
+      this.instance = new BotCommandsRegistry();
+    }
+    return this.instance;
+  }
   constructor() {
     this.commands = new Map();
     this.moduleCommands = new Map();
@@ -353,6 +361,6 @@ class BotCommandsRegistry {
   }
 }
 // 싱글톤 인스턴스
-const botCommandsRegistry = new BotCommandsRegistry();
+// const botCommandsRegistry = new BotCommandsRegistry();
 
-module.exports = botCommandsRegistry;
+module.exports = BotCommandsRegistry;
