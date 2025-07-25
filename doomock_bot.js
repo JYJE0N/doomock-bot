@@ -143,7 +143,7 @@ class DoomockBot {
         return;
       }
 
-      const DatabaseManager = require("./src/core/DatabaseManager");
+      const DatabaseManager = require("./src/database/DatabaseManager");
       this.dbManager = new DatabaseManager(this.config.database.uri);
 
       await this.dbManager.connect();
