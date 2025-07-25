@@ -50,25 +50,56 @@ class TimerModule extends BaseModule {
   }
 
   // ✅ 표준 액션 등록
+  // setupActions() {
+  //   this.registerActions({
+  //     menu: this.showTimerMenu.bind(this),
+  //     status: this.showTimerStatus.bind(this),
+  //     start: this.startTimer.bind(this),
+  //     stop: this.stopTimer.bind(this),
+  //     pause: this.pauseTimer.bind(this),
+  //     resume: this.resumeTimer.bind(this),
+  //     "pomodoro:start": this.startPomodoro.bind(this),
+  //     "pomodoro:break": this.startBreak.bind(this),
+  //     "start:prompt": this.showStartPrompt.bind(this),
+  //     "start:5": () => this.startCustomTimer(5),
+  //     "start:10": () => this.startCustomTimer(10),
+  //     "start:15": () => this.startCustomTimer(15),
+  //     "start:25": () => this.startCustomTimer(25),
+  //     "start:custom": this.promptCustomTimer.bind(this),
+  //     stats: this.showStats.bind(this),
+  //     help: this.showTimerHelp.bind(this),
+  //   });
+  // }
+
   setupActions() {
-    this.registerActions({
-      menu: this.showTimerMenu.bind(this),
-      status: this.showTimerStatus.bind(this),
-      start: this.startTimer.bind(this),
-      stop: this.stopTimer.bind(this),
-      pause: this.pauseTimer.bind(this),
-      resume: this.resumeTimer.bind(this),
-      "pomodoro:start": this.startPomodoro.bind(this),
-      "pomodoro:break": this.startBreak.bind(this),
-      "start:prompt": this.showStartPrompt.bind(this),
-      "start:5": () => this.startCustomTimer(5),
-      "start:10": () => this.startCustomTimer(10),
-      "start:15": () => this.startCustomTimer(15),
-      "start:25": () => this.startCustomTimer(25),
-      "start:custom": this.promptCustomTimer.bind(this),
-      stats: this.showStats.bind(this),
-      help: this.showTimerHelp.bind(this),
-    });
+    // 안전한 바인딩을 위해 메서드 존재 여부 확인
+    const actions = {};
+
+    // 메서드가 존재하는 경우에만 바인딩
+    if (this.showTimerMenu) actions.menu = this.showTimerMenu.bind(this);
+    if (this.showTimerStatus) actions.status = this.showTimerStatus.bind(this);
+    if (this.startCustomTimer) actions.start = this.startCustomTimer.bind(this);
+    if (this.stopTimer) actions.stop = this.stopTimer.bind(this);
+    if (this.pauseTimer) actions.pause = this.pauseTimer.bind(this);
+    if (this.resumeTimer) actions.resume = this.resumeTimer.bind(this);
+    if (this.startPomodoro)
+      actions["pomodoro:start"] = this.startPomodoro.bind(this);
+    if (this.startBreak) actions["pomodoro:break"] = this.startBreak.bind(this);
+    if (this.showStartPrompt)
+      actions["start:prompt"] = this.showStartPrompt.bind(this);
+    if (this.showStats) actions.stats = this.showStats.bind(this);
+    if (this.showTimerHelp) actions.help = this.showTimerHelp.bind(this);
+
+    // 커스텀 타이머 액션
+    actions["start:5"] = () => this.startCustomTimer(5);
+    actions["start:10"] = () => this.startCustomTimer(10);
+    actions["start:15"] = () => this.startCustomTimer(15);
+    actions["start:25"] = () => this.startCustomTimer(25);
+
+    if (this.promptCustomTimer)
+      actions["start:custom"] = this.promptCustomTimer.bind(this);
+
+    this.registerActions(actions);
   }
 
   // ✅ 모듈 초기화
@@ -98,9 +129,21 @@ class TimerModule extends BaseModule {
     if (userState) {
       switch (userState.action) {
         case "waiting_timer_input":
-          return await this.handleTimerInput(bot, chatId, userId, text, userState);
+          return await this.handleTimerInput(
+            bot,
+            chatId,
+            userId,
+            text,
+            userState
+          );
         case "waiting_pomodoro_task":
-          return await this.handlePomodoroTaskInput(bot, chatId, userId, text, userState);
+          return await this.handlePomodoroTaskInput(
+            bot,
+            chatId,
+            userId,
+            text,
+            userState
+          );
       }
     }
 
@@ -153,35 +196,36 @@ class TimerModule extends BaseModule {
     }
 
     const keyboard = {
-      inline_keyboard: activeTimer.success && activeTimer.timer
-        ? [
-            [
-              { text: "📊 상태", callback_data: "timer:status" },
-              { text: "⏸️ 일시정지", callback_data: "timer:pause" },
+      inline_keyboard:
+        activeTimer.success && activeTimer.timer
+          ? [
+              [
+                { text: "📊 상태", callback_data: "timer:status" },
+                { text: "⏸️ 일시정지", callback_data: "timer:pause" },
+              ],
+              [
+                { text: "⏹️ 정지", callback_data: "timer:stop" },
+                { text: "📈 통계", callback_data: "timer:stats" },
+              ],
+              [
+                { text: "❓ 도움말", callback_data: "timer:help" },
+                { text: "🏠 메인 메뉴", callback_data: "main:menu" },
+              ],
+            ]
+          : [
+              [
+                {
+                  text: "🍅 뽀모도로 시작",
+                  callback_data: "timer:pomodoro:start",
+                },
+                { text: "⏱️ 일반 타이머", callback_data: "timer:start:prompt" },
+              ],
+              [
+                { text: "📈 내 통계", callback_data: "timer:stats" },
+                { text: "❓ 도움말", callback_data: "timer:help" },
+              ],
+              [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
             ],
-            [
-              { text: "⏹️ 정지", callback_data: "timer:stop" },
-              { text: "📈 통계", callback_data: "timer:stats" },
-            ],
-            [
-              { text: "❓ 도움말", callback_data: "timer:help" },
-              { text: "🏠 메인 메뉴", callback_data: "main:menu" },
-            ],
-          ]
-        : [
-            [
-              {
-                text: "🍅 뽀모도로 시작",
-                callback_data: "timer:pomodoro:start",
-              },
-              { text: "⏱️ 일반 타이머", callback_data: "timer:start:prompt" },
-            ],
-            [
-              { text: "📈 내 통계", callback_data: "timer:stats" },
-              { text: "❓ 도움말", callback_data: "timer:help" },
-            ],
-            [{ text: "🏠 메인 메뉴", callback_data: "main:menu" }],
-          ],
     };
 
     if (messageId) {
@@ -316,9 +360,7 @@ class TimerModule extends BaseModule {
 최소 1분, 최대 240분(4시간)까지 설정 가능합니다.`;
 
     const keyboard = {
-      inline_keyboard: [
-        [{ text: "❌ 취소", callback_data: "timer:menu" }],
-      ],
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "timer:menu" }]],
     };
 
     await this.editMessage(bot, chatId, messageId, promptText, {
@@ -335,7 +377,9 @@ class TimerModule extends BaseModule {
       const duration = parseInt(text.trim());
 
       if (isNaN(duration) || duration < 1 || duration > 240) {
-        await this.sendMessage(bot, chatId, 
+        await this.sendMessage(
+          bot,
+          chatId,
           "❌ 올바른 시간을 입력해주세요. (1-240분)\n다시 입력하거나 /cancel로 취소하세요."
         );
         return true;
@@ -373,10 +417,16 @@ class TimerModule extends BaseModule {
 
         // 기존 메시지 수정
         if (userState.messageId) {
-          await this.editMessage(bot, chatId, userState.messageId, successText, {
-            parse_mode: "Markdown",
-            reply_markup: keyboard,
-          });
+          await this.editMessage(
+            bot,
+            chatId,
+            userState.messageId,
+            successText,
+            {
+              parse_mode: "Markdown",
+              reply_markup: keyboard,
+            }
+          );
         } else {
           await this.sendMessage(bot, chatId, successText, {
             parse_mode: "Markdown",
@@ -384,14 +434,22 @@ class TimerModule extends BaseModule {
           });
         }
       } else {
-        await this.sendMessage(bot, chatId, `❌ 타이머 시작 실패: ${result.error}`);
+        await this.sendMessage(
+          bot,
+          chatId,
+          `❌ 타이머 시작 실패: ${result.error}`
+        );
       }
 
       return true;
     } catch (error) {
       logger.error("타이머 입력 처리 오류:", error);
       this.clearUserState(userId);
-      await this.sendMessage(bot, chatId, "❌ 처리 중 오류가 발생했습니다. 다시 시도해주세요.");
+      await this.sendMessage(
+        bot,
+        chatId,
+        "❌ 처리 중 오류가 발생했습니다. 다시 시도해주세요."
+      );
       return true;
     }
   }
@@ -408,7 +466,10 @@ class TimerModule extends BaseModule {
     } = callbackQuery;
     const userId = callbackQuery.from.id;
 
-    const result = await this.timerService.startPomodoro(userId, "포모도로 작업");
+    const result = await this.timerService.startPomodoro(
+      userId,
+      "포모도로 작업"
+    );
 
     if (result.success) {
       const successText = `🍅 **포모도로 시작됨**
@@ -466,7 +527,7 @@ class TimerModule extends BaseModule {
 
     // params[0]에서 휴식 타입 확인 (short/long)
     const breakDuration = params?.[0] === "long" ? 15 : 5;
-    
+
     // 휴식용 타이머 시작
     const result = await this.timerService.startTimer(
       userId,
@@ -796,7 +857,7 @@ ${this.getProgressBar(progress)}`;
    */
   formatTime(minutes) {
     if (minutes <= 0) return "완료";
-    
+
     const hours = Math.floor(minutes / 60);
     const mins = minutes % 60;
 
@@ -812,9 +873,12 @@ ${this.getProgressBar(progress)}`;
    */
   calculateProgress(timer) {
     if (!timer.duration || timer.duration <= 0) return 0;
-    
+
     const elapsed = timer.elapsedTime || 0;
-    const progress = Math.min(100, Math.round((elapsed / timer.duration) * 100));
+    const progress = Math.min(
+      100,
+      Math.round((elapsed / timer.duration) * 100)
+    );
     return Math.max(0, progress);
   }
 
@@ -825,7 +889,7 @@ ${this.getProgressBar(progress)}`;
     const barLength = 10;
     const filled = Math.round((progress / 100) * barLength);
     const empty = barLength - filled;
-    
+
     return "█".repeat(filled) + "░".repeat(empty) + ` ${progress}%`;
   }
 
@@ -834,7 +898,7 @@ ${this.getProgressBar(progress)}`;
    */
   getStatus() {
     const serviceStatus = this.timerService?.getServiceStatus() || {};
-    
+
     return {
       active: true,
       initialized: true,

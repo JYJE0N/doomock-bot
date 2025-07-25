@@ -113,7 +113,10 @@ class ModuleManager {
           logger.debug("✅ ReminderService 참조 저장됨");
         }
 
-        this.moduleInstances.set(key, moduleInstance);
+        // ⭐ 두 가지 방식으로 저장 (호환성 유지)
+        this.moduleInstances.set(key, moduleInstance); // key로 저장
+        this.moduleInstances.set(config.class, moduleInstance); // class 이름으로도 저장
+
         logger.info(`✅ ${config.class} 로드 완료`);
       } catch (error) {
         logger.error(`❌ ${config.class} 로드 실패:`, error);
