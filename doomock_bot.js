@@ -288,38 +288,104 @@ class DooMockBot {
       logger.debug("🔧 ValidationManager 등록됨");
     }
 
-    // ✅ 개선: TodoService 등록 방식 개선
+    // ✅ 개선: 모든 가능한 모듈 키로 TodoService 찾기
     if (this.moduleManager && this.moduleManager.moduleInstances) {
-      const todoModule = this.moduleManager.moduleInstances.get("TodoModule");
+      logger.debug(
+        `🔍 등록된 모듈 수: ${this.moduleManager.moduleInstances.size}`
+      );
+
+      // 모든 등록된 모듈 키 출력 (디버깅용)
+      const moduleKeys = Array.from(this.moduleManager.moduleInstances.keys());
+      logger.debug(`🔍 등록된 모듈 키들: ${moduleKeys.join(", ")}`);
+
+      // TodoModule/TodoService 찾기 (여러 가능한 키로 시도)
+      const possibleTodoKeys = ["TodoModule", "todoModule", "todo", "Todo"];
+      let todoModule = null;
+      let foundKey = null;
+
+      for (const key of possibleTodoKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module) {
+          todoModule = module;
+          foundKey = key;
+          break;
+        }
+      }
+
       if (todoModule && todoModule.todoService) {
         this.healthChecker.registerComponent(
           "todoService",
           todoModule.todoService
         );
-        logger.debug("🔧 TodoService 등록됨");
+        logger.debug(`🔧 TodoService 등록됨 (키: ${foundKey})`);
+      } else if (todoModule) {
+        logger.warn(`⚠️ ${foundKey} 모듈은 있지만 todoService가 없음`);
+        logger.debug(
+          `📋 ${foundKey} 모듈 속성: ${Object.keys(todoModule).join(", ")}`
+        );
       } else {
-        logger.warn("⚠️ TodoModule 또는 TodoService를 찾을 수 없음");
+        logger.warn(
+          `⚠️ TodoModule을 찾을 수 없음. 시도한 키: ${possibleTodoKeys.join(
+            ", "
+          )}`
+        );
+
+        // 실제로 있는 모듈들의 정보 출력 (디버깅)
+        for (const [key, module] of this.moduleManager.moduleInstances) {
+          const services = [];
+          if (module.todoService) services.push("todoService");
+          if (module.timerService) services.push("timerService");
+          if (module.worktimeService) services.push("worktimeService");
+
+          logger.debug(`📋 모듈 ${key}: 서비스 [${services.join(", ")}]`);
+        }
       }
 
-      // 다른 서비스들도 등록
-      const timerModule = this.moduleManager.moduleInstances.get("TimerModule");
-      if (timerModule && timerModule.timerService) {
-        this.healthChecker.registerComponent(
-          "timerService",
-          timerModule.timerService
-        );
-        logger.debug("🔧 TimerService 등록됨");
+      // TimerModule/TimerService 찾기
+      const possibleTimerKeys = [
+        "TimerModule",
+        "timerModule",
+        "timer",
+        "Timer",
+      ];
+      let timerModule = null;
+
+      for (const key of possibleTimerKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.timerService) {
+          this.healthChecker.registerComponent(
+            "timerService",
+            module.timerService
+          );
+          logger.debug(`🔧 TimerService 등록됨 (키: ${key})`);
+          timerModule = module;
+          break;
+        }
       }
 
-      const worktimeModule =
-        this.moduleManager.moduleInstances.get("WorktimeModule");
-      if (worktimeModule && worktimeModule.worktimeService) {
-        this.healthChecker.registerComponent(
-          "worktimeService",
-          worktimeModule.worktimeService
-        );
-        logger.debug("🔧 WorktimeService 등록됨");
+      // WorktimeModule/WorktimeService 찾기
+      const possibleWorktimeKeys = [
+        "WorktimeModule",
+        "worktimeModule",
+        "worktime",
+        "Worktime",
+      ];
+      let worktimeModule = null;
+
+      for (const key of possibleWorktimeKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.worktimeService) {
+          this.healthChecker.registerComponent(
+            "worktimeService",
+            module.worktimeService
+          );
+          logger.debug(`🔧 WorktimeService 등록됨 (키: ${key})`);
+          worktimeModule = module;
+          break;
+        }
       }
+    } else {
+      logger.warn("⚠️ ModuleManager 또는 moduleInstances가 없음");
     }
 
     logger.debug("✅ 헬스체커 컴포넌트 등록 완료");

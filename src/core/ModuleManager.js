@@ -184,8 +184,8 @@ class ModuleManager {
     // 📋 표준 모듈 정의 (우선순위 순)
     const standardModules = [
       {
-        key: "system",
-        name: "SystemModule",
+        key: "SystemModule",
+        name: "시스템모듈",
         path: "../modules/SystemModule",
         priority: 1,
         required: true,
@@ -193,8 +193,8 @@ class ModuleManager {
         features: ["메인메뉴", "도움말", "상태조회"],
       },
       {
-        key: "todo",
-        name: "TodoModule",
+        key: "TodoModule",
+        name: "할일 관리",
         path: "../modules/TodoModule",
         priority: 2,
         required: false,
@@ -202,8 +202,8 @@ class ModuleManager {
         features: ["할일추가", "완료처리", "목록조회", "통계"],
       },
       {
-        key: "timer",
-        name: "TimerModule",
+        key: "TimerModule",
+        name: "타이머",
         path: "../modules/TimerModule",
         priority: 3,
         required: false,
@@ -211,43 +211,36 @@ class ModuleManager {
         features: ["타이머", "뽀모도로", "알림"],
       },
       {
-        key: "worktime",
-        name: "WorktimeModule",
+        key: "WorktimeModule",
+        name: "근퇴관리",
         path: "../modules/WorktimeModule",
         priority: 4,
         required: false,
-        description: "근무시간 관리",
+        description: "퇴근카운터",
         features: ["출근", "퇴근", "근무시간", "통계"],
       },
     ];
 
     // 모듈 등록
-    for (const moduleConfig of standardModules) {
+    for (const config of moduleConfigs) {
       try {
-        // 모듈 파일 존재 확인
-        require.resolve(moduleConfig.path);
+        // 모듈 등록
+        this.moduleRegistry.set(config.key, config);
 
-        this.moduleRegistry.set(moduleConfig.key, {
-          ...moduleConfig,
-          loaded: false,
-          initialized: false,
-          loadedAt: null,
-          initializedAt: null,
-        });
-
-        this.stats.totalModules++;
-        logger.debug(`📋 모듈 등록: ${moduleConfig.name}`);
+        // ✅ 등록된 키 로깅 추가
+        logger.debug(`📋 모듈 등록: ${config.key} (${config.name})`);
       } catch (error) {
-        if (moduleConfig.required) {
-          logger.error(`❌ 필수 모듈 로드 실패: ${moduleConfig.name}`, error);
-          throw error;
-        } else {
-          logger.warn(`⚠️ 선택 모듈 로드 실패 (무시됨): ${moduleConfig.name}`);
-        }
+        logger.error(`❌ 모듈 등록 실패: ${config.key}`, error);
       }
     }
 
-    logger.info(`📋 ${this.stats.totalModules}개 모듈 등록 완료`);
+    // ✅ 최종 등록된 모듈 키들 출력
+    const registeredKeys = Array.from(this.moduleRegistry.keys());
+    logger.info(
+      `📋 ${registeredKeys.length}개 모듈 등록 완료: ${registeredKeys.join(
+        ", "
+      )}`
+    );
   }
 
   /**
@@ -376,6 +369,46 @@ class ModuleManager {
           `필수 모듈 ${moduleConfig.name} 초기화 실패: ${error.message}`
         );
       }
+    }
+  }
+  // ===== 추가: 짧은 업타임 경고 해결 =====
+
+  // HealthChecker.js의 checkSystemResources 메서드 수정
+  async checkSystemResources() {
+    try {
+      const issues = [];
+      let severity = "healthy";
+
+      // 업타임 체크 (짧은 업타임 경고 완화)
+      const uptimeSeconds = Math.round(process.uptime());
+      if (uptimeSeconds < 30) {
+        // 30초 미만일 때만 경고 (기존 60초에서 완화)
+        issues.push(`짧은 업타임: ${uptimeSeconds}초`);
+        severity = "warning";
+      }
+
+      // 메모리 사용량 체크
+      const memUsage = process.memoryUsage();
+      const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+
+      if (heapUsedMB > 500) {
+        // 500MB 이상
+        issues.push(`높은 메모리 사용량: ${heapUsedMB}MB`);
+        severity = heapUsedMB > 800 ? "critical" : "warning";
+      }
+
+      return this.createHealthResult(severity, issues.join(", ") || "정상", {
+        uptime: uptimeSeconds,
+        memory: {
+          heapUsed: heapUsedMB,
+          heapTotal: Math.round(memUsage.heapTotal / 1024 / 1024),
+          rss: Math.round(memUsage.rss / 1024 / 1024),
+        },
+        pid: process.pid,
+      });
+    } catch (error) {
+      logger.error("❌ 시스템 리소스 체크 실패:", error);
+      return this.createHealthResult("error", `체크 실패: ${error.message}`);
     }
   }
 

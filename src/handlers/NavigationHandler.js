@@ -120,56 +120,336 @@ class NavigationHandler {
     params,
     moduleManager
   ) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-      from,
-    } = callbackQuery;
-
     logger.debug(`🏛️ 시스템 네비게이션: ${action}`);
 
-    switch (action) {
-      case "menu":
-      case "start":
-        return await this.showMainMenu(
-          bot,
-          callbackQuery,
-          params,
-          moduleManager
-        );
+    try {
+      // ✅ 수정: SystemModule을 통해 처리하도록 변경
+      if (moduleManager && moduleManager.hasModule("SystemModule")) {
+        const systemModule = moduleManager.getModule("SystemModule");
 
-      case "help":
-        return await this.showSystemHelp(
-          bot,
-          callbackQuery,
-          params,
-          moduleManager
-        );
+        if (systemModule && systemModule.handleCallback) {
+          logger.debug(`🔄 SystemModule로 위임: ${action}`);
+          return await systemModule.handleCallback(
+            bot,
+            callbackQuery,
+            action,
+            params,
+            moduleManager
+          );
+        }
+      }
 
-      case "status":
-        return await this.showSystemStatus(
-          bot,
-          callbackQuery,
-          params,
-          moduleManager
-        );
+      // ✅ 폴백: SystemModule이 없으면 NavigationHandler에서 직접 처리
+      logger.warn("⚠️ SystemModule이 없음 - NavigationHandler에서 직접 처리");
 
-      case "settings":
-        return await this.showSystemSettings(
-          bot,
-          callbackQuery,
-          params,
-          moduleManager
-        );
+      switch (action) {
+        case "menu":
+        case "start":
+          return await this.showFallbackMainMenu(
+            bot,
+            callbackQuery,
+            params,
+            moduleManager
+          );
 
-      default:
-        logger.warn(`❓ 알 수 없는 시스템 액션: ${action}`);
-        return false;
+        case "help":
+          return await this.showFallbackHelp(bot, callbackQuery);
+
+        case "status":
+          return await this.showFallbackStatus(
+            bot,
+            callbackQuery,
+            moduleManager
+          );
+
+        default:
+          logger.warn(`❓ 알 수 없는 시스템 액션: ${action}`);
+          await this.showUnknownAction(bot, callbackQuery, action);
+          return false;
+      }
+    } catch (error) {
+      logger.error("❌ 시스템 네비게이션 처리 오류:", error);
+      await this.showNavigationError(
+        bot,
+        callbackQuery,
+        "시스템 메뉴 처리 중 오류가 발생했습니다."
+      );
+      return false;
+    }
+  }
+  /**
+   * 🏠 폴백 메인 메뉴 (SystemModule이 없을 때)
+   */
+  async showFallbackMainMenu(bot, callbackQuery, params, moduleManager) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+        from,
+      } = callbackQuery;
+
+      const userName = getUserName(from);
+
+      const menuText = `🤖 **두목봇 v3.0.1**
+
+👋 안녕하세요, **${userName}**님!
+
+⚠️ 시스템이 초기화 중입니다.
+잠시 후 다시 시도해주세요.
+
+**📊 현재 상태**
+- 🔄 모듈 로딩 중...
+- ⏱️ 가동 시간: ${this.formatUptime(process.uptime())}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 새로고침", callback_data: "system:menu" },
+            { text: "📊 상태", callback_data: "system:status" },
+          ],
+          [{ text: "❓ 도움말", callback_data: "system:help" }],
+        ],
+      };
+
+      await bot.editMessageText(menuText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 폴백 메인 메뉴 오류:", error);
+      return false;
     }
   }
 
+  /**
+   * ❓ 폴백 도움말
+   */
+  async showFallbackHelp(bot, callbackQuery) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+      } = callbackQuery;
+
+      const helpText = `❓ **도움말**
+
+**🔹 기본 명령어:**
+• \`/start\` - 봇 시작 및 메인 메뉴
+• \`/help\` - 도움말 표시
+• \`/cancel\` - 현재 작업 취소
+
+**🔹 사용 방법:**
+1. 메뉴 버튼을 눌러 원하는 기능 선택
+2. 안내에 따라 단계별로 진행
+3. 언제든 🔙 버튼으로 이전 단계로 이동
+
+**🔧 문제 해결:**
+• 버튼이 작동하지 않으면 \`/start\` 재시작
+• 지속적인 문제는 잠시 후 다시 시도
+
+시스템이 완전히 로드되면 더 많은 기능을 사용할 수 있습니다.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+        ],
+      };
+
+      await bot.editMessageText(helpText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 폴백 도움말 오류:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 📊 폴백 상태 표시
+   */
+  async showFallbackStatus(bot, callbackQuery, moduleManager) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+      } = callbackQuery;
+
+      const uptimeSeconds = Math.round(process.uptime());
+      const memUsage = process.memoryUsage();
+      const memoryMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+
+      let moduleStatus = "🔄 로딩 중...";
+      let moduleCount = 0;
+
+      if (moduleManager && moduleManager.moduleInstances) {
+        moduleCount = moduleManager.moduleInstances.size;
+        moduleStatus = moduleManager.isInitialized
+          ? `✅ ${moduleCount}개 모듈 활성`
+          : `⚠️ ${moduleCount}개 모듈 초기화 중`;
+      }
+
+      const statusText = `📊 **시스템 상태**
+
+**🔹 기본 정보**
+• 🤖 버전: v3.0.1
+• 🌍 환경: ${process.env.RAILWAY_ENVIRONMENT ? "Railway" : "Local"}
+• ⏱️ 가동 시간: ${this.formatUptime(uptimeSeconds)}
+• 🧠 메모리: ${memoryMB}MB
+
+**🔹 모듈 상태**
+• ${moduleStatus}
+
+**🔹 네비게이션 핸들러**
+• 처리된 요청: ${this.stats.navigationsHandled}회
+• 생성된 메뉴: ${this.stats.menusGenerated}개
+• 오류 횟수: ${this.stats.errorsCount}회
+
+${
+  moduleManager && moduleManager.isInitialized
+    ? "✅ 시스템이 정상적으로 작동 중입니다!"
+    : "⚠️ 시스템이 초기화 중입니다..."
+}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 새로고침", callback_data: "system:status" },
+            { text: "🏠 메인 메뉴", callback_data: "system:menu" },
+          ],
+        ],
+      };
+
+      await bot.editMessageText(statusText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 폴백 상태 표시 오류:", error);
+      return false;
+    }
+  }
+
+  /**
+   * ❓ 알 수 없는 액션 처리
+   */
+  async showUnknownAction(bot, callbackQuery, action) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+      } = callbackQuery;
+
+      const errorText = `❓ **알 수 없는 요청**
+
+"${action}" 기능을 찾을 수 없습니다.
+
+**🔧 해결 방법:**
+• 🏠 메인 메뉴로 돌아가기
+• 🔄 페이지 새로고침
+• \`/start\` 명령어로 재시작
+
+시스템이 완전히 로드될 때까지 기다려주세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🏠 메인 메뉴", callback_data: "system:menu" },
+            { text: "🔄 새로고침", callback_data: "system:status" },
+          ],
+        ],
+      };
+
+      await bot.editMessageText(errorText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ 알 수 없는 액션 처리 오류:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 🔧 네비게이션 오류 표시
+   */
+  async showNavigationError(bot, callbackQuery, message) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+      } = callbackQuery;
+
+      const errorText = `❌ **네비게이션 오류**
+
+${message}
+
+**🔧 해결 방법:**
+• \`/start\` 명령어로 봇 재시작
+• 잠시 후 다시 시도
+• 문제가 지속되면 관리자에게 문의
+
+죄송합니다. 빠른 시일 내에 해결하겠습니다.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔄 재시작", callback_data: "system:menu" }],
+        ],
+      };
+
+      await bot.editMessageText(errorText, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("❌ 네비게이션 오류 표시 실패:", error);
+    }
+  }
+
+  /**
+   * ⏰ 업타임 포맷팅 (유틸리티)
+   */
+  formatUptime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    const secs = Math.floor(seconds % 60);
+
+    if (hours > 0) {
+      return `${hours}시간 ${minutes}분`;
+    } else if (minutes > 0) {
+      return `${minutes}분 ${secs}초`;
+    } else {
+      return `${secs}초`;
+    }
+  }
   /**
    * 🏠 메인 메뉴 표시 (핵심 개선!)
    */
