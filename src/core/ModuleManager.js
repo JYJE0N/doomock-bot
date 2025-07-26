@@ -835,5 +835,17 @@ class ModuleManager {
     return states;
   }
 }
+// 싱글톤 인스턴스
+let moduleManagerInstance = null;
 
-module.exports = ModuleManager;
+/**
+ * ModuleManager 인스턴스 생성 또는 반환
+ */
+function createModuleManager(config = {}) {
+  if (!moduleManagerInstance) {
+    moduleManagerInstance = new ModuleManager(config);
+  }
+  return moduleManagerInstance;
+}
+
+module.exports = { ModuleManager, createModuleManager };

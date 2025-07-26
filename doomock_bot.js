@@ -1,5 +1,9 @@
 require("dotenv").config();
 
+const {
+  ServiceBuilder,
+  createServiceBuilder,
+} = require("./src/core/ServiceBuilder");
 const { Telegraf } = require("telegraf");
 const logger = require("./src/utils/Logger");
 
@@ -49,6 +53,9 @@ class DooMockBot {
     this.validationManager = null;
     this.healthChecker = null;
 
+    // 🏗️ ServiceBuilder 추가
+    this.serviceBuilder = null;
+
     // ⚙️ 설정
     this.config = {
       // 봇 설정
@@ -79,18 +86,18 @@ class DooMockBot {
    */
   async start() {
     try {
-      logger.moduleStart("두목봇 v3.0.1 - Telegraf (수정됨)");
+      logger.moduleStart("두목봇 v3.0.1 - ServiceBuilder 추가");
 
       // 환경 검증
       await this.validateEnvironment();
 
       // 초기화 순서 (의존성 순) - 수정됨
-      // ✅ 제거: await this.initializeTelegrafBot(); // BotController가 직접 생성
       await this.initializeDatabaseManager();
+      await this.initializeServiceBuilder(); // ⭐ ServiceBuilder 추가
       await this.initializeValidationManager();
       await this.initializeHealthChecker();
-      await this.initializeModuleManager();
-      await this.initializeBotController(); // 여기서 bot 인스턴스가 생성됨
+      await this.initializeModuleManager(); // ServiceBuilder 이후
+      await this.initializeBotController();
 
       // 🏥 모든 컴포넌트가 초기화된 후 헬스체커에 등록 및 시작
       if (this.healthChecker && this.config.enableHealthCheck) {
@@ -104,28 +111,10 @@ class DooMockBot {
 
       logger.success(`🎊 두목봇 시작 완료 🎊`);
       logger.info(`🌍 환경: ${this.config.environment}`);
-      logger.info(
-        `🚂 Railway: ${this.config.isRailway ? "활성화" : "비활성화"}`
-      );
-      logger.info(
-        `📊 검증: ${this.config.enableValidation ? "활성화" : "비활성화"}`
-      );
-      logger.info(
-        `🏥 헬스체크: ${this.config.enableHealthCheck ? "활성화" : "비활성화"}`
-      );
-
-      // 📊 초기 상태 출력
-      if (this.moduleManager) {
-        const status = await this.moduleManager.getActiveModulesStatus();
-        logger.info(`📦 활성 모듈: ${status.length}개`);
-        status.forEach((mod) => {
-          logger.info(`   - ${mod.name}: ${mod.status}`);
-        });
-      }
+      logger.info(`🚂 Railway: ${this.config.isRailway ? "활성" : "비활성"}`);
     } catch (error) {
-      logger.fatal(`🚨 애플리케이션 시작 실패:`, error);
-      await this.emergencyShutdown();
-      throw error;
+      logger.error("❌ 애플리케이션 시작 실패:", error);
+      await this.shutdown(1);
     }
   }
 
@@ -291,6 +280,22 @@ class DooMockBot {
     });
 
     logger.debug("✅ 중앙 검증 시스템 초기화 완료");
+  }
+
+  /**
+   * 🏗️ ServiceBuilder 초기화 (새로 추가)
+   */
+  async initializeServiceBuilder() {
+    logger.info("🏗️ ServiceBuilder 초기화 중...");
+
+    this.serviceBuilder = createServiceBuilder();
+
+    // ServiceBuilder에 DB 연결 전달
+    this.serviceBuilder.setDefaultDatabase(this.dbManager.getDb());
+
+    await this.serviceBuilder.initialize();
+
+    logger.debug("✅ ServiceBuilder 초기화 완료");
   }
 
   /**
@@ -507,24 +512,30 @@ class DooMockBot {
    * 📦 모듈 매니저 초기화
    */
   async initializeModuleManager() {
-    logger.info("📦 모듈 매니저 초기화 중...");
+    logger.info("📦 ModuleManager 초기화 중...");
 
-    // dbManager.db 직접 접근
-    const db = this.dbManager.db;
+    const {
+      ModuleManager,
+      createModuleManager,
+    } = require("./src/core/ModuleManager");
 
-    this.moduleManager = new ModuleManager({
-      bot: null,
-      db: db,
+    this.moduleManager = createModuleManager({
+      bot: this.bot,
+      db: this.dbManager ? this.dbManager.getDb() : null,
+      serviceBuilder: this.serviceBuilder, // ⭐ ServiceBuilder 전달
       config: this.config,
-      validationManager: this.validationManager,
+      enableCache: this.config.moduleCacheEnabled !== false,
+      isRailway: this.config.isRailway,
     });
+
+    // ServiceBuilder 설정 (추가 안전장치)
+    if (this.moduleManager.setServiceBuilder) {
+      this.moduleManager.setServiceBuilder(this.serviceBuilder);
+    }
 
     await this.moduleManager.initialize();
 
-    // 📝 모듈 레지스트리에서 모듈 로드
-    await this.loadModulesFromRegistry();
-
-    logger.debug("✅ 모듈 매니저 초기화 완료");
+    logger.debug("✅ ModuleManager 초기화 완료");
   }
 
   /**
