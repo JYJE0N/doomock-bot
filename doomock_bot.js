@@ -350,15 +350,8 @@ class DooMockBot {
   async initializeServiceBuilder() {
     logger.debug("🏗️ ServiceBuilder 초기화 중...");
 
-    // ServiceBuilder 초기화
+    // ServiceBuilder 초기화 (독립적으로)
     await ServiceBuilder.initialize();
-
-    // DB 연결 주입
-    const dbManager = this.components.get("dbManager");
-    if (dbManager) {
-      ServiceBuilder.dbManager = dbManager;
-      ServiceBuilder.db = dbManager.db;
-    }
 
     // 컴포넌트로 등록
     this.components.set("serviceBuilder", ServiceBuilder);
