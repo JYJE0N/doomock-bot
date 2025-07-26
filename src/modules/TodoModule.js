@@ -1,5 +1,6 @@
 // src/modules/TodoModule.js - ServiceBuilder 연동 리팩토링 v3.0.1 (수정됨)
 const BaseModule = require("../core/BaseModule");
+const TodoService = require("../services/TodoService");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
