@@ -11,8 +11,6 @@ const ServiceBuilder = require("./src/core/ServiceBuilder");
 const ValidationManager = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
 
-const serviceBuilder = new ServiceBuilder();
-await serviceBuilder.setDefaultDatabase(db); // DB 연결 설정
 /**
  * 🚀 메인 애플리케이션 v3.0.1 - Telegraf 버전 (HealthChecker 수정)
  *
