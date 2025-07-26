@@ -16,7 +16,7 @@ const modules = [
     key: "system",
     name: "시스템",
     description: "시스템 관리 및 설정",
-    path: "../modules/SystemModule",
+    path: "./src/modules/SystemModule",
     priority: 1,
     required: true, // 필수 모듈
     enabled: true,
@@ -30,7 +30,7 @@ const modules = [
     key: "todo",
     name: "할일 관리",
     description: "할일을 관리합니다",
-    path: "../modules/TodoModule",
+    path: "./src/modules/TodoModule",
     priority: 10,
     enabled: process.env.MODULE_TODO_ENABLED !== "false",
     config: {
@@ -42,7 +42,7 @@ const modules = [
     key: "timer",
     name: "타이머",
     description: "타이머와 포모도로 기능",
-    path: "../modules/TimerModule",
+    path: "./src/modules/TimerModule",
     priority: 20,
     enabled: process.env.MODULE_TIMER_ENABLED !== "false",
     config: {
@@ -54,7 +54,7 @@ const modules = [
     key: "worktime",
     name: "근무시간",
     description: "출퇴근 및 근무시간 관리",
-    path: "../modules/WorktimeModule",
+    path: "./src/modules/WorktimeModule",
     priority: 30,
     enabled: process.env.MODULE_WORKTIME_ENABLED !== "false",
     config: {
@@ -68,7 +68,7 @@ const modules = [
     key: "leave",
     name: "휴가 관리",
     description: "휴가 신청 및 관리",
-    path: "../modules/LeaveModule",
+    path: "./src/modules/LeaveModule",
     priority: 40,
     enabled: process.env.MODULE_LEAVE_ENABLED !== "false",
     config: {
@@ -80,7 +80,7 @@ const modules = [
     key: "reminder",
     name: "리마인더",
     description: "알림 설정 및 관리",
-    path: "../modules/ReminderModule",
+    path: "./src/modules/ReminderModule",
     priority: 50,
     enabled: process.env.MODULE_REMINDER_ENABLED !== "false",
     config: {
@@ -94,7 +94,7 @@ const modules = [
     key: "fortune",
     name: "운세",
     description: "오늘의 운세 확인",
-    path: "../modules/FortuneModule",
+    path: "./src/modules/FortuneModule",
     priority: 60,
     enabled: process.env.MODULE_FORTUNE_ENABLED !== "false",
     config: {
@@ -106,7 +106,7 @@ const modules = [
     key: "weather",
     name: "날씨",
     description: "날씨 정보 제공",
-    path: "../modules/WeatherModule",
+    path: "./src/modules/WeatherModule",
     priority: 70,
     enabled: process.env.MODULE_WEATHER_ENABLED !== "false",
     config: {
@@ -121,7 +121,7 @@ const modules = [
     key: "tts",
     name: "TTS",
     description: "텍스트를 음성으로 변환",
-    path: "../modules/TTSModule",
+    path: "./src/modules/TTSModule",
     priority: 80,
     enabled: process.env.MODULE_TTS_ENABLED !== "false",
     config: {
@@ -134,7 +134,7 @@ const modules = [
     key: "insight",
     name: "인사이트",
     description: "데이터 분석 및 통계",
-    path: "../modules/InsightModule",
+    path: "./src/modules/InsightModule",
     priority: 90,
     enabled: process.env.MODULE_INSIGHT_ENABLED !== "false",
     config: {
