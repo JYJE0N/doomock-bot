@@ -1,10 +1,13 @@
-//두몫봇
+// doomock_bot.js - v3.0.1 Telegraf 마이그레이션 버전 (ConfigManager 에러 + dotenv 수정)
+
+// 🔑 가장 먼저 dotenv 로드 (환경변수 읽기 위해)
 require("dotenv").config();
+
 const { Telegraf } = require("telegraf");
 const logger = require("./src/utils/Logger");
 
 // 🏗️ 핵심 시스템들
-const DatabaseManager = require("./src/core/DatabaseManager");
+const { DatabaseManager } = require("./src/database/DatabaseManager"); // ✅ 올바른 경로!
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
@@ -165,17 +168,14 @@ class DooMockBot {
   }
 
   /**
-   * 🗄️ 데이터베이스 매니저 초기화 (그대로 유지!)
+   * 🗄️ 데이터베이스 매니저 초기화 (싱글톤 패턴)
    */
   async initializeDatabaseManager() {
     logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
 
     try {
-      this.dbManager = new DatabaseManager({
-        uri: this.config.mongoUri,
-        dbName: this.config.dbName,
-        isRailway: this.config.isRailway, // ✅ 수정된 isRailway 사용
-      });
+      // 싱글톤 패턴으로 인스턴스 가져오기
+      this.dbManager = new DatabaseManager(this.config.mongoUri);
 
       await this.dbManager.connect();
       logger.info("🗄️ 데이터베이스 연결 성공");
