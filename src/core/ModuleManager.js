@@ -482,65 +482,73 @@ class ModuleManager {
   /**
    * 🎯 콜백 처리 (NavigationHandler에서 호출)
    */
-  async handleCallback(bot, callbackQuery) {
-    const callbackKey = `${callbackQuery.from.id}-${callbackQuery.id}`;
-
-    // 중복 처리 방지
-    if (this.processingCallbacks.has(callbackKey)) {
-      logger.debug("🔁 중복 콜백 무시 (ModuleManager):", callbackKey);
-      return false;
-    }
-
-    this.processingCallbacks.add(callbackKey);
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const callbackId = callbackQuery.id;
     const startTime = Date.now();
 
     try {
-      // 콜백 데이터 파싱
-      const { moduleKey, subAction, params } = this.parseCallbackData(
+      // 중복 처리 방지
+      if (this.processingCallbacks.has(callbackId)) {
+        logger.debug(`🔄 중복 콜백 무시: ${callbackId}`);
+        return true;
+      }
+      this.processingCallbacks.add(callbackId);
+
+      // ✅ 수정된 콜백 데이터 파싱
+      const { moduleKey, action, additionalParams } = this.parseCallbackData(
         callbackQuery.data
       );
 
+      // ✅ 올바른 로깅 형식 (콜론 사용)
       logger.debug(
-        `🎯 ModuleManager 콜백 라우팅: ${moduleKey}.${subAction}(${params.join(
+        `🎯 ModuleManager 콜백: ${moduleKey}:${action} (${additionalParams.join(
           ", "
         )})`
       );
 
-      // 모듈 인스턴스 찾기
-      const moduleInstance = this.moduleInstances.get(moduleKey);
-
-      if (!moduleInstance) {
-        logger.warn(`❓ 모듈을 찾을 수 없음: ${moduleKey}`);
+      // 모듈 존재 확인
+      if (!this.hasModule(moduleKey)) {
+        logger.warn(`❓ 모듈 없음: ${moduleKey}`);
         return false;
       }
 
-      // 🔥 표준 매개변수로 모듈의 handleCallback 호출
-      const handled = await moduleInstance.handleCallback(
-        bot,
-        callbackQuery,
-        subAction,
-        params,
-        this // moduleManager 자신을 전달
-      );
-
-      if (handled) {
-        this.stats.callbacksHandled++;
-        this.updateCallbackTimeStats(Date.now() - startTime);
-        logger.debug(
-          `✅ ${moduleKey} 콜백 처리 완료 (${Date.now() - startTime}ms)`
-        );
+      // 모듈 인스턴스 가져오기
+      const moduleInstance = this.getModule(moduleKey);
+      if (!moduleInstance) {
+        logger.warn(`❓ 모듈 인스턴스 없음: ${moduleKey}`);
+        return false;
       }
 
-      return handled;
+      // 콜백 처리
+      if (typeof moduleInstance.handleCallback === "function") {
+        const handled = await moduleInstance.handleCallback(
+          bot,
+          callbackQuery,
+          action,
+          additionalParams,
+          this
+        );
+
+        if (handled) {
+          this.stats.callbacksHandled++;
+          this.stats.lastActivity = new Date();
+          return true;
+        }
+      }
+
+      logger.debug(`❓ 처리되지 않은 콜백: ${moduleKey}:${action}`);
+      return false;
     } catch (error) {
       logger.error("❌ ModuleManager 콜백 처리 오류:", error);
       this.stats.errorsCount++;
       return false;
     } finally {
-      // 처리 완료 후 제거
-      setTimeout(() => {
-        this.processingCallbacks.delete(callbackKey);
-      }, 1000);
+      // 정리
+      this.processingCallbacks.delete(callbackId);
+
+      // 통계 업데이트
+      const responseTime = Date.now() - startTime;
+      this.updateResponseTimeStats(responseTime);
     }
   }
 
@@ -698,21 +706,43 @@ class ModuleManager {
    * 🔍 콜백 데이터 파싱
    */
   parseCallbackData(data) {
-    if (!data || typeof data !== "string") {
+    try {
+      if (!data || typeof data !== "string") {
+        logger.warn("❓ 빈 콜백 데이터, 기본값 사용");
+        return {
+          moduleKey: "system",
+          action: "menu",
+          additionalParams: [],
+        };
+      }
+
+      // ✅ 콜론(:) 기준으로 파싱
+      const parts = data.split(":");
+
+      const result = {
+        moduleKey: parts[0] || "system",
+        action: parts[1] || "menu",
+        additionalParams: parts.slice(2) || [],
+      };
+
+      // ✅ 상세 파싱 로그 (디버그 모드에서만)
+      logger.debug(
+        `🔍 콜백 파싱: "${data}" → ${result.moduleKey}:${result.action}${
+          result.additionalParams.length > 0
+            ? `:${result.additionalParams.join(":")}`
+            : ""
+        }`
+      );
+
+      return result;
+    } catch (error) {
+      logger.error("❌ 콜백 데이터 파싱 오류:", error);
       return {
         moduleKey: "system",
-        subAction: "menu",
-        params: [],
+        action: "menu",
+        additionalParams: [],
       };
     }
-
-    const parts = data.split(":");
-
-    return {
-      moduleKey: parts[0] || "system",
-      subAction: parts[1] || "menu",
-      params: parts.slice(2) || [],
-    };
   }
 
   /**

@@ -20,68 +20,60 @@ const { getUserName } = require("../utils/UserHelper");
  * - this.hasService('weather') - 서비스 존재 확인
  */
 class BaseModule {
-  constructor(moduleName, options = {}) {
-    this.moduleName = moduleName;
-    this.bot = options.bot;
+  /**
+   * 🎯 표준 콜백 처리 (개선된 버전)
+   */
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const startTime = Date.now();
 
-    // 🏗️ ServiceBuilder 연동 (핵심!)
-    this.serviceBuilder = options.serviceBuilder;
-    this.moduleManager = options.moduleManager;
+    try {
+      // ✅ 액션 정규화
+      const action = subAction?.toLowerCase()?.trim() || "menu";
 
-    // 📋 모듈 메타데이터
-    this.moduleKey = options.moduleKey;
-    this.moduleConfig = options.moduleConfig;
+      // ✅ 상세 로깅 (모듈별)
+      logger.debug(
+        `📦 ${this.moduleName} 콜백: ${action} (params: [${params.join(", ")}])`
+      );
 
-    // ⚙️ 설정 (Railway 환경변수 기반)
-    this.config = {
-      timeout: parseInt(process.env.MODULE_TIMEOUT) || 30000,
-      maxRetries: parseInt(process.env.MODULE_MAX_RETRIES) || 3,
-      cacheEnabled: process.env.MODULE_CACHE_ENABLED !== "false",
-      enableMetrics: process.env.MODULE_METRICS_ENABLED === "true",
-      enableHealthCheck: process.env.MODULE_HEALTH_CHECK !== "false",
-      ...options.config,
-    };
+      // 📊 통계 업데이트
+      this.stats.callbacksHandled++;
+      this.stats.lastActivity = new Date();
 
-    // 🎯 액션 맵 (핵심!)
-    this.actionMap = new Map();
+      // 액션 맵에서 핸들러 조회
+      const handler = this.actionMap.get(action);
 
-    // 📊 사용자 상태 관리
-    this.userStates = new Map();
+      if (handler && typeof handler === "function") {
+        // ✅ 표준 매개변수로 핸들러 호출
+        const result = await handler.call(
+          this,
+          bot,
+          callbackQuery,
+          params,
+          moduleManager
+        );
+        return !!result;
+      } else {
+        // ❓ 액션 없음
+        logger.warn(`❓ ${this.moduleName}: "${action}" 액션 없음`);
 
-    // 🔧 서비스 캐시 (성능 최적화)
-    this.serviceCache = new Map();
-    this.serviceCacheTimestamps = new Map();
+        if (this.config.enableFallback !== false) {
+          await this.sendActionNotFound(bot, callbackQuery, action);
+        }
 
-    // 📊 모듈 통계
-    this.stats = {
-      callbacksHandled: 0,
-      messagesHandled: 0,
-      errorsCount: 0,
-      serviceRequests: 0,
-      serviceCacheHits: 0,
-      serviceCacheMisses: 0,
-      averageResponseTime: 0,
-      lastActivity: null,
-      createdAt: TimeHelper.getTimestamp(),
-      totalResponseTime: 0,
-    };
+        return false;
+      }
+    } catch (error) {
+      logger.error(`❌ ${this.moduleName} 콜백 오류:`, error);
+      this.stats.errorsCount++;
 
-    // 🔄 초기화 상태
-    this.isInitialized = false;
-    this.initializationInProgress = false;
-
-    // 🏥 헬스체크 상태
-    this.healthStatus = {
-      healthy: true,
-      lastCheck: null,
-      errors: [],
-      services: {},
-    };
-
-    // Railway 환경 체크
-    this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
-
-    logger.info(`🏗️ ${moduleName} 베이스 모듈 생성됨 (ServiceBuilder 연동)`);
+      // 오류 처리
+      await this.sendError(bot, callbackQuery, "처리 중 오류가 발생했습니다.");
+      return false;
+    } finally {
+      // 응답 시간 통계
+      const responseTime = Date.now() - startTime;
+      this.updateResponseTimeStats(responseTime);
+    }
   }
 
   /**
@@ -464,14 +456,12 @@ class BaseModule {
    * 📊 응답 시간 통계 업데이트
    */
   updateResponseTimeStats(responseTime) {
-    this.stats.totalResponseTime += responseTime;
-
     if (this.stats.averageResponseTime === 0) {
       this.stats.averageResponseTime = responseTime;
     } else {
-      // 지수 평활법으로 평균 계산
-      this.stats.averageResponseTime =
-        this.stats.averageResponseTime * 0.9 + responseTime * 0.1;
+      this.stats.averageResponseTime = Math.round(
+        (this.stats.averageResponseTime + responseTime) / 2
+      );
     }
   }
 

@@ -15,39 +15,86 @@ const { getUserName } = require("../utils/UserHelper");
  * - 기존 비즈니스 로직은 최대한 유지
  */
 class SystemModule extends BaseModule {
-  constructor(bot, options = {}) {
-    super("SystemModule", {
-      bot,
-      serviceBuilder: options.serviceBuilder,
-      moduleManager: options.moduleManager,
-      moduleKey: options.moduleKey,
-      moduleConfig: options.moduleConfig,
-      config: options.config,
-    });
+  /**
+   * 🎯 표준 콜백 처리 (BaseModule 오버라이드)
+   */
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const startTime = Date.now();
 
-    // 🎯 시스템 설정 (기존 유지)
-    this.config = {
-      version: process.env.npm_package_version || "3.0.1",
-      environment: process.env.NODE_ENV || "development",
-      isRailway: !!process.env.RAILWAY_ENVIRONMENT,
-      botName: process.env.BOT_NAME || "doomock_todoBot",
-      maxUsersInStatus: parseInt(process.env.MAX_USERS_IN_STATUS) || 10,
-      enableDetailedStatus: process.env.ENABLE_DETAILED_STATUS === "true",
-      memoryWarningThreshold: parseInt(process.env.MEMORY_WARNING_MB) || 400,
-      ...this.config,
-    };
+    try {
+      // ✅ 액션 이름 정규화 (혹시 모를 파싱 문제 대비)
+      const normalizedAction = subAction?.toLowerCase()?.trim() || "menu";
 
-    // 📊 시스템 통계 (기존 유지)
-    this.systemStats = {
-      startTime: Date.now(),
-      totalCallbacks: 0,
-      totalMessages: 0,
-      totalErrors: 0,
-      lastActivity: null,
-      systemChecks: 0,
-    };
+      // ✅ 상세 로깅
+      logger.debug(
+        `🏠 SystemModule 액션: ${normalizedAction} (params: [${params.join(
+          ", "
+        )}])`
+      );
 
-    logger.info("🏠 SystemModule v3.0.1 생성됨 (데이터 전용)");
+      // 📊 통계 업데이트
+      this.systemStats.totalCallbacks++;
+      this.systemStats.lastActivity = new Date();
+
+      // 액션 맵에서 핸들러 조회
+      const handler = this.actionMap.get(normalizedAction);
+
+      if (handler && typeof handler === "function") {
+        logger.debug(`✅ SystemModule 핸들러 발견: ${normalizedAction}`);
+
+        const result = await handler(
+          bot,
+          callbackQuery,
+          subAction,
+          params,
+          moduleManager
+        );
+
+        // 성공 시 통계 업데이트
+        if (result) {
+          this.stats.callbacksHandled++;
+          this.stats.lastActivity = new Date();
+          return true;
+        }
+      } else {
+        // ❓ 핸들러 없음
+        logger.warn(`❓ SystemModule: "${normalizedAction}" 핸들러 없음`);
+        logger.debug(
+          `🔍 사용 가능한 액션: [${Array.from(this.actionMap.keys()).join(
+            ", "
+          )}]`
+        );
+
+        // 폴백: 메뉴로 리다이렉트
+        if (normalizedAction !== "menu") {
+          logger.debug("🔄 SystemModule: 메뉴로 폴백");
+          return await this.handleMenuAction(
+            bot,
+            callbackQuery,
+            "menu",
+            [],
+            moduleManager
+          );
+        }
+      }
+
+      return false;
+    } catch (error) {
+      logger.error("❌ SystemModule 콜백 처리 오류:", error);
+      this.systemStats.totalErrors++;
+      this.stats.errorsCount++;
+
+      // 응급 처리
+      return await this.handleEmergencyAction(
+        bot,
+        callbackQuery,
+        error.message
+      );
+    } finally {
+      // 응답 시간 기록
+      const responseTime = Date.now() - startTime;
+      logger.debug(`📊 SystemModule 응답시간: ${responseTime}ms`);
+    }
   }
 
   /**

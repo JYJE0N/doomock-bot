@@ -79,12 +79,12 @@ class NavigationHandler {
    */
   async handleNavigation(bot, callbackQuery, subAction, params, moduleManager) {
     const startTime = Date.now();
-    const callbackId = callbackQuery.id;
 
     try {
       // 중복 처리 방지
+      const callbackId = callbackQuery.id;
       if (this.callbackCache.has(callbackId)) {
-        logger.debug(`🔄 중복 콜백 무시: ${callbackId}`);
+        logger.debug(`🔄 중복 네비게이션 콜백 무시: ${callbackId}`);
         return true;
       }
       this.callbackCache.set(callbackId, true);
@@ -93,13 +93,16 @@ class NavigationHandler {
         this.cacheTimeout
       );
 
-      // 콜백 데이터 파싱
+      // ✅ 수정된 콜백 데이터 파싱
       const { moduleKey, action, additionalParams } = this.parseCallbackData(
         callbackQuery.data
       );
 
+      // ✅ 올바른 로깅 형식 (콜론 사용)
       logger.debug(
-        `🎹 네비게이션: ${moduleKey}.${action}(${additionalParams.join(", ")})`
+        `🎹 NavigationHandler: ${moduleKey}:${action} (${additionalParams.join(
+          ", "
+        )})`
       );
 
       // 시스템 네비게이션 (직접 처리)
@@ -676,15 +679,45 @@ class NavigationHandler {
    */
   parseCallbackData(callbackData) {
     try {
+      if (!callbackData || typeof callbackData !== "string") {
+        logger.warn("❓ NavigationHandler: 빈 콜백 데이터");
+        return {
+          moduleKey: "system",
+          action: "menu",
+          additionalParams: [],
+        };
+      }
+
+      // ✅ 콜론(:) 기준으로 파싱
       const parts = callbackData.split(":");
-      return {
-        moduleKey: parts[0] || "",
-        action: parts[1] || "",
+
+      const result = {
+        moduleKey: parts[0] || "system",
+        action: parts[1] || "menu",
         additionalParams: parts.slice(2) || [],
       };
+
+      // ✅ 상세 디버그 로그
+      if (logger.level === "debug") {
+        logger.debug(
+          `🎹 Navigation 파싱: "${callbackData}" → ${result.moduleKey}:${
+            result.action
+          }${
+            result.additionalParams.length > 0
+              ? `:${result.additionalParams.join(":")}`
+              : ""
+          }`
+        );
+      }
+
+      return result;
     } catch (error) {
-      logger.error("콜백 데이터 파싱 오류:", error);
-      return { moduleKey: "", action: "", additionalParams: [] };
+      logger.error("❌ NavigationHandler 콜백 파싱 오류:", error);
+      return {
+        moduleKey: "system",
+        action: "menu",
+        additionalParams: [],
+      };
     }
   }
 
@@ -767,7 +800,8 @@ class NavigationHandler {
    * ❓ 알 수 없는 네비게이션 처리
    */
   async handleUnknownNavigation(bot, callbackQuery, moduleKey, action) {
-    logger.warn(`❓ 처리되지 않은 네비게이션: ${moduleKey}.${action}`);
+    // ✅ 올바른 형식으로 로깅
+    logger.warn(`❓ 처리되지 않은 네비게이션: ${moduleKey}:${action}`);
 
     const errorText = `❓ **처리할 수 없는 요청**\n\n모듈: \`${moduleKey}\`\n액션: \`${action}\`\n\n해당 기능이 아직 구현되지 않았거나\n모듈이 비활성화되었습니다.`;
 
