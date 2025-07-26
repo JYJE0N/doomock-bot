@@ -12,12 +12,16 @@ logs/
 *_bak.*
 *.bak.js
 *.js.bak
+_bak/
 
 # docs
 docs/
 
 # temp
 temp/
+
+# scripts
+scripts/
 
 # OS-specific
 .DS_Store
