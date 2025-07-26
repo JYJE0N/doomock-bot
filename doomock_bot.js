@@ -18,7 +18,7 @@ const {
 } = require("./src/database/DatabaseManager");
 
 // 🛡️ 중앙 시스템들
-const ValidationManager = require("./src/utils/ValidationHelper");
+const ValidationHelper = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
 
 /**
@@ -35,7 +35,7 @@ const HealthChecker = require("./src/utils/HealthChecker");
  * 📊 시스템 아키텍처:
  * App → BotController → ModuleManager → Modules → Services
  *  ↓
- * ValidationManager (중앙 검증)
+ * ValidationHelper (중앙 검증)
  * HealthChecker (중앙 모니터링)
  * DatabaseManager (데이터 관리)
  */
@@ -50,7 +50,7 @@ class DooMockBot {
     this.moduleManager = null;
 
     // 🛡️ 중앙 시스템들
-    this.validationManager = null;
+    this.ValidationHelper = null;
     this.healthChecker = null;
 
     // 🏗️ ServiceBuilder 추가
@@ -90,6 +90,10 @@ class DooMockBot {
 
       // 환경 검증
       await this.validateEnvironment();
+
+      // 🤖 봇 인스턴스 먼저 생성 (중요!)
+      this.bot = new Telegraf(this.config.botToken);
+      logger.info("🤖 Telegraf 봇 인스턴스 생성됨");
 
       // 각 단계별로 try-catch로 감싸서 정확한 에러 위치 파악
       try {
@@ -313,7 +317,7 @@ class DooMockBot {
   /**
    * 🛡️ 중앙 검증 시스템 초기화
    */
-  async initializeValidationManager() {
+  async initializeValidationHelper() {
     if (!this.config.enableValidation) {
       logger.info("🛡️ 검증 시스템 비활성화됨");
       return;
@@ -321,7 +325,7 @@ class DooMockBot {
 
     logger.info("🛡️ 중앙 검증 시스템 초기화 중...");
 
-    this.validationManager = new ValidationManager({
+    this.ValidationHelper = new ValidationHelper({
       enableCache: this.config.validationCacheEnabled,
       cacheTimeout: 300000,
       maxCacheSize: this.config.isRailway ? 500 : 1000,
@@ -437,12 +441,12 @@ class DooMockBot {
       logger.debug("🔧 BotController 등록됨");
     }
 
-    if (this.validationManager) {
+    if (this.ValidationHelper) {
       this.healthChecker.registerComponent(
-        "validationManager",
-        this.validationManager
+        "ValidationHelper",
+        this.ValidationHelper
       );
-      logger.debug("🔧 ValidationManager 등록됨");
+      logger.debug("🔧 ValidationHelper 등록됨");
     }
 
     // ✅ 수정: ModuleManager의 실제 등록 키 사용
@@ -795,7 +799,7 @@ class DooMockBot {
       this.moduleManager?.constructor?.name
     );
     console.log("   dbManager:", !!this.dbManager);
-    console.log("   validationManager:", !!this.validationManager);
+    console.log("   ValidationHelper:", !!this.ValidationHelper);
     console.log("   healthChecker:", !!this.healthChecker);
     console.log("   config:", !!this.config);
 
@@ -825,7 +829,7 @@ class DooMockBot {
 
     // ✅ 추가: 다른 의존성들 직접 설정
     this.botController.dbManager = this.dbManager;
-    this.botController.validationManager = this.validationManager;
+    this.botController.ValidationHelper = this.ValidationHelper;
     this.botController.healthChecker = this.healthChecker;
 
     // ✅ 중요: DooMockBot의 bot 인스턴스를 BotController의 bot으로 교체

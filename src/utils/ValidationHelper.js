@@ -17,7 +17,7 @@ const TimeHelper = require("./TimeHelper");
  * - 더 안전한 에러 처리
  * - 기본 스키마 완성
  */
-class ValidationManager {
+class ValidationHelper {
   constructor(options = {}) {
     // 🗂️ 검증 스키마 저장소
     this.schemas = new Map();
@@ -57,7 +57,7 @@ class ValidationManager {
     this.registerDefaultSchemas();
 
     logger.info(
-      "🛡️ ValidationManager v3.0.1 초기화됨 (callbackData 스키마 포함)"
+      "🛡️ ValidationHelper v3.0.1 초기화됨 (callbackData 스키마 포함)"
     );
   }
 
@@ -756,8 +756,8 @@ class ValidationManager {
   cleanup() {
     this.cache.clear();
     this.cacheExpiry.clear();
-    logger.debug("🧹 ValidationManager 정리 완료");
+    logger.debug("🧹 ValidationHelper 정리 완료");
   }
 }
 
-module.exports = ValidationManager;
+module.exports = ValidationHelper;

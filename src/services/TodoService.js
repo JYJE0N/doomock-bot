@@ -1,7 +1,7 @@
 // src/services/TodoService.js - 컬렉션 연결 문제 해결 v3.0.1
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const ValidationManager = require("../utils/ValidationManager");
+const ValidationHelper = require("../utils/ValidationHelper");
 const DatabaseManager = require("../core/DatabaseManager");
 
 /**
@@ -248,14 +248,11 @@ class TodoService {
     logger.debug("✅ 4단계: 검증 시스템 확인");
 
     try {
-      // ValidationManager 확인
-      if (
-        ValidationManager &&
-        typeof ValidationManager.validate === "function"
-      ) {
-        logger.debug("✅ ValidationManager 준비됨");
+      // ValidationHelper 확인
+      if (ValidationHelper && typeof ValidationHelper.validate === "function") {
+        logger.debug("✅ ValidationHelper 준비됨");
       } else {
-        logger.warn("⚠️ ValidationManager를 찾을 수 없음 - 기본 검증 사용");
+        logger.warn("⚠️ ValidationHelper를 찾을 수 없음 - 기본 검증 사용");
       }
     } catch (error) {
       logger.warn(`⚠️ 검증 시스템 확인 실패: ${error.message}`);

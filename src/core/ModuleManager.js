@@ -21,6 +21,11 @@ class ModuleManager {
       ...config,
     };
 
+    // 🤖 bot 인스턴스 저장 (중요!)
+    this.bot = config.bot || null;
+    this.db = config.db || null;
+    this.serviceBuilder = config.serviceBuilder || null;
+
     // 📦 모듈 관리
     this.moduleRegistry = new Map();
     this.moduleInstances = new Map();
@@ -181,19 +186,16 @@ class ModuleManager {
       this.initializingModules.add(moduleKey);
       logger.debug(`🔧 ${moduleConfig.name} 초기화 중...`);
 
-      // ✅ 수정: 모듈 인스턴스 생성 시 ServiceBuilder 전달
-      const moduleInstance = new moduleConfig.ModuleClass(
-        this.config.bot || this.bot,
-        {
-          bot: this.config.bot || this.bot,
-          db: this.config.db || this.db,
-          serviceBuilder: this.serviceBuilder || this.config.serviceBuilder, // ⭐ ServiceBuilder 추가!
-          moduleManager: this,
-          moduleKey: moduleKey,
-          moduleConfig: moduleConfig.config,
-          config: moduleConfig.config,
-        }
-      );
+      // ✅ 수정: bot을 첫 번째 매개변수로 전달
+      const moduleInstance = new moduleConfig.ModuleClass(this.bot, {
+        bot: this.bot,
+        db: this.db,
+        serviceBuilder: this.serviceBuilder,
+        moduleManager: this,
+        moduleKey: moduleKey,
+        moduleConfig: moduleConfig.config,
+        config: moduleConfig.config,
+      });
 
       // 모듈 초기화
       if (typeof moduleInstance.initialize === "function") {

@@ -390,10 +390,15 @@ class SystemModule extends BaseModule {
       }
 
       // 4. 봇 연결 상태 확인
-      if (this.bot && typeof this.bot.telegram === "object") {
-        logger.debug("✅ 봇 인스턴스 정상");
-      } else {
-        logger.warn("⚠️ 봇 인스턴스 상태 불명확");
+      // if (this.bot && typeof this.bot.telegram === "object") {
+      //   logger.debug("✅ 봇 인스턴스 정상");
+      // } else {
+      //   logger.warn("⚠️ 봇 인스턴스 상태 불명확");
+      // }
+      if (!this.bot) {
+        logger.warn("⚠️ Bot 인스턴스가 아직 없습니다");
+        // throw 대신 경고만 하고 계속 진행
+        return;
       }
 
       // 5. ModuleManager 상태 확인
@@ -405,7 +410,6 @@ class SystemModule extends BaseModule {
 
       // 6. 시스템 체크 횟수 증가
       this.systemStats.systemChecks++;
-
       logger.debug("✅ SystemModule 기본 시스템 체크 완료");
     } catch (error) {
       logger.error("❌ SystemModule 기본 시스템 체크 실패:", error);

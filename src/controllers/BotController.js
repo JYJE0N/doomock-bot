@@ -381,7 +381,7 @@ class BotController {
 
     const optional = [
       { name: "dbManager", obj: this.dbManager },
-      { name: "validationManager", obj: this.validationManager },
+      { name: "ValidationHelper", obj: this.ValidationHelper },
       { name: "healthChecker", obj: this.healthChecker },
     ];
 
