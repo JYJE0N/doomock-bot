@@ -7,6 +7,12 @@ const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
+// 🗄️ 데이터베이스 매니저 (누락된 import 추가!)
+const {
+  DatabaseManager,
+  createInstance,
+} = require("./src/database/DatabaseManager");
+
 // 🛡️ 중앙 시스템들
 const ValidationManager = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
@@ -14,11 +20,20 @@ const HealthChecker = require("./src/utils/HealthChecker");
 /**
  * 🚀 메인 애플리케이션 v3.0.1
  *
- * 🎯 핵심 변경사항:
- * - ConfigManager.isRailwayEnvironment() 에러만 수정
- * - DatabaseManager는 그대로 유지
- * - 나머지 모든 기능 보존
- * - 안정적인 초기화 프로세스
+ * 🎯 핵심 수정사항:
+ * - DatabaseManager import 추가 (누락된 문제 해결)
+ * - node-telegram-bot-api → Telegraf 마이그레이션
+ * - Context 기반 처리
+ * - Middleware 지원
+ * - 더 나은 에러 처리
+ * - HealthChecker 컴포넌트 등록 시스템 개선
+ *
+ * 📊 시스템 아키텍처:
+ * App → BotController → ModuleManager → Modules → Services
+ *  ↓
+ * ValidationManager (중앙 검증)
+ * HealthChecker (중앙 모니터링)
+ * DatabaseManager (데이터 관리)
  */
 class DooMockBot {
   constructor() {
@@ -26,7 +41,7 @@ class DooMockBot {
     this.bot = null;
 
     // 🏗️ 핵심 매니저들
-    this.dbManager = null; // ✅ DatabaseManager 유지!
+    this.dbManager = null;
     this.botController = null;
     this.moduleManager = null;
 
@@ -34,20 +49,20 @@ class DooMockBot {
     this.validationManager = null;
     this.healthChecker = null;
 
-    // ⚙️ 설정 (ConfigManager 메서드 호출만 제거)
+    // ⚙️ 설정
     this.config = {
       // 봇 설정
       botToken: process.env.BOT_TOKEN,
       environment: process.env.NODE_ENV || "development",
 
-      // 데이터베이스 설정 (그대로 유지)
-      mongoUri: process.env.MONGODB_URI || process.env.MONGO_URL,
+      // 데이터베이스 설정
+      mongoUri: process.env.MONGO_URL || process.env.MONGODB_URI,
       dbName: process.env.DB_NAME || "DooMockBot",
 
-      // Railway 최적화 (직접 체크로 변경 - 이것만 수정!)
-      isRailway: !!process.env.RAILWAY_ENVIRONMENT, // ✅ 이 부분만 수정
+      // Railway 최적화
+      isRailway: !!process.env.RAILWAY_ENVIRONMENT,
 
-      // 시스템 설정 (그대로 유지)
+      // 시스템 설정
       enableValidation: process.env.ENABLE_VALIDATION !== "false",
       enableHealthCheck: process.env.ENABLE_HEALTH_CHECK !== "false",
       validationCacheEnabled: process.env.VALIDATION_CACHE_ENABLED !== "false",
@@ -64,16 +79,16 @@ class DooMockBot {
    */
   async start() {
     try {
-      logger.moduleStart("두목봇 v3.0.1 - Telegraf (ConfigManager 수정)");
+      logger.moduleStart("두목봇 v3.0.1 - Telegraf (수정됨)");
 
       // 환경 검증
       await this.validateEnvironment();
 
-      // 초기화 순서 (의존성 순) - 모든 컴포넌트 유지!
+      // 초기화 순서 (의존성 순)
       await this.initializeTelegrafBot();
-      await this.initializeDatabaseManager(); // ✅ DatabaseManager 초기화 유지!
+      await this.initializeDatabaseManager();
       await this.initializeValidationManager();
-      await this.initializeHealthChecker();
+      await this.initializeHealthChecker(); // 생성만 함, start()는 나중에
       await this.initializeModuleManager();
       await this.initializeBotController();
 
@@ -91,41 +106,41 @@ class DooMockBot {
       logger.info(`🌍 환경: ${this.config.environment}`);
       logger.info(`🚂 Railway: ${this.config.isRailway ? "활성" : "비활성"}`);
       logger.info(
-        `🗄️ 데이터베이스: ${
-          this.dbManager?.isConnected ? "연결됨" : "연결 안됨"
-        }`
-      );
-      logger.info(
         `🛡️ 검증 시스템: ${this.config.enableValidation ? "활성" : "비활성"}`
       );
       logger.info(
         `🏥 헬스체커: ${this.config.enableHealthCheck ? "활성" : "비활성"}`
       );
     } catch (error) {
-      logger.error("🚨 애플리케이션 시작 실패:", error);
-      await this.emergencyShutdown(error);
+      logger.error("🚨 두목봇 시작 실패:", error);
+      await this.handleInitializationFailure(error);
+      process.exit(1);
     }
   }
 
   /**
-   * 🧪 환경 검증
+   * 🔍 환경 검증
    */
   async validateEnvironment() {
     logger.info("🧪 환경 검증 시작...");
 
-    const required = ["BOT_TOKEN"];
-    const missing = required.filter((key) => !process.env[key]);
+    const requiredEnvVars = ["BOT_TOKEN"];
+    const missingVars = requiredEnvVars.filter(
+      (varName) => !process.env[varName]
+    );
 
-    if (missing.length > 0) {
-      throw new Error(`필수 환경변수 누락: ${missing.join(", ")}`);
+    if (missingVars.length > 0) {
+      throw new Error(`필수 환경변수 누락: ${missingVars.join(", ")}`);
     }
 
-    // MongoDB URI 검증
+    // MongoDB URI 확인
     if (!this.config.mongoUri) {
-      throw new Error("MONGODB_URI 또는 MONGO_URL이 설정되지 않음");
+      logger.warn(
+        "⚠️ MongoDB URI가 설정되지 않음. 일부 기능이 제한될 수 있습니다."
+      );
     }
 
-    // 환경 정보 출력
+    // 🔍 환경 정보 출력
     console.log("🔍 환경 정보:");
     console.log(`   NODE_ENV: ${this.config.environment}`);
     console.log(`   Railway: ${this.config.isRailway ? "활성" : "비활성"}`);
@@ -140,58 +155,111 @@ class DooMockBot {
   async initializeTelegrafBot() {
     logger.info("🤖 Telegraf 봇 초기화 중...");
 
-    if (!this.config.botToken) {
-      throw new Error("BOT_TOKEN이 설정되지 않음");
-    }
-
     this.bot = new Telegraf(this.config.botToken);
 
-    // 기본 에러 처리
-    this.bot.catch((err, ctx) => {
-      logger.error("🤖 봇 에러:", err);
-      logger.error("🔍 컨텍스트:", ctx?.update);
-    });
-
     // 봇 정보 확인
-    try {
-      const botInfo = await this.bot.telegram.getMe();
-      logger.info(`🤖 봇 연결됨: @${botInfo.username}`);
-    } catch (error) {
-      logger.warn("⚠️ 봇 정보 확인 실패:", error.message);
-    }
+    const botInfo = await this.bot.telegram.getMe();
+    logger.info(`🤖 봇 연결됨: @${botInfo.username}`);
+
+    // 기본 미들웨어 설정
+    this.setupTelegrafMiddleware();
 
     logger.debug("✅ Telegraf 봇 초기화 완료");
   }
 
   /**
-   * 🗄️ 데이터베이스 매니저 초기화 (보안 처리)
+   * 🔧 Telegraf 미들웨어 설정
+   */
+  setupTelegrafMiddleware() {
+    // 요청 제한 미들웨어 (옵션)
+    if (this.config.rateLimitEnabled) {
+      const userLimits = new Map();
+
+      this.bot.use((ctx, next) => {
+        const userId = ctx.from?.id;
+        if (!userId) return next();
+
+        const now = Date.now();
+        const userLimit = userLimits.get(userId) || {
+          count: 0,
+          resetTime: now,
+        };
+
+        // 1분마다 초기화
+        if (now > userLimit.resetTime + 60000) {
+          userLimit.count = 0;
+          userLimit.resetTime = now;
+        }
+
+        // 제한 확인
+        if (userLimit.count >= this.config.maxRequestsPerMinute) {
+          return ctx.reply(
+            "⚠️ 요청이 너무 많습니다. 잠시 후 다시 시도해주세요.\n" +
+              "너무 많은 요청을 보내고 있습니다."
+          );
+        }
+
+        userLimit.count++;
+        userLimits.set(userId, userLimit);
+        return next();
+      });
+    }
+
+    // 에러 핸들링 미들웨어
+    this.bot.catch((err, ctx) => {
+      logger.error("Telegraf 오류:", err);
+      try {
+        ctx.reply("❌ 처리 중 오류가 발생했습니다.");
+      } catch (replyError) {
+        logger.error("오류 응답 실패:", replyError);
+      }
+    });
+  }
+
+  /**
+   * 🗄️ 데이터베이스 매니저 초기화 (수정된 DatabaseManager 사용)
    */
   async initializeDatabaseManager() {
     logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
 
     try {
-      // ✅ 핵심 수정! createInstance()로 URL 직접 전달
-      const { createInstance } = require("./src/database/DatabaseManager");
+      // ✅ 수정: 수정된 createInstance 사용
       this.dbManager = createInstance(this.config.mongoUri);
 
+      console.log(
+        "🔍 DatabaseManager 모듈 내용:",
+        Object.keys(require("./src/database/DatabaseManager"))
+      );
+      logger.info("🗄️ DatabaseManager 생성됨");
+
+      // URL 설정 확인
+      console.log("🔧 DatabaseManager에 직접 URL 설정 중...");
+      console.log(
+        "🔍 dbManager.mongoUrl:",
+        this.dbManager.mongoUrl ? "설정됨" : "없음"
+      );
+
+      // MongoDB 연결 시도
+      logger.info("🔌 MongoDB 연결 중...");
       await this.dbManager.connect();
+
       logger.info("🗄️ 데이터베이스 연결 성공");
+
+      // 🔍 디버깅 정보 출력
+      console.log("🔍 config.mongoUri:", this.config.mongoUri);
+      console.log("🔍 process.env.MONGO_URL:", process.env.MONGO_URL);
+      console.log("🔍 dbManager.mongoUrl:", this.dbManager.mongoUrl);
+      console.log("🔍 dbManager 생성:", !!this.dbManager);
+      console.log("🔍 연결 상태:", this.dbManager.isConnected);
+
+      logger.debug("✅ 데이터베이스 매니저 초기화 완료");
     } catch (error) {
-      logger.error("❌ 데이터베이스 매니저 초기화 실패:", error);
+      // ✅ 추가: 정확한 에러 메시지 출력
+      logger.error("❌ 데이터베이스 매니저 초기화 실패:", error.message);
+      logger.error("❌ 전체 에러:", error);
+      console.error("🔍 전체 에러 스택:", error.stack);
       throw error;
     }
-
-    // 🔒 보안 처리된 디버깅 정보
-    const maskUrl = (url) => {
-      if (!url) return "NULL";
-      // mongodb://user:password@host:port/db 형태에서 password 마스킹
-      return url.replace(/:([^:@]+)@/, ":***@");
-    };
-
-    console.log("🔍 config.mongoUri:", maskUrl(this.config.mongoUri));
-    console.log("🔍 dbManager.mongoUrl:", maskUrl(this.dbManager.mongoUrl));
-    console.log("🔍 dbManager 생성 후:", !!this.dbManager);
-    console.log("🔍 연결 시도 후:", this.dbManager.isConnected);
   }
 
   /**
@@ -237,8 +305,6 @@ class DooMockBot {
    * 🏥 헬스체커에 컴포넌트 등록 (모든 컴포넌트 초기화 후)
    */
   async registerHealthCheckerComponents() {
-    if (!this.healthChecker) return;
-
     logger.info("🏥 헬스체커 컴포넌트 등록 중...");
 
     // 실제 인스턴스들을 직접 등록
@@ -265,16 +331,17 @@ class DooMockBot {
       logger.debug("🔧 ValidationManager 등록됨");
     }
 
-    // TodoModule/TodoService 찾기 및 등록
+    // ✅ 수정: ModuleManager의 실제 등록 키 사용
     if (this.moduleManager && this.moduleManager.moduleInstances) {
       logger.debug(
         `🔍 등록된 모듈 수: ${this.moduleManager.moduleInstances.size}`
       );
 
+      // 모든 등록된 모듈 키 출력 (디버깅용)
       const moduleKeys = Array.from(this.moduleManager.moduleInstances.keys());
       logger.debug(`🔍 등록된 모듈 키들: ${moduleKeys.join(", ")}`);
 
-      // TodoModule/TodoService 찾기
+      // ✅ TodoModule/TodoService 찾기 - "todo" 키로 수정
       const possibleTodoKeys = ["todo", "TodoModule", "todoModule", "Todo"];
       let todoModule = null;
       let foundKey = null;
@@ -301,245 +368,370 @@ class DooMockBot {
         );
       } else {
         logger.warn(
-          "⚠️ TodoModule을 찾을 수 없음. 사용 가능한 키들을 확인하세요."
+          `⚠️ TodoModule을 찾을 수 없음. 가능한 키들을 시도했음: ${possibleTodoKeys.join(
+            ", "
+          )}`
         );
       }
+
+      // ✅ TimerModule/TimerService 찾기 - "timer" 키로 수정
+      const possibleTimerKeys = [
+        "timer",
+        "TimerModule",
+        "timerModule",
+        "Timer",
+      ];
+      let timerModule = null;
+
+      for (const key of possibleTimerKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.timerService) {
+          this.healthChecker.registerComponent(
+            "timerService",
+            module.timerService
+          );
+          logger.debug(`🔧 TimerService 등록됨 (키: ${key})`);
+          timerModule = module;
+          break;
+        }
+      }
+
+      // ✅ WorktimeModule/WorktimeService 찾기 - "worktime" 키로 수정
+      const possibleWorktimeKeys = [
+        "worktime",
+        "WorktimeModule",
+        "worktimeModule",
+        "Worktime",
+      ];
+      let worktimeModule = null;
+
+      for (const key of possibleWorktimeKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.worktimeService) {
+          this.healthChecker.registerComponent(
+            "worktimeService",
+            module.worktimeService
+          );
+          logger.debug(`🔧 WorktimeService 등록됨 (키: ${key})`);
+          worktimeModule = module;
+          break;
+        }
+      }
+
+      // ✅ LeaveModule/LeaveService 찾기 - "leave" 키로 수정
+      const possibleLeaveKeys = [
+        "leave",
+        "LeaveModule",
+        "leaveModule",
+        "Leave",
+      ];
+      let leaveModule = null;
+
+      for (const key of possibleLeaveKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.leaveService) {
+          this.healthChecker.registerComponent(
+            "leaveService",
+            module.leaveService
+          );
+          logger.debug(`🔧 LeaveService 등록됨 (키: ${key})`);
+          leaveModule = module;
+          break;
+        }
+      }
+
+      // ✅ ReminderModule/ReminderService 찾기 - "reminder" 키로 수정
+      const possibleReminderKeys = [
+        "reminder",
+        "ReminderModule",
+        "reminderModule",
+        "Reminder",
+      ];
+      let reminderModule = null;
+
+      for (const key of possibleReminderKeys) {
+        const module = this.moduleManager.moduleInstances.get(key);
+        if (module && module.reminderService) {
+          this.healthChecker.registerComponent(
+            "reminderService",
+            module.reminderService
+          );
+          logger.debug(`🔧 ReminderService 등록됨 (키: ${key})`);
+          reminderModule = module;
+          break;
+        }
+      }
+
+      // ✅ 등록 못 찾은 모듈들 요약 로깅
+      const searchedModules = [
+        { name: "TodoModule", found: !!todoModule },
+        { name: "TimerModule", found: !!timerModule },
+        { name: "WorktimeModule", found: !!worktimeModule },
+        { name: "LeaveModule", found: !!leaveModule },
+        { name: "ReminderModule", found: !!reminderModule },
+      ];
+
+      const foundCount = searchedModules.filter((m) => m.found).length;
+      const totalCount = searchedModules.length;
+
+      logger.info(
+        `🔧 HealthChecker 서비스 등록 완료: ${foundCount}/${totalCount}개 모듈 서비스 발견`
+      );
+
+      // 못 찾은 모듈들 요약
+      const notFound = searchedModules
+        .filter((m) => !m.found)
+        .map((m) => m.name);
+      if (notFound.length > 0) {
+        logger.debug(`⚠️ 서비스를 찾지 못한 모듈: ${notFound.join(", ")}`);
+      }
+    } else {
+      logger.warn("⚠️ ModuleManager 또는 moduleInstances가 없음");
     }
 
     logger.debug("✅ 헬스체커 컴포넌트 등록 완료");
   }
 
   /**
-   * 📦 모듈 매니저 초기화 (순환 참조 방지)
+   * 📦 모듈 매니저 초기화
    */
   async initializeModuleManager() {
     logger.info("📦 모듈 매니저 초기화 중...");
 
-    // ✅ DatabaseManager 존재 확인
-    if (!this.dbManager || !this.dbManager.db) {
-      throw new Error("DatabaseManager가 없거나 DB 연결이 없습니다.");
-    }
+    // dbManager.db 직접 접근
+    const db = this.dbManager.db;
 
-    // ✅ 순환 참조 방지: ModuleManager 먼저 생성 (빈 상태)
     this.moduleManager = new ModuleManager({
       bot: this.bot,
-      db: this.dbManager.db,
-      config: {
-        isRailway: this.config.isRailway,
-        enableValidation: this.config.enableValidation,
-        maxModules: 20,
-        timeout: 30000,
-      },
-      validationManager: this.validationManager,
+      db: db,
+      config: this.config,
+      validationManager: this.validationManager, // ✅ 반드시 있어야 함
     });
 
-    // ✅ ModuleManager 초기화 (모듈들 로드)
     await this.moduleManager.initialize();
-
-    logger.info("📦 모듈 매니저 초기화 완료");
+    logger.debug("✅ 모듈 매니저 초기화 완료");
   }
 
   /**
-   * 🎮 봇 컨트롤러 초기화 (순환 참조 방지)
+   * 🎮 봇 컨트롤러 초기화 (디버깅 강화!)
    */
   async initializeBotController() {
     logger.info("🎮 봇 컨트롤러 초기화 중...");
 
-    // ✅ ModuleManager 존재 확인
-    if (!this.moduleManager) {
-      throw new Error(
-        "ModuleManager가 없습니다. ModuleManager를 먼저 초기화해주세요."
-      );
-    }
+    // 🔍 전달되는 매개변수 디버깅
+    console.log("🔍 BotController에 전달되는 매개변수들:");
+    console.log("   bot:", !!this.bot);
+    console.log("   moduleManager:", !!this.moduleManager);
+    console.log("   dbManager:", !!this.dbManager);
+    console.log("   validationManager:", !!this.validationManager);
+    console.log("   healthChecker:", !!this.healthChecker);
+    console.log("   config:", !!this.config);
 
-    // ✅ 순환 참조 방지: BotController는 ModuleManager만 참조 (역참조 없음)
     this.botController = new BotController({
       bot: this.bot,
-      moduleManager: this.moduleManager, // ✅ 단방향 참조만!
+      moduleManager: this.moduleManager,
       dbManager: this.dbManager,
       validationManager: this.validationManager,
       healthChecker: this.healthChecker,
-      config: {
-        rateLimitEnabled: this.config.rateLimitEnabled,
-        maxRequestsPerMinute: this.config.maxRequestsPerMinute,
-        messageTimeout: 5000,
-        callbackTimeout: 2000,
-        isRailway: this.config.isRailway,
-      },
+      config: this.config,
     });
 
     await this.botController.initialize();
-    logger.info("🎮 봇 컨트롤러 초기화 완료");
+    logger.debug("✅ 봇 컨트롤러 초기화 완료");
   }
 
   /**
-   * 🚀 봇 시작
+   * 🚀 봇 시작 (Railway 중복 실행 방지)
    */
   async startBot() {
     logger.info("🚀 봇 시작 중...");
 
     try {
-      // Railway 환경에서는 웹훅, 로컬에서는 폴링
+      // 🛡️ 1단계: 기존 연결 정리 (핵심!)
+      logger.debug("🧹 기존 봇 연결 정리 중...");
+
+      try {
+        await this.bot.telegram.deleteWebhook();
+        logger.debug("✅ 웹훅 정리됨");
+      } catch (webhookError) {
+        logger.debug("⚠️ 웹훅 정리 실패 (무시):", webhookError.message);
+      }
+
+      // 🛡️ 2단계: 안전 대기 (충돌 방지)
+      logger.debug("⏳ 안전 대기 중... (3초)");
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // 🛡️ 3단계: Railway 환경별 시작 방식
       if (this.config.isRailway) {
-        // Railway 웹훅 모드
-        const port = process.env.PORT || 3000;
-
-        // 기존 웹훅 삭제
-        await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
-
-        // 웹훅 시작
-        await this.bot.launch({
-          webhook: {
-            domain:
-              process.env.RAILWAY_STATIC_URL ||
-              `https://${process.env.RAILWAY_SERVICE_NAME}.up.railway.app`,
-            port: port,
-            hookPath: "/webhook",
-          },
-        });
-
-        logger.info(`🚂 Railway 웹훅 모드로 시작됨 (포트: ${port})`);
+        await this.startRailwayBot();
       } else {
-        // 로컬 폴링 모드
-        await this.bot.launch();
-        logger.info("🏠 로컬 폴링 모드로 시작됨");
+        await this.startLocalBot();
       }
 
       logger.success("✅ 봇 시작 완료");
     } catch (error) {
-      logger.error("❌ 봇 시작 실패:", error);
+      await this.handleBotStartError(error);
+    }
+  }
+
+  /**
+   * 🚂 Railway 환경 봇 시작
+   */
+  async startRailwayBot() {
+    logger.info("🚂 Railway 폴링 모드 시작 (최적화)");
+    await this.startPollingMode();
+  }
+
+  /**
+   * 🏠 로컬 환경 봇 시작
+   */
+  async startLocalBot() {
+    logger.info("🏠 로컬 폴링 모드 시작");
+    await this.startPollingMode();
+  }
+
+  /**
+   * 🔄 폴링 모드 시작 (Railway 최적화)
+   */
+  async startPollingMode() {
+    await this.bot.launch({
+      polling: {
+        timeout: 30,
+        limit: 100,
+        allowed_updates: ["message", "callback_query"],
+        drop_pending_updates: true, // 🔥 중요: 이전 업데이트 무시
+      },
+    });
+  }
+
+  /**
+   * 🚨 봇 시작 에러 처리 (409 Conflict 특별 처리)
+   */
+  async handleBotStartError(error) {
+    logger.error("❌ 봇 시작 실패:", error.message);
+
+    // 409 Conflict 특별 처리
+    if (error.response?.error_code === 409) {
+      logger.warn("⚠️ 봇 중복 실행 감지! 복구 시도 중...");
+
+      // 강제 정리 및 재시도
+      await this.forceBotRecovery();
+    } else {
+      // 다른 에러는 그대로 던지기
       throw error;
     }
   }
 
   /**
-   * 🔧 프로세스 핸들러 설정
+   * 🛠️ 봇 강제 복구 (409 에러 시)
    */
-  setupProcessHandlers() {
-    // 정상 종료 신호들
-    const signals = ["SIGINT", "SIGTERM"];
-    signals.forEach((signal) => {
-      process.on(signal, () => {
-        logger.info(`📡 ${signal} 신호 수신됨`);
-        this.gracefulShutdown(signal);
-      });
-    });
+  async forceBotRecovery() {
+    try {
+      logger.info("🔧 봇 강제 복구 시작...");
 
-    // Railway 헬스체크 신호
-    if (this.config.isRailway) {
-      process.on("SIGUSR2", () => {
-        logger.debug("💓 Railway 헬스체크 수신");
-      });
+      // 1. 웹훅 완전 삭제
+      await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+      logger.debug("🧹 웹훅 및 대기 업데이트 정리됨");
+
+      // 2. 더 긴 대기
+      logger.debug("⏳ 복구 대기 중... (10초)");
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      // 3. 폴링 모드로 재시도
+      logger.info("🔄 폴링 모드로 복구 시도");
+      await this.startPollingMode();
+
+      logger.success("✅ 봇 복구 성공!");
+    } catch (recoveryError) {
+      logger.error("❌ 봇 복구 실패:", recoveryError);
+      throw recoveryError;
+    }
+  }
+
+  /**
+   * 🚨 초기화 실패 처리
+   */
+  async handleInitializationFailure(error) {
+    logger.error("🚨 애플리케이션 시작 실패:");
+    logger.error(error);
+
+    // 응급 정리
+    logger.error("🚨 비상 종료 실행...");
+    try {
+      await this.cleanup();
+    } catch (cleanupError) {
+      logger.error("❌ 비상 정리 실패:");
+      logger.error(cleanupError);
     }
 
-    // 예외 처리 (Railway 안전)
-    process.on("uncaughtException", async (error) => {
+    logger.error("💥 비상 종료됨");
+  }
+
+  /**
+   * 🧹 정리 작업
+   */
+  async cleanup() {
+    logger.info("🧹 정리 작업 시작...");
+
+    try {
+      // 봇 중지
+      if (this.bot) {
+        await this.bot.stop();
+        logger.debug("✅ 봇 중지됨");
+      }
+
+      // 헬스체커 중지
+      if (this.healthChecker) {
+        await this.healthChecker.stop();
+        logger.debug("✅ 헬스체커 중지됨");
+      }
+
+      // 데이터베이스 연결 종료
+      if (this.dbManager) {
+        await this.dbManager.disconnect();
+        logger.debug("✅ 데이터베이스 연결 종료됨");
+      }
+
+      logger.success("✅ 정리 작업 완료");
+    } catch (error) {
+      logger.error("❌ 정리 작업 실패:", error);
+    }
+  }
+
+  /**
+   * 🔧 프로세스 이벤트 핸들러 설정
+   */
+  setupProcessHandlers() {
+    // 정상 종료 처리
+    process.once("SIGINT", () => this.gracefulShutdown("SIGINT"));
+    process.once("SIGTERM", () => this.gracefulShutdown("SIGTERM"));
+
+    // 예외 처리
+    process.on("uncaughtException", (error) => {
       logger.error("💥 처리되지 않은 예외:", error);
-      await this.emergencyShutdown(error);
+      this.gracefulShutdown("uncaughtException");
     });
 
     process.on("unhandledRejection", (reason, promise) => {
       logger.error("💥 처리되지 않은 Promise 거부:", reason);
-      // Railway에서는 즉시 종료하지 않고 로깅만
-      if (this.config.isRailway) {
-        logger.warn("⚠️ Railway 환경: Promise 거부 무시하고 계속 실행");
-      }
+      logger.debug("Promise:", promise);
+      this.gracefulShutdown("unhandledRejection");
     });
-
-    // Railway 메모리 모니터링 (최적화)
-    if (this.config.isRailway) {
-      setInterval(() => {
-        const memUsage = process.memoryUsage();
-        const memUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
-
-        // Railway 메모리 제한: 512MB
-        if (memUsedMB > 400) {
-          logger.warn(`⚠️ 높은 메모리 사용량: ${memUsedMB}MB`);
-
-          // 캐시 정리 시도
-          if (global.gc) {
-            global.gc();
-            logger.debug("🧹 가비지 컬렉션 실행됨");
-          }
-        }
-      }, 60000); // 1분마다 체크
-    }
   }
 
   /**
-   * 🛑 정상 종료 (Railway 최적화)
+   * 🚪 정상 종료
    */
   async gracefulShutdown(signal) {
-    logger.info(`🛑 정상 종료 시작 (${signal})...`);
+    logger.info(`📥 종료 신호 수신: ${signal}`);
+    logger.info("🚪 정상 종료 프로세스 시작...");
 
     try {
-      // 🛡️ 1단계: 봇 연결 정리 (가장 중요!)
-      if (this.bot) {
-        logger.debug("🤖 봇 연결 종료 중...");
-
-        try {
-          // 웹훅 정리
-          await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
-          logger.debug("🧹 웹훅 정리됨");
-        } catch (webhookError) {
-          logger.debug("⚠️ 웹훅 정리 실패 (무시)");
-        }
-
-        // 봇 정지
-        this.bot.stop(signal);
-        logger.debug("✅ 봇 정지됨");
-      }
-
-      // 2단계: 헬스체커 정지
-      if (this.healthChecker) {
-        await this.healthChecker.stop();
-        logger.debug("🏥 헬스체커 정지됨");
-      }
-
-      // 3단계: 모듈 정리
-      if (this.moduleManager) {
-        await this.moduleManager.cleanup();
-        logger.debug("📦 모듈 정리됨");
-      }
-
-      // 4단계: 데이터베이스 연결 해제 (중요!)
-      if (this.dbManager) {
-        await this.dbManager.disconnect();
-        logger.debug("🗄️ DB 연결 해제됨");
-      }
-
-      // Railway: 정상 종료 신호
+      await this.cleanup();
       logger.success("✅ 정상 종료 완료");
-
-      // Railway 종료 대기 (중복 방지)
-      setTimeout(() => {
-        process.exit(0);
-      }, 1000);
+      process.exit(0);
     } catch (error) {
       logger.error("❌ 정상 종료 실패:", error);
-      await this.emergencyShutdown(error);
-    }
-  }
-
-  /**
-   * 🚨 비상 종료
-   */
-  async emergencyShutdown(error) {
-    logger.error("🚨 비상 종료 실행...");
-
-    try {
-      // 최소한의 정리만
-      if (this.bot) {
-        this.bot.stop("SIGKILL");
-      }
-
-      if (this.dbManager) {
-        await this.dbManager.disconnect();
-      }
-    } catch (cleanupError) {
-      logger.error("❌ 비상 정리 실패:", cleanupError);
-    } finally {
-      logger.error("💥 비상 종료됨");
       process.exit(1);
     }
   }
