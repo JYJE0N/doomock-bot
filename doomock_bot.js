@@ -1,4 +1,4 @@
-// doomock_bot.js - 완전 리팩토링 v3.0.1
+// 메인 엔트리 포인트 완전 리팩토링 v3.0.1
 require("dotenv").config(); // 🔑 dotenv는 최우선으로 로드
 
 const { Telegraf } = require("telegraf");
@@ -6,17 +6,14 @@ const logger = require("./src/utils/Logger");
 const TimeHelper = require("./src/utils/TimeHelper");
 
 // 🏗️ 핵심 시스템들 (필요한 imports 추가)
-const BotController = require("./src/core/BotController");
+const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 const ServiceBuilder = require("./src/core/ServiceBuilder");
-const DatabaseManager = require("./src/core/DatabaseManager");
+const DatabaseManager = require("./src/database/DatabaseManager");
 
 // 🛡️ 중앙 시스템들
 const ValidationManager = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
-
-// 📊 설정 관리 (AppConfig 호환)
-// const AppConfig = require("./src/config/AppConfig");
 
 /**
  * 🤖 DooMockBot v3.0.1 - 완전 리팩토링
@@ -32,13 +29,13 @@ const HealthChecker = require("./src/utils/HealthChecker");
 class DooMockBot {
   constructor() {
     this.startTime = Date.now();
-    this.version = AppConfig.VERSION || "3.0.1";
+    this.version = process.env.VERSION || "3.0.1";
     this.components = new Map();
     this.isShuttingDown = false;
     this.processHandlersSetup = false;
 
-    // 🌍 환경 설정 (AppConfig 사용)
-    this.config = this.createConfiguration();
+    // 🌍 환경 설정 (직접 환경변수 사용)
+    this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
 
     // 🔄 초기화 설정
     this.initConfig = {
@@ -61,85 +58,10 @@ class DooMockBot {
 
     logger.info(`🤖 DooMockBot v${this.version} 생성됨 - Railway 최적화`);
     logger.info(
-      `🌍 환경: ${this.config.nodeEnv} | Railway: ${
-        this.config.isRailway ? "YES" : "NO"
+      `🌍 환경: ${process.env.NODE_ENV || "development"} | Railway: ${
+        this.isRailway ? "YES" : "NO"
       }`
     );
-  }
-
-  /**
-   * 📊 설정 생성 (AppConfig 기반)
-   */
-  createConfiguration() {
-    return {
-      // 기본 환경 정보
-      nodeEnv: AppConfig.NODE_ENV,
-      isRailway: AppConfig.isRailway,
-      version: AppConfig.VERSION,
-
-      // 봇 설정
-      bot: {
-        token: AppConfig.BOT_TOKEN,
-        username: AppConfig.BOT_USERNAME,
-        webhook: {
-          enabled: !!process.env.WEBHOOK_ENABLED,
-          url: process.env.WEBHOOK_URL,
-          port: parseInt(process.env.PORT) || 3000,
-        },
-        rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== "false",
-        maxRequestsPerMinute:
-          parseInt(process.env.MAX_REQUESTS_PER_MINUTE) || 30,
-      },
-
-      // 데이터베이스 설정
-      database: {
-        url: AppConfig.MONGO_URL,
-        name: this.extractDatabaseName(AppConfig.MONGO_URL),
-        connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
-        maxRetries: parseInt(process.env.DB_MAX_RETRIES) || 3,
-      },
-
-      // 헬스체크 설정
-      healthCheck: {
-        enabled: process.env.HEALTH_CHECK_ENABLED !== "false",
-        interval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 30000,
-        autoRecovery: process.env.HEALTH_AUTO_RECOVERY !== "false",
-      },
-
-      // 성능 설정
-      performance: {
-        memoryThreshold:
-          parseInt(process.env.MEMORY_THRESHOLD) ||
-          (AppConfig.isRailway ? 400 : 200),
-        messageTimeout: parseInt(process.env.MESSAGE_TIMEOUT) || 5000,
-        callbackTimeout: parseInt(process.env.CALLBACK_TIMEOUT) || 2000,
-      },
-
-      // Railway 설정
-      railway: AppConfig.RAILWAY || {},
-
-      // 기능 설정
-      features: AppConfig.FEATURES || {},
-
-      // API 키들
-      apis: {
-        weather: AppConfig.WEATHER_API_KEY,
-        airKorea: AppConfig.AIR_KOREA_API_KEY,
-      },
-    };
-  }
-
-  /**
-   * 🗄️ 데이터베이스 이름 추출
-   */
-  extractDatabaseName(url) {
-    try {
-      const match = url?.match(/\/([^/?]+)(\?|$)/);
-      return match ? match[1] : "doomock_bot";
-    } catch (error) {
-      logger.warn("DB 이름 추출 실패, 기본값 사용");
-      return "doomock_bot";
-    }
   }
 
   /**
@@ -260,7 +182,7 @@ class DooMockBot {
     }
 
     // MongoDB URL 확인
-    if (!this.config.database.url) {
+    if (!process.env.MONGO_URL) {
       logger.warn(
         "⚠️ MongoDB URI가 설정되지 않음. 일부 기능이 제한될 수 있습니다."
       );
@@ -275,7 +197,7 @@ class DooMockBot {
       `📊 시간대: ${TimeHelper.format(new Date(), "YYYY-MM-DD HH:mm:ss Z")}`
     );
 
-    if (this.config.isRailway) {
+    if (this.isRailway) {
       logger.info(
         `🚂 Railway 서비스: ${process.env.RAILWAY_SERVICE_NAME || "Unknown"}`
       );
@@ -305,7 +227,7 @@ class DooMockBot {
     }
 
     // 새 봇 인스턴스 생성
-    const bot = new Telegraf(this.config.bot.token);
+    const bot = new Telegraf(process.env.BOT_TOKEN);
 
     // 🔧 기본 미들웨어 설정
     this.setupBotMiddleware(bot);
@@ -321,9 +243,10 @@ class DooMockBot {
    */
   setupBotMiddleware(bot) {
     // 요청 제한 (Railway 환경에서 중요)
-    if (this.config.bot.rateLimitEnabled) {
+    const rateLimitEnabled = process.env.RATE_LIMIT_ENABLED !== "false";
+    if (rateLimitEnabled) {
       const userLimits = new Map();
-      const maxRequests = this.config.bot.maxRequestsPerMinute;
+      const maxRequests = parseInt(process.env.MAX_REQUESTS_PER_MINUTE) || 30;
 
       bot.use((ctx, next) => {
         const userId = ctx.from?.id;
@@ -380,9 +303,9 @@ class DooMockBot {
     logger.debug("🗄️ 데이터베이스 매니저 생성 중...");
 
     const dbManager = new DatabaseManager({
-      mongoUri: this.config.database.url,
-      connectTimeout: this.config.database.connectTimeout,
-      maxRetries: this.config.database.maxRetries,
+      mongoUri: process.env.MONGO_URL,
+      connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
+      maxRetries: parseInt(process.env.DB_MAX_RETRIES) || 3,
     });
 
     // 연결 시도
@@ -486,7 +409,7 @@ class DooMockBot {
       config: {
         enableNavigationHandler: true,
         enableErrorHandling: true,
-        isRailway: this.config.isRailway,
+        isRailway: this.isRailway,
       },
     });
 
@@ -504,7 +427,8 @@ class DooMockBot {
    * 🏥 헬스체커 초기화 (지연 시작)
    */
   async initializeHealthChecker() {
-    if (!this.config.healthCheck.enabled) {
+    const healthCheckEnabled = process.env.HEALTH_CHECK_ENABLED !== "false";
+    if (!healthCheckEnabled) {
       logger.debug("⚠️ HealthChecker 비활성화됨");
       return;
     }
@@ -517,8 +441,8 @@ class DooMockBot {
       serviceBuilder: this.components.get("serviceBuilder"),
       botController: this.components.get("botController"),
       config: {
-        checkInterval: this.config.healthCheck.interval,
-        enableAutoRecovery: this.config.healthCheck.autoRecovery,
+        checkInterval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 30000,
+        enableAutoRecovery: process.env.HEALTH_AUTO_RECOVERY !== "false",
         maxRecoveryAttempts: 3,
       },
     });
@@ -556,7 +480,7 @@ class DooMockBot {
     await this.cleanupExistingBotConnections(bot);
 
     // Railway 환경별 시작 방식
-    if (this.config.isRailway) {
+    if (this.isRailway) {
       await this.startRailwayBot(bot);
     } else {
       await this.startLocalBot(bot);
@@ -591,7 +515,7 @@ class DooMockBot {
     const port = process.env.PORT || 3000;
     const domain = process.env.RAILWAY_PUBLIC_DOMAIN;
 
-    if (domain && this.config.bot.webhook.enabled) {
+    if (domain && process.env.WEBHOOK_ENABLED === "true") {
       // 웹훅 모드
       logger.info(`🌐 Railway 웹훅 모드: https://${domain}:${port}`);
 
@@ -699,7 +623,8 @@ class DooMockBot {
     }
 
     // Railway 헬스체크 엔드포인트 설정
-    if (this.config.isRailway && this.config.healthCheck.enabled) {
+    const healthCheckEnabled = process.env.HEALTH_CHECK_ENABLED !== "false";
+    if (this.isRailway && healthCheckEnabled) {
       this.setupRailwayHealthEndpoint();
     }
   }
@@ -708,7 +633,8 @@ class DooMockBot {
    * 📊 메모리 모니터링 시작 (Railway 최적화)
    */
   startMemoryMonitoring() {
-    const memoryThreshold = this.config.performance.memoryThreshold; // MB
+    const memoryThreshold =
+      parseInt(process.env.MEMORY_THRESHOLD) || (this.isRailway ? 400 : 200); // MB
     const checkInterval = 60000; // 1분
 
     setInterval(() => {
@@ -792,7 +718,7 @@ class DooMockBot {
     await this.cleanupComponents();
 
     // Railway 환경에서는 재시작 가능성을 위해 exit(1) 사용
-    if (this.config.isRailway) {
+    if (this.isRailway) {
       logger.error("🚂 Railway 환경 - 프로세스 종료 (재시작 예상)");
       process.exit(1);
     } else {
@@ -999,8 +925,8 @@ class DooMockBot {
     return {
       version: this.version,
       uptime: Date.now() - this.startTime,
-      environment: this.config.nodeEnv,
-      isRailway: this.config.isRailway,
+      environment: process.env.NODE_ENV || "development",
+      isRailway: this.isRailway,
       components: Array.from(this.components.keys()),
       stats: this.stats,
       memory: {
