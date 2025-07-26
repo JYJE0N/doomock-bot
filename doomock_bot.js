@@ -5,6 +5,7 @@ const logger = require("./src/utils/Logger");
 // 🏗️ 핵심 시스템들
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
+const ServiceBuilder = require("./src/core/ServiceBuilder");
 
 // 🛡️ 중앙 시스템들
 const ValidationManager = require("./src/utils/ValidationHelper");
@@ -217,6 +218,16 @@ class DooMockBot {
     console.log("🔍 config.mongoUri:", this.config.mongoUri);
     console.log("🔍 dbManager 생성 후:", !!this.dbManager);
     console.log("🔍 연결 시도 후:", this.dbManager.isConnected);
+  }
+
+  // 서비스빌더 초기화
+  async initializeServiceBuilder() {
+    logger.info("🏗️ ServiceBuilder 초기화 중...");
+
+    this.serviceBuilder = new ServiceBuilder();
+    await this.serviceBuilder.initialize();
+
+    logger.debug("✅ ServiceBuilder 초기화 완료");
   }
 
   /**
