@@ -1,331 +1,432 @@
-// src/database/schemas/StandardSchema.js
+// ===== 2. src/database/schemas/StandardSchema.js - 느슨한 결합 스키마 시스템 =====
+const logger = require("../../utils/Logger");
+const { ObjectId } = require("mongodb");
+
 /**
- * 🗄️ 표준 데이터베이스 스키마 정의
- * - MongoDB 네이티브 드라이버 사용
- * - Railway 환경 최적화
- * - 표준 필드 체계
+ * 🗄️ StandardSchema v3.0.1 - 느슨한 결합 스키마 시스템
+ *
+ * 🎯 역할:
+ * 1. 스키마 정의: 각 컬렉션별 표준 구조 정의
+ * 2. 검증 로직: 데이터 입력 시 검증 규칙 제공
+ * 3. 인덱스 관리: 성능 최적화 인덱스 정의
+ * 4. 변환 헬퍼: 데이터 타입 변환 및 정규화
+ *
+ * 🌟 특징:
+ * - DatabaseManager와 느슨하게 결합
+ * - 필요시에만 검증 로직 실행
+ * - 설정으로 검증 기능 on/off 가능
  */
 
 /**
- * 📋 기본 문서 스키마 (모든 컬렉션 공통)
+ * 📋 기본 문서 템플릿 (모든 컬렉션 공통)
  */
-const BaseDocumentSchema = {
+const BaseDocumentTemplate = {
   // 🔑 기본 식별자
-  _id: "ObjectId", // MongoDB 기본 ID
+  _id: { type: "ObjectId", required: false }, // MongoDB 자동 생성
 
   // 👤 사용자 정보
-  userId: "Number", // 텔레그램 사용자 ID (필수)
-  userName: "String", // 사용자명 (선택)
+  userId: { type: "number", required: true, index: true },
+  userName: { type: "string", required: false, maxLength: 50 },
 
-  // ⏰ 타임스탬프 (필수)
-  createdAt: "Date", // 생성 시간
-  updatedAt: "Date", // 수정 시간
+  // ⏰ 타임스탬프 (자동 관리)
+  createdAt: { type: "date", required: true, default: () => new Date() },
+  updatedAt: { type: "date", required: true, default: () => new Date() },
 
   // 🏷️ 메타데이터
-  version: "Number", // 문서 버전 (기본: 1)
-  isActive: "Boolean", // 활성 상태 (기본: true)
+  version: { type: "number", required: true, default: 1 },
+  isActive: { type: "boolean", required: true, default: true },
 
-  // 🌍 환경 정보
-  environment: "String", // railway/development
-  timezone: "String", // Asia/Seoul
-};
-
-/**
- * 📝 할일 스키마 (todos 컬렉션)
- */
-const TodoSchema = {
-  ...BaseDocumentSchema,
-
-  // 📝 할일 내용
-  text: "String", // 할일 텍스트 (필수)
-  description: "String", // 상세 설명 (선택)
-
-  // ✅ 완료 상태
-  completed: "Boolean", // 완료 여부 (기본: false)
-  completedAt: "Date", // 완료 시간 (null 가능)
-
-  // 🎯 우선순위
-  priority: "Number", // 1(낮음) ~ 5(높음), 기본: 3
-
-  // 🏷️ 분류
-  category: "String", // 카테고리 (업무, 개인, etc.)
-  tags: ["String"], // 태그 배열
-
-  // ⏰ 일정
-  dueDate: "Date", // 마감일 (선택)
-  reminderAt: "Date", // 알림 시간 (선택)
-
-  // 📊 통계
-  estimatedMinutes: "Number", // 예상 소요 시간 (분)
-  actualMinutes: "Number", // 실제 소요 시간 (분)
-};
-
-/**
- * ⏰ 타이머 스키마 (timers 컬렉션)
- */
-const TimerSchema = {
-  ...BaseDocumentSchema,
-
-  // ⏱️ 타이머 정보
-  type: "String", // pomodoro/work/break/custom
-  name: "String", // 타이머 이름
-
-  // ⏰ 시간 설정
-  duration: "Number", // 설정 시간 (분)
-  remainingTime: "Number", // 남은 시간 (초)
-
-  // 📊 상태
-  status: "String", // running/paused/completed/stopped
-  startedAt: "Date", // 시작 시간
-  pausedAt: "Date", // 일시정지 시간 (null 가능)
-  completedAt: "Date", // 완료 시간 (null 가능)
-
-  // 🔄 뽀모도로 정보
-  pomodoroRound: "Number", // 현재 라운드
-  totalRounds: "Number", // 총 라운드
-
-  // 📝 연결된 작업
-  linkedTodoId: "ObjectId", // 연결된 할일 ID (선택)
-
-  // 🔔 알림 설정
-  notificationEnabled: "Boolean", // 알림 활성화 (기본: true)
-  soundEnabled: "Boolean", // 사운드 활성화 (기본: true)
-};
-
-/**
- * 🏖️ 휴가 스키마 (leaves 컬렉션)
- */
-const LeaveSchema = {
-  ...BaseDocumentSchema,
-
-  // 📅 휴가 기본 정보
-  year: "Number", // 연도 (2025, 2026...)
-  leaveType: "String", // ANNUAL/MONTHLY/SICK/HALF_DAY/QUARTER_DAY
-  typeName: "String", // 한글명 (연차, 월차, etc.)
-
-  // 📏 사용량
-  requestedDays: "Number", // 신청 일수 (1, 0.5, 0.25)
-  deductedDays: "Number", // 실제 차감 일수
-
-  // 📅 날짜 정보
-  startDate: "Date", // 시작일
-  endDate: "Date", // 종료일
-  useDate: "Date", // 사용일 (단일일 경우)
-
-  // ⏰ 시간 정보
-  timeType: "String", // 전일/오전/오후/시간지정
-  timeRange: "String", // 09:00-18:00 형태
-
-  // 📝 사유 및 메모
-  reason: "String", // 휴가 사유
-  memo: "String", // 메모
-
-  // 📊 승인 상태
-  status: "String", // pending/approved/rejected/used
-  approvedAt: "Date", // 승인 시간
-  approvedBy: "String", // 승인자
-
-  // 🎯 연차 정보
-  remainingLeaves: "Number", // 신청 후 잔여 연차
-  totalLeaves: "Number", // 총 연차
-};
-
-/**
- * ⏰ 리마인더 스키마 (reminders 컬렉션)
- */
-const ReminderSchema = {
-  ...BaseDocumentSchema,
-
-  // 📝 리마인더 내용
-  message: "String", // 알림 메시지 (필수)
-
-  // ⏰ 알림 시간
-  reminderAt: "Date", // 알림 시간 (필수)
-  type: "String", // minutes/time/recurring
-
-  // 🔄 반복 설정
-  isRecurring: "Boolean", // 반복 여부 (기본: false)
-  recurringType: "String", // daily/weekly/monthly
-  recurringDays: ["Number"], // 반복 요일 (0-6, 일-토)
-
-  // 📊 상태
-  status: "String", // pending/sent/cancelled
-  sentAt: "Date", // 발송 시간
-
-  // 🔔 알림 설정
-  notificationEnabled: "Boolean", // 알림 활성화
-  voiceEnabled: "Boolean", // 음성 알림 (TTS)
-
-  // 📱 알림 결과
-  deliveryStatus: "String", // success/failed/pending
-  errorMessage: "String", // 오류 메시지 (선택)
-};
-
-/**
- * 🔮 운세 스키마 (fortunes 컬렉션)
- */
-const FortuneSchema = {
-  ...BaseDocumentSchema,
-
-  // 📅 날짜
-  date: "Date", // 운세 날짜 (YYYY-MM-DD)
-
-  // 🔮 운세 타입
-  fortuneType: "String", // general/work/love/money/health/party
-
-  // 📜 운세 내용
-  content: "String", // 운세 내용
-  luckyItem: "String", // 행운의 아이템
-  luckyColor: "String", // 행운의 색상
-  luckyNumber: "Number", // 행운의 숫자
-
-  // 🎯 점수
-  score: "Number", // 운세 점수 (1-100)
-  level: "String", // 대길/길/보통/흉/대흉
-
-  // 🎰 로또 번호 (재물운 전용)
-  lottoNumbers: ["Number"], // 로또 번호 6개
-
-  // 🃏 타로카드 정보
-  tarotCard: {
-    name: "String", // 카드명
-    meaning: "String", // 카드 의미
-    advice: "String", // 조언
+  // 🌍 환경 정보 (자동 설정)
+  environment: {
+    type: "string",
+    required: true,
+    default: () => process.env.NODE_ENV || "development",
   },
+  timezone: { type: "string", required: true, default: "Asia/Seoul" },
 };
 
 /**
- * 🌤️ 날씨 캐시 스키마 (weather_cache 컬렉션)
+ * 📝 컬렉션별 스키마 정의
  */
-const WeatherCacheSchema = {
-  ...BaseDocumentSchema,
+const SchemaDefinitions = {
+  // 📝 할일 컬렉션
+  todos: {
+    ...BaseDocumentTemplate,
 
-  // 📍 위치 정보
-  location: "String", // 도시명
-  coordinates: {
-    lat: "Number", // 위도
-    lon: "Number", // 경도
-  },
-
-  // 🌤️ 날씨 데이터
-  current: {
-    temperature: "Number", // 현재 온도
-    humidity: "Number", // 습도
-    description: "String", // 날씨 설명
-    icon: "String", // 아이콘 코드
-    windSpeed: "Number", // 풍속
-    pressure: "Number", // 기압
-  },
-
-  // 📅 예보 데이터
-  forecast: [
-    {
-      date: "Date", // 예보 날짜
-      minTemp: "Number", // 최저 온도
-      maxTemp: "Number", // 최고 온도
-      description: "String", // 날씨 설명
-      icon: "String", // 아이콘
-      precipitation: "Number", // 강수 확률
+    // 할일 내용
+    text: { type: "string", required: true, maxLength: 500, trim: true },
+    description: {
+      type: "string",
+      required: false,
+      maxLength: 1000,
+      trim: true,
     },
+
+    // 완료 상태
+    completed: { type: "boolean", required: true, default: false },
+    completedAt: { type: "date", required: false },
+
+    // 우선순위 및 분류
+    priority: { type: "number", required: true, default: 3, min: 1, max: 5 },
+    category: {
+      type: "string",
+      required: false,
+      default: "일반",
+      maxLength: 20,
+    },
+    tags: { type: "array", required: false, default: [], maxItems: 10 },
+
+    // 일정
+    dueDate: { type: "date", required: false },
+    reminderAt: { type: "date", required: false },
+
+    // 통계
+    estimatedMinutes: { type: "number", required: false, min: 1 },
+    actualMinutes: { type: "number", required: false, min: 1 },
+  },
+
+  // ⏰ 타이머 컬렉션
+  timers: {
+    ...BaseDocumentTemplate,
+
+    // 타이머 정보
+    type: {
+      type: "string",
+      required: true,
+      enum: ["pomodoro", "work", "break", "custom"],
+    },
+    name: { type: "string", required: true, maxLength: 100, trim: true },
+
+    // 시간 설정
+    duration: { type: "number", required: true, min: 1, max: 480 }, // 최대 8시간
+    remainingTime: { type: "number", required: true, min: 0 },
+
+    // 상태
+    status: {
+      type: "string",
+      required: true,
+      enum: ["running", "paused", "completed", "stopped"],
+    },
+    startedAt: { type: "date", required: false },
+    pausedAt: { type: "date", required: false },
+    completedAt: { type: "date", required: false },
+
+    // 연결
+    linkedTodoId: { type: "ObjectId", required: false },
+  },
+
+  // 👤 사용자 설정 컬렉션
+  user_settings: {
+    ...BaseDocumentTemplate,
+
+    // 일반 설정
+    timezone: { type: "string", required: true, default: "Asia/Seoul" },
+    language: {
+      type: "string",
+      required: true,
+      default: "ko",
+      enum: ["ko", "en"],
+    },
+
+    // 알림 설정 (중첩 객체)
+    notifications: {
+      type: "object",
+      required: true,
+      properties: {
+        enabled: { type: "boolean", default: true },
+        sound: { type: "boolean", default: true },
+        vibration: { type: "boolean", default: true },
+      },
+    },
+  },
+};
+
+/**
+ * 🔍 인덱스 정의 (성능 최적화)
+ */
+const IndexDefinitions = {
+  todos: [
+    { fields: { userId: 1, createdAt: -1 }, background: true },
+    { fields: { userId: 1, completed: 1 }, background: true },
+    { fields: { text: "text", description: "text" }, background: true }, // 텍스트 검색
+    { fields: { dueDate: 1 }, background: true, sparse: true },
+    { fields: { priority: -1 }, background: true },
   ],
 
-  // ⏰ 캐시 정보
-  cachedAt: "Date", // 캐시 시간
-  expiresAt: "Date", // 만료 시간
+  timers: [
+    { fields: { userId: 1, createdAt: -1 }, background: true },
+    { fields: { userId: 1, status: 1 }, background: true },
+    { fields: { type: 1 }, background: true },
+  ],
 
-  // 📊 API 정보
-  source: "String", // API 소스 (openweather)
-  requestCount: "Number", // 요청 횟수
+  user_settings: [
+    { fields: { userId: 1 }, unique: true },
+    { fields: { updatedAt: -1 }, background: true },
+  ],
 };
 
 /**
- * 🎤 TTS 기록 스키마 (tts_logs 컬렉션)
+ * 🛠️ 스키마 유틸리티 클래스 (느슨한 결합)
  */
-const TTSLogSchema = {
-  ...BaseDocumentSchema,
+class SchemaManager {
+  constructor(config = {}) {
+    this.config = {
+      validationEnabled: config.validationEnabled !== false,
+      autoIndexCreation: config.autoIndexCreation !== false,
+      cacheValidation: config.cacheValidation !== false,
+      strictMode: config.strictMode === true,
+      ...config,
+    };
 
-  // 📝 텍스트 정보
-  text: "String", // 변환할 텍스트
-  language: "String", // 언어 코드 (ko, en, etc.)
+    // 캐시
+    this.validationCache = new Map();
+    this.indexCache = new Map();
 
-  // 🎵 음성 설정
-  voice: "String", // 음성 타입
-  speed: "Number", // 속도 (0.5-2.0)
-  pitch: "Number", // 피치 (-20~20)
+    logger.debug("🗄️ SchemaManager 초기화됨", {
+      validationEnabled: this.config.validationEnabled,
+      autoIndexCreation: this.config.autoIndexCreation,
+    });
+  }
 
-  // 📊 처리 결과
-  status: "String", // success/failed/processing
-  fileSize: "Number", // 파일 크기 (bytes)
-  duration: "Number", // 음성 길이 (초)
+  /**
+   * 📋 스키마 정의 조회
+   */
+  getSchema(collectionName) {
+    return SchemaDefinitions[collectionName] || null;
+  }
 
-  // 📂 파일 정보
-  fileName: "String", // 생성된 파일명
-  filePath: "String", // 파일 경로
+  /**
+   * 🔍 인덱스 정의 조회
+   */
+  getIndexes(collectionName) {
+    return IndexDefinitions[collectionName] || [];
+  }
 
-  // ⏰ 처리 시간
-  processingTime: "Number", // 처리 시간 (ms)
+  /**
+   * ✅ 데이터 검증 (선택적)
+   */
+  async validateDocument(collectionName, document, options = {}) {
+    if (!this.config.validationEnabled) {
+      return { isValid: true, document }; // 검증 비활성화시 그대로 통과
+    }
 
-  // ❌ 오류 정보
-  errorMessage: "String", // 오류 메시지
-  retryCount: "Number", // 재시도 횟수
-};
+    const schema = this.getSchema(collectionName);
+    if (!schema) {
+      logger.warn(`스키마 정의 없음: ${collectionName}`);
+      return { isValid: true, document }; // 스키마 없으면 통과
+    }
 
-/**
- * 👤 사용자 설정 스키마 (user_settings 컬렉션)
- */
-const UserSettingsSchema = {
-  ...BaseDocumentSchema,
+    // 캐시 확인
+    const cacheKey = this.generateCacheKey(collectionName, document);
+    if (this.config.cacheValidation && this.validationCache.has(cacheKey)) {
+      return this.validationCache.get(cacheKey);
+    }
 
-  // 🎛️ 일반 설정
-  timezone: "String", // 시간대 (기본: Asia/Seoul)
-  language: "String", // 언어 (기본: ko)
+    try {
+      const result = await this.performValidation(schema, document, options);
 
-  // 🔔 알림 설정
-  notifications: {
-    enabled: "Boolean", // 알림 활성화
-    sound: "Boolean", // 사운드 알림
-    vibration: "Boolean", // 진동 알림
-    quietHours: {
-      enabled: "Boolean", // 조용한 시간 활성화
-      start: "String", // 시작 시간 (22:00)
-      end: "String", // 종료 시간 (08:00)
-    },
-  },
+      // 캐시 저장
+      if (this.config.cacheValidation && result.isValid) {
+        this.validationCache.set(cacheKey, result);
+      }
 
-  // 📝 할일 설정
-  todoSettings: {
-    autoDelete: "Boolean", // 완료된 할일 자동 삭제
-    defaultPriority: "Number", // 기본 우선순위
-    showCompleted: "Boolean", // 완료된 할일 표시
-  },
+      return result;
+    } catch (error) {
+      logger.error(`검증 오류 (${collectionName}):`, error);
+      return {
+        isValid: false,
+        errors: [`검증 중 오류: ${error.message}`],
+        document,
+      };
+    }
+  }
 
-  // ⏰ 타이머 설정
-  timerSettings: {
-    workDuration: "Number", // 작업 시간 (분)
-    shortBreak: "Number", // 짧은 휴식 (분)
-    longBreak: "Number", // 긴 휴식 (분)
-    autoStart: "Boolean", // 자동 시작
-    soundAlert: "Boolean", // 사운드 알림
-  },
+  /**
+   * 🔄 실제 검증 수행
+   */
+  async performValidation(schema, document, options) {
+    const errors = [];
+    const transformedDoc = { ...document };
 
-  // 🎤 TTS 설정
-  ttsSettings: {
-    enabled: "Boolean", // TTS 활성화
-    language: "String", // 기본 언어
-    voice: "String", // 기본 음성
-    speed: "Number", // 속도
-    autoMode: "Boolean", // 자동 모드
-  },
-};
+    for (const [fieldName, fieldSchema] of Object.entries(schema)) {
+      const value = document[fieldName];
+
+      // 필수 필드 검증
+      if (fieldSchema.required && (value === undefined || value === null)) {
+        if (fieldSchema.default !== undefined) {
+          // 기본값 적용
+          transformedDoc[fieldName] =
+            typeof fieldSchema.default === "function"
+              ? fieldSchema.default()
+              : fieldSchema.default;
+        } else {
+          errors.push(`필수 필드 누락: ${fieldName}`);
+        }
+        continue;
+      }
+
+      // 값이 있는 경우 타입 및 제약 검증
+      if (value !== undefined && value !== null) {
+        const fieldErrors = this.validateField(fieldName, value, fieldSchema);
+        errors.push(...fieldErrors);
+
+        // 데이터 변환 (trim, 타입 변환 등)
+        const transformedValue = this.transformValue(value, fieldSchema);
+        if (transformedValue !== value) {
+          transformedDoc[fieldName] = transformedValue;
+        }
+      }
+    }
+
+    return {
+      isValid: errors.length === 0,
+      errors,
+      document: transformedDoc,
+    };
+  }
+
+  /**
+   * 🔍 개별 필드 검증
+   */
+  validateField(fieldName, value, fieldSchema) {
+    const errors = [];
+
+    // 타입 검증
+    if (fieldSchema.type && !this.validateType(value, fieldSchema.type)) {
+      errors.push(`${fieldName}: 타입 오류 (expected: ${fieldSchema.type})`);
+      return errors; // 타입이 틀리면 다른 검증 불가
+    }
+
+    // 길이 검증
+    if (
+      fieldSchema.maxLength &&
+      typeof value === "string" &&
+      value.length > fieldSchema.maxLength
+    ) {
+      errors.push(
+        `${fieldName}: 최대 길이 초과 (${value.length}/${fieldSchema.maxLength})`
+      );
+    }
+
+    // 숫자 범위 검증
+    if (typeof value === "number") {
+      if (fieldSchema.min !== undefined && value < fieldSchema.min) {
+        errors.push(
+          `${fieldName}: 최소값 미만 (${value} < ${fieldSchema.min})`
+        );
+      }
+      if (fieldSchema.max !== undefined && value > fieldSchema.max) {
+        errors.push(
+          `${fieldName}: 최대값 초과 (${value} > ${fieldSchema.max})`
+        );
+      }
+    }
+
+    // 열거형 검증
+    if (fieldSchema.enum && !fieldSchema.enum.includes(value)) {
+      errors.push(`${fieldName}: 허용되지 않은 값 (${value})`);
+    }
+
+    return errors;
+  }
+
+  /**
+   * 🔄 데이터 변환
+   */
+  transformValue(value, fieldSchema) {
+    // 문자열 trim
+    if (fieldSchema.trim && typeof value === "string") {
+      return value.trim();
+    }
+
+    // ObjectId 변환
+    if (fieldSchema.type === "ObjectId" && typeof value === "string") {
+      try {
+        return new ObjectId(value);
+      } catch (error) {
+        return value; // 변환 실패시 원본 유지
+      }
+    }
+
+    return value;
+  }
+
+  /**
+   * 🔍 타입 검증
+   */
+  validateType(value, expectedType) {
+    switch (expectedType) {
+      case "string":
+        return typeof value === "string";
+      case "number":
+        return typeof value === "number" && !isNaN(value);
+      case "boolean":
+        return typeof value === "boolean";
+      case "date":
+        return value instanceof Date || !isNaN(Date.parse(value));
+      case "array":
+        return Array.isArray(value);
+      case "object":
+        return (
+          typeof value === "object" && value !== null && !Array.isArray(value)
+        );
+      case "ObjectId":
+        return ObjectId.isValid(value);
+      default:
+        return true; // 알 수 없는 타입은 통과
+    }
+  }
+
+  /**
+   * 🔑 캐시 키 생성
+   */
+  generateCacheKey(collectionName, document) {
+    const keyData = {
+      collection: collectionName,
+      fields: Object.keys(document).sort(),
+      hash: this.simpleHash(JSON.stringify(document)),
+    };
+    return JSON.stringify(keyData);
+  }
+
+  /**
+   * 🔨 간단한 해시 함수
+   */
+  simpleHash(str) {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = (hash << 5) - hash + char;
+      hash = hash & hash; // 32bit 정수로 변환
+    }
+    return hash;
+  }
+
+  /**
+   * 🧹 캐시 정리
+   */
+  clearCache() {
+    this.validationCache.clear();
+    this.indexCache.clear();
+    logger.debug("스키마 캐시 정리됨");
+  }
+
+  /**
+   * 📊 상태 조회
+   */
+  getStatus() {
+    return {
+      config: this.config,
+      cacheSize: this.validationCache.size,
+      availableSchemas: Object.keys(SchemaDefinitions),
+      indexDefinitions: Object.keys(IndexDefinitions),
+    };
+  }
+}
 
 module.exports = {
-  BaseDocumentSchema,
-  TodoSchema,
-  TimerSchema,
-  LeaveSchema,
-  ReminderSchema,
-  FortuneSchema,
-  WeatherCacheSchema,
-  TTSLogSchema,
-  UserSettingsSchema,
+  SchemaDefinitions,
+  IndexDefinitions,
+  BaseDocumentTemplate,
+  SchemaManager,
 };
