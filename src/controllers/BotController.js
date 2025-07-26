@@ -1,163 +1,182 @@
-// src/controllers/BotController.js - 수정된 버전
+// src/controllers/BotController.js - 통합 봇 컨트롤러 v3.0.1
+const { Telegraf } = require("telegraf");
+const NavigationHandler = require("../handlers/NavigationHandler");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
-const NavigationHandler = require("../handlers/NavigationHandler"); // ✅ 추가!
 
 /**
- * 🎮 봇 컨트롤러 v3.0.1 - Telegraf 버전 (NavigationHandler 연결)
+ * 🤖 BotController v3.0.1 (리팩토링)
  *
- * 🔧 핵심 수정사항:
- * - NavigationHandler 인스턴스 생성
- * - 콜백 처리를 NavigationHandler로 위임
- * - 표준 매개변수 체계 준수
- * - 중앙집중식 네비게이션 처리
+ * 🔧 주요 개선사항:
+ * - 중복 처리 방지 로직 강화
+ * - NavigationHandler 위임 구조 명확화
+ * - 에러 처리 표준화
+ * - Railway 환경 최적화
+ * - 성능 모니터링 강화
  */
 class BotController {
-  constructor(options = {}) {
-    // 🤖 텔레그래프 봇
-    this.bot = options.bot;
-
-    // 🏗️ 의존성들
-    this.moduleManager = options.moduleManager;
-    this.dbManager = options.dbManager;
-    this.validationManager = options.validationManager;
-    this.healthChecker = options.healthChecker;
-
-    // ⚙️ 설정
+  constructor(botToken, config = {}) {
+    this.botToken = botToken;
     this.config = {
-      rateLimitEnabled: options.config?.rateLimitEnabled ?? true,
-      maxRequestsPerMinute: options.config?.maxRequestsPerMinute || 30,
-      messageTimeout: options.config?.messageTimeout || 5000,
-      callbackTimeout: options.config?.callbackTimeout || 2000,
-      ...options.config,
+      timeout: 30000,
+      retries: 3,
+      isRailway: !!process.env.RAILWAY_ENVIRONMENT,
+      webhookMode: config.webhookMode || false,
+      ...config,
     };
 
-    // 🎹 NavigationHandler 생성 (핵심 추가!)
-    this.navigationHandler = null; // initialize()에서 생성
+    // 🤖 Telegraf 인스턴스
+    this.bot = null;
+
+    // 🎹 핸들러들
+    this.navigationHandler = null;
+    this.moduleManager = null;
+
+    // 🚫 중복 처리 방지 맵
+    this.processingCallbacks = new Map();
+    this.processingMessages = new Map();
+
+    // ⏰ 정리 타이머
+    this.cleanupInterval = null;
 
     // 📊 통계
     this.stats = {
       messagesReceived: 0,
       callbacksReceived: 0,
-      errorsCount: 0,
       activeMessages: 0,
       activeCallbacks: 0,
+      totalUsers: 0,
+      uniqueUsers: new Set(),
+      errorsCount: 0,
       averageResponseTime: 0,
       totalResponseTime: 0,
-      uniqueUsers: new Set(),
-      totalUsers: 0,
       lastActivity: null,
+      startTime: Date.now(),
     };
 
-    // 🔒 중복 처리 방지
-    this.processingMessages = new Map();
-    this.processingCallbacks = new Map();
-
-    // 초기화 상태
+    // 🔧 상태
     this.initialized = false;
-
-    logger.info("🎮 BotController 생성됨 (Telegraf + NavigationHandler)");
   }
 
   /**
-   * 🎯 초기화 (NavigationHandler 포함)
+   * 🚀 BotController 초기화
    */
-  async initialize() {
+  async initialize(moduleManager) {
     try {
-      logger.info("🎮 BotController 초기화 중...");
+      logger.moduleStart("BotController", "3.0.1");
 
-      // 의존성 검증
-      this.validateDependencies();
+      // 매개변수 검증
+      if (!this.botToken) {
+        throw new Error("봇 토큰이 없습니다");
+      }
 
-      // 🎹 NavigationHandler 생성 (핵심!)
-      this.createNavigationHandler();
+      if (!moduleManager) {
+        throw new Error("ModuleManager가 필요합니다");
+      }
 
-      // Telegraf 핸들러 설정
-      this.setupHandlers();
+      this.moduleManager = moduleManager;
 
-      // 정리 스케줄러 시작
-      this.startCleanupScheduler();
+      // 🤖 Telegraf 초기화
+      await this.initializeTelegraf();
+
+      // 🎹 NavigationHandler 초기화
+      await this.initializeNavigationHandler();
+
+      // 🎮 이벤트 핸들러 설정
+      this.setupEventHandlers();
+
+      // ⏰ 정리 작업 스케줄
+      this.scheduleCleanup();
+
+      // 🏥 헬스체크 엔드포인트 (Railway)
+      if (this.config.isRailway) {
+        this.setupHealthEndpoint();
+      }
 
       this.initialized = true;
-      logger.success("✅ BotController 초기화 완료");
+      logger.success("✅ BotController 초기화 완료", {
+        bot: !!this.bot,
+        navigation: !!this.navigationHandler,
+        modules: !!this.moduleManager,
+        railway: this.config.isRailway,
+      });
     } catch (error) {
-      logger.error("❌ BotController 초기화 실패:", error);
+      logger.fatal("💀 BotController 초기화 실패", error);
       throw error;
     }
   }
 
   /**
-   * 🎹 NavigationHandler 생성 (핵심 추가!)
+   * 🤖 Telegraf 초기화
    */
-  createNavigationHandler() {
+  async initializeTelegraf() {
     try {
-      this.navigationHandler = new NavigationHandler(this.bot, {
-        moduleManager: this.moduleManager,
-        commandsRegistry: null, // 필요시 추가
+      this.bot = new Telegraf(this.botToken);
+
+      // 봇 정보 확인
+      const botInfo = await this.bot.telegram.getMe();
+      logger.info(`🤖 봇 연결됨: @${botInfo.username}`, {
+        botId: botInfo.id,
+        botName: botInfo.first_name,
       });
 
-      logger.info("🎹 NavigationHandler 생성 완료");
+      return true;
     } catch (error) {
-      logger.error("❌ NavigationHandler 생성 실패:", error);
+      logger.error("❌ Telegraf 초기화 실패:", error);
       throw error;
     }
   }
 
   /**
-   * 🔍 의존성 검증
+   * 🎹 NavigationHandler 초기화
    */
-  validateDependencies() {
-    const required = [
-      { name: "bot", obj: this.bot },
-      { name: "moduleManager", obj: this.moduleManager },
-    ];
+  async initializeNavigationHandler() {
+    try {
+      this.navigationHandler = new NavigationHandler();
+      await this.navigationHandler.initialize(this.moduleManager);
 
-    const optional = [
-      { name: "dbManager", obj: this.dbManager },
-      { name: "validationManager", obj: this.validationManager },
-      { name: "healthChecker", obj: this.healthChecker },
-    ];
-
-    // 필수 의존성 체크
-    for (const { name, obj } of required) {
-      if (!obj) {
-        throw new Error(`필수 의존성 누락: ${name}`);
-      }
+      logger.success("🎹 NavigationHandler 초기화 완료");
+      return true;
+    } catch (error) {
+      logger.error("❌ NavigationHandler 초기화 실패:", error);
+      throw error;
     }
-
-    // 선택적 의존성 체크 (경고만)
-    for (const { name, obj } of optional) {
-      if (!obj) {
-        logger.warn(
-          `⚠️ 선택적 의존성 누락: ${name} - 관련 기능이 제한될 수 있습니다.`
-        );
-      }
-    }
-
-    logger.debug("✅ 의존성 검증 완료");
   }
 
   /**
-   * 🎮 Telegraf 핸들러 설정
+   * 🎮 이벤트 핸들러 설정
    */
-  setupHandlers() {
-    // 명령어 처리
-    this.bot.command("start", (ctx) => this.handleCommand(ctx, "start"));
-    this.bot.command("help", (ctx) => this.handleCommand(ctx, "help"));
-    this.bot.command("status", (ctx) => this.handleCommand(ctx, "status"));
-    this.bot.command("cancel", (ctx) => this.handleCommand(ctx, "cancel"));
+  setupEventHandlers() {
+    if (!this.bot) {
+      throw new Error("Telegraf 인스턴스가 없습니다");
+    }
 
-    // 텍스트 메시지 처리
+    // 🔄 미들웨어: 기본 정보 로깅
+    this.bot.use(async (ctx, next) => {
+      const startTime = Date.now();
+
+      try {
+        await next();
+      } catch (error) {
+        logger.error("🔄 미들웨어 오류:", error);
+      } finally {
+        const duration = Date.now() - startTime;
+        this.updateResponseTimeStats(duration);
+      }
+    });
+
+    // 💬 메시지 처리
     this.bot.on("text", (ctx) => this.handleMessage(ctx));
+    this.bot.command("start", (ctx) => this.handleMessage(ctx));
 
-    // 🎯 콜백 쿼리 처리 (핵심 수정!)
+    // ⚡ 콜백 쿼리 처리 (핵심!)
     this.bot.on("callback_query", (ctx) => this.handleCallback(ctx));
 
-    // 인라인 쿼리 처리
+    // 🔍 인라인 쿼리 처리
     this.bot.on("inline_query", (ctx) => this.handleInlineQuery(ctx));
 
-    // 기타 메시지 타입
+    // 📎 미디어 처리
     this.bot.on("photo", (ctx) => this.handleMedia(ctx, "photo"));
     this.bot.on("document", (ctx) => this.handleMedia(ctx, "document"));
     this.bot.on("voice", (ctx) => this.handleMedia(ctx, "voice"));
@@ -167,35 +186,37 @@ class BotController {
   }
 
   /**
-   * ⚡ 콜백 처리 (핵심 수정: NavigationHandler로 위임)
+   * ⚡ 콜백 처리 (핵심 로직)
    */
   async handleCallback(ctx) {
     const startTime = Date.now();
     const userId = ctx.from?.id;
     const callbackId = ctx.callbackQuery?.id;
-    const uniqueKey = `${userId}-${callbackId}`;
+    const uniqueKey = `callback_${userId}_${callbackId}`;
 
     try {
-      // 중복 처리 방지
+      // 🚫 중복 처리 방지
       if (this.processingCallbacks.has(uniqueKey)) {
-        logger.debug(`🚫 중복 콜백 무시: ${uniqueKey}`);
+        logger.debug(`🚫 중복 콜백 차단: ${uniqueKey}`);
 
-        // 이미 처리 중이라는 알림
-        try {
-          await ctx.answerCbQuery("⏳ 처리 중입니다...", {
-            show_alert: true,
-          });
-        } catch (answerError) {
-          logger.debug("중복 콜백 답변 실패:", answerError.message);
-        }
+        await this.answerCallbackQuery(ctx, "⏳ 처리 중입니다...", true);
         return;
       }
 
-      // 처리 시작
-      this.processingCallbacks.set(uniqueKey, Date.now());
+      // 📊 처리 시작 등록
+      this.processingCallbacks.set(uniqueKey, {
+        startTime,
+        userId,
+        callbackData: ctx.callbackQuery.data,
+      });
+
       this.stats.activeCallbacks++;
       this.stats.callbacksReceived++;
       this.stats.lastActivity = TimeHelper.getLogTimeString();
+
+      // 👤 사용자 통계 업데이트
+      this.stats.uniqueUsers.add(userId);
+      this.stats.totalUsers = this.stats.uniqueUsers.size;
 
       logger.debug(
         `⚡ 콜백 처리 시작: ${getUserName(ctx.from)} -> ${
@@ -203,76 +224,41 @@ class BotController {
         }`
       );
 
-      // 콜백 응답 (사용자 대기 상태 해제)
-      await ctx.answerCbQuery();
+      // ✅ 기본 콜백 응답 (사용자 대기 해제)
+      await this.answerCallbackQuery(ctx);
 
-      // 🎹 NavigationHandler로 위임 (핵심!)
+      // 🎹 NavigationHandler로 위임 (표준 흐름)
+      let handled = false;
+
       if (this.navigationHandler) {
-        const handled = await this.navigationHandler.handleNavigation(
+        handled = await this.navigationHandler.handleNavigation(
           this.bot,
           ctx.callbackQuery,
           null, // subAction은 NavigationHandler에서 파싱
           [], // params도 NavigationHandler에서 파싱
           this.moduleManager
         );
-
-        if (!handled) {
-          logger.warn("❓ 처리되지 않은 콜백:", ctx.callbackQuery.data);
-
-          // 처리되지 않은 콜백에 대한 사용자 알림
-          try {
-            await ctx.editMessageText(
-              "⚠️ 요청을 처리할 수 없습니다.\n메인 메뉴로 돌아가세요.",
-              {
-                reply_markup: {
-                  inline_keyboard: [
-                    [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-                  ],
-                },
-              }
-            );
-          } catch (editError) {
-            logger.debug(
-              "처리되지 않은 콜백 메시지 편집 실패:",
-              editError.message
-            );
-          }
-        }
       } else {
-        logger.error("❌ NavigationHandler가 없어 콜백 처리 불가");
+        logger.error("❌ NavigationHandler가 없음");
+        await this.handleSystemError(ctx, "네비게이션 핸들러 오류");
+        return;
+      }
 
-        try {
-          await ctx.editMessageText(
-            "❌ 시스템 오류가 발생했습니다.\n잠시 후 다시 시도해주세요.",
-            {
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: "🔄 새로고침", callback_data: "system:start" }],
-                ],
-              },
-            }
-          );
-        } catch (editError) {
-          logger.debug("시스템 오류 메시지 편집 실패:", editError.message);
-        }
+      // 🚨 처리되지 않은 콜백 처리
+      if (!handled) {
+        logger.warn(`❓ 처리되지 않은 콜백: ${ctx.callbackQuery.data}`);
+        await this.handleUnprocessedCallback(ctx);
       }
     } catch (error) {
       logger.error(`❌ 콜백 처리 실패 (${uniqueKey}):`, error);
       this.stats.errorsCount++;
 
-      try {
-        await ctx.answerCbQuery("❌ 처리 중 오류가 발생했습니다.", {
-          show_alert: true,
-        });
-      } catch (answerError) {
-        logger.error("콜백 에러 답변 실패:", answerError);
-      }
+      await this.handleCallbackError(ctx, error);
     } finally {
-      // 처리 완료 정리
+      // 🧹 정리 작업
       this.processingCallbacks.delete(uniqueKey);
       this.stats.activeCallbacks = Math.max(0, this.stats.activeCallbacks - 1);
 
-      // 응답 시간 통계 업데이트
       const duration = Date.now() - startTime;
       this.updateResponseTimeStats(duration);
 
@@ -281,27 +267,33 @@ class BotController {
   }
 
   /**
-   * 💬 메시지 처리 (기존 로직 유지)
+   * 💬 메시지 처리
    */
   async handleMessage(ctx) {
     const startTime = Date.now();
     const userId = ctx.from?.id;
     const messageId = ctx.message?.message_id;
-    const uniqueKey = `${userId}-${messageId}`;
+    const uniqueKey = `message_${userId}_${messageId}`;
 
     try {
-      // 중복 처리 방지
+      // 🚫 중복 처리 방지
       if (this.processingMessages.has(uniqueKey)) {
-        logger.debug(`🚫 중복 메시지 무시: ${uniqueKey}`);
+        logger.debug(`🚫 중복 메시지 차단: ${uniqueKey}`);
         return;
       }
 
-      this.processingMessages.set(uniqueKey, Date.now());
+      // 📊 처리 시작 등록
+      this.processingMessages.set(uniqueKey, {
+        startTime,
+        userId,
+        text: ctx.message.text?.substring(0, 50),
+      });
+
       this.stats.activeMessages++;
       this.stats.messagesReceived++;
       this.stats.lastActivity = TimeHelper.getLogTimeString();
 
-      // 사용자 통계 업데이트
+      // 👤 사용자 통계 업데이트
       this.stats.uniqueUsers.add(userId);
       this.stats.totalUsers = this.stats.uniqueUsers.size;
 
@@ -311,29 +303,25 @@ class BotController {
         )} -> "${ctx.message.text?.substring(0, 30)}..."`
       );
 
-      // ModuleManager에 위임 (기존 로직)
+      // 📦 ModuleManager로 위임
       if (this.moduleManager) {
         await this.moduleManager.handleMessage(this.bot, ctx.message);
       } else {
         logger.warn("⚠️ ModuleManager가 없어 메시지 처리 불가");
+        await ctx.reply(
+          "🚧 시스템이 아직 준비되지 않았습니다. 잠시만 기다려주세요."
+        );
       }
     } catch (error) {
       logger.error(`❌ 메시지 처리 실패 (${uniqueKey}):`, error);
       this.stats.errorsCount++;
 
-      try {
-        await ctx.reply(
-          "❌ 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-        );
-      } catch (replyError) {
-        logger.error("에러 메시지 전송 실패:", replyError);
-      }
+      await this.handleMessageError(ctx, error);
     } finally {
-      // 처리 완료 정리
+      // 🧹 정리 작업
       this.processingMessages.delete(uniqueKey);
       this.stats.activeMessages = Math.max(0, this.stats.activeMessages - 1);
 
-      // 응답 시간 통계 업데이트
       const duration = Date.now() - startTime;
       this.updateResponseTimeStats(duration);
 
@@ -342,89 +330,26 @@ class BotController {
   }
 
   /**
-   * 🔧 명령어 처리 (기존 로직 유지)
+   * 🔍 인라인 쿼리 처리
    */
-  async handleCommand(ctx, command) {
-    const startTime = Date.now();
-    const userId = ctx.from?.id;
-    const userName = getUserName(ctx.from);
-
+  async handleInlineQuery(ctx) {
     try {
-      logger.info(`⌨️ 명령어 처리: /${command} (${userName})`);
+      logger.debug(`🔍 인라인 쿼리: ${ctx.inlineQuery.query}`);
 
-      // 시스템 명령어는 직접 처리
-      switch (command) {
-        case "start":
-          await ctx.reply(
-            `🏠 안녕하세요 ${userName}님!\n두목봇에 오신 것을 환영합니다.`,
-            {
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: "📋 메인 메뉴", callback_data: "system:menu" }],
-                  [{ text: "❓ 도움말", callback_data: "system:help" }],
-                ],
-              },
-            }
-          );
-          break;
-
-        case "help":
-          await ctx.reply("❓ 도움말 메뉴", {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "📖 사용법", callback_data: "system:help:usage" }],
-                [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-              ],
-            },
-          });
-          break;
-
-        case "status":
-          const status = this.getStatus();
-          await ctx.reply(
-            `📊 **시스템 상태**\n\n${this.formatStatus(status)}`,
-            {
-              parse_mode: "Markdown",
-            }
-          );
-          break;
-
-        case "cancel":
-          await ctx.reply("❌ 작업이 취소되었습니다.", {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-              ],
-            },
-          });
-          break;
-
-        default:
-          // 모듈 명령어는 ModuleManager에 위임
-          if (this.moduleManager) {
-            await this.moduleManager.handleMessage(this.bot, ctx.message);
-          }
-          break;
-      }
+      // 기본 인라인 응답
+      await ctx.answerInlineQuery([]);
     } catch (error) {
-      logger.error(`❌ 명령어 처리 실패 (/${command}):`, error);
-      await ctx.reply("명령어 처리 중 오류가 발생했습니다.");
-    } finally {
-      const duration = Date.now() - startTime;
-      this.updateResponseTimeStats(duration);
-
-      logger.debug(`⌨️ 명령어 처리 완료: /${command} (${duration}ms)`);
+      logger.error("❌ 인라인 쿼리 처리 실패:", error);
     }
   }
 
   /**
-   * 🖼️ 미디어 처리 (기존 로직 유지)
+   * 📎 미디어 처리
    */
   async handleMedia(ctx, mediaType) {
     try {
-      logger.debug(`🖼️ 미디어 처리: ${mediaType}`);
+      logger.debug(`📎 미디어 수신: ${mediaType}`);
 
-      // ModuleManager에 위임
       if (this.moduleManager) {
         await this.moduleManager.handleMessage(this.bot, ctx.message);
       }
@@ -433,167 +358,243 @@ class BotController {
     }
   }
 
-  /**
-   * 🔍 인라인 쿼리 처리 (기존 로직 유지)
-   */
-  async handleInlineQuery(ctx) {
-    try {
-      logger.debug("🔍 인라인 쿼리 처리");
+  // ===== 🚨 에러 처리 메서드들 =====
 
-      // 기본 응답
-      await ctx.answerInlineQuery([
-        {
-          type: "article",
-          id: "1",
-          title: "두목봇 v3.0.1",
-          description: "봇과 개인 채팅으로 이동하기",
-          input_message_content: {
-            message_text:
-              "안녕하세요! 두목봇입니다. /start 명령어로 시작하세요.",
-          },
-        },
-      ]);
+  /**
+   * ✅ 안전한 콜백 응답
+   */
+  async answerCallbackQuery(ctx, text = null, showAlert = false) {
+    try {
+      const options = {};
+      if (text) options.text = text;
+      if (showAlert) options.show_alert = true;
+
+      await ctx.answerCbQuery(options);
     } catch (error) {
-      logger.error("❌ 인라인 쿼리 처리 실패:", error);
+      logger.debug("콜백 쿼리 응답 실패:", error.message);
     }
   }
 
   /**
-   * 📊 응답 시간 통계 업데이트 (기존 로직 유지)
+   * 🚨 처리되지 않은 콜백 처리
+   */
+  async handleUnprocessedCallback(ctx) {
+    try {
+      await ctx.editMessageText(
+        "⚠️ **요청을 처리할 수 없습니다**\n\n해당 기능이 일시적으로 사용할 수 없거나\n아직 구현되지 않았습니다.\n\n메인 메뉴로 돌아가서 다시 시도해주세요.",
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+            ],
+          },
+        }
+      );
+    } catch (editError) {
+      logger.debug("처리되지 않은 콜백 메시지 편집 실패:", editError.message);
+    }
+  }
+
+  /**
+   * 🚨 시스템 오류 처리
+   */
+  async handleSystemError(ctx, errorMessage) {
+    try {
+      await ctx.editMessageText(
+        `❌ **시스템 오류**\n\n${errorMessage}\n\n시스템 관리자에게 문의하거나\n잠시 후 다시 시도해주세요.`,
+        {
+          parse_mode: "Markdown",
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "🔄 새로고침", callback_data: "system:start" },
+                { text: "📊 시스템 상태", callback_data: "system:status" },
+              ],
+            ],
+          },
+        }
+      );
+    } catch (editError) {
+      logger.debug("시스템 오류 메시지 편집 실패:", editError.message);
+    }
+  }
+
+  /**
+   * 🚨 콜백 에러 처리
+   */
+  async handleCallbackError(ctx, error) {
+    try {
+      await this.answerCallbackQuery(
+        ctx,
+        "❌ 처리 중 오류가 발생했습니다.",
+        true
+      );
+    } catch (answerError) {
+      logger.error("콜백 에러 응답 실패:", answerError);
+    }
+  }
+
+  /**
+   * 🚨 메시지 에러 처리
+   */
+  async handleMessageError(ctx, error) {
+    try {
+      await ctx.reply(
+        "❌ 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+      );
+    } catch (replyError) {
+      logger.error("메시지 에러 응답 실패:", replyError);
+    }
+  }
+
+  // ===== 🛠️ 유틸리티 메서드들 =====
+
+  /**
+   * ⏰ 정리 작업 스케줄
+   */
+  scheduleCleanup() {
+    // 5분마다 오래된 처리 맵 정리
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupStaleProcesses();
+    }, 5 * 60 * 1000);
+
+    logger.debug("⏰ 자동 정리 작업 예약됨 (5분 간격)");
+  }
+
+  /**
+   * 🧹 오래된 프로세스 정리
+   */
+  cleanupStaleProcesses() {
+    const now = Date.now();
+    const timeout = 2 * 60 * 1000; // 2분 타임아웃
+    let cleanedCount = 0;
+
+    // 오래된 콜백 정리
+    for (const [key, data] of this.processingCallbacks.entries()) {
+      if (now - data.startTime > timeout) {
+        this.processingCallbacks.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    // 오래된 메시지 정리
+    for (const [key, data] of this.processingMessages.entries()) {
+      if (now - data.startTime > timeout) {
+        this.processingMessages.delete(key);
+        cleanedCount++;
+      }
+    }
+
+    if (cleanedCount > 0) {
+      logger.debug(`🧹 오래된 프로세스 ${cleanedCount}개 정리됨`);
+    }
+  }
+
+  /**
+   * 📊 응답 시간 통계 업데이트
    */
   updateResponseTimeStats(responseTime) {
     this.stats.totalResponseTime += responseTime;
 
-    if (this.stats.averageResponseTime === 0) {
-      this.stats.averageResponseTime = responseTime;
-    } else {
-      // 지수 평활법으로 평균 계산
-      this.stats.averageResponseTime =
-        this.stats.averageResponseTime * 0.9 + responseTime * 0.1;
+    const totalRequests =
+      this.stats.messagesReceived + this.stats.callbacksReceived;
+    if (totalRequests > 0) {
+      this.stats.averageResponseTime = Math.round(
+        this.stats.totalResponseTime / totalRequests
+      );
     }
   }
 
-  /**
-   * 🧹 정리 스케줄러 시작 (기존 로직 유지)
-   */
-  startCleanupScheduler() {
-    setInterval(() => {
-      this.cleanupProcessingMaps();
-    }, 60000); // 1분마다
-
-    logger.debug("🧹 정리 스케줄러 시작됨");
-  }
+  // ===== 🔄 봇 시작/중지 =====
 
   /**
-   * 🧹 처리 맵 정리 (기존 로직 유지)
+   * 🚀 봇 시작 (폴링 모드)
    */
-  cleanupProcessingMaps() {
-    const now = Date.now();
-    const messageTimeout = this.config.messageTimeout;
-    const callbackTimeout = this.config.callbackTimeout;
-
-    // 오래된 메시지 처리 정리
-    for (const [key, timestamp] of this.processingMessages.entries()) {
-      if (now - timestamp > messageTimeout) {
-        this.processingMessages.delete(key);
-        this.stats.activeMessages = Math.max(0, this.stats.activeMessages - 1);
+  async startPolling() {
+    try {
+      if (!this.initialized) {
+        throw new Error("BotController가 초기화되지 않았습니다");
       }
-    }
 
-    // 오래된 콜백 처리 정리
-    for (const [key, timestamp] of this.processingCallbacks.entries()) {
-      if (now - timestamp > callbackTimeout) {
-        this.processingCallbacks.delete(key);
-        this.stats.activeCallbacks = Math.max(
-          0,
-          this.stats.activeCallbacks - 1
-        );
+      logger.info("🚀 봇 폴링 시작...");
+      await this.bot.launch();
+
+      logger.success("✅ 봇이 성공적으로 시작되었습니다 (폴링 모드)");
+
+      // Railway에서 업타임 유지
+      if (this.config.isRailway) {
+        this.keepAlive();
       }
+    } catch (error) {
+      logger.fatal("💀 봇 시작 실패", error, true);
     }
   }
 
   /**
-   * 📊 상태 조회 (NavigationHandler 상태 포함)
+   * 🌐 봇 시작 (웹훅 모드)
    */
-  getStatus() {
-    return {
-      initialized: this.initialized,
-      botConnected: !!this.bot,
-      navigationHandlerActive: !!this.navigationHandler,
-      moduleManagerActive: !!this.moduleManager,
-      stats: {
-        ...this.stats,
-        totalUsers: this.stats.uniqueUsers.size,
-        averageResponseTime: Math.round(this.stats.averageResponseTime),
-      },
-      navigationStats: this.navigationHandler
-        ? this.navigationHandler.getStats()
-        : null,
-      performance: {
-        activeMessages: this.stats.activeMessages,
-        activeCallbacks: this.stats.activeCallbacks,
-        processingMapsSize: {
-          messages: this.processingMessages.size,
-          callbacks: this.processingCallbacks.size,
+  async startWebhook(domain, port = 3000) {
+    try {
+      if (!this.initialized) {
+        throw new Error("BotController가 초기화되지 않았습니다");
+      }
+
+      const webhookUrl = `${domain}/webhook`;
+
+      logger.info(`🌐 봇 웹훅 시작: ${webhookUrl}`);
+      await this.bot.launch({
+        webhook: {
+          domain,
+          port,
         },
-      },
-    };
+      });
+
+      logger.success(
+        `✅ 봇이 성공적으로 시작되었습니다 (웹훅 모드: ${webhookUrl})`
+      );
+    } catch (error) {
+      logger.fatal("💀 봇 웹훅 시작 실패", error, true);
+    }
   }
 
   /**
-   * 📊 상태 포맷팅 (기존 로직 유지)
+   * 💚 Railway 업타임 유지
    */
-  formatStatus(status) {
-    return `🎮 **BotController**: ${status.initialized ? "✅" : "❌"}
-🤖 **Bot 연결**: ${status.botConnected ? "✅" : "❌"}
-🎹 **NavigationHandler**: ${status.navigationHandlerActive ? "✅" : "❌"}
-📦 **ModuleManager**: ${status.moduleManagerActive ? "✅" : "❌"}
-
-📊 **통계**:
-• 메시지: ${status.stats.messagesReceived}개
-• 콜백: ${status.stats.callbacksReceived}개  
-• 사용자: ${status.stats.totalUsers}명
-• 평균응답: ${status.stats.averageResponseTime}ms
-• 에러: ${status.stats.errorsCount}개
-
-⚡ **현재 처리 중**:
-• 메시지: ${status.performance.activeMessages}개
-• 콜백: ${status.performance.activeCallbacks}개`;
-  }
-
-  /**
-   * 🏥 Railway 헬스체크 엔드포인트 설정
-   */
-  setupHealthEndpoint() {
+  keepAlive() {
     if (!this.config.isRailway) return;
 
+    setInterval(() => {
+      logger.debug("💚 Railway 업타임 유지");
+    }, 25 * 60 * 1000); // 25분마다
+  }
+
+  /**
+   * 🏥 헬스체크 엔드포인트 설정
+   */
+  setupHealthEndpoint() {
     const express = require("express");
     const app = express();
 
-    // 헬스체크 엔드포인트
     app.get("/health", (req, res) => {
       const health = {
         status: "healthy",
-        timestamp: new Date().toISOString(),
+        timestamp: TimeHelper.getLogTimeString(),
         uptime: process.uptime(),
         memory: process.memoryUsage(),
         bot: {
           initialized: this.initialized,
           connected: !!this.bot,
         },
-        modules: {
-          total: this.moduleManager?.stats?.totalModules || 0,
-          active: this.moduleManager?.stats?.activeModules || 0,
-          failed: this.moduleManager?.stats?.failedModules || 0,
-        },
+        stats: this.stats,
+        modules: this.moduleManager?.getStatus() || {},
       };
 
       res.status(200).json(health);
     });
 
-    // 간단한 핑
     app.get("/ping", (req, res) => {
-      res.status(200).text("pong");
+      res.status(200).send("pong");
     });
 
     const port = process.env.PORT || 3000;
@@ -602,12 +603,94 @@ class BotController {
     });
   }
 
+  // ===== 📊 상태 및 통계 =====
+
   /**
-   * 🛑 정리 (NavigationHandler 포함)
+   * 📊 봇 상태 조회
+   */
+  getStatus() {
+    return {
+      className: "BotController",
+      version: "3.0.1",
+      initialized: this.initialized,
+      botConnected: !!this.bot,
+      navigationHandlerActive: !!this.navigationHandler,
+      moduleManagerActive: !!this.moduleManager,
+      stats: {
+        ...this.stats,
+        uniqueUsersCount: this.stats.uniqueUsers.size,
+      },
+      performance: {
+        activeMessages: this.stats.activeMessages,
+        activeCallbacks: this.stats.activeCallbacks,
+        processingMapsSize: {
+          callbacks: this.processingCallbacks.size,
+          messages: this.processingMessages.size,
+        },
+      },
+      config: {
+        isRailway: this.config.isRailway,
+        webhookMode: this.config.webhookMode,
+      },
+    };
+  }
+
+  /**
+   * 📊 상태 텍스트 생성
+   */
+  generateStatusText() {
+    const status = this.getStatus();
+    const uptime = Date.now() - this.stats.startTime;
+
+    return `🤖 **BotController v3.0.1 상태**
+
+🔧 **시스템 상태**:
+• 초기화: ${status.initialized ? "✅" : "❌"}
+• 봇 연결: ${status.botConnected ? "✅" : "❌"}
+• 네비게이션: ${status.navigationHandlerActive ? "✅" : "❌"}
+• 모듈관리자: ${status.moduleManagerActive ? "✅" : "❌"}
+
+📊 **통계**:
+• 메시지: ${status.stats.messagesReceived}개
+• 콜백: ${status.stats.callbacksReceived}개
+• 사용자: ${status.stats.totalUsers}명
+• 평균응답: ${status.stats.averageResponseTime}ms
+• 에러: ${status.stats.errorsCount}개
+
+⚡ **현재 처리**:
+• 메시지: ${status.performance.activeMessages}개
+• 콜백: ${status.performance.activeCallbacks}개
+
+⏱️ **가동시간**: ${this.formatUptime(uptime)}`;
+  }
+
+  /**
+   * ⏱️ 가동시간 포맷팅
+   */
+  formatUptime(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}일 ${hours % 24}시간`;
+    if (hours > 0) return `${hours}시간 ${minutes % 60}분`;
+    if (minutes > 0) return `${minutes}분`;
+    return `${seconds}초`;
+  }
+
+  /**
+   * 🛑 정리 작업
    */
   async cleanup() {
     try {
       logger.info("🛑 BotController 정리 시작...");
+
+      // 정리 타이머 중지
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+        this.cleanupInterval = null;
+      }
 
       // NavigationHandler 정리
       if (this.navigationHandler) {
@@ -616,14 +699,20 @@ class BotController {
       }
 
       // 처리 맵 정리
-      this.processingMessages.clear();
       this.processingCallbacks.clear();
+      this.processingMessages.clear();
 
-      // 통계 초기화
+      // 통계 정리
       this.stats.uniqueUsers.clear();
 
+      // 봇 정지
+      if (this.bot) {
+        await this.bot.stop();
+        this.bot = null;
+      }
+
       this.initialized = false;
-      logger.info("✅ BotController 정리 완료");
+      logger.success("✅ BotController 정리 완료");
     } catch (error) {
       logger.error("❌ BotController 정리 실패:", error);
     }
