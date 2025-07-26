@@ -1,177 +1,198 @@
 // src/config/moduleRegistry.js - 중앙 모듈 레지스트리
-
+const path = require("path");
 /**
- * 📦 모듈 레지스트리 - 모든 모듈 정의를 한 곳에서 관리
- *
- * 장점:
- * 1. 한눈에 모든 모듈 파악 가능
- * 2. 우선순위 관리 쉬움
- * 3. 환경별 활성화/비활성화 쉬움
- * 4. 새 모듈 추가가 간단함
+ * 📝 모듈 중앙 레지스트리
+ * - 모든 모듈의 메타데이터 관리
+ * - 우선순위 기반 로드 순서
+ * - 환경변수 기반 활성/비활성
  */
-
-const modules = [
-  // ===== 🏛️ 시스템 모듈 (최우선) =====
+const MODULE_REGISTRY = [
+  // ===== 🏠 핵심 시스템 모듈 (우선순위 1-10) =====
   {
     key: "system",
-    name: "시스템",
-    description: "시스템 관리 및 설정",
-    path: "./src/modules/SystemModule",
+    name: "시스템 모듈",
+    description: "시스템 핵심 기능",
+    path: path.join(__dirname, "../modules/SystemModule"),
     priority: 1,
-    required: true, // 필수 모듈
+    required: true,
     enabled: true,
     config: {
-      showInMenu: false, // 메인 메뉴에 표시 안 함
+      showInMenu: true,
+      icon: "🏠",
     },
   },
 
-  // ===== 📱 핵심 기능 모듈 =====
+  // ===== 📋 주요 기능 모듈 (우선순위 10-50) =====
   {
     key: "todo",
     name: "할일 관리",
-    description: "할일을 관리합니다",
-    path: "./src/modules/TodoModule",
+    description: "할일 추가, 완료, 삭제",
+    path: path.join(__dirname, "../modules/TodoModule"),
     priority: 10,
-    enabled: process.env.MODULE_TODO_ENABLED !== "false",
+    required: false,
+    enabled: process.env.ENABLE_TODO_MODULE !== "false",
     config: {
+      showInMenu: true,
       icon: "📝",
-      commands: ["/todo", "/할일"],
-    },
-  },
-  {
-    key: "timer",
-    name: "타이머",
-    description: "타이머와 포모도로 기능",
-    path: "./src/modules/TimerModule",
-    priority: 20,
-    enabled: process.env.MODULE_TIMER_ENABLED !== "false",
-    config: {
-      icon: "⏰",
-      commands: ["/timer", "/타이머"],
-    },
-  },
-  {
-    key: "worktime",
-    name: "근무시간",
-    description: "출퇴근 및 근무시간 관리",
-    path: "./src/modules/WorktimeModule",
-    priority: 30,
-    enabled: process.env.MODULE_WORKTIME_ENABLED !== "false",
-    config: {
-      icon: "🏢",
-      commands: ["/work", "/출근", "/퇴근"],
+      maxTodos: 100,
     },
   },
 
-  // ===== 🌟 부가 기능 모듈 =====
+  {
+    key: "timer",
+    name: "타이머/포모도로",
+    description: "타이머 및 포모도로 기능",
+    path: path.join(__dirname, "../modules/TimerModule"),
+    priority: 20,
+    required: false,
+    enabled: process.env.ENABLE_TIMER_MODULE !== "false",
+    config: {
+      showInMenu: true,
+      icon: "⏰",
+      defaultDuration: 25,
+    },
+  },
+
+  {
+    key: "worktime",
+    name: "근무시간 관리",
+    description: "출퇴근 및 근무시간 추적",
+    path: path.join(__dirname, "../modules/WorktimeModule"),
+    priority: 25,
+    required: false,
+    enabled: process.env.ENABLE_WORKTIME_MODULE !== "false",
+    config: {
+      showInMenu: true,
+      icon: "🕐",
+    },
+  },
+
   {
     key: "leave",
     name: "휴가 관리",
-    description: "휴가 신청 및 관리",
-    path: "./src/modules/LeaveModule",
-    priority: 40,
-    enabled: process.env.MODULE_LEAVE_ENABLED !== "false",
+    description: "연차, 월차, 반차 관리",
+    path: path.join(__dirname, "../modules/LeaveModule"),
+    priority: 30,
+    required: false,
+    enabled: process.env.ENABLE_LEAVE_MODULE !== "false",
     config: {
+      showInMenu: true,
       icon: "🏖️",
-      commands: ["/leave", "/휴가"],
-    },
-  },
-  {
-    key: "reminder",
-    name: "리마인더",
-    description: "알림 설정 및 관리",
-    path: "./src/modules/ReminderModule",
-    priority: 50,
-    enabled: process.env.MODULE_REMINDER_ENABLED !== "false",
-    config: {
-      icon: "🔔",
-      commands: ["/remind", "/알림"],
     },
   },
 
-  // ===== 🎨 엔터테인먼트 모듈 =====
+  {
+    key: "reminder",
+    name: "리마인더",
+    description: "알림 및 리마인더 설정",
+    path: path.join(__dirname, "../modules/ReminderModule"),
+    priority: 35,
+    required: false,
+    enabled: process.env.ENABLE_REMINDER_MODULE !== "false",
+    config: {
+      showInMenu: true,
+      icon: "⏰",
+    },
+  },
+
+  // ===== 🎮 보조 기능 모듈 (우선순위 50-100) =====
   {
     key: "fortune",
     name: "운세",
     description: "오늘의 운세 확인",
-    path: "./src/modules/FortuneModule",
+    path: path.join(__dirname, "../modules/FortuneModule"),
     priority: 60,
-    enabled: process.env.MODULE_FORTUNE_ENABLED !== "false",
+    required: false,
+    enabled: process.env.ENABLE_FORTUNE_MODULE !== "false",
     config: {
+      showInMenu: true,
       icon: "🔮",
-      commands: ["/fortune", "/운세"],
-    },
-  },
-  {
-    key: "weather",
-    name: "날씨",
-    description: "날씨 정보 제공",
-    path: "./src/modules/WeatherModule",
-    priority: 70,
-    enabled: process.env.MODULE_WEATHER_ENABLED !== "false",
-    config: {
-      icon: "🌤️",
-      commands: ["/weather", "/날씨"],
-      apiRequired: true,
     },
   },
 
-  // ===== 🔧 유틸리티 모듈 =====
   {
-    key: "tts",
-    name: "TTS",
-    description: "텍스트를 음성으로 변환",
-    path: "./src/modules/TTSModule",
-    priority: 80,
-    enabled: process.env.MODULE_TTS_ENABLED !== "false",
+    key: "weather",
+    name: "날씨",
+    description: "날씨 정보 및 미세먼지",
+    path: path.join(__dirname, "../modules/WeatherModule"),
+    priority: 65,
+    required: false,
+    enabled: process.env.ENABLE_WEATHER_MODULE !== "false",
     config: {
-      icon: "🔊",
-      commands: ["/tts", "/음성"],
-      apiRequired: true,
+      showInMenu: true,
+      icon: "🌤️",
     },
   },
+
   {
-    key: "insight",
-    name: "인사이트",
-    description: "데이터 분석 및 통계",
-    path: "./src/modules/InsightModule",
-    priority: 90,
-    enabled: process.env.MODULE_INSIGHT_ENABLED !== "false",
+    key: "tts",
+    name: "텍스트 음성 변환",
+    description: "텍스트를 음성으로 변환",
+    path: path.join(__dirname, "../modules/TTSModule"),
+    priority: 70,
+    required: false,
+    enabled: process.env.ENABLE_TTS_MODULE !== "false",
     config: {
-      icon: "📊",
-      commands: ["/insight", "/통계"],
+      showInMenu: true,
+      icon: "🎤",
     },
   },
 ];
 
-// 환경별 필터링
+/**
+ * 🔍 활성화된 모듈만 가져오기
+ */
 function getEnabledModules() {
-  return modules.filter((module) => module.enabled);
+  return MODULE_REGISTRY.filter((module) => module.enabled).sort(
+    (a, b) => a.priority - b.priority
+  );
 }
 
-// 우선순위 정렬
-function getModulesByPriority() {
-  return [...modules].sort((a, b) => a.priority - b.priority);
+/**
+ * 🔍 모든 모듈 가져오기
+ */
+function getAllModules() {
+  return MODULE_REGISTRY.sort((a, b) => a.priority - b.priority);
 }
 
-// 명령어 맵 생성
-function getCommandMap() {
-  const commandMap = new Map();
+/**
+ * 🔍 특정 모듈 정보 가져오기
+ */
+function getModuleInfo(moduleKey) {
+  return MODULE_REGISTRY.find((module) => module.key === moduleKey);
+}
 
-  modules.forEach((module) => {
-    if (module.config.commands) {
-      module.config.commands.forEach((cmd) => {
-        commandMap.set(cmd, module.key);
-      });
-    }
-  });
+/**
+ * 🔍 메뉴에 표시할 모듈만 가져오기
+ */
+function getMenuModules() {
+  return MODULE_REGISTRY.filter(
+    (module) => module.enabled && module.config.showInMenu
+  ).sort((a, b) => a.priority - b.priority);
+}
 
-  return commandMap;
+/**
+ * 📊 모듈 통계
+ */
+function getModuleStats() {
+  const total = MODULE_REGISTRY.length;
+  const enabled = MODULE_REGISTRY.filter((m) => m.enabled).length;
+  const required = MODULE_REGISTRY.filter((m) => m.required).length;
+
+  return {
+    total,
+    enabled,
+    disabled: total - enabled,
+    required,
+    optional: total - required,
+  };
 }
 
 module.exports = {
-  modules,
+  MODULE_REGISTRY,
   getEnabledModules,
-  getModulesByPriority,
-  getCommandMap,
+  getAllModules,
+  getModuleInfo,
+  getMenuModules,
+  getModuleStats,
 };

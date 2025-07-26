@@ -649,6 +649,9 @@ class DooMockBot {
 
       await this.moduleManager.initialize();
 
+      // 📝 모듈 레지스트리에서 모듈 로드
+      await this.loadModulesFromRegistry();
+
       logger.debug("✅ ModuleManager 초기화 완료");
     } catch (error) {
       logger.error("❌ ModuleManager 초기화 실패:", error);
