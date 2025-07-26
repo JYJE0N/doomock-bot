@@ -389,12 +389,13 @@ class ServiceBuilder {
       }
 
       // 서비스 파일들 읽기
-      const files = fs.readdirSync(servicesDir);
-      let registeredCount = 0;
-
       for (const file of files) {
-        // BaseService.js는 제외
-        if (file === "BaseService.js" || !file.endsWith("Service.js")) {
+        // BaseService.js와 HealthService.js는 제외
+        if (
+          file === "BaseService.js" ||
+          file === "HealthService.js" || // 추가
+          !file.endsWith("Service.js")
+        ) {
           continue;
         }
 

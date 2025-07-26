@@ -169,7 +169,227 @@ class DooMockBot {
       await this.shutdown(1);
     }
   }
+  /**
+   * 🛡️ 중앙 검증 시스템 초기화
+   */
+  async initializeValidationManager() {
+    if (!this.config.enableValidation) {
+      logger.info("🛡️ 검증 시스템 비활성화됨");
+      return;
+    }
 
+    logger.info("🛡️ 중앙 검증 시스템 초기화 중...");
+
+    try {
+      const ValidationManager = require("./src/utils/ValidationHelper");
+
+      this.validationManager = new ValidationManager({
+        enableCache: this.config.validationCacheEnabled,
+        cacheTimeout: 300000,
+        maxCacheSize: this.config.isRailway ? 500 : 1000,
+      });
+
+      logger.debug("✅ 중앙 검증 시스템 초기화 완료");
+    } catch (error) {
+      logger.error("❌ ValidationManager 초기화 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🏥 헬스체커 초기화 (start()는 나중에)
+   */
+  async initializeHealthChecker() {
+    if (!this.config.enableHealthCheck) {
+      logger.info("🏥 헬스체커 비활성화됨");
+      return;
+    }
+
+    logger.info("🏥 헬스체커 초기화 중...");
+
+    try {
+      const HealthChecker = require("./src/utils/HealthChecker");
+
+      this.healthChecker = new HealthChecker({
+        checkInterval: this.config.isRailway ? 120000 : 60000,
+        // 빈 컴포넌트로 시작 - 나중에 등록할 예정
+      });
+
+      logger.debug("✅ 헬스체커 초기화 완료");
+    } catch (error) {
+      logger.error("❌ HealthChecker 초기화 오류:", error);
+      // HealthChecker는 필수가 아니므로 오류를 throw하지 않음
+      this.healthChecker = null;
+    }
+  }
+
+  /**
+   * 🏥 헬스체커에 컴포넌트 등록 (모든 컴포넌트 초기화 후)
+   */
+  async registerHealthCheckerComponents() {
+    if (!this.healthChecker) {
+      logger.warn(
+        "⚠️ HealthChecker가 초기화되지 않아 컴포넌트 등록을 건너뜁니다"
+      );
+      return;
+    }
+
+    logger.info("🏥 헬스체커 컴포넌트 등록 중...");
+
+    try {
+      // 실제 인스턴스들을 직접 등록
+      if (this.dbManager) {
+        this.healthChecker.registerComponent("database", this.dbManager);
+        logger.debug("🔧 DatabaseManager 등록됨");
+      }
+
+      if (this.moduleManager) {
+        this.healthChecker.registerComponent(
+          "moduleManager",
+          this.moduleManager
+        );
+        logger.debug("🔧 ModuleManager 등록됨");
+      }
+
+      if (this.botController) {
+        this.healthChecker.registerComponent(
+          "botController",
+          this.botController
+        );
+        logger.debug("🔧 BotController 등록됨");
+      }
+
+      if (this.validationManager) {
+        this.healthChecker.registerComponent(
+          "validationManager",
+          this.validationManager
+        );
+        logger.debug("🔧 ValidationManager 등록됨");
+      }
+
+      // 모듈별 서비스 등록
+      if (this.moduleManager && this.moduleManager.moduleInstances) {
+        logger.debug(
+          `🔍 등록된 모듈 수: ${this.moduleManager.moduleInstances.size}`
+        );
+
+        const moduleKeys = Array.from(
+          this.moduleManager.moduleInstances.keys()
+        );
+        logger.debug(`🔍 등록된 모듈 키들: ${moduleKeys.join(", ")}`);
+
+        // 각 모듈의 서비스 찾기
+        for (const [
+          key,
+          module,
+        ] of this.moduleManager.moduleInstances.entries()) {
+          // 서비스 이름 추론 (예: todo -> todoService)
+          const serviceName = `${key}Service`;
+
+          if (module[serviceName]) {
+            this.healthChecker.registerComponent(
+              serviceName,
+              module[serviceName]
+            );
+            logger.debug(`🔧 ${serviceName} 등록됨`);
+          }
+        }
+      }
+
+      logger.debug("✅ 헬스체커 컴포넌트 등록 완료");
+    } catch (error) {
+      logger.error("❌ 헬스체커 컴포넌트 등록 실패:", error);
+    }
+  }
+
+  /**
+   * 🧪 환경 검증
+   */
+  async validateEnvironment() {
+    logger.info("🧪 환경 검증 시작...");
+
+    // 필수 환경변수 확인
+    const required = ["BOT_TOKEN"];
+    const missing = required.filter((key) => !process.env[key]);
+
+    if (missing.length > 0) {
+      throw new Error(`필수 환경변수 누락: ${missing.join(", ")}`);
+    }
+
+    // 환경 정보 출력
+    console.log("🔍 환경 정보:");
+    console.log("   NODE_ENV:", process.env.NODE_ENV);
+    console.log("   Railway:", this.config.isRailway ? "활성" : "비활성");
+    console.log("   MongoDB URI:", this.config.mongoUri ? "있음" : "없음");
+
+    logger.debug("✅ 환경 검증 완료");
+  }
+
+  /**
+   * 📋 프로세스 이벤트 핸들러 설정
+   */
+  setupProcessHandlers() {
+    // Graceful shutdown
+    process.once("SIGINT", () => this.shutdown(0, "SIGINT"));
+    process.once("SIGTERM", () => this.shutdown(0, "SIGTERM"));
+
+    // 예외 처리
+    process.on("uncaughtException", (error) => {
+      logger.error("🚨 처리되지 않은 예외:", error);
+      this.shutdown(1);
+    });
+
+    process.on("unhandledRejection", (reason, promise) => {
+      logger.error("🚨 처리되지 않은 Promise 거부:", reason);
+    });
+  }
+
+  /**
+   * 🛑 애플리케이션 종료
+   */
+  async shutdown(code = 0, signal = "") {
+    try {
+      logger.info(
+        `🛑 애플리케이션 종료 시작... ${signal ? `(${signal})` : ""}`
+      );
+
+      // 봇 정지
+      if (this.bot) {
+        try {
+          await this.bot.stop();
+          logger.info("✅ 봇 정지됨");
+        } catch (error) {
+          logger.error("❌ 봇 정지 실패:", error);
+        }
+      }
+
+      // 모듈 정리
+      if (this.moduleManager) {
+        try {
+          await this.moduleManager.cleanup();
+          logger.info("✅ 모듈 정리됨");
+        } catch (error) {
+          logger.error("❌ 모듈 정리 실패:", error);
+        }
+      }
+
+      // 데이터베이스 연결 종료
+      if (this.dbManager) {
+        try {
+          await this.dbManager.disconnect();
+          logger.info("✅ 데이터베이스 연결 종료됨");
+        } catch (error) {
+          logger.error("❌ 데이터베이스 연결 종료 실패:", error);
+        }
+      }
+
+      logger.info("👋 애플리케이션 종료 완료");
+      process.exit(code);
+    } catch (error) {
+      logger.error("❌ 종료 중 오류:", error);
+      process.exit(1);
+    }
+  }
   /**
    * 🔍 환경 검증
    */
