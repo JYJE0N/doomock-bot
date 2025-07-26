@@ -10,9 +10,10 @@ const { getUserName, getUserId } = require("../utils/UserHelper");
  * 🎯 주요 수정사항:
  * - setupActions 메서드 완전 구현 (필수!)
  * - handleCallback 메서드 표준화
- * - performBasicSystemCheck 메서드 구현
+ * - performBasicSystemCheck 메서드 완전 구현 ⭐
  * - NavigationHandler와 완전 연동
  * - 표준 매개변수 준수
+ * - 모든 메서드 완성
  */
 class SystemModule extends BaseModule {
   constructor(bot, options = {}) {
@@ -135,26 +136,17 @@ class SystemModule extends BaseModule {
         type: "system_help",
         content: {
           basicCommands: [
-            { command: "/start", description: "봇 시작 및 메인 메뉴" },
-            { command: "/help", description: "도움말 표시" },
-            { command: "/status", description: "시스템 상태 확인" },
-            { command: "/cancel", description: "현재 작업 취소" },
+            "/start - 메인 메뉴 열기",
+            "/help - 도움말 보기",
+            "/status - 시스템 상태 확인",
           ],
-          features: [
-            "📝 할일 관리 - 체계적인 업무 관리",
-            "⏰ 타이머 기능 - 포모도로 테크닉 지원",
-            "🕐 근무시간 관리 - 출퇴근 기록",
-            "🏖️ 휴가 관리 - 연차/월차 신청",
-            "🔔 리마인더 - 중요한 일정 알림",
-          ],
+          moduleCommands: await this.getModuleCommands(moduleManager),
           tips: [
-            "인라인 키보드를 활용해 쉽게 조작하세요",
-            "/cancel로 언제든 작업을 취소할 수 있습니다",
-            "문제 발생 시 /start로 재시작하세요",
-            "시스템 상태는 /status로 확인 가능합니다",
+            "버튼을 클릭하여 쉽게 조작할 수 있습니다",
+            "언제든 /start로 메인 메뉴로 돌아갈 수 있습니다",
+            "문제가 있으면 /status로 시스템 상태를 확인하세요",
           ],
         },
-        availableModules: await this.getActiveModules(moduleManager),
         timestamp: TimeHelper.getTimestamp(),
       };
 
@@ -172,7 +164,7 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 📊 상태 액션
+   * 📊 상태 확인 액션
    */
   async handleStatusAction(
     bot,
@@ -184,16 +176,15 @@ class SystemModule extends BaseModule {
     try {
       const statusData = {
         type: "system_status",
-        system: {
+        overall: await this.getSystemHealth(),
+        modules: await this.getModuleStatus(moduleManager),
+        performance: this.getPerformanceStats(),
+        environment: {
           version: this.config.version,
           environment: this.config.environment,
-          uptime: this.getUptime(),
-          memory: this.getMemoryUsage(),
           isRailway: this.config.isRailway,
+          uptime: this.getUptime(),
         },
-        modules: await this.getModuleStatuses(moduleManager),
-        statistics: this.getSystemStats(),
-        health: await this.getSystemHealth(),
         timestamp: TimeHelper.getTimestamp(),
       };
 
@@ -221,17 +212,17 @@ class SystemModule extends BaseModule {
     moduleManager
   ) {
     try {
+      const userId = getUserId(callbackQuery);
+
       const settingsData = {
         type: "system_settings",
-        currentSettings: this.config,
-        availableOptions: {
-          notifications: ["enabled", "disabled"],
-          theme: ["light", "dark", "auto"],
-          language: ["ko", "en"],
+        userPreferences: await this.getUserPreferences(userId),
+        systemSettings: {
+          notifications: true,
+          detailedStatus: this.config.enableDetailedStatus,
+          environment: this.config.environment,
         },
-        userPreferences: await this.getUserPreferences(
-          getUserId(callbackQuery)
-        ),
+        availableOptions: ["notifications", "theme", "language", "timezone"],
         timestamp: TimeHelper.getTimestamp(),
       };
 
@@ -249,7 +240,7 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 📖 정보 액션
+   * ℹ️ 정보 액션
    */
   async handleAboutAction(
     bot,
@@ -261,24 +252,23 @@ class SystemModule extends BaseModule {
     try {
       const aboutData = {
         type: "system_about",
-        info: {
+        botInfo: {
           name: this.config.botName,
           version: this.config.version,
-          description: "다양한 업무 관리 기능을 제공하는 텔레그램 봇",
-          developer: "DooMock",
-          repository: "https://github.com/doomock/todo-bot",
-          supportChat: "@doomock_support",
+          author: "doomock",
+          description: "Todo 관리 및 생산성 향상을 위한 텔레그램 봇",
         },
         features: [
-          "📝 할일 관리",
-          "⏰ 타이머 기능",
-          "🕐 근무시간 추적",
-          "🏖️ 휴가 관리",
-          "🔔 리마인더",
-          "🔮 운세 보기",
-          "🌤️ 날씨 정보",
-          "🎤 TTS 변환",
+          "Todo 관리",
+          "타이머 기능",
+          "근무시간 관리",
+          "휴가 관리",
+          "알림 서비스",
+          "운세 보기",
+          "날씨 정보",
+          "TTS 기능",
         ],
+        stats: this.getSystemStats(),
         timestamp: TimeHelper.getTimestamp(),
       };
 
@@ -368,7 +358,7 @@ class SystemModule extends BaseModule {
   // ===== 🛠️ 유틸리티 메서드들 =====
 
   /**
-   * 🔍 기본 시스템 체크 (필수 메서드!)
+   * 🔍 기본 시스템 체크 (완전 구현!)
    */
   async performBasicSystemCheck() {
     try {
@@ -399,18 +389,34 @@ class SystemModule extends BaseModule {
         }
       }
 
-      // 4. 통계 업데이트
+      // 4. 봇 연결 상태 확인
+      if (this.bot && typeof this.bot.telegram === "object") {
+        logger.debug("✅ 봇 인스턴스 정상");
+      } else {
+        logger.warn("⚠️ 봇 인스턴스 상태 불명확");
+      }
+
+      // 5. ModuleManager 상태 확인
+      if (this.moduleManager && this.moduleManager.isInitialized) {
+        logger.debug("✅ ModuleManager 초기화됨");
+      } else {
+        logger.debug("⏳ ModuleManager 초기화 대기 중");
+      }
+
+      // 6. 시스템 체크 횟수 증가
       this.systemStats.systemChecks++;
 
       logger.debug("✅ SystemModule 기본 시스템 체크 완료");
     } catch (error) {
-      logger.error("❌ SystemModule 시스템 체크 실패:", error);
+      logger.error("❌ SystemModule 기본 시스템 체크 실패:", error);
       throw error;
     }
   }
 
+  // ===== 📊 데이터 수집 메서드들 =====
+
   /**
-   * 활성 모듈 조회
+   * 활성 모듈 목록 조회
    */
   async getActiveModules(moduleManager) {
     try {
@@ -419,11 +425,11 @@ class SystemModule extends BaseModule {
       }
 
       const modules = [];
-      for (const [key, instance] of moduleManager.moduleInstances) {
-        const config = moduleManager.moduleRegistry.get(key);
+      for (const [moduleKey, instance] of moduleManager.moduleInstances) {
+        const config = moduleManager.moduleRegistry.get(moduleKey);
         modules.push({
-          key,
-          name: config?.name || key,
+          key: moduleKey,
+          name: config?.name || moduleKey,
           initialized: instance.isInitialized || false,
           healthy: instance.getStatus ? instance.getStatus().healthy : true,
         });
@@ -437,69 +443,83 @@ class SystemModule extends BaseModule {
   }
 
   /**
+   * 모듈 명령어 목록 조회
+   */
+  async getModuleCommands(moduleManager) {
+    try {
+      // 기본 명령어들
+      const commands = {
+        시스템: ["/start", "/help", "/status"],
+        Todo: ["/todo", "/task"],
+        타이머: ["/timer", "/pomodoro"],
+        근무시간: ["/worktime", "/punch"],
+        기타: ["/weather", "/fortune"],
+      };
+
+      return commands;
+    } catch (error) {
+      logger.error("❌ 모듈 명령어 조회 실패:", error);
+      return {};
+    }
+  }
+
+  /**
    * 시스템 통계 조회
    */
   getSystemStats() {
-    return {
-      ...this.systemStats,
-      uptime: this.getUptime(),
-      memory: this.getMemoryUsage(),
-    };
-  }
-
-  /**
-   * 업타임 계산
-   */
-  getUptime() {
     const uptime = Date.now() - this.systemStats.startTime;
-    const days = Math.floor(uptime / (1000 * 60 * 60 * 24));
-    const hours = Math.floor(
-      (uptime % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)
-    );
-    const minutes = Math.floor((uptime % (1000 * 60 * 60)) / (1000 * 60));
 
-    return { days, hours, minutes, milliseconds: uptime };
-  }
-
-  /**
-   * 메모리 사용량 조회
-   */
-  getMemoryUsage() {
-    const usage = process.memoryUsage();
     return {
-      heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
-      heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
-      external: Math.round(usage.external / 1024 / 1024),
-      rss: Math.round(usage.rss / 1024 / 1024),
+      uptime: this.formatUptime(uptime),
+      totalCallbacks: this.systemStats.totalCallbacks,
+      totalMessages: this.systemStats.totalMessages,
+      totalErrors: this.systemStats.totalErrors,
+      systemChecks: this.systemStats.systemChecks,
+      lastActivity: this.systemStats.lastActivity,
+      memoryUsage: this.getMemoryUsage(),
     };
   }
 
   /**
    * 모듈 상태 조회
    */
-  async getModuleStatuses(moduleManager) {
+  async getModuleStatus(moduleManager) {
     try {
-      const statuses = [];
-
-      if (moduleManager && moduleManager.moduleInstances) {
-        for (const [key, instance] of moduleManager.moduleInstances) {
-          const config = moduleManager.moduleRegistry.get(key);
-          statuses.push({
-            key,
-            name: config?.name || key,
-            status: instance.getStatus
-              ? instance.getStatus()
-              : { healthy: true },
-            initialized: instance.isInitialized || false,
-          });
-        }
+      if (!moduleManager) {
+        return { total: 0, active: 0, failed: 0, modules: [] };
       }
 
-      return statuses;
+      const stats = moduleManager.stats || {};
+      const modules = await this.getActiveModules(moduleManager);
+
+      return {
+        total: stats.totalModules || 0,
+        active: stats.activeModules || 0,
+        failed: stats.failedModules || 0,
+        successRate: stats.loadSuccessRate || 0,
+        modules: modules,
+      };
     } catch (error) {
       logger.error("❌ 모듈 상태 조회 실패:", error);
-      return [];
+      return { total: 0, active: 0, failed: 0, modules: [] };
     }
+  }
+
+  /**
+   * 성능 통계 조회
+   */
+  getPerformanceStats() {
+    const memUsage = process.memoryUsage();
+
+    return {
+      memory: {
+        used: Math.round(memUsage.heapUsed / 1024 / 1024),
+        total: Math.round(memUsage.heapTotal / 1024 / 1024),
+        external: Math.round(memUsage.external / 1024 / 1024),
+      },
+      uptime: Math.round(process.uptime()),
+      cpuUsage: process.cpuUsage(),
+    };
   }
 
   /**
@@ -507,77 +527,22 @@ class SystemModule extends BaseModule {
    */
   async getSystemHealth() {
     try {
-      const health = {
-        overall: "healthy",
-        checks: {
-          memory: this.checkMemoryHealth(),
-          modules: await this.checkModulesHealth(),
-          bot: this.checkBotHealth(),
-        },
-        timestamp: TimeHelper.getTimestamp(),
+      const memUsage = this.getMemoryUsage();
+      const isMemoryHigh =
+        memUsage.heapUsed > this.config.memoryWarningThreshold;
+
+      return {
+        overall: isMemoryHigh ? "warning" : "healthy",
+        memory: isMemoryHigh ? "high" : "normal",
+        bot: this.bot ? "connected" : "disconnected",
+        moduleManager: this.moduleManager?.isInitialized
+          ? "ready"
+          : "initializing",
       };
-
-      // 전체 상태 결정
-      const hasUnhealthy = Object.values(health.checks).some(
-        (check) => check.status !== "healthy"
-      );
-
-      if (hasUnhealthy) {
-        health.overall = "degraded";
-      }
-
-      return health;
     } catch (error) {
       logger.error("❌ 시스템 헬스 체크 실패:", error);
       return { overall: "error", error: error.message };
     }
-  }
-
-  /**
-   * 메모리 헬스 체크
-   */
-  checkMemoryHealth() {
-    const memoryUsage = this.getMemoryUsage();
-    const threshold = this.config.memoryWarningThreshold;
-
-    return {
-      status: memoryUsage.heapUsed > threshold ? "warning" : "healthy",
-      usage: memoryUsage,
-      threshold,
-    };
-  }
-
-  /**
-   * 모듈 헬스 체크
-   */
-  async checkModulesHealth() {
-    try {
-      const moduleCount = this.moduleManager?.moduleInstances?.size || 0;
-      const failedCount = this.moduleManager?.stats?.failedModules || 0;
-
-      return {
-        status: failedCount > 0 ? "warning" : "healthy",
-        totalModules: moduleCount,
-        failedModules: failedCount,
-        successRate:
-          moduleCount > 0
-            ? (((moduleCount - failedCount) / moduleCount) * 100).toFixed(1)
-            : "0",
-      };
-    } catch (error) {
-      return { status: "error", error: error.message };
-    }
-  }
-
-  /**
-   * 봇 헬스 체크
-   */
-  checkBotHealth() {
-    return {
-      status: this.bot ? "healthy" : "error",
-      connected: !!this.bot,
-      lastActivity: this.systemStats.lastActivity,
-    };
   }
 
   /**
@@ -598,35 +563,59 @@ class SystemModule extends BaseModule {
     }
   }
 
+  // ===== 🛠️ 헬퍼 메서드들 =====
+
+  /**
+   * 업타임 조회
+   */
+  getUptime() {
+    const uptime = Date.now() - this.systemStats.startTime;
+    return this.formatUptime(uptime);
+  }
+
+  /**
+   * 업타임 포맷팅
+   */
+  formatUptime(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days}일 ${hours % 24}시간 ${minutes % 60}분`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes % 60}분`;
+    } else {
+      return `${minutes}분 ${seconds % 60}초`;
+    }
+  }
+
+  /**
+   * 메모리 사용량 조회
+   */
+  getMemoryUsage() {
+    const usage = process.memoryUsage();
+    return {
+      heapUsed: Math.round(usage.heapUsed / 1024 / 1024),
+      heapTotal: Math.round(usage.heapTotal / 1024 / 1024),
+      external: Math.round(usage.external / 1024 / 1024),
+      rss: Math.round(usage.rss / 1024 / 1024),
+    };
+  }
+
   /**
    * 에러 응답 처리
    */
   handleErrorResponse(error) {
+    this.systemStats.totalErrors++;
+
     return {
       success: false,
       error: error.message,
       action: "show_error",
       timestamp: TimeHelper.getTimestamp(),
     };
-  }
-
-  /**
-   * 응급 처리 (폴백)
-   */
-  async handleEmergencyAction(bot, callbackQuery, errorMessage) {
-    try {
-      logger.warn("🚨 SystemModule 응급 처리 실행");
-
-      return {
-        success: false,
-        action: "emergency_fallback",
-        error: errorMessage,
-        timestamp: TimeHelper.getTimestamp(),
-      };
-    } catch (emergencyError) {
-      logger.error("💥 SystemModule 응급 처리마저 실패:", emergencyError);
-      return false;
-    }
   }
 
   /**
@@ -670,7 +659,7 @@ class SystemModule extends BaseModule {
    */
   getStatus() {
     return {
-      healthy: this.isInitialized && !!this.bot,
+      healthy: this.isInitialized && !this.bot,
       initialized: this.isInitialized,
       stats: this.stats,
       systemStats: this.systemStats,
