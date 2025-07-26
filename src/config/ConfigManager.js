@@ -148,6 +148,46 @@ class ConfigManager {
   }
 
   /**
+   * 설정 요약 출력 메서드
+   */
+  printConfigSummary() {
+    console.log("\n🎯 ===== DooMockBot v3.0.1 설정 요약 =====");
+    console.log(`🌍 환경: ${this.nodeEnv}`);
+    console.log(`🚂 Railway: ${this.isRailway ? "✅ 활성" : "❌ 비활성"}`);
+    console.log(
+      `🤖 봇모드: ${this.get("bot.webhook.enabled") ? "웹훅" : "폴링"}`
+    );
+    console.log(`💾 데이터베이스: ${this.get("database.name")}`);
+    console.log(
+      `⚡ 캐시: ${this.get("cache.enabled") ? "✅ 활성" : "❌ 비활성"}`
+    );
+    console.log(`📝 로그레벨: ${this.get("logging.level")}`);
+    console.log(
+      `🎤 TTS: ${this.get("apis.tts.enabled") ? "✅ 활성" : "❌ 비활성"}`
+    );
+    console.log(
+      `🛡️ 보안: ${
+        this.get("security.rateLimitEnabled") ? "✅ 활성" : "❌ 비활성"
+      }`
+    );
+    console.log(
+      `🏥 헬스체크: ${this.get("performance.healthCheckInterval")}ms`
+    );
+    console.log(
+      `💾 메모리 임계값: ${this.get("performance.memoryThreshold")}MB`
+    );
+
+    if (this.isRailway) {
+      console.log(
+        `🚂 Railway 서비스: ${this.get("railway.service") || "미설정"}`
+      );
+      console.log(`🌍 Railway 지역: ${this.get("railway.region") || "미설정"}`);
+    }
+
+    console.log("=======================================\n");
+  }
+
+  /**
    * 🔍 MongoDB URL에서 DB 이름 추출
    */
   extractDatabaseName(mongoUrl) {
