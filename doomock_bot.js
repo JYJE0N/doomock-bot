@@ -513,14 +513,75 @@ class DooMockBot {
     const db = this.dbManager.db;
 
     this.moduleManager = new ModuleManager({
-      bot: null, // ✅ 수정: 아직 bot이 없으므로 null 전달
+      bot: null,
       db: db,
       config: this.config,
       validationManager: this.validationManager,
     });
 
     await this.moduleManager.initialize();
+
+    // 📝 모듈 레지스트리에서 모듈 로드
+    await this.loadModulesFromRegistry();
+
     logger.debug("✅ 모듈 매니저 초기화 완료");
+  }
+
+  /**
+   * 📝 레지스트리에서 모듈 로드
+   */
+  async loadModulesFromRegistry() {
+    try {
+      const { getEnabledModules } = require("./src/config/ModuleRegistry");
+      const enabledModules = getEnabledModules();
+
+      logger.info(`📝 ${enabledModules.length}개 모듈 로드 시작...`);
+
+      let successCount = 0;
+      let failCount = 0;
+
+      // 우선순위 순으로 이미 정렬됨
+      for (const moduleConfig of enabledModules) {
+        try {
+          const ModuleClass = require(moduleConfig.path);
+
+          const registered = this.moduleManager.registerModule(
+            moduleConfig.key,
+            ModuleClass,
+            {
+              name: moduleConfig.name,
+              description: moduleConfig.description,
+              priority: moduleConfig.priority,
+              required: moduleConfig.required,
+              moduleConfig: moduleConfig.config,
+            }
+          );
+
+          if (registered) {
+            logger.success(`✅ ${moduleConfig.name} (${moduleConfig.key})`);
+            successCount++;
+          }
+        } catch (error) {
+          logger.error(`❌ ${moduleConfig.name} 로드 실패:`, error.message);
+          failCount++;
+
+          // 필수 모듈이 실패하면 종료
+          if (moduleConfig.required) {
+            throw new Error(`필수 모듈 ${moduleConfig.name} 로드 실패`);
+          }
+        }
+      }
+
+      logger.info(
+        `📊 모듈 로드 완료: ${successCount}개 성공, ${failCount}개 실패`
+      );
+
+      // 모든 모듈 초기화
+      await this.moduleManager.initializeAllModules();
+    } catch (error) {
+      logger.error("❌ 모듈 레지스트리 로드 실패:", error);
+      throw error;
+    }
   }
 
   /**
