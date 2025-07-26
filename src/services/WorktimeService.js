@@ -18,6 +18,13 @@ class WorktimeService extends BaseService {
       lunchEnd: 13,
     };
 
+    // DB가 없어도 작동하도록 수정
+    if (!db) {
+      logger.warn("⚠️ WorktimeService: DB 없이 메모리 모드로 실행");
+      this.memoryMode = true;
+      this.memoryStore = new Map();
+    }
+
     logger.info("🕐 WorktimeService 생성됨");
   }
 
@@ -164,7 +171,9 @@ class WorktimeService extends BaseService {
   formatTime(decimalHours) {
     const hours = Math.floor(decimalHours);
     const minutes = Math.round((decimalHours - hours) * 60);
-    return `${hours.toString().padStart(2, "0")}:${minutes.toString().padStart(2, "0")}`;
+    return `${hours.toString().padStart(2, "0")}:${minutes
+      .toString()
+      .padStart(2, "0")}`;
   }
 
   // 🎯 주간 근무 기록 조회
