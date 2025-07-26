@@ -181,13 +181,19 @@ class ModuleManager {
       this.initializingModules.add(moduleKey);
       logger.debug(`🔧 ${moduleConfig.name} 초기화 중...`);
 
-      // 모듈 인스턴스 생성
-      const moduleInstance = new moduleConfig.ModuleClass(moduleKey, {
-        bot: this.bot,
-        db: this.db,
-        moduleManager: this,
-        config: moduleConfig.config,
-      });
+      // ✅ 수정: 모듈 인스턴스 생성 시 ServiceBuilder 전달
+      const moduleInstance = new moduleConfig.ModuleClass(
+        this.config.bot || this.bot,
+        {
+          bot: this.config.bot || this.bot,
+          db: this.config.db || this.db,
+          serviceBuilder: this.serviceBuilder || this.config.serviceBuilder, // ⭐ ServiceBuilder 추가!
+          moduleManager: this,
+          moduleKey: moduleKey,
+          moduleConfig: moduleConfig.config,
+          config: moduleConfig.config,
+        }
+      );
 
       // 모듈 초기화
       if (typeof moduleInstance.initialize === "function") {
@@ -201,30 +207,22 @@ class ModuleManager {
       moduleConfig.initialized = true;
       moduleConfig.initializedAt = TimeHelper.getTimestamp();
 
+      // 통계 업데이트
+      const initTime = Date.now() - startTime;
+      this.updateInitTimeStats(initTime);
       this.stats.activeModules++;
-      this.updateInitTimeStats(Date.now() - startTime);
 
-      logger.success(
-        `✅ ${moduleConfig.name} 초기화 완료 (${Date.now() - startTime}ms)`
-      );
+      logger.success(`✅ ${moduleConfig.name} 초기화 완료 (${initTime}ms)`);
     } catch (error) {
       logger.error(`❌ ${moduleKey} 초기화 실패:`, error);
-
-      // 실패한 모듈 정리
-      this.moduleInstances.delete(moduleKey);
 
       const moduleConfig = this.moduleRegistry.get(moduleKey);
       if (moduleConfig) {
         moduleConfig.initError = error.message;
         this.stats.failedModules++;
-
-        // 필수 모듈인 경우 전체 실패
-        if (moduleConfig.required) {
-          throw new Error(
-            `필수 모듈 ${moduleKey} 초기화 실패: ${error.message}`
-          );
-        }
       }
+
+      throw error;
     } finally {
       this.initializingModules.delete(moduleKey);
     }
@@ -833,6 +831,20 @@ class ModuleManager {
     }
 
     return states;
+  }
+  /**
+   * 🏗️ ServiceBuilder 설정 (ModuleManager 생성자에 추가)
+   */
+  setServiceBuilder(serviceBuilder) {
+    this.serviceBuilder = serviceBuilder;
+    logger.debug("🏗️ ServiceBuilder 연결됨");
+  }
+
+  /**
+   * 🔍 ServiceBuilder 가져오기
+   */
+  getServiceBuilder() {
+    return this.serviceBuilder;
   }
 }
 // 싱글톤 인스턴스

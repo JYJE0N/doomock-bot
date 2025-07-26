@@ -613,15 +613,20 @@ class DooMockBot {
     logger.info("📦 ModuleManager 초기화 중...");
 
     try {
-      const {
-        ModuleManager,
-        createModuleManager,
-      } = require("./src/core/ModuleManager");
+      // createModuleManager가 없을 경우를 위한 처리
+      let ModuleManager;
+      try {
+        const moduleManagerExports = require("./src/core/ModuleManager");
+        ModuleManager =
+          moduleManagerExports.ModuleManager || moduleManagerExports;
+      } catch (error) {
+        logger.error("❌ ModuleManager 로드 실패:", error);
+        throw error;
+      }
 
-      // DB 가져오기 - 수정된 부분
+      // DB 가져오기
       let db = null;
       if (this.dbManager) {
-        // getDb 메서드가 있으면 사용, 없으면 직접 접근
         if (typeof this.dbManager.getDb === "function") {
           db = this.dbManager.getDb();
         } else {
@@ -633,28 +638,31 @@ class DooMockBot {
         }
       }
 
-      this.moduleManager = createModuleManager({
+      // ModuleManager 인스턴스 생성
+      this.moduleManager = new ModuleManager({
         bot: this.bot,
-        db: db, // 수정된 부분
+        db: db,
         serviceBuilder: this.serviceBuilder,
         config: this.config,
         enableCache: this.config.moduleCacheEnabled !== false,
         isRailway: this.config.isRailway,
       });
 
-      // ServiceBuilder 설정 (추가 안전장치)
-      if (this.moduleManager.setServiceBuilder) {
+      // ServiceBuilder 설정
+      if (this.serviceBuilder && this.moduleManager.setServiceBuilder) {
         this.moduleManager.setServiceBuilder(this.serviceBuilder);
       }
 
+      // ModuleManager 초기화
       await this.moduleManager.initialize();
 
-      // 📝 모듈 레지스트리에서 모듈 로드
-      await this.loadModulesFromRegistry();
+      logger.success("✅ ModuleManager 초기화 완료");
 
-      logger.debug("✅ ModuleManager 초기화 완료");
+      // 📝 모듈 레지스트리에서 모듈 로드 (중요!)
+      await this.loadModulesFromRegistry();
     } catch (error) {
       logger.error("❌ ModuleManager 초기화 실패:", error);
+      logger.error("에러 스택:", error.stack);
       throw error;
     }
   }
@@ -690,8 +698,13 @@ class DooMockBot {
           );
 
           if (registered) {
-            logger.success(`✅ ${moduleConfig.name} (${moduleConfig.key})`);
+            logger.success(
+              `✅ ${moduleConfig.name} (${moduleConfig.key}) 등록됨`
+            );
             successCount++;
+          } else {
+            logger.warn(`⚠️ ${moduleConfig.name} 등록 실패`);
+            failCount++;
           }
         } catch (error) {
           logger.error(`❌ ${moduleConfig.name} 로드 실패:`, error.message);
@@ -699,7 +712,9 @@ class DooMockBot {
 
           // 필수 모듈이 실패하면 종료
           if (moduleConfig.required) {
-            throw new Error(`필수 모듈 ${moduleConfig.name} 로드 실패`);
+            throw new Error(
+              `필수 모듈 ${moduleConfig.name} 로드 실패: ${error.message}`
+            );
           }
         }
       }
@@ -709,7 +724,11 @@ class DooMockBot {
       );
 
       // 모든 모듈 초기화
-      await this.moduleManager.initializeAllModules();
+      if (successCount > 0) {
+        await this.moduleManager.initializeAllModules();
+      } else {
+        logger.warn("⚠️ 초기화할 모듈이 없습니다");
+      }
     } catch (error) {
       logger.error("❌ 모듈 레지스트리 로드 실패:", error);
       throw error;
