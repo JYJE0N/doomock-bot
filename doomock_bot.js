@@ -297,12 +297,32 @@ class DooMockBot {
 
       logger.info("🗄️ 데이터베이스 연결 성공");
 
-      // 🔍 디버깅 정보 출력
-      console.log("🔍 config.mongoUri:", this.config.mongoUri);
-      console.log("🔍 process.env.MONGO_URL:", process.env.MONGO_URL);
-      console.log("🔍 dbManager.mongoUrl:", this.dbManager.mongoUrl);
-      console.log("🔍 dbManager 생성:", !!this.dbManager);
-      console.log("🔍 연결 상태:", this.dbManager.isConnected);
+      // 🔍 디버깅 정보 출력 (보안강화)
+      if (
+        process.env.NODE_ENV === "development" &&
+        process.env.SHOW_SENSITIVE === "true"
+      ) {
+        console.log("🔍 config.mongoUri:", this.config.mongoUri);
+        console.log("🔍 process.env.MONGO_URL:", process.env.MONGO_URL);
+        console.log("🔍 dbManager.mongoUrl:", this.dbManager.mongoUrl);
+        console.log("🔍 dbManager 생성:", !!this.dbManager);
+        console.log("🔍 연결 상태:", this.dbManager.isConnected);
+      } else {
+        console.log(
+          "🔍 config.mongoUri:",
+          this.config.mongoUri ? "설정됨" : "없음"
+        );
+        console.log(
+          "🔍 process.env.MONGO_URL:",
+          process.env.MONGO_URL ? "설정됨" : "없음"
+        );
+        console.log(
+          "🔍 dbManager.mongoUrl:",
+          this.dbManager.mongoUrl ? "설정됨" : "없음"
+        );
+        console.log("🔍 dbManager 생성:", !!this.dbManager); // ✅ 수정: "설정됨" 제거
+        console.log("🔍 연결 상태:", this.dbManager.isConnected); // ✅ 수정: boolean 값 그대로
+      }
 
       logger.debug("✅ 데이터베이스 매니저 초기화 완료");
     } catch (error) {

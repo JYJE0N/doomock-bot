@@ -506,7 +506,291 @@ class AdvancedLogger {
   }
 }
 
-// 싱글톤 인스턴스 생성 및 내보내기
-const logger = new AdvancedLogger();
+/**
+ * 🛡️ 민감한 정보 마스킹 클래스
+ */
+class SensitiveDataMasker {
+  constructor() {
+    // 마스킹할 패턴들
+    this.patterns = [
+      // 봇 토큰 (숫자:영숫자 형식)
+      {
+        regex: /\b\d{8,12}:[A-Za-z0-9_-]{30,40}\b/g,
+        replacement: "[BOT_TOKEN]",
+      },
+      // MongoDB URI
+      {
+        regex: /mongodb(\+srv)?:\/\/[^:]+:[^@]+@[^\/\s]+/gi,
+        replacement: "mongodb://[USER]:[PASS]@[HOST]",
+      },
+      // MongoDB 비밀번호만
+      {
+        regex: /mongo:[A-Za-z0-9]{20,}/g,
+        replacement: "mongo:[MONGODB_PASS]",
+      },
+      // API 키 형식 (32자 이상의 영숫자)
+      {
+        regex: /\b[A-Za-z0-9_-]{32,}\b/g,
+        replacement: (match) => {
+          // 파일 경로나 일반 텍스트는 제외
+          if (match.includes("/") || match.includes("_") || match.length < 35) {
+            return match;
+          }
+          return "[API_KEY]";
+        },
+      },
+      // 이메일 주소
+      {
+        regex: /\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b/g,
+        replacement: "[EMAIL]",
+      },
+      // IP 주소
+      {
+        regex: /\b(?:\d{1,3}\.){3}\d{1,3}\b/g,
+        replacement: "[IP_ADDRESS]",
+      },
+      // 전화번호
+      {
+        regex: /\b\d{3}[-.]?\d{3,4}[-.]?\d{4}\b/g,
+        replacement: "[PHONE]",
+      },
+      // JWT 토큰
+      {
+        regex: /Bearer\s+[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+\.[A-Za-z0-9-_]+/g,
+        replacement: "Bearer [JWT_TOKEN]",
+      },
+      // 신용카드 번호
+      {
+        regex: /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g,
+        replacement: "[CARD_NUMBER]",
+      },
+      // Railway 도메인
+      {
+        regex: /[a-z0-9-]+\.proxy\.rlwy\.net/g,
+        replacement: "[RAILWAY_HOST]",
+      },
+      // 포트 번호가 포함된 URL
+      {
+        regex: /:(\d{4,5})\//g,
+        replacement: ":[PORT]/",
+      },
+    ];
+
+    // 환경변수로 추가 패턴 설정 가능
+    this.customPatterns = this.loadCustomPatterns();
+  }
+
+  /**
+   * 커스텀 패턴 로드
+   */
+  loadCustomPatterns() {
+    const patterns = [];
+
+    // 특정 환경변수 값들을 마스킹
+    const sensitiveEnvVars = [
+      "BOT_TOKEN",
+      "MONGO_URL",
+      "MONGODB_URI",
+      "DATABASE_URL",
+      "OPENWEATHER_API_KEY",
+      "GOOGLE_CLOUD_KEY",
+      "AWS_ACCESS_KEY_ID",
+      "AWS_SECRET_ACCESS_KEY",
+    ];
+
+    sensitiveEnvVars.forEach((varName) => {
+      const value = process.env[varName];
+      if (value && value.length > 5) {
+        patterns.push({
+          regex: new RegExp(this.escapeRegExp(value), "g"),
+          replacement: `[${varName}]`,
+        });
+      }
+    });
+
+    return patterns;
+  }
+
+  /**
+   * 정규식 특수문자 이스케이프
+   */
+  escapeRegExp(string) {
+    return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  /**
+   * 텍스트 마스킹
+   */
+  mask(text) {
+    if (typeof text !== "string") {
+      if (typeof text === "object") {
+        return this.maskObject(text);
+      }
+      return text;
+    }
+
+    let maskedText = text;
+
+    // 기본 패턴 적용
+    this.patterns.forEach((pattern) => {
+      if (typeof pattern.replacement === "function") {
+        maskedText = maskedText.replace(pattern.regex, pattern.replacement);
+      } else {
+        maskedText = maskedText.replace(pattern.regex, pattern.replacement);
+      }
+    });
+
+    // 커스텀 패턴 적용
+    this.customPatterns.forEach((pattern) => {
+      maskedText = maskedText.replace(pattern.regex, pattern.replacement);
+    });
+
+    return maskedText;
+  }
+
+  /**
+   * 객체 마스킹 (재귀적)
+   */
+  maskObject(obj) {
+    if (!obj || typeof obj !== "object") {
+      return obj;
+    }
+
+    // 배열인 경우
+    if (Array.isArray(obj)) {
+      return obj.map((item) => this.mask(item));
+    }
+
+    // 객체인 경우
+    const maskedObj = {};
+    const sensitiveKeys = [
+      "password",
+      "token",
+      "secret",
+      "key",
+      "auth",
+      "credential",
+      "private",
+      "api_key",
+      "apikey",
+      "access_token",
+      "refresh_token",
+      "bearer",
+    ];
+
+    for (const [key, value] of Object.entries(obj)) {
+      // 키 이름이 민감한 정보를 나타내는 경우
+      const lowerKey = key.toLowerCase();
+      if (sensitiveKeys.some((sensitive) => lowerKey.includes(sensitive))) {
+        maskedObj[key] = "[REDACTED]";
+      } else if (typeof value === "string") {
+        maskedObj[key] = this.mask(value);
+      } else if (typeof value === "object") {
+        maskedObj[key] = this.maskObject(value);
+      } else {
+        maskedObj[key] = value;
+      }
+    }
+
+    return maskedObj;
+  }
+}
+
+// Logger 클래스 수정
+class Logger {
+  constructor() {
+    // ... 기존 코드 ...
+
+    // 🛡️ 마스킹 인스턴스
+    this.masker = new SensitiveDataMasker();
+
+    // 마스킹 활성화 여부
+    this.enableMasking = process.env.ENABLE_LOG_MASKING !== "false";
+  }
+
+  /**
+   * 🛡️ 메시지 마스킹
+   */
+  maskMessage(message, ...args) {
+    if (!this.enableMasking) {
+      return { message, args };
+    }
+
+    // 메시지 마스킹
+    const maskedMessage = this.masker.mask(message);
+
+    // 인자들 마스킹
+    const maskedArgs = args.map((arg) => {
+      if (typeof arg === "string") {
+        return this.masker.mask(arg);
+      } else if (typeof arg === "object") {
+        return this.masker.maskObject(arg);
+      }
+      return arg;
+    });
+
+    return { message: maskedMessage, args: maskedArgs };
+  }
+
+  // 기존 로그 메서드들 수정
+  log(level, message, ...args) {
+    // 마스킹 적용
+    const { message: maskedMessage, args: maskedArgs } = this.maskMessage(
+      message,
+      ...args
+    );
+
+    const timestamp = this.getTimestamp();
+    const coloredLevel = this.colorize(level.toUpperCase().padEnd(7), level);
+    const icon = this.getIcon(level);
+
+    let logMessage = `${icon} [${timestamp}] ${coloredLevel} ${maskedMessage}`;
+
+    if (maskedArgs.length > 0) {
+      const formattedArgs = maskedArgs
+        .map((arg) =>
+          typeof arg === "object" ? JSON.stringify(arg, null, 2) : arg
+        )
+        .join(" ");
+      logMessage += ` ${formattedArgs}`;
+    }
+
+    console.log(logMessage);
+  }
+
+  // 각 로그 레벨 메서드도 수정
+  info(message, ...args) {
+    if (this.level <= this.levels.INFO) {
+      this.log("info", message, ...args);
+    }
+  }
+
+  debug(message, ...args) {
+    if (this.level <= this.levels.DEBUG) {
+      this.log("debug", message, ...args);
+    }
+  }
+
+  warn(message, ...args) {
+    if (this.level <= this.levels.WARN) {
+      this.log("warn", message, ...args);
+    }
+  }
+
+  error(message, ...args) {
+    if (this.level <= this.levels.ERROR) {
+      this.log("error", message, ...args);
+    }
+  }
+
+  success(message, ...args) {
+    if (this.level <= this.levels.INFO) {
+      this.log("success", message, ...args);
+    }
+  }
+}
+
+// 전역 인스턴스 생성
+const logger = new Logger();
 
 module.exports = logger;
