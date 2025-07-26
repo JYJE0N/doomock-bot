@@ -1,14 +1,14 @@
 // src/services/InsightService.js - 미세먼지 기반 마케팅 인사이트 서비스
 
 const BaseService = require("./BaseService");
-const AirQualityService = require("./AirQualityService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const AirQualityHelper = require("../utils/AirQualityHelper");
 
 class InsightService extends BaseService {
   constructor() {
     super();
-    this.airQualityService = new AirQualityService();
+    this.AirQualityHelper = new AirQualityHelper();
 
     // 마케팅 데이터베이스 (실제 환경에서는 DB 연동)
     this.marketData = {
@@ -40,7 +40,7 @@ class InsightService extends BaseService {
    */
   async generateFullInsight(userName) {
     try {
-      const airData = await this.airQualityService.getMarketingInsightData();
+      const airData = await this.AirQualityHelper.getMarketingInsightData();
       const marketAnalysis = this.generateMarketAnalysis(airData);
       const actionPlan = this.generateActionPlan(airData, marketAnalysis);
 
@@ -93,7 +93,7 @@ ${airData.analysis.marketingMessage.urgency}
    */
   async generateQuickInsight(userName) {
     try {
-      const airResult = await this.airQualityService.getCurrentAirQuality(
+      const airResult = await this.AirQualityHelper.getCurrentAirQuality(
         "화성"
       );
       const airData = airResult.data;
@@ -126,7 +126,7 @@ ${this.getOnePointStrategy(grade)}
   async generateDashboard(userName) {
     try {
       const nationalResult =
-        await this.airQualityService.getNationalAirQuality();
+        await this.AirQualityHelper.getNationalAirQuality();
       const nationalData = nationalResult.data;
 
       const dashboard = `📱 **${userName}님의 실시간 대시보드**
@@ -172,7 +172,7 @@ ${this.generateRealTimeAlerts(nationalData)}
    */
   async generateProductStrategy(userName) {
     try {
-      const airResult = await this.airQualityService.getCurrentAirQuality(
+      const airResult = await this.AirQualityHelper.getCurrentAirQuality(
         "화성"
       );
       const grade = Math.max(
@@ -220,8 +220,8 @@ ${this.getProductMixRecommendation(grade)}`;
   async generatePricingStrategy(userName) {
     try {
       const [airResult, nationalResult] = await Promise.all([
-        this.airQualityService.getCurrentAirQuality("화성"),
-        this.airQualityService.getNationalAirQuality(),
+        this.AirQualityHelper.getCurrentAirQuality("화성"),
+        this.AirQualityHelper.getNationalAirQuality(),
       ]);
 
       const localGrade = Math.max(
@@ -278,8 +278,8 @@ ${this.marketData.products
   async generateInventoryStrategy(userName) {
     try {
       const [airResult, forecastResult] = await Promise.all([
-        this.airQualityService.getCurrentAirQuality("화성"),
-        this.airQualityService.getAirQualityForecast(),
+        this.AirQualityHelper.getCurrentAirQuality("화성"),
+        this.AirQualityHelper.getAirQualityForecast(),
       ]);
 
       const currentGrade = Math.max(
@@ -342,7 +342,7 @@ ${this.getInventoryTurnoverImprovement(currentGrade)}`;
    */
   async generateMarketingStrategy(userName) {
     try {
-      const airData = await this.airQualityService.getMarketingInsightData();
+      const airData = await this.AirQualityHelper.getMarketingInsightData();
 
       const strategy = `🎯 **${userName}님의 마케팅 전략**
 
@@ -389,7 +389,7 @@ ${this.getExecutionTimeline(airData.current)}`;
   async generateNationalStatus(userName) {
     try {
       const nationalResult =
-        await this.airQualityService.getNationalAirQuality();
+        await this.AirQualityHelper.getNationalAirQuality();
       const nationalData = nationalResult.data;
 
       const status = `🗺️ **${userName}님의 전국 현황 분석**
