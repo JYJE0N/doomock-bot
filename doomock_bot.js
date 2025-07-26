@@ -1,13 +1,13 @@
-// doomock_bot.js - v3.0.1 Telegraf 마이그레이션 버전 (ConfigManager 에러 + dotenv 수정)
-
-// 🔑 가장 먼저 dotenv 로드 (환경변수 읽기 위해)
+// 🔑 두몫봇
 require("dotenv").config();
 
 const { Telegraf } = require("telegraf");
 const logger = require("./src/utils/Logger");
 
 // 🏗️ 핵심 시스템들
-const { DatabaseManager } = require("./src/database/DatabaseManager"); // ✅ 올바른 경로!
+const {
+  getInstance: getDatabaseManager,
+} = require("./src/database/DatabaseManager"); // ✅ 싱글톤 패턴!
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
@@ -168,14 +168,14 @@ class DooMockBot {
   }
 
   /**
-   * 🗄️ 데이터베이스 매니저 초기화 (싱글톤 패턴)
+   * 🗄️ 데이터베이스 매니저 초기화 (싱글톤 패턴 - 올바른 방식)
    */
   async initializeDatabaseManager() {
     logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
 
     try {
-      // 싱글톤 패턴으로 인스턴스 가져오기
-      this.dbManager = new DatabaseManager(this.config.mongoUri);
+      // ✅ 싱글톤 패턴으로 인스턴스 가져오기 (표준 방식)
+      this.dbManager = getDatabaseManager();
 
       await this.dbManager.connect();
       logger.info("🗄️ 데이터베이스 연결 성공");
@@ -306,15 +306,26 @@ class DooMockBot {
   }
 
   /**
-   * 📦 모듈 매니저 초기화
+   * 📦 모듈 매니저 초기화 (매개변수 수정)
    */
   async initializeModuleManager() {
     logger.info("📦 모듈 매니저 초기화 중...");
 
-    this.moduleManager = new ModuleManager(this.bot, {
-      db: this.dbManager?.db, // ✅ DatabaseManager에서 db 사용
-      isRailway: this.config.isRailway,
-      validationManager: this.validationManager,
+    // ✅ DatabaseManager 존재 확인
+    if (!this.dbManager || !this.dbManager.db) {
+      throw new Error("DatabaseManager가 없거나 DB 연결이 없습니다.");
+    }
+
+    this.moduleManager = new ModuleManager({
+      bot: this.bot, // ✅ bot 인스턴스
+      db: this.dbManager.db, // ✅ DB 인스턴스 (dbManager.db)
+      config: {
+        isRailway: this.config.isRailway,
+        enableValidation: this.config.enableValidation,
+        maxModules: 20,
+        timeout: 30000,
+      },
+      validationManager: this.validationManager, // ✅ ValidationManager
     });
 
     await this.moduleManager.initialize();
@@ -322,15 +333,31 @@ class DooMockBot {
   }
 
   /**
-   * 🎮 봇 컨트롤러 초기화
+   * 🎮 봇 컨트롤러 초기화 (매개변수 수정)
    */
   async initializeBotController() {
     logger.info("🎮 봇 컨트롤러 초기화 중...");
 
-    this.botController = new BotController(this.bot, {
-      moduleManager: this.moduleManager,
-      validationManager: this.validationManager,
-      isRailway: this.config.isRailway,
+    // ✅ ModuleManager 존재 확인
+    if (!this.moduleManager) {
+      throw new Error(
+        "ModuleManager가 없습니다. ModuleManager를 먼저 초기화해주세요."
+      );
+    }
+
+    this.botController = new BotController({
+      bot: this.bot, // ✅ bot 인스턴스
+      moduleManager: this.moduleManager, // ✅ 핵심! ModuleManager 전달
+      dbManager: this.dbManager, // ✅ DatabaseManager
+      validationManager: this.validationManager, // ✅ ValidationManager
+      healthChecker: this.healthChecker, // ✅ HealthChecker
+      config: {
+        rateLimitEnabled: this.config.rateLimitEnabled,
+        maxRequestsPerMinute: this.config.maxRequestsPerMinute,
+        messageTimeout: 5000,
+        callbackTimeout: 2000,
+        isRailway: this.config.isRailway,
+      },
     });
 
     await this.botController.initialize();
