@@ -1,13 +1,9 @@
-// 🔑 두몫봇
 require("dotenv").config();
 
 const { Telegraf } = require("telegraf");
 const logger = require("./src/utils/Logger");
 
 // 🏗️ 핵심 시스템들
-const {
-  getInstance: getDatabaseManager,
-} = require("./src/database/DatabaseManager"); // ✅ 싱글톤 패턴!
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
@@ -16,7 +12,7 @@ const ValidationManager = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
 
 /**
- * 🚀 메인 애플리케이션 v3.0.1 - Telegraf 버전 (ConfigManager 에러만 수정)
+ * 🚀 메인 애플리케이션 v3.0.1
  *
  * 🎯 핵심 변경사항:
  * - ConfigManager.isRailwayEnvironment() 에러만 수정
@@ -168,14 +164,15 @@ class DooMockBot {
   }
 
   /**
-   * 🗄️ 데이터베이스 매니저 초기화 (싱글톤 패턴 - 올바른 방식)
+   * 🗄️ 데이터베이스 매니저 초기화 (올바른 URL 전달)
    */
   async initializeDatabaseManager() {
     logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
 
     try {
-      // ✅ 싱글톤 패턴으로 인스턴스 가져오기 (표준 방식)
-      this.dbManager = getDatabaseManager();
+      // ✅ 핵심 수정! createInstance()로 URL 직접 전달
+      const { createInstance } = require("./src/database/DatabaseManager");
+      this.dbManager = createInstance(this.config.mongoUri);
 
       await this.dbManager.connect();
       logger.info("🗄️ 데이터베이스 연결 성공");
@@ -186,6 +183,7 @@ class DooMockBot {
 
     // 디버깅 정보
     console.log("🔍 config.mongoUri:", this.config.mongoUri);
+    console.log("🔍 dbManager.mongoUrl:", this.dbManager.mongoUrl);
     console.log("🔍 dbManager 생성 후:", !!this.dbManager);
     console.log("🔍 연결 시도 후:", this.dbManager.isConnected);
   }
@@ -306,7 +304,7 @@ class DooMockBot {
   }
 
   /**
-   * 📦 모듈 매니저 초기화 (매개변수 수정)
+   * 📦 모듈 매니저 초기화 (순환 참조 방지)
    */
   async initializeModuleManager() {
     logger.info("📦 모듈 매니저 초기화 중...");
@@ -316,24 +314,27 @@ class DooMockBot {
       throw new Error("DatabaseManager가 없거나 DB 연결이 없습니다.");
     }
 
+    // ✅ 순환 참조 방지: ModuleManager 먼저 생성 (빈 상태)
     this.moduleManager = new ModuleManager({
-      bot: this.bot, // ✅ bot 인스턴스
-      db: this.dbManager.db, // ✅ DB 인스턴스 (dbManager.db)
+      bot: this.bot,
+      db: this.dbManager.db,
       config: {
         isRailway: this.config.isRailway,
         enableValidation: this.config.enableValidation,
         maxModules: 20,
         timeout: 30000,
       },
-      validationManager: this.validationManager, // ✅ ValidationManager
+      validationManager: this.validationManager,
     });
 
+    // ✅ ModuleManager 초기화 (모듈들 로드)
     await this.moduleManager.initialize();
+
     logger.info("📦 모듈 매니저 초기화 완료");
   }
 
   /**
-   * 🎮 봇 컨트롤러 초기화 (매개변수 수정)
+   * 🎮 봇 컨트롤러 초기화 (순환 참조 방지)
    */
   async initializeBotController() {
     logger.info("🎮 봇 컨트롤러 초기화 중...");
@@ -345,12 +346,13 @@ class DooMockBot {
       );
     }
 
+    // ✅ 순환 참조 방지: BotController는 ModuleManager만 참조 (역참조 없음)
     this.botController = new BotController({
-      bot: this.bot, // ✅ bot 인스턴스
-      moduleManager: this.moduleManager, // ✅ 핵심! ModuleManager 전달
-      dbManager: this.dbManager, // ✅ DatabaseManager
-      validationManager: this.validationManager, // ✅ ValidationManager
-      healthChecker: this.healthChecker, // ✅ HealthChecker
+      bot: this.bot,
+      moduleManager: this.moduleManager, // ✅ 단방향 참조만!
+      dbManager: this.dbManager,
+      validationManager: this.validationManager,
+      healthChecker: this.healthChecker,
       config: {
         rateLimitEnabled: this.config.rateLimitEnabled,
         maxRequestsPerMinute: this.config.maxRequestsPerMinute,
