@@ -499,37 +499,137 @@ class DooMockBot {
   }
 
   /**
-   * 🚀 봇 시작
+   * 🚀 봇 시작 (Railway 중복 실행 방지)
    */
   async startBot() {
     logger.info("🚀 봇 시작 중...");
 
-    if (this.config.isRailway && process.env.PORT) {
-      // Railway 환경에서는 웹훅 사용
-      const port = process.env.PORT;
-      const domain =
-        process.env.RAILWAY_PUBLIC_DOMAIN || process.env.WEBHOOK_DOMAIN;
+    try {
+      // 🛡️ 1단계: 기존 연결 정리 (핵심!)
+      logger.debug("🧹 기존 봇 연결 정리 중...");
 
-      if (domain) {
-        await this.bot.launch({
-          webhook: {
-            domain: `https://${domain}`,
-            port: port,
-          },
-        });
-        logger.info(`🌐 웹훅 모드로 시작됨 (포트: ${port})`);
-      } else {
-        // 도메인이 없으면 폴링 모드
-        await this.bot.launch();
-        logger.info("🔄 폴링 모드로 시작됨");
+      try {
+        await this.bot.telegram.deleteWebhook();
+        logger.debug("✅ 웹훅 정리됨");
+      } catch (webhookError) {
+        logger.debug("⚠️ 웹훅 정리 실패 (무시):", webhookError.message);
       }
-    } else {
-      // 로컬 환경에서는 폴링 사용
-      await this.bot.launch();
-      logger.info("🔄 폴링 모드로 시작됨");
-    }
 
-    logger.success("✅ 봇 시작 완료");
+      // 🛡️ 2단계: 안전 대기 (충돌 방지)
+      logger.debug("⏳ 안전 대기 중... (3초)");
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+
+      // 🛡️ 3단계: Railway 환경별 시작 방식
+      if (this.config.isRailway) {
+        await this.startRailwayBot();
+      } else {
+        await this.startLocalBot();
+      }
+
+      logger.success("✅ 봇 시작 완료");
+    } catch (error) {
+      await this.handleBotStartError(error);
+    }
+  }
+
+  /**
+   * 🏠 로컬 환경 봇 시작
+   */
+  async startLocalBot() {
+    logger.info("🏠 로컬 폴링 모드 시작");
+    await this.startPollingMode();
+  }
+
+  /**
+   * 🔄 폴링 모드 시작 (Railway 최적화)
+   */
+  async startPollingMode() {
+    await this.bot.launch({
+      polling: {
+        timeout: 30,
+        limit: 100,
+        allowed_updates: ["message", "callback_query"],
+        drop_pending_updates: true, // 🔥 중요: 이전 업데이트 무시
+      },
+    });
+  }
+
+  /**
+   * 🚨 봇 시작 에러 처리 (409 Conflict 특별 처리)
+   */
+  async handleBotStartError(error) {
+    logger.error("❌ 봇 시작 실패:", error.message);
+
+    // 409 Conflict 특별 처리
+    if (error.response?.error_code === 409) {
+      logger.warn("⚠️ 봇 중복 실행 감지! 복구 시도 중...");
+
+      // 강제 정리 및 재시도
+      await this.forceBotRecovery();
+    } else {
+      // 다른 에러는 그대로 던지기
+      throw error;
+    }
+  }
+
+  /**
+   * 🛠️ 봇 강제 복구 (409 에러 시)
+   */
+  async forceBotRecovery() {
+    try {
+      logger.info("🔧 봇 강제 복구 시작...");
+
+      // 1. 웹훅 완전 삭제
+      await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+      logger.debug("🧹 웹훅 및 대기 업데이트 정리됨");
+
+      // 2. 더 긴 대기
+      logger.debug("⏳ 복구 대기 중... (10초)");
+      await new Promise((resolve) => setTimeout(resolve, 10000));
+
+      // 3. 폴링 모드로 재시도
+      logger.info("🔄 폴링 모드로 복구 시도");
+      await this.startPollingMode();
+
+      logger.success("✅ 봇 복구 성공!");
+    } catch (recoveryError) {
+      logger.error("❌ 봇 복구 실패:", recoveryError);
+      throw new Error(`봇 복구 실패: ${recoveryError.message}`);
+    }
+  }
+
+  /**
+   * 🚂 Railway 환경 봇 시작
+   */
+  async startRailwayBot() {
+    const port = process.env.PORT || 3000;
+    const domain =
+      process.env.RAILWAY_PUBLIC_DOMAIN || process.env.WEBHOOK_DOMAIN;
+
+    if (domain) {
+      // 웹훅 모드 (Railway 권장)
+      logger.info(`🌐 웹훅 모드 시작: ${domain}:${port}`);
+
+      const webhookUrl = `https://${domain}/webhook`;
+
+      // 웹훅 설정 (Railway 최적화)
+      await this.bot.telegram.setWebhook(webhookUrl, {
+        allowed_updates: ["message", "callback_query"],
+        drop_pending_updates: true, // 🔥 중요: 대기 중인 업데이트 삭제
+      });
+
+      await this.bot.launch({
+        webhook: {
+          domain: `https://${domain}`,
+          port: port,
+          hookPath: "/webhook",
+        },
+      });
+    } else {
+      // 폴링 모드 (도메인 없는 경우)
+      logger.info("🔄 Railway 폴링 모드 시작");
+      await this.startPollingMode();
+    }
   }
 
   /**
@@ -590,43 +690,144 @@ class DooMockBot {
    * 🔧 프로세스 이벤트 핸들러 설정
    */
   setupProcessHandlers() {
+    // 🛡️ 중복 핸들러 방지
+    if (this.processHandlersSetup) {
+      return;
+    }
+    this.processHandlersSetup = true;
+
     // 정상 종료 시그널 처리
-    process.once("SIGINT", () => {
+    process.once("SIGINT", async () => {
       logger.info("📡 SIGINT 수신 - 정상 종료 시작");
-      this.stop().then(() => process.exit(0));
+      await this.gracefulShutdown("SIGINT");
     });
 
-    process.once("SIGTERM", () => {
-      logger.info("📡 SIGTERM 수신 - 정상 종료 시작");
-      this.stop().then(() => process.exit(0));
+    process.once("SIGTERM", async () => {
+      logger.info("📡 SIGTERM 수신 - Railway 재배포 감지");
+      await this.gracefulShutdown("SIGTERM");
     });
 
-    // 예외 처리
-    process.on("uncaughtException", (error) => {
+    // Railway 특별 처리
+    if (this.config.isRailway) {
+      // Railway 헬스체크 응답
+      process.on('SIGUSR2', () => {
+        logger.debug("💓 Railway 헬스체크 수신");
+      });
+    }
+
+    // 예외 처리 (Railway 안전)
+    process.on("uncaughtException", async (error) => {
       logger.error("💥 처리되지 않은 예외:", error);
-      this.handleInitializationFailure(error).then(() => process.exit(1));
+      await this.emergencyShutdown(error);
     });
 
     process.on("unhandledRejection", (reason, promise) => {
       logger.error("💥 처리되지 않은 Promise 거부:", reason);
-      logger.error("Promise:", promise);
+      // Railway에서는 즉시 종료하지 않고 로깅만
+      if (this.config.isRailway) {
+        logger.warn("⚠️ Railway 환경: Promise 거부 무시하고 계속 실행");
+      }
     });
 
-    // Railway 환경에서의 메모리 모니터링
+    // Railway 메모리 모니터링 (최적화)
     if (this.config.isRailway) {
       setInterval(() => {
         const memUsage = process.memoryUsage();
         const memUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
 
-        if (memUsedMB > 450) {
-          // Railway 메모리 제한 근처
+        // Railway 메모리 제한: 512MB
+        if (memUsedMB > 400) {
           logger.warn(`⚠️ 높은 메모리 사용량: ${memUsedMB}MB`);
+          
+          // 캐시 정리 시도
+          if (global.gc) {
+            global.gc();
+            logger.debug("🧹 가비지 컬렉션 실행됨");
+          }
         }
       }, 60000); // 1분마다 체크
     }
+  
   }
-}
+  /**
+   * 🛑 정상 종료 (Railway 최적화)
+   */
+  async gracefulShutdown(signal) {
+    logger.info(`🛑 정상 종료 시작 (${signal})...`);
 
+    try {
+      // 🛡️ 1단계: 봇 연결 정리 (가장 중요!)
+      if (this.bot) {
+        logger.debug("🤖 봇 연결 종료 중...");
+        
+        try {
+          // 웹훅 정리
+          await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
+          logger.debug("🧹 웹훅 정리됨");
+        } catch (webhookError) {
+          logger.debug("⚠️ 웹훅 정리 실패 (무시)");
+        }
+        
+        // 봇 정지
+        this.bot.stop(signal);
+        logger.debug("✅ 봇 정지됨");
+      }
+
+      // 2단계: 헬스체커 정지
+      if (this.healthChecker) {
+        await this.healthChecker.stop();
+        logger.debug("🏥 헬스체커 정지됨");
+      }
+
+      // 3단계: 모듈 정리
+      if (this.moduleManager) {
+        await this.moduleManager.cleanup();
+        logger.debug("📦 모듈 정리됨");
+      }
+
+      // 4단계: 데이터베이스 연결 해제
+      if (this.dbManager) {
+        await this.dbManager.disconnect();
+        logger.debug("🗄️ DB 연결 해제됨");
+      }
+
+      // Railway: 정상 종료 신호
+      logger.success("✅ 정상 종료 완료");
+      
+      // Railway 종료 대기 (중복 방지)
+      setTimeout(() => {
+        process.exit(0);
+      }, 1000);
+
+    } catch (error) {
+      logger.error("❌ 정상 종료 실패:", error);
+      await this.emergencyShutdown(error);
+    }
+  }
+
+  /**
+   * 🚨 비상 종료
+   */
+  async emergencyShutdown(error) {
+    logger.error("🚨 비상 종료 실행...");
+
+    try {
+      // 최소한의 정리만
+      if (this.bot) {
+        this.bot.stop("SIGKILL");
+      }
+      
+      if (this.dbManager) {
+        await this.dbManager.disconnect();
+      }
+
+    } catch (cleanupError) {
+      logger.error("❌ 비상 정리 실패:", cleanupError);
+    } finally {
+      logger.error("💥 비상 종료됨");
+      process.exit(1);
+    }
+  }
 // 애플리케이션 인스턴스 생성 및 시작
 const app = new DooMockBot();
 

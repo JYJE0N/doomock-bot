@@ -562,6 +562,47 @@ class BotController {
   }
 
   /**
+   * 🏥 Railway 헬스체크 엔드포인트 설정
+   */
+  setupHealthEndpoint() {
+    if (!this.config.isRailway) return;
+
+    const express = require("express");
+    const app = express();
+
+    // 헬스체크 엔드포인트
+    app.get("/health", (req, res) => {
+      const health = {
+        status: "healthy",
+        timestamp: new Date().toISOString(),
+        uptime: process.uptime(),
+        memory: process.memoryUsage(),
+        bot: {
+          initialized: this.initialized,
+          connected: !!this.bot,
+        },
+        modules: {
+          total: this.moduleManager?.stats?.totalModules || 0,
+          active: this.moduleManager?.stats?.activeModules || 0,
+          failed: this.moduleManager?.stats?.failedModules || 0,
+        },
+      };
+
+      res.status(200).json(health);
+    });
+
+    // 간단한 핑
+    app.get("/ping", (req, res) => {
+      res.status(200).text("pong");
+    });
+
+    const port = process.env.PORT || 3000;
+    app.listen(port, () => {
+      logger.debug(`🏥 헬스체크 서버 시작: 포트 ${port}`);
+    });
+  }
+
+  /**
    * 🛑 정리 (NavigationHandler 포함)
    */
   async cleanup() {

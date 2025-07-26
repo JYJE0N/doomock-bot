@@ -1,0 +1,6 @@
+# railway.toml - 간단 버전
+[deploy]
+replicas = 1
+
+[env]
+NODE_ENV = "production"

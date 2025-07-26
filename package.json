@@ -6,9 +6,11 @@
   "scripts": {
     "start": "node doomock_bot.js",
     "dev": "NODE_ENV=development nodemon doomock_bot.js",
+    "railway": "NODE_ENV=production node --max-old-space-size=400 doomock_bot.js",
+    "test": "node --test",
+    "health": "node scripts/health-check.js",
     "railway:start": "NODE_ENV=production node doomock_bot.js",
     "railway:build": "echo 'Build complete'",
-    "test": "echo 'Tests will be added later'",
     "cleanup": "pkill -f 'node doomock_bot.js' || true",
     "restart": "npm run cleanup && sleep 5 && npm start"
   },
