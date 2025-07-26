@@ -1,4 +1,4 @@
-// 메인 엔트리 포인트 완전 리팩토링 v3.0.1
+// doomock_bot.js - 완전 리팩토링 v3.0.1
 require("dotenv").config(); // 🔑 dotenv는 최우선으로 로드
 
 const { Telegraf } = require("telegraf");
@@ -302,15 +302,12 @@ class DooMockBot {
   async initializeDatabaseManager() {
     logger.debug("🗄️ 데이터베이스 매니저 생성 중...");
 
-    const dbManager = new DatabaseManager({
-      mongoUri: process.env.MONGO_URL,
-      connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
-      maxRetries: parseInt(process.env.DB_MAX_RETRIES) || 3,
-    });
+    // DatabaseManager는 싱글톤 패턴을 사용하므로 새 인스턴스 생성
+    const dbManager = new DatabaseManager(process.env.MONGO_URL);
 
     // 연결 시도
     logger.debug("🔗 데이터베이스 연결 중...");
-    await dbManager.initialize();
+    await dbManager.connect();
 
     // 연결 확인 대기
     await this.waitForDatabaseConnection(dbManager);
@@ -331,7 +328,7 @@ class DooMockBot {
 
     while (Date.now() - startTime < timeout) {
       try {
-        if (dbManager.isConnected && dbManager.isConnected()) {
+        if (dbManager.isConnected) {
           const waitTime = Date.now() - startTime;
           logger.debug(`✅ 데이터베이스 연결 확인 완료 (${waitTime}ms)`);
           return;
@@ -360,7 +357,7 @@ class DooMockBot {
     const dbManager = this.components.get("dbManager");
     if (dbManager) {
       ServiceBuilder.dbManager = dbManager;
-      ServiceBuilder.db = dbManager.getDatabase();
+      ServiceBuilder.db = dbManager.db;
     }
 
     // 컴포넌트로 등록
