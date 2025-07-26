@@ -678,7 +678,7 @@ class FortuneService extends BaseService {
       `🎁 행운의 아이템: ${this.getLuckyItem(seed)}\n` +
       `🧭 행운의 방향: ${this.getLuckyDirection(seed)}\n` +
       `⏰ 행운의 시간: ${this.getLuckyTime(seed)}\n` +
-      `🍽️ 오늘 점메추: ${this.getLuckyFood(seed)}`
+      `🍽️ 오늘의 메뉴: ${this.getLuckyFood(seed)}`
     );
   }
 
