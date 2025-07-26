@@ -164,7 +164,7 @@ class DooMockBot {
   }
 
   /**
-   * 🗄️ 데이터베이스 매니저 초기화 (올바른 URL 전달)
+   * 🗄️ 데이터베이스 매니저 초기화 (보안 처리)
    */
   async initializeDatabaseManager() {
     logger.info("🗄️ 데이터베이스 매니저 초기화 중...");
@@ -181,9 +181,15 @@ class DooMockBot {
       throw error;
     }
 
-    // 디버깅 정보
-    console.log("🔍 config.mongoUri:", this.config.mongoUri);
-    console.log("🔍 dbManager.mongoUrl:", this.dbManager.mongoUrl);
+    // 🔒 보안 처리된 디버깅 정보
+    const maskUrl = (url) => {
+      if (!url) return "NULL";
+      // mongodb://user:password@host:port/db 형태에서 password 마스킹
+      return url.replace(/:([^:@]+)@/, ":***@");
+    };
+
+    console.log("🔍 config.mongoUri:", maskUrl(this.config.mongoUri));
+    console.log("🔍 dbManager.mongoUrl:", maskUrl(this.dbManager.mongoUrl));
     console.log("🔍 dbManager 생성 후:", !!this.dbManager);
     console.log("🔍 연결 시도 후:", this.dbManager.isConnected);
   }
