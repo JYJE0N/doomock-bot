@@ -784,7 +784,7 @@ class NavigationHandler {
   }
 
   /**
-   * 📝 메시지 업데이트
+   * 📝 메시지 업데이트 (Telegraf 호환)
    */
   async updateMessage(bot, callbackQuery, text, keyboard) {
     try {
@@ -795,28 +795,34 @@ class NavigationHandler {
         },
       } = callbackQuery;
 
-      await bot.editMessageText(text, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "Markdown",
-        reply_markup: keyboard,
-      });
+      // ✅ Telegraf 정확한 API 사용
+      await bot.telegram.editMessageText(
+        chatId,
+        messageId,
+        undefined, // inline_message_id (사용하지 않음)
+        text,
+        {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        }
+      );
 
-      // 콜백 쿼리 응답
-      await bot.answerCallbackQuery(callbackQuery.id);
+      logger.debug("✅ 메시지 업데이트 성공");
     } catch (error) {
       logger.error("❌ 메시지 업데이트 오류:", error);
 
-      // 콜백 쿼리 오류 응답
-      try {
-        await bot.answerCallbackQuery(callbackQuery.id, {
-          text: "처리 중 오류가 발생했습니다.",
-          show_alert: true,
-        });
-      } catch (answerError) {
-        logger.error("❌ 콜백 쿼리 응답 오류:", answerError);
+      // 특정 오류 타입별 처리
+      if (error.description?.includes("message is not modified")) {
+        logger.debug("⚠️ 메시지 내용 동일, 편집 스킵");
+        return; // 오류가 아님
       }
 
+      if (error.description?.includes("message to edit not found")) {
+        logger.warn("⚠️ 편집할 메시지를 찾을 수 없음");
+        return; // 이미 삭제된 메시지
+      }
+
+      // 치명적 오류만 재발생
       throw error;
     }
   }
