@@ -1,17 +1,17 @@
-// src/handlers/NavigationHandler.js - 완전 구현 v3.0.1 🎹
+// src/handlers/NavigationHandler.js - system:menu 처리 완전 구현본 v3.0.1
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 
 /**
- * 🎹 NavigationHandler v3.0.1 - 완전 구현
+ * 🎹 NavigationHandler v3.0.1 - system:menu 처리 완전 구현본
  *
- * 🎯 역할:
- * ✅ 모든 인라인키보드 생성 중앙관리
- * ✅ 시스템 네비게이션 직접 처리
- * ✅ 모듈 네비게이션 ModuleManager 위임
- * ✅ 일관된 UI/UX 디자인 시스템
- * ✅ 콜백 데이터 파싱 및 라우팅
+ * 🎯 핵심 수정사항:
+ * - handleSystemNavigation 완전 구현 ⭐
+ * - system:menu 콜백 처리 완성
+ * - SystemModule과 완전 연동
+ * - 폴백(fallback) 시스템 구현
+ * - 에러 처리 완성
  */
 class NavigationHandler {
   constructor(bot, options = {}) {
@@ -49,13 +49,6 @@ class NavigationHandler {
         save: "💾",
         cancel: "❌",
       },
-
-      // 버튼 스타일
-      buttonStyles: {
-        primary: { maxWidth: 2, priority: 1 },
-        secondary: { maxWidth: 3, priority: 2 },
-        action: { maxWidth: 4, priority: 3 },
-      },
     };
 
     // 📊 통계
@@ -71,7 +64,7 @@ class NavigationHandler {
     this.callbackCache = new Map();
     this.cacheTimeout = 5000; // 5초
 
-    logger.info("🎹 NavigationHandler v3.0.1 완전 구현 시작!");
+    logger.info("🎹 NavigationHandler 생성 완료");
   }
 
   /**
@@ -93,19 +86,14 @@ class NavigationHandler {
         this.cacheTimeout
       );
 
-      // ✅ 수정된 콜백 데이터 파싱
+      // ✅ 콜백 데이터 파싱
       const { moduleKey, action, additionalParams } = this.parseCallbackData(
         callbackQuery.data
       );
 
-      // ✅ 올바른 로깅 형식 (콜론 사용)
-      logger.debug(
-        `🎹 NavigationHandler: ${moduleKey}:${action} (${additionalParams.join(
-          ", "
-        )})`
-      );
+      logger.debug(`🎹 NavigationHandler: ${moduleKey}:${action}`);
 
-      // 시스템 네비게이션 (직접 처리)
+      // ✅ 시스템 네비게이션 (직접 처리)
       if (moduleKey === "system" || moduleKey === "main") {
         const handled = await this.handleSystemNavigation(
           bot,
@@ -116,6 +104,7 @@ class NavigationHandler {
         );
         if (handled) {
           this.stats.navigationsHandled++;
+          this.updateResponseTimeStats(Date.now() - startTime);
           return true;
         }
       }
@@ -138,16 +127,18 @@ class NavigationHandler {
 
           if (handled) {
             this.stats.navigationsHandled++;
+            this.updateResponseTimeStats(Date.now() - startTime);
             return true;
           }
         }
       }
 
       // 처리되지 않은 네비게이션
+      logger.warn(`⚠️ ❓ 처리되지 않은 네비게이션: ${moduleKey}:${action}`);
       await this.handleUnknownNavigation(bot, callbackQuery, moduleKey, action);
       return false;
     } catch (error) {
-      logger.error("❌ NavigationHandler 오류:", error);
+      logger.error("❌ ❌ NavigationHandler 오류:", error);
       this.stats.errorsCount++;
       await this.showSystemError(
         bot,
@@ -155,15 +146,11 @@ class NavigationHandler {
         "네비게이션 처리 중 오류가 발생했습니다."
       );
       return false;
-    } finally {
-      // 응답 시간 통계
-      const responseTime = Date.now() - startTime;
-      this.updateResponseTimeStats(responseTime);
     }
   }
 
   /**
-   * 🏛️ 시스템 네비게이션 처리
+   * 🎯 시스템 네비게이션 처리 (완전 구현!)
    */
   async handleSystemNavigation(
     bot,
@@ -172,95 +159,143 @@ class NavigationHandler {
     params,
     moduleManager
   ) {
-    logger.debug(`🏛️ 시스템 네비게이션: ${action}`);
+    logger.debug(`🎹 시스템 네비게이션: ${action}`);
 
     try {
+      // ✅ 액션에 따라 처리
       switch (action) {
         case "menu":
         case "start":
-          return await this.showMainMenu(bot, callbackQuery, moduleManager);
+          return await this.handleMainMenuRequest(
+            bot,
+            callbackQuery,
+            moduleManager
+          );
 
         case "help":
-          return await this.showHelpMenu(bot, callbackQuery, moduleManager);
+          return await this.handleHelpRequest(
+            bot,
+            callbackQuery,
+            moduleManager
+          );
 
         case "status":
-          return await this.showStatusMenu(bot, callbackQuery, moduleManager);
+          return await this.handleStatusRequest(
+            bot,
+            callbackQuery,
+            moduleManager
+          );
 
         case "settings":
-          return await this.showSettingsMenu(bot, callbackQuery, moduleManager);
+          return await this.handleSettingsRequest(
+            bot,
+            callbackQuery,
+            moduleManager
+          );
 
         case "about":
-          return await this.showAboutMenu(bot, callbackQuery, moduleManager);
+          return await this.handleAboutRequest(
+            bot,
+            callbackQuery,
+            moduleManager
+          );
 
         default:
-          await this.showUnknownAction(bot, callbackQuery, action);
-          return false;
+          logger.warn(`❓ 알 수 없는 시스템 액션: ${action}`);
+          return await this.showUnknownSystemAction(bot, callbackQuery, action);
       }
     } catch (error) {
-      logger.error("❌ 시스템 네비게이션 오류:", error);
-      await this.showSystemError(
-        bot,
-        callbackQuery,
-        "시스템 메뉴 처리 중 오류가 발생했습니다."
-      );
-      return false;
+      logger.error("❌ ❌ 시스템 네비게이션 오류:", error);
+      return await this.showSystemError(bot, callbackQuery, error.message);
     }
   }
 
-  // ===== 🎹 메인 키보드 생성 메서드들 =====
-
   /**
-   * 🏠 메인 메뉴 표시
+   * 🏠 메인 메뉴 요청 처리 (핵심!)
    */
-  async showMainMenu(bot, callbackQuery, moduleManager) {
+  async handleMainMenuRequest(bot, callbackQuery, moduleManager) {
     try {
-      const userName = getUserName(callbackQuery);
-      const activeModules = this.getActiveModules(moduleManager);
+      logger.debug("🏠 메인 메뉴 요청 처리 시작");
 
-      // 메인 메뉴 텍스트 생성
-      const menuText = this.buildMainMenuText(userName, activeModules);
+      // 1. SystemModule 찾기
+      let systemModule = null;
 
-      // 메인 메뉴 키보드 생성
-      const keyboard = this.buildMainMenuKeyboard(activeModules);
+      if (moduleManager && moduleManager.hasModule) {
+        // ModuleManager의 정확한 키 확인
+        const possibleKeys = ["SystemModule", "system", "System"];
+        for (const key of possibleKeys) {
+          if (moduleManager.hasModule(key)) {
+            systemModule = moduleManager.getModule(key);
+            logger.debug(`✅ SystemModule 발견: ${key}`);
+            break;
+          }
+        }
+      }
 
-      // 메시지 업데이트
-      await this.updateMessage(bot, callbackQuery, menuText, keyboard);
-      this.stats.keyboardsGenerated++;
+      // 2. SystemModule이 있는 경우 - 데이터 요청
+      if (systemModule && typeof systemModule.handleMenuAction === "function") {
+        logger.debug("🔧 SystemModule에서 데이터 요청");
 
-      return true;
+        const result = await systemModule.handleMenuAction(
+          bot,
+          callbackQuery,
+          "menu",
+          [],
+          moduleManager
+        );
+
+        if (result && result.success && result.data) {
+          // NavigationHandler에서 UI 생성
+          const menuText = this.buildMainMenuText(result.data);
+          const keyboard = this.buildMainMenuKeyboard(
+            result.data,
+            moduleManager
+          );
+
+          await this.updateMessage(bot, callbackQuery, menuText, keyboard);
+          this.stats.keyboardsGenerated++;
+
+          logger.debug("✅ 메인 메뉴 표시 성공 (SystemModule 연동)");
+          return true;
+        } else {
+          logger.warn("⚠️ SystemModule에서 유효하지 않은 응답");
+        }
+      }
+
+      // 3. 폴백: SystemModule이 없거나 실패한 경우
+      logger.warn("⚠️ SystemModule 사용 불가, 폴백 메뉴 표시");
+      return await this.showFallbackMainMenu(bot, callbackQuery, moduleManager);
     } catch (error) {
-      logger.error("❌ 메인 메뉴 표시 오류:", error);
-      return false;
+      logger.error("❌ ❌ 메인 메뉴 표시 오류:", error);
+      return await this.showFallbackMainMenu(bot, callbackQuery, moduleManager);
     }
   }
 
   /**
    * 📝 메인 메뉴 텍스트 생성
    */
-  buildMainMenuText(userName, activeModules) {
-    const uptime = this.formatUptime(process.uptime());
+  buildMainMenuText(data) {
+    const userName = data.userName || "사용자";
+    const currentTime = TimeHelper.format(new Date(), "time");
 
     let text = `🤖 **두목봇 v3.0.1**\n\n`;
-    text += `👋 안녕하세요, **${userName}**님!\n`;
-    text += `원하는 기능을 선택해주세요.\n\n`;
+    text += `안녕하세요, ${userName}님! 👋\n`;
+    text += `현재 시간: ${currentTime}\n\n`;
 
-    if (activeModules.length > 0) {
-      text += `**🎯 사용 가능한 기능 (${activeModules.length}개)**\n`;
-      activeModules.slice(0, 5).forEach((module) => {
-        text += `${module.emoji} ${module.name}\n`;
+    // 활성 모듈 정보
+    if (data.activeModules && data.activeModules.length > 0) {
+      text += `📱 **사용 가능한 기능** (${data.activeModules.length}개)\n`;
+      data.activeModules.forEach((module) => {
+        const emoji = this.getModuleEmoji(module.key);
+        text += `${emoji} ${module.name}\n`;
       });
-
-      if (activeModules.length > 5) {
-        text += `... 외 ${activeModules.length - 5}개\n`;
-      }
     } else {
-      text += `⚠️ 시스템 초기화 중입니다.\n잠시 후 다시 시도해주세요.\n`;
+      text += `📱 **기본 기능만 사용 가능**\n`;
+      text += `⚙️ 시스템 관리\n`;
+      text += `❓ 도움말\n`;
     }
 
-    text += `\n**📊 시스템 정보**\n`;
-    text += `• ⏱️ 가동시간: ${uptime}\n`;
-    text += `• 🔄 처리된 요청: ${this.stats.navigationsHandled}회\n`;
-    text += `• 🌍 환경: ${process.env.RAILWAY_ENVIRONMENT || "개발"}`;
+    text += `\n원하는 기능을 선택해주세요! 🎯`;
 
     return text;
   }
@@ -268,62 +303,112 @@ class NavigationHandler {
   /**
    * ⌨️ 메인 메뉴 키보드 생성
    */
-  buildMainMenuKeyboard(activeModules) {
+  buildMainMenuKeyboard(data, moduleManager) {
     const keyboard = { inline_keyboard: [] };
 
-    // 활성 모듈 버튼들 (2열씩 배치)
-    if (activeModules.length > 0) {
-      for (let i = 0; i < activeModules.length; i += 2) {
-        const row = [];
+    // 활성 모듈들 버튼 생성
+    if (data.activeModules && data.activeModules.length > 0) {
+      const moduleButtons = data.activeModules.map((module) => ({
+        text: `${this.getModuleEmoji(module.key)} ${module.name}`,
+        callback_data: `${module.key}:menu`,
+      }));
 
-        // 첫 번째 모듈
-        const module1 = activeModules[i];
-        row.push({
-          text: `${module1.emoji} ${module1.name}`,
-          callback_data: `${module1.key}:menu`,
-        });
-
-        // 두 번째 모듈 (있으면)
-        if (i + 1 < activeModules.length) {
-          const module2 = activeModules[i + 1];
-          row.push({
-            text: `${module2.emoji} ${module2.name}`,
-            callback_data: `${module2.key}:menu`,
-          });
-        }
-
+      // 2개씩 행 생성
+      for (let i = 0; i < moduleButtons.length; i += 2) {
+        const row = moduleButtons.slice(i, i + 2);
         keyboard.inline_keyboard.push(row);
       }
+    } else {
+      // 폴백 버튼들
+      keyboard.inline_keyboard.push([
+        { text: "📝 할일관리", callback_data: "todo:menu" },
+        { text: "⏰ 타이머", callback_data: "timer:menu" },
+      ]);
+      keyboard.inline_keyboard.push([
+        { text: "🕐 근무시간", callback_data: "worktime:menu" },
+        { text: "🏖️ 휴가관리", callback_data: "leave:menu" },
+      ]);
     }
 
-    // 시스템 메뉴 (2줄)
+    // 시스템 버튼들
     keyboard.inline_keyboard.push([
-      { text: "📊 시스템 상태", callback_data: "system:status" },
       { text: "❓ 도움말", callback_data: "system:help" },
+      { text: "📊 상태확인", callback_data: "system:status" },
     ]);
 
     keyboard.inline_keyboard.push([
       { text: "⚙️ 설정", callback_data: "system:settings" },
-      { text: "ℹ️ 정보", callback_data: "system:about" },
     ]);
 
     return keyboard;
   }
 
   /**
-   * ❓ 도움말 메뉴 표시
+   * 🛡️ 폴백 메인 메뉴 (SystemModule 없을 때)
    */
-  async showHelpMenu(bot, callbackQuery, moduleManager) {
+  async showFallbackMainMenu(bot, callbackQuery, moduleManager) {
     try {
-      const helpText = this.buildHelpText(moduleManager);
-      const keyboard = this.buildHelpKeyboard(moduleManager);
+      logger.debug("🛡️ 폴백 메인 메뉴 표시");
+
+      const userName = getUserName(callbackQuery) || "사용자";
+      const currentTime = TimeHelper.format(new Date(), "time");
+
+      const fallbackText =
+        `🤖 **두목봇 v3.0.1** (안전모드)\n\n` +
+        `안녕하세요, ${userName}님! 👋\n` +
+        `현재 시간: ${currentTime}\n\n` +
+        `⚠️ 일부 서비스가 일시적으로 사용할 수 없어 기본 기능만 제공됩니다.\n\n` +
+        `**📱 사용 가능한 기능**\n` +
+        `📝 할일 관리\n` +
+        `⏰ 타이머\n` +
+        `🕐 근무시간 관리\n` +
+        `❓ 도움말\n\n` +
+        `원하는 기능을 선택해주세요! 🎯`;
+
+      const fallbackKeyboard = {
+        inline_keyboard: [
+          [
+            { text: "📝 할일관리", callback_data: "todo:menu" },
+            { text: "⏰ 타이머", callback_data: "timer:menu" },
+          ],
+          [
+            { text: "🕐 근무시간", callback_data: "worktime:menu" },
+            { text: "❓ 도움말", callback_data: "system:help" },
+          ],
+          [{ text: "🔄 새로고침", callback_data: "system:menu" }],
+        ],
+      };
+
+      await this.updateMessage(
+        bot,
+        callbackQuery,
+        fallbackText,
+        fallbackKeyboard
+      );
+      this.stats.keyboardsGenerated++;
+
+      logger.debug("✅ 폴백 메인 메뉴 표시 완료");
+      return true;
+    } catch (error) {
+      logger.error("❌ 폴백 메뉴 표시도 실패:", error);
+      return false;
+    }
+  }
+
+  /**
+   * ❓ 도움말 요청 처리
+   */
+  async handleHelpRequest(bot, callbackQuery, moduleManager) {
+    try {
+      const helpText = this.buildHelpText();
+      const keyboard = this.buildHelpKeyboard();
 
       await this.updateMessage(bot, callbackQuery, helpText, keyboard);
       this.stats.keyboardsGenerated++;
 
       return true;
     } catch (error) {
-      logger.error("❌ 도움말 메뉴 표시 오류:", error);
+      logger.error("❌ 도움말 표시 오류:", error);
       return false;
     }
   }
@@ -331,32 +416,27 @@ class NavigationHandler {
   /**
    * 📝 도움말 텍스트 생성
    */
-  buildHelpText(moduleManager) {
-    const activeModules = this.getActiveModules(moduleManager);
+  buildHelpText() {
+    let text = `❓ **두목봇 v3.0.1 도움말**\n\n`;
 
-    let text = `❓ **도움말**\n\n`;
+    text += `**🎯 주요 기능**\n`;
+    text += `📝 할일 관리 - 체계적인 작업 관리\n`;
+    text += `⏰ 타이머 - 포모도로 및 일반 타이머\n`;
+    text += `🕐 근무시간 - 출퇴근 시간 관리\n`;
+    text += `🏖️ 휴가관리 - 연차 및 휴가 신청\n\n`;
 
-    text += `**🔹 기본 명령어**\n`;
-    text += `• \`/start\` - 봇 시작 및 메인 메뉴\n`;
-    text += `• \`/help\` - 도움말 표시\n`;
-    text += `• \`/status\` - 시스템 상태 확인\n`;
-    text += `• \`/cancel\` - 현재 작업 취소\n\n`;
+    text += `**⌨️ 기본 명령어**\n`;
+    text += `• /start - 메인 메뉴 열기\n`;
+    text += `• /help - 이 도움말 보기\n`;
+    text += `• /status - 시스템 상태 확인\n\n`;
 
-    if (activeModules.length > 0) {
-      text += `**🔹 사용 가능한 기능**\n`;
-      activeModules.forEach((module) => {
-        text += `• ${module.emoji} **${module.name}** - ${
-          module.description || "기능 설명"
-        }\n`;
-      });
-      text += `\n`;
-    }
+    text += `**💡 사용 팁**\n`;
+    text += `• 버튼을 클릭하여 쉽게 조작하세요\n`;
+    text += `• 언제든 🏠 버튼으로 메인 메뉴로 돌아갈 수 있습니다\n`;
+    text += `• 문제가 있으면 /status로 상태를 확인해보세요\n\n`;
 
-    text += `**🔹 사용 팁**\n`;
-    text += `• 메뉴 버튼을 통해 편리하게 이용하세요\n`;
-    text += `• 작업 중 언제든 \`/cancel\`로 취소 가능\n`;
-    text += `• 문제 발생 시 \`/start\`로 초기화하세요\n`;
-    text += `• 각 기능별 상세 도움말은 해당 메뉴에서 확인`;
+    text += `**🔧 문의사항**\n`;
+    text += `기술 지원이 필요하시면 관리자에게 문의하세요.`;
 
     return text;
   }
@@ -364,43 +444,22 @@ class NavigationHandler {
   /**
    * ⌨️ 도움말 키보드 생성
    */
-  buildHelpKeyboard(moduleManager) {
-    const keyboard = { inline_keyboard: [] };
-    const activeModules = this.getActiveModules(moduleManager);
-
-    // 모듈별 도움말 (최대 6개, 3열씩)
-    if (activeModules.length > 0) {
-      const helpModules = activeModules.slice(0, 6);
-
-      for (let i = 0; i < helpModules.length; i += 3) {
-        const row = [];
-
-        for (let j = 0; j < 3 && i + j < helpModules.length; j++) {
-          const module = helpModules[i + j];
-          row.push({
-            text: `${module.emoji} ${module.shortName || module.name}`,
-            callback_data: `${module.key}:help`,
-          });
-        }
-
-        keyboard.inline_keyboard.push(row);
-      }
-    }
-
-    // 시스템 메뉴
-    keyboard.inline_keyboard.push([
-      { text: "📊 상태", callback_data: "system:status" },
-      { text: "⚙️ 설정", callback_data: "system:settings" },
-      { text: "🏠 메인", callback_data: "system:menu" },
-    ]);
-
-    return keyboard;
+  buildHelpKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: "📊 상태확인", callback_data: "system:status" },
+          { text: "⚙️ 설정", callback_data: "system:settings" },
+        ],
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+      ],
+    };
   }
 
   /**
-   * 📊 상태 메뉴 표시
+   * 📊 상태 요청 처리
    */
-  async showStatusMenu(bot, callbackQuery, moduleManager) {
+  async handleStatusRequest(bot, callbackQuery, moduleManager) {
     try {
       const statusText = this.buildStatusText(moduleManager);
       const keyboard = this.buildStatusKeyboard();
@@ -410,7 +469,7 @@ class NavigationHandler {
 
       return true;
     } catch (error) {
-      logger.error("❌ 상태 메뉴 표시 오류:", error);
+      logger.error("❌ 상태 표시 오류:", error);
       return false;
     }
   }
@@ -419,44 +478,28 @@ class NavigationHandler {
    * 📝 상태 텍스트 생성
    */
   buildStatusText(moduleManager) {
-    const memoryUsage = process.memoryUsage();
-    const uptime = this.formatUptime(process.uptime());
-    const activeModules = this.getActiveModules(moduleManager);
+    const uptime = this.getUptime();
+    const currentTime = TimeHelper.format(new Date(), "full");
 
     let text = `📊 **시스템 상태**\n\n`;
-
-    // 시스템 정보
-    text += `**🖥️ 시스템 정보**\n`;
-    text += `• 버전: v3.0.1\n`;
-    text += `• 환경: ${process.env.RAILWAY_ENVIRONMENT || "개발"}\n`;
-    text += `• 가동시간: ${uptime}\n`;
-    text += `• Node.js: ${process.version}\n\n`;
-
-    // 메모리 사용량
-    text += `**💾 메모리 사용량**\n`;
-    text += `• RSS: ${(memoryUsage.rss / 1024 / 1024).toFixed(1)}MB\n`;
-    text += `• Heap Used: ${(memoryUsage.heapUsed / 1024 / 1024).toFixed(
-      1
-    )}MB\n`;
-    text += `• Heap Total: ${(memoryUsage.heapTotal / 1024 / 1024).toFixed(
-      1
-    )}MB\n\n`;
+    text += `🕐 현재 시간: ${currentTime}\n`;
+    text += `⏱️ 가동 시간: ${uptime}\n\n`;
 
     // 모듈 상태
-    text += `**📦 모듈 상태**\n`;
-    text += `• 전체 모듈: ${
-      moduleManager ? moduleManager.getModuleList().length : 0
-    }개\n`;
-    text += `• 활성 모듈: ${activeModules.length}개\n`;
-    text += `• 비활성 모듈: ${
-      moduleManager
-        ? moduleManager.getModuleList().length - activeModules.length
-        : 0
-    }개\n\n`;
+    if (moduleManager && moduleManager.getModuleList) {
+      const modules = moduleManager.getModuleList();
+      const activeCount = modules.filter((m) => m.active).length;
+      const totalCount = modules.length;
+
+      text += `**📱 모듈 상태**\n`;
+      text += `• 전체 모듈: ${totalCount}개\n`;
+      text += `• 활성 모듈: ${activeCount}개\n`;
+      text += `• 비활성 모듈: ${totalCount - activeCount}개\n\n`;
+    }
 
     // NavigationHandler 통계
-    text += `**🎹 NavigationHandler 통계**\n`;
-    text += `• 처리된 네비게이션: ${this.stats.navigationsHandled}회\n`;
+    text += `**🎹 네비게이션 통계**\n`;
+    text += `• 처리된 요청: ${this.stats.navigationsHandled}회\n`;
     text += `• 생성된 키보드: ${this.stats.keyboardsGenerated}개\n`;
     text += `• 오류 발생: ${this.stats.errorsCount}회\n`;
     text += `• 평균 응답시간: ${this.stats.averageResponseTime}ms\n\n`;
@@ -468,7 +511,7 @@ class NavigationHandler {
         : this.stats.errorsCount < 20
         ? "🟡"
         : "🔴";
-    text += `${healthIcon} 시스템이 정상적으로 작동 중입니다!`;
+    text += `${healthIcon} 시스템이 정상 작동 중입니다!`;
 
     return text;
   }
@@ -481,11 +524,7 @@ class NavigationHandler {
       inline_keyboard: [
         [
           { text: "🔄 새로고침", callback_data: "system:status" },
-          { text: "📈 상세 정보", callback_data: "system:details" },
-        ],
-        [
-          { text: "🧹 캐시 정리", callback_data: "system:cleanup" },
-          { text: "📊 성능 분석", callback_data: "system:performance" },
+          { text: "📈 상세정보", callback_data: "system:details" },
         ],
         [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
       ],
@@ -493,9 +532,9 @@ class NavigationHandler {
   }
 
   /**
-   * ⚙️ 설정 메뉴 표시
+   * ⚙️ 설정 요청 처리
    */
-  async showSettingsMenu(bot, callbackQuery, moduleManager) {
+  async handleSettingsRequest(bot, callbackQuery, moduleManager) {
     try {
       const settingsText = this.buildSettingsText();
       const keyboard = this.buildSettingsKeyboard();
@@ -505,7 +544,7 @@ class NavigationHandler {
 
       return true;
     } catch (error) {
-      logger.error("❌ 설정 메뉴 표시 오류:", error);
+      logger.error("❌ 설정 표시 오류:", error);
       return false;
     }
   }
@@ -516,20 +555,18 @@ class NavigationHandler {
   buildSettingsText() {
     let text = `⚙️ **시스템 설정**\n\n`;
 
-    text += `**🎨 인터페이스 설정**\n`;
+    text += `**🎨 인터페이스**\n`;
     text += `• 테마: 기본 테마\n`;
     text += `• 언어: 한국어\n`;
     text += `• 시간대: Asia/Seoul\n\n`;
 
     text += `**🔔 알림 설정**\n`;
     text += `• 시스템 알림: 활성화\n`;
-    text += `• 오류 알림: 활성화\n`;
-    text += `• 업데이트 알림: 활성화\n\n`;
+    text += `• 오류 알림: 활성화\n\n`;
 
     text += `**🛠️ 고급 설정**\n`;
     text += `• 캐시 사용: 활성화\n`;
-    text += `• 디버그 모드: 비활성화\n`;
-    text += `• 자동 재시작: 활성화\n\n`;
+    text += `• 디버그 모드: 비활성화\n\n`;
 
     text += `⚠️ 설정 변경은 관리자만 가능합니다.`;
 
@@ -543,16 +580,12 @@ class NavigationHandler {
     return {
       inline_keyboard: [
         [
-          { text: "🎨 테마 변경", callback_data: "system:theme" },
-          { text: "🌐 언어 설정", callback_data: "system:language" },
+          { text: "🎨 테마", callback_data: "system:theme" },
+          { text: "🌐 언어", callback_data: "system:language" },
         ],
         [
-          { text: "🔔 알림 설정", callback_data: "system:notifications" },
-          { text: "⏰ 시간대 설정", callback_data: "system:timezone" },
-        ],
-        [
-          { text: "🛠️ 고급 설정", callback_data: "system:advanced" },
-          { text: "🔄 초기화", callback_data: "system:reset" },
+          { text: "🔔 알림", callback_data: "system:notifications" },
+          { text: "⏰ 시간대", callback_data: "system:timezone" },
         ],
         [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
       ],
@@ -560,9 +593,9 @@ class NavigationHandler {
   }
 
   /**
-   * ℹ️ 정보 메뉴 표시
+   * ℹ️ 정보 요청 처리
    */
-  async showAboutMenu(bot, callbackQuery, moduleManager) {
+  async handleAboutRequest(bot, callbackQuery, moduleManager) {
     try {
       const aboutText = this.buildAboutText();
       const keyboard = this.buildAboutKeyboard();
@@ -572,7 +605,7 @@ class NavigationHandler {
 
       return true;
     } catch (error) {
-      logger.error("❌ 정보 메뉴 표시 오류:", error);
+      logger.error("❌ 정보 표시 오류:", error);
       return false;
     }
   }
@@ -581,32 +614,30 @@ class NavigationHandler {
    * 📝 정보 텍스트 생성
    */
   buildAboutText() {
-    let text = `ℹ️ **두목봇 v3.0.1**\n\n`;
+    let text = `ℹ️ **두목봇 v3.0.1 정보**\n\n`;
 
     text += `**🤖 봇 정보**\n`;
-    text += `• 이름: 두목봇\n`;
+    text += `• 이름: 두목봇 (doomock-bot)\n`;
     text += `• 버전: v3.0.1\n`;
-    text += `• 개발: Navigation 중앙처리 시스템\n`;
-    text += `• 아키텍처: 모듈형 마이크로서비스\n\n`;
+    text += `• 개발자: doomock\n`;
+    text += `• 플랫폼: Telegram\n\n`;
 
-    text += `**🔧 주요 기능**\n`;
-    text += `• 📝 할일 관리\n`;
-    text += `• ⏰ 타이머 기능\n`;
-    text += `• 🕐 근무시간 관리\n`;
-    text += `• 🏖️ 휴가 관리\n\n`;
+    text += `**🎯 주요 기능**\n`;
+    text += `📝 Todo 관리\n`;
+    text += `⏰ 타이머 기능\n`;
+    text += `🕐 근무시간 관리\n`;
+    text += `🏖️ 휴가 관리\n`;
+    text += `⏰ 리마인더\n`;
+    text += `🔮 운세 보기\n`;
+    text += `🌤️ 날씨 정보\n`;
+    text += `🎤 TTS 기능\n\n`;
 
-    text += `**🏗️ 기술 스택**\n`;
-    text += `• Runtime: Node.js ${process.version}\n`;
-    text += `• Database: MongoDB\n`;
-    text += `• Platform: Railway\n`;
-    text += `• Architecture: 중앙집중식 모듈 시스템\n\n`;
+    text += `**🛠️ 기술 스택**\n`;
+    text += `• Node.js + Telegraf\n`;
+    text += `• MongoDB\n`;
+    text += `• Railway 배포\n\n`;
 
-    text += `**📊 성능**\n`;
-    text += `• 가동시간: ${this.formatUptime(process.uptime())}\n`;
-    text += `• 처리 요청: ${this.stats.navigationsHandled}회\n`;
-    text += `• 평균 응답: ${this.stats.averageResponseTime}ms\n\n`;
-
-    text += `🚀 지속적으로 업데이트되고 있습니다!`;
+    text += `© 2025 doomock. 모든 권리 보유.`;
 
     return text;
   }
@@ -618,60 +649,100 @@ class NavigationHandler {
     return {
       inline_keyboard: [
         [
-          { text: "📋 변경 기록", callback_data: "system:changelog" },
-          { text: "📄 라이센스", callback_data: "system:license" },
-        ],
-        [
-          { text: "🐛 버그 신고", callback_data: "system:bug_report" },
-          { text: "💡 기능 제안", callback_data: "system:feature_request" },
+          { text: "📊 상태확인", callback_data: "system:status" },
+          { text: "❓ 도움말", callback_data: "system:help" },
         ],
         [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
       ],
     };
   }
 
-  // ===== 🔧 유틸리티 메서드들 =====
+  // ===== 🛠️ 유틸리티 메서드들 =====
 
   /**
-   * 📋 활성 모듈 목록 조회
+   * ❓ 알 수 없는 네비게이션 처리
    */
-  getActiveModules(moduleManager) {
-    if (!moduleManager) return [];
-
+  async handleUnknownNavigation(bot, callbackQuery, moduleKey, action) {
     try {
-      const modules = moduleManager.getActiveModulesStatus();
-      return modules
-        .map((module) => ({
-          key: module.key,
-          name: module.name,
-          shortName: module.name.substring(0, 4),
-          emoji: this.getModuleEmoji(module.key),
-          description: module.description || `${module.name} 기능`,
-          priority: module.priority || 99,
-        }))
-        .sort((a, b) => a.priority - b.priority);
+      const unknownText =
+        `❓ **알 수 없는 요청**\n\n` +
+        `요청하신 기능을 찾을 수 없습니다.\n` +
+        `• 모듈: ${moduleKey}\n` +
+        `• 액션: ${action}\n\n` +
+        `메인 메뉴로 돌아가서 다시 시도해주세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🏠 메인 메뉴", callback_data: "system:menu" },
+            { text: "🔄 새로고침", callback_data: "system:menu" },
+          ],
+        ],
+      };
+
+      await this.updateMessage(bot, callbackQuery, unknownText, keyboard);
+      logger.warn(`⚠️ ❓ 처리되지 않은 콜백: ${moduleKey}:${action}`);
+
+      return true;
     } catch (error) {
-      logger.error("활성 모듈 조회 오류:", error);
-      return [];
+      logger.error("❌ 알 수 없는 네비게이션 처리 실패:", error);
+      return false;
     }
   }
 
   /**
-   * 🎨 모듈 이모지 매핑
+   * ❓ 알 수 없는 시스템 액션 처리
    */
-  getModuleEmoji(moduleKey) {
-    const emojiMap = {
-      todo: "📝",
-      timer: "⏰",
-      worktime: "🕐",
-      vacation: "🏖️",
-      system: "⚙️",
-      example: "📱",
-      demo: "🎪",
-      test: "🧪",
-    };
+  async showUnknownSystemAction(bot, callbackQuery, action) {
+    try {
+      const unknownText =
+        `❓ **알 수 없는 시스템 기능**\n\n` +
+        `요청하신 시스템 기능을 찾을 수 없습니다.\n` +
+        `• 액션: ${action}\n\n` +
+        `메인 메뉴로 돌아가세요.`;
 
-    return emojiMap[moduleKey] || "📦";
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+        ],
+      };
+
+      await this.updateMessage(bot, callbackQuery, unknownText, keyboard);
+      return true;
+    } catch (error) {
+      logger.error("❌ 알 수 없는 시스템 액션 처리 실패:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 🚨 시스템 오류 표시
+   */
+  async showSystemError(bot, callbackQuery, errorMessage) {
+    try {
+      const errorText =
+        `🚨 **시스템 오류**\n\n` +
+        `처리 중 오류가 발생했습니다.\n` +
+        `${errorMessage}\n\n` +
+        `잠시 후 다시 시도해주세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 다시 시도", callback_data: "system:menu" },
+            { text: "❓ 도움말", callback_data: "system:help" },
+          ],
+        ],
+      };
+
+      await this.updateMessage(bot, callbackQuery, errorText, keyboard);
+      logger.error("❌ ❌ 시스템 오류 표시 실패:", errorMessage);
+
+      return true;
+    } catch (error) {
+      logger.error("❌ ❌ 시스템 오류 표시 실패:", error);
+      return false;
+    }
   }
 
   /**
@@ -688,7 +759,7 @@ class NavigationHandler {
         };
       }
 
-      // ✅ 콜론(:) 기준으로 파싱
+      // 콜론(:) 기준으로 파싱
       const parts = callbackData.split(":");
 
       const result = {
@@ -697,18 +768,9 @@ class NavigationHandler {
         additionalParams: parts.slice(2) || [],
       };
 
-      // ✅ 상세 디버그 로그
-      if (logger.level === "debug") {
-        logger.debug(
-          `🎹 Navigation 파싱: "${callbackData}" → ${result.moduleKey}:${
-            result.action
-          }${
-            result.additionalParams.length > 0
-              ? `:${result.additionalParams.join(":")}`
-              : ""
-          }`
-        );
-      }
+      logger.debug(
+        `🎹 Navigation 파싱: "${callbackData}" → ${result.moduleKey}:${result.action}`
+      );
 
       return result;
     } catch (error) {
@@ -743,7 +805,7 @@ class NavigationHandler {
       // 콜백 쿼리 응답
       await bot.answerCallbackQuery(callbackQuery.id);
     } catch (error) {
-      logger.error("메시지 업데이트 오류:", error);
+      logger.error("❌ 메시지 업데이트 오류:", error);
 
       // 콜백 쿼리 오류 응답
       try {
@@ -751,8 +813,8 @@ class NavigationHandler {
           text: "처리 중 오류가 발생했습니다.",
           show_alert: true,
         });
-      } catch (callbackError) {
-        logger.error("콜백 쿼리 응답 오류:", callbackError);
+      } catch (answerError) {
+        logger.error("❌ 콜백 쿼리 응답 오류:", answerError);
       }
 
       throw error;
@@ -760,80 +822,39 @@ class NavigationHandler {
   }
 
   /**
-   * 🚨 시스템 오류 표시
+   * 🎨 모듈 이모지 매핑
    */
-  async showSystemError(bot, callbackQuery, errorMessage) {
-    try {
-      const errorText = `🚨 **시스템 오류**\n\n${errorMessage}\n\n🔧 **해결 방법:**\n• 🔄 메인 메뉴로 돌아가기\n• 📊 시스템 상태 확인\n• 잠시 후 다시 시도\n\n⚠️ 문제가 지속되면 관리자에게 문의해주세요.`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "🔄 메인 메뉴", callback_data: "system:menu" },
-            { text: "📊 시스템 상태", callback_data: "system:status" },
-          ],
-        ],
-      };
-
-      await this.updateMessage(bot, callbackQuery, errorText, keyboard);
-    } catch (error) {
-      logger.error("❌ 시스템 오류 표시 실패:", error);
-    }
-  }
-
-  /**
-   * ❓ 알 수 없는 액션 처리
-   */
-  async showUnknownAction(bot, callbackQuery, action) {
-    const errorText = `❓ **알 수 없는 액션**\n\n\`${action}\` 액션을 찾을 수 없습니다.\n\n메인 메뉴로 돌아가서 다시 시도해주세요.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-      ],
+  getModuleEmoji(moduleKey) {
+    const emojiMap = {
+      todo: "📝",
+      timer: "⏰",
+      worktime: "🕐",
+      leave: "🏖️",
+      reminder: "⏰",
+      fortune: "🔮",
+      weather: "🌤️",
+      tts: "🎤",
+      system: "⚙️",
     };
 
-    await this.updateMessage(bot, callbackQuery, errorText, keyboard);
+    return emojiMap[moduleKey] || "📦";
   }
 
   /**
-   * ❓ 알 수 없는 네비게이션 처리
+   * ⏱️ 업타임 계산
    */
-  async handleUnknownNavigation(bot, callbackQuery, moduleKey, action) {
-    // ✅ 올바른 형식으로 로깅
-    logger.warn(`❓ 처리되지 않은 네비게이션: ${moduleKey}:${action}`);
+  getUptime() {
+    const uptime = process.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    const seconds = Math.floor(uptime % 60);
 
-    const errorText = `❓ **처리할 수 없는 요청**\n\n모듈: \`${moduleKey}\`\n액션: \`${action}\`\n\n해당 기능이 아직 구현되지 않았거나\n모듈이 비활성화되었습니다.`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-          { text: "📊 시스템 상태", callback_data: "system:status" },
-        ],
-      ],
-    };
-
-    await this.updateMessage(bot, callbackQuery, errorText, keyboard);
-  }
-
-  /**
-   * ⏱️ 업타임 포맷팅
-   */
-  formatUptime(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-    const secs = Math.floor(seconds % 60);
-
-    if (days > 0) {
-      return `${days}일 ${hours}시간`;
-    } else if (hours > 0) {
-      return `${hours}시간 ${minutes}분`;
+    if (hours > 0) {
+      return `${hours}시간 ${minutes}분 ${seconds}초`;
     } else if (minutes > 0) {
-      return `${minutes}분 ${secs}초`;
+      return `${minutes}분 ${seconds}초`;
     } else {
-      return `${secs}초`;
+      return `${seconds}초`;
     }
   }
 
@@ -841,41 +862,23 @@ class NavigationHandler {
    * 📊 응답 시간 통계 업데이트
    */
   updateResponseTimeStats(responseTime) {
-    try {
-      this.stats.totalResponseTime += responseTime;
-
-      if (this.stats.navigationsHandled === 0) {
-        this.stats.averageResponseTime = responseTime;
-      } else {
-        this.stats.averageResponseTime = Math.round(
-          this.stats.totalResponseTime / (this.stats.navigationsHandled + 1)
-        );
-      }
-    } catch (error) {
-      logger.debug("📊 응답 시간 통계 업데이트 오류:", error);
-    }
+    this.stats.totalResponseTime += responseTime;
+    this.stats.averageResponseTime = Math.round(
+      this.stats.totalResponseTime / Math.max(this.stats.navigationsHandled, 1)
+    );
   }
 
   /**
-   * 📊 NavigationHandler 상태 조회
+   * 📊 상태 조회
    */
   getStatus() {
     return {
-      className: "NavigationHandler",
-      version: "3.0.1",
-      isHealthy: this.stats.errorsCount < 10,
-      stats: {
-        navigationsHandled: this.stats.navigationsHandled,
-        keyboardsGenerated: this.stats.keyboardsGenerated,
-        errorsCount: this.stats.errorsCount,
-        averageResponseTime: this.stats.averageResponseTime,
-      },
-      config: {
-        hasModuleManager: !!this.moduleManager,
-        hasCommandsRegistry: !!this.commandsRegistry,
-        cacheTimeout: this.cacheTimeout,
-      },
-      lastActivity: TimeHelper.getLogTimeString(),
+      navigationsHandled: this.stats.navigationsHandled,
+      keyboardsGenerated: this.stats.keyboardsGenerated,
+      errorsCount: this.stats.errorsCount,
+      averageResponseTime: this.stats.averageResponseTime,
+      cacheSize: this.callbackCache.size,
+      healthy: this.stats.errorsCount < 10,
     };
   }
 

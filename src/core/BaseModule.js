@@ -2,6 +2,7 @@
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName, getUserId } = require("../utils/UserHelper");
+const ServiceBuilder = require("./ServiceBuilder");
 
 /**
  * 🏗️ 베이스 모듈 v3.0.1 - 완전 구현본
@@ -29,7 +30,8 @@ class BaseModule {
     this.moduleName = moduleName;
     this.bot = options.bot;
     this.db = options.db;
-    this.serviceBuilder = options.serviceBuilder;
+    // ✅ ServiceBuilder 연결 (주입받거나 기본값 사용)
+    this.serviceBuilder = options.serviceBuilder || ServiceBuilder;
     this.moduleManager = options.moduleManager;
     this.moduleKey = options.moduleKey;
     this.moduleConfig = options.moduleConfig;
