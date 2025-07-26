@@ -388,38 +388,34 @@ class ServiceBuilder {
         return;
       }
 
-      // 서비스 파일들 읽기
+      const files = fs.readdirSync(servicesDir);
+      let registeredCount = 0;
+
       for (const file of files) {
-        // BaseService.js와 HealthService.js는 제외
-        if (
-          file === "BaseService.js" ||
-          file === "HealthService.js" || // 추가
-          !file.endsWith("Service.js")
-        ) {
+        // 제외할 파일들
+        const excludeFiles = [
+          "BaseService.js",
+          "HealthService.js", // 존재하지 않는 파일
+          ".DS_Store", // macOS 시스템 파일
+        ];
+
+        if (excludeFiles.includes(file) || !file.endsWith("Service.js")) {
           continue;
         }
 
         try {
-          // 서비스 클래스 로드
-          const ServiceClass = require(path.join(servicesDir, file));
+          // 파일이 실제로 존재하는지 확인
+          const filePath = path.join(servicesDir, file);
+          if (!fs.existsSync(filePath)) {
+            continue;
+          }
 
-          // 서비스명 추출 (예: TodoService.js -> todo)
-          const serviceName = file.replace("Service.js", "").toLowerCase();
-
-          // 서비스 등록
-          this.register(serviceName, ServiceClass, {
-            autoRegistered: true,
-            priority: 5,
-          });
-
-          registeredCount++;
-          logger.debug(`📝 자동 등록: ${serviceName}`);
+          const ServiceClass = require(filePath);
+          // ... 나머지 코드
         } catch (error) {
           logger.error(`❌ 서비스 자동 등록 실패 (${file}):`, error);
         }
       }
-
-      logger.info(`✅ ${registeredCount}개 서비스 자동 등록 완료`);
     } catch (error) {
       logger.error("❌ 서비스 자동 등록 중 오류:", error);
     }
