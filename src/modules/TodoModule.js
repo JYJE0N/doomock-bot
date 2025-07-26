@@ -153,30 +153,94 @@ class TodoModule extends BaseModule {
    */
   async onHandleMessage(bot, msg) {
     try {
-      const { text, from } = msg;
+      const userId = getUserId(msg);
+      const userState = this.getUserState(userId);
 
-      // 사용자 상태별 메시지 처리
-      if (this.addStates.has(from.id)) {
-        return await this.handleAddTodoMessage(bot, msg);
+      if (!userState) {
+        return false;
       }
 
-      if (this.editStates.has(from.id)) {
-        return await this.handleEditTodoMessage(bot, msg);
+      // 취소 명령 확인
+      if (msg.text === "/cancel") {
+        this.clearUserState(userId);
+        await bot.sendMessage(msg.chat.id, "❌ 작업이 취소되었습니다.");
+        return true;
       }
 
-      if (this.searchStates.has(from.id)) {
-        return await this.handleSearchMessage(bot, msg);
+      // 할일 추가 처리
+      if (
+        userState.action === "adding_todo" &&
+        userState.step === "waiting_text"
+      ) {
+        const todoText = msg.text.trim();
+
+        // 유효성 검사
+        if (!todoText) {
+          await bot.sendMessage(msg.chat.id, "⚠️ 할일 내용을 입력해주세요.");
+          return true;
+        }
+
+        if (todoText.length > 500) {
+          await bot.sendMessage(
+            msg.chat.id,
+            "⚠️ 할일 내용은 500자 이내로 입력해주세요."
+          );
+          return true;
+        }
+
+        // 할일 생성
+        const newTodo = await this.todoService.createTodo({
+          userId,
+          text: todoText,
+          category: "일반",
+          priority: 3,
+        });
+
+        // 상태 초기화
+        this.clearUserState(userId);
+
+        // 성공 메시지와 키보드
+        const successText = `✅ 할일이 추가되었습니다!
+
+"${todoText}"
+
+카테고리와 우선순위를 설정하시겠습니까?`;
+
+        const keyboard = {
+          inline_keyboard: [
+            [
+              {
+                text: "📁 카테고리 설정",
+                callback_data: `todo:category:${newTodo._id}`,
+              },
+              {
+                text: "⭐ 우선순위 설정",
+                callback_data: `todo:priority:${newTodo._id}`,
+              },
+            ],
+            [
+              { text: "📋 목록 보기", callback_data: "todo:list" },
+              { text: "➕ 또 추가", callback_data: "todo:add" },
+            ],
+          ],
+        };
+
+        await bot.sendMessage(msg.chat.id, successText, {
+          parse_mode: "Markdown",
+          reply_markup: keyboard,
+        });
+
+        return true;
       }
 
-      // 빠른 할일 추가 패턴 감지
-      if (this.isQuickAddPattern(text)) {
-        return await this.handleQuickAdd(bot, msg);
-      }
-
-      return false; // 처리하지 않음
-    } catch (error) {
-      logger.error("❌ TodoModule 메시지 처리 실패:", error);
       return false;
+    } catch (error) {
+      logger.error("TodoModule 메시지 처리 오류:", error);
+      await bot.sendMessage(
+        msg.chat.id,
+        "❌ 처리 중 오류가 발생했습니다.\n다시 시도해주세요."
+      );
+      return true;
     }
   }
 
@@ -721,6 +785,81 @@ class TodoModule extends BaseModule {
     } catch (error) {
       logger.error("❌ TodoModule 정리 실패:", error);
     }
+  }
+  // ===== 헬퍼 메서드들 =====
+
+  /**
+   * 우선순위 이모지
+   */
+  getPriorityEmoji(priority) {
+    const emojis = {
+      1: "🔴", // 매우 높음
+      2: "🟠", // 높음
+      3: "🟡", // 보통
+      4: "🟢", // 낮음
+      5: "🔵", // 매우 낮음
+    };
+    return emojis[priority] || "⚪";
+  }
+
+  /**
+   * 목록 키보드 생성
+   */
+  createListKeyboard(todos, currentPage, totalPages) {
+    const keyboard = [];
+
+    // 할일 버튼들 (2열로 배치)
+    for (let i = 0; i < todos.length; i += 2) {
+      const row = [];
+
+      // 첫 번째 할일
+      const todo1 = todos[i];
+      row.push({
+        text: `${i + 1}. ${
+          todo1.completed ? "✅" : "⬜"
+        } ${todo1.text.substring(0, 20)}...`,
+        callback_data: `todo:detail:${todo1._id}`,
+      });
+
+      // 두 번째 할일 (있다면)
+      if (i + 1 < todos.length) {
+        const todo2 = todos[i + 1];
+        row.push({
+          text: `${i + 2}. ${
+            todo2.completed ? "✅" : "⬜"
+          } ${todo2.text.substring(0, 20)}...`,
+          callback_data: `todo:detail:${todo2._id}`,
+        });
+      }
+
+      keyboard.push(row);
+    }
+
+    // 페이징 버튼
+    const pagingRow = [];
+    if (currentPage > 1) {
+      pagingRow.push({
+        text: "◀️ 이전",
+        callback_data: `todo:page:${currentPage - 1}`,
+      });
+    }
+    if (currentPage < totalPages) {
+      pagingRow.push({
+        text: "다음 ▶️",
+        callback_data: `todo:page:${currentPage + 1}`,
+      });
+    }
+    if (pagingRow.length > 0) {
+      keyboard.push(pagingRow);
+    }
+
+    // 하단 메뉴
+    keyboard.push([
+      { text: "➕ 추가", callback_data: "todo:add" },
+      { text: "🔙 뒤로", callback_data: "todo:menu" },
+    ]);
+
+    return { inline_keyboard: keyboard };
   }
 }
 

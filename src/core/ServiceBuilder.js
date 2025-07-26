@@ -346,25 +346,105 @@ class ServiceBuilder {
    */
   get(serviceName) {
     try {
-      if (!this.serviceInstances.has(serviceName)) {
-        logger.warn(`⚠️ 서비스 인스턴스를 찾을 수 없음: ${serviceName}`);
-        return null;
+      if (!serviceName) {
+        throw new Error("서비스명이 필요합니다");
       }
 
-      const instance = this.serviceInstances.get(serviceName);
+      // 캐시된 인스턴스 확인
+      if (this.serviceInstances.has(serviceName)) {
+        const instance = this.serviceInstances.get(serviceName);
 
-      // 헬스체크
-      if (!this.isServiceHealthy(instance)) {
-        logger.warn(`🏥 비정상 서비스 감지: ${serviceName}`);
-        this.serviceInstances.delete(serviceName);
-        return null;
+        // 헬스 체크
+        if (this.isServiceHealthy(instance)) {
+          return instance;
+        } else {
+          // 비정상 인스턴스 제거
+          this.serviceInstances.delete(serviceName);
+          logger.warn(`🧹 비정상 서비스 인스턴스 제거: ${serviceName}`);
+          return null;
+        }
       }
 
-      this.stats.cacheHits++;
-      return instance;
+      return null;
     } catch (error) {
       logger.error(`❌ 서비스 조회 실패 (${serviceName}):`, error);
       return null;
+    }
+  }
+
+  /**
+   * 🏥 서비스 헬스 체크
+   */
+  isServiceHealthy(service) {
+    try {
+      if (!service) return false;
+
+      // 기본 헬스 체크
+      if (typeof service.getStatus === "function") {
+        const status = service.getStatus();
+        return status.isConnected !== false;
+      }
+
+      // 서비스가 존재하면 일단 정상으로 간주
+      return true;
+    } catch (error) {
+      logger.debug(`헬스 체크 실패:`, error);
+      return false;
+    }
+  }
+
+  /**
+   * 🔍 자동 서비스 등록
+   */
+  async autoRegisterServices() {
+    try {
+      logger.info("🔍 서비스 자동 등록 시작...");
+
+      const fs = require("fs");
+      const path = require("path");
+
+      // services 디렉토리 경로
+      const servicesDir = path.join(__dirname, "..", "services");
+
+      // 디렉토리 존재 확인
+      if (!fs.existsSync(servicesDir)) {
+        logger.warn(`⚠️ services 디렉토리가 없음: ${servicesDir}`);
+        return;
+      }
+
+      // 서비스 파일들 읽기
+      const files = fs.readdirSync(servicesDir);
+      let registeredCount = 0;
+
+      for (const file of files) {
+        // BaseService.js는 제외
+        if (file === "BaseService.js" || !file.endsWith("Service.js")) {
+          continue;
+        }
+
+        try {
+          // 서비스 클래스 로드
+          const ServiceClass = require(path.join(servicesDir, file));
+
+          // 서비스명 추출 (예: TodoService.js -> todo)
+          const serviceName = file.replace("Service.js", "").toLowerCase();
+
+          // 서비스 등록
+          this.register(serviceName, ServiceClass, {
+            autoRegistered: true,
+            priority: 5,
+          });
+
+          registeredCount++;
+          logger.debug(`📝 자동 등록: ${serviceName}`);
+        } catch (error) {
+          logger.error(`❌ 서비스 자동 등록 실패 (${file}):`, error);
+        }
+      }
+
+      logger.info(`✅ ${registeredCount}개 서비스 자동 등록 완료`);
+    } catch (error) {
+      logger.error("❌ 서비스 자동 등록 중 오류:", error);
     }
   }
 
@@ -491,34 +571,42 @@ class ServiceBuilder {
   }
 
   /**
-   * 🔄 의존성 그래프 업데이트
+   * 🔗 의존성 그래프 업데이트
    */
   updateDependencyGraph(serviceName, dependencies) {
-    this.dependencyGraph.set(serviceName, dependencies || []);
+    // 서비스의 의존성 저장
+    this.dependencyGraph.set(serviceName, dependencies);
+
+    // 역방향 의존성도 추적 (누가 이 서비스를 사용하는지)
+    for (const dep of dependencies) {
+      if (!this.dependencyGraph.has(`_reverse_${dep}`)) {
+        this.dependencyGraph.set(`_reverse_${dep}`, new Set());
+      }
+      this.dependencyGraph.get(`_reverse_${dep}`).add(serviceName);
+    }
   }
 
   /**
    * 🌀 순환 의존성 체크
    */
-  hasCircularDependency(serviceA, serviceB, visited = new Set()) {
-    if (visited.has(serviceA)) {
+  hasCircularDependency(serviceName, targetDependency, visited = new Set()) {
+    if (serviceName === targetDependency) {
       return true;
     }
 
-    visited.add(serviceA);
+    if (visited.has(serviceName)) {
+      return false;
+    }
 
-    const dependencies = this.dependencyGraph.get(serviceA) || [];
+    visited.add(serviceName);
 
-    for (const dependency of dependencies) {
-      if (
-        dependency === serviceB ||
-        this.hasCircularDependency(dependency, serviceB, visited)
-      ) {
+    const dependencies = this.dependencyGraph.get(serviceName) || [];
+    for (const dep of dependencies) {
+      if (this.hasCircularDependency(dep, targetDependency, visited)) {
         return true;
       }
     }
 
-    visited.delete(serviceA);
     return false;
   }
 
@@ -665,15 +753,72 @@ class ServiceBuilder {
    * 🧹 정리 스케줄러 시작
    */
   startCleanupScheduler() {
-    if (this.cleanupTimer) {
-      clearInterval(this.cleanupTimer);
+    try {
+      // 기존 타이머 정리
+      if (this.cleanupTimer) {
+        clearInterval(this.cleanupTimer);
+      }
+
+      // 새 타이머 설정
+      this.cleanupTimer = setInterval(() => {
+        this.performCleanup();
+      }, this.config.cleanupInterval);
+
+      logger.debug(
+        `🧹 ServiceBuilder 정리 스케줄러 시작 (${this.config.cleanupInterval}ms 간격)`
+      );
+    } catch (error) {
+      logger.error("❌ 정리 스케줄러 시작 실패:", error);
+    }
+  }
+
+  /**
+   * 🧹 정리 작업 수행
+   */
+  async performCleanup() {
+    try {
+      logger.debug("🧹 ServiceBuilder 정리 작업 시작...");
+
+      let cleanedCount = 0;
+      const now = Date.now();
+
+      // 비정상 서비스 인스턴스 정리
+      for (const [serviceName, instance] of this.serviceInstances) {
+        if (!this.isServiceHealthy(instance)) {
+          this.serviceInstances.delete(serviceName);
+          cleanedCount++;
+          logger.debug(`🧹 비정상 서비스 제거: ${serviceName}`);
+        }
+      }
+
+      // 통계 업데이트
+      this.updateHealthStats();
+
+      if (cleanedCount > 0) {
+        logger.info(`🧹 ${cleanedCount}개 비정상 서비스 정리 완료`);
+      }
+    } catch (error) {
+      logger.error("❌ 정리 작업 중 오류:", error);
+    }
+  }
+
+  /**
+   * 📊 헬스 통계 업데이트
+   */
+  updateHealthStats() {
+    let healthyCount = 0;
+    let unhealthyCount = 0;
+
+    for (const [serviceName, instance] of this.serviceInstances) {
+      if (this.isServiceHealthy(instance)) {
+        healthyCount++;
+      } else {
+        unhealthyCount++;
+      }
     }
 
-    this.cleanupTimer = setInterval(() => {
-      this.performHealthCheck();
-    }, this.config.cleanupInterval);
-
-    logger.debug("🧹 ServiceBuilder 정리 스케줄러 시작됨");
+    this.stats.healthyServices = healthyCount;
+    this.stats.unhealthyServices = unhealthyCount;
   }
 
   /**
@@ -756,41 +901,29 @@ class ServiceBuilder {
     try {
       logger.info("🧹 ServiceBuilder 정리 시작...");
 
-      // 스케줄러 정리
+      // 타이머 정리
       if (this.cleanupTimer) {
         clearInterval(this.cleanupTimer);
         this.cleanupTimer = null;
       }
 
-      // 서비스 인스턴스들 정리
+      // 모든 서비스 정리
       for (const [serviceName, instance] of this.serviceInstances) {
         try {
-          if (instance.cleanup && typeof instance.cleanup === "function") {
+          if (instance && typeof instance.cleanup === "function") {
             await instance.cleanup();
           }
-          logger.debug(`✅ ${serviceName} 서비스 정리 완료`);
         } catch (error) {
-          logger.error(`❌ ${serviceName} 서비스 정리 실패:`, error);
+          logger.error(`❌ 서비스 정리 실패 (${serviceName}):`, error);
         }
       }
 
-      // 내부 상태 정리
-      this.serviceRegistry.clear();
+      // 인스턴스 제거
       this.serviceInstances.clear();
+      this.serviceRegistry.clear();
       this.dependencyGraph.clear();
 
-      this.stats = {
-        totalRegistered: 0,
-        totalCreated: 0,
-        totalErrors: 0,
-        cacheHits: 0,
-        cacheMisses: 0,
-        averageCreationTime: 0,
-        lastActivity: null,
-        healthyServices: 0,
-        unhealthyServices: 0,
-      };
-
+      // 상태 초기화
       this.isInitialized = false;
 
       logger.info("✅ ServiceBuilder 정리 완료");
