@@ -169,6 +169,38 @@ class BaseModule {
     }
   }
 
+  // 서비스빌더 없이도 서비스 생성하기
+  async requireService(serviceName) {
+    try {
+      if (!this.serviceBuilder) {
+        logger.warn(
+          `⚠️ ${this.moduleName}: ServiceBuilder가 없어 직접 서비스 생성 시도`
+        );
+
+        // ServiceBuilder 없이 직접 생성 시도
+        const ServiceClass = require(`../services/${
+          serviceName.charAt(0).toUpperCase() + serviceName.slice(1)
+        }Service`);
+        const service = new ServiceClass(this.db);
+        if (service.initialize) {
+          await service.initialize();
+        }
+        return service;
+      }
+
+      return await this.serviceBuilder.getOrCreate(serviceName, {
+        db: this.db,
+        moduleRef: this,
+      });
+    } catch (error) {
+      logger.error(
+        `❌ ${this.moduleName}: ${serviceName} 서비스 요청 실패:`,
+        error
+      );
+      return null;
+    }
+  }
+
   /**
    * 💬 표준 메시지 처리
    * 매개변수: (bot, msg)
