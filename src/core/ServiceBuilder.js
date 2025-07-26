@@ -165,8 +165,8 @@ class ServiceBuilder {
 
       switch (serviceName) {
         case "todo":
-          // TodoService는 아직 없으므로 Mock 생성
-          serviceInstance = this.createMockService("TodoService");
+          // TodoService는 db 매개변수 필요
+          serviceInstance = new ServiceClass(options.db || this.defaultDb);
           break;
 
         case "worktime":
@@ -176,6 +176,11 @@ class ServiceBuilder {
 
         case "reminder":
           // ReminderService는 매개변수 없음
+          serviceInstance = new ServiceClass();
+          break;
+
+        case "fortune":
+          // 운세는 매개변수 없음
           serviceInstance = new ServiceClass();
           break;
 
@@ -191,6 +196,16 @@ class ServiceBuilder {
 
         case "leave":
           // LeaveService는 db 매개변수 필요
+          serviceInstance = new ServiceClass(options.db || this.defaultDb);
+          break;
+
+        case "weather":
+          // 날씨는 db 매개변수 필요
+          serviceInstance = new ServiceClass(options.db || this.defaultDb);
+          break;
+
+        case "insight":
+          // 인사이트 db 매개변수 필요
           serviceInstance = new ServiceClass(options.db || this.defaultDb);
           break;
 

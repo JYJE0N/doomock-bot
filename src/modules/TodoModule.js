@@ -3,14 +3,14 @@ const BaseModule = require("../core/BaseModule");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
-const ValidationManager = require("../utils/ValidationHelper"); // ✅ 직접 import
+const ValidationHelper = require("../utils/ValidationHelper"); // ✅ 직접 import
 
 /**
  * 📝 TodoModule v3.0.1 - ServiceBuilder 연동 리팩토링 (의존성 수정)
  *
  * 🎯 수정 사항:
  * - 존재하지 않는 ValidationService/NotificationService 의존성 제거
- * - ValidationManager 직접 사용 (utils에서 import)
+ * - ValidationHelper 직접 사용 (utils에서 import)
  * - 필수 서비스는 TodoService만 유지
  * - 안전한 초기화 로직 적용
  * - 에러 발생 시에도 기본 기능 제공
@@ -29,8 +29,8 @@ class TodoModule extends BaseModule {
     // 🔧 서비스 인스턴스들 (ServiceBuilder로 요청)
     this.todoService = null;
 
-    // ✅ ValidationManager 직접 생성 (서비스가 아님)
-    this.validationManager = new ValidationManager();
+    // ✅ ValidationHelper 직접 생성 (서비스가 아님)
+    this.ValidationHelper = new ValidationHelper();
 
     // Railway 환경변수 기반 설정
     this.config = {
@@ -77,8 +77,8 @@ class TodoModule extends BaseModule {
         throw new Error("TodoService 초기화 실패");
       }
 
-      // ✅ ValidationManager는 이미 생성되어 있음 (utils에서 직접 사용)
-      logger.info("✅ ValidationManager 준비됨 (내장 검증 시스템)");
+      // ✅ ValidationHelper는 이미 생성되어 있음 (utils에서 직접 사용)
+      logger.info("✅ ValidationHelper 준비됨 (내장 검증 시스템)");
 
       // 📋 액션 설정
       this.setupActions();
@@ -460,8 +460,8 @@ class TodoModule extends BaseModule {
       // 텍스트 파싱
       const parsedTodo = this.parseAddTodoText(text);
 
-      // ValidationManager로 검증
-      const validationResult = await this.validationManager.validate(
+      // ValidationHelper로 검증
+      const validationResult = await this.ValidationHelper.validate(
         "todo",
         parsedTodo
       );
@@ -549,7 +549,7 @@ class TodoModule extends BaseModule {
       const parsedTodo = this.parseAddTodoText(text);
 
       // 검증
-      const validationResult = await this.validationManager.validate(
+      const validationResult = await this.ValidationHelper.validate(
         "todo",
         parsedTodo
       );
@@ -746,9 +746,9 @@ class TodoModule extends BaseModule {
         connected: !!this.todoService,
         status: this.todoService?.getStatus?.() || "unknown",
       },
-      validationManager: {
-        connected: !!this.validationManager,
-        status: this.validationManager?.getStatus?.() || "unknown",
+      ValidationHelper: {
+        connected: !!this.ValidationHelper,
+        status: this.ValidationHelper?.getStatus?.() || "unknown",
       },
       userStates: {
         adding: this.addStates.size,
@@ -772,14 +772,14 @@ class TodoModule extends BaseModule {
       this.editStates.clear();
       this.searchStates.clear();
 
-      // ValidationManager 정리
-      if (this.validationManager && this.validationManager.cleanup) {
-        this.validationManager.cleanup();
+      // ValidationHelper 정리
+      if (this.ValidationHelper && this.ValidationHelper.cleanup) {
+        this.ValidationHelper.cleanup();
       }
 
       // 서비스 참조 정리 (ServiceBuilder가 관리하므로 직접 정리하지 않음)
       this.todoService = null;
-      this.validationManager = null;
+      this.ValidationHelper = null;
 
       logger.info("✅ TodoModule 정리 완료");
     } catch (error) {
