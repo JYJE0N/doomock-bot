@@ -710,7 +710,7 @@ class DooMockBot {
     // Railway 특별 처리
     if (this.config.isRailway) {
       // Railway 헬스체크 응답
-      process.on('SIGUSR2', () => {
+      process.on("SIGUSR2", () => {
         logger.debug("💓 Railway 헬스체크 수신");
       });
     }
@@ -738,7 +738,7 @@ class DooMockBot {
         // Railway 메모리 제한: 512MB
         if (memUsedMB > 400) {
           logger.warn(`⚠️ 높은 메모리 사용량: ${memUsedMB}MB`);
-          
+
           // 캐시 정리 시도
           if (global.gc) {
             global.gc();
@@ -747,7 +747,6 @@ class DooMockBot {
         }
       }, 60000); // 1분마다 체크
     }
-  
   }
   /**
    * 🛑 정상 종료 (Railway 최적화)
@@ -759,7 +758,7 @@ class DooMockBot {
       // 🛡️ 1단계: 봇 연결 정리 (가장 중요!)
       if (this.bot) {
         logger.debug("🤖 봇 연결 종료 중...");
-        
+
         try {
           // 웹훅 정리
           await this.bot.telegram.deleteWebhook({ drop_pending_updates: true });
@@ -767,7 +766,7 @@ class DooMockBot {
         } catch (webhookError) {
           logger.debug("⚠️ 웹훅 정리 실패 (무시)");
         }
-        
+
         // 봇 정지
         this.bot.stop(signal);
         logger.debug("✅ 봇 정지됨");
@@ -793,12 +792,11 @@ class DooMockBot {
 
       // Railway: 정상 종료 신호
       logger.success("✅ 정상 종료 완료");
-      
+
       // Railway 종료 대기 (중복 방지)
       setTimeout(() => {
         process.exit(0);
       }, 1000);
-
     } catch (error) {
       logger.error("❌ 정상 종료 실패:", error);
       await this.emergencyShutdown(error);
@@ -816,19 +814,20 @@ class DooMockBot {
       if (this.bot) {
         this.bot.stop("SIGKILL");
       }
-      
+
       if (this.dbManager) {
         await this.dbManager.disconnect();
       }
-
     } catch (cleanupError) {
       logger.error("❌ 비상 정리 실패:", cleanupError);
     } finally {
       logger.error("💥 비상 종료됨");
       process.exit(1);
     }
-  }
-// 애플리케이션 인스턴스 생성 및 시작
+  } // ⭐ 이 닫는 중괄호가 누락되어 있었습니다!
+} // ⭐ 클래스 끝 닫는 중괄호
+
+// 🚀 애플리케이션 인스턴스 생성 및 시작
 const app = new DooMockBot();
 
 // 즉시 시작 (Railway 환경 고려)
