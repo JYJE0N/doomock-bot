@@ -222,7 +222,32 @@ class DatabaseManager {
       mongoUrl: this.mongoUrl ? "SET" : "NOT_SET",
     };
   }
-}
+
+  // ⭐️ 여기에 추가! (getStatus 메서드 다음)
+  /**
+   * DB 인스턴스 가져오기 (호환성을 위한 메서드)
+   */
+  getDb() {
+    if (!this.db) {
+      throw new Error("데이터베이스가 연결되지 않았습니다");
+    }
+    return this.db;
+  }
+
+  /**
+   * DB 인스턴스 가져오기 (별칭)
+   */
+  getDatabase() {
+    return this.getDb();
+  }
+
+  /**
+   * 연결 상태 확인 (메서드 형태)
+   */
+  isConnected() {
+    return this.isConnected;
+  }
+} // 클래스 끝
 
 /**
  * 싱글톤 인스턴스 가져오기

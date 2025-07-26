@@ -351,10 +351,22 @@ class DooMockBot {
 
       // DB 연결 설정
       try {
-        if (this.dbManager && this.dbManager.getDb) {
-          const db = this.dbManager.getDb();
-          this.serviceBuilder.setDefaultDatabase(db);
-          logger.debug("✅ ServiceBuilder에 DB 연결 설정 완료");
+        if (this.dbManager) {
+          let db = null;
+
+          // getDb 메서드가 있으면 사용, 없으면 직접 접근
+          if (typeof this.dbManager.getDb === "function") {
+            db = this.dbManager.getDb();
+          } else if (this.dbManager.db) {
+            db = this.dbManager.db;
+          }
+
+          if (db) {
+            this.serviceBuilder.setDefaultDatabase(db);
+            logger.debug("✅ ServiceBuilder에 DB 연결 설정 완료");
+          } else {
+            logger.warn("⚠️ DB 인스턴스를 가져올 수 없음");
+          }
         } else {
           logger.warn("⚠️ DB Manager가 준비되지 않음");
         }
@@ -600,28 +612,48 @@ class DooMockBot {
   async initializeModuleManager() {
     logger.info("📦 ModuleManager 초기화 중...");
 
-    const {
-      ModuleManager,
-      createModuleManager,
-    } = require("./src/core/ModuleManager");
+    try {
+      const {
+        ModuleManager,
+        createModuleManager,
+      } = require("./src/core/ModuleManager");
 
-    this.moduleManager = createModuleManager({
-      bot: this.bot,
-      db: this.dbManager ? this.dbManager.getDb() : null,
-      serviceBuilder: this.serviceBuilder, // ⭐ ServiceBuilder 전달
-      config: this.config,
-      enableCache: this.config.moduleCacheEnabled !== false,
-      isRailway: this.config.isRailway,
-    });
+      // DB 가져오기 - 수정된 부분
+      let db = null;
+      if (this.dbManager) {
+        // getDb 메서드가 있으면 사용, 없으면 직접 접근
+        if (typeof this.dbManager.getDb === "function") {
+          db = this.dbManager.getDb();
+        } else {
+          db = this.dbManager.db;
+        }
 
-    // ServiceBuilder 설정 (추가 안전장치)
-    if (this.moduleManager.setServiceBuilder) {
-      this.moduleManager.setServiceBuilder(this.serviceBuilder);
+        if (!db) {
+          logger.warn("⚠️ DB 인스턴스를 가져올 수 없습니다");
+        }
+      }
+
+      this.moduleManager = createModuleManager({
+        bot: this.bot,
+        db: db, // 수정된 부분
+        serviceBuilder: this.serviceBuilder,
+        config: this.config,
+        enableCache: this.config.moduleCacheEnabled !== false,
+        isRailway: this.config.isRailway,
+      });
+
+      // ServiceBuilder 설정 (추가 안전장치)
+      if (this.moduleManager.setServiceBuilder) {
+        this.moduleManager.setServiceBuilder(this.serviceBuilder);
+      }
+
+      await this.moduleManager.initialize();
+
+      logger.debug("✅ ModuleManager 초기화 완료");
+    } catch (error) {
+      logger.error("❌ ModuleManager 초기화 실패:", error);
+      throw error;
     }
-
-    await this.moduleManager.initialize();
-
-    logger.debug("✅ ModuleManager 초기화 완료");
   }
 
   /**
