@@ -84,13 +84,13 @@ class DooMockBot {
       // 환경 검증
       await this.validateEnvironment();
 
-      // 초기화 순서 (의존성 순)
-      await this.initializeTelegrafBot();
+      // 초기화 순서 (의존성 순) - 수정됨
+      // ✅ 제거: await this.initializeTelegrafBot(); // BotController가 직접 생성
       await this.initializeDatabaseManager();
       await this.initializeValidationManager();
-      await this.initializeHealthChecker(); // 생성만 함, start()는 나중에
+      await this.initializeHealthChecker();
       await this.initializeModuleManager();
-      await this.initializeBotController();
+      await this.initializeBotController(); // 여기서 bot 인스턴스가 생성됨
 
       // 🏥 모든 컴포넌트가 초기화된 후 헬스체커에 등록 및 시작
       if (this.healthChecker && this.config.enableHealthCheck) {
@@ -104,17 +104,28 @@ class DooMockBot {
 
       logger.success(`🎊 두목봇 시작 완료 🎊`);
       logger.info(`🌍 환경: ${this.config.environment}`);
-      logger.info(`🚂 Railway: ${this.config.isRailway ? "활성" : "비활성"}`);
       logger.info(
-        `🛡️ 검증 시스템: ${this.config.enableValidation ? "활성" : "비활성"}`
+        `🚂 Railway: ${this.config.isRailway ? "활성화" : "비활성화"}`
       );
       logger.info(
-        `🏥 헬스체커: ${this.config.enableHealthCheck ? "활성" : "비활성"}`
+        `📊 검증: ${this.config.enableValidation ? "활성화" : "비활성화"}`
       );
+      logger.info(
+        `🏥 헬스체크: ${this.config.enableHealthCheck ? "활성화" : "비활성화"}`
+      );
+
+      // 📊 초기 상태 출력
+      if (this.moduleManager) {
+        const status = await this.moduleManager.getActiveModulesStatus();
+        logger.info(`📦 활성 모듈: ${status.length}개`);
+        status.forEach((mod) => {
+          logger.info(`   - ${mod.name}: ${mod.status}`);
+        });
+      }
     } catch (error) {
-      logger.error("🚨 두목봇 시작 실패:", error);
-      await this.handleInitializationFailure(error);
-      process.exit(1);
+      logger.fatal(`🚨 애플리케이션 시작 실패:`, error);
+      await this.emergencyShutdown();
+      throw error;
     }
   }
 
@@ -502,10 +513,10 @@ class DooMockBot {
     const db = this.dbManager.db;
 
     this.moduleManager = new ModuleManager({
-      bot: this.bot,
+      bot: null, // ✅ 수정: 아직 bot이 없으므로 null 전달
       db: db,
       config: this.config,
-      validationManager: this.validationManager, // ✅ 반드시 있어야 함
+      validationManager: this.validationManager,
     });
 
     await this.moduleManager.initialize();
@@ -513,8 +524,52 @@ class DooMockBot {
   }
 
   /**
+   * 🚀 봇 시작 (수정된 버전)
+   */
+  async startBot() {
+    logger.info("🚀 봇 시작 중...");
+
+    try {
+      // ✅ 수정: BotController의 bot 인스턴스 사용
+      if (!this.bot || !this.botController) {
+        throw new Error("봇 또는 봇 컨트롤러가 초기화되지 않았습니다");
+      }
+
+      // 🌐 Webhook 설정 (Railway)
+      if (this.config.isRailway) {
+        const port = process.env.PORT || 3000;
+        const domain =
+          process.env.RAILWAY_PUBLIC_DOMAIN || process.env.RAILWAY_STATIC_URL;
+
+        if (domain) {
+          const webhookUrl = `https://${domain}/${this.config.botToken}`;
+          await this.bot.telegram.setWebhook(webhookUrl);
+
+          // Express 앱이 필요한 경우 별도 설정
+          logger.info(`🌐 웹훅 설정 완료: ${webhookUrl}`);
+        }
+      } else {
+        // 로컬 환경: polling 모드
+        await this.bot.launch({
+          dropPendingUpdates: true,
+        });
+        logger.info("🚀 봇 시작됨 (polling 모드)");
+      }
+
+      logger.success("✅ 두목봇이 준비되었습니다!");
+    } catch (error) {
+      logger.error("❌ 봇 시작 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
    * 🎮 봇 컨트롤러 초기화 (상세 디버깅)
    */
+  /**
+   * 🎮 봇 컨트롤러 초기화 (수정된 버전)
+   */
+
   async initializeBotController() {
     logger.info("🎮 봇 컨트롤러 초기화 중...");
 
@@ -543,16 +598,27 @@ class DooMockBot {
       );
     }
 
-    this.botController = new BotController({
-      bot: this.bot,
-      moduleManager: this.moduleManager,
-      dbManager: this.dbManager,
-      validationManager: this.validationManager,
-      healthChecker: this.healthChecker,
-      config: this.config,
-    });
+    // ✅ 수정: BotController 생성자에 맞게 매개변수 전달
+    this.botController = new BotController(
+      this.config.botToken, // 첫 번째 매개변수: botToken
+      {
+        // 두 번째 매개변수: config 객체
+        ...this.config,
+        webhookMode: this.config.isRailway, // Railway 환경에서는 webhook 모드 사용
+      }
+    );
 
-    await this.botController.initialize();
+    // ✅ 수정: initialize 메서드에 moduleManager 전달
+    await this.botController.initialize(this.moduleManager);
+
+    // ✅ 추가: 다른 의존성들 직접 설정
+    this.botController.dbManager = this.dbManager;
+    this.botController.validationManager = this.validationManager;
+    this.botController.healthChecker = this.healthChecker;
+
+    // ✅ 중요: DooMockBot의 bot 인스턴스를 BotController의 bot으로 교체
+    this.bot = this.botController.bot;
+
     logger.debug("✅ 봇 컨트롤러 초기화 완료");
   }
 

@@ -4,7 +4,7 @@ const TimeHelper = require("../utils/TimeHelper");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 
 /**
- * 🎹 NavigationHandler v3.0.1 - 문법 오류 수정
+ * 🎹 NavigationHandler v3.0.1
  *
  * 🎯 역할:
  * ✅ 모든 인라인키보드 생성 중앙관리
@@ -19,7 +19,7 @@ class NavigationHandler {
     this.moduleManager = options.moduleManager;
     this.commandsRegistry = options.commandsRegistry;
 
-    // 🎨 UI 디자인 시스템
+    // 🎨 UI 디자인 시스템💎
     this.uiTheme = {
       // 색상 팔레트
       colors: {
@@ -27,7 +27,7 @@ class NavigationHandler {
         success: "🟢",
         warning: "🟡",
         danger: "🔴",
-        info: "🔵",
+        info: "💎",
         system: "⚙️",
       },
 
@@ -72,6 +72,41 @@ class NavigationHandler {
     this.cacheTimeout = 5000; // 5초
 
     logger.info("🎹 NavigationHandler v3.0.1 완전 구현 시작!");
+  }
+
+  // NavigationHandler.js에 추가할 initialize 메서드
+  /**
+   * 🚀 NavigationHandler 초기화
+   */
+  async initialize(moduleManager) {
+    try {
+      logger.info("🎹 NavigationHandler 초기화 시작...");
+
+      // ModuleManager 연결
+      this.moduleManager = moduleManager;
+
+      // 초기 상태 설정
+      this.stats = {
+        navigationsHandled: 0,
+        keyboardsGenerated: 0,
+        errorsCount: 0,
+        averageResponseTime: 0,
+        totalResponseTime: 0,
+      };
+
+      // 캐시 초기화
+      this.callbackCache.clear();
+
+      logger.success("✅ NavigationHandler 초기화 완료", {
+        hasModuleManager: !!this.moduleManager,
+        cacheTimeout: this.cacheTimeout,
+      });
+
+      return true;
+    } catch (error) {
+      logger.error("❌ NavigationHandler 초기화 실패:", error);
+      throw error;
+    }
   }
 
   /**

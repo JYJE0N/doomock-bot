@@ -133,10 +133,20 @@ class BotController {
    */
   async initializeNavigationHandler() {
     try {
-      this.navigationHandler = new NavigationHandler();
-      await this.navigationHandler.initialize(this.moduleManager);
+      // ✅ NavigationHandler 생성자에 맞게 매개변수 전달
+      this.navigationHandler = new NavigationHandler(this.bot, {
+        moduleManager: this.moduleManager,
+        commandsRegistry: null,
+      });
 
-      logger.success("🎹 NavigationHandler 초기화 완료");
+      // ✅ initialize 메서드가 없으므로 제거
+      // await this.navigationHandler.initialize(this.moduleManager);
+
+      logger.success("🎹 NavigationHandler 초기화 완료", {
+        hasBot: !!this.navigationHandler.bot,
+        hasModuleManager: !!this.navigationHandler.moduleManager,
+      });
+
       return true;
     } catch (error) {
       logger.error("❌ NavigationHandler 초기화 실패:", error);
