@@ -1,9 +1,9 @@
 // src/controllers/BotController.js - 통합 봇 컨트롤러 v3.0.1
 const { Telegraf } = require("telegraf");
-const NavigationHandler = require("../handlers/NavigationHandler");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName } = require("../utils/UserHelper");
+const NavigationHandler = require("../handlers/NavigationHandler");
 
 /**
  * 🤖 BotController v3.0.1 (리팩토링)
@@ -356,6 +356,65 @@ class BotController {
     } catch (error) {
       logger.error(`❌ 미디어 처리 실패 (${mediaType}):`, error);
     }
+  }
+
+  /**
+   * 🔍 의존성 검증 (상세 디버깅 추가)
+   */
+  validateDependencies() {
+    console.log("🔍 BotController 의존성 검증 시작...");
+
+    const required = [
+      { name: "bot", obj: this.bot },
+      { name: "moduleManager", obj: this.moduleManager },
+    ];
+
+    const optional = [
+      { name: "dbManager", obj: this.dbManager },
+      { name: "validationManager", obj: this.validationManager },
+      { name: "healthChecker", obj: this.healthChecker },
+    ];
+
+    // 🔍 상세 디버깅: 각 의존성 개별 확인
+    console.log("🔍 필수 의존성 상세 확인:");
+    for (const { name, obj } of required) {
+      console.log(`   ${name}:`, {
+        exists: !!obj,
+        type: typeof obj,
+        constructor: obj?.constructor?.name,
+        isNull: obj === null,
+        isUndefined: obj === undefined,
+        truthyCheck: !!obj,
+      });
+    }
+
+    // 필수 의존성 체크
+    for (const { name, obj } of required) {
+      if (!obj) {
+        console.error(`❌ 필수 의존성 누락 상세:`, {
+          name,
+          obj,
+          type: typeof obj,
+          isNull: obj === null,
+          isUndefined: obj === undefined,
+        });
+        throw new Error(`필수 의존성 누락: ${name}`);
+      }
+    }
+
+    // 선택적 의존성 체크 (경고만)
+    console.log("🔍 선택적 의존성 확인:");
+    for (const { name, obj } of optional) {
+      console.log(`   ${name}: ${!!obj}`);
+      if (!obj) {
+        logger.warn(
+          `⚠️ 선택적 의존성 누락: ${name} - 관련 기능이 제한될 수 있습니다.`
+        );
+      }
+    }
+
+    console.log("✅ 의존성 검증 완료");
+    logger.debug("✅ 의존성 검증 완료");
   }
 
   // ===== 🚨 에러 처리 메서드들 =====

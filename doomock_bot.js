@@ -7,7 +7,7 @@ const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 
-// 🗄️ 데이터베이스 매니저 (누락된 import 추가!)
+// 🗄️ 데이터베이스 매니저
 const {
   DatabaseManager,
   createInstance,
@@ -18,10 +18,10 @@ const ValidationManager = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
 
 /**
- * 🚀 메인 애플리케이션 v3.0.1
+ * 🚀 메인 애플리케이션 v3.0.1 - Telegraf 버전 (DatabaseManager import 수정)
  *
  * 🎯 핵심 수정사항:
- * - DatabaseManager import 추가 (누락된 문제 해결)
+ * - DatabaseManager import 추가
  * - node-telegram-bot-api → Telegraf 마이그레이션
  * - Context 기반 처리
  * - Middleware 지원
@@ -513,7 +513,7 @@ class DooMockBot {
   }
 
   /**
-   * 🎮 봇 컨트롤러 초기화 (디버깅 강화!)
+   * 🎮 봇 컨트롤러 초기화 (상세 디버깅)
    */
   async initializeBotController() {
     logger.info("🎮 봇 컨트롤러 초기화 중...");
@@ -522,10 +522,26 @@ class DooMockBot {
     console.log("🔍 BotController에 전달되는 매개변수들:");
     console.log("   bot:", !!this.bot);
     console.log("   moduleManager:", !!this.moduleManager);
+    console.log("   moduleManager 타입:", typeof this.moduleManager);
+    console.log(
+      "   moduleManager 생성자:",
+      this.moduleManager?.constructor?.name
+    );
     console.log("   dbManager:", !!this.dbManager);
     console.log("   validationManager:", !!this.validationManager);
     console.log("   healthChecker:", !!this.healthChecker);
     console.log("   config:", !!this.config);
+
+    // 🔍 ModuleManager 상세 확인
+    if (this.moduleManager) {
+      console.log("🔍 ModuleManager 상세 정보:");
+      console.log("   isInitialized:", this.moduleManager.isInitialized);
+      console.log("   moduleInstances:", !!this.moduleManager.moduleInstances);
+      console.log(
+        "   메서드들:",
+        Object.getOwnPropertyNames(Object.getPrototypeOf(this.moduleManager))
+      );
+    }
 
     this.botController = new BotController({
       bot: this.bot,
