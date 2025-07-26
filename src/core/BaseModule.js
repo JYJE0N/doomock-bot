@@ -1,29 +1,25 @@
-// src/core/BaseModule.js - ServiceBuilder 연동 리팩토링 v3.0.1 (수정됨)
+// src/core/BaseModule.js - 메시지 편집 및 콜백 처리 문제 해결 v3.0.1
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 
 /**
- * 🏗️ 베이스 모듈 v3.0.1 - ServiceBuilder 연동 리팩토링
+ * 🏗️ BaseModule v3.0.1 - 메시지 편집 및 콜백 처리 문제 해결
  *
- * 🎯 주요 변경사항:
- * - ServiceBuilder를 통한 서비스 요청 시스템
- * - 서비스 의존성 자동 해결
- * - 느슨한 결합 (Loose Coupling) 구현
- * - 표준 매개변수 체계 준수
- * - actionMap 방식 사용
- * - Railway 환경 최적화
+ * 🎯 해결된 문제들:
+ * 1. 메시지 편집 실패 문제 (안전한 fallback)
+ * 2. 콜백 처리 매개변수 표준화
+ * 3. 에러 핸들링 강화
+ * 4. Markdown 파싱 오류 대응
+ * 5. 텔레그램 API 제한 대응
  */
 class BaseModule {
   constructor(moduleName, options = {}) {
     this.moduleName = moduleName;
     this.bot = options.bot;
-
-    // 🏗️ ServiceBuilder 연동 (핵심!)
-    this.serviceBuilder = options.serviceBuilder;
+    this.db = options.db;
     this.moduleManager = options.moduleManager;
-    this.moduleKey = options.moduleKey;
-    this.moduleConfig = options.moduleConfig;
+    this.serviceBuilder = options.serviceBuilder;
 
     // 🎯 액션 맵 (핵심!)
     this.actionMap = new Map();
@@ -31,22 +27,14 @@ class BaseModule {
     // 📊 사용자 상태 관리
     this.userStates = new Map();
 
-    // 🔧 서비스 캐시 (ServiceBuilder 연동용)
-    this.serviceCache = new Map();
-    this.serviceCacheTimestamps = new Map();
-
     // 📊 통계
     this.stats = {
       callbacksHandled: 0,
       messagesHandled: 0,
       errorsCount: 0,
-      serviceRequests: 0,
-      serviceCacheHits: 0,
-      serviceCacheMisses: 0,
-      averageResponseTime: 0,
+      messageEditAttempts: 0,
+      messageEditFailures: 0,
       lastActivity: null,
-      createdAt: TimeHelper.getTimestamp(),
-      totalResponseTime: 0,
     };
 
     // ⏱️ 설정
@@ -54,22 +42,17 @@ class BaseModule {
       timeout: 30000,
       maxRetries: 3,
       cacheEnabled: true,
-      cacheTTL: 300000, // 5분
-      enableMetrics: true,
-      enableFallback: true,
+      enableSafeMessageEdit: true, // 안전한 메시지 편집
+      enableFallbackText: true, // fallback 텍스트 사용
+      retryDelay: 1000, // 재시도 간격
       ...options.config,
     };
 
-    // 🏥 헬스 상태
-    this.healthStatus = {
-      healthy: true,
-      services: {},
-      errors: [],
-      lastCheck: null,
-    };
-
+    // 🔒 상태 관리
     this.isInitialized = false;
-    logger.info(`🏗️ ${moduleName} 베이스 모듈 생성됨`);
+    this.editOperationsInProgress = new Set(); // 편집 작업 추적
+
+    logger.info(`🏗️ ${moduleName} 베이스 모듈 생성됨 (메시지 편집 문제 해결)`);
   }
 
   /**
@@ -84,9 +67,6 @@ class BaseModule {
     try {
       logger.info(`🎯 ${this.moduleName} 초기화 시작...`);
 
-      // ServiceBuilder 연결 확인
-      this.validateServiceBuilder();
-
       // 자식 클래스의 초기화 로직
       await this.onInitialize();
 
@@ -94,398 +74,286 @@ class BaseModule {
       this.setupActions();
 
       this.isInitialized = true;
-      this.healthStatus.lastCheck = TimeHelper.getTimestamp();
-
       logger.success(`✅ ${this.moduleName} 초기화 완료`);
     } catch (error) {
       logger.error(`❌ ${this.moduleName} 초기화 실패:`, error);
-      this.healthStatus.healthy = false;
-      this.healthStatus.errors.push({
-        type: "initialization_error",
-        message: error.message,
-        timestamp: TimeHelper.getTimestamp(),
-      });
       throw error;
     }
   }
 
   /**
-   * 🔍 ServiceBuilder 연결 확인
-   */
-  validateServiceBuilder() {
-    if (!this.serviceBuilder) {
-      throw new Error(`${this.moduleName}: ServiceBuilder가 주입되지 않음`);
-    }
-
-    // ServiceBuilder가 정상적인 객체인지 확인
-    if (
-      typeof this.serviceBuilder.create !== "function" ||
-      typeof this.serviceBuilder.get !== "function"
-    ) {
-      logger.warn(`⚠️ ${this.moduleName}: ServiceBuilder가 불완전함`);
-    }
-
-    logger.debug(`✅ ${this.moduleName}: ServiceBuilder 연결 확인됨`);
-  }
-
-  /**
-   * 🎯 자식 클래스에서 구현할 초기화 메서드
-   */
-  async onInitialize() {
-    // 자식 클래스에서 구현
-    // 예: 필요한 서비스들 요청
-    // this.todoService = await this.requireService('todo');
-  }
-
-  /**
-   * 🎯 액션 설정 (자식 클래스에서 구현)
-   */
-  setupActions() {
-    // 자식 클래스에서 구현
-    // 예: this.registerActions({ menu: this.showMenu, ... });
-  }
-
-  /**
-   * 📝 액션 등록 헬퍼
-   */
-  registerActions(actions) {
-    for (const [action, handler] of Object.entries(actions)) {
-      if (typeof handler === "function") {
-        this.actionMap.set(action.toLowerCase(), handler);
-        logger.debug(`📝 ${this.moduleName}: "${action}" 액션 등록됨`);
-      }
-    }
-  }
-
-  // ===== 🔧 ServiceBuilder 연동 메서드들 =====
-
-  /**
-   * 🔧 서비스 요청 (캐싱 지원)
-   */
-  async getService(serviceName, forceRefresh = false) {
-    try {
-      this.stats.serviceRequests++;
-
-      // 캐시 확인 (강제 새로고침이 아닌 경우)
-      if (
-        !forceRefresh &&
-        this.config.cacheEnabled &&
-        this.serviceCache.has(serviceName)
-      ) {
-        if (this.isServiceCacheValid(serviceName)) {
-          this.stats.serviceCacheHits++;
-          logger.debug(
-            `📦 ${this.moduleName}: 캐시된 서비스 반환 - ${serviceName}`
-          );
-          return this.serviceCache.get(serviceName);
-        } else {
-          // 만료된 캐시 제거
-          this.serviceCache.delete(serviceName);
-          this.serviceCacheTimestamps.delete(serviceName);
-        }
-      }
-
-      this.stats.serviceCacheMisses++;
-
-      // ServiceBuilder를 통해 서비스 요청
-      const service = await this.serviceBuilder.create(serviceName);
-
-      if (!service) {
-        logger.warn(
-          `⚠️ ${this.moduleName}: 서비스를 찾을 수 없음 - ${serviceName}`
-        );
-        return null;
-      }
-
-      // 캐시에 저장
-      if (this.config.cacheEnabled) {
-        this.serviceCache.set(serviceName, service);
-        this.serviceCacheTimestamps.set(serviceName, Date.now());
-      }
-
-      // 헬스 상태 업데이트
-      this.healthStatus.services[serviceName] = {
-        connected: true,
-        lastAccess: TimeHelper.getTimestamp(),
-      };
-
-      logger.debug(`🔧 ${this.moduleName}: 서비스 요청 성공 - ${serviceName}`);
-      return service;
-    } catch (error) {
-      logger.error(
-        `❌ ${this.moduleName}: 서비스 요청 실패 - ${serviceName}`,
-        error
-      );
-
-      // 헬스 상태 업데이트
-      this.healthStatus.services[serviceName] = {
-        connected: false,
-        error: error.message,
-        lastError: TimeHelper.getTimestamp(),
-      };
-
-      this.stats.errorsCount++;
-      return null;
-    }
-  }
-
-  /**
-   * 🔧 필수 서비스 요청 (실패 시 예외 발생)
-   */
-  async requireService(serviceName) {
-    const service = await this.getService(serviceName);
-
-    if (!service) {
-      const error = new Error(
-        `${this.moduleName}: 필수 서비스를 찾을 수 없음 - ${serviceName}`
-      );
-      this.healthStatus.healthy = false;
-      this.healthStatus.errors.push({
-        type: "required_service_missing",
-        message: error.message,
-        timestamp: TimeHelper.getTimestamp(),
-      });
-      throw error;
-    }
-
-    return service;
-  }
-
-  /**
-   * 🔍 서비스 존재 확인
-   */
-  hasService(serviceName) {
-    try {
-      // 캐시 확인
-      if (
-        this.serviceCache.has(serviceName) &&
-        this.isServiceCacheValid(serviceName)
-      ) {
-        return true;
-      }
-
-      // ServiceBuilder에서 확인
-      const service = this.serviceBuilder.get(serviceName);
-      return !!service;
-    } catch (error) {
-      logger.debug(
-        `🔍 ${this.moduleName}: 서비스 존재 확인 실패 - ${serviceName}`,
-        error
-      );
-      return false;
-    }
-  }
-
-  /**
-   * 🔍 서비스 캐시 유효성 검사
-   */
-  isServiceCacheValid(serviceName) {
-    const timestamp = this.serviceCacheTimestamps.get(serviceName);
-    if (!timestamp) return false;
-
-    const age = Date.now() - timestamp;
-    return age < this.config.cacheTTL;
-  }
-
-  /**
-   * 🔄 서비스 캐시 새로고침
-   */
-  async refreshService(serviceName) {
-    logger.debug(
-      `🔄 ${this.moduleName}: 서비스 캐시 새로고침 - ${serviceName}`
-    );
-
-    // 캐시에서 제거
-    this.serviceCache.delete(serviceName);
-    this.serviceCacheTimestamps.delete(serviceName);
-
-    // 새로운 인스턴스 요청
-    return await this.getService(serviceName, true);
-  }
-
-  /**
-   * 📦 여러 서비스 한번에 요청
-   */
-  async getServices(serviceNames, required = false) {
-    const services = {};
-    const errors = [];
-
-    for (const serviceName of serviceNames) {
-      try {
-        const service = required
-          ? await this.requireService(serviceName)
-          : await this.getService(serviceName);
-
-        services[serviceName] = service;
-      } catch (error) {
-        errors.push({ serviceName, error: error.message });
-
-        if (required) {
-          throw new Error(
-            `${this.moduleName}: 필수 서비스 요청 실패 - ${serviceName}: ${error.message}`
-          );
-        }
-      }
-    }
-
-    if (errors.length > 0 && !required) {
-      logger.warn(`⚠️ ${this.moduleName}: 일부 서비스 요청 실패`, errors);
-    }
-
-    return services;
-  }
-
-  // ===== 🎯 표준 콜백/메시지 처리 =====
-
-  /**
-   * 🎯 표준 콜백 처리 (핵심!)
+   * 🎯 표준 콜백 처리 (매개변수 문제 해결)
    */
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     const startTime = Date.now();
 
     try {
-      // ✅ 액션 정규화
-      const action = subAction?.toLowerCase()?.trim() || "menu";
-
-      // ✅ 상세 로깅 (모듈별)
-      logger.debug(
-        `📦 ${this.moduleName} 콜백: ${action} (params: [${params.join(", ")}])`
+      // 🔍 매개변수 검증 및 정규화
+      const {
+        normalizedBot,
+        normalizedCallbackQuery,
+        normalizedSubAction,
+        normalizedParams,
+        normalizedModuleManager,
+      } = this.normalizeCallbackParams(
+        bot,
+        callbackQuery,
+        subAction,
+        params,
+        moduleManager
       );
 
-      // 📊 통계 업데이트
+      // 통계 업데이트
       this.stats.callbacksHandled++;
-      this.stats.lastActivity = new Date();
+      this.stats.lastActivity = TimeHelper.getLogTimeString();
 
-      // 액션 맵에서 핸들러 조회
-      const handler = this.actionMap.get(action);
-
-      if (handler && typeof handler === "function") {
-        // ✅ 표준 매개변수로 핸들러 호출
-        const result = await handler.call(
-          this,
-          bot,
-          callbackQuery,
-          params,
-          moduleManager
+      // 액션 실행
+      const action = this.actionMap.get(normalizedSubAction);
+      if (!action) {
+        logger.warn(
+          `${this.moduleName}: 알 수 없는 액션 - ${normalizedSubAction}`
         );
-
-        // 응답 시간 기록
-        const responseTime = Date.now() - startTime;
-        this.updateResponseTime(responseTime);
-
-        return !!result;
-      } else {
-        // ❓ 액션 없음
-        logger.warn(`❓ ${this.moduleName}: "${action}" 액션 없음`);
-
-        if (this.config.enableFallback !== false) {
-          await this.sendActionNotFound(bot, callbackQuery, action);
-        }
-
+        await this.sendActionNotFoundSafely(
+          normalizedBot,
+          normalizedCallbackQuery,
+          normalizedSubAction
+        );
         return false;
       }
-    } catch (error) {
-      logger.error(`❌ ${this.moduleName} 콜백 오류:`, error);
-      this.stats.errorsCount++;
 
-      // 오류 처리
-      await this.sendError(bot, callbackQuery, "처리 중 오류가 발생했습니다.");
-
-      return false;
-    }
-  }
-
-  /**
-   * 📨 표준 메시지 처리
-   */
-  async handleMessage(bot, msg) {
-    try {
-      logger.debug(`📨 ${this.moduleName} 메시지 처리: ${msg.text}`);
-
-      this.stats.messagesHandled++;
-      this.stats.lastActivity = new Date();
-
-      // 자식 클래스의 메시지 처리 로직
-      return await this.onHandleMessage(bot, msg);
-    } catch (error) {
-      logger.error(`❌ ${this.moduleName} 메시지 처리 오류:`, error);
-      this.stats.errorsCount++;
-
-      await bot.sendMessage(
-        msg.chat.id,
-        `❌ 처리 중 오류가 발생했습니다.\n다시 시도해주세요.`
+      // 🎯 표준 매개변수로 액션 실행 (안전한 방식)
+      await this.executeActionSafely(
+        action,
+        normalizedBot,
+        normalizedCallbackQuery,
+        normalizedParams,
+        normalizedModuleManager
       );
 
+      logger.debug(
+        `✅ ${this.moduleName}.${normalizedSubAction} 처리 완료 (${
+          Date.now() - startTime
+        }ms)`
+      );
+      return true;
+    } catch (error) {
+      logger.error(`❌ ${this.moduleName} 콜백 처리 오류:`, error);
+      this.stats.errorsCount++;
+
+      await this.sendErrorSafely(
+        bot,
+        callbackQuery,
+        "처리 중 오류가 발생했습니다."
+      );
       return false;
     }
   }
 
   /**
-   * 📨 자식 클래스에서 구현할 메시지 처리 메서드
+   * 🔧 매개변수 정규화 (안전한 처리)
    */
-  async onHandleMessage(bot, msg) {
-    // 자식 클래스에서 구현
-    return false;
-  }
+  normalizeCallbackParams(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    // bot 정규화
+    const normalizedBot = bot || this.bot;
 
-  // ===== 🔧 공통 유틸리티 메서드들 =====
+    // callbackQuery 정규화
+    let normalizedCallbackQuery = callbackQuery;
+    if (!normalizedCallbackQuery || !normalizedCallbackQuery.message) {
+      logger.warn(`${this.moduleName}: 잘못된 callbackQuery 구조`);
+      normalizedCallbackQuery = this.createFallbackCallbackQuery(callbackQuery);
+    }
+
+    // subAction 정규화
+    let normalizedSubAction = subAction;
+    if (!normalizedSubAction || typeof normalizedSubAction !== "string") {
+      // callbackQuery.data에서 추출 시도
+      if (normalizedCallbackQuery.data) {
+        const parts = normalizedCallbackQuery.data.split(":");
+        normalizedSubAction = parts[1] || "menu";
+      } else {
+        normalizedSubAction = "menu";
+      }
+    }
+
+    // params 정규화
+    const normalizedParams = Array.isArray(params) ? params : [];
+
+    // moduleManager 정규화
+    const normalizedModuleManager = moduleManager || this.moduleManager;
+
+    return {
+      normalizedBot,
+      normalizedCallbackQuery,
+      normalizedSubAction,
+      normalizedParams,
+      normalizedModuleManager,
+    };
+  }
 
   /**
-   * 사용자 상태 관리
+   * 🛡️ Fallback CallbackQuery 생성
    */
-  getUserState(userId) {
-    return this.userStates.get(userId) || null;
-  }
+  createFallbackCallbackQuery(originalCallbackQuery) {
+    const fallback = {
+      id: originalCallbackQuery?.id || `fallback_${Date.now()}`,
+      from: originalCallbackQuery?.from || { id: 0, first_name: "Unknown" },
+      data: originalCallbackQuery?.data || `${this.moduleName}:menu`,
+      message: originalCallbackQuery?.message || {
+        message_id: 0,
+        chat: { id: originalCallbackQuery?.from?.id || 0 },
+        text: "메시지를 찾을 수 없습니다.",
+      },
+    };
 
-  setUserState(userId, state) {
-    this.userStates.set(userId, {
-      ...state,
-      updatedAt: TimeHelper.getTimestamp(),
-    });
-  }
-
-  clearUserState(userId) {
-    return this.userStates.delete(userId);
+    logger.warn(`${this.moduleName}: Fallback CallbackQuery 생성됨`);
+    return fallback;
   }
 
   /**
-   * 응답 시간 업데이트
+   * 🎯 안전한 액션 실행
    */
-  updateResponseTime(responseTime) {
-    this.stats.totalResponseTime += responseTime;
-    const totalCalls = this.stats.callbacksHandled + this.stats.messagesHandled;
-    this.stats.averageResponseTime = this.stats.totalResponseTime / totalCalls;
-  }
-
-  /**
-   * 메시지 편집 헬퍼
-   */
-  async editMessage(bot, chatId, messageId, text, options = {}) {
+  async executeActionSafely(action, bot, callbackQuery, params, moduleManager) {
     try {
-      return await bot.editMessageText(text, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "Markdown",
-        ...options,
-      });
-    } catch (error) {
-      if (
-        error.response?.body?.error_code === 400 &&
-        error.response?.body?.description?.includes("message is not modified")
-      ) {
-        logger.debug(`${this.moduleName} 메시지가 동일하여 편집하지 않음`);
-        return null;
+      // 액션 함수 바인딩 확인
+      if (typeof action !== "function") {
+        throw new Error(`액션이 함수가 아닙니다: ${typeof action}`);
       }
 
-      logger.error(`${this.moduleName} 메시지 편집 실패:`, error);
+      // 표준 매개변수로 실행
+      await action.call(this, bot, callbackQuery, params, moduleManager);
+    } catch (actionError) {
+      logger.error(`${this.moduleName} 액션 실행 오류:`, actionError);
+
+      // 에러 액션 처리 시도
+      try {
+        await this.handleActionError(bot, callbackQuery, actionError);
+      } catch (errorHandlingError) {
+        logger.error(
+          `${this.moduleName} 에러 액션 처리도 실패:`,
+          errorHandlingError
+        );
+
+        // 최후의 수단: 간단한 메시지
+        try {
+          await this.sendSimpleErrorMessage(bot, callbackQuery);
+        } catch (finalError) {
+          logger.error(`${this.moduleName} 최종 에러 처리도 실패:`, finalError);
+        }
+      }
+
+      throw actionError;
+    }
+  }
+
+  /**
+   * 🛡️ 안전한 메시지 편집 (핵심 해결책!)
+   */
+  async editMessageSafely(bot, chatId, messageId, text, options = {}) {
+    const operationId = `${chatId}-${messageId}-${Date.now()}`;
+
+    // 중복 편집 방지
+    if (this.editOperationsInProgress.has(operationId)) {
+      logger.debug(
+        `${this.moduleName}: 중복 메시지 편집 방지 - ${operationId}`
+      );
+      return false;
+    }
+
+    this.editOperationsInProgress.add(operationId);
+    this.stats.messageEditAttempts++;
+
+    try {
+      // 1차 시도: Markdown 모드
+      try {
+        const result = await bot.editMessageText(text, {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "Markdown",
+          ...options,
+        });
+
+        logger.debug(`✅ ${this.moduleName}: 메시지 편집 성공 (Markdown)`);
+        return result;
+      } catch (markdownError) {
+        logger.debug(
+          `${this.moduleName}: Markdown 편집 실패, 일반 텍스트로 재시도`
+        );
+
+        // 2차 시도: 일반 텍스트
+        const result = await bot.editMessageText(text, {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: undefined,
+          ...options,
+        });
+
+        logger.debug(`✅ ${this.moduleName}: 메시지 편집 성공 (일반 텍스트)`);
+        return result;
+      }
+    } catch (editError) {
+      this.stats.messageEditFailures++;
+      logger.error(`❌ ${this.moduleName} 메시지 편집 실패:`, editError);
+
+      // 3차 시도: 새 메시지 전송
+      if (this.config.enableFallbackText) {
+        try {
+          const fallbackText = `📝 ${text}\n\n⚠️ 메시지 업데이트 중 문제가 발생했습니다.`;
+
+          const newMessage = await bot.sendMessage(chatId, fallbackText, {
+            reply_markup: options.reply_markup,
+            parse_mode: undefined,
+          });
+
+          logger.warn(`⚠️ ${this.moduleName}: Fallback 메시지 전송됨`);
+          return newMessage;
+        } catch (fallbackError) {
+          logger.error(
+            `❌ ${this.moduleName} Fallback 메시지도 실패:`,
+            fallbackError
+          );
+        }
+      }
+
+      throw editError;
+    } finally {
+      this.editOperationsInProgress.delete(operationId);
+    }
+  }
+
+  /**
+   * 🛡️ 안전한 메시지 전송
+   */
+  async sendMessageSafely(bot, chatId, text, options = {}) {
+    try {
+      // 1차 시도: Markdown 모드
+      try {
+        return await bot.sendMessage(chatId, text, {
+          parse_mode: "Markdown",
+          ...options,
+        });
+      } catch (markdownError) {
+        // 2차 시도: 일반 텍스트
+        return await bot.sendMessage(chatId, text, {
+          ...options,
+          parse_mode: undefined,
+        });
+      }
+    } catch (error) {
+      logger.error(`${this.moduleName} 메시지 전송 오류:`, error);
       throw error;
     }
   }
 
   /**
-   * 에러 메시지 전송
+   * ❌ 안전한 액션 Not Found 처리
    */
-  async sendError(bot, callbackQuery, message) {
+  async sendActionNotFoundSafely(bot, callbackQuery, action) {
     try {
       const {
         message: {
@@ -493,103 +361,196 @@ class BaseModule {
           message_id: messageId,
         },
       } = callbackQuery;
-      const userName = getUserName(callbackQuery);
 
-      const errorText = `❌ **오류 발생**
-
-${userName}님, ${message}
-
-잠시 후 다시 시도해주세요.`;
+      const errorText = `❓ **알 수 없는 액션**\n\n\`${action}\` 기능을 찾을 수 없습니다.\n\n메인 메뉴로 돌아가세요.`;
 
       const keyboard = {
         inline_keyboard: [
-          [
-            {
-              text: "🔄 다시 시도",
-              callback_data: `${this.moduleName.toLowerCase()}:menu`,
-            },
-            { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-          ],
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+          [{ text: "🔄 새로고침", callback_data: `${this.moduleName}:menu` }],
         ],
       };
 
-      await this.editMessage(bot, chatId, messageId, errorText, {
+      await this.editMessageSafely(bot, chatId, messageId, errorText, {
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error(`${this.moduleName} 액션 Not Found 처리 실패:`, error);
+      await this.sendSimpleErrorMessage(bot, callbackQuery);
+    }
+  }
+
+  /**
+   * 🚨 안전한 에러 메시지 전송
+   */
+  async sendErrorSafely(bot, callbackQuery, message) {
+    try {
+      const {
+        message: {
+          chat: { id: chatId },
+          message_id: messageId,
+        },
+      } = callbackQuery;
+
+      const errorText = `🚨 **오류 발생**\n\n${message}\n\n다시 시도해주세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔄 다시 시도", callback_data: `${this.moduleName}:menu` }],
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+        ],
+      };
+
+      await this.editMessageSafely(bot, chatId, messageId, errorText, {
         reply_markup: keyboard,
       });
     } catch (error) {
       logger.error(`${this.moduleName} 에러 메시지 전송 실패:`, error);
+      await this.sendSimpleErrorMessage(bot, callbackQuery);
     }
   }
 
   /**
-   * 액션 없음 메시지
+   * 📝 간단한 에러 메시지 (최후의 수단)
    */
-  async sendActionNotFound(bot, callbackQuery, action) {
-    await this.sendError(bot, callbackQuery, `알 수 없는 명령: ${action}`);
-  }
-
-  /**
-   * 📊 상태 조회
-   */
-  getStatus() {
-    return {
-      moduleName: this.moduleName,
-      moduleKey: this.moduleKey,
-      initialized: this.isInitialized,
-      healthy: this.healthStatus.healthy,
-      stats: this.stats,
-      config: {
-        timeout: this.config.timeout,
-        cacheEnabled: this.config.cacheEnabled,
-        enableMetrics: this.config.enableMetrics,
-      },
-      services: {
-        cached: Array.from(this.serviceCache.keys()),
-        health: this.healthStatus.services,
-      },
-      actions: Array.from(this.actionMap.keys()),
-      lastActivity: this.stats.lastActivity,
-      healthStatus: this.healthStatus,
-    };
-  }
-
-  /**
-   * 🧹 정리
-   */
-  async cleanup() {
+  async sendSimpleErrorMessage(bot, callbackQuery) {
     try {
-      logger.info(`🧹 ${this.moduleName} 정리 시작...`);
+      const chatId = callbackQuery.message?.chat?.id || callbackQuery.from?.id;
 
-      // 사용자 상태 정리
-      this.userStates.clear();
+      if (chatId) {
+        await bot.sendMessage(
+          chatId,
+          "❌ 처리 중 오류가 발생했습니다. /start 명령으로 다시 시작해주세요.",
+          {
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🔄 다시 시작", callback_data: "system:start" }],
+              ],
+            },
+          }
+        );
+      }
+    } catch (finalError) {
+      logger.error(`${this.moduleName} 최종 에러 메시지 실패:`, finalError);
+    }
+  }
 
-      // 서비스 캐시 정리
-      this.serviceCache.clear();
-      this.serviceCacheTimestamps.clear();
+  /**
+   * 🔧 액션 에러 처리
+   */
+  async handleActionError(bot, callbackQuery, error) {
+    const errorMessage = error.message || "알 수 없는 오류";
 
-      // 액션 맵 정리
-      this.actionMap.clear();
+    // 특정 에러 타입별 처리
+    if (errorMessage.includes("message is not modified")) {
+      logger.debug(`${this.moduleName}: 메시지 중복 편집 시도 (무시)`);
+      return; // 중복 편집은 에러가 아님
+    }
 
-      // 통계 초기화
-      this.stats = {
-        callbacksHandled: 0,
-        messagesHandled: 0,
-        errorsCount: 0,
-        serviceRequests: 0,
-        serviceCacheHits: 0,
-        serviceCacheMisses: 0,
-        averageResponseTime: 0,
-        lastActivity: null,
-        createdAt: TimeHelper.getTimestamp(),
-        totalResponseTime: 0,
+    if (errorMessage.includes("message to edit not found")) {
+      logger.warn(
+        `${this.moduleName}: 편집할 메시지를 찾을 수 없음 - 새 메시지 전송`
+      );
+      await this.sendFreshMessage(bot, callbackQuery);
+      return;
+    }
+
+    if (errorMessage.includes("Bad Request")) {
+      logger.warn(`${this.moduleName}: 잘못된 요청 - ${errorMessage}`);
+      await this.sendErrorSafely(bot, callbackQuery, "잘못된 요청입니다.");
+      return;
+    }
+
+    // 일반적인 에러 처리
+    await this.sendErrorSafely(
+      bot,
+      callbackQuery,
+      "처리 중 오류가 발생했습니다."
+    );
+  }
+
+  /**
+   * 📨 새 메시지 전송 (편집 실패 시)
+   */
+  async sendFreshMessage(bot, callbackQuery) {
+    try {
+      const chatId = callbackQuery.message?.chat?.id || callbackQuery.from?.id;
+
+      const freshText = `🔄 **새로운 메뉴**\n\n${this.moduleName} 메뉴입니다.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+          [{ text: "🔄 새로고침", callback_data: `${this.moduleName}:menu` }],
+        ],
       };
 
-      this.isInitialized = false;
+      await this.sendMessageSafely(bot, chatId, freshText, {
+        reply_markup: keyboard,
+      });
 
-      logger.info(`✅ ${this.moduleName} 정리 완료`);
+      logger.info(`📨 ${this.moduleName}: 새 메시지 전송됨`);
     } catch (error) {
-      logger.error(`❌ ${this.moduleName} 정리 실패:`, error);
+      logger.error(`${this.moduleName} 새 메시지 전송 실패:`, error);
     }
+  }
+
+  // ===== 🔧 유틸리티 메서드들 =====
+
+  /**
+   * 액션 등록 (기존 로직 유지)
+   */
+  registerAction(name, handler) {
+    if (typeof handler !== "function") {
+      throw new Error(`핸들러는 함수여야 합니다: ${name}`);
+    }
+    this.actionMap.set(name, handler.bind(this));
+    logger.debug(`🎯 ${this.moduleName}.${name} 액션 등록됨`);
+  }
+
+  /**
+   * 여러 액션 한번에 등록
+   */
+  registerActions(actions) {
+    for (const [name, handler] of Object.entries(actions)) {
+      this.registerAction(name, handler);
+    }
+  }
+
+  /**
+   * 🎯 자식 클래스에서 구현할 초기화 메서드
+   */
+  async onInitialize() {
+    // 자식 클래스에서 구현
+  }
+
+  /**
+   * 🎯 액션 설정 (자식 클래스에서 구현)
+   */
+  setupActions() {
+    // 자식 클래스에서 구현
+  }
+
+  /**
+   * 🎯 자식 클래스에서 구현할 메시지 처리
+   */
+  async onHandleMessage(bot, msg) {
+    // 자식 클래스에서 구현
+    return false;
+  }
+
+  /**
+   * 📊 모듈 상태 조회
+   */
+  getModuleStatus() {
+    return {
+      moduleName: this.moduleName,
+      isInitialized: this.isInitialized,
+      stats: this.stats,
+      config: this.config,
+      activeEditOperations: this.editOperationsInProgress.size,
+      lastActivity: this.stats.lastActivity,
+    };
   }
 }
 
