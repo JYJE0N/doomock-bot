@@ -12,15 +12,14 @@ const ServiceBuilder = require("./src/core/ServiceBuilder");
 const DatabaseManager = require("./src/database/DatabaseManager");
 
 // 🛡️ 중앙 시스템들
-const ValidationManager = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
 
 /**
  * 🤖 DooMockBot v3.0.1 - 완전 리팩토링
  *
  * 🎯 주요 개선사항:
- * 1. ApplicationBootstrap 패턴 적용
- * 2. 단계별 초기화 시스템
+ * 1. 단계별 초기화 시스템 적용
+ * 2. 순차적 컴포넌트 로딩
  * 3. 안전한 재시도 메커니즘
  * 4. Railway 환경 최적화
  * 5. 메모리 효율성 개선
@@ -82,7 +81,7 @@ class DooMockBot {
       this.validateEnvironment();
 
       // 단계별 초기화 실행
-      await this.executeBootstrapSequence();
+      await this.executeInitializationSequence();
 
       // 시작 완료 처리
       await this.completeStartup();
@@ -92,9 +91,9 @@ class DooMockBot {
   }
 
   /**
-   * 🔧 부트스트랩 시퀀스 실행
+   * 🔧 단계별 초기화 실행
    */
-  async executeBootstrapSequence() {
+  async executeInitializationSequence() {
     const sequence = [
       { name: "1️⃣ Telegraf 봇", handler: this.initializeTelegrafBot },
       { name: "2️⃣ 데이터베이스", handler: this.initializeDatabaseManager },
