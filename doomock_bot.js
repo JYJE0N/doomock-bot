@@ -91,29 +91,77 @@ class DooMockBot {
       // 환경 검증
       await this.validateEnvironment();
 
-      // 초기화 순서 (의존성 순) - 수정됨
-      await this.initializeDatabaseManager();
-      await this.initializeServiceBuilder(); // ⭐ ServiceBuilder 추가
-      await this.initializeValidationManager();
-      await this.initializeHealthChecker();
-      await this.initializeModuleManager(); // ServiceBuilder 이후
-      await this.initializeBotController();
+      // 각 단계별로 try-catch로 감싸서 정확한 에러 위치 파악
+      try {
+        await this.initializeDatabaseManager();
+      } catch (error) {
+        logger.error("❌ DatabaseManager 초기화 실패:", error);
+        throw error;
+      }
+
+      try {
+        await this.initializeServiceBuilder();
+      } catch (error) {
+        logger.error("❌ ServiceBuilder 초기화 실패:", error);
+        // ServiceBuilder는 선택적이므로 계속 진행
+        logger.warn("⚠️ ServiceBuilder 없이 계속 진행");
+      }
+
+      try {
+        await this.initializeValidationManager();
+      } catch (error) {
+        logger.error("❌ ValidationManager 초기화 실패:", error);
+        throw error;
+      }
+
+      try {
+        await this.initializeHealthChecker();
+      } catch (error) {
+        logger.error("❌ HealthChecker 초기화 실패:", error);
+        // HealthChecker는 선택적이므로 계속 진행
+        logger.warn("⚠️ HealthChecker 없이 계속 진행");
+      }
+
+      try {
+        await this.initializeModuleManager();
+      } catch (error) {
+        logger.error("❌ ModuleManager 초기화 실패:", error);
+        throw error;
+      }
+
+      try {
+        await this.initializeBotController();
+      } catch (error) {
+        logger.error("❌ BotController 초기화 실패:", error);
+        throw error;
+      }
 
       // 🏥 모든 컴포넌트가 초기화된 후 헬스체커에 등록 및 시작
       if (this.healthChecker && this.config.enableHealthCheck) {
-        await this.registerHealthCheckerComponents();
-        await this.healthChecker.start();
-        logger.info("🏥 헬스체커 시작됨");
+        try {
+          await this.registerHealthCheckerComponents();
+          await this.healthChecker.start();
+          logger.info("🏥 헬스체커 시작됨");
+        } catch (error) {
+          logger.error("❌ HealthChecker 시작 실패:", error);
+          // 계속 진행
+        }
       }
 
       // 봇 시작
-      await this.startBot();
+      try {
+        await this.startBot();
+      } catch (error) {
+        logger.error("❌ 봇 시작 실패:", error);
+        throw error;
+      }
 
       logger.success(`🎊 두목봇 시작 완료 🎊`);
       logger.info(`🌍 환경: ${this.config.environment}`);
       logger.info(`🚂 Railway: ${this.config.isRailway ? "활성" : "비활성"}`);
     } catch (error) {
       logger.error("❌ 애플리케이션 시작 실패:", error);
+      logger.error("에러 스택:", error.stack);
       await this.shutdown(1);
     }
   }
@@ -283,19 +331,57 @@ class DooMockBot {
   }
 
   /**
-   * 🏗️ ServiceBuilder 초기화 (새로 추가)
+   * 🏗️ ServiceBuilder 초기화 (디버깅 추가)
    */
   async initializeServiceBuilder() {
-    logger.info("🏗️ ServiceBuilder 초기화 중...");
+    try {
+      logger.info("🏗️ ServiceBuilder 초기화 중...");
 
-    this.serviceBuilder = createServiceBuilder();
+      // ServiceBuilder 모듈 확인
+      try {
+        const { createServiceBuilder } = require("./src/core/ServiceBuilder");
+        logger.debug("✅ ServiceBuilder 모듈 로드 성공");
 
-    // ServiceBuilder에 DB 연결 전달
-    this.serviceBuilder.setDefaultDatabase(this.dbManager.getDb());
+        this.serviceBuilder = createServiceBuilder();
+        logger.debug("✅ ServiceBuilder 인스턴스 생성 성공");
+      } catch (loadError) {
+        logger.error("❌ ServiceBuilder 로드 실패:", loadError);
+        throw new Error(`ServiceBuilder 로드 실패: ${loadError.message}`);
+      }
 
-    await this.serviceBuilder.initialize();
+      // DB 연결 설정
+      try {
+        if (this.dbManager && this.dbManager.getDb) {
+          const db = this.dbManager.getDb();
+          this.serviceBuilder.setDefaultDatabase(db);
+          logger.debug("✅ ServiceBuilder에 DB 연결 설정 완료");
+        } else {
+          logger.warn("⚠️ DB Manager가 준비되지 않음");
+        }
+      } catch (dbError) {
+        logger.error("❌ DB 설정 실패:", dbError);
+      }
 
-    logger.debug("✅ ServiceBuilder 초기화 완료");
+      // ServiceBuilder 초기화
+      try {
+        await this.serviceBuilder.initialize();
+        logger.success("✅ ServiceBuilder 초기화 완료");
+      } catch (initError) {
+        logger.error("❌ ServiceBuilder 초기화 실패:", initError);
+        throw initError;
+      }
+    } catch (error) {
+      logger.error("❌ ServiceBuilder 초기화 중 치명적 오류:", error);
+
+      // ServiceBuilder 없이도 계속 진행 (Mock 모드)
+      logger.warn("⚠️ ServiceBuilder 없이 계속 진행 (제한된 기능)");
+      this.serviceBuilder = {
+        getOrCreate: async () => null,
+        has: () => false,
+        setDefaultDatabase: () => {},
+        initialize: async () => {},
+      };
+    }
   }
 
   /**
