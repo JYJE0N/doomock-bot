@@ -1,18 +1,22 @@
 // doomock_bot.js - 완전 리팩토링 v3.0.1
-require("dotenv").config();
+require("dotenv").config(); // 🔑 dotenv는 최우선으로 로드
 
 const { Telegraf } = require("telegraf");
 const logger = require("./src/utils/Logger");
 const TimeHelper = require("./src/utils/TimeHelper");
 
-// 🏗️ 핵심 시스템들
-const BotController = require("./src/controllers/BotController");
+// 🏗️ 핵심 시스템들 (필요한 imports 추가)
+const BotController = require("./src/core/BotController");
 const ModuleManager = require("./src/core/ModuleManager");
 const ServiceBuilder = require("./src/core/ServiceBuilder");
+const DatabaseManager = require("./src/core/DatabaseManager");
 
 // 🛡️ 중앙 시스템들
 const ValidationManager = require("./src/utils/ValidationHelper");
 const HealthChecker = require("./src/utils/HealthChecker");
+
+// 📊 설정 관리 (AppConfig 호환)
+// const AppConfig = require("./src/config/AppConfig");
 
 /**
  * 🤖 DooMockBot v3.0.1 - 완전 리팩토링
@@ -28,14 +32,13 @@ const HealthChecker = require("./src/utils/HealthChecker");
 class DooMockBot {
   constructor() {
     this.startTime = Date.now();
-    this.version = "3.0.1";
+    this.version = AppConfig.VERSION || "3.0.1";
     this.components = new Map();
     this.isShuttingDown = false;
     this.processHandlersSetup = false;
 
-    // 🌍 환경 설정
-    this.configManager = new ConfigManager();
-    this.config = this.configManager.getConfig();
+    // 🌍 환경 설정 (AppConfig 사용)
+    this.config = this.createConfiguration();
 
     // 🔄 초기화 설정
     this.initConfig = {
@@ -62,6 +65,81 @@ class DooMockBot {
         this.config.isRailway ? "YES" : "NO"
       }`
     );
+  }
+
+  /**
+   * 📊 설정 생성 (AppConfig 기반)
+   */
+  createConfiguration() {
+    return {
+      // 기본 환경 정보
+      nodeEnv: AppConfig.NODE_ENV,
+      isRailway: AppConfig.isRailway,
+      version: AppConfig.VERSION,
+
+      // 봇 설정
+      bot: {
+        token: AppConfig.BOT_TOKEN,
+        username: AppConfig.BOT_USERNAME,
+        webhook: {
+          enabled: !!process.env.WEBHOOK_ENABLED,
+          url: process.env.WEBHOOK_URL,
+          port: parseInt(process.env.PORT) || 3000,
+        },
+        rateLimitEnabled: process.env.RATE_LIMIT_ENABLED !== "false",
+        maxRequestsPerMinute:
+          parseInt(process.env.MAX_REQUESTS_PER_MINUTE) || 30,
+      },
+
+      // 데이터베이스 설정
+      database: {
+        url: AppConfig.MONGO_URL,
+        name: this.extractDatabaseName(AppConfig.MONGO_URL),
+        connectTimeout: parseInt(process.env.DB_CONNECT_TIMEOUT) || 30000,
+        maxRetries: parseInt(process.env.DB_MAX_RETRIES) || 3,
+      },
+
+      // 헬스체크 설정
+      healthCheck: {
+        enabled: process.env.HEALTH_CHECK_ENABLED !== "false",
+        interval: parseInt(process.env.HEALTH_CHECK_INTERVAL) || 30000,
+        autoRecovery: process.env.HEALTH_AUTO_RECOVERY !== "false",
+      },
+
+      // 성능 설정
+      performance: {
+        memoryThreshold:
+          parseInt(process.env.MEMORY_THRESHOLD) ||
+          (AppConfig.isRailway ? 400 : 200),
+        messageTimeout: parseInt(process.env.MESSAGE_TIMEOUT) || 5000,
+        callbackTimeout: parseInt(process.env.CALLBACK_TIMEOUT) || 2000,
+      },
+
+      // Railway 설정
+      railway: AppConfig.RAILWAY || {},
+
+      // 기능 설정
+      features: AppConfig.FEATURES || {},
+
+      // API 키들
+      apis: {
+        weather: AppConfig.WEATHER_API_KEY,
+        airKorea: AppConfig.AIR_KOREA_API_KEY,
+      },
+    };
+  }
+
+  /**
+   * 🗄️ 데이터베이스 이름 추출
+   */
+  extractDatabaseName(url) {
+    try {
+      const match = url?.match(/\/([^/?]+)(\?|$)/);
+      return match ? match[1] : "doomock_bot";
+    } catch (error) {
+      logger.warn("DB 이름 추출 실패, 기본값 사용");
+      return "doomock_bot";
+    }
   }
 
   /**
@@ -173,11 +251,19 @@ class DooMockBot {
   validateEnvironment() {
     logger.info("🔍 환경 검증 중...");
 
+    // AppConfig에서 이미 검증되었지만 추가 확인
     const requiredVars = ["BOT_TOKEN"];
     const missingVars = requiredVars.filter((varName) => !process.env[varName]);
 
     if (missingVars.length > 0) {
       throw new Error(`필수 환경변수 누락: ${missingVars.join(", ")}`);
+    }
+
+    // MongoDB URL 확인
+    if (!this.config.database.url) {
+      logger.warn(
+        "⚠️ MongoDB URI가 설정되지 않음. 일부 기능이 제한될 수 있습니다."
+      );
     }
 
     // 환경 정보 로그
@@ -205,8 +291,6 @@ class DooMockBot {
    * 🤖 Telegraf 봇 초기화
    */
   async initializeTelegrafBot() {
-    const { Telegraf } = require("telegraf");
-
     logger.debug("🤖 Telegraf 봇 인스턴스 생성 중...");
 
     // 🛡️ 기존 봇 정리 (중복 방지)
@@ -293,8 +377,6 @@ class DooMockBot {
    * 🗄️ 데이터베이스 매니저 초기화
    */
   async initializeDatabaseManager() {
-    const DatabaseManager = require("./src/core/DatabaseManager");
-
     logger.debug("🗄️ 데이터베이스 매니저 생성 중...");
 
     const dbManager = new DatabaseManager({
@@ -346,8 +428,6 @@ class DooMockBot {
    * 🏗️ 서비스 빌더 초기화
    */
   async initializeServiceBuilder() {
-    const ServiceBuilder = require("./src/core/ServiceBuilder");
-
     logger.debug("🏗️ ServiceBuilder 초기화 중...");
 
     // ServiceBuilder 초기화
@@ -370,8 +450,6 @@ class DooMockBot {
    * 📦 모듈 매니저 초기화
    */
   async initializeModuleManager() {
-    const ModuleManager = require("./src/core/ModuleManager");
-
     logger.debug("📦 ModuleManager 생성 중...");
 
     const moduleManager = new ModuleManager({
@@ -400,8 +478,6 @@ class DooMockBot {
    * 🎮 봇 컨트롤러 초기화
    */
   async initializeBotController() {
-    const BotController = require("./src/core/BotController");
-
     logger.debug("🎮 BotController 생성 중...");
 
     const botController = new BotController({
@@ -432,8 +508,6 @@ class DooMockBot {
       logger.debug("⚠️ HealthChecker 비활성화됨");
       return;
     }
-
-    const HealthChecker = require("./src/utils/HealthChecker");
 
     logger.debug("🏥 HealthChecker 설정 중...");
 
