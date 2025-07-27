@@ -68,17 +68,41 @@ class UnifiedMessageSystem {
       },
     };
 
+    // ✅ 수정: chalk.rainbow() 대신 this.rainbow() 사용
     console.log(this.rainbow("🎨 UnifiedMessageSystem v3.0.1 초기화 완료!"));
   }
 
   // ===== 🌈 커스텀 rainbow 메서드 구현 =====
 
+  /**
+   * 🌈 커스텀 rainbow 효과 (chalk.rainbow은 존재하지 않음)
+   */
   rainbow(text) {
     const colors = ["red", "yellow", "green", "cyan", "blue", "magenta"];
     return text
       .split("")
       .map((char, i) => chalk[colors[i % colors.length]](char))
       .join("");
+  }
+
+  /**
+   * 🌅 그라데이션 효과
+   */
+  gradient(text, startColor = "#FF6B6B", endColor = "#4ECDC4") {
+    try {
+      // Chalk hex 지원 확인
+      const halfPoint = Math.floor(text.length / 2);
+      return (
+        chalk.hex(startColor)(text.slice(0, halfPoint)) +
+        chalk.hex(endColor)(text.slice(halfPoint))
+      );
+    } catch (error) {
+      // Fallback: 일반 색상 사용
+      return (
+        chalk.red(text.slice(0, text.length / 2)) +
+        chalk.blue(text.slice(text.length / 2))
+      );
+    }
   }
 
   // ===== 🎨 콘솔 스타일 초기화 =====
@@ -141,32 +165,6 @@ class UnifiedMessageSystem {
     };
   }
 
-  // ===== 🌈 특수 효과들 =====
-  rainbow(text) {
-    const colors = ["red", "yellow", "green", "cyan", "blue", "magenta"];
-    return text
-      .split("")
-      .map((char, i) => chalk[colors[i % colors.length]](char))
-      .join("");
-  }
-
-  gradient(text, startColor = "#FF6B6B", endColor = "#4ECDC4") {
-    try {
-      // Chalk hex 지원 확인
-      const halfPoint = Math.floor(text.length / 2);
-      return (
-        chalk.hex(startColor)(text.slice(0, halfPoint)) +
-        chalk.hex(endColor)(text.slice(halfPoint))
-      );
-    } catch (error) {
-      // Fallback: 일반 색상 사용
-      return (
-        chalk.red(text.slice(0, text.length / 2)) +
-        chalk.blue(text.slice(text.length / 2))
-      );
-    }
-  }
-
   // ===== 📱 MarkdownV2 처리 =====
   escape(text) {
     if (!text) return "";
@@ -187,6 +185,30 @@ class UnifiedMessageSystem {
     spoiler: (text) => `||${this.escape(text)}||`,
     link: (text, url) => `[${this.escape(text)}](${url})`,
   };
+
+  // ===== 🎯 시간 관련 유틸리티 =====
+
+  /**
+   * 🕐 시간대별 인사말
+   */
+  getGreeting() {
+    const hour = new Date().getHours();
+    if (hour < 6) return "🌙 안녕히 주무세요";
+    if (hour < 12) return "🌅 좋은 아침";
+    if (hour < 18) return "☀️ 좋은 오후";
+    return "🌆 좋은 저녁";
+  }
+
+  /**
+   * ⏰ 시간대별 이모지
+   */
+  getTimeEmoji() {
+    const hour = new Date().getHours();
+    if (hour < 6) return "🌙";
+    if (hour < 12) return "☀️";
+    if (hour < 18) return "🌤️";
+    return "🌆";
+  }
 
   // ===== 🎯 통합 메시지 전송 시스템 =====
 
@@ -215,313 +237,218 @@ ${this.getGreeting()} ${this.markdownStyles.bold(
 ${this.markdownStyles.bold("원하는 기능을 선택해주세요\\!")}
     `.trim();
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📝 할일 관리", callback_data: "todo:menu" },
-          { text: "⏰ 타이머", callback_data: "timer:menu" },
-        ],
-        [
-          { text: "🏢 근무시간", callback_data: "worktime:menu" },
-          { text: "🔔 리마인더", callback_data: "reminder:menu" },
-        ],
-        [
-          { text: "🔮 운세", callback_data: "fortune:menu" },
-          { text: "🌤️ 날씨", callback_data: "weather:menu" },
-        ],
-        [
-          { text: "⚙️ 설정", callback_data: "system:settings" },
-          { text: "❓ 도움말", callback_data: "system:help" },
-        ],
-      ],
-    };
-
     try {
-      const sentMessage = await bot.sendMessage(chatId, menuText, {
-        ...this.telegramOptions,
-        reply_markup: keyboard,
-      });
-
-      console.log(this.consoleStyles.success("메인 메뉴 전송 완료"));
-      return sentMessage;
+      if (bot && chatId) {
+        await bot.sendMessage(chatId, menuText, this.telegramOptions);
+      }
     } catch (error) {
-      console.log(this.consoleStyles.error("메인 메뉴 전송 실패"));
-      return await this.sendFallbackMessage(
-        bot,
-        chatId,
-        "메뉴를 불러오는 중 오류가 발생했습니다."
-      );
+      console.log(chalk.red("❌ 텔레그램 메시지 전송 실패:"), error.message);
     }
   }
 
   /**
-   * 📝 할일 목록 - 통합 처리
+   * 📝 할일 목록 표시
    */
-  async sendTodoList(bot, chatId, todos = [], pagination = {}) {
+  async sendTodoList(bot, chatId, todos, page = 1, pageSize = 10) {
     // 🖥️ 콘솔 출력
     console.log(this.consoleStyles.moduleTitle("todo", "📝"));
-    console.log(this.consoleStyles.todoAdd(`${todos.length}개 할일 표시`));
-
-    // 📱 텔레그램 메시지
-    let todoText = `📝 ${this.markdownStyles.bold("할일 목록")}\n\n`;
+    console.log(
+      chalk.blue(`📝 할일 목록 표시: ${todos.length}개 (페이지 ${page})`)
+    );
 
     if (todos.length === 0) {
-      todoText += `${this.markdownStyles.italic(
-        "등록된 할일이 없습니다\\."
-      )}\n\n`;
-      todoText += `➕ ${this.markdownStyles.bold(
-        "새로운 할일을 추가해보세요\\!"
-      )}`;
-    } else {
-      todos.forEach((todo, index) => {
-        const status = todo.completed ? "✅" : "⭕";
-        const task = todo.completed
-          ? this.markdownStyles.strikethrough(todo.task)
-          : this.markdownStyles.bold(todo.task);
-        todoText += `${status} ${index + 1}\\. ${task}\n`;
-      });
+      const emptyText = `📝 ${this.markdownStyles.bold("할일 목록")}
 
-      // 진행률 표시
-      const completed = todos.filter((t) => t.completed).length;
-      const progressText = this.createTelegramProgressBar(
-        completed,
-        todos.length
-      );
-      todoText += `\n📊 ${progressText}`;
+${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
+
+➕ 새로운 할일을 추가해보세요\\!`;
+
+      try {
+        if (bot && chatId) {
+          await bot.sendMessage(chatId, emptyText, this.telegramOptions);
+        }
+      } catch (error) {
+        console.log(chalk.red("❌ 빈 할일 목록 전송 실패:"), error.message);
+      }
+      return;
     }
 
-    // 페이지네이션 처리
-    const keyboard = this.createTodoKeyboard(pagination);
+    // 페이지네이션
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const paginatedTodos = todos.slice(startIndex, endIndex);
+    const totalPages = Math.ceil(todos.length / pageSize);
 
-    try {
-      return await bot.sendMessage(chatId, todoText, {
-        ...this.telegramOptions,
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      console.log(this.consoleStyles.error("할일 목록 전송 실패"));
-      return await this.sendFallbackMessage(
-        bot,
-        chatId,
-        "할일 목록을 불러올 수 없습니다."
-      );
-    }
-  }
+    let todoText = `📝 ${this.markdownStyles.bold(
+      "할일 목록"
+    )} \\(${page}/${totalPages}\\)\n\n`;
 
-  /**
-   * ✅ 성공 메시지 - 통합 처리
-   */
-  async sendSuccess(bot, chatId, title, description = "") {
-    // 🖥️ 화려한 콘솔 출력
-    console.log(this.rainbow("🎉 ===== 성공! ====="));
-    console.log(this.consoleStyles.success(title));
-    if (description) console.log(this.consoleStyles.info(description));
+    paginatedTodos.forEach((todo, index) => {
+      const displayIndex = startIndex + index + 1;
+      const status = todo.completed ? "✅" : "◻️";
+      const priority =
+        todo.priority === "high"
+          ? "🔴"
+          : todo.priority === "medium"
+          ? "🟡"
+          : "🔵";
 
-    // 📱 텔레그램 메시지
-    const successText = `
-✅ ${this.markdownStyles.bold(title)}
+      todoText += `${status} ${priority} ${this.markdownStyles.bold(
+        displayIndex.toString()
+      )}\\. ${this.escape(todo.title)}\n`;
 
-${description ? this.markdownStyles.italic(description) : ""}
+      if (todo.description) {
+        todoText += `   ${this.markdownStyles.italic(
+          this.escape(todo.description)
+        )}\n`;
+      }
 
-🎉 ${this.markdownStyles.bold("완료되었습니다\\!")}
-    `.trim();
+      if (todo.dueDate) {
+        todoText += `   📅 ${this.escape(todo.dueDate)}\n`;
+      }
 
-    try {
-      return await bot.sendMessage(chatId, successText, this.telegramOptions);
-    } catch (error) {
-      return await this.sendFallbackMessage(bot, chatId, title);
-    }
-  }
+      todoText += "\n";
+    });
 
-  /**
-   * ❌ 에러 메시지 - 통합 처리
-   */
-  async sendError(bot, chatId, title, description = "") {
-    // 🖥️ 콘솔 출력
-    console.log(this.consoleStyles.error(title));
-    if (description) console.log(this.consoleStyles.warning(description));
-
-    // 📱 텔레그램 메시지
-    const errorText = `
-❌ ${this.markdownStyles.bold(title)}
-
-${description ? this.markdownStyles.italic(description) : ""}
-
-🔄 ${this.markdownStyles.bold("다시 시도해주세요\\.")}
-    `.trim();
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🔄 다시 시도", callback_data: "retry" },
-          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-        ],
-      ],
-    };
-
-    try {
-      return await bot.sendMessage(chatId, errorText, {
-        ...this.telegramOptions,
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      return await this.sendFallbackMessage(bot, chatId, title);
-    }
-  }
-
-  /**
-   * ⏳ 로딩 메시지 - 애니메이션 효과
-   */
-  async sendLoading(bot, chatId, message = "처리 중") {
-    // 🖥️ 콘솔
-    console.log(chalk.blue(`⏳ ${message}...`));
-
-    // 📱 텔레그램
-    const loadingText = `⏳ ${this.markdownStyles.italic(
-      message + "\\.\\.\\."
+    todoText += `📊 ${this.markdownStyles.italic(
+      `총 ${todos.length}개의 할일`
     )}`;
 
     try {
-      return await bot.sendMessage(chatId, loadingText, this.telegramOptions);
+      if (bot && chatId) {
+        await bot.sendMessage(chatId, todoText, this.telegramOptions);
+      }
     } catch (error) {
-      return await this.sendFallbackMessage(bot, chatId, message);
+      console.log(chalk.red("❌ 할일 목록 전송 실패:"), error.message);
     }
+  }
+
+  /**
+   * ✅ 성공 메시지
+   */
+  async sendSuccess(bot, chatId, message, details = null) {
+    // 🖥️ 콘솔 출력
+    console.log(this.rainbow(`🎉 성공: ${message}`));
+    if (details) {
+      console.log(
+        chalk.gray(`   세부사항: ${JSON.stringify(details, null, 2)}`)
+      );
+    }
+
+    // 📱 텔레그램 메시지
+    const successEmoji =
+      this.emojiSets.success[
+        Math.floor(Math.random() * this.emojiSets.success.length)
+      ];
+    const telegramText = `${successEmoji} ${this.markdownStyles.bold("성공\\!")}
+
+${this.escape(message)}${
+      details
+        ? `\n\n${this.markdownStyles.code(JSON.stringify(details, null, 2))}`
+        : ""
+    }`;
+
+    try {
+      if (bot && chatId) {
+        await bot.sendMessage(chatId, telegramText, this.telegramOptions);
+      }
+    } catch (error) {
+      console.log(chalk.red("❌ 성공 메시지 전송 실패:"), error.message);
+    }
+  }
+
+  /**
+   * ❌ 에러 메시지
+   */
+  async sendError(bot, chatId, message, error = null) {
+    // 🖥️ 콘솔 출력
+    console.log(chalk.red.bold(`❌ 에러: ${message}`));
+    if (error) {
+      console.log(chalk.gray(`   상세: ${error.message || error}`));
+    }
+
+    // 📱 텔레그램 메시지
+    const errorEmoji =
+      this.emojiSets.error[
+        Math.floor(Math.random() * this.emojiSets.error.length)
+      ];
+    const telegramText = `${errorEmoji} ${this.markdownStyles.bold("오류 발생")}
+
+${this.escape(message)}
+
+${this.markdownStyles.italic("잠시 후 다시 시도해주세요\\.")}`;
+
+    try {
+      if (bot && chatId) {
+        await bot.sendMessage(chatId, telegramText, this.telegramOptions);
+      }
+    } catch (error) {
+      console.log(chalk.red("❌ 에러 메시지 전송 실패:"), error.message);
+    }
+  }
+
+  /**
+   * ⏳ 로딩 메시지
+   */
+  async sendLoading(bot, chatId, message) {
+    // 🖥️ 콘솔 출력
+    const loadingEmoji = this.emojiSets.loading[0];
+    console.log(chalk.blue(`${loadingEmoji} 로딩: ${message}`));
+
+    // 📱 텔레그램 메시지
+    const telegramText = `⏳ ${this.markdownStyles.italic(
+      this.escape(message)
+    )}`;
+
+    try {
+      if (bot && chatId) {
+        const sentMessage = await bot.sendMessage(
+          chatId,
+          telegramText,
+          this.telegramOptions
+        );
+        return sentMessage.message_id;
+      }
+    } catch (error) {
+      console.log(chalk.red("❌ 로딩 메시지 전송 실패:"), error.message);
+    }
+    return null;
   }
 
   /**
    * 🔄 로딩 메시지 업데이트
    */
-  async updateLoading(bot, chatId, messageId, newText, isSuccess = true) {
-    const emoji = isSuccess ? "✅" : "❌";
-    const style = isSuccess
-      ? this.markdownStyles.bold
-      : this.markdownStyles.italic;
+  async updateLoading(bot, chatId, messageId, newMessage) {
+    // 🖥️ 콘솔 출력
+    console.log(chalk.blue(`🔄 로딩 업데이트: ${newMessage}`));
 
-    // 🖥️ 콘솔
-    const consoleStyle = isSuccess
-      ? this.consoleStyles.success
-      : this.consoleStyles.error;
-    console.log(consoleStyle(newText));
-
-    // 📱 텔레그램
-    const updatedText = `${emoji} ${style(newText)}`;
+    // 📱 텔레그램 메시지 수정
+    const telegramText = `⌛ ${this.markdownStyles.italic(
+      this.escape(newMessage)
+    )}`;
 
     try {
-      return await bot.editMessageText(updatedText, {
-        chat_id: chatId,
-        message_id: messageId,
-        ...this.telegramOptions,
-      });
-    } catch (error) {
-      console.log(this.consoleStyles.error("메시지 업데이트 실패"));
-    }
-  }
-
-  // ===== 🛠️ 헬퍼 메서드들 =====
-
-  /**
-   * 📊 텔레그램용 진행률 바
-   */
-  createTelegramProgressBar(current, total, width = 10) {
-    const percentage = Math.round((current / total) * 100);
-    const filled = Math.round(width * (current / total));
-    const empty = width - filled;
-
-    const filledBar = "▰".repeat(filled);
-    const emptyBar = "▱".repeat(empty);
-
-    return `\`${filledBar}${emptyBar}\` ${this.markdownStyles.bold(
-      percentage + "%"
-    )} \\(${current}/${total}\\)`;
-  }
-
-  /**
-   * 🎹 할일 키보드 생성
-   */
-  createTodoKeyboard(pagination = {}) {
-    const { currentPage = 1, totalPages = 1 } = pagination;
-    const buttons = [];
-
-    // 페이지네이션
-    if (totalPages > 1) {
-      const pageButtons = [];
-      if (currentPage > 1) {
-        pageButtons.push({
-          text: "⬅️ 이전",
-          callback_data: `todo:page:${currentPage - 1}`,
+      if (bot && chatId && messageId) {
+        await bot.editMessageText(telegramText, {
+          chat_id: chatId,
+          message_id: messageId,
+          parse_mode: "MarkdownV2",
         });
       }
-      pageButtons.push({
-        text: `${currentPage}/${totalPages}`,
-        callback_data: "todo:page:info",
-      });
-      if (currentPage < totalPages) {
-        pageButtons.push({
-          text: "다음 ➡️",
-          callback_data: `todo:page:${currentPage + 1}`,
-        });
-      }
-      buttons.push(pageButtons);
-    }
-
-    // 액션 버튼들
-    buttons.push([
-      { text: "➕ 추가", callback_data: "todo:add" },
-      { text: "✅ 완료", callback_data: "todo:complete" },
-    ]);
-
-    buttons.push([
-      { text: "✏️ 편집", callback_data: "todo:edit" },
-      { text: "🗑️ 삭제", callback_data: "todo:delete" },
-    ]);
-
-    buttons.push([{ text: "🔙 메인 메뉴", callback_data: "system:menu" }]);
-
-    return { inline_keyboard: buttons };
-  }
-
-  /**
-   * 🛡️ Fallback 메시지 (최후의 수단)
-   */
-  async sendFallbackMessage(bot, chatId, text) {
-    try {
-      return await bot.sendMessage(chatId, `❌ ${text}`, {
-        parse_mode: "HTML",
-      });
     } catch (error) {
-      console.log(this.consoleStyles.error("Fallback 메시지도 실패"));
-      return await bot.sendMessage(chatId, text); // 마지막 수단: 일반 텍스트
+      console.log(chalk.red("❌ 로딩 메시지 업데이트 실패:"), error.message);
     }
   }
 
   /**
-   * 🕐 시간별 인사말
-   */
-  getGreeting() {
-    const hour = new Date().getHours();
-    if (hour >= 5 && hour < 12) return "좋은 아침";
-    if (hour >= 12 && hour < 17) return "좋은 오후";
-    if (hour >= 17 && hour < 22) return "좋은 저녁";
-    return "안녕하세요";
-  }
-
-  /**
-   * 🕐 시간별 이모지
-   */
-  getTimeEmoji() {
-    const hour = new Date().getHours();
-    if (hour >= 6 && hour < 12) return "🌅";
-    if (hour >= 12 && hour < 18) return "☀️";
-    if (hour >= 18 && hour < 22) return "🌆";
-    return "🌙";
-  }
-
-  /**
-   * 📊 통계 정보 반환
+   * 📊 통계 정보
    */
   getStats() {
     return {
       version: this.version,
+      escapeChars: this.escapeChars.length,
+      emojiSets: Object.keys(this.emojiSets).length,
+      modules: Object.keys(this.emojiSets.modules).length,
       features: [
         "통합 메시지 시스템",
         "MarkdownV2 지원",
@@ -549,14 +476,17 @@ class LoggerEnhancer {
     // Logger에 메시지 기능들 주입
     this.injectMessageFeatures();
 
-    console.log(chalk.rainbow("🎨 Logger 알록달록 업그레이드 완료!"));
+    // ✅ 수정: chalk.rainbow() 대신 messageSystem.rainbow() 사용
+    console.log(
+      this.messageSystem.rainbow("🎨 Logger 알록달록 업그레이드 완료!")
+    );
   }
 
   /**
    * 🎯 Logger에 새로운 메서드들 주입
    */
   injectMessageFeatures() {
-    // ✅ 수정: rainbow 메서드를 messageSystem에서 바인딩
+    // 기존 Logger 메서드 강화
     this.logger.rainbow = this.messageSystem.rainbow.bind(this.messageSystem);
     this.logger.gradient = this.messageSystem.gradient.bind(this.messageSystem);
 
@@ -564,10 +494,19 @@ class LoggerEnhancer {
     this.logger.sendMainMenu = this.messageSystem.sendMainMenu.bind(
       this.messageSystem
     );
+    this.logger.sendTodoList = this.messageSystem.sendTodoList.bind(
+      this.messageSystem
+    );
     this.logger.sendSuccess = this.messageSystem.sendSuccess.bind(
       this.messageSystem
     );
     this.logger.sendError = this.messageSystem.sendError.bind(
+      this.messageSystem
+    );
+    this.logger.sendLoading = this.messageSystem.sendLoading.bind(
+      this.messageSystem
+    );
+    this.logger.updateLoading = this.messageSystem.updateLoading.bind(
       this.messageSystem
     );
 
