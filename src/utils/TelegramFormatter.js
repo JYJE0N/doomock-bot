@@ -419,7 +419,7 @@ ${suggestion}
 }
 
 module.exports = {
-  TelegramFormatter: TelegramFormatter(),
+  TelegramFormatter: new TelegramFormatter(),
   // EnhancedBotResponses: new EnhancedBotResponses(),
 };
 

@@ -1,7 +1,6 @@
 const logger = require("./Logger");
 const { MessageStyler } = require("./MessageStyler");
 
-const TelegramFormatter = require("./TelegramFormatter");
 /**
  * 🎨 화려한 봇 메시지 시스템
  *
@@ -13,7 +12,7 @@ const TelegramFormatter = require("./TelegramFormatter");
  */
 class EnhancedBotResponses {
   constructor() {
-    this.formatter = TelegramFormatter();
+    // this.formatter = new TelegramFormatter();
     this.styler = null;
 
     // 🎨 메시지 전송 옵션
