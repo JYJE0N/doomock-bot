@@ -1,790 +1,358 @@
-// src/controllers/BotController.js - 통합 봇 컨트롤러 v3.0.1
+// src/controllers/BotController.js
+// 🎮 봇 중앙 제어 시스템 (v3.0.1)
+
 const { Telegraf } = require("telegraf");
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-const { getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/LoggerEnhancer");
 const NavigationHandler = require("../handlers/NavigationHandler");
+const ModuleManager = require("../core/ModuleManager");
+const DatabaseManager = require("../database/DatabaseManager");
+const TimeHelper = require("../utils/TimeHelper");
+const { getUserName, getUserId } = require("../utils/UserHelper");
 
 /**
- * 🤖 BotController v3.0.1 (리팩토링)
+ * 🎮 BotController - 봇의 중앙 제어 시스템
  *
- * 🔧 주요 개선사항:
- * - 중복 처리 방지 로직 강화
- * - NavigationHandler 위임 구조 명확화
- * - 에러 처리 표준화
- * - Railway 환경 최적화
- * - 성능 모니터링 강화
+ * 역할: 모든 이벤트를 받아서 적절한 핸들러로 라우팅
+ * 비유: 대형 쇼핑몰의 총괄 매니저
  */
 class BotController {
-  constructor(botToken, config = {}) {
-    this.botToken = botToken;
-    this.config = {
-      timeout: 30000,
-      retries: 3,
-      isRailway: !!process.env.RAILWAY_ENVIRONMENT,
-      webhookMode: config.webhookMode || false,
-      ...config,
-    };
-
-    // 🤖 Telegraf 인스턴스
+  constructor() {
     this.bot = null;
-
-    // 🎹 핸들러들
     this.navigationHandler = null;
     this.moduleManager = null;
-
-    // 🚫 중복 처리 방지 맵
-    this.processingCallbacks = new Map();
-    this.processingMessages = new Map();
-
-    // ⏰ 정리 타이머
-    this.cleanupInterval = null;
-
-    // 📊 통계
-    this.stats = {
-      messagesReceived: 0,
-      callbacksReceived: 0,
-      activeMessages: 0,
-      activeCallbacks: 0,
-      totalUsers: 0,
-      uniqueUsers: new Set(),
-      errorsCount: 0,
-      averageResponseTime: 0,
-      totalResponseTime: 0,
-      lastActivity: null,
-      startTime: Date.now(),
-    };
-
-    // 🔧 상태
+    this.dbManager = null;
     this.initialized = false;
+
+    // 통계
+    this.stats = {
+      startTime: Date.now(),
+      totalCallbacks: 0,
+      totalMessages: 0,
+      totalErrors: 0,
+      uniqueUsers: new Set(),
+    };
   }
 
   /**
-   * 🚀 BotController 초기화
+   * 🎯 초기화
    */
-  async initialize(moduleManager) {
+  async initialize() {
     try {
-      logger.moduleStart("BotController", "3.0.1");
+      logger.system("BotController 초기화 시작...");
 
-      // 매개변수 검증
-      if (!this.botToken) {
-        throw new Error("봇 토큰이 없습니다");
-      }
+      // 1. 봇 인스턴스 생성
+      this.createBot();
 
-      if (!moduleManager) {
-        throw new Error("ModuleManager가 필요합니다");
-      }
+      // 2. 데이터베이스 연결
+      await this.initializeDatabase();
 
-      this.moduleManager = moduleManager;
+      // 3. 핸들러 초기화
+      await this.initializeHandlers();
 
-      // 🤖 Telegraf 초기화
-      await this.initializeTelegraf();
-
-      // 🎹 NavigationHandler 초기화
-      await this.initializeNavigationHandler();
-
-      // 🎮 이벤트 핸들러 설정
+      // 4. 이벤트 핸들러 설정
       this.setupEventHandlers();
 
-      // ⏰ 정리 작업 스케줄
-      this.scheduleCleanup();
-
-      // 🏥 헬스체크 엔드포인트 (Railway)
-      if (this.config.isRailway) {
-        this.setupHealthEndpoint();
+      // 5. 헬스체크 설정 (Railway)
+      if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+        this.setupHealthCheck();
       }
 
       this.initialized = true;
-      logger.success("✅ BotController 초기화 완료", {
-        bot: !!this.bot,
-        navigation: !!this.navigationHandler,
-        modules: !!this.moduleManager,
-        railway: this.config.isRailway,
-      });
+      logger.success("✅ BotController 초기화 완료");
     } catch (error) {
-      logger.fatal("💀 BotController 초기화 실패", error);
+      logger.fatal("BotController 초기화 실패", error);
       throw error;
     }
   }
 
   /**
-   * 🤖 Telegraf 초기화
+   * 🤖 봇 인스턴스 생성
    */
-  async initializeTelegraf() {
-    try {
-      this.bot = new Telegraf(this.botToken);
-
-      // 봇 정보 확인
-      const botInfo = await this.bot.telegram.getMe();
-      logger.info(`🤖 봇 연결됨: @${botInfo.username}`, {
-        botId: botInfo.id,
-        botName: botInfo.first_name,
-      });
-
-      return true;
-    } catch (error) {
-      logger.error("❌ Telegraf 초기화 실패:", error);
-      throw error;
+  createBot() {
+    const token = process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      throw new Error("TELEGRAM_BOT_TOKEN이 설정되지 않았습니다");
     }
+
+    this.bot = new Telegraf(token);
+    logger.success("✅ 봇 인스턴스 생성됨");
   }
 
   /**
-   * 🎹 NavigationHandler 초기화
+   * 🗄️ 데이터베이스 초기화
    */
-  async initializeNavigationHandler() {
-    try {
-      // ✅ NavigationHandler 생성자에 맞게 매개변수 전달
-      this.navigationHandler = new NavigationHandler(this.bot, {
-        moduleManager: this.moduleManager,
-        commandsRegistry: null,
-      });
+  async initializeDatabase() {
+    logger.database("데이터베이스 연결 시작...");
 
-      // ✅ initialize 메서드가 없으므로 제거
-      // await this.navigationHandler.initialize(this.moduleManager);
+    this.dbManager = new DatabaseManager();
+    await this.dbManager.connect();
 
-      logger.success("🎹 NavigationHandler 초기화 완료", {
-        hasBot: !!this.navigationHandler.bot,
-        hasModuleManager: !!this.navigationHandler.moduleManager,
-      });
-
-      return true;
-    } catch (error) {
-      logger.error("❌ NavigationHandler 초기화 실패:", error);
-      throw error;
-    }
+    logger.database("✅ 데이터베이스 연결 성공");
   }
 
   /**
-   * 🎮 이벤트 핸들러 설정
+   * 🎯 핸들러 초기화
+   */
+  async initializeHandlers() {
+    // NavigationHandler 초기화
+    logger.module("NavigationHandler", "초기화 중...");
+    this.navigationHandler = new NavigationHandler();
+    await this.navigationHandler.initialize(this.bot);
+
+    // ModuleManager 초기화
+    logger.module("ModuleManager", "초기화 중...");
+    this.moduleManager = new ModuleManager(this.bot, {
+      db: this.dbManager.getDb(),
+    });
+    await this.moduleManager.initialize();
+
+    logger.success("✅ 모든 핸들러 초기화 완료");
+  }
+
+  /**
+   * 🎯 이벤트 핸들러 설정
    */
   setupEventHandlers() {
-    if (!this.bot) {
-      throw new Error("Telegraf 인스턴스가 없습니다");
-    }
+    // /start 명령어
+    this.bot.command("start", (ctx) => this.handleStartCommand(ctx));
 
-    // 🔄 미들웨어: 기본 정보 로깅
-    this.bot.use(async (ctx, next) => {
-      const startTime = Date.now();
+    // 콜백 쿼리 (인라인 키보드)
+    this.bot.on("callback_query", (ctx) => this.handleCallbackQuery(ctx));
 
-      try {
-        await next();
-      } catch (error) {
-        logger.error("🔄 미들웨어 오류:", error);
-      } finally {
-        const duration = Date.now() - startTime;
-        this.updateResponseTimeStats(duration);
-      }
-    });
-
-    // 💬 메시지 처리
+    // 텍스트 메시지
     this.bot.on("text", (ctx) => this.handleMessage(ctx));
-    this.bot.command("start", (ctx) => this.handleMessage(ctx));
 
-    // ⚡ 콜백 쿼리 처리 (핵심!)
-    this.bot.on("callback_query", (ctx) => this.handleCallback(ctx));
+    // 에러 핸들러
+    this.bot.catch((err, ctx) => this.handleError(err, ctx));
 
-    // 🔍 인라인 쿼리 처리
-    this.bot.on("inline_query", (ctx) => this.handleInlineQuery(ctx));
-
-    // 📎 미디어 처리
-    this.bot.on("photo", (ctx) => this.handleMedia(ctx, "photo"));
-    this.bot.on("document", (ctx) => this.handleMedia(ctx, "document"));
-    this.bot.on("voice", (ctx) => this.handleMedia(ctx, "voice"));
-    this.bot.on("audio", (ctx) => this.handleMedia(ctx, "audio"));
-
-    logger.debug("🎮 Telegraf 핸들러 설정 완료");
+    logger.debug("✅ 이벤트 핸들러 설정 완료");
   }
 
   /**
-   * ⚡ 콜백 처리 (핵심 로직)
+   * 🚀 /start 명령어 처리
    */
-  async handleCallback(ctx) {
-    const startTime = Date.now();
-    const userId = ctx.from?.id;
-    const callbackId = ctx.callbackQuery?.id;
-    const uniqueKey = `callback_${userId}_${callbackId}`;
-
+  async handleStartCommand(ctx) {
     try {
-      // 🚫 중복 처리 방지
-      if (this.processingCallbacks.has(uniqueKey)) {
-        logger.debug(`🚫 중복 콜백 차단: ${uniqueKey}`);
+      const userName = getUserName(ctx);
+      const userId = getUserId(ctx);
 
-        await this.answerCallbackQuery(ctx, "⏳ 처리 중입니다...", true);
-        return;
-      }
+      logger.user(userId, `/start 명령어 실행`);
 
-      // 📊 처리 시작 등록
-      this.processingCallbacks.set(uniqueKey, {
-        startTime,
-        userId,
-        callbackData: ctx.callbackQuery.data,
-      });
+      // NavigationHandler가 메인 메뉴 표시
+      await this.navigationHandler.showMainMenu(ctx);
 
-      this.stats.activeCallbacks++;
-      this.stats.callbacksReceived++;
-      this.stats.lastActivity = TimeHelper.getLogTimeString();
-
-      // 👤 사용자 통계 업데이트
+      // 통계 업데이트
       this.stats.uniqueUsers.add(userId);
-      this.stats.totalUsers = this.stats.uniqueUsers.size;
-
-      logger.debug(
-        `⚡ 콜백 처리 시작: ${getUserName(ctx.from)} -> ${
-          ctx.callbackQuery.data
-        }`
-      );
-
-      // ✅ 기본 콜백 응답 (사용자 대기 해제)
-      await this.answerCallbackQuery(ctx);
-
-      // 🎹 NavigationHandler로 위임 (표준 흐름)
-      let handled = false;
-
-      if (this.navigationHandler) {
-        handled = await this.navigationHandler.handleNavigation(
-          this.bot,
-          ctx.callbackQuery,
-          null, // subAction은 NavigationHandler에서 파싱
-          [], // params도 NavigationHandler에서 파싱
-          this.moduleManager
-        );
-      } else {
-        logger.error("❌ NavigationHandler가 없음");
-        await this.handleSystemError(ctx, "네비게이션 핸들러 오류");
-        return;
-      }
-
-      // 🚨 처리되지 않은 콜백 처리
-      if (!handled) {
-        logger.warn(`❓ 처리되지 않은 콜백: ${ctx.callbackQuery.data}`);
-        await this.handleUnprocessedCallback(ctx);
-      }
+      this.stats.totalMessages++;
     } catch (error) {
-      logger.error(`❌ 콜백 처리 실패 (${uniqueKey}):`, error);
-      this.stats.errorsCount++;
-
-      await this.handleCallbackError(ctx, error);
-    } finally {
-      // 🧹 정리 작업
-      this.processingCallbacks.delete(uniqueKey);
-      this.stats.activeCallbacks = Math.max(0, this.stats.activeCallbacks - 1);
-
-      const duration = Date.now() - startTime;
-      this.updateResponseTimeStats(duration);
-
-      logger.debug(`⚡ 콜백 처리 완료: ${uniqueKey} (${duration}ms)`);
+      logger.error("start 명령어 처리 실패", error);
+      await ctx.reply("❌ 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
     }
   }
 
   /**
-   * 💬 메시지 처리
+   * 🎯 콜백 쿼리 처리 (인라인 키보드)
+   */
+  async handleCallbackQuery(ctx) {
+    try {
+      const callbackQuery = ctx.callbackQuery;
+      const userId = getUserId(callbackQuery);
+      const data = callbackQuery.data;
+
+      logger.debug(`📥 콜백: ${data} (사용자: ${userId})`);
+
+      // 즉시 응답
+      await ctx.answerCbQuery();
+
+      // NavigationHandler로 라우팅
+      await this.navigationHandler.handleCallback(ctx);
+
+      // 통계 업데이트
+      this.stats.totalCallbacks++;
+      this.stats.uniqueUsers.add(userId);
+    } catch (error) {
+      logger.error("콜백 처리 실패", error);
+      await ctx.answerCbQuery("❌ 처리 중 오류가 발생했습니다", {
+        show_alert: true,
+      });
+    }
+  }
+
+  /**
+   * 💬 텍스트 메시지 처리
    */
   async handleMessage(ctx) {
-    const startTime = Date.now();
-    const userId = ctx.from?.id;
-    const messageId = ctx.message?.message_id;
-    const uniqueKey = `message_${userId}_${messageId}`;
-
     try {
-      // 🚫 중복 처리 방지
-      if (this.processingMessages.has(uniqueKey)) {
-        logger.debug(`🚫 중복 메시지 차단: ${uniqueKey}`);
-        return;
-      }
+      const msg = ctx.message;
+      const userId = getUserId(msg);
+      const text = msg.text;
 
-      // 📊 처리 시작 등록
-      this.processingMessages.set(uniqueKey, {
-        startTime,
-        userId,
-        text: ctx.message.text?.substring(0, 50),
-      });
-
-      this.stats.activeMessages++;
-      this.stats.messagesReceived++;
-      this.stats.lastActivity = TimeHelper.getLogTimeString();
-
-      // 👤 사용자 통계 업데이트
-      this.stats.uniqueUsers.add(userId);
-      this.stats.totalUsers = this.stats.uniqueUsers.size;
+      // 명령어는 제외 (이미 처리됨)
+      if (text.startsWith("/")) return;
 
       logger.debug(
-        `💬 메시지 처리 시작: ${getUserName(
-          ctx.from
-        )} -> "${ctx.message.text?.substring(0, 30)}..."`
+        `💬 메시지: ${text.substring(0, 50)}... (사용자: ${userId})`
       );
 
-      // 📦 ModuleManager로 위임
-      if (this.moduleManager) {
-        await this.moduleManager.handleMessage(this.bot, ctx.message);
-      } else {
-        logger.warn("⚠️ ModuleManager가 없어 메시지 처리 불가");
-        await ctx.reply(
-          "🚧 시스템이 아직 준비되지 않았습니다. 잠시만 기다려주세요."
-        );
-      }
+      // ModuleManager로 메시지 전달
+      await this.moduleManager.handleMessage(this.bot, msg);
+
+      // 통계 업데이트
+      this.stats.totalMessages++;
+      this.stats.uniqueUsers.add(userId);
     } catch (error) {
-      logger.error(`❌ 메시지 처리 실패 (${uniqueKey}):`, error);
-      this.stats.errorsCount++;
-
-      await this.handleMessageError(ctx, error);
-    } finally {
-      // 🧹 정리 작업
-      this.processingMessages.delete(uniqueKey);
-      this.stats.activeMessages = Math.max(0, this.stats.activeMessages - 1);
-
-      const duration = Date.now() - startTime;
-      this.updateResponseTimeStats(duration);
-
-      logger.debug(`💬 메시지 처리 완료: ${uniqueKey} (${duration}ms)`);
+      logger.error("메시지 처리 실패", error);
+      await ctx.reply("❌ 메시지 처리 중 오류가 발생했습니다.");
     }
   }
 
   /**
-   * 🔍 인라인 쿼리 처리
+   * ❌ 에러 처리
    */
-  async handleInlineQuery(ctx) {
+  async handleError(err, ctx) {
+    logger.error("봇 에러 발생", err);
+    this.stats.totalErrors++;
+
     try {
-      logger.debug(`🔍 인라인 쿼리: ${ctx.inlineQuery.query}`);
-
-      // 기본 인라인 응답
-      await ctx.answerInlineQuery([]);
-    } catch (error) {
-      logger.error("❌ 인라인 쿼리 처리 실패:", error);
-    }
-  }
-
-  /**
-   * 📎 미디어 처리
-   */
-  async handleMedia(ctx, mediaType) {
-    try {
-      logger.debug(`📎 미디어 수신: ${mediaType}`);
-
-      if (this.moduleManager) {
-        await this.moduleManager.handleMessage(this.bot, ctx.message);
+      if (ctx && ctx.chat) {
+        await ctx.reply("❌ 오류가 발생했습니다. 개발자에게 문의해주세요.");
       }
-    } catch (error) {
-      logger.error(`❌ 미디어 처리 실패 (${mediaType}):`, error);
-    }
-  }
-
-  /**
-   * 🔍 의존성 검증 (상세 디버깅 추가)
-   */
-  validateDependencies() {
-    console.log("🔍 BotController 의존성 검증 시작...");
-
-    const required = [
-      { name: "bot", obj: this.bot },
-      { name: "moduleManager", obj: this.moduleManager },
-    ];
-
-    const optional = [
-      { name: "dbManager", obj: this.dbManager },
-      { name: "ValidationHelper", obj: this.ValidationHelper },
-      { name: "healthChecker", obj: this.healthChecker },
-    ];
-
-    // 🔍 상세 디버깅: 각 의존성 개별 확인
-    console.log("🔍 필수 의존성 상세 확인:");
-    for (const { name, obj } of required) {
-      console.log(`   ${name}:`, {
-        exists: !!obj,
-        type: typeof obj,
-        constructor: obj?.constructor?.name,
-        isNull: obj === null,
-        isUndefined: obj === undefined,
-        truthyCheck: !!obj,
-      });
-    }
-
-    // 필수 의존성 체크
-    for (const { name, obj } of required) {
-      if (!obj) {
-        console.error(`❌ 필수 의존성 누락 상세:`, {
-          name,
-          obj,
-          type: typeof obj,
-          isNull: obj === null,
-          isUndefined: obj === undefined,
-        });
-        throw new Error(`필수 의존성 누락: ${name}`);
-      }
-    }
-
-    // 선택적 의존성 체크 (경고만)
-    console.log("🔍 선택적 의존성 확인:");
-    for (const { name, obj } of optional) {
-      console.log(`   ${name}: ${!!obj}`);
-      if (!obj) {
-        logger.warn(
-          `⚠️ 선택적 의존성 누락: ${name} - 관련 기능이 제한될 수 있습니다.`
-        );
-      }
-    }
-
-    console.log("✅ 의존성 검증 완료");
-    logger.debug("✅ 의존성 검증 완료");
-  }
-
-  // ===== 🚨 에러 처리 메서드들 =====
-
-  /**
-   * ✅ 안전한 콜백 응답
-   */
-  async answerCallbackQuery(ctx, text = null, showAlert = false) {
-    try {
-      const options = {};
-      if (text) options.text = text;
-      if (showAlert) options.show_alert = true;
-
-      await ctx.answerCbQuery(options);
-    } catch (error) {
-      logger.debug("콜백 쿼리 응답 실패:", error.message);
-    }
-  }
-
-  /**
-   * 🚨 처리되지 않은 콜백 처리
-   */
-  async handleUnprocessedCallback(ctx) {
-    try {
-      await ctx.editMessageText(
-        "⚠️ **요청을 처리할 수 없습니다**\n\n해당 기능이 일시적으로 사용할 수 없거나\n아직 구현되지 않았습니다.\n\n메인 메뉴로 돌아가서 다시 시도해주세요.",
-        {
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-            ],
-          },
-        }
-      );
-    } catch (editError) {
-      logger.debug("처리되지 않은 콜백 메시지 편집 실패:", editError.message);
-    }
-  }
-
-  /**
-   * 🚨 시스템 오류 처리
-   */
-  async handleSystemError(ctx, errorMessage) {
-    try {
-      await ctx.editMessageText(
-        `❌ **시스템 오류**\n\n${errorMessage}\n\n시스템 관리자에게 문의하거나\n잠시 후 다시 시도해주세요.`,
-        {
-          parse_mode: "Markdown",
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "🔄 새로고침", callback_data: "system:start" },
-                { text: "📊 시스템 상태", callback_data: "system:status" },
-              ],
-            ],
-          },
-        }
-      );
-    } catch (editError) {
-      logger.debug("시스템 오류 메시지 편집 실패:", editError.message);
-    }
-  }
-
-  /**
-   * 🚨 콜백 에러 처리
-   */
-  async handleCallbackError(ctx, error) {
-    try {
-      await this.answerCallbackQuery(
-        ctx,
-        "❌ 처리 중 오류가 발생했습니다.",
-        true
-      );
-    } catch (answerError) {
-      logger.error("콜백 에러 응답 실패:", answerError);
-    }
-  }
-
-  /**
-   * 🚨 메시지 에러 처리
-   */
-  async handleMessageError(ctx, error) {
-    try {
-      await ctx.reply(
-        "❌ 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-      );
     } catch (replyError) {
-      logger.error("메시지 에러 응답 실패:", replyError);
+      logger.error("에러 응답 실패", replyError);
     }
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 =====
-
   /**
-   * ⏰ 정리 작업 스케줄
+   * 🚀 봇 시작
    */
-  scheduleCleanup() {
-    // 5분마다 오래된 처리 맵 정리
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupStaleProcesses();
-    }, 5 * 60 * 1000);
-
-    logger.debug("⏰ 자동 정리 작업 예약됨 (5분 간격)");
-  }
-
-  /**
-   * 🧹 오래된 프로세스 정리
-   */
-  cleanupStaleProcesses() {
-    const now = Date.now();
-    const timeout = 2 * 60 * 1000; // 2분 타임아웃
-    let cleanedCount = 0;
-
-    // 오래된 콜백 정리
-    for (const [key, data] of this.processingCallbacks.entries()) {
-      if (now - data.startTime > timeout) {
-        this.processingCallbacks.delete(key);
-        cleanedCount++;
+  async start() {
+    try {
+      if (!this.initialized) {
+        throw new Error("BotController가 초기화되지 않았습니다");
       }
-    }
 
-    // 오래된 메시지 정리
-    for (const [key, data] of this.processingMessages.entries()) {
-      if (now - data.startTime > timeout) {
-        this.processingMessages.delete(key);
-        cleanedCount++;
+      // Railway 환경에서는 웹훅 모드
+      if (process.env.RAILWAY_ENVIRONMENT_NAME) {
+        await this.startWebhook();
+      } else {
+        await this.startPolling();
       }
-    }
-
-    if (cleanedCount > 0) {
-      logger.debug(`🧹 오래된 프로세스 ${cleanedCount}개 정리됨`);
+    } catch (error) {
+      logger.error("봇 시작 실패", error);
+      throw error;
     }
   }
 
   /**
-   * 📊 응답 시간 통계 업데이트
-   */
-  updateResponseTimeStats(responseTime) {
-    this.stats.totalResponseTime += responseTime;
-
-    const totalRequests =
-      this.stats.messagesReceived + this.stats.callbacksReceived;
-    if (totalRequests > 0) {
-      this.stats.averageResponseTime = Math.round(
-        this.stats.totalResponseTime / totalRequests
-      );
-    }
-  }
-
-  // ===== 🔄 봇 시작/중지 =====
-
-  /**
-   * 🚀 봇 시작 (폴링 모드)
+   * 🔄 폴링 모드 시작
    */
   async startPolling() {
-    try {
-      if (!this.initialized) {
-        throw new Error("BotController가 초기화되지 않았습니다");
-      }
+    logger.network("봇 폴링 모드 시작...");
 
-      logger.info("🚀 봇 폴링 시작...");
-      await this.bot.launch();
+    await this.bot.launch({
+      dropPendingUpdates: true,
+    });
 
-      logger.success("✅ 봇이 성공적으로 시작되었습니다 (폴링 모드)");
+    logger.success("✅ 봇이 폴링 모드로 시작되었습니다");
+  }
 
-      // Railway에서 업타임 유지
-      if (this.config.isRailway) {
-        this.keepAlive();
-      }
-    } catch (error) {
-      logger.fatal("💀 봇 시작 실패", error, true);
+  /**
+   * 🌐 웹훅 모드 시작
+   */
+  async startWebhook() {
+    const port = process.env.PORT || 3000;
+    const domain = process.env.WEBHOOK_DOMAIN;
+
+    if (!domain) {
+      throw new Error("웹훅 도메인이 설정되지 않았습니다");
     }
+
+    logger.network(`봇 웹훅 모드 시작 (포트: ${port})...`);
+
+    await this.bot.launch({
+      webhook: {
+        domain,
+        port,
+      },
+    });
+
+    logger.success("✅ 봇이 웹훅 모드로 시작되었습니다");
   }
 
   /**
-   * 🌐 봇 시작 (웹훅 모드)
+   * 🏥 헬스체크 설정
    */
-  async startWebhook(domain, port = 3000) {
-    try {
-      if (!this.initialized) {
-        throw new Error("BotController가 초기화되지 않았습니다");
-      }
-
-      const webhookUrl = `${domain}/webhook`;
-
-      logger.info(`🌐 봇 웹훅 시작: ${webhookUrl}`);
-      await this.bot.launch({
-        webhook: {
-          domain,
-          port,
-        },
-      });
-
-      logger.success(
-        `✅ 봇이 성공적으로 시작되었습니다 (웹훅 모드: ${webhookUrl})`
-      );
-    } catch (error) {
-      logger.fatal("💀 봇 웹훅 시작 실패", error, true);
-    }
-  }
-
-  /**
-   * 💚 Railway 업타임 유지
-   */
-  keepAlive() {
-    if (!this.config.isRailway) return;
-
-    setInterval(() => {
-      logger.debug("💚 Railway 업타임 유지");
-    }, 25 * 60 * 1000); // 25분마다
-  }
-
-  /**
-   * 🏥 헬스체크 엔드포인트 설정
-   */
-  setupHealthEndpoint() {
+  setupHealthCheck() {
     const express = require("express");
     const app = express();
+    const port = process.env.PORT || 3000;
 
     app.get("/health", (req, res) => {
       const health = {
         status: "healthy",
-        timestamp: TimeHelper.getLogTimeString(),
-        uptime: process.uptime(),
-        memory: process.memoryUsage(),
-        bot: {
-          initialized: this.initialized,
-          connected: !!this.bot,
+        version: "3.0.1",
+        timestamp: TimeHelper.now(),
+        uptime: Math.floor((Date.now() - this.stats.startTime) / 1000),
+        stats: {
+          callbacks: this.stats.totalCallbacks,
+          messages: this.stats.totalMessages,
+          errors: this.stats.totalErrors,
+          users: this.stats.uniqueUsers.size,
         },
-        stats: this.stats,
-        modules: this.moduleManager?.getStatus() || {},
       };
 
-      res.status(200).json(health);
+      res.json(health);
     });
 
-    app.get("/ping", (req, res) => {
-      res.status(200).send("pong");
-    });
-
-    const port = process.env.PORT || 3000;
     app.listen(port, () => {
-      logger.debug(`🏥 헬스체크 서버 시작: 포트 ${port}`);
+      logger.network(`헬스체크 서버 시작 (포트: ${port})`);
     });
   }
 
-  // ===== 📊 상태 및 통계 =====
+  /**
+   * 🧹 정리 작업
+   */
+  async cleanup() {
+    logger.system("BotController 정리 시작...");
+
+    try {
+      // 봇 중지
+      if (this.bot) {
+        await this.bot.stop();
+        logger.debug("봇 중지됨");
+      }
+
+      // 모듈 정리
+      if (this.moduleManager) {
+        await this.moduleManager.cleanup();
+        logger.debug("ModuleManager 정리됨");
+      }
+
+      // 데이터베이스 연결 종료
+      if (this.dbManager) {
+        await this.dbManager.disconnect();
+        logger.debug("데이터베이스 연결 종료됨");
+      }
+
+      logger.success("✅ BotController 정리 완료");
+    } catch (error) {
+      logger.error("정리 작업 실패", error);
+    }
+  }
 
   /**
-   * 📊 봇 상태 조회
+   * 📊 상태 조회
    */
   getStatus() {
     return {
-      className: "BotController",
-      version: "3.0.1",
       initialized: this.initialized,
-      botConnected: !!this.bot,
-      navigationHandlerActive: !!this.navigationHandler,
-      moduleManagerActive: !!this.moduleManager,
+      uptime: Math.floor((Date.now() - this.stats.startTime) / 1000),
       stats: {
         ...this.stats,
-        uniqueUsersCount: this.stats.uniqueUsers.size,
+        uniqueUsers: this.stats.uniqueUsers.size,
       },
-      performance: {
-        activeMessages: this.stats.activeMessages,
-        activeCallbacks: this.stats.activeCallbacks,
-        processingMapsSize: {
-          callbacks: this.processingCallbacks.size,
-          messages: this.processingMessages.size,
-        },
-      },
-      config: {
-        isRailway: this.config.isRailway,
-        webhookMode: this.config.webhookMode,
-      },
+      modules: this.moduleManager?.getStatus() || {},
     };
-  }
-
-  /**
-   * 📊 상태 텍스트 생성
-   */
-  generateStatusText() {
-    const status = this.getStatus();
-    const uptime = Date.now() - this.stats.startTime;
-
-    return `🤖 **BotController v3.0.1 상태**
-
-🔧 **시스템 상태**:
-• 초기화: ${status.initialized ? "✅" : "❌"}
-• 봇 연결: ${status.botConnected ? "✅" : "❌"}
-• 네비게이션: ${status.navigationHandlerActive ? "✅" : "❌"}
-• 모듈관리자: ${status.moduleManagerActive ? "✅" : "❌"}
-
-📊 **통계**:
-• 메시지: ${status.stats.messagesReceived}개
-• 콜백: ${status.stats.callbacksReceived}개
-• 사용자: ${status.stats.totalUsers}명
-• 평균응답: ${status.stats.averageResponseTime}ms
-• 에러: ${status.stats.errorsCount}개
-
-⚡ **현재 처리**:
-• 메시지: ${status.performance.activeMessages}개
-• 콜백: ${status.performance.activeCallbacks}개
-
-⏱️ **가동시간**: ${this.formatUptime(uptime)}`;
-  }
-
-  /**
-   * ⏱️ 가동시간 포맷팅
-   */
-  formatUptime(ms) {
-    const seconds = Math.floor(ms / 1000);
-    const minutes = Math.floor(seconds / 60);
-    const hours = Math.floor(minutes / 60);
-    const days = Math.floor(hours / 24);
-
-    if (days > 0) return `${days}일 ${hours % 24}시간`;
-    if (hours > 0) return `${hours}시간 ${minutes % 60}분`;
-    if (minutes > 0) return `${minutes}분`;
-    return `${seconds}초`;
-  }
-
-  /**
-   * 🛑 정리 작업
-   */
-  async cleanup() {
-    try {
-      logger.info("🛑 BotController 정리 시작...");
-
-      // 정리 타이머 중지
-      if (this.cleanupInterval) {
-        clearInterval(this.cleanupInterval);
-        this.cleanupInterval = null;
-      }
-
-      // NavigationHandler 정리
-      if (this.navigationHandler) {
-        await this.navigationHandler.cleanup();
-        this.navigationHandler = null;
-      }
-
-      // 처리 맵 정리
-      this.processingCallbacks.clear();
-      this.processingMessages.clear();
-
-      // 통계 정리
-      this.stats.uniqueUsers.clear();
-
-      // 봇 정지
-      if (this.bot) {
-        await this.bot.stop();
-        this.bot = null;
-      }
-
-      this.initialized = false;
-      logger.success("✅ BotController 정리 완료");
-    } catch (error) {
-      logger.error("❌ BotController 정리 실패:", error);
-    }
   }
 }
 
