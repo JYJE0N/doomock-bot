@@ -1,5 +1,5 @@
 // ========================================
-// 🌈 src/utils/Logger.js - Enhanced v3.0.1 수정본
+// 🌈 src/utils/Logger.js - Enhanced v3.0.1 최종 수정본
 // ========================================
 // Message/ 폴더 기능들이 모두 주입된 알록달록한 Logger!
 // ========================================
@@ -26,7 +26,7 @@ class EnhancedLogger {
     this.version = "3.0.1";
     this.initialized = false;
 
-    // 🎨 기본 스타일 시스템 (함수 형태로 수정)
+    // 🎨 기본 스타일 시스템 - ✅ 모든 color 속성을 함수로 수정
     this.styles = {
       info: {
         badge: chalk.bgBlue.white(" INFO "),
@@ -98,7 +98,7 @@ class EnhancedLogger {
       "██╔══██╗██║   ██║████╗ ████║██╔═══██╗██║ ██╔╝",
       "██║  ██║██║   ██║██╔████╔██║██║   ██║█████╔╝ ",
       "██║  ██║██║   ██║██║╚██╔╝██║██║   ██║██╔═██╗ ",
-      "██████╔╝╚██████╔╝██║ ╚═╝ ██║╚██████╔╝██║  ██╗",
+      "██████╗ ╚██████╔╝██║ ╚═╝ ██║╚██████╔╝██║  ██╗",
       "╚═════╝  ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝",
       "                                             ",
       "🤖 두목봇 Enhanced Logger v3.0.1 - 알록달록 모드! 🌈",
@@ -116,11 +116,11 @@ class EnhancedLogger {
 
   // ===== 🌈 특수 효과들 (Message 시스템에서 주입됨) =====
   rainbow(text) {
-    return this.messageSystem.rainbow(text);
+    return this.messageSystem?.rainbow(text) || text;
   }
 
   gradient(text, startColor, endColor) {
-    return this.messageSystem.gradient(text, startColor, endColor);
+    return this.messageSystem?.gradient(text, startColor, endColor) || text;
   }
 
   /**
@@ -309,10 +309,9 @@ class EnhancedLogger {
    * 📊 진행률 바 표시
    */
   progress(label, current, total) {
-    const progressBar = this.messageSystem.consoleStyles.progressBar(
-      current,
-      total
-    );
+    const progressBar =
+      this.messageSystem?.consoleStyles?.progressBar?.(current, total) ||
+      `${current}/${total}`;
     console.log(`📊 ${label}: ${progressBar}`);
   }
 
@@ -482,30 +481,20 @@ class EnhancedLogger {
   // ===== 🛠️ 내부 헬퍼 메서드들 =====
 
   /**
-   * ✅ 수정된 formatEnhancedLog 메서드
+   * ✅ 완전 수정된 formatEnhancedLog 메서드 (style.color 함수 문제 해결)
    */
   #formatEnhancedLog(level, message, data) {
     const style = this.styles[level];
+    if (!style) {
+      // Fallback for unknown levels
+      return `${this.#getTimestamp()} [${level.toUpperCase()}] ${message}`;
+    }
+
     const timestamp = this.#getTimestamp();
     const cleanMessage = this.#sanitize(message);
 
-    // ✅ style.color가 함수인지 확인하고 안전하게 호출
-    let coloredMessage;
-    if (typeof style.color === "function") {
-      coloredMessage = style.color(cleanMessage);
-    } else {
-      // Fallback: 직접 chalk 색상 적용
-      const colorMap = {
-        info: chalk.blue,
-        success: chalk.green,
-        warn: chalk.yellow,
-        error: chalk.red,
-        debug: chalk.gray,
-        system: chalk.magenta,
-      };
-      const colorFn = colorMap[level] || chalk.white;
-      coloredMessage = colorFn(cleanMessage);
-    }
+    // ✅ style.color는 이제 확실히 함수이므로 안전하게 호출
+    const coloredMessage = style.color(cleanMessage);
 
     let output = `${timestamp} ${style.badge} ${style.icon} ${coloredMessage}`;
 
@@ -517,28 +506,22 @@ class EnhancedLogger {
   }
 
   /**
-   * ✅ 수정된 formatData 메서드
+   * ✅ 완전 수정된 formatData 메서드
    */
   #formatData(data, level) {
     const cleanData = this.#sanitize(JSON.stringify(data, null, 2));
     const style = this.styles[level];
 
-    // ✅ style.color가 함수인지 확인하고 안전하게 호출
-    let colorFn;
-    if (typeof style.color === "function") {
-      colorFn = style.color;
-    } else {
-      // Fallback: 직접 chalk 색상 적용
-      const colorMap = {
-        info: chalk.blue,
-        success: chalk.green,
-        warn: chalk.yellow,
-        error: chalk.red,
-        debug: chalk.gray,
-        system: chalk.magenta,
-      };
-      colorFn = colorMap[level] || chalk.white;
+    if (!style || !style.color) {
+      // Fallback for unknown levels or missing color function
+      return cleanData
+        .split("\n")
+        .map((line) => chalk.gray("    │ ") + line)
+        .join("\n");
     }
+
+    // ✅ style.color는 확실히 함수이므로 안전하게 호출
+    const colorFn = style.color;
 
     return cleanData
       .split("\n")
