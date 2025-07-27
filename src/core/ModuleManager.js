@@ -1,9 +1,11 @@
 // src/core/ModuleManager.js
 // 📦 모듈 매니저 - 모듈 중앙 관리 (v3.0.1)
 
+const logger = require("../utils/Logger");
 const { createServiceBuilder } = require("./ServiceBuilder");
 const { getInstance } = require("../database/DatabaseManager");
-const BaseModule = require("./BaseModule");
+const { getEnabledModules } = require("../config/ModuleRegistry");
+// const BaseModule = require("../core/BaseModule");
 
 /**
  * 📦 ModuleManager - 모든 모듈의 중앙 관리자
@@ -27,6 +29,8 @@ class ModuleManager {
       callbacksHandled: 0,
       messagesHandled: 0,
     };
+    // ✅ 생성자에서 logger 사용 가능 확인
+    logger.info("📦 ModuleManager 생성됨");
   }
 
   /**
@@ -34,6 +38,8 @@ class ModuleManager {
    */
   async initialize() {
     try {
+      logger.system("ModuleManager 초기화 시작...");
+
       // 1. DatabaseManager 초기화
       const dbManager = getInstance();
       await dbManager.ensureConnection();

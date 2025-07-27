@@ -25,6 +25,7 @@ class DooMockBot {
     this.botController = null;
     this.isRunning = false;
     this.startTime = Date.now();
+    this.isInitialized = false; // ✅ 초기화 상태 추가
 
     // 🌈 LoggerEnhancer 활용
     this.messageSystem = logger.messageSystem;
@@ -56,7 +57,11 @@ class DooMockBot {
    */
   async start() {
     try {
-      // 🌈 화려한 시작 배너
+      logger.startup("DooMock Bot", "3.0.1");
+      logger.system("두목봇 초기화 시작...");
+      // ✅ 시작 에러 핸들러 추가
+      await this.executeStartupSequence();
+
       this.showWelcomeBanner();
 
       // 📋 환경 정보 표시
@@ -66,8 +71,8 @@ class DooMockBot {
       await this.executeStartupSequence();
 
       // 🎉 시작 완료 축하
-      this.celebrateStartup();
     } catch (error) {
+      logger.fatal("💥 봇 시작 실패", error);
       await this.handleStartupError(error);
     }
   }
@@ -566,6 +571,7 @@ class DooMockBot {
     console.log(
       this.messageSystem.gradient(`❌ 오류: ${error.message}`, "red", "orange")
     );
+
     console.log(
       this.messageSystem.gradient(
         `🕐 발생 시간: ${TimeHelper.format(new Date(), "full")}`,
@@ -588,6 +594,7 @@ class DooMockBot {
     logger.fatal("💥 봇 시작 실패", error);
     this.stats.criticalErrors++;
 
+    // ✅ 안전한 정리 작업
     await this.cleanup();
     process.exit(1);
   }
@@ -679,44 +686,57 @@ class DooMockBot {
    * 🧹 정리 작업
    */
   async cleanup() {
-    console.log(
-      this.messageSystem.gradient("🧹 정리 작업 시작...", "yellow", "orange")
-    );
-
     try {
-      if (this.botController) {
-        console.log(
-          this.messageSystem.gradient(
-            "   🤖 BotController 정리...",
-            "blue",
-            "purple"
-          )
-        );
-        await this.botController.cleanup();
-        console.log(
-          this.messageSystem.gradient(
-            "   ✅ BotController 정리 완료",
-            "green",
-            "blue"
-          )
-        );
+      logger.info("🧹 정리 작업 시작...");
+
+      // ✅ 안전한 BotController 정리
+      if (this.botController && this.isInitialized) {
+        // BotController가 완전히 초기화된 경우에만 cleanup 호출
+        if (typeof this.botController.cleanup === "function") {
+          logger.info("   🤖 BotController 정리...");
+          await this.botController.cleanup();
+          logger.debug("   ✅ BotController 정리 완료");
+        } else {
+          logger.warn(
+            "   ⚠️ BotController.cleanup 메서드가 없음 (부분 초기화)"
+          );
+
+          // 수동 정리 시도
+          if (this.botController.bot) {
+            logger.info("   🔄 봇 인스턴스 수동 정리...");
+            try {
+              await this.botController.bot.stop();
+              logger.debug("   ✅ 봇 중지 완료");
+            } catch (stopError) {
+              logger.warn("   ⚠️ 봇 중지 실패:", stopError.message);
+            }
+          }
+        }
+      } else {
+        logger.warn("   ⚠️ BotController가 초기화되지 않음 - 정리 생략");
       }
 
-      // 메모리 정리
-      this.botController = null;
-
-      console.log(
-        this.messageSystem.gradient("✅ 모든 정리 작업 완료", "green", "blue")
-      );
+      logger.success("✅ 모든 정리 작업 완료");
     } catch (error) {
-      console.log(
-        this.messageSystem.gradient(
-          `❌ 정리 중 오류: ${error.message}`,
-          "red",
-          "orange"
-        )
-      );
       logger.error("정리 작업 중 오류:", error);
+
+      // ✅ 정리 실패 시에도 상세 정보 출력
+      console.log("\n💥 ══════════════════════════════════════════════════");
+      console.log("💀 FATAL ERROR - 애플리케이션 종료");
+      console.log(
+        `[${new Date().toLocaleTimeString()}] ${error.name || "Error"} ${
+          error.message || "Unknown error"
+        } 💥 봇 시작 실패`
+      );
+      console.log("    │", JSON.stringify({}, null, 2));
+
+      if (error.stack) {
+        console.log("📋 스택 트레이스:");
+        console.log(error.stack);
+      }
+
+      console.log("💀 프로세스를 종료합니다...");
+      console.log("💀 ══════════════════════════════════════════════════");
     }
   }
 
@@ -763,22 +783,21 @@ class DooMockBot {
 // ========================================
 
 if (require.main === module) {
-  // 🌈 최초 시작 메시지
-  console.log(
-    logger.messageSystem.rainbow("🚀 두목봇 v3.0.1 애플리케이션 시작...")
-  );
-
   const bot = new DooMockBot();
 
   bot.start().catch((error) => {
-    console.log(
-      logger.messageSystem.gradient(
-        `💥 애플리케이션 시작 실패: ${error.message}`,
-        "red",
-        "darkred"
-      )
-    );
-    logger.fatal("애플리케이션 시작 실패", error);
+    // ✅ 최종 에러 핸들러 - 모든 것이 실패했을 때
+    console.error("\n💀 ══════════════════════════════════════════════════");
+    console.error("💀 CRITICAL FAILURE - 애플리케이션 시작 불가");
+    console.error(`💀 시간: ${new Date().toLocaleString("ko-KR")}`);
+    console.error(`💀 오류: ${error.message}`);
+
+    if (error.stack) {
+      console.error("💀 스택 트레이스:");
+      console.error(error.stack);
+    }
+
+    console.error("💀 ══════════════════════════════════════════════════");
     process.exit(1);
   });
 }
