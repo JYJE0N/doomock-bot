@@ -68,7 +68,17 @@ class UnifiedMessageSystem {
       },
     };
 
-    console.log(chalk.rainbow("🎨 UnifiedMessageSystem v3.0.1 초기화 완료!"));
+    console.log(this.rainbow("🎨 UnifiedMessageSystem v3.0.1 초기화 완료!"));
+  }
+
+  // ===== 🌈 커스텀 rainbow 메서드 구현 =====
+
+  rainbow(text) {
+    const colors = ["red", "yellow", "green", "cyan", "blue", "magenta"];
+    return text
+      .split("")
+      .map((char, i) => chalk[colors[i % colors.length]](char))
+      .join("");
   }
 
   // ===== 🎨 콘솔 스타일 초기화 =====
@@ -93,7 +103,7 @@ class UnifiedMessageSystem {
           todo: chalk.blue.bold,
           timer: chalk.cyan.bold,
           worktime: chalk.green.bold,
-          fortune: this.rainbow,
+          fortune: (text) => this.rainbow(text), // ✅ 수정: this.rainbow 사용
           weather: chalk.yellow.bold,
           reminder: chalk.magenta.bold,
         };
@@ -141,11 +151,20 @@ class UnifiedMessageSystem {
   }
 
   gradient(text, startColor = "#FF6B6B", endColor = "#4ECDC4") {
-    // 간단한 그라데이션 효과 (실제로는 chalk로 근사)
-    return (
-      chalk.hex(startColor)(text.slice(0, text.length / 2)) +
-      chalk.hex(endColor)(text.slice(text.length / 2))
-    );
+    try {
+      // Chalk hex 지원 확인
+      const halfPoint = Math.floor(text.length / 2);
+      return (
+        chalk.hex(startColor)(text.slice(0, halfPoint)) +
+        chalk.hex(endColor)(text.slice(halfPoint))
+      );
+    } catch (error) {
+      // Fallback: 일반 색상 사용
+      return (
+        chalk.red(text.slice(0, text.length / 2)) +
+        chalk.blue(text.slice(text.length / 2))
+      );
+    }
   }
 
   // ===== 📱 MarkdownV2 처리 =====
@@ -537,7 +556,7 @@ class LoggerEnhancer {
    * 🎯 Logger에 새로운 메서드들 주입
    */
   injectMessageFeatures() {
-    // 기존 Logger 메서드 강화
+    // ✅ 수정: rainbow 메서드를 messageSystem에서 바인딩
     this.logger.rainbow = this.messageSystem.rainbow.bind(this.messageSystem);
     this.logger.gradient = this.messageSystem.gradient.bind(this.messageSystem);
 
@@ -545,19 +564,10 @@ class LoggerEnhancer {
     this.logger.sendMainMenu = this.messageSystem.sendMainMenu.bind(
       this.messageSystem
     );
-    this.logger.sendTodoList = this.messageSystem.sendTodoList.bind(
-      this.messageSystem
-    );
     this.logger.sendSuccess = this.messageSystem.sendSuccess.bind(
       this.messageSystem
     );
     this.logger.sendError = this.messageSystem.sendError.bind(
-      this.messageSystem
-    );
-    this.logger.sendLoading = this.messageSystem.sendLoading.bind(
-      this.messageSystem
-    );
-    this.logger.updateLoading = this.messageSystem.updateLoading.bind(
       this.messageSystem
     );
 
