@@ -1,5 +1,5 @@
 // ========================================
-// 🌈 src/utils/Logger.js - Enhanced v3.0.1
+// 🌈 src/utils/Logger.js - Enhanced v3.0.1 수정본
 // ========================================
 // Message/ 폴더 기능들이 모두 주입된 알록달록한 Logger!
 // ========================================
@@ -26,37 +26,37 @@ class EnhancedLogger {
     this.version = "3.0.1";
     this.initialized = false;
 
-    // 🎨 기본 스타일 시스템
+    // 🎨 기본 스타일 시스템 (함수 형태로 수정)
     this.styles = {
       info: {
         badge: chalk.bgBlue.white(" INFO "),
         icon: "ℹ️",
-        color: chalk.blue,
+        color: (text) => chalk.blue(text), // ✅ 함수로 변경
       },
       success: {
         badge: chalk.bgGreen.black(" SUCCESS "),
         icon: "✅",
-        color: chalk.green,
+        color: (text) => chalk.green(text), // ✅ 함수로 변경
       },
       warn: {
         badge: chalk.bgYellow.black(" WARN "),
         icon: "⚠️",
-        color: chalk.yellow,
+        color: (text) => chalk.yellow(text), // ✅ 함수로 변경
       },
       error: {
         badge: chalk.bgRed.white(" ERROR "),
         icon: "❌",
-        color: chalk.red,
+        color: (text) => chalk.red(text), // ✅ 함수로 변경
       },
       debug: {
         badge: chalk.bgGray.white(" DEBUG "),
         icon: "🔍",
-        color: chalk.gray,
+        color: (text) => chalk.gray(text), // ✅ 함수로 변경
       },
       system: {
         badge: chalk.bgMagenta.white(" SYSTEM "),
         icon: "🤖",
-        color: chalk.magenta,
+        color: (text) => chalk.magenta(text), // ✅ 함수로 변경
       },
     };
 
@@ -257,76 +257,44 @@ class EnhancedLogger {
     console.log(this.#formatEnhancedLog("system", message, data));
   }
 
-  // ===== 🎯 모듈별 특화 로그들 =====
+  // ===== 🎯 모듈별 로그 메서드들 =====
 
   /**
-   * 📝 Todo 모듈 전용 로그
+   * 📦 모듈 로그
    */
-  todo(action, task, userName) {
-    this.#updateModuleStats("todo");
-    console.log(this.messageSystem.consoleStyles.moduleTitle("todo", "📝"));
-
-    switch (action) {
-      case "add":
-        console.log(
-          this.messageSystem.consoleStyles.todoAdd(`${task} (${userName})`)
-        );
-        break;
-      case "complete":
-        console.log(
-          this.messageSystem.consoleStyles.todoComplete(`${task} (${userName})`)
-        );
-        break;
-      case "delete":
-        console.log(
-          this.messageSystem.consoleStyles.todoDelete(`${task} (${userName})`)
-        );
-        break;
-      default:
-        console.log(chalk.blue(`📝 ${action}: ${task}`));
+  moduleLog(moduleName, message, data) {
+    this.#updateModuleStats(moduleName);
+    const emoji = this.messageSystem?.emojiSets?.modules?.[moduleName] || "📦";
+    console.log(chalk.cyan(`${emoji} [${moduleName.toUpperCase()}]`), message);
+    if (data) {
+      console.log(
+        chalk.gray("   데이터:"),
+        this.#sanitize(JSON.stringify(data, null, 2))
+      );
     }
-  }
-
-  /**
-   * ⏰ Timer 모듈 전용 로그
-   */
-  timer(action, duration, userName) {
-    this.#updateModuleStats("timer");
-    console.log(this.messageSystem.consoleStyles.moduleTitle("timer", "⏰"));
-
-    const timeStr = this.#formatDuration(duration);
-    console.log(chalk.cyan(`⏰ ${action}: ${timeStr} (${userName})`));
-  }
-
-  /**
-   * 🏢 WorkTime 모듈 전용 로그
-   */
-  worktime(action, hours, userName) {
-    this.#updateModuleStats("worktime");
-    console.log(this.messageSystem.consoleStyles.moduleTitle("worktime", "🏢"));
-    console.log(chalk.green(`🏢 ${action}: ${hours}시간 (${userName})`));
   }
 
   /**
    * 👤 사용자 액션 로그
    */
-  user(action, userName, details = {}) {
+  userAction(userName, action, details = {}) {
     console.log(chalk.cyan("👤 ") + "─".repeat(30));
 
     switch (action) {
       case "join":
-        console.log(this.messageSystem.consoleStyles.userJoin(userName));
+        console.log(chalk.green.bold(`👋 ${userName}님이 접속했습니다!`));
         break;
-      case "message":
+      case "command":
         console.log(
-          this.messageSystem.consoleStyles.userMessage(
-            userName,
-            details.message
+          chalk.blue(
+            `💬 ${userName}: /${details.command} ${
+              details.args?.join(" ") || ""
+            }`
           )
         );
         break;
       case "callback":
-        console.log(chalk.yellow(`🎯 ${userName}: ${details.action}`));
+        console.log(chalk.magenta(`🔘 ${userName}: ${details.action}`));
         break;
       default:
         console.log(chalk.cyan(`👤 ${userName}: ${action}`));
@@ -465,7 +433,7 @@ class EnhancedLogger {
     if (this.stats.moduleUsage.size > 0) {
       console.log(chalk.yellow("   📦 모듈 사용량:"));
       for (const [module, count] of this.stats.moduleUsage) {
-        const emoji = this.messageSystem.emojiSets.modules[module] || "📦";
+        const emoji = this.messageSystem?.emojiSets?.modules?.[module] || "📦";
         console.log(chalk.gray(`      ${emoji} ${module}: ${count}회`));
       }
     }
@@ -508,19 +476,38 @@ class EnhancedLogger {
    * 🎯 Message 시스템 통계
    */
   getMessageStats() {
-    return this.messageSystem.getStats();
+    return this.messageSystem?.getStats() || {};
   }
 
   // ===== 🛠️ 내부 헬퍼 메서드들 =====
 
+  /**
+   * ✅ 수정된 formatEnhancedLog 메서드
+   */
   #formatEnhancedLog(level, message, data) {
     const style = this.styles[level];
     const timestamp = this.#getTimestamp();
     const cleanMessage = this.#sanitize(message);
 
-    let output = `${timestamp} ${style.badge} ${style.icon} ${style.color(
-      cleanMessage
-    )}`;
+    // ✅ style.color가 함수인지 확인하고 안전하게 호출
+    let coloredMessage;
+    if (typeof style.color === "function") {
+      coloredMessage = style.color(cleanMessage);
+    } else {
+      // Fallback: 직접 chalk 색상 적용
+      const colorMap = {
+        info: chalk.blue,
+        success: chalk.green,
+        warn: chalk.yellow,
+        error: chalk.red,
+        debug: chalk.gray,
+        system: chalk.magenta,
+      };
+      const colorFn = colorMap[level] || chalk.white;
+      coloredMessage = colorFn(cleanMessage);
+    }
+
+    let output = `${timestamp} ${style.badge} ${style.icon} ${coloredMessage}`;
 
     if (data) {
       output += "\n" + this.#formatData(data, level);
@@ -529,13 +516,33 @@ class EnhancedLogger {
     return output;
   }
 
+  /**
+   * ✅ 수정된 formatData 메서드
+   */
   #formatData(data, level) {
     const cleanData = this.#sanitize(JSON.stringify(data, null, 2));
     const style = this.styles[level];
 
+    // ✅ style.color가 함수인지 확인하고 안전하게 호출
+    let colorFn;
+    if (typeof style.color === "function") {
+      colorFn = style.color;
+    } else {
+      // Fallback: 직접 chalk 색상 적용
+      const colorMap = {
+        info: chalk.blue,
+        success: chalk.green,
+        warn: chalk.yellow,
+        error: chalk.red,
+        debug: chalk.gray,
+        system: chalk.magenta,
+      };
+      colorFn = colorMap[level] || chalk.white;
+    }
+
     return cleanData
       .split("\n")
-      .map((line) => chalk.gray("    │ ") + style.color(line))
+      .map((line) => chalk.gray("    │ ") + colorFn(line))
       .join("\n");
   }
 
@@ -560,180 +567,37 @@ class EnhancedLogger {
       return sanitized;
     }
 
-    // 🔐 데이터베이스 연결 문자열 마스킹
-    if (sanitized.match(/mongodb:\/\/[^:\s]+:[^@\s]+@[^\s]+/g)) {
-      sanitized = sanitized.replace(
-        /mongodb:\/\/[^:\s]+:[^@\s]+@[^\s]+/g,
-        "mongodb://***:***@***"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    if (sanitized.match(/postgresql:\/\/[^:\s]+:[^@\s]+@[^\s]+/g)) {
-      sanitized = sanitized.replace(
-        /postgresql:\/\/[^:\s]+:[^@\s]+@[^\s]+/g,
-        "postgresql://***:***@***"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    if (sanitized.match(/redis:\/\/[^:\s]*:[^@\s]*@[^\s]+/g)) {
-      sanitized = sanitized.replace(
-        /redis:\/\/[^:\s]*:[^@\s]*@[^\s]+/g,
-        "redis://***:***@***"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    // 🔐 JWT 토큰 마스킹
-    if (
-      sanitized.match(
-        /Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g
-      )
-    ) {
-      sanitized = sanitized.replace(
-        /Bearer\s+[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g,
-        "Bearer ***JWT_TOKEN***"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    if (
-      sanitized.match(/eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g)
-    ) {
-      sanitized = sanitized.replace(
-        /eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_]+/g,
-        "***JWT_TOKEN***"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    // 🔐 특수 API 키 패턴들
-    if (sanitized.match(/sk-[a-zA-Z0-9]{32,}/g)) {
-      sanitized = sanitized.replace(/sk-[a-zA-Z0-9]{32,}/g, "***OPENAI_KEY***");
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    if (sanitized.match(/xapp-[a-zA-Z0-9]{32,}/g)) {
-      sanitized = sanitized.replace(/xapp-[a-zA-Z0-9]{32,}/g, "***XAPP_KEY***");
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    if (sanitized.match(/gho_[a-zA-Z0-9]{36}/g)) {
-      sanitized = sanitized.replace(
-        /gho_[a-zA-Z0-9]{36}/g,
-        "***GITHUB_TOKEN***"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    // 🔐 Telegram Bot Token 마스킹
-    if (sanitized.match(/\d{8,10}:[A-Za-z0-9_-]{35}/g)) {
-      sanitized = sanitized.replace(
-        /\d{8,10}:[A-Za-z0-9_-]{35}/g,
-        "***TELEGRAM_BOT_TOKEN***"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    // 🔐 이메일 마스킹 (부분)
-    sanitized = sanitized.replace(
-      /([a-zA-Z0-9._%+-]+)@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/g,
-      (match, user, domain) => {
-        maskedCount++;
-        const maskedUser =
-          user.length > 2 ? user.substring(0, 2) + "***" : "***";
-        return `${maskedUser}@${domain}`;
-      }
-    );
-
-    // 🔐 신용카드 번호 마스킹
-    if (sanitized.match(/\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g)) {
-      sanitized = sanitized.replace(
-        /\b\d{4}[\s-]?\d{4}[\s-]?\d{4}[\s-]?\d{4}\b/g,
-        "****-****-****-****"
-      );
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    // 🔐 주민등록번호 마스킹 (한국)
-    if (sanitized.match(/\b\d{6}[\s-]?\d{7}\b/g)) {
-      sanitized = sanitized.replace(/\b\d{6}[\s-]?\d{7}\b/g, "******-*******");
-      maskedCount++;
-      this.securityStats.dataBreachPrevented++;
-    }
-
-    // 🔐 전화번호 마스킹 (한국)
-    if (sanitized.match(/\b01[0-9][\s-]?\d{3,4}[\s-]?\d{4}\b/g)) {
-      sanitized = sanitized.replace(
-        /\b01[0-9][\s-]?\d{3,4}[\s-]?\d{4}\b/g,
-        "010-****-****"
-      );
-      maskedCount++;
-    }
-
-    // 🔐 JSON 필드 마스킹
-    const jsonFields = [
-      { field: "password", replacement: "***MASKED***" },
-      { field: "passwd", replacement: "***MASKED***" },
-      { field: "pwd", replacement: "***MASKED***" },
-      { field: "token", replacement: "***MASKED***" },
-      { field: "access_token", replacement: "***MASKED***" },
-      { field: "refresh_token", replacement: "***MASKED***" },
-      { field: "api_key", replacement: "***MASKED***" },
-      { field: "secret", replacement: "***MASKED***" },
-      { field: "private_key", replacement: "***MASKED***" },
-    ];
-
-    for (const { field, replacement } of jsonFields) {
-      const pattern = new RegExp(`"${field}"\\s*:\\s*"[^"]*"`, "gi");
-      if (sanitized.match(pattern)) {
-        sanitized = sanitized.replace(pattern, `"${field}": "${replacement}"`);
-        maskedCount++;
-        this.securityStats.dataBreachPrevented++;
+    // 🔐 패턴별 마스킹 적용
+    for (const [patternName, pattern] of Object.entries(
+      this.securityMasks.patterns
+    )) {
+      const matches = sanitized.match(pattern);
+      if (matches) {
+        matches.forEach((match) => {
+          const masked =
+            match.length > 6
+              ? match.substring(0, 3) +
+                "***" +
+                match.substring(match.length - 2)
+              : "***";
+          sanitized = sanitized.replace(match, masked);
+          maskedCount++;
+        });
       }
     }
-
-    // 🔐 일반 API 키 패턴 마스킹 (길이 32자 이상)
-    sanitized = sanitized.replace(/\b[a-zA-Z0-9_-]{32,}\b/g, (match) => {
-      // 이미 마스킹된 것은 건드리지 않음
-      if (match.includes("***")) return match;
-      maskedCount++;
-      return "***API_KEY***";
-    });
-
-    // 🔐 긴 숫자 시퀀스 마스킹 (6자리 이상)
-    sanitized = sanitized.replace(/\b\d{6,}\b/g, (match) => {
-      maskedCount++;
-      return match.length > 8
-        ? match.substring(0, 3) + "***" + match.substring(match.length - 2)
-        : match.substring(0, 3) + "***";
-    });
 
     // 🔐 커스텀 마스킹 패턴 적용
     for (const [name, { pattern, replacement }] of this.securityMasks
       .customMasks) {
-      if (sanitized.match(pattern)) {
+      if (pattern.test(sanitized)) {
         sanitized = sanitized.replace(pattern, replacement);
         maskedCount++;
-        console.log(chalk.yellow(`🛡️ 커스텀 마스킹 적용: ${name}`));
       }
     }
 
     // 📊 마스킹 통계 업데이트
     if (maskedCount > 0) {
       this.securityStats.maskedItems += maskedCount;
-      console.log(chalk.yellow(`🛡️ ${maskedCount}개 보안 정보 마스킹됨`));
     }
 
     return sanitized;
@@ -753,10 +617,6 @@ class EnhancedLogger {
     const current = this.stats.moduleUsage.get(moduleName) || 0;
     this.stats.moduleUsage.set(moduleName, current + 1);
   }
-
-  // ===== 🎯 봇 메시지 통합 메서드들 (Message 시스템에서 주입됨) =====
-  // sendMainMenu, sendTodoList, sendSuccess, sendError, sendLoading, updateLoading
-  // 이미 LoggerEnhancer에서 주입됨!
 
   // ===== 🧹 정리 작업 =====
   cleanup() {
