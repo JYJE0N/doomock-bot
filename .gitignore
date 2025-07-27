@@ -20,8 +20,8 @@ docs/
 # temp
 temp/
 
-# scripts
-scripts/*.log
+# scripts 폴더는 추적하기 (주석으로 명시)
+scripts/
 
 # OS-specific
 .DS_Store
