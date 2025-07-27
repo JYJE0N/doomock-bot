@@ -1,6 +1,6 @@
 // src/utils/TelegramFormatter.js
 
-const logger = require("./Logger");
+const logger = require("../Logger");
 const { MessageStyler } = require("./MessageStyler");
 const EnhancedBotResponses = require("./EnhancedBotResponses");
 /**
