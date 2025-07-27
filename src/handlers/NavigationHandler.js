@@ -26,8 +26,8 @@ class NavigationHandler {
     this.initialized = false;
 
     // 🌈 LoggerEnhancer 스타일 시스템 활용
-    this.messageSystem = logger.messageSystem; // Logger에서 messageSystem 가져오기
-    this.enhancer = logger.enhancer; // LoggerEnhancer 가져오기
+     // Logger에서 messageSystem 가져오기
+     // LoggerEnhancer 가져오기
 
     // 🎨 UI 테마 시스템 (알록달록!)
     this.uiThemes = {
@@ -104,18 +104,18 @@ class NavigationHandler {
 
       // 🌈 초기화 환영 메시지 (알록달록!)
       console.log(
-        this.messageSystem.rainbow("🎹 ═══ NavigationHandler 초기화 ═══")
+        logger.rainbow("🎹 ═══ NavigationHandler 초기화 ═══")
       );
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           "🎨 알록달록 UI 시스템 로딩...",
           "cyan",
           "magenta"
         )
       );
-      console.log(this.messageSystem.rainbow("📱 MarkdownV2 파서 준비..."));
+      console.log(logger.rainbow("📱 MarkdownV2 파서 준비..."));
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           "✨ 사용자 친화적 인터페이스 활성화!",
           "green",
           "blue"
@@ -143,9 +143,9 @@ class NavigationHandler {
       const userName = getUserName(callbackQuery);
 
       // 🌈 알록달록 로그
-      console.log(this.messageSystem.rainbow(`🎯 네비게이션: ${action}`));
+      console.log(logger.rainbow(`🎯 네비게이션: ${action}`));
       console.log(
-        this.messageSystem.gradient(`👤 사용자: ${userName}`, "blue", "purple")
+        logger.gradient(`👤 사용자: ${userName}`, "blue", "purple")
       );
 
       // 📊 통계 업데이트
@@ -481,7 +481,7 @@ ${moduleStats
     await ctx.answerCbQuery(`${loadingEmoji} 새로고침 중...`);
 
     // 알록달록 로그
-    console.log(this.messageSystem.rainbow(`🔄 새로고침: ${target}`));
+    console.log(logger.rainbow(`🔄 새로고침: ${target}`));
 
     switch (target) {
       case "main":
@@ -698,14 +698,14 @@ ${moduleStats
    */
   cleanup() {
     // 🌈 알록달록 종료 메시지
-    console.log(this.messageSystem.rainbow("🎹 NavigationHandler 정리 중..."));
+    console.log(logger.rainbow("🎹 NavigationHandler 정리 중..."));
     console.log(
-      this.messageSystem.gradient("📊 통계 저장 중...", "blue", "purple")
+      logger.gradient("📊 통계 저장 중...", "blue", "purple")
     );
 
     logger.moduleLog("NavigationHandler", "정리 완료", this.stats);
 
-    console.log(this.messageSystem.rainbow("✨ NavigationHandler 종료됨"));
+    console.log(logger.rainbow("✨ NavigationHandler 종료됨"));
   }
 }
 

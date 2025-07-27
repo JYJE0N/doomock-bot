@@ -49,10 +49,14 @@ class ModuleManager {
       this.serviceBuilder.setDefaultDatabase(dbManager.getDb());
       await this.serviceBuilder.initialize(); // 여기서 모든 서비스 자동 등록!
 
-      // 3. 모듈들 초기화
-      await this.initializeModules();
+      // 3. 모듈들 초기화 - ✅ 이 메서드를 loadModules로 변경
+      await this.loadModules(); // ✅ initializeModules → loadModules
+
+      this.initialized = true;
+      logger.success("✅ ModuleManager 초기화 완료");
     } catch (error) {
       logger.error("ModuleManager 초기화 실패:", error);
+      throw error;
     }
   }
 

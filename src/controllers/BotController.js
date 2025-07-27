@@ -38,8 +38,8 @@ class BotController {
     this.initialized = false;
 
     // 🌈 LoggerEnhancer 활용을 위한 참조
-    this.messageSystem = logger.messageSystem;
-    this.enhancer = logger.enhancer;
+    //this.messageSystem = logger.messageSystem;
+    //this.enhancer = logger.enhancer;
 
     // 📊 상세 통계 시스템
     this.stats = {
@@ -97,111 +97,75 @@ class BotController {
     try {
       // 🌈 화려한 시작 배너
       console.clear();
+      console.log(logger.rainbow("🎮 ═══════════════════════════════════════"));
       console.log(
-        this.messageSystem.rainbow("🎮 ═══════════════════════════════════════")
-      );
-      console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           "    봇 컨트롤러 v3.0.1 초기화 시작!",
           "cyan",
           "magenta"
         )
       );
-      console.log(
-        this.messageSystem.rainbow("🎮 ═══════════════════════════════════════")
-      );
+      console.log(logger.rainbow("🎮 ═══════════════════════════════════════"));
       console.log();
 
       // 1. 봇 인스턴스 생성
       console.log(
-        this.messageSystem.gradient(
-          "🤖 봇 인스턴스 생성 중...",
-          "blue",
-          "purple"
-        )
+        logger.gradient("🤖 봇 인스턴스 생성 중...", "blue", "purple")
       );
       this.createBot();
-      console.log(this.messageSystem.rainbow("✅ 봇 인스턴스 생성 완료!"));
+      console.log(logger.rainbow("✅ 봇 인스턴스 생성 완료!"));
 
       // 2. 데이터베이스 연결
       console.log(
-        this.messageSystem.gradient(
-          "🗄️ 데이터베이스 연결 중...",
-          "green",
-          "blue"
-        )
+        logger.gradient("🗄️ 데이터베이스 연결 중...", "green", "blue")
       );
       await this.initializeDatabase();
-      console.log(this.messageSystem.rainbow("✅ 데이터베이스 연결 완료!"));
+      console.log(logger.rainbow("✅ 데이터베이스 연결 완료!"));
 
       // 3. 핸들러 초기화
-      console.log(
-        this.messageSystem.gradient("🎯 핸들러 초기화 중...", "yellow", "red")
-      );
+      console.log(logger.gradient("🎯 핸들러 초기화 중...", "yellow", "red"));
       await this.initializeHandlers();
-      console.log(this.messageSystem.rainbow("✅ 핸들러 초기화 완료!"));
+      console.log(logger.rainbow("✅ 핸들러 초기화 완료!"));
 
       // 4. 이벤트 핸들러 설정
       console.log(
-        this.messageSystem.gradient(
-          "🔗 이벤트 핸들러 설정 중...",
-          "purple",
-          "cyan"
-        )
+        logger.gradient("🔗 이벤트 핸들러 설정 중...", "purple", "cyan")
       );
       this.setupEventHandlers();
-      console.log(this.messageSystem.rainbow("✅ 이벤트 핸들러 설정 완료!"));
+      console.log(logger.rainbow("✅ 이벤트 핸들러 설정 완료!"));
 
       // 5. 모니터링 시작
       console.log(
-        this.messageSystem.gradient(
-          "📊 실시간 모니터링 시작...",
-          "orange",
-          "pink"
-        )
+        logger.gradient("📊 실시간 모니터링 시작...", "orange", "pink")
       );
       this.startMonitoring();
-      console.log(this.messageSystem.rainbow("✅ 모니터링 시작 완료!"));
+      console.log(logger.rainbow("✅ 모니터링 시작 완료!"));
 
       // 6. Railway 헬스체크 설정
       if (process.env.RAILWAY_ENVIRONMENT_NAME) {
         console.log(
-          this.messageSystem.gradient(
-            "🚂 Railway 헬스체크 설정...",
-            "green",
-            "yellow"
-          )
+          logger.gradient("🚂 Railway 헬스체크 설정...", "green", "yellow")
         );
         this.setupHealthCheck();
-        console.log(this.messageSystem.rainbow("✅ Railway 설정 완료!"));
+        console.log(logger.rainbow("✅ Railway 설정 완료!"));
       }
 
       this.initialized = true;
 
       // 🎉 초기화 완료 축하 메시지
       console.log();
+      console.log(logger.rainbow("🎉 ═══════════════════════════════════════"));
       console.log(
-        this.messageSystem.rainbow("🎉 ═══════════════════════════════════════")
+        logger.gradient("     BotController 초기화 완료!", "green", "blue")
       );
-      console.log(
-        this.messageSystem.gradient(
-          "     BotController 초기화 완료!",
-          "green",
-          "blue"
-        )
-      );
-      console.log(
-        this.messageSystem.rainbow("🎉 ═══════════════════════════════════════")
-      );
+      console.log(logger.rainbow("🎉 ═══════════════════════════════════════"));
 
       // 📊 시작 통계 표시
       this.showInitializationStats();
 
       logger.celebration("두목봇 v3.0.1 알록달록 모드로 준비 완료!");
     } catch (error) {
-      console.log(
-        this.messageSystem.gradient("❌ 초기화 실패!", "red", "darkred")
-      );
+      console.log(logger.gradient("❌ 초기화 실패!", "red", "darkred"));
       logger.error("BotController 초기화 실패:", error);
       throw error;
     }
@@ -220,7 +184,7 @@ class BotController {
 
     // 🎨 봇 정보 알록달록 로그
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `   🎯 토큰: ${token.substring(0, 10)}...`,
         "gray",
         "blue"
@@ -265,20 +229,14 @@ class BotController {
   async initializeHandlers() {
     // NavigationHandler 초기화 (알록달록 강화판!)
     console.log(
-      this.messageSystem.rainbow(
-        "   🎹 NavigationHandler (알록달록 버전) 초기화..."
-      )
+      logger.rainbow("   🎹 NavigationHandler (알록달록 버전) 초기화...")
     );
     this.navigationHandler = new NavigationHandler();
     await this.navigationHandler.initialize(this.bot);
 
     // ModuleManager 초기화
     console.log(
-      this.messageSystem.gradient(
-        "   📦 ModuleManager 초기화...",
-        "purple",
-        "blue"
-      )
+      logger.gradient("   📦 ModuleManager 초기화...", "purple", "blue")
     );
     this.moduleManager = new ModuleManager(this.bot, {
       db: this.dbManager.getDb(),
@@ -295,18 +253,14 @@ class BotController {
   setupEventHandlers() {
     // /start 명령어 (알록달록 환영!)
     this.bot.command("start", async (ctx) => {
-      console.log(
-        this.messageSystem.rainbow(`🚀 /start 명령어: ${getUserName(ctx)}`)
-      );
+      console.log(logger.rainbow(`🚀 /start 명령어: ${getUserName(ctx)}`));
       await this.handleStartCommand(ctx);
     });
 
     // 콜백 쿼리 (알록달록 네비게이션!)
     this.bot.on("callback_query", async (ctx) => {
       const data = ctx.callbackQuery.data;
-      console.log(
-        this.messageSystem.gradient(`🎯 콜백: ${data}`, "blue", "purple")
-      );
+      console.log(logger.gradient(`🎯 콜백: ${data}`, "blue", "purple"));
       await this.handleCallbackQuery(ctx);
     });
 
@@ -315,7 +269,7 @@ class BotController {
       const text = ctx.message.text;
       if (!text.startsWith("/")) {
         console.log(
-          this.messageSystem.gradient(
+          logger.gradient(
             `💬 메시지: ${text.substring(0, 20)}...`,
             "green",
             "cyan"
@@ -328,16 +282,12 @@ class BotController {
     // 에러 핸들러 (알록달록 오류 처리!)
     this.bot.catch(async (err, ctx) => {
       console.log(
-        this.messageSystem.gradient(
-          `❌ 에러 발생: ${err.message}`,
-          "red",
-          "orange"
-        )
+        logger.gradient(`❌ 에러 발생: ${err.message}`, "red", "orange")
       );
       await this.handleError(err, ctx);
     });
 
-    console.log(this.messageSystem.rainbow("   ✅ 이벤트 핸들러 등록 완료"));
+    console.log(logger.rainbow("   ✅ 이벤트 핸들러 등록 완료"));
   }
 
   /**
@@ -351,10 +301,8 @@ class BotController {
       const userId = getUserId(ctx);
 
       // 🌈 사용자 환영 로그
-      console.log(this.messageSystem.rainbow(`👋 새로운 사용자: ${userName}`));
-      console.log(
-        this.messageSystem.gradient(`   🆔 ID: ${userId}`, "blue", "purple")
-      );
+      console.log(logger.rainbow(`👋 새로운 사용자: ${userName}`));
+      console.log(logger.gradient(`   🆔 ID: ${userId}`, "blue", "purple"));
 
       // 세션 시작 기록
       this.startUserSession(userId, userName);
@@ -369,15 +317,11 @@ class BotController {
       // 🎉 성공 로그
       const responseTime = Date.now() - startTime;
       console.log(
-        this.messageSystem.gradient(
-          `✅ 처리 완료 (${responseTime}ms)`,
-          "green",
-          "blue"
-        )
+        logger.gradient(`✅ 처리 완료 (${responseTime}ms)`, "green", "blue")
       );
     } catch (error) {
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           `❌ start 명령어 실패: ${error.message}`,
           "red",
           "darkred"
@@ -404,17 +348,15 @@ class BotController {
       const data = callbackQuery.data;
 
       // 🎨 콜백 상세 로그
-      console.log(this.messageSystem.rainbow(`📱 콜백 상세:`));
+      console.log(logger.rainbow(`📱 콜백 상세:`));
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           `   👤 사용자: ${getUserName(callbackQuery)}`,
           "cyan",
           "blue"
         )
       );
-      console.log(
-        this.messageSystem.gradient(`   🎯 액션: ${data}`, "purple", "pink")
-      );
+      console.log(logger.gradient(`   🎯 액션: ${data}`, "purple", "pink"));
 
       // 즉시 응답 (로딩 효과)
       const loadingEmoji = ["⏳", "⌛", "🔄", "⚡"][
@@ -435,7 +377,7 @@ class BotController {
       // 🎉 성공 로그
       const responseTime = Date.now() - startTime;
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           `✅ 콜백 처리 완료 (${responseTime}ms)`,
           "green",
           "blue"
@@ -446,11 +388,7 @@ class BotController {
       this.updatePerformanceMetrics(responseTime);
     } catch (error) {
       console.log(
-        this.messageSystem.gradient(
-          `❌ 콜백 처리 실패: ${error.message}`,
-          "red",
-          "orange"
-        )
+        logger.gradient(`❌ 콜백 처리 실패: ${error.message}`, "red", "orange")
       );
       logger.error("콜백 처리 실패:", error);
 
@@ -478,20 +416,16 @@ class BotController {
       if (text.startsWith("/")) return;
 
       // 🌈 메시지 분석 로그
-      console.log(this.messageSystem.rainbow(`📝 메시지 분석:`));
+      console.log(logger.rainbow(`📝 메시지 분석:`));
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           `   📄 내용: ${text.substring(0, 50)}...`,
           "green",
           "cyan"
         )
       );
       console.log(
-        this.messageSystem.gradient(
-          `   📏 길이: ${text.length}자`,
-          "blue",
-          "purple"
-        )
+        logger.gradient(`   📏 길이: ${text.length}자`, "blue", "purple")
       );
 
       // 세션 활동 업데이트
@@ -502,13 +436,9 @@ class BotController {
 
       // 처리 결과 로그
       if (handled) {
-        console.log(
-          this.messageSystem.gradient("✅ 모듈에서 처리됨", "green", "blue")
-        );
+        console.log(logger.gradient("✅ 모듈에서 처리됨", "green", "blue"));
       } else {
-        console.log(
-          this.messageSystem.gradient("ℹ️ 처리되지 않음", "yellow", "orange")
-        );
+        console.log(logger.gradient("ℹ️ 처리되지 않음", "yellow", "orange"));
       }
 
       // 통계 업데이트
@@ -520,7 +450,7 @@ class BotController {
       this.updatePerformanceMetrics(responseTime);
     } catch (error) {
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           `❌ 메시지 처리 실패: ${error.message}`,
           "red",
           "darkred"
@@ -537,12 +467,10 @@ class BotController {
    * ❌ 에러 처리 (알록달록 오류 관리!)
    */
   async handleError(err, ctx) {
-    console.log(this.messageSystem.rainbow("🚨 ═══ 에러 발생 ═══"));
+    console.log(logger.rainbow("🚨 ═══ 에러 발생 ═══"));
+    console.log(logger.gradient(`❌ 오류: ${err.message}`, "red", "orange"));
     console.log(
-      this.messageSystem.gradient(`❌ 오류: ${err.message}`, "red", "orange")
-    );
-    console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `🔍 스택: ${err.stack?.substring(0, 100)}...`,
         "gray",
         "red"
@@ -571,7 +499,7 @@ class BotController {
       }
     } catch (replyError) {
       console.log(
-        this.messageSystem.gradient(
+        logger.gradient(
           `❌ 오류 응답 실패: ${replyError.message}`,
           "darkred",
           "red"
@@ -593,7 +521,7 @@ class BotController {
       this.monitoring.lastHeartbeat = Date.now();
     }, 10000);
 
-    console.log(this.messageSystem.rainbow("📊 실시간 모니터링 활성화됨"));
+    console.log(logger.rainbow("📊 실시간 모니터링 활성화됨"));
   }
 
   /**
@@ -603,46 +531,40 @@ class BotController {
     const uptime = Date.now() - this.stats.startTime;
     const uptimeStr = this.formatUptime(uptime);
 
-    console.log(this.messageSystem.rainbow("📊 ═══ 실시간 통계 ═══"));
+    console.log(logger.rainbow("📊 ═══ 실시간 통계 ═══"));
+    console.log(logger.gradient(`⏰ 가동시간: ${uptimeStr}`, "blue", "cyan"));
     console.log(
-      this.messageSystem.gradient(`⏰ 가동시간: ${uptimeStr}`, "blue", "cyan")
-    );
-    console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `👥 활성 사용자: ${this.stats.uniqueUsers.size}명`,
         "green",
         "blue"
       )
     );
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `📱 총 콜백: ${this.stats.totalCallbacks}회`,
         "purple",
         "pink"
       )
     );
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `💬 총 메시지: ${this.stats.totalMessages}개`,
         "yellow",
         "orange"
       )
     );
     console.log(
-      this.messageSystem.gradient(
-        `❌ 오류: ${this.stats.totalErrors}건`,
-        "red",
-        "orange"
-      )
+      logger.gradient(`❌ 오류: ${this.stats.totalErrors}건`, "red", "orange")
     );
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `⚡ 평균 응답시간: ${this.stats.performanceMetrics.avgResponseTime}ms`,
         "cyan",
         "blue"
       )
     );
-    console.log(this.messageSystem.rainbow("📊 ═══════════════"));
+    console.log(logger.rainbow("📊 ═══════════════"));
   }
 
   /**
@@ -652,32 +574,28 @@ class BotController {
     const initTime = Date.now() - this.stats.startTime;
 
     console.log();
-    console.log(this.messageSystem.rainbow("📊 ═══ 초기화 통계 ═══"));
+    console.log(logger.rainbow("📊 ═══ 초기화 통계 ═══"));
     console.log(
-      this.messageSystem.gradient(
-        `⚡ 초기화 시간: ${initTime}ms`,
-        "green",
-        "blue"
-      )
+      logger.gradient(`⚡ 초기화 시간: ${initTime}ms`, "green", "blue")
     );
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `🤖 봇 상태: ${this.bot ? "🟢 준비됨" : "🔴 오류"}`,
         "blue",
         "purple"
       )
     );
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `🗄️ DB 상태: ${
-          this.dbManager?.isConnected() ? "🟢 연결됨" : "🔴 연결 실패"
+          this.dbManager?.isConnected ? "🟢 연결됨" : "🔴 연결 실패"
         }`,
         "cyan",
         "green"
       )
     );
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `🎹 네비게이션: ${
           this.navigationHandler?.initialized ? "🟢 활성화" : "🔴 비활성화"
         }`,
@@ -686,7 +604,7 @@ class BotController {
       )
     );
     console.log(
-      this.messageSystem.gradient(
+      logger.gradient(
         `📦 모듈 관리자: ${
           this.moduleManager?.initialized ? "🟢 준비됨" : "🔴 오류"
         }`,
@@ -694,7 +612,7 @@ class BotController {
         "orange"
       )
     );
-    console.log(this.messageSystem.rainbow("📊 ═══════════════"));
+    console.log(logger.rainbow("📊 ═══════════════"));
   }
 
   /**
@@ -709,9 +627,7 @@ class BotController {
       activities: [],
     });
 
-    console.log(
-      this.messageSystem.gradient(`📝 세션 시작: ${userName}`, "green", "blue")
-    );
+    console.log(logger.gradient(`📝 세션 시작: ${userName}`, "green", "blue"));
   }
 
   /**
@@ -790,17 +706,13 @@ class BotController {
         stats: this.stats.performanceMetrics,
       };
 
-      console.log(
-        this.messageSystem.gradient(`🏥 헬스체크 요청`, "green", "blue")
-      );
+      console.log(logger.gradient(`🏥 헬스체크 요청`, "green", "blue"));
       res.json(healthStatus);
     });
 
     app.listen(port, () => {
       console.log(
-        this.messageSystem.rainbow(
-          `🚂 Railway 헬스체크 서버 시작: 포트 ${port}`
-        )
+        logger.rainbow(`🚂 Railway 헬스체크 서버 시작: 포트 ${port}`)
       );
     });
   }
@@ -815,26 +727,16 @@ class BotController {
       );
     }
 
-    console.log(this.messageSystem.rainbow("🚀 ═══ 봇 시작 ═══"));
+    console.log(logger.rainbow("🚀 ═══ 봇 시작 ═══"));
     console.log(
-      this.messageSystem.gradient(
-        "텔레그램 봇 서비스 시작 중...",
-        "green",
-        "blue"
-      )
+      logger.gradient("텔레그램 봇 서비스 시작 중...", "green", "blue")
     );
 
     await this.bot.launch();
 
+    console.log(logger.rainbow("✅ 봇이 성공적으로 시작되었습니다!"));
     console.log(
-      this.messageSystem.rainbow("✅ 봇이 성공적으로 시작되었습니다!")
-    );
-    console.log(
-      this.messageSystem.gradient(
-        "사용자의 메시지를 기다리는 중...",
-        "cyan",
-        "purple"
-      )
+      logger.gradient("사용자의 메시지를 기다리는 중...", "cyan", "purple")
     );
 
     // 우아한 종료 처리
@@ -846,10 +748,8 @@ class BotController {
    * 🛑 우아한 종료
    */
   async shutdown(signal) {
-    console.log(this.messageSystem.rainbow(`🛑 ═══ ${signal} 신호 수신 ═══`));
-    console.log(
-      this.messageSystem.gradient("우아한 종료 시작...", "yellow", "red")
-    );
+    console.log(logger.rainbow(`🛑 ═══ ${signal} 신호 수신 ═══`));
+    console.log(logger.gradient("우아한 종료 시작...", "yellow", "red"));
 
     try {
       // 모니터링 중지
@@ -859,7 +759,7 @@ class BotController {
       }
 
       // 최종 통계 표시
-      console.log(this.messageSystem.rainbow("📊 ═══ 최종 통계 ═══"));
+      console.log(logger.rainbow("📊 ═══ 최종 통계 ═══"));
       this.showLiveStats();
 
       // NavigationHandler 정리
@@ -877,15 +777,11 @@ class BotController {
         await this.dbManager.disconnect();
       }
 
-      console.log(this.messageSystem.rainbow("✅ 우아한 종료 완료"));
+      console.log(logger.rainbow("✅ 우아한 종료 완료"));
       process.exit(0);
     } catch (error) {
       console.log(
-        this.messageSystem.gradient(
-          `❌ 종료 중 오류: ${error.message}`,
-          "red",
-          "darkred"
-        )
+        logger.gradient(`❌ 종료 중 오류: ${error.message}`, "red", "darkred")
       );
       process.exit(1);
     }

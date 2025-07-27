@@ -1,22 +1,21 @@
-// src/utils/Logger.js v3.0.1 - 단순하고 확실한 로거
+// src/utils/Logger.js v3.0.1 - 완전 안정화 버전
 // ========================================
-// 🌈 Simple but Powerful Logger v3.0.1
-// 복잡한 의존성 제거하고 확실하게 작동하는 버전!
+// 🌈 Complete Stable Logger v3.0.1
+// 모든 메서드 직접 정의로 안정성 확보!
 // ========================================
 
 const chalk = require("chalk");
 
 /**
- * 🎯 SimpleLogger - 확실하게 작동하는 간단한 로거
+ * 🎯 CompleteLogger - 모든 메서드가 확실히 작동하는 안정화된 로거
  *
  * 특징:
- * - 의존성 최소화 (chalk만 사용)
- * - 모든 필요한 메서드 포함
- * - 즉시 작동 보장
- * - 에러 없는 안정성
- * - Railway 환경 최적화
+ * - 순환 참조 완전 제거
+ * - 모든 메서드 직접 정의
+ * - 즉시 사용 가능
+ * - 의존성 최소화
  */
-class SimpleLogger {
+class CompleteLogger {
   constructor() {
     this.version = "3.0.1";
     this.initialized = true;
@@ -36,10 +35,11 @@ class SimpleLogger {
       startTime: this.startTime,
     };
 
-    // 초기화 완료 메시지 (즉시 출력으로 확인)
-    console.log(chalk.green("🌈 SimpleLogger v3.0.1 활성화됨!"));
-    console.log(chalk.blue(`🎯 환경: ${this.isRailway ? "Railway" : "Local"}`));
-    console.log(chalk.blue(`📊 로그 레벨: ${this.logLevel}`));
+    // 색상 배열 (rainbow 용)
+    this.rainbowColors = ["red", "yellow", "green", "cyan", "blue", "magenta"];
+
+    // 초기화 완료 메시지
+    console.log(chalk.green("🌈 CompleteLogger v3.0.1 초기화 완료!"));
   }
 
   // ===== 🎨 기본 로그 메서드들 =====
@@ -180,6 +180,13 @@ class SimpleLogger {
     if (data) this.printData(data);
   }
 
+  database(message, data) {
+    this.stats.totalLogs++;
+    const timestamp = this.getTimestamp();
+    console.log(chalk.cyan(`${timestamp} 🗄️ [DB] ${message}`));
+    if (data) this.printData(data);
+  }
+
   // ===== 🎯 모듈별 전용 로그들 =====
 
   todo(action, task, userName) {
@@ -216,37 +223,52 @@ class SimpleLogger {
     );
   }
 
-  // ===== 🎨 스타일 메서드들 =====
+  // ===== 🎨 스타일 메서드들 (완전 정의) =====
 
+  /**
+   * 🌈 무지개 효과 (완전히 작동)
+   */
   rainbow(text) {
-    // 간단한 무지개 효과
-    const colors = ["red", "yellow", "green", "cyan", "blue", "magenta"];
+    if (!text) return "";
+
+    let result = "";
+    for (let i = 0; i < text.length; i++) {
+      const colorIndex = i % this.rainbowColors.length;
+      const color = this.rainbowColors[colorIndex];
+      result += chalk[color](text[i]);
+    }
+    return result;
+  }
+
+  /**
+   * 🎨 그라디언트 효과 (완전히 작동)
+   */
+  gradient(text, startColor = "blue", endColor = "magenta") {
+    if (!text) return "";
+
+    // 간단한 그라디언트: 시작색과 끝색을 번갈아 사용
+    const colors = [startColor, endColor];
     let result = "";
 
     for (let i = 0; i < text.length; i++) {
-      const colorIndex = i % colors.length;
-      result += chalk[colors[colorIndex]](text[i]);
+      const colorIndex = Math.floor((i / text.length) * 2) % 2;
+      const color = colors[colorIndex];
+
+      if (chalk[color]) {
+        result += chalk[color](text[i]);
+      } else {
+        result += chalk.blue(text[i]); // 폴백
+      }
     }
 
     return result;
   }
 
-  gradient(text, startColor = "blue", endColor = "magenta") {
-    // 간단한 그라디언트 효과
-    const colors = {
-      red: 1,
-      green: 2,
-      yellow: 3,
-      blue: 4,
-      magenta: 5,
-      cyan: 6,
-    };
-
-    const start = colors[startColor] || 4;
-    const end = colors[endColor] || 5;
-
-    // 색상 전환 효과
-    return chalk.rgb(start * 40, 100, end * 40)(text);
+  /**
+   * 🎉 축하 메시지
+   */
+  celebration(message) {
+    console.log(this.rainbow(`🎉 ${message}`));
   }
 
   // ===== 🛠️ 유틸리티 메서드들 =====
@@ -318,7 +340,7 @@ class SimpleLogger {
   // ===== 🧪 테스트 메서드 =====
 
   test() {
-    console.log(chalk.yellow("\n🧪 Logger 테스트 시작..."));
+    console.log(chalk.yellow("\n🧪 CompleteLogger 테스트 시작..."));
 
     this.info("정보 메시지 테스트");
     this.success("성공 메시지 테스트");
@@ -327,31 +349,62 @@ class SimpleLogger {
     this.debug("디버그 메시지 테스트");
     this.system("시스템 메시지 테스트");
     this.module("TestModule", "모듈 메시지 테스트");
+    this.database("데이터베이스 메시지 테스트");
 
     console.log("\n🎨 스타일 테스트:");
-    console.log(this.rainbow("🌈 무지개 효과 테스트"));
-    console.log(this.gradient("🎨 그라디언트 효과 테스트", "blue", "magenta"));
+    console.log("🌈 무지개:", this.rainbow("무지개 효과 테스트"));
+    console.log(
+      "🎨 그라디언트:",
+      this.gradient("그라디언트 효과 테스트", "blue", "magenta")
+    );
+
+    this.celebration("축하 메시지 테스트");
 
     this.showStats();
-    console.log(chalk.green("✅ Logger 테스트 완료!\n"));
+    console.log(chalk.green("✅ CompleteLogger 테스트 완료!\n"));
+  }
+
+  // ===== 📱 텔레그램 메시지 메서드들 =====
+
+  /**
+   * 📱 로딩 메시지 전송
+   */
+  async sendLoading(bot, chatId, message = "처리 중...") {
+    try {
+      const loadingMessage = await bot.sendMessage(chatId, `⏳ ${message}`);
+      this.info("로딩 메시지 전송됨", {
+        chatId,
+        messageId: loadingMessage.message_id,
+      });
+      return loadingMessage;
+    } catch (error) {
+      this.error("로딩 메시지 전송 실패", error);
+    }
+  }
+
+  /**
+   * 📱 로딩 메시지 업데이트
+   */
+  async updateLoading(bot, chatId, messageId, newMessage, isComplete = false) {
+    try {
+      const icon = isComplete ? "✅" : "⏳";
+      await bot.editMessageText(`${icon} ${newMessage}`, {
+        chat_id: chatId,
+        message_id: messageId,
+      });
+      this.info("로딩 메시지 업데이트됨", { chatId, messageId, isComplete });
+    } catch (error) {
+      this.error("로딩 메시지 업데이트 실패", error);
+    }
   }
 }
 
 // ========================================
-// 🎯 싱글톤 패턴
+// 🎯 단순한 직접 내보내기 (싱글톤 패턴 제거)
 // ========================================
 
-let loggerInstance = null;
+// 하나의 인스턴스 생성
+const loggerInstance = new CompleteLogger();
 
-function getInstance() {
-  if (!loggerInstance) {
-    loggerInstance = new SimpleLogger();
-  }
-  return loggerInstance;
-}
-
-// ========================================
-// 🚀 모듈 내보내기
-// ========================================
-
-module.exports = getInstance();
+// 직접 내보내기 (순환 참조 방지)
+module.exports = loggerInstance;
