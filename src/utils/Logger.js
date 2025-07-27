@@ -81,6 +81,11 @@ class EnhancedLogger {
         icon: "⚙️",
         color: chalk.cyan,
       },
+      fatal: {
+        badge: chalk.bgRed.white.bold(" FATAL "),
+        icon: "💀",
+        color: chalk.red.bold,
+      },
     };
 
     // 모듈별 색상 테마
@@ -188,6 +193,40 @@ class EnhancedLogger {
 
   system(message, data) {
     console.log(this.formatLog("system", message, data));
+  }
+
+  /**
+   * 💀 치명적 오류 로그 (Fatal)
+   */
+  fatal(message, data, shouldExit = false) {
+    // fatal 스타일 정의가 없다면 error 스타일 사용하거나 새로 정의
+    const style = {
+      badge: chalk.bgRed.white.bold(" FATAL "),
+      icon: "💀",
+      color: chalk.red.bold,
+    };
+
+    const timestamp = this.getTimestamp();
+    let output = `${timestamp} ${style.badge} ${style.icon}  ${style.color(
+      sanitize(message)
+    )}`;
+
+    if (data) {
+      const sanitizedData = sanitize(data);
+      output += "\n" + this.formatData(sanitizedData, "error");
+    }
+
+    console.log(output);
+
+    // 스택 트레이스가 있으면 출력
+    if (data && data.stack) {
+      console.log(chalk.red(data.stack));
+    }
+
+    // shouldExit가 true면 프로세스 종료
+    if (shouldExit) {
+      process.exit(1);
+    }
   }
 
   /**

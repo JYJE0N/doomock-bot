@@ -131,7 +131,7 @@ if (require.main === module) {
   const bot = new DooMockBot();
 
   bot.start().catch((error) => {
-    logger.fatal("애플리케이션 시작 실패", error, true);
+    logger.fatal("애플리케이션 시작 실패", error);
   });
 }
 
