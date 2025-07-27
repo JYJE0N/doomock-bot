@@ -116,34 +116,54 @@ class ModuleManager {
   /**
    * 🎯 콜백 쿼리 처리 (라우팅)
    */
-  async handleCallback(bot, callbackQuery, action, params, moduleManager) {
+  async handleCallback(
+    bot,
+    callbackQuery,
+    moduleName,
+    subAction,
+    moduleManager
+  ) {
     try {
-      const moduleKey = action.split(":")[0];
-      const subAction = action.substring(moduleKey.length + 1) || "menu";
-
-      logger.debug(`📦 모듈 라우팅: ${moduleKey} → ${subAction}`);
-
-      // 모듈 찾기
-      const module = this.modules.get(moduleKey);
+      // 🔍 모듈 찾기
+      const module = this.modules.get(moduleName);
       if (!module) {
-        logger.warn(`모듈을 찾을 수 없음: ${moduleKey}`);
-        // ❌ answerCallbackQuery 제거! (이미 BotController에서 처리)
-        return;
+        logger.warn(`모듈을 찾을 수 없음: ${moduleName}`);
+        return {
+          type: "error",
+          message: `'${moduleName}' 모듈을 찾을 수 없습니다.`,
+          module: moduleName,
+        };
       }
 
-      // ❌ answerCallbackQuery 제거! 모듈로 바로 전달
-      await module.instance.handleCallback(
+      logger.navigation(moduleName, subAction, getUserId(callbackQuery));
+
+      // ✅ 표준 매개변수로 모듈 콜백 호출
+      const result = await module.handleCallback(
         bot,
         callbackQuery,
         subAction,
-        params,
-        moduleManager
+        {}, // params - 빈 객체로 통일
+        moduleManager || this
       );
 
-      this.stats.callbacksHandled++;
+      // ✅ 결과 데이터 반환 (NavigationHandler가 UI 처리)
+      return (
+        result || {
+          type: "success",
+          module: moduleName,
+          action: subAction,
+        }
+      );
     } catch (error) {
-      logger.error("모듈 콜백 처리 실패", error);
-      throw error;
+      logger.error(`모듈 콜백 처리 실패 (${moduleName}:${subAction}):`, error);
+
+      return {
+        type: "error",
+        message: `${moduleName} 처리 중 오류가 발생했습니다.`,
+        module: moduleName,
+        action: subAction,
+        error: error.message,
+      };
     }
   }
 

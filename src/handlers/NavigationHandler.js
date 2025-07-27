@@ -246,6 +246,272 @@ _버튼을 눌러 원하는 기능을 선택하세요\\!_`;
   }
 
   /**
+   * 🎯 콜백 처리 (중앙 라우터) - UI 렌더링 추가!
+   */
+  async handleCallback(ctx, options = {}) {
+    try {
+      const callbackQuery = ctx.callbackQuery;
+      const data = callbackQuery.data;
+      const [action, ...params] = data.split(":");
+      const userName = getUserName(callbackQuery);
+
+      // 🌈 알록달록 로그
+      console.log(this.messageSystem.rainbow(`🎯 네비게이션: ${action}`));
+      console.log(
+        this.messageSystem.gradient(`👤 사용자: ${userName}`, "blue", "purple")
+      );
+
+      // 📊 통계 업데이트
+      this.stats.totalNavigation++;
+      this.stats.lastActivity = TimeHelper.getLogTimeString();
+
+      // 시스템 네비게이션 처리 (직접 UI 렌더링)
+      switch (action) {
+        case "main":
+        case "menu":
+          this.stats.menuViews++;
+          return await this.showMainMenu(ctx);
+
+        case "back":
+          return await this.handleBackNavigation(ctx, params);
+
+        case "help":
+          return await this.showHelp(ctx);
+
+        case "about":
+          return await this.showAbout(ctx);
+
+        case "status":
+          return await this.showSystemStatus(ctx);
+
+        case "refresh":
+          return await this.handleRefresh(ctx, params);
+
+        default:
+          // ✅ 모듈로 라우팅 + UI 렌더링 추가!
+          this.updateModuleStats(action);
+          if (this.moduleManager) {
+            // 1. 모듈에서 데이터 받기
+            const result = await this.moduleManager.handleCallback(
+              this.bot,
+              callbackQuery,
+              action,
+              params.join(":"),
+              this.moduleManager
+            );
+
+            // 2. ✅ 받은 데이터로 UI 렌더링!
+            if (result) {
+              return await this.renderModuleResult(ctx, result);
+            }
+          }
+      }
+    } catch (error) {
+      logger.error("네비게이션 콜백 처리 실패:", error);
+      await this.showNavigationError(ctx, error.message);
+    }
+  }
+
+  /**
+   * ✅ 새로 추가: 모듈 결과 UI 렌더링
+   */
+  async renderModuleResult(ctx, result) {
+    const callbackQuery = ctx.callbackQuery;
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+
+    try {
+      switch (result.type) {
+        case "menu":
+          return await this.renderModuleMenu(ctx, result);
+
+        case "error":
+          return await this.renderModuleError(ctx, result);
+
+        case "success":
+          return await this.renderModuleSuccess(ctx, result);
+
+        case "checkin":
+        case "checkout":
+          return await this.renderWorktimeAction(ctx, result);
+
+        case "today":
+          return await this.renderWorktimeStatus(ctx, result);
+
+        case "help":
+          return await this.renderModuleHelp(ctx, result);
+
+        default:
+          logger.warn("알 수 없는 결과 타입:", result.type);
+          return await this.renderGenericResult(ctx, result);
+      }
+    } catch (error) {
+      logger.error("모듈 UI 렌더링 실패:", error);
+      await this.showNavigationError(ctx, "UI 렌더링 중 오류가 발생했습니다");
+    }
+  }
+
+  /**
+   * ✅ 워크타임 메뉴 렌더링
+   */
+  async renderWorktimeMenu(ctx, result) {
+    const callbackQuery = ctx.callbackQuery;
+    const chatId = callbackQuery.message.chat.id;
+    const messageId = callbackQuery.message.message_id;
+
+    const { status } = result.data;
+
+    const menuText = `🏢 **근무시간 관리**
+
+📅 **오늘 (${status.date})**
+${
+  status.isCheckedIn
+    ? `✅ 출근 완료: ${TimeHelper.format(status.checkInTime, "HH:mm")}`
+    : "⏸️ 아직 출근하지 않음"
+}
+${
+  status.isCheckedOut
+    ? `✅ 퇴근 완료: ${TimeHelper.format(status.checkOutTime, "HH:mm")}`
+    : "⏸️ 아직 퇴근하지 않음"
+}
+
+${
+  status.workDuration > 0
+    ? `⏱️ 근무시간: ${Math.floor(status.workDuration / 60)}시간 ${
+        status.workDuration % 60
+      }분`
+    : ""
+}
+
+원하는 작업을 선택해주세요.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          status.isCheckedIn
+            ? { text: "🏃‍♂️ 퇴근하기", callback_data: "worktime:checkout" }
+            : { text: "👋 출근하기", callback_data: "worktime:checkin" },
+        ],
+        [
+          { text: "📊 오늘 현황", callback_data: "worktime:today" },
+          { text: "❓ 도움말", callback_data: "worktime:help" },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "main" }],
+      ],
+    };
+
+    await ctx.editMessageText(menuText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * ✅ 모듈 메뉴 렌더링 (통합)
+   */
+  async renderModuleMenu(ctx, result) {
+    const { module } = result;
+
+    switch (module) {
+      case "worktime":
+        return await this.renderWorktimeMenu(ctx, result);
+      case "todo":
+        return await this.renderTodoMenu(ctx, result);
+      case "timer":
+        return await this.renderTimerMenu(ctx, result);
+      default:
+        return await this.renderGenericMenu(ctx, result);
+    }
+  }
+
+  /**
+   * ✅ 워크타임 액션 렌더링
+   */
+  async renderWorktimeAction(ctx, result) {
+    const { type, data } = result;
+    const { result: actionResult } = data;
+
+    const actionText = type === "checkin" ? "출근" : "퇴근";
+    const emoji = type === "checkin" ? "👋" : "🏃‍♂️";
+
+    const successText = `${emoji} **${actionText} 처리 완료!**
+
+${actionResult.message}
+⏰ 시간: ${TimeHelper.format(
+      actionResult.checkInTime || actionResult.checkOutTime,
+      "HH:mm"
+    )}
+
+다른 작업을 선택해주세요.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "📊 오늘 현황", callback_data: "worktime:today" },
+          { text: "🔙 워크타임 메뉴", callback_data: "worktime:menu" },
+        ],
+        [{ text: "🏠 메인 메뉴", callback_data: "main" }],
+      ],
+    };
+
+    await ctx.editMessageText(successText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * ✅ 에러 렌더링
+   */
+  async renderModuleError(ctx, result) {
+    const errorText = `❌ **오류 발생**
+
+${result.message}
+
+다시 시도하거나 메인 메뉴로 돌아가세요.`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🔄 다시 시도", callback_data: `${result.module}:menu` },
+          { text: "🏠 메인 메뉴", callback_data: "main" },
+        ],
+      ],
+    };
+
+    await ctx.editMessageText(errorText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * ✅ 기본 결과 렌더링
+   */
+  async renderGenericResult(ctx, result) {
+    const resultText = `✅ **처리 완료**
+
+모듈: ${result.module}
+액션: ${result.action}
+
+메인 메뉴로 돌아가시겠습니까?`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🔙 이전 메뉴", callback_data: `${result.module}:menu` },
+          { text: "🏠 메인 메뉴", callback_data: "main" },
+        ],
+      ],
+    };
+
+    await ctx.editMessageText(resultText, {
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
    * 📱 폴백 메뉴 (오류 시 - 안전한 일반 텍스트)
    */
   async showFallbackMenu(ctx) {
