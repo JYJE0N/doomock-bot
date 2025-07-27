@@ -36,6 +36,7 @@ class BotController {
     this.moduleManager = null;
     this.dbManager = null;
     this.initialized = false;
+    // this.callbackManager = new CallbackResponseManager();
 
     // 🌈 LoggerEnhancer 활용을 위한 참조
     //this.messageSystem = logger.messageSystem;
@@ -339,6 +340,9 @@ class BotController {
   /**
    * 🎯 콜백 쿼리 처리 (알록달록 라우팅!)
    */
+  /**
+   * ✅ 수정된 콜백 처리 - 중복 방지
+   */
   async handleCallbackQuery(ctx) {
     const startTime = Date.now();
 
@@ -348,27 +352,38 @@ class BotController {
       const data = callbackQuery.data;
 
       // 🎨 콜백 상세 로그
-      console.log(logger.rainbow(`📱 콜백 상세:`));
+      console.log(this.messageSystem.rainbow(`📱 콜백 상세:`));
       console.log(
-        logger.gradient(
+        this.messageSystem.gradient(
           `   👤 사용자: ${getUserName(callbackQuery)}`,
           "cyan",
           "blue"
         )
       );
-      console.log(logger.gradient(`   🎯 액션: ${data}`, "purple", "pink"));
+      console.log(
+        this.messageSystem.gradient(`   🎯 액션: ${data}`, "purple", "pink")
+      );
 
-      // 즉시 응답 (로딩 효과)
+      // ✅ 즉시 응답 (로딩 효과) - 중앙 관리
       const loadingEmoji = ["⏳", "⌛", "🔄", "⚡"][
         Math.floor(Math.random() * 4)
       ];
-      await ctx.answerCbQuery(`${loadingEmoji} 처리 중...`);
+
+      const answered = await this.callbackManager.answerCallback(
+        this.bot,
+        callbackQuery,
+        { text: `${loadingEmoji} 처리 중...` }
+      );
+
+      if (!answered) {
+        logger.warn("콜백 응답 실패 - 이미 처리됨");
+      }
 
       // 세션 활동 업데이트
       this.updateUserSession(userId, "callback", data);
 
-      // NavigationHandler의 알록달록 콜백 처리
-      await this.navigationHandler.handleCallback(ctx);
+      // ✅ NavigationHandler 호출 - 응답은 하지 말고 처리만
+      await this.navigationHandler.handleCallback(ctx, { skipAnswer: true });
 
       // 통계 업데이트
       this.stats.totalCallbacks++;
@@ -377,7 +392,7 @@ class BotController {
       // 🎉 성공 로그
       const responseTime = Date.now() - startTime;
       console.log(
-        logger.gradient(
+        this.messageSystem.gradient(
           `✅ 콜백 처리 완료 (${responseTime}ms)`,
           "green",
           "blue"
@@ -388,12 +403,17 @@ class BotController {
       this.updatePerformanceMetrics(responseTime);
     } catch (error) {
       console.log(
-        logger.gradient(`❌ 콜백 처리 실패: ${error.message}`, "red", "orange")
+        this.messageSystem.gradient(
+          `❌ 콜백 처리 실패: ${error.message}`,
+          "red",
+          "orange"
+        )
       );
       logger.error("콜백 처리 실패:", error);
 
-      // 사용자 친화적 오류 메시지
-      await ctx.answerCbQuery("❌ 처리 중 오류가 발생했습니다", {
+      // ✅ 에러 응답도 중앙 관리
+      await this.callbackManager.answerCallback(this.bot, ctx.callbackQuery, {
+        text: "❌ 처리 중 오류가 발생했습니다",
         show_alert: true,
       });
 
@@ -528,6 +548,11 @@ class BotController {
    * 📊 실시간 통계 표시
    */
   showLiveStats() {
+    return; //환경변수로 제어
+    if (process.env.DISABLE_LIVE_STATS === "true") {
+      return;
+    }
+
     const uptime = Date.now() - this.stats.startTime;
     const uptimeStr = this.formatUptime(uptime);
 

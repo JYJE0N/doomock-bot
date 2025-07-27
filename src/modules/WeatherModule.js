@@ -11,7 +11,6 @@ class WeatherModule extends BaseModule {
       config: options.config,
     });
     this.serviceBuilder = options.serviceBuilder || null;
-
     this.weatherService = null;
     this.config = {
       defaultLocation: process.env.DEFAULT_LOCATION || "서울",
@@ -121,3 +120,4 @@ class WeatherModule extends BaseModule {
     };
   }
 }
+module.exports = WeatherModule;

@@ -142,3 +142,4 @@ class ReminderModule extends BaseModule {
     };
   }
 }
+module.exports = ReminderModule; // ✅ 필수!

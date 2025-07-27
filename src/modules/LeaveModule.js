@@ -139,3 +139,4 @@ class LeaveModule extends BaseModule {
     };
   }
 }
+module.exports = LeaveModule; // ✅ 필수!

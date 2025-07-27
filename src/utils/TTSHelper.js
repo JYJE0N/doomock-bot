@@ -32,9 +32,10 @@ class TTSService {
   }
 
   async handleTTSCallback(bot, callbackQuery, params) {
-    await bot.answerCallbackQuery(callbackQuery.id, {
-      text: "🔊 TTS 설정 완료",
-    });
+    // await bot.answerCallbackQuery(callbackQuery.id, {
+    //   text: "🔊 TTS 설정 완료",
+    // });
+    logger.debug("TTS 콜백 처리 (응답은 BotController에서 이미 처리됨)");
   }
 
   async handleAutoTTS(bot, msg) {

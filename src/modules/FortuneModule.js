@@ -128,3 +128,4 @@ class FortuneModule extends BaseModule {
     };
   }
 }
+module.exports = FortuneModule; // ✅ 필수!

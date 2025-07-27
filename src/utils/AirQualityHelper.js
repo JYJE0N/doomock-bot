@@ -1,6 +1,6 @@
 // 한국환경공단 대기질 API 서비스
 const BaseService = require("../core/BaseModule");
-const logger = require("../utils/Logger");
+const logger = require("./Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 class AirQualityHelper extends BaseService {

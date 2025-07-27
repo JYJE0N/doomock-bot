@@ -1,3 +1,5 @@
+const logger = require("../utils/Logger");
+
 const { getInstance } = require("../database/DatabaseManager");
 
 class TTSService {
@@ -11,7 +13,7 @@ class TTSService {
       ...options.config,
     };
 
-    logger.service("TTSService", "서비스 생성");
+    logger.info("🔧 TTSService", "서비스 생성");
   }
 
   async initialize() {

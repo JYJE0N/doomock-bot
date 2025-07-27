@@ -144,4 +144,4 @@ class TTSModule extends BaseModule {
   }
 }
 
-module.exports = TTSModule;
+module.exports = TTSModule; // ✅ 필수!

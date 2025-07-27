@@ -1,3 +1,5 @@
+const logger = require("../utils/Logger");
+
 const { getInstance } = require("../database/DatabaseManager");
 
 class ReminderService {
@@ -12,7 +14,7 @@ class ReminderService {
       ...options.config,
     };
 
-    logger.service("ReminderService", "서비스 생성");
+    logger.info("🔧 ReminderService", "서비스 생성");
   }
 
   async initialize() {

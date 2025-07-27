@@ -140,3 +140,4 @@ class TimerModule extends BaseModule {
     };
   }
 }
+module.exports = TimerModule; // ✅ 필수!

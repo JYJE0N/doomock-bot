@@ -128,10 +128,8 @@ class ModuleManager {
       const module = this.modules.get(moduleKey);
       if (!module) {
         logger.warn(`모듈을 찾을 수 없음: ${moduleKey}`);
-        await bot.answerCallbackQuery(
-          callbackQuery.id,
-          "❌ 해당 기능을 찾을 수 없습니다."
-        );
+        // ❌ BotController에서 이미 answerCallbackQuery 처리하므로 제거
+        // await bot.answerCallbackQuery(callbackQuery.id);
         return;
       }
 

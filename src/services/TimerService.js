@@ -1,3 +1,4 @@
+const logger = require("../utils/Logger");
 const { getInstance } = require("../database/DatabaseManager");
 
 class TimerService {
@@ -15,7 +16,7 @@ class TimerService {
     // 활성 타이머 메모리 관리
     this.activeTimers = new Map();
 
-    logger.service("TimerService", "서비스 생성");
+    logger.info("🔧 TimerService", "서비스 생성");
   }
 
   async initialize() {

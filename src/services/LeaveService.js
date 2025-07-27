@@ -1,3 +1,5 @@
+const logger = require("../utils/Logger");
+
 const { getInstance } = require("../database/DatabaseManager");
 
 class LeaveService {
@@ -12,7 +14,7 @@ class LeaveService {
       ...options.config,
     };
 
-    logger.service("LeaveService", "서비스 생성");
+    logger.info("🔧 LeaveService", "서비스 생성");
   }
 
   async initialize() {

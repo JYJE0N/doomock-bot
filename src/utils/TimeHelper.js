@@ -1,4 +1,6 @@
 // src/utils/TimeHelper.js - 호환성 수정된 시간 헬퍼
+const logger = require("./Logger");
+
 const moment = require("moment-timezone");
 
 /**

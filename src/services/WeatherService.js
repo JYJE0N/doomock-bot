@@ -1,6 +1,7 @@
 const { getInstance } = require("../database/DatabaseManager");
 
 const logger = require("../utils/Logger");
+
 const TimeHelper = require("../utils/TimeHelper");
 
 class WeatherService {
@@ -18,7 +19,7 @@ class WeatherService {
     this.cache = new Map();
     this.cacheTimestamps = new Map();
 
-    logger.service("WeatherService", "서비스 생성");
+    logger.info("🔧 WeatherService", "서비스 생성");
   }
 
   async initialize() {

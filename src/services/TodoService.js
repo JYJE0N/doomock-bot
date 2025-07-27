@@ -1,5 +1,6 @@
 // src/services/TodoService.js - 할일 관리 서비스 (표준 준수)
-const logger = require("../utils/Logger"); // LoggerEnhancer 적용
+const logger = require("../utils/Logger");
+
 const TimeHelper = require("../utils/TimeHelper");
 const { ObjectId } = require("mongodb");
 const { getInstance } = require("../database/DatabaseManager"); // DatabaseManager 사용
@@ -37,7 +38,7 @@ class TodoService {
     // Railway 환경 체크
     this.isRailway = !process.env.NODE_ENV || process.env.RAILWAY_ENVIRONMENT;
 
-    logger.service("TodoService", "서비스 생성", {
+    logger.info("🔧 TodoService", "서비스 생성", {
       railway: this.isRailway,
       config: this.config,
     });

@@ -1,4 +1,5 @@
-const logger = require("../utils/Logger"); // LoggerEnhancer 적용
+const logger = require("../utils/Logger");
+
 const TimeHelper = require("../utils/TimeHelper");
 const { ObjectId } = require("mongodb");
 const { getInstance } = require("../database/DatabaseManager");
@@ -24,7 +25,7 @@ class FortuneService {
       ],
     };
 
-    logger.service("FortuneService", "서비스 생성");
+    logger.info("🔧 FortuneService", "서비스 생성");
   }
 
   async initialize() {

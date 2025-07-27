@@ -1,4 +1,5 @@
 const { getInstance } = require("../database/DatabaseManager");
+const logger = require("../utils/Logger");
 
 class WorktimeService {
   constructor(options = {}) {
@@ -13,7 +14,7 @@ class WorktimeService {
       ...options.config,
     };
 
-    logger.service("WorktimeService", "서비스 생성");
+    logger.info("🔧 WorktimeService", "서비스 생성");
   }
 
   async initialize() {

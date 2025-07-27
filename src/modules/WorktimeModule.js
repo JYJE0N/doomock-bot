@@ -140,3 +140,4 @@ class WorktimeModule extends BaseModule {
     };
   }
 }
+module.exports = WorktimeModule; // ✅ 필수!
