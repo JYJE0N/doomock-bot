@@ -1,143 +1,386 @@
-// src/utils/Logger.js - 완전히 정리된 버전! 🎯
+// ========================================
+// 🌈 src/utils/Logger.js - Enhanced v3.0.1
+// ========================================
+// Message/ 폴더 기능들이 모두 주입된 알록달록한 Logger!
+// ========================================
+
 const chalk = require("chalk");
-const moment = require("moment-timezone");
+const {
+  UnifiedMessageSystem,
+  LoggerEnhancer,
+} = require("./Message/UnifiedMessageSystem");
 
 /**
- * 🎨 깔끔한 로거 클래스
- * - 싱글톤 패턴 간소화
- * - 기능별 명확한 분리
- * - 스파게티 코드 정리 완료!
+ * 🌈 Enhanced Logger v3.0.1 - 알록달록 통합 시스템
+ *
+ * ✨ 새로운 기능들:
+ * - 🎨 Message/ 폴더 기능들 완전 통합
+ * - 🌈 알록달록한 콘솔 출력
+ * - 📱 텔레그램 메시지 통합 관리
+ * - 🎯 모듈별 전용 로그 스타일
+ * - 📊 진행률 바 및 애니메이션
+ * - 🛡️ Fallback 메커니즘
  */
-class Logger {
-  static #instance = null;
-
-  /**
-   * 싱글톤 인스턴스 반환 (private 필드 사용)
-   */
-  static getInstance() {
-    if (!Logger.#instance) {
-      Logger.#instance = new Logger();
-    }
-    return Logger.#instance;
-  }
-
+class EnhancedLogger {
   constructor() {
-    // 중복 생성 방지
-    if (Logger.#instance) {
-      return Logger.#instance;
-    }
+    this.version = "3.0.1";
+    this.initialized = false;
 
-    this.#initializeStyles();
-    this.#initializeBoxChars();
-    this.#checkGradientSupport();
-
-    Logger.#instance = this;
-  }
-
-  // ===== 🎨 초기화 메서드들 =====
-
-  #initializeStyles() {
+    // 🎨 기본 스타일 시스템
     this.styles = {
       info: {
-        badge: chalk.bgBlue.white.bold(" INFO "),
-        icon: "💎",
+        badge: chalk.bgBlue.white(" INFO "),
+        icon: "ℹ️",
         color: chalk.blue,
       },
       success: {
-        badge: chalk.bgGreen.black.bold(" SUCCESS "),
+        badge: chalk.bgGreen.black(" SUCCESS "),
         icon: "✅",
         color: chalk.green,
       },
       warn: {
-        badge: chalk.bgYellow.black.bold(" WARN "),
+        badge: chalk.bgYellow.black(" WARN "),
         icon: "⚠️",
         color: chalk.yellow,
       },
       error: {
-        badge: chalk.bgRed.white.bold(" ERROR "),
+        badge: chalk.bgRed.white(" ERROR "),
         icon: "❌",
         color: chalk.red,
       },
       debug: {
-        badge: chalk.bgMagenta.white.bold(" DEBUG "),
+        badge: chalk.bgGray.white(" DEBUG "),
         icon: "🔍",
-        color: chalk.magenta,
+        color: chalk.gray,
       },
       system: {
-        badge: chalk.bgCyan.black.bold(" SYSTEM "),
-        icon: "⚙️",
-        color: chalk.cyan,
+        badge: chalk.bgMagenta.white(" SYSTEM "),
+        icon: "🤖",
+        color: chalk.magenta,
       },
     };
 
-    this.moduleColors = {
-      BotController: chalk.hex("#FF6B6B"),
-      NavigationHandler: chalk.hex("#4ECDC4"),
-      ModuleManager: chalk.hex("#45B7D1"),
-      TodoModule: chalk.hex("#96CEB4"),
-      TimerModule: chalk.hex("#FECA57"),
-      LeaveModule: chalk.hex("#48C9B0"),
-      WorktimeModule: chalk.hex("#6C5CE7"),
-      WeatherModule: chalk.hex("#74B9FF"),
-      FortuneModule: chalk.hex("#A29BFE"),
-      TTSModule: chalk.hex("#FD79A8"),
-      ReminderModule: chalk.hex("#FDCB6E"),
+    // 📊 통계 시스템
+    this.stats = {
+      totalLogs: 0,
+      messagesSent: 0,
+      errorsHandled: 0,
+      startTime: Date.now(),
+      moduleUsage: new Map(),
     };
+
+    // 🎨 Message 시스템 통합
+    this.messageSystem = new UnifiedMessageSystem();
+    this.enhancer = new LoggerEnhancer(this, this.messageSystem);
+
+    this.initialized = true;
+    this.showWelcomeBanner();
   }
 
-  #initializeBoxChars() {
-    this.box = {
-      topLeft: "╔",
-      topRight: "╗",
-      bottomLeft: "╚",
-      bottomRight: "╝",
-      horizontal: "═",
-      vertical: "║",
-      cross: "╬",
-      teeRight: "╠",
-      teeLeft: "╣",
-    };
+  // ===== 🎉 시작 배너 =====
+  showWelcomeBanner() {
+    const banner = [
+      "██████╗ ██╗   ██╗███╗   ███╗ ██████╗ ██╗  ██╗",
+      "██╔══██╗██║   ██║████╗ ████║██╔═══██╗██║ ██╔╝",
+      "██║  ██║██║   ██║██╔████╔██║██║   ██║█████╔╝ ",
+      "██║  ██║██║   ██║██║╚██╔╝██║██║   ██║██╔═██╗ ",
+      "██████╔╝╚██████╔╝██║ ╚═╝ ██║╚██████╔╝██║  ██╗",
+      "╚═════╝  ╚═════╝ ╚═╝     ╚═╝ ╚═════╝ ╚═╝  ╚═╝",
+      "                                             ",
+      "🤖 두목봇 Enhanced Logger v3.0.1 - 알록달록 모드! 🌈",
+    ];
+
+    console.clear();
+    banner.forEach((line) => {
+      console.log(this.rainbow(line));
+    });
+    console.log();
+    console.log(chalk.bold.white("✨ Message 시스템 통합 완료!"));
+    console.log(chalk.gray("────────────────────────────────────────────────"));
+    console.log();
   }
 
-  #checkGradientSupport() {
-    try {
-      this.gradientString = require("gradient-string");
-      this.hasGradient = true;
-    } catch (error) {
-      this.hasGradient = false;
-      this.warn("gradient-string 패키지 없음 - 기본 색상 사용");
+  // ===== 🌈 특수 효과들 (Message 시스템에서 주입됨) =====
+  rainbow(text) {
+    return this.messageSystem.rainbow(text);
+  }
+
+  gradient(text, startColor, endColor) {
+    return this.messageSystem.gradient(text, startColor, endColor);
+  }
+
+  // ===== 🎯 Enhanced 로그 메서드들 =====
+
+  /**
+   * 📊 Enhanced Info - 통계 포함
+   */
+  info(message, data) {
+    this.stats.totalLogs++;
+    console.log(this.#formatEnhancedLog("info", message, data));
+  }
+
+  /**
+   * ✅ Enhanced Success - 축하 효과
+   */
+  success(message, data) {
+    this.stats.totalLogs++;
+    console.log(this.rainbow("🎉 ================"));
+    console.log(this.#formatEnhancedLog("success", message, data));
+    console.log(this.rainbow("🎉 ================"));
+  }
+
+  /**
+   * ⚠️ Enhanced Warning - 주목도 UP
+   */
+  warn(message, data) {
+    this.stats.totalLogs++;
+    console.log(chalk.yellow("⚠️ ") + "━".repeat(50));
+    console.log(this.#formatEnhancedLog("warn", message, data));
+    console.log(chalk.yellow("⚠️ ") + "━".repeat(50));
+  }
+
+  /**
+   * ❌ Enhanced Error - 상세 에러 처리
+   */
+  error(message, data) {
+    this.stats.totalLogs++;
+    this.stats.errorsHandled++;
+
+    console.log(chalk.red("💥 ") + "═".repeat(50));
+    console.log(this.#formatEnhancedLog("error", message, data));
+
+    // 에러 스택 트레이스 예쁘게 출력
+    if (data instanceof Error) {
+      console.log(chalk.red("📋 스택 트레이스:"));
+      console.log(chalk.gray(data.stack));
+    }
+
+    console.log(chalk.red("💥 ") + "═".repeat(50));
+  }
+
+  /**
+   * 🔍 Enhanced Debug - 개발 모드 전용
+   */
+  debug(message, data) {
+    if (process.env.DEBUG === "true") {
+      this.stats.totalLogs++;
+      console.log(this.#formatEnhancedLog("debug", message, data));
     }
   }
 
-  // ===== 🕐 시간 관련 =====
-
-  getTimestamp() {
-    return chalk.gray(`[${moment().tz("Asia/Seoul").format("HH:mm:ss.SSS")}]`);
+  /**
+   * 🤖 Enhanced System - 시스템 로그
+   */
+  system(message, data) {
+    this.stats.totalLogs++;
+    console.log(this.#formatEnhancedLog("system", message, data));
   }
 
-  // ===== 🔒 보안 관련 =====
+  // ===== 🎯 모듈별 특화 로그들 =====
 
-  #sanitize(text) {
-    if (!text) return text;
+  /**
+   * 📝 Todo 모듈 전용 로그
+   */
+  todo(action, task, userName) {
+    this.#updateModuleStats("todo");
+    console.log(this.messageSystem.consoleStyles.moduleTitle("todo", "📝"));
 
-    return String(text)
-      .replace(/\d{9,10}:[A-Za-z0-9_-]{35}/g, "BOT_TOKEN_***")
-      .replace(
-        /mongodb(\+srv)?:\/\/[^:\s]+:[^@\s]+@[^\s]+/g,
-        "mongodb://***:***@***"
-      )
-      .replace(/\d{6,}/g, (match) => match.substring(0, 3) + "***")
-      .replace(/[a-zA-Z0-9_-]{32,}/g, "***API_KEY***");
+    switch (action) {
+      case "add":
+        console.log(
+          this.messageSystem.consoleStyles.todoAdd(`${task} (${userName})`)
+        );
+        break;
+      case "complete":
+        console.log(
+          this.messageSystem.consoleStyles.todoComplete(`${task} (${userName})`)
+        );
+        break;
+      case "delete":
+        console.log(
+          this.messageSystem.consoleStyles.todoDelete(`${task} (${userName})`)
+        );
+        break;
+      default:
+        console.log(chalk.blue(`📝 ${action}: ${task}`));
+    }
   }
 
-  // ===== 📝 기본 로그 메서드들 =====
+  /**
+   * ⏰ Timer 모듈 전용 로그
+   */
+  timer(action, duration, userName) {
+    this.#updateModuleStats("timer");
+    console.log(this.messageSystem.consoleStyles.moduleTitle("timer", "⏰"));
 
-  #formatLog(level, message, data) {
-    const cleanMessage = this.#sanitize(message);
+    const timeStr = this.#formatDuration(duration);
+    console.log(chalk.cyan(`⏰ ${action}: ${timeStr} (${userName})`));
+  }
+
+  /**
+   * 🏢 WorkTime 모듈 전용 로그
+   */
+  worktime(action, hours, userName) {
+    this.#updateModuleStats("worktime");
+    console.log(this.messageSystem.consoleStyles.moduleTitle("worktime", "🏢"));
+    console.log(chalk.green(`🏢 ${action}: ${hours}시간 (${userName})`));
+  }
+
+  /**
+   * 👤 사용자 액션 로그
+   */
+  user(action, userName, details = {}) {
+    console.log(chalk.cyan("👤 ") + "─".repeat(30));
+
+    switch (action) {
+      case "join":
+        console.log(this.messageSystem.consoleStyles.userJoin(userName));
+        break;
+      case "message":
+        console.log(
+          this.messageSystem.consoleStyles.userMessage(
+            userName,
+            details.message
+          )
+        );
+        break;
+      case "callback":
+        console.log(chalk.yellow(`🎯 ${userName}: ${details.action}`));
+        break;
+      default:
+        console.log(chalk.cyan(`👤 ${userName}: ${action}`));
+    }
+
+    console.log(chalk.cyan("👤 ") + "─".repeat(30));
+  }
+
+  // ===== 📊 진행률 및 애니메이션 =====
+
+  /**
+   * 📊 진행률 바 표시
+   */
+  progress(label, current, total) {
+    const progressBar = this.messageSystem.consoleStyles.progressBar(
+      current,
+      total
+    );
+    console.log(`📊 ${label}: ${progressBar}`);
+  }
+
+  /**
+   * 🎉 축하 애니메이션
+   */
+  celebration(message) {
+    console.log(this.rainbow("🎉 ✨ 🎊 ✨ 🎉 ✨ 🎊 ✨ 🎉"));
+    console.log(this.rainbow(`     ${message}     `));
+    console.log(this.rainbow("🎉 ✨ 🎊 ✨ 🎉 ✨ 🎊 ✨ 🎉"));
+  }
+
+  /**
+   * ⏳ 로딩 애니메이션 시작
+   */
+  startLoading(message) {
+    try {
+      const ora = require("ora");
+      return ora({
+        text: message,
+        spinner: {
+          interval: 80,
+          frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        },
+        color: "cyan",
+      }).start();
+    } catch (error) {
+      // ora 없으면 심플한 로딩
+      console.log(chalk.blue(`⏳ ${message}...`));
+      return {
+        stop: () => {},
+        succeed: (msg) => this.success(msg || message),
+        fail: (msg) => this.error(msg || `${message} 실패`),
+      };
+    }
+  }
+
+  // ===== 🌐 네트워크 및 데이터베이스 로그 =====
+
+  /**
+   * 💾 데이터베이스 로그
+   */
+  database(operation, collection, details = {}) {
+    console.log(chalk.yellow("💾 ") + "─".repeat(40));
+    console.log(chalk.yellow(`💾 DB ${operation}: ${collection}`));
+
+    if (details.query) {
+      console.log(chalk.gray(`   쿼리: ${JSON.stringify(details.query)}`));
+    }
+    if (details.result) {
+      console.log(chalk.green(`   결과: ${details.result}`));
+    }
+    if (details.duration) {
+      console.log(chalk.blue(`   소요시간: ${details.duration}ms`));
+    }
+
+    console.log(chalk.yellow("💾 ") + "─".repeat(40));
+  }
+
+  /**
+   * 🌐 네트워크 로그
+   */
+  network(action, url, status) {
+    const statusColor =
+      status >= 200 && status < 300
+        ? chalk.green
+        : status >= 300 && status < 400
+        ? chalk.yellow
+        : chalk.red;
+
+    console.log(chalk.cyan("🌐 ") + "─".repeat(40));
+    console.log(chalk.cyan(`🌐 ${action}: ${url}`));
+    console.log(`   ${statusColor(`상태: ${status}`)}`);
+    console.log(chalk.cyan("🌐 ") + "─".repeat(40));
+  }
+
+  // ===== 📊 통계 및 모니터링 =====
+
+  /**
+   * 📊 통계 정보 출력
+   */
+  showStats() {
+    const uptime = Date.now() - this.stats.startTime;
+    const uptimeStr = this.#formatDuration(uptime);
+
+    console.log(this.rainbow("📊 ═══ Logger 통계 ═══"));
+    console.log(chalk.blue(`   🕐 실행 시간: ${uptimeStr}`));
+    console.log(chalk.green(`   📝 총 로그: ${this.stats.totalLogs}개`));
+    console.log(chalk.cyan(`   📱 메시지 전송: ${this.stats.messagesSent}개`));
+    console.log(chalk.red(`   ❌ 에러 처리: ${this.stats.errorsHandled}개`));
+
+    if (this.stats.moduleUsage.size > 0) {
+      console.log(chalk.yellow("   📦 모듈 사용량:"));
+      for (const [module, count] of this.stats.moduleUsage) {
+        const emoji = this.messageSystem.emojiSets.modules[module] || "📦";
+        console.log(chalk.gray(`      ${emoji} ${module}: ${count}회`));
+      }
+    }
+
+    console.log(this.rainbow("📊 ══════════════════"));
+  }
+
+  /**
+   * 🎯 Message 시스템 통계
+   */
+  getMessageStats() {
+    return this.messageSystem.getStats();
+  }
+
+  // ===== 🛠️ 내부 헬퍼 메서드들 =====
+
+  #formatEnhancedLog(level, message, data) {
     const style = this.styles[level];
-    const timestamp = this.getTimestamp();
+    const timestamp = this.#getTimestamp();
+    const cleanMessage = this.#sanitize(message);
 
-    let output = `${timestamp} ${style.badge} ${style.icon}  ${style.color(
+    let output = `${timestamp} ${style.badge} ${style.icon} ${style.color(
       cleanMessage
     )}`;
 
@@ -158,254 +401,63 @@ class Logger {
       .join("\n");
   }
 
-  info(message, data) {
-    console.log(this.#formatLog("info", message, data));
+  #getTimestamp() {
+    return chalk.gray(`[${new Date().toLocaleTimeString("ko-KR")}]`);
   }
 
-  success(message, data) {
-    console.log(this.#formatLog("success", message, data));
+  #sanitize(message) {
+    if (!message) return "";
+    return message
+      .toString()
+      .replace(/mongodb:\/\/[^:\s]+:[^@\s]+@[^\s]+/g, "mongodb://***:***@***")
+      .replace(/\d{6,}/g, (match) => match.substring(0, 3) + "***")
+      .replace(/[a-zA-Z0-9_-]{32,}/g, "***API_KEY***");
   }
 
-  warn(message, data) {
-    console.log(this.#formatLog("warn", message, data));
+  #formatDuration(ms) {
+    const seconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+
+    if (hours > 0) return `${hours}시간 ${minutes % 60}분`;
+    if (minutes > 0) return `${minutes}분 ${seconds % 60}초`;
+    return `${seconds}초`;
   }
 
-  error(message, data) {
-    console.log(this.#formatLog("error", message, data));
+  #updateModuleStats(moduleName) {
+    const current = this.stats.moduleUsage.get(moduleName) || 0;
+    this.stats.moduleUsage.set(moduleName, current + 1);
   }
 
-  debug(message, data) {
-    if (process.env.DEBUG === "true") {
-      console.log(this.#formatLog("debug", message, data));
-    }
-  }
+  // ===== 🎯 봇 메시지 통합 메서드들 (Message 시스템에서 주입됨) =====
+  // sendMainMenu, sendTodoList, sendSuccess, sendError, sendLoading, updateLoading
+  // 이미 LoggerEnhancer에서 주입됨!
 
-  system(message, data) {
-    console.log(this.#formatLog("system", message, data));
-  }
-
-  // ===== 📦 모듈별 로그 =====
-
-  module(moduleName, message, data) {
-    const moduleColor = this.moduleColors[moduleName] || chalk.white;
-    const timestamp = this.getTimestamp();
-    const badge = moduleColor.bold(` ${moduleName} `);
-
-    let output = `${timestamp} ${badge} ${message}`;
-
-    if (data) {
-      output += "\n" + this.#formatData(data, "info");
-    }
-
-    console.log(output);
-  }
-
-  // ===== 🎯 네비게이션 로그 =====
-
-  navigation(from, to, params = []) {
-    const timestamp = this.getTimestamp();
-    const arrow = chalk.cyan("→");
-    const fromModule = chalk.bold.yellow(from);
-    const toModule = chalk.bold.green(to);
-    const paramsStr =
-      params.length > 0 ? chalk.gray(`(${params.join(", ")})`) : "";
-
-    console.log(
-      `${timestamp} 🎯 ${fromModule} ${arrow} ${toModule} ${paramsStr}`
-    );
-  }
-
-  // ===== 💬 메시지 로그 =====
-
-  message(user, text, type = "received") {
-    const timestamp = this.getTimestamp();
-    const icon = type === "received" ? "📨" : "📤";
-    const userStr = chalk.bold.cyan(`@${user}`);
-    const textStr = chalk.white(
-      text.length > 50 ? text.substring(0, 50) + "..." : text
-    );
-
-    console.log(`${timestamp} ${icon} ${userStr}: ${textStr}`);
-  }
-
-  // ===== 🎨 시각적 요소들 =====
-
-  gradient(text, startColor = "#FF6B6B", endColor = "#4ECDC4") {
-    if (this.hasGradient) {
-      return this.gradientString(startColor, endColor)(text);
-    }
-    // 폴백: 그라디언트 없으면 기본 색상
-    return chalk.cyan(text);
-  }
-
-  banner(title, subtitle) {
-    const width = 60;
-    const titlePadding = Math.floor((width - title.length - 2) / 2);
-    const subtitlePadding = Math.floor((width - subtitle.length - 2) / 2);
-
-    console.log();
-    console.log(
-      chalk.cyan(
-        this.box.topLeft + this.box.horizontal.repeat(width) + this.box.topRight
-      )
-    );
-    console.log(
-      chalk.cyan(this.box.vertical) +
-        " ".repeat(titlePadding) +
-        chalk.bold.white(title) +
-        " ".repeat(width - titlePadding - title.length - 1) +
-        chalk.cyan(this.box.vertical)
-    );
-    console.log(
-      chalk.cyan(this.box.vertical) +
-        " ".repeat(subtitlePadding) +
-        chalk.gray(subtitle) +
-        " ".repeat(width - subtitlePadding - subtitle.length - 1) +
-        chalk.cyan(this.box.vertical)
-    );
-    console.log(
-      chalk.cyan(
-        this.box.bottomLeft +
-          this.box.horizontal.repeat(width) +
-          this.box.bottomRight
-      )
-    );
-    console.log();
-  }
-
-  box(title, content, color = "cyan") {
-    const boxColor = chalk[color];
-    const width = 50;
-
-    console.log();
-    console.log(
-      boxColor(
-        this.box.topLeft + this.box.horizontal.repeat(width) + this.box.topRight
-      )
-    );
-    console.log(
-      boxColor(this.box.vertical) +
-        " " +
-        chalk.bold.white(title.padEnd(width - 2)) +
-        " " +
-        boxColor(this.box.vertical)
-    );
-    console.log(
-      boxColor(
-        this.box.teeRight + this.box.horizontal.repeat(width) + this.box.teeLeft
-      )
-    );
-
-    content.split("\n").forEach((line) => {
-      console.log(
-        boxColor(this.box.vertical) +
-          " " +
-          line.padEnd(width - 2) +
-          " " +
-          boxColor(this.box.vertical)
-      );
-    });
-
-    console.log(
-      boxColor(
-        this.box.bottomLeft +
-          this.box.horizontal.repeat(width) +
-          this.box.bottomRight
-      )
-    );
-    console.log();
-  }
-
-  progress(current, total, label) {
-    const percentage = Math.round((current / total) * 100);
-    const barLength = 30;
-    const filledLength = Math.round((percentage / 100) * barLength);
-
-    const filled = chalk.green("█").repeat(filledLength);
-    const empty = chalk.gray("░").repeat(barLength - filledLength);
-    const bar = `${filled}${empty}`;
-    const stats = chalk.cyan(`${current}/${total} (${percentage}%)`);
-
-    console.log(`${chalk.bold(label)} ${bar} ${stats}`);
-  }
-
-  // ===== 🚀 시작 메시지 =====
-
-  startup() {
-    console.clear();
-
-    const logo = [
-      "██████╗  ██████╗  ██████╗ ███╗   ███╗ ██████╗  ██████╗██╗  ██╗",
-      "██╔══██╗██╔═══██╗██╔═══██╗████╗ ████║██╔═══██╗██╔════╝██║ ██╔╝",
-      "██║  ██║██║   ██║██║   ██║██╔████╔██║██║   ██║██║     █████╔╝ ",
-      "██║  ██║██║   ██║██║   ██║██║╚██╔╝██║██║   ██║██║     ██╔═██╗ ",
-      "██████╔╝╚██████╔╝╚██████╔╝██║ ╚═╝ ██║╚██████╔╝╚██████╗██║  ██╗",
-      "╚═════╝  ╚═════╝  ╚═════╝ ╚═╝     ╚═╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝",
-    ];
-
-    logo.forEach((line) => {
-      console.log(this.gradient(line, "#FF6B6B", "#4ECDC4"));
-    });
-
-    console.log();
-    console.log(chalk.bold.white("🤖 두목봇 v3.0.1 시작 중..."));
-    console.log(
-      chalk.gray("────────────────────────────────────────────────────")
-    );
-    console.log();
-  }
-
-  complete(message) {
-    const timestamp = this.getTimestamp();
-    const badge = chalk.bgGreen.black(" COMPLETE ");
-    const checkmark = chalk.green("✓");
-
-    console.log(
-      `${timestamp} ${badge} ${checkmark} ${chalk.bold.green(message)}`
-    );
-  }
-
-  // ===== 🔄 로딩 애니메이션 =====
-
-  loading(message) {
-    try {
-      const ora = require("ora");
-      return ora({
-        text: message,
-        spinner: {
-          interval: 80,
-          frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
-        },
-        color: "cyan",
-      }).start();
-    } catch (error) {
-      // ora 없으면 심플한 로딩 메시지
-      this.info(`🔄 ${message}`);
-      return { stop: () => {}, succeed: () => {}, fail: () => {} };
-    }
-  }
-
-  // ===== 📋 테이블 출력 =====
-
-  table(headers, rows) {
-    try {
-      const Table = require("cli-table3");
-      const table = new Table({
-        head: headers.map((h) => chalk.bold.white(h)),
-        style: { head: ["cyan"], border: ["gray"] },
-      });
-
-      rows.forEach((row) => table.push(row));
-      console.log(table.toString());
-    } catch (error) {
-      // cli-table3 없으면 심플한 테이블
-      this.info("📊 테이블 데이터:");
-      console.log(headers.join(" | "));
-      console.log("-".repeat(headers.join(" | ").length));
-      rows.forEach((row) => console.log(row.join(" | ")));
-    }
+  // ===== 🧹 정리 작업 =====
+  cleanup() {
+    this.showStats();
+    console.log(this.rainbow("🌈 Enhanced Logger 종료됨"));
   }
 }
 
-// 🎯 깔끔한 내보내기 - 싱글톤 인스턴스만!
-module.exports = Logger.getInstance();
+// ========================================
+// 🎯 싱글톤 인스턴스 관리
+// ========================================
+
+let loggerInstance = null;
+
+/**
+ * 🎯 Logger 인스턴스 가져오기 (싱글톤)
+ */
+function getInstance() {
+  if (!loggerInstance) {
+    loggerInstance = new EnhancedLogger();
+  }
+  return loggerInstance;
+}
+
+// ========================================
+// 🚀 모듈 내보내기
+// ========================================
+
+module.exports = getInstance();

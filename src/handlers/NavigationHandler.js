@@ -89,6 +89,8 @@ class NavigationHandler {
 
 무엇을 도와드릴까요?
 `;
+      // ✅ 통합 메인 메뉴 전송 (텔레그램 + 콘솔)
+      await logger.sendMainMenu(bot, chatId, userName, stats);
 
       const keyboard = this.createMainMenuKeyboard(modules);
 
