@@ -278,7 +278,7 @@ class DooMockBot {
    * 🔧 환경 변수 검증
    */
   async validateEnvironment() {
-    const requiredEnvVars = ["TELEGRAM_BOT_TOKEN", "MONGODB_URI"];
+    const requiredEnvVars = ["BOT_TOKEN", "MONGO_URI"];
 
     const missingVars = requiredEnvVars.filter(
       (varName) => !process.env[varName]
@@ -289,7 +289,7 @@ class DooMockBot {
     }
 
     // 토큰 유효성 기본 체크
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token = process.env.BOT_TOKEN;
     if (!token.includes(":") || token.length < 40) {
       throw new Error("유효하지 않은 텔레그램 봇 토큰 형식");
     }

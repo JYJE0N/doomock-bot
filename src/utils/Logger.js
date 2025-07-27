@@ -234,6 +234,31 @@ class EnhancedLogger {
   }
 
   /**
+   * 💀 Enhanced Fatal - 치명적 오류 (애플리케이션 종료)
+   */
+  fatal(message, data) {
+    this.stats.totalLogs++;
+    this.stats.errorsHandled++;
+
+    console.log(chalk.red.bold("💀 ") + "═".repeat(50));
+    console.log(chalk.red.bold("💀 FATAL ERROR - 애플리케이션 종료"));
+    console.log(this.#formatEnhancedLog("error", message, data));
+
+    if (data instanceof Error) {
+      console.log(chalk.red("📋 스택 트레이스:"));
+      console.log(chalk.gray(data.stack));
+    }
+
+    console.log(chalk.red.bold("💀 프로세스를 종료합니다..."));
+    console.log(chalk.red.bold("💀 ") + "═".repeat(50));
+
+    // 짧은 지연 후 프로세스 종료 (로그 출력 보장)
+    setTimeout(() => {
+      process.exit(1);
+    }, 100);
+  }
+
+  /**
    * 🔍 Enhanced Debug - 개발 모드 전용
    */
   debug(message, data) {
