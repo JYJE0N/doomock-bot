@@ -1,19 +1,19 @@
-// src/services/TodoService.js
-// 🔧 할일 데이터 관리 (v3.0.1)
+// src/services/InsightService.js
+// 🔧 통계 데이터 분석 (v3.0.1)
 
 const logger = require("../utils/LoggerEnhancer");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🔧 TodoService - 할일 데이터 관리
+ * 🔧 InsightService - 통계 데이터 분석
  * 
  * @version 3.0.1
  */
-class TodoService {
+class InsightService {
   constructor(db) {
     this.db = db;
     this.collection = null;
-    this.collectionName = "todos";
+    this.collectionName = "insights";
   }
 
   /**
@@ -172,4 +172,4 @@ class TodoService {
   // TODO: 서비스별 추가 메서드 구현
 }
 
-module.exports = TodoService;
+module.exports = InsightService;
