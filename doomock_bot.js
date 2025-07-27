@@ -278,7 +278,7 @@ class DooMockBot {
    * 🔧 환경 변수 검증
    */
   async validateEnvironment() {
-    const requiredEnvVars = ["BOT_TOKEN", "MONGO_URI"];
+    const requiredEnvVars = ["BOT_TOKEN", "MONGO_URL"];
 
     const missingVars = requiredEnvVars.filter(
       (varName) => !process.env[varName]

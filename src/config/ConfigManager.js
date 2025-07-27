@@ -110,7 +110,7 @@ class ConfigManager {
 
       // 🤖 봇 설정
       bot: {
-        token: process.env.BOT_TOKEN || process.env.TELEGRAM_BOT_TOKEN,
+        token: process.env.BOT_TOKEN,
         webhook: {
           enabled: process.env.WEBHOOK_ENABLED === "true",
           port: parseInt(process.env.PORT) || 3000,

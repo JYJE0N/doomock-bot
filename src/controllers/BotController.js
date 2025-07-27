@@ -8,7 +8,8 @@ const { Telegraf } = require("telegraf");
 const logger = require("../utils/Logger");
 const NavigationHandler = require("../handlers/NavigationHandler");
 const ModuleManager = require("../core/ModuleManager");
-const DatabaseManager = require("../database/DatabaseManager");
+const { getInstance } = require("../database/DatabaseManager");
+
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 
@@ -24,6 +25,12 @@ const { getUserName, getUserId } = require("../utils/UserHelper");
  */
 class BotController {
   constructor() {
+    // ✅ Railway 표준 환경변수 사용
+    const token = process.env.BOT_TOKEN;
+
+    if (!token) {
+      throw new Error("BOT_TOKEN이 설정되지 않았습니다");
+    }
     this.bot = null;
     this.navigationHandler = null;
     this.moduleManager = null;
@@ -178,9 +185,9 @@ class BotController {
    * 🤖 봇 인스턴스 생성
    */
   createBot() {
-    const token = process.env.TELEGRAM_BOT_TOKEN;
+    const token = process.env.BOT_TOKEN;
     if (!token) {
-      throw new Error("TELEGRAM_BOT_TOKEN이 설정되지 않았습니다");
+      throw new Error("BOT_TOKEN이 설정되지 않았습니다");
     }
 
     this.bot = new Telegraf(token);
@@ -199,7 +206,8 @@ class BotController {
    * 🗄️ 데이터베이스 초기화
    */
   async initializeDatabase() {
-    this.dbManager = new DatabaseManager();
+    logger.database("데이터베이스 연결 시작...");
+    this.dbManager = getInstance();
     await this.dbManager.connect();
 
     // 🌈 연결 상태 알록달록 표시
@@ -207,6 +215,7 @@ class BotController {
     console.log(
       this.messageSystem.gradient(`   📊 상태: ${dbStatus}`, "cyan", "green")
     );
+    logger.database("✅ 데이터베이스 연결 성공");
   }
 
   /**
