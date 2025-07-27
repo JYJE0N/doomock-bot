@@ -1,175 +1,188 @@
-// src/services/WorktimeService.js
-// 🔧 근무시간 데이터 관리 (v3.0.1)
-
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-
-/**
- * 🔧 WorktimeService - 근무시간 데이터 관리
- * 
- * @version 3.0.1
- */
 class WorktimeService {
-  constructor(db) {
-    this.db = db;
-    this.collection = null;
+  constructor(options = {}) {
     this.collectionName = "worktimes";
+    this.db = options.db || null;
+    this.collection = null;
+    this.config = {
+      workStartTime: "09:00",
+      workEndTime: "18:00",
+      ...options.config,
+    };
+
+    logger.service("WorktimeService", "서비스 생성");
   }
 
-  /**
-   * 🎯 초기화
-   */
   async initialize() {
-    try {
-      this.collection = this.db.collection(this.collectionName);
-      
-      // 인덱스 생성
-      await this.createIndexes();
-      
-      logger.success(`✅ ${this.constructor.name} 초기화 완료`);
-    } catch (error) {
-      logger.error(`❌ ${this.constructor.name} 초기화 실패`, error);
-      throw error;
+    if (!this.db) {
+      throw new Error("Database connection required");
     }
+
+    this.collection = this.db.collection(this.collectionName);
+    await this.createIndexes();
+    logger.success("WorktimeService 초기화 완료");
   }
 
-  /**
-   * 🔍 인덱스 생성
-   */
   async createIndexes() {
     try {
-      // 기본 인덱스
-      await this.collection.createIndex({ userId: 1 });
-      await this.collection.createIndex({ createdAt: -1 });
-      await this.collection.createIndex({ updatedAt: -1 });
-      
-      // TODO: 서비스별 추가 인덱스
-      
-      logger.debug(`🔍 ${this.collectionName} 인덱스 생성 완료`);
+      await this.collection.createIndex({ userId: 1, date: -1 });
+      await this.collection.createIndex({ userId: 1, createdAt: -1 });
     } catch (error) {
-      logger.warn(`인덱스 생성 실패 (이미 존재할 수 있음): ${error.message}`);
+      logger.warn("근무시간 인덱스 생성 실패", error.message);
     }
   }
 
-  /**
-   * 📊 사용자 통계 조회
-   */
-  async getUserStats(userId) {
+  async checkIn(userId) {
     try {
-      const total = await this.collection.countDocuments({ userId });
-      
-      // TODO: 서비스별 통계 구현
-      return {
-        total,
-        // 추가 통계...
-      };
-    } catch (error) {
-      logger.error(`사용자 통계 조회 실패: ${error.message}`);
-      return { total: 0 };
-    }
-  }
+      const today = TimeHelper.format(TimeHelper.now(), "YYYY-MM-DD");
 
-  /**
-   * 📝 데이터 생성
-   */
-  async create(userId, data) {
-    try {
-      const document = {
+      // 오늘 출근 기록 확인
+      const existingRecord = await this.collection.findOne({
         userId,
-        ...data,
-        createdAt: TimeHelper.now(),
-        updatedAt: TimeHelper.now(),
-        version: "3.0.1",
+        date: today,
+        isActive: true,
+      });
+
+      if (existingRecord && existingRecord.checkInTime) {
+        throw new Error("이미 출근 처리되었습니다.");
+      }
+
+      const now = TimeHelper.now();
+      const checkInData = {
+        userId,
+        date: today,
+        checkInTime: now,
+        checkOutTime: null,
+
+        // 표준 필드
+        createdAt: now,
+        updatedAt: now,
+        version: 1,
         isActive: true,
       };
 
-      const result = await this.collection.insertOne(document);
-      
-      logger.debug(`📝 ${this.collectionName} 데이터 생성: ${result.insertedId}`);
-      
-      return result.insertedId;
+      if (existingRecord) {
+        // 기존 레코드 업데이트
+        await this.collection.updateOne(
+          { _id: existingRecord._id },
+          { $set: { checkInTime: now, updatedAt: now, $inc: { version: 1 } } }
+        );
+      } else {
+        // 새 레코드 생성
+        await this.collection.insertOne(checkInData);
+      }
+
+      logger.data("worktime", "checkin", userId, { date: today });
+      return {
+        success: true,
+        checkInTime: now,
+        message: "출근 처리되었습니다.",
+      };
     } catch (error) {
-      logger.error(`데이터 생성 실패: ${error.message}`);
+      logger.error("출근 처리 실패", error);
       throw error;
     }
   }
 
-  /**
-   * 🔍 데이터 조회
-   */
-  async findByUserId(userId, options = {}) {
+  async checkOut(userId) {
     try {
-      const query = { userId, isActive: true };
-      
-      const cursor = this.collection.find(query)
-        .sort({ createdAt: -1 })
-        .limit(options.limit || 10);
-      
-      return await cursor.toArray();
-    } catch (error) {
-      logger.error(`데이터 조회 실패: ${error.message}`);
-      return [];
-    }
-  }
+      const today = TimeHelper.format(TimeHelper.now(), "YYYY-MM-DD");
 
-  /**
-   * 🔄 데이터 업데이트
-   */
-  async update(id, updates) {
-    try {
-      const result = await this.collection.updateOne(
-        { _id: id },
+      const record = await this.collection.findOne({
+        userId,
+        date: today,
+        isActive: true,
+        checkInTime: { $exists: true },
+      });
+
+      if (!record) {
+        throw new Error("출근 기록이 없습니다.");
+      }
+
+      if (record.checkOutTime) {
+        throw new Error("이미 퇴근 처리되었습니다.");
+      }
+
+      const now = TimeHelper.now();
+      const workDuration = Math.round((now - record.checkInTime) / (1000 * 60)); // 분 단위
+
+      await this.collection.updateOne(
+        { _id: record._id },
         {
           $set: {
-            ...updates,
-            updatedAt: TimeHelper.now(),
+            checkOutTime: now,
+            workDuration,
+            updatedAt: now,
+            $inc: { version: 1 },
           },
         }
       );
 
-      logger.debug(`🔄 ${this.collectionName} 업데이트: ${id}`);
-      
-      return result.modifiedCount > 0;
+      logger.data("worktime", "checkout", userId, {
+        date: today,
+        duration: workDuration,
+      });
+
+      return {
+        success: true,
+        checkOutTime: now,
+        workDuration,
+        message: "퇴근 처리되었습니다.",
+      };
     } catch (error) {
-      logger.error(`데이터 업데이트 실패: ${error.message}`);
-      return false;
+      logger.error("퇴근 처리 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🗑️ 데이터 삭제 (소프트 삭제)
-   */
-  async delete(id) {
+  async getTodayStatus(userId) {
     try {
-      const result = await this.collection.updateOne(
-        { _id: id },
-        {
-          $set: {
-            isActive: false,
-            deletedAt: TimeHelper.now(),
-            updatedAt: TimeHelper.now(),
-          },
-        }
-      );
+      const today = TimeHelper.format(TimeHelper.now(), "YYYY-MM-DD");
 
-      logger.debug(`🗑️ ${this.collectionName} 삭제: ${id}`);
-      
-      return result.modifiedCount > 0;
+      const record = await this.collection.findOne({
+        userId,
+        date: today,
+        isActive: true,
+      });
+
+      const status = {
+        date: today,
+        isCheckedIn: !!(record && record.checkInTime),
+        isCheckedOut: !!(record && record.checkOutTime),
+        checkInTime: record?.checkInTime || null,
+        checkOutTime: record?.checkOutTime || null,
+        workDuration: record?.workDuration || 0,
+      };
+
+      logger.data("worktime", "status", userId, status);
+      return status;
     } catch (error) {
-      logger.error(`데이터 삭제 실패: ${error.message}`);
-      return false;
+      logger.error("오늘 근무 상태 조회 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🧹 정리 작업
-   */
+  async getTodayWorktime(userId) {
+    try {
+      const status = await this.getTodayStatus(userId);
+
+      // 현재 근무 시간 계산 (진행중인 경우)
+      if (status.isCheckedIn && !status.isCheckedOut) {
+        const now = TimeHelper.now();
+        status.currentWorkDuration = Math.round(
+          (now - status.checkInTime) / (1000 * 60)
+        );
+      }
+
+      return status;
+    } catch (error) {
+      logger.error("오늘 근무시간 조회 실패", error);
+      throw error;
+    }
+  }
+
   async cleanup() {
-    // TODO: 필요한 정리 작업
-    logger.debug(`🧹 ${this.constructor.name} 정리 완료`);
+    logger.info("WorktimeService 정리 완료");
   }
-
-  // TODO: 서비스별 추가 메서드 구현
 }
 
 module.exports = WorktimeService;

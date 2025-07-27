@@ -1,175 +1,187 @@
-// src/services/TimerService.js
-// 🔧 타이머 데이터 관리 (v3.0.1)
-
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-
-/**
- * 🔧 TimerService - 타이머 데이터 관리
- * 
- * @version 3.0.1
- */
 class TimerService {
-  constructor(db) {
-    this.db = db;
-    this.collection = null;
+  constructor(options = {}) {
     this.collectionName = "timers";
+    this.db = options.db || null;
+    this.collection = null;
+    this.config = {
+      defaultDuration: 25, // 25분
+      ...options.config,
+    };
+
+    // 활성 타이머 메모리 관리
+    this.activeTimers = new Map();
+
+    logger.service("TimerService", "서비스 생성");
   }
 
-  /**
-   * 🎯 초기화
-   */
   async initialize() {
-    try {
-      this.collection = this.db.collection(this.collectionName);
-      
-      // 인덱스 생성
-      await this.createIndexes();
-      
-      logger.success(`✅ ${this.constructor.name} 초기화 완료`);
-    } catch (error) {
-      logger.error(`❌ ${this.constructor.name} 초기화 실패`, error);
-      throw error;
+    if (!this.db) {
+      throw new Error("Database connection required");
     }
+
+    this.collection = this.db.collection(this.collectionName);
+    await this.createIndexes();
+    logger.success("TimerService 초기화 완료");
   }
 
-  /**
-   * 🔍 인덱스 생성
-   */
   async createIndexes() {
     try {
-      // 기본 인덱스
-      await this.collection.createIndex({ userId: 1 });
-      await this.collection.createIndex({ createdAt: -1 });
-      await this.collection.createIndex({ updatedAt: -1 });
-      
-      // TODO: 서비스별 추가 인덱스
-      
-      logger.debug(`🔍 ${this.collectionName} 인덱스 생성 완료`);
+      await this.collection.createIndex({ userId: 1, createdAt: -1 });
+      await this.collection.createIndex({ userId: 1, isActive: 1 });
     } catch (error) {
-      logger.warn(`인덱스 생성 실패 (이미 존재할 수 있음): ${error.message}`);
+      logger.warn("타이머 인덱스 생성 실패", error.message);
     }
   }
 
-  /**
-   * 📊 사용자 통계 조회
-   */
-  async getUserStats(userId) {
+  async startTimer(userId, duration = null) {
     try {
-      const total = await this.collection.countDocuments({ userId });
-      
-      // TODO: 서비스별 통계 구현
-      return {
-        total,
-        // 추가 통계...
-      };
-    } catch (error) {
-      logger.error(`사용자 통계 조회 실패: ${error.message}`);
-      return { total: 0 };
-    }
-  }
+      // 기존 활성 타이머 확인
+      const existingTimer = this.activeTimers.get(userId);
+      if (existingTimer) {
+        throw new Error("이미 실행 중인 타이머가 있습니다.");
+      }
 
-  /**
-   * 📝 데이터 생성
-   */
-  async create(userId, data) {
-    try {
-      const document = {
+      const timerDuration = duration || this.config.defaultDuration;
+      const startTime = TimeHelper.now();
+      const endTime = new Date(startTime.getTime() + timerDuration * 60 * 1000);
+
+      const timer = {
         userId,
-        ...data,
-        createdAt: TimeHelper.now(),
-        updatedAt: TimeHelper.now(),
-        version: "3.0.1",
+        duration: timerDuration,
+        startTime,
+        endTime,
+        isCompleted: false,
+
+        // 표준 필드
+        createdAt: startTime,
+        updatedAt: startTime,
+        version: 1,
         isActive: true,
       };
 
-      const result = await this.collection.insertOne(document);
-      
-      logger.debug(`📝 ${this.collectionName} 데이터 생성: ${result.insertedId}`);
-      
-      return result.insertedId;
+      const result = await this.collection.insertOne(timer);
+
+      // 메모리에 활성 타이머 저장
+      this.activeTimers.set(userId, {
+        _id: result.insertedId,
+        startTime,
+        endTime,
+        duration: timerDuration,
+      });
+
+      logger.data("timer", "start", userId, { duration: timerDuration });
+      return {
+        success: true,
+        timerId: result.insertedId,
+        duration: timerDuration,
+        endTime,
+      };
     } catch (error) {
-      logger.error(`데이터 생성 실패: ${error.message}`);
+      logger.error("타이머 시작 실패", error);
       throw error;
     }
   }
 
-  /**
-   * 🔍 데이터 조회
-   */
-  async findByUserId(userId, options = {}) {
+  async stopTimer(userId) {
     try {
-      const query = { userId, isActive: true };
-      
-      const cursor = this.collection.find(query)
-        .sort({ createdAt: -1 })
-        .limit(options.limit || 10);
-      
-      return await cursor.toArray();
-    } catch (error) {
-      logger.error(`데이터 조회 실패: ${error.message}`);
-      return [];
-    }
-  }
+      const activeTimer = this.activeTimers.get(userId);
+      if (!activeTimer) {
+        throw new Error("실행 중인 타이머가 없습니다.");
+      }
 
-  /**
-   * 🔄 데이터 업데이트
-   */
-  async update(id, updates) {
-    try {
-      const result = await this.collection.updateOne(
-        { _id: id },
+      const stopTime = TimeHelper.now();
+      const actualDuration = Math.round(
+        (stopTime - activeTimer.startTime) / (1000 * 60)
+      );
+
+      await this.collection.updateOne(
+        { _id: activeTimer._id },
         {
           $set: {
-            ...updates,
-            updatedAt: TimeHelper.now(),
+            stopTime,
+            actualDuration,
+            isCompleted: true,
+            updatedAt: stopTime,
+            $inc: { version: 1 },
           },
         }
       );
 
-      logger.debug(`🔄 ${this.collectionName} 업데이트: ${id}`);
-      
-      return result.modifiedCount > 0;
+      // 메모리에서 제거
+      this.activeTimers.delete(userId);
+
+      logger.data("timer", "stop", userId, { actualDuration });
+      return {
+        success: true,
+        actualDuration,
+        stopTime,
+      };
     } catch (error) {
-      logger.error(`데이터 업데이트 실패: ${error.message}`);
-      return false;
+      logger.error("타이머 정지 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🗑️ 데이터 삭제 (소프트 삭제)
-   */
-  async delete(id) {
+  async getTimerStatus(userId) {
     try {
-      const result = await this.collection.updateOne(
-        { _id: id },
-        {
-          $set: {
-            isActive: false,
-            deletedAt: TimeHelper.now(),
-            updatedAt: TimeHelper.now(),
-          },
-        }
-      );
+      const activeTimer = this.activeTimers.get(userId);
 
-      logger.debug(`🗑️ ${this.collectionName} 삭제: ${id}`);
-      
-      return result.modifiedCount > 0;
+      if (!activeTimer) {
+        return {
+          isActive: false,
+          message: "실행 중인 타이머가 없습니다.",
+        };
+      }
+
+      const now = TimeHelper.now();
+      const remaining = Math.max(
+        0,
+        Math.round((activeTimer.endTime - now) / (1000 * 60))
+      );
+      const elapsed = Math.round((now - activeTimer.startTime) / (1000 * 60));
+
+      return {
+        isActive: true,
+        duration: activeTimer.duration,
+        elapsed,
+        remaining,
+        endTime: activeTimer.endTime,
+      };
     } catch (error) {
-      logger.error(`데이터 삭제 실패: ${error.message}`);
-      return false;
+      logger.error("타이머 상태 조회 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🧹 정리 작업
-   */
+  async getDetailedStatus(userId) {
+    try {
+      const status = await this.getTimerStatus(userId);
+
+      // 오늘 완료된 타이머 개수
+      const today = TimeHelper.format(TimeHelper.now(), "YYYY-MM-DD");
+      const todayCount = await this.collection.countDocuments({
+        userId,
+        isCompleted: true,
+        createdAt: {
+          $gte: new Date(today),
+          $lt: new Date(new Date(today).getTime() + 24 * 60 * 60 * 1000),
+        },
+      });
+
+      return {
+        ...status,
+        todayCompleted: todayCount,
+      };
+    } catch (error) {
+      logger.error("상세 타이머 상태 조회 실패", error);
+      throw error;
+    }
+  }
+
   async cleanup() {
-    // TODO: 필요한 정리 작업
-    logger.debug(`🧹 ${this.constructor.name} 정리 완료`);
+    this.activeTimers.clear();
+    logger.info("TimerService 정리 완료");
   }
-
-  // TODO: 서비스별 추가 메서드 구현
 }
 
 module.exports = TimerService;

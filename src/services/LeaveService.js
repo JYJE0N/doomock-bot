@@ -1,175 +1,154 @@
-// src/services/LeaveService.js
-// 🔧 휴가 데이터 관리 (v3.0.1)
-
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-
-/**
- * 🔧 LeaveService - 휴가 데이터 관리
- * 
- * @version 3.0.1
- */
 class LeaveService {
-  constructor(db) {
-    this.db = db;
-    this.collection = null;
+  constructor(options = {}) {
     this.collectionName = "leaves";
+    this.db = options.db || null;
+    this.collection = null;
+    this.config = {
+      annualLeaveDays: 15,
+      ...options.config,
+    };
+
+    logger.service("LeaveService", "서비스 생성");
   }
 
-  /**
-   * 🎯 초기화
-   */
   async initialize() {
-    try {
-      this.collection = this.db.collection(this.collectionName);
-      
-      // 인덱스 생성
-      await this.createIndexes();
-      
-      logger.success(`✅ ${this.constructor.name} 초기화 완료`);
-    } catch (error) {
-      logger.error(`❌ ${this.constructor.name} 초기화 실패`, error);
-      throw error;
+    if (!this.db) {
+      throw new Error("Database connection required");
     }
+
+    this.collection = this.db.collection(this.collectionName);
+    await this.createIndexes();
+    logger.success("LeaveService 초기화 완료");
   }
 
-  /**
-   * 🔍 인덱스 생성
-   */
   async createIndexes() {
     try {
-      // 기본 인덱스
-      await this.collection.createIndex({ userId: 1 });
-      await this.collection.createIndex({ createdAt: -1 });
-      await this.collection.createIndex({ updatedAt: -1 });
-      
-      // TODO: 서비스별 추가 인덱스
-      
-      logger.debug(`🔍 ${this.collectionName} 인덱스 생성 완료`);
+      await this.collection.createIndex({ userId: 1, year: -1 });
+      await this.collection.createIndex({ userId: 1, createdAt: -1 });
     } catch (error) {
-      logger.warn(`인덱스 생성 실패 (이미 존재할 수 있음): ${error.message}`);
+      logger.warn("연차 인덱스 생성 실패", error.message);
     }
   }
 
-  /**
-   * 📊 사용자 통계 조회
-   */
-  async getUserStats(userId) {
+  async useLeave(userId, days, reason = "") {
     try {
-      const total = await this.collection.countDocuments({ userId });
-      
-      // TODO: 서비스별 통계 구현
-      return {
-        total,
-        // 추가 통계...
-      };
-    } catch (error) {
-      logger.error(`사용자 통계 조회 실패: ${error.message}`);
-      return { total: 0 };
-    }
-  }
+      const currentYear = new Date().getFullYear();
 
-  /**
-   * 📝 데이터 생성
-   */
-  async create(userId, data) {
-    try {
-      const document = {
+      // 현재 연도 연차 상태 확인
+      const leaveStatus = await this.getLeaveStatus(userId, currentYear);
+
+      if (leaveStatus.remaining < days) {
+        throw new Error("잔여 연차가 부족합니다.");
+      }
+
+      const leaveRecord = {
         userId,
-        ...data,
+        year: currentYear,
+        days: parseFloat(days),
+        reason: reason.trim(),
+        usedDate: TimeHelper.now(),
+
+        // 표준 필드
         createdAt: TimeHelper.now(),
         updatedAt: TimeHelper.now(),
-        version: "3.0.1",
+        version: 1,
         isActive: true,
       };
 
-      const result = await this.collection.insertOne(document);
-      
-      logger.debug(`📝 ${this.collectionName} 데이터 생성: ${result.insertedId}`);
-      
-      return result.insertedId;
+      const result = await this.collection.insertOne(leaveRecord);
+
+      logger.data("leave", "use", userId, { days, year: currentYear });
+      return result;
     } catch (error) {
-      logger.error(`데이터 생성 실패: ${error.message}`);
+      logger.error("연차 사용 실패", error);
       throw error;
     }
   }
 
-  /**
-   * 🔍 데이터 조회
-   */
-  async findByUserId(userId, options = {}) {
+  async getLeaveStatus(userId, year = null) {
     try {
-      const query = { userId, isActive: true };
-      
-      const cursor = this.collection.find(query)
-        .sort({ createdAt: -1 })
-        .limit(options.limit || 10);
-      
-      return await cursor.toArray();
+      const targetYear = year || new Date().getFullYear();
+
+      const pipeline = [
+        { $match: { userId, year: targetYear, isActive: true } },
+        { $group: { _id: null, totalUsed: { $sum: "$days" } } },
+      ];
+
+      const result = await this.collection.aggregate(pipeline).toArray();
+      const totalUsed = result[0]?.totalUsed || 0;
+      const remaining = this.config.annualLeaveDays - totalUsed;
+
+      const status = {
+        year: targetYear,
+        total: this.config.annualLeaveDays,
+        used: totalUsed,
+        remaining: Math.max(0, remaining),
+        usageRate: Math.round((totalUsed / this.config.annualLeaveDays) * 100),
+      };
+
+      logger.data("leave", "status", userId, status);
+      return status;
     } catch (error) {
-      logger.error(`데이터 조회 실패: ${error.message}`);
-      return [];
+      logger.error("연차 상태 조회 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🔄 데이터 업데이트
-   */
-  async update(id, updates) {
+  async getDetailedStatus(userId) {
     try {
-      const result = await this.collection.updateOne(
-        { _id: id },
-        {
-          $set: {
-            ...updates,
-            updatedAt: TimeHelper.now(),
+      const currentStatus = await this.getLeaveStatus(userId);
+
+      // 이번 달 사용 연차
+      const currentMonth = TimeHelper.format(TimeHelper.now(), "YYYY-MM");
+      const monthlyUsed = await this.collection
+        .aggregate([
+          {
+            $match: {
+              userId,
+              isActive: true,
+              usedDate: {
+                $gte: new Date(currentMonth + "-01"),
+                $lt: new Date(
+                  new Date(currentMonth + "-01").getFullYear(),
+                  new Date(currentMonth + "-01").getMonth() + 1,
+                  1
+                ),
+              },
+            },
           },
-        }
-      );
+          { $group: { _id: null, total: { $sum: "$days" } } },
+        ])
+        .toArray();
 
-      logger.debug(`🔄 ${this.collectionName} 업데이트: ${id}`);
-      
-      return result.modifiedCount > 0;
+      return {
+        ...currentStatus,
+        thisMonth: monthlyUsed[0]?.total || 0,
+      };
     } catch (error) {
-      logger.error(`데이터 업데이트 실패: ${error.message}`);
-      return false;
+      logger.error("상세 연차 상태 조회 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🗑️ 데이터 삭제 (소프트 삭제)
-   */
-  async delete(id) {
+  async getLeaveHistory(userId, limit = 20) {
     try {
-      const result = await this.collection.updateOne(
-        { _id: id },
-        {
-          $set: {
-            isActive: false,
-            deletedAt: TimeHelper.now(),
-            updatedAt: TimeHelper.now(),
-          },
-        }
-      );
+      const history = await this.collection
+        .find({ userId, isActive: true })
+        .sort({ usedDate: -1 })
+        .limit(limit)
+        .toArray();
 
-      logger.debug(`🗑️ ${this.collectionName} 삭제: ${id}`);
-      
-      return result.modifiedCount > 0;
+      logger.data("leave", "history", userId, { count: history.length });
+      return history;
     } catch (error) {
-      logger.error(`데이터 삭제 실패: ${error.message}`);
-      return false;
+      logger.error("연차 기록 조회 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🧹 정리 작업
-   */
   async cleanup() {
-    // TODO: 필요한 정리 작업
-    logger.debug(`🧹 ${this.constructor.name} 정리 완료`);
+    logger.info("LeaveService 정리 완료");
   }
-
-  // TODO: 서비스별 추가 메서드 구현
 }
 
 module.exports = LeaveService;

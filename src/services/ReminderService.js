@@ -1,175 +1,145 @@
-// src/services/ReminderService.js
-// 🔧 리마인더 데이터 관리 (v3.0.1)
-
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-
-/**
- * 🔧 ReminderService - 리마인더 데이터 관리
- * 
- * @version 3.0.1
- */
 class ReminderService {
-  constructor(db) {
-    this.db = db;
-    this.collection = null;
+  constructor(options = {}) {
     this.collectionName = "reminders";
+    this.db = options.db || null;
+    this.collection = null;
+    this.config = {
+      maxRemindersPerUser: 20,
+      ...options.config,
+    };
+
+    logger.service("ReminderService", "서비스 생성");
   }
 
-  /**
-   * 🎯 초기화
-   */
   async initialize() {
-    try {
-      this.collection = this.db.collection(this.collectionName);
-      
-      // 인덱스 생성
-      await this.createIndexes();
-      
-      logger.success(`✅ ${this.constructor.name} 초기화 완료`);
-    } catch (error) {
-      logger.error(`❌ ${this.constructor.name} 초기화 실패`, error);
-      throw error;
+    if (!this.db) {
+      throw new Error("Database connection required");
     }
+
+    this.collection = this.db.collection(this.collectionName);
+    await this.createIndexes();
+    logger.success("ReminderService 초기화 완료");
   }
 
-  /**
-   * 🔍 인덱스 생성
-   */
   async createIndexes() {
     try {
-      // 기본 인덱스
-      await this.collection.createIndex({ userId: 1 });
-      await this.collection.createIndex({ createdAt: -1 });
-      await this.collection.createIndex({ updatedAt: -1 });
-      
-      // TODO: 서비스별 추가 인덱스
-      
-      logger.debug(`🔍 ${this.collectionName} 인덱스 생성 완료`);
+      await this.collection.createIndex({ userId: 1, createdAt: -1 });
+      await this.collection.createIndex({ userId: 1, reminderTime: 1 });
     } catch (error) {
-      logger.warn(`인덱스 생성 실패 (이미 존재할 수 있음): ${error.message}`);
+      logger.warn("리마인더 인덱스 생성 실패", error.message);
     }
   }
 
-  /**
-   * 📊 사용자 통계 조회
-   */
-  async getUserStats(userId) {
+  async createReminder(userId, reminderData) {
     try {
-      const total = await this.collection.countDocuments({ userId });
-      
-      // TODO: 서비스별 통계 구현
-      return {
-        total,
-        // 추가 통계...
-      };
-    } catch (error) {
-      logger.error(`사용자 통계 조회 실패: ${error.message}`);
-      return { total: 0 };
-    }
-  }
-
-  /**
-   * 📝 데이터 생성
-   */
-  async create(userId, data) {
-    try {
-      const document = {
+      const userCount = await this.collection.countDocuments({
         userId,
-        ...data,
+        isActive: true,
+      });
+
+      if (userCount >= this.config.maxRemindersPerUser) {
+        throw new Error(
+          `리마인더는 최대 ${this.config.maxRemindersPerUser}개까지 등록 가능합니다.`
+        );
+      }
+
+      const reminder = {
+        userId,
+        text: reminderData.text.trim(),
+        reminderTime: reminderData.reminderTime || null,
+        isRecurring: false,
+        completed: false,
+
+        // 표준 필드
         createdAt: TimeHelper.now(),
         updatedAt: TimeHelper.now(),
-        version: "3.0.1",
+        version: 1,
         isActive: true,
       };
 
-      const result = await this.collection.insertOne(document);
-      
-      logger.debug(`📝 ${this.collectionName} 데이터 생성: ${result.insertedId}`);
-      
-      return result.insertedId;
+      const result = await this.collection.insertOne(reminder);
+      const createdReminder = await this.collection.findOne({
+        _id: result.insertedId,
+      });
+
+      logger.data("reminder", "create", userId, { text: reminder.text });
+      return createdReminder;
     } catch (error) {
-      logger.error(`데이터 생성 실패: ${error.message}`);
+      logger.error("리마인더 생성 실패", error);
       throw error;
     }
   }
 
-  /**
-   * 🔍 데이터 조회
-   */
-  async findByUserId(userId, options = {}) {
+  async getUserReminders(userId) {
     try {
-      const query = { userId, isActive: true };
-      
-      const cursor = this.collection.find(query)
+      const reminders = await this.collection
+        .find({ userId, isActive: true })
         .sort({ createdAt: -1 })
-        .limit(options.limit || 10);
-      
-      return await cursor.toArray();
+        .toArray();
+
+      logger.data("reminder", "list", userId, { count: reminders.length });
+      return reminders;
     } catch (error) {
-      logger.error(`데이터 조회 실패: ${error.message}`);
-      return [];
+      logger.error("리마인더 목록 조회 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🔄 데이터 업데이트
-   */
-  async update(id, updates) {
+  async deleteReminder(userId, reminderId) {
     try {
-      const result = await this.collection.updateOne(
-        { _id: id },
-        {
-          $set: {
-            ...updates,
-            updatedAt: TimeHelper.now(),
-          },
-        }
-      );
+      const { ObjectId } = require("mongodb");
+      const objectId = new ObjectId(reminderId);
 
-      logger.debug(`🔄 ${this.collectionName} 업데이트: ${id}`);
-      
-      return result.modifiedCount > 0;
-    } catch (error) {
-      logger.error(`데이터 업데이트 실패: ${error.message}`);
-      return false;
-    }
-  }
-
-  /**
-   * 🗑️ 데이터 삭제 (소프트 삭제)
-   */
-  async delete(id) {
-    try {
       const result = await this.collection.updateOne(
-        { _id: id },
+        { _id: objectId, userId, isActive: true },
         {
           $set: {
             isActive: false,
             deletedAt: TimeHelper.now(),
             updatedAt: TimeHelper.now(),
+            $inc: { version: 1 },
           },
         }
       );
 
-      logger.debug(`🗑️ ${this.collectionName} 삭제: ${id}`);
-      
-      return result.modifiedCount > 0;
+      if (result.modifiedCount === 0) {
+        throw new Error("리마인더를 찾을 수 없습니다.");
+      }
+
+      logger.data("reminder", "delete", userId, { reminderId });
+      return true;
     } catch (error) {
-      logger.error(`데이터 삭제 실패: ${error.message}`);
-      return false;
+      logger.error("리마인더 삭제 실패", error);
+      throw error;
     }
   }
 
-  /**
-   * 🧹 정리 작업
-   */
-  async cleanup() {
-    // TODO: 필요한 정리 작업
-    logger.debug(`🧹 ${this.constructor.name} 정리 완료`);
+  async getUserStats(userId) {
+    try {
+      const total = await this.collection.countDocuments({
+        userId,
+        isActive: true,
+      });
+
+      const completed = await this.collection.countDocuments({
+        userId,
+        isActive: true,
+        completed: true,
+      });
+
+      return {
+        total,
+        active: total - completed,
+        completed,
+      };
+    } catch (error) {
+      logger.error("리마인더 통계 조회 실패", error);
+      return { total: 0, active: 0, completed: 0 };
+    }
   }
 
-  // TODO: 서비스별 추가 메서드 구현
+  async cleanup() {
+    logger.info("ReminderService 정리 완료");
+  }
 }
-
 module.exports = ReminderService;
