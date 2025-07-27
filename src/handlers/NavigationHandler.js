@@ -1,7 +1,7 @@
 // src/handlers/NavigationHandler.js
 // 🎹 네비게이션 핸들러 - UI/UX 전담 (v3.0.1)
 
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 const { getEnabledModules } = require("../config/ModuleRegistry");
 

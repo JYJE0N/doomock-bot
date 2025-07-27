@@ -1,7 +1,7 @@
 // src/core/BaseModule.js
 // 🏗️ 베이스 모듈 - 모든 모듈의 부모 클래스 (v3.0.1)
 
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

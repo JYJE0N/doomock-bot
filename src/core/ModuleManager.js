@@ -1,7 +1,7 @@
 // src/core/ModuleManager.js
 // 📦 모듈 매니저 - 모듈 중앙 관리 (v3.0.1)
 
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const { getEnabledModules } = require("../config/ModuleRegistry");
 const BaseModule = require("./BaseModule");
 

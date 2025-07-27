@@ -2,7 +2,7 @@
 // 🎮 봇 중앙 제어 시스템 (v3.0.1)
 
 const { Telegraf } = require("telegraf");
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const NavigationHandler = require("../handlers/NavigationHandler");
 const ModuleManager = require("../core/ModuleManager");
 const DatabaseManager = require("../database/DatabaseManager");

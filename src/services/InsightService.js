@@ -1,7 +1,7 @@
 // src/services/InsightService.js
 // 🔧 통계 데이터 분석 (v3.0.1)
 
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

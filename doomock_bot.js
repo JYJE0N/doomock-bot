@@ -2,7 +2,7 @@
 // 🤖 두목봇 v3.0.1 - 메인 엔트리 포인트
 
 require("dotenv").config();
-const logger = require("./src/utils/LoggerEnhancer");
+const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
 
 /**

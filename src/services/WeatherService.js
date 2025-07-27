@@ -1,7 +1,7 @@
 // src/services/WeatherService.js
 // 🔧 날씨 API 연동 (v3.0.1)
 
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

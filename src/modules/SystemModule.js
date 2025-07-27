@@ -2,7 +2,7 @@
 // ⚙️ 시스템 모듈 (v3.0.1)
 
 const BaseModule = require("../core/BaseModule");
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
 

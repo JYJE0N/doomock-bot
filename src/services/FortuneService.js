@@ -1,7 +1,7 @@
 // src/services/FortuneService.js
 // 🔧 운세 데이터 관리 (v3.0.1)
 
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

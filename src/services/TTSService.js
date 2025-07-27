@@ -1,7 +1,7 @@
 // src/services/TTSService.js
 // 🔧 TTS API 연동 (v3.0.1)
 
-const logger = require("../utils/LoggerEnhancer");
+const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
