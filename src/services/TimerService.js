@@ -1,649 +1,469 @@
-// src/services/TimerService.js - 이벤트 시스템 추가 버전
-
-const TimeHelper = require("../utils/TimeHelper");
+// ===== 💾 Enhanced TimerService - 화려한 타이머 데이터 서비스 =====
+// src/services/TimerService.js
+const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
-const EventEmitter = require('events');
+const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 타이머 서비스
- * - 포모도로 및 일반 타이머 관리
- * - 자동 백업 및 복원
- * - 이벤트 기반 알림 시스템
+ * 💾 Enhanced TimerService v3.0.1 - 화려한 타이머 데이터 서비스
+ *
+ * 🎯 Enhanced 특징:
+ * - MongoDB 네이티브 드라이버
+ * - 고급 집계 및 분석
+ * - 포모도로 세션 추적
+ * - 실시간 통계
+ * - Enhanced Logger 통합
  */
-class TimerService extends EventEmitter {
-  constructor() {
-    super();
-    
-    // 활성 타이머 관리
-    this.timers = new Map(); // userId → timer 객체
-    this.pomodoroSessions = new Map(); // userId → session 객체
-    this.sessionHistory = {}; // userId → 히스토리 배열
+class TimerService extends BaseService {
+  constructor(options = {}) {
+    super("timers", options);
 
-    // 백업 관리
-    this.lastBackup = null;
-    this.backupKey = "TIMER_BACKUP_DATA";
-    this.sessionHistoryKey = "TIMER_SESSION_HISTORY";
+    // 🎨 Enhanced Logger - 서비스 시작
+    logger.moduleStart("TimerService", "3.0.1");
 
-    // 설정
-    this.config = {
-      workDuration: 25, // 포모도로 작업 시간 (분)
-      shortBreakDuration: 5, // 짧은 휴식 시간 (분)
-      longBreakDuration: 15, // 긴 휴식 시간 (분)
-      longBreakInterval: 4, // 긴 휴식 주기
-      autoSaveInterval: 60000, // 1분마다 자동 백업
-      maxHistoryDays: 30, // 히스토리 보관 기간
-      notificationInterval: 1000, // 1초마다 타이머 체크
+    // 📋 비즈니스 규칙 (Enhanced)
+    this.rules = {
+      maxTimersPerUser: 50,
+      minDurationMinutes: 1,
+      maxDurationMinutes: 480, // 8시간
+      allowedTypes: ["focus", "break", "meeting", "pomodoro", "custom"],
+      allowedStatuses: [
+        "pending",
+        "running",
+        "paused",
+        "completed",
+        "cancelled",
+      ],
     };
 
-    // 알림 인터벌 관리
-    this.notificationTimer = null;
-    this.isRunning = false;
+    // 📊 Enhanced 인덱스 설정
+    this.indexes = [
+      { userId: 1, createdAt: -1 },
+      { userId: 1, status: 1 },
+      { userId: 1, type: 1 },
+      { userId: 1, startTime: -1 },
+      { userId: 1, completedAt: -1 },
+      { userId: 1, status: 1, endTime: 1 }, // 활성 타이머 조회용
+      { userId: 1, type: 1, createdAt: -1 }, // 타입별 조회
+      { name: "text" }, // 타이머 이름 검색
+    ];
 
-    logger.info("⏰ TimerService 생성됨 (이벤트 시스템 포함)");
+    logger.success("💾 Enhanced TimerService 생성됨");
   }
 
   /**
-   * 서비스 초기화
+   * ⏰ Enhanced 타이머 생성
    */
-  async initialize() {
+  async createTimer(userId, timerData) {
     try {
-      logger.info("⏰ TimerService 초기화 중...");
-
-      // 백업에서 복원
-      await this.restoreFromBackup();
-
-      // 주기적 백업 설정
-      this.setupPeriodicBackup();
-
-      // 안전한 종료 처리
-      this.setupGracefulShutdown();
-
-      // 이벤트 기반 알림 시스템 시작
-      this.startNotificationSystem();
-
-      this.isRunning = true;
-      logger.success("✅ TimerService 초기화 완료");
-      
-      return { success: true };
-    } catch (error) {
-      logger.error("❌ TimerService 초기화 실패:", error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  /**
-   * 이벤트 기반 알림 시스템 시작
-   */
-  startNotificationSystem() {
-    if (this.notificationTimer) {
-      clearInterval(this.notificationTimer);
-    }
-
-    this.notificationTimer = setInterval(() => {
-      this.checkTimerCompletions();
-    }, this.config.notificationInterval);
-
-    logger.info("🔔 타이머 알림 시스템 시작됨");
-  }
-
-  /**
-   * 타이머 완료 체크 및 이벤트 발생
-   */
-  checkTimerCompletions() {
-    const now = TimeHelper.getKoreaTime();
-
-    this.timers.forEach((timer, userId) => {
-      const elapsedMinutes = Math.floor((now - timer.startTime) / 60000);
-      const isCompleted = elapsedMinutes >= timer.duration;
-
-      if (isCompleted && !timer.completed) {
-        // 타이머 완료 처리
-        timer.completed = true;
-        this.handleTimerCompletion(userId, timer);
-      }
-    });
-  }
-
-  /**
-   * 타이머 완료 처리 및 이벤트 발생
-   */
-  async handleTimerCompletion(userId, timer) {
-    try {
-      const now = TimeHelper.getKoreaTime();
-      const actualDuration = Math.floor((now - timer.startTime) / 60000);
-
-      logger.info(`⏰ 타이머 완료: 사용자 ${userId}, 타입: ${timer.type}`);
-
-      if (timer.type === "pomodoro") {
-        // 포모도로 완료 처리
-        const completionResult = await this.handlePomodoroCompletion(userId, timer, actualDuration);
-        
-        // 포모도로 완료 이벤트 발생
-        this.emit('pomodoroCompleted', {
-          userId,
-          timer,
-          completionData: completionResult.data,
-          timestamp: now
-        });
-      } else {
-        // 일반 타이머 완료 처리
-        const completionData = {
-          userId,
-          taskName: timer.taskName,
-          type: timer.type,
-          plannedDuration: timer.duration,
-          actualDuration,
-          startTime: timer.startTime,
-          endTime: now,
-          message: `⏰ "${timer.taskName}" 타이머가 완료되었습니다! (${actualDuration}분)`
-        };
-
-        // 히스토리 기록
-        this.addToHistory(userId, {
-          type: 'timer_completed',
-          task: timer.taskName,
-          duration: actualDuration,
-          timestamp: now,
-          sessionId: timer.sessionId
-        });
-
-        // 타이머 제거
-        this.timers.delete(userId);
-
-        // 일반 타이머 완료 이벤트 발생
-        this.emit('timerCompleted', completionData);
-      }
-
-      // 백업 저장
-      this.saveToBackup();
-
-    } catch (error) {
-      logger.error("타이머 완료 처리 오류:", error);
-      
-      // 오류 이벤트 발생
-      this.emit('timerError', {
+      logger.info("⏰ Enhanced Timer 생성 시작", {
+        service: "TimerService",
         userId,
-        error: error.message,
-        timer
-      });
-    }
-  }
-
-  /**
-   * 포모도로 완료 처리
-   */
-  async handlePomodoroCompletion(userId, timer, actualDuration) {
-    const session = this.pomodoroSessions.get(userId) || {
-      count: 0,
-      totalWorkTime: 0,
-      totalBreakTime: 0,
-      startDate: TimeHelper.getKoreaTime(),
-    };
-
-    const now = TimeHelper.getKoreaTime();
-    let nextMode, nextDuration, message;
-    const autoTransition = false; // 수동 전환으로 설정
-
-    if (timer.mode === "work") {
-      // 작업 완료 → 휴식
-      session.count += 1;
-      session.totalWorkTime += actualDuration;
-      this.pomodoroSessions.set(userId, session);
-
-      // 휴식 종류 결정
-      const isLongBreak = session.count % this.config.longBreakInterval === 0;
-      nextMode = "break";
-      nextDuration = isLongBreak 
-        ? this.config.longBreakDuration 
-        : this.config.shortBreakDuration;
-
-      const breakType = isLongBreak ? "긴 휴식" : "짧은 휴식";
-      message = `🎉 ${session.count}번째 포모도로 완료!\n${breakType} 시간입니다 (${nextDuration}분)`;
-      
-    } else {
-      // 휴식 완료 → 다음 작업 준비
-      session.totalBreakTime += actualDuration;
-      nextMode = "work";
-      nextDuration = this.config.workDuration;
-      message = "💪 휴식 완료! 다음 포모도로를 시작할 준비가 되셨나요?";
-    }
-
-    // 히스토리 기록
-    this.addToHistory(userId, {
-      type: `pomodoro_${timer.mode}_completed`,
-      task: timer.taskName,
-      duration: actualDuration,
-      timestamp: now,
-      sessionId: timer.sessionId,
-      sessionCount: session.count
-    });
-
-    // 현재 타이머 제거 (수동 전환)
-    this.timers.delete(userId);
-
-    const completionData = {
-      completedMode: timer.mode,
-      completedTask: timer.taskName,
-      actualDuration,
-      plannedDuration: timer.duration,
-      nextMode,
-      nextDuration,
-      sessionCount: session.count,
-      totalWorkTime: session.totalWorkTime,
-      totalBreakTime: session.totalBreakTime,
-      message,
-      completedAt: TimeHelper.formatDateTime(now),
-      autoTransition
-    };
-
-    return {
-      success: true,
-      data: completionData
-    };
-  }
-
-  /**
-   * 일반 타이머 시작 (시간 지정)
-   */
-  async startTimer(userId, duration, taskName = "일반 타이머") {
-    try {
-      // 기존 타이머 확인
-      if (this.timers.has(userId)) {
-        return {
-          success: false,
-          error: "이미 실행 중인 타이머가 있습니다. 먼저 정지해주세요."
-        };
-      }
-
-      if (duration < 1 || duration > 180) {
-        return {
-          success: false,
-          error: "타이머는 1분에서 180분(3시간) 사이로 설정할 수 있습니다."
-        };
-      }
-
-      const timer = {
-        taskName,
-        startTime: TimeHelper.getKoreaTime(),
-        duration: duration, // 분 단위
-        type: "general",
-        sessionId: this.generateSessionId(),
-        completed: false
-      };
-
-      this.timers.set(userId, timer);
-
-      // 히스토리 기록
-      this.addToHistory(userId, {
-        type: "timer_start",
-        task: taskName,
-        duration: duration,
-        timestamp: timer.startTime,
-        sessionId: timer.sessionId
+        name: timerData.name,
+        duration: timerData.duration,
       });
 
-      logger.info(`⏰ 타이머 시작: 사용자 ${userId}, ${duration}분, 작업 "${taskName}"`);
+      // 검증
+      this.validateTimerData(userId, timerData);
 
-      return {
-        success: true,
-        data: {
-          taskName,
-          duration,
-          startTime: TimeHelper.formatDateTime(timer.startTime),
-          endTime: TimeHelper.formatDateTime(TimeHelper.addMinutes(timer.startTime, duration)),
-          sessionId: timer.sessionId
-        }
-      };
-    } catch (error) {
-      logger.error("타이머 시작 오류:", error);
-      return {
-        success: false,
-        error: "타이머 시작 중 오류가 발생했습니다."
-      };
-    }
-  }
-
-  /**
-   * 포모도로 시작
-   */
-  async startPomodoro(userId, taskName = "포모도로 작업") {
-    try {
-      // 기존 타이머 확인
-      const existingTimer = this.timers.get(userId);
-      if (existingTimer && !existingTimer.restored) {
-        return {
-          success: false,
-          error: "이미 실행 중인 타이머가 있습니다. 먼저 정지해주세요."
-        };
-      }
-
-      const timer = {
-        taskName,
-        startTime: TimeHelper.getKoreaTime(),
-        duration: this.config.workDuration,
-        type: "pomodoro",
-        mode: "work", // work 또는 break
-        sessionId: this.generateSessionId(),
-        completed: false
-      };
-
-      this.timers.set(userId, timer);
-
-      // 포모도로 세션 초기화 (필요시)
-      if (!this.pomodoroSessions.has(userId)) {
-        this.pomodoroSessions.set(userId, {
-          count: 0,
-          totalWorkTime: 0,
-          totalBreakTime: 0,
-          startDate: timer.startTime,
+      // 사용자 타이머 수 체크
+      const currentCount = await this.getUserTimerCount(userId);
+      if (currentCount >= this.rules.maxTimersPerUser) {
+        const error = new Error(
+          `최대 ${this.rules.maxTimersPerUser}개까지만 생성 가능합니다`
+        );
+        logger.warn("⚠️ 타이머 한도 초과", {
+          userId,
+          currentCount,
+          maxAllowed: this.rules.maxTimersPerUser,
         });
+        throw error;
       }
 
-      // 히스토리 기록
-      this.addToHistory(userId, {
-        type: "pomodoro_start",
-        task: taskName,
-        timestamp: timer.startTime,
-        sessionId: timer.sessionId
+      // Enhanced 문서 준비
+      const document = {
+        userId,
+        name: timerData.name.trim(),
+        duration: timerData.duration, // 분 단위
+        type: timerData.type || "focus",
+        status: "pending",
+        description: timerData.description || "",
+
+        // 시간 관련 필드들
+        startTime: null,
+        endTime: null,
+        pausedAt: null,
+        completedAt: null,
+        elapsedTime: 0,
+
+        // 메타데이터
+        metadata: {
+          source: "telegram",
+          version: "3.0.1",
+          enhanced: true,
+          ...timerData.metadata,
+        },
+
+        // 통계용 필드들
+        pauseCount: 0,
+        resumeCount: 0,
+        actualDuration: null,
+        efficiency: null, // 실제 시간 / 계획 시간
+
+        ...this.getStandardFields(),
+      };
+
+      // 저장
+      const result = await this.create(document);
+
+      logger.success("✅ Enhanced Timer 생성 완료", {
+        service: "TimerService",
+        timerId: result.insertedId,
+        name: document.name,
+        duration: document.duration,
+        type: document.type,
       });
 
-      logger.info(`🍅 포모도로 시작: 사용자 ${userId}, 작업 "${taskName}"`);
-
       return {
-        success: true,
-        data: {
-          taskName,
-          duration: this.config.workDuration,
-          mode: "work",
-          startTime: TimeHelper.formatDateTime(timer.startTime),
-          endTime: TimeHelper.formatDateTime(
-            TimeHelper.addMinutes(timer.startTime, this.config.workDuration)
-          ),
-          sessionId: timer.sessionId
-        }
+        id: result.insertedId,
+        ...document,
       };
     } catch (error) {
-      logger.error("포모도로 시작 오류:", error);
-      return {
-        success: false,
-        error: "포모도로 시작 중 오류가 발생했습니다."
-      };
+      logger.error("❌ Enhanced Timer 생성 실패:", error);
+      throw error;
     }
   }
 
   /**
-   * 활성 타이머 상태 조회
+   * 📊 Enhanced 상세 통계
    */
-  async getActiveTimer(userId) {
+  async getDetailedStats(userId) {
     try {
-      const timer = this.timers.get(userId);
+      logger.debug("📊 Enhanced Timer 상세 통계 조회", {
+        service: "TimerService",
+        userId,
+      });
 
-      if (!timer) {
+      const pipeline = [
+        { $match: { userId, isActive: true } },
+        {
+          $group: {
+            _id: null,
+            totalTimers: { $sum: 1 },
+            completedTimers: {
+              $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+            },
+            totalPlannedTime: { $sum: "$duration" },
+            totalActualTime: { $sum: "$actualDuration" },
+            totalFocusTime: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ["$type", "focus"] },
+                      { $eq: ["$status", "completed"] },
+                    ],
+                  },
+                  "$actualDuration",
+                  0,
+                ],
+              },
+            },
+            totalBreakTime: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $eq: ["$type", "break"] },
+                      { $eq: ["$status", "completed"] },
+                    ],
+                  },
+                  "$actualDuration",
+                  0,
+                ],
+              },
+            },
+            avgEfficiency: { $avg: "$efficiency" },
+            maxDuration: { $max: "$duration" },
+            minDuration: { $min: "$duration" },
+
+            // 타입별 분류
+            focusTimers: {
+              $sum: { $cond: [{ $eq: ["$type", "focus"] }, 1, 0] },
+            },
+            pomodoroTimers: {
+              $sum: { $cond: [{ $eq: ["$type", "pomodoro"] }, 1, 0] },
+            },
+            breakTimers: {
+              $sum: { $cond: [{ $eq: ["$type", "break"] }, 1, 0] },
+            },
+          },
+        },
+      ];
+
+      const [stats] = await this.aggregate(pipeline);
+
+      if (!stats) {
         return {
-          success: false,
-          error: "실행 중인 타이머가 없습니다."
+          totalTimers: 0,
+          completedTimers: 0,
+          completionRate: 0,
+          totalPlannedTime: 0,
+          totalActualTime: 0,
+          totalFocusTime: 0,
+          totalBreakTime: 0,
+          avgEfficiency: 0,
+          maxDuration: 0,
+          minDuration: 0,
+          categoryBreakdown: {
+            focus: 0,
+            pomodoro: 0,
+            break: 0,
+            other: 0,
+          },
         };
       }
 
-      const now = TimeHelper.getKoreaTime();
-      const elapsedMinutes = Math.floor((now - timer.startTime) / 60000);
-      const remainingMinutes = Math.max(0, timer.duration - elapsedMinutes);
-      const remainingSeconds = Math.max(0, (timer.duration * 60) - Math.floor((now - timer.startTime) / 1000));
+      // 완료율 계산
+      stats.completionRate =
+        stats.totalTimers > 0
+          ? Math.round((stats.completedTimers / stats.totalTimers) * 100)
+          : 0;
 
-      // 포모도로 세션 정보
-      let sessionInfo = null;
-      if (timer.type === "pomodoro") {
-        const session = this.pomodoroSessions.get(userId);
-        if (session) {
-          sessionInfo = {
-            count: session.count,
-            totalWorkTime: session.totalWorkTime,
-            totalBreakTime: session.totalBreakTime
-          };
-        }
-      }
-
-      return {
-        success: true,
-        timer: {
-          taskName: timer.taskName,
-          type: timer.type,
-          mode: timer.mode || null,
-          startTime: timer.startTime,
-          duration: timer.duration,
-          elapsedTime: elapsedMinutes,
-          remainingTime: remainingSeconds,
-          totalTime: timer.duration * 60, // 초 단위
-          isCompleted: timer.completed || false,
-          sessionId: timer.sessionId,
-          sessionInfo
-        }
+      // 카테고리 분류
+      stats.categoryBreakdown = {
+        focus: stats.focusTimers || 0,
+        pomodoro: stats.pomodoroTimers || 0,
+        break: stats.breakTimers || 0,
+        other:
+          (stats.totalTimers || 0) -
+          (stats.focusTimers || 0) -
+          (stats.pomodoroTimers || 0) -
+          (stats.breakTimers || 0),
       };
+
+      logger.debug("📈 상세 통계 조회 완료", {
+        totalTimers: stats.totalTimers,
+        completionRate: stats.completionRate,
+        totalFocusTime: stats.totalFocusTime,
+      });
+
+      return stats;
     } catch (error) {
-      logger.error("타이머 상태 조회 오류:", error);
-      return {
-        success: false,
-        error: "타이머 상태 조회 중 오류가 발생했습니다."
-      };
+      logger.error("❌ Enhanced Timer 상세 통계 조회 실패:", error);
+      throw error;
     }
   }
 
   /**
-   * 타이머 정지
+   * 📅 주간 트렌드 분석
    */
-  async stopTimer(userId) {
+  async getWeeklyTrends(userId) {
     try {
-      const timer = this.timers.get(userId);
+      logger.debug("📅 Timer 주간 트렌드 분석", {
+        service: "TimerService",
+        userId,
+      });
 
-      if (!timer) {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+
+      const pipeline = [
+        {
+          $match: {
+            userId,
+            isActive: true,
+            completedAt: { $gte: weekAgo },
+            status: "completed",
+          },
+        },
+        {
+          $group: {
+            _id: {
+              date: {
+                $dateToString: {
+                  format: "%Y-%m-%d",
+                  date: "$completedAt",
+                },
+              },
+              type: "$type",
+            },
+            count: { $sum: 1 },
+            totalMinutes: { $sum: "$actualDuration" },
+            avgDuration: { $avg: "$actualDuration" },
+          },
+        },
+        { $sort: { "_id.date": 1 } },
+      ];
+
+      const rawData = await this.aggregate(pipeline);
+
+      // 일별 데이터 정리
+      const dailyFocus = {};
+      const dailyData = {};
+
+      rawData.forEach((item) => {
+        const date = item._id.date;
+        const type = item._id.type;
+
+        if (!dailyData[date]) {
+          dailyData[date] = { date, focus: 0, break: 0, pomodoro: 0, total: 0 };
+        }
+
+        dailyData[date][type] = item.totalMinutes;
+        dailyData[date].total += item.totalMinutes;
+
+        if (type === "focus" || type === "pomodoro") {
+          if (!dailyFocus[date]) {
+            dailyFocus[date] = { date, minutes: 0, sessions: 0 };
+          }
+          dailyFocus[date].minutes += item.totalMinutes;
+          dailyFocus[date].sessions += item.count;
+        }
+      });
+
+      return {
+        dailyFocus: Object.values(dailyFocus),
+        dailyBreakdown: Object.values(dailyData),
+        weeklyCompleted: rawData.reduce((sum, item) => sum + item.count, 0),
+        weeklyFocusTime: Object.values(dailyFocus).reduce(
+          (sum, day) => sum + day.minutes,
+          0
+        ),
+      };
+    } catch (error) {
+      logger.error("❌ Timer 주간 트렌드 분석 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🍅 포모도로 통계
+   */
+  async getPomodoroStats(userId) {
+    try {
+      logger.debug("🍅 포모도로 통계 조회", {
+        service: "TimerService",
+        userId,
+      });
+
+      const pipeline = [
+        {
+          $match: {
+            userId,
+            isActive: true,
+            type: "pomodoro",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalPomodoros: { $sum: 1 },
+            completedPomodoros: {
+              $sum: { $cond: [{ $eq: ["$status", "completed"] }, 1, 0] },
+            },
+            totalPomodoroTime: {
+              $sum: {
+                $cond: [
+                  { $eq: ["$status", "completed"] },
+                  "$actualDuration",
+                  0,
+                ],
+              },
+            },
+            avgPomodoroLength: {
+              $avg: {
+                $cond: [
+                  { $eq: ["$status", "completed"] },
+                  "$actualDuration",
+                  null,
+                ],
+              },
+            },
+          },
+        },
+      ];
+
+      const [stats] = await this.aggregate(pipeline);
+
+      if (!stats) {
         return {
-          success: false,
-          error: "실행 중인 타이머가 없습니다."
+          totalPomodoros: 0,
+          completedPomodoros: 0,
+          completedCycles: 0,
+          totalPomodoroTime: 0,
+          avgPomodoroLength: 0,
+          completionRate: 0,
         };
       }
 
-      const now = TimeHelper.getKoreaTime();
-      const duration = Math.floor((now.getTime() - timer.startTime.getTime()) / 60000);
+      // 완료된 사이클 수 (포모도로 4개 = 1사이클)
+      stats.completedCycles = Math.floor(stats.completedPomodoros / 4);
 
-      // 히스토리 기록
-      this.addToHistory(userId, {
-        type: `${timer.type}_stop`,
-        task: timer.taskName,
-        duration: duration,
-        timestamp: now,
-        sessionId: timer.sessionId
-      });
+      // 완료율
+      stats.completionRate =
+        stats.totalPomodoros > 0
+          ? Math.round((stats.completedPomodoros / stats.totalPomodoros) * 100)
+          : 0;
 
-      this.timers.delete(userId);
-
-      let sessionInfo = null;
-      if (timer.type === "pomodoro") {
-        const session = this.pomodoroSessions.get(userId);
-        if (session) {
-          sessionInfo = {
-            totalSessions: session.count,
-            totalWorkTime: session.totalWorkTime,
-            totalBreakTime: session.totalBreakTime
-          };
-        }
-      }
-
-      logger.info(`🛑 타이머 중지: 사용자 ${userId}, ${duration}분 경과`);
-
-      return {
-        success: true,
-        data: {
-          taskName: timer.taskName,
-          type: timer.type,
-          duration: duration,
-          elapsedTime: this.formatElapsedTime(duration),
-          startTime: TimeHelper.formatDateTime(timer.startTime),
-          endTime: TimeHelper.formatDateTime(now),
-          sessionInfo
-        }
-      };
+      return stats;
     } catch (error) {
-      logger.error("타이머 중지 오류:", error);
-      return {
-        success: false,
-        error: "타이머 중지 중 오류가 발생했습니다."
-      };
+      logger.error("❌ 포모도로 통계 조회 실패:", error);
+      throw error;
     }
   }
 
   /**
-   * 서비스 종료
+   * 🔍 데이터 검증 (Enhanced)
    */
-  async shutdown() {
-    logger.info("🛑 TimerService 종료 중...");
-    
-    this.isRunning = false;
-    
-    // 알림 시스템 정지
-    if (this.notificationTimer) {
-      clearInterval(this.notificationTimer);
-      this.notificationTimer = null;
+  validateTimerData(userId, data) {
+    if (!userId) {
+      throw new Error("사용자 ID가 필요합니다");
     }
 
-    // 백업 저장
-    this.saveToBackup();
-
-    // 이벤트 리스너 정리
-    this.removeAllListeners();
-
-    logger.info("✅ TimerService 종료 완료");
-  }
-
-  // =========================== 유틸리티 메서드 ===========================
-
-  /**
-   * 세션 ID 생성
-   */
-  generateSessionId() {
-    return `timer_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-  }
-
-  /**
-   * 경과 시간 포맷팅
-   */
-  formatElapsedTime(minutes) {
-    if (minutes < 60) {
-      return `${minutes}분`;
-    }
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}시간 ${remainingMinutes}분`;
-  }
-
-  /**
-   * 히스토리 추가
-   */
-  addToHistory(userId, entry) {
-    if (!this.sessionHistory[userId]) {
-      this.sessionHistory[userId] = {
-        sessions: [],
-        totalSessions: 0,
-        totalWorkTime: 0,
-        totalBreakTime: 0
-      };
+    if (!data.name || data.name.trim().length === 0) {
+      throw new Error("타이머 이름을 입력해주세요");
     }
 
-    this.sessionHistory[userId].sessions.push(entry);
-    
-    // 오래된 히스토리 정리 (30일 이상)
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - this.config.maxHistoryDays);
-    
-    this.sessionHistory[userId].sessions = this.sessionHistory[userId].sessions.filter(
-      session => session.timestamp > cutoffDate
-    );
+    if (!data.duration || data.duration < this.rules.minDurationMinutes) {
+      throw new Error(
+        `최소 ${this.rules.minDurationMinutes}분 이상이어야 합니다`
+      );
+    }
+
+    if (data.duration > this.rules.maxDurationMinutes) {
+      throw new Error(
+        `최대 ${this.rules.maxDurationMinutes}분까지만 설정 가능합니다`
+      );
+    }
+
+    if (data.type && !this.rules.allowedTypes.includes(data.type)) {
+      throw new Error(`허용되지 않은 타이머 타입입니다: ${data.type}`);
+    }
   }
 
   /**
-   * 백업에서 복원
+   * 🔢 사용자 타이머 수 조회
    */
-  async restoreFromBackup() {
+  async getUserTimerCount(userId) {
+    return await this.count({ userId, isActive: true });
+  }
+
+  /**
+   * 🔄 활성 타이머들 조회
+   */
+  async getActiveTimers() {
     try {
-      // Railway 환경변수에서 복원 (실제로는 로그 기반)
-      logger.info("🔄 타이머 백업 복원 시도...");
-      
-      // 실제 구현에서는 데이터베이스나 Redis 등을 사용
-      // 현재는 메모리 초기화
-      this.sessionHistory = {};
-      
-      logger.info("📊 새로운 세션으로 시작");
+      const activeTimers = await this.find({
+        status: { $in: ["running", "paused"] },
+        isActive: true,
+      });
+
+      return activeTimers;
     } catch (error) {
-      logger.warn("백업 복원 실패 (신규 시작):", error.message);
-      this.sessionHistory = {};
+      logger.error("❌ 활성 타이머 조회 실패:", error);
+      throw error;
     }
-  }
-
-  /**
-   * 백업 저장
-   */
-  saveToBackup() {
-    try {
-      const backupData = {
-        timers: {},
-        sessions: {},
-        timestamp: new Date().toISOString(),
-        version: "3.0.1"
-      };
-
-      // 활성 타이머 백업
-      this.timers.forEach((timer, userId) => {
-        backupData.timers[userId] = {
-          ...timer,
-          startTime: timer.startTime.toISOString(),
-          elapsedMinutes: Math.floor((TimeHelper.getKoreaTime() - timer.startTime) / 60000)
-        };
-      });
-
-      // 포모도로 세션 백업
-      this.pomodoroSessions.forEach((session, userId) => {
-        backupData.sessions[userId] = session;
-      });
-
-      // 로그를 통한 백업 (개발자가 수동으로 복원 가능)
-      this.lastBackup = backupData;
-      
-      logger.info("📦 타이머 백업 생성:", {
-        activeTimers: Object.keys(backupData.timers).length,
-        activeSessions: Object.keys(backupData.sessions).length,
-        timestamp: backupData.timestamp
-      });
-
-      return true;
-    } catch (error) {
-      logger.error("백업 저장 실패:", error);
-      return false;
-    }
-  }
-
-  /**
-   * 주기적 백업 설정
-   */
-  setupPeriodicBackup() {
-    setInterval(() => {
-      if (this.timers.size > 0 || this.pomodoroSessions.size > 0) {
-        this.saveToBackup();
-      }
-    }, this.config.autoSaveInterval);
-
-    logger.info(`⚙️ 자동 백업 설정: ${this.config.autoSaveInterval / 1000}초마다`);
-  }
-
-  /**
-   * 안전한 종료 처리
-   */
-  setupGracefulShutdown() {
-    const shutdown = () => {
-      this.shutdown();
-    };
-
-    process.on("SIGINT", shutdown);
-    process.on("SIGTERM", shutdown);
-    process.on("beforeExit", shutdown);
   }
 }
 

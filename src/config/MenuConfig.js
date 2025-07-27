@@ -188,7 +188,7 @@ const MENU_CONFIG = {
         ["💰 금전운", "fortune:money"],
         ["💼 직장운", "fortune:work"],
         ["📅 이번주", "fortune:weekly"],
-        ["🎯 띠별운세", "fortune:zodiac"],
+        ["🎴 타로카드", "fortune:tarot"],
       ],
     },
 

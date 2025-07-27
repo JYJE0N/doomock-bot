@@ -1,370 +1,389 @@
+// ===== 💾 Enhanced WorktimeService - 화려한 근무시간 데이터 서비스 =====
+// src/services/WorktimeService.js
+const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const BaseService = require("./BaseService");
 
+/**
+ * 💾 Enhanced WorktimeService v3.0.1 - 화려한 근무시간 데이터 서비스
+ *
+ * 🎯 Enhanced 특징:
+ * - MongoDB 네이티브 드라이버
+ * - 고급 집계 및 분석
+ * - 실시간 세션 추적
+ * - 성과 분석 시스템
+ * - Enhanced Logger 통합
+ */
 class WorktimeService extends BaseService {
-  constructor(db) {
-    super("worktime", {
-      db: db, // ✅ db를 options 객체에 포함
-      enableCache: true,
-      cacheTimeout: 60000,
-    });
+  constructor(options = {}) {
+    super("work_sessions", options);
 
-    // 설정
-    this.workHours = {
-      start: 9, // 9시
-      end: 18, // 18시
-      lunchStart: 12,
-      lunchEnd: 13,
+    // 🎨 Enhanced Logger - 서비스 시작
+    logger.moduleStart("WorktimeService", "3.0.1");
+
+    // 📋 비즈니스 규칙 (Enhanced)
+    this.rules = {
+      maxSessionsPerDay: 3, // 하루 최대 세션 수
+      minWorkMinutes: 30, // 최소 근무 시간
+      maxWorkHours: 16, // 최대 근무 시간
+      maxBreakMinutes: 180, // 최대 휴식 시간 (3시간)
+      allowedWorkTypes: [
+        "regular",
+        "remote",
+        "hybrid",
+        "business_trip",
+        "conference",
+      ],
+      allowedStatuses: ["working", "break", "completed", "cancelled"],
     };
 
-    // DB가 없어도 작동하도록 수정
-    if (!db) {
-      logger.warn("⚠️ WorktimeService: DB 없이 메모리 모드로 실행");
-      this.memoryMode = true;
-      this.memoryStore = new Map();
-    }
+    // 📊 Enhanced 인덱스 설정
+    this.indexes = [
+      { userId: 1, date: -1 },
+      { userId: 1, status: 1 },
+      { userId: 1, startTime: -1 },
+      { userId: 1, type: 1, date: -1 },
+      { userId: 1, status: 1, startTime: -1 }, // 활성 세션 조회용
+      { date: -1, totalHours: -1 }, // 일별 통계용
+      { userId: 1, date: -1, totalHours: -1 }, // 사용자별 일별 통계
+    ];
 
-    logger.info("🕐 WorktimeService 생성됨");
+    logger.success("💾 Enhanced WorktimeService 생성됨");
   }
 
-  async initialize() {
+  /**
+   * 🏢 Enhanced 근무 세션 생성
+   */
+  async createWorkSession(userId, sessionData) {
     try {
-      // BaseService의 initialize 호출 (중요!)
-      await super.initialize();
+      logger.info("🏢 Enhanced WorkSession 생성 시작", {
+        service: "WorktimeService",
+        userId,
+        type: sessionData.type,
+        startTime: TimeHelper.format(sessionData.startTime, "HH:mm"),
+      });
 
-      // collection 확인
-      if (!this.collection) {
-        logger.warn(
-          "⚠️ WorktimeService: collection이 없습니다. DB 연결 확인 필요"
+      // 검증
+      this.validateWorkSessionData(userId, sessionData);
+
+      // 오늘 세션 수 체크
+      const todaySessionCount = await this.getTodaySessionCount(userId);
+      if (todaySessionCount >= this.rules.maxSessionsPerDay) {
+        const error = new Error(
+          `하루 최대 ${this.rules.maxSessionsPerDay}개 세션까지만 생성 가능합니다`
         );
+        logger.warn("⚠️ 세션 한도 초과", {
+          userId,
+          todayCount: todaySessionCount,
+          maxAllowed: this.rules.maxSessionsPerDay,
+        });
+        throw error;
       }
 
-      logger.info("✅ WorktimeService 초기화 성공");
-      return true;
-    } catch (error) {
-      logger.error("❌ WorktimeService 초기화 실패:", error);
-      return false;
-    }
-  }
-  // 🎯 오늘 근무 기록 조회
-  async getTodayRecord(userId) {
-    try {
-      // collection 체크
-      if (!this.collection) {
-        logger.error("WorktimeService: collection이 초기화되지 않음");
-        return null;
-      }
+      // Enhanced 문서 준비
+      const document = {
+        userId,
+        date: TimeHelper.getKoreanDate(),
+        startTime: sessionData.startTime,
+        endTime: sessionData.endTime || null,
+        type: sessionData.type || "regular",
+        status: sessionData.status || "working",
+        location: sessionData.location || "office",
 
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+        // 시간 계산 필드들
+        totalHours: 0,
+        totalBreakTime: 0,
+        actualWorkTime: 0,
 
-      const tomorrow = new Date(today);
-      tomorrow.setDate(tomorrow.getDate() + 1);
+        // 휴식 관리
+        breaks: sessionData.breaks || [],
 
-      const record = await this.collection.findOne({
-        userId: userId,
-        date: {
-          $gte: today,
-          $lt: tomorrow,
+        // 메타데이터
+        metadata: {
+          userName: sessionData.metadata?.userName,
+          source: "telegram",
+          version: "3.0.1",
+          enhanced: true,
+          ...sessionData.metadata,
         },
+
+        // 분석용 필드들
+        punctualityScore: null,
+        productivityScore: null,
+        notes: sessionData.notes || "",
+
+        ...this.getStandardFields(),
+      };
+
+      // 저장
+      const result = await this.create(document);
+
+      logger.success("✅ Enhanced WorkSession 생성 완료", {
+        service: "WorktimeService",
+        sessionId: result.insertedId,
+        type: document.type,
+        startTime: TimeHelper.format(document.startTime, "HH:mm"),
       });
-
-      return record;
-    } catch (error) {
-      logger.error("오늘 근무 기록 조회 실패:", error);
-      return null;
-    }
-  }
-  // WorktimeService에 추가할 메서드
-  async getRecentHistory(userId, days = 7) {
-    try {
-      // DB 모드
-      if (this.collection) {
-        const endDate = new Date();
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() - days);
-        startDate.setHours(0, 0, 0, 0);
-
-        const records = await this.collection
-          .find({
-            userId: userId,
-            date: {
-              $gte: startDate,
-              $lte: endDate,
-            },
-          })
-          .sort({ date: -1 })
-          .toArray();
-
-        return records;
-      }
-      // 메모리 모드
-      else {
-        const records = [];
-        const endDate = new Date();
-
-        for (let i = 0; i < days; i++) {
-          const date = new Date();
-          date.setDate(date.getDate() - i);
-          const key = `${userId}_${date.toDateString()}`;
-          const record = this.memoryStorage.get(key);
-          if (record) {
-            records.push(record);
-          }
-        }
-
-        return records;
-      }
-    } catch (error) {
-      logger.error("근무 기록 조회 실패:", error);
-      return [];
-    }
-  }
-
-  // 주간 통계 조회 메서드
-  async getWeeklyStats(userId) {
-    try {
-      const records = await this.getRecentHistory(userId, 7);
-
-      let totalMinutes = 0;
-      let workDays = 0;
-      let avgCheckIn = 0;
-      let avgCheckOut = 0;
-
-      records.forEach((record) => {
-        if (record.checkIn) {
-          workDays++;
-          totalMinutes += record.totalMinutes || 0;
-
-          const checkInHour = new Date(record.checkIn).getHours();
-          const checkInMinute = new Date(record.checkIn).getMinutes();
-          avgCheckIn += checkInHour + checkInMinute / 60;
-
-          if (record.checkOut) {
-            const checkOutHour = new Date(record.checkOut).getHours();
-            const checkOutMinute = new Date(record.checkOut).getMinutes();
-            avgCheckOut += checkOutHour + checkOutMinute / 60;
-          }
-        }
-      });
-
-      if (workDays > 0) {
-        avgCheckIn = avgCheckIn / workDays;
-        avgCheckOut = avgCheckOut / workDays;
-      }
 
       return {
-        totalMinutes,
-        workDays,
-        avgCheckIn: this.formatTime(avgCheckIn),
-        avgCheckOut: this.formatTime(avgCheckOut),
-        avgWorkHours: Math.round((totalMinutes / workDays / 60) * 10) / 10,
+        id: result.insertedId,
+        ...document,
       };
     } catch (error) {
-      logger.error("주간 통계 조회 실패:", error);
-      return null;
+      logger.error("❌ Enhanced WorkSession 생성 실패:", error);
+      throw error;
     }
   }
 
-  // 시간 포맷 헬퍼
-  formatTime(decimalHours) {
-    const hours = Math.floor(decimalHours);
-    const minutes = Math.round((decimalHours - hours) * 60);
-    return `${hours.toString().padStart(2, "0")}:${minutes
-      .toString()
-      .padStart(2, "0")}`;
-  }
-
-  // 🎯 주간 근무 기록 조회
-  async getWeeklyHistory(userId) {
+  /**
+   * 📊 오늘 통계 조회
+   */
+  async getTodayStats(userId) {
     try {
-      const today = TimeHelper.getKoreaTime();
-      const dayOfWeek = today.getDay();
-      const monday = new Date(today);
-      monday.setDate(today.getDate() - ((dayOfWeek + 6) % 7));
-      monday.setHours(0, 0, 0, 0);
+      const today = TimeHelper.getKoreanDate();
 
-      const records = await this.db
-        .collection("worktime_records")
-        .find({
-          userId: userId,
-          date: { $gte: monday },
-        })
-        .sort({ date: 1 })
-        .toArray();
-
-      // 주간 데이터 포맷팅
-      const weekData = [];
-      for (let i = 0; i < 5; i++) {
-        // 월-금
-        const date = new Date(monday);
-        date.setDate(monday.getDate() + i);
-
-        const record = records.find((r) => {
-          const recordDate = new Date(r.date);
-          return recordDate.toDateString() === date.toDateString();
-        });
-
-        weekData.push({
-          date: date,
-          dayName: ["월", "화", "수", "목", "금"][i],
-          checkIn: record?.checkIn || null,
-          checkOut: record?.checkOut || null,
-          workHours: record
-            ? this.calculateWorkHours(record.checkIn, record.checkOut)
-            : null,
-          memo: record?.memo || null,
-        });
-      }
-
-      return weekData;
-    } catch (error) {
-      logger.error("주간 근무 기록 조회 실패:", error);
-      return [];
-    }
-  }
-
-  // 🎯 출근 처리
-  async checkIn(userId, checkInTime) {
-    try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      // 이미 출근했는지 확인
-      const existingRecord = await this.getTodayRecord(userId);
-      if (existingRecord?.checkIn) {
-        return {
-          success: false,
-          error: "이미 출근하셨습니다.",
-        };
-      }
-
-      // 출근 시간 체크 (08:30 기준)
-      const checkInDate = new Date(`${today.toDateString()} ${checkInTime}`);
-      const startTime = new Date(
-        `${today.toDateString()} ${this.schedule.start}`
-      );
-      const isLate = checkInDate > startTime;
-
-      // 출근 기록 저장
-      const result = await this.db.collection("worktime_records").insertOne({
-        userId: userId,
+      logger.debug("📊 오늘 근무 통계 조회", {
+        service: "WorktimeService",
+        userId,
         date: today,
-        checkIn: checkInTime,
-        checkOut: null,
-        isLate: isLate,
-        createdAt: TimeHelper.getKoreaTime(),
-        updatedAt: TimeHelper.getKoreaTime(),
       });
 
-      return {
-        success: true,
-        isLate: isLate,
-        recordId: result.insertedId,
-      };
+      const pipeline = [
+        {
+          $match: {
+            userId,
+            date: today,
+            isActive: true,
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalSessions: { $sum: 1 },
+            totalHours: { $sum: "$totalHours" },
+            totalBreakTime: { $sum: "$totalBreakTime" },
+            avgProductivity: { $avg: "$productivityScore" },
+            workTypes: { $push: "$type" },
+            firstCheckIn: { $min: "$startTime" },
+            lastCheckOut: { $max: "$endTime" },
+          },
+        },
+      ];
+
+      const [stats] = await this.aggregate(pipeline);
+
+      if (!stats) {
+        return {
+          totalSessions: 0,
+          totalHours: 0,
+          totalBreakTime: 0,
+          avgProductivity: 0,
+          workTypes: [],
+          firstCheckIn: null,
+          lastCheckOut: null,
+          hasActiveSession: false,
+        };
+      }
+
+      // 활성 세션 체크
+      const activeSession = await this.findOne({
+        userId,
+        date: today,
+        status: { $in: ["working", "break"] },
+        isActive: true,
+      });
+
+      stats.hasActiveSession = !!activeSession;
+
+      return stats;
     } catch (error) {
-      logger.error("출근 처리 실패:", error);
-      return {
-        success: false,
-        error: "출근 처리 중 오류가 발생했습니다.",
-      };
+      logger.error("❌ 오늘 통계 조회 실패:", error);
+      throw error;
     }
   }
 
-  // 🎯 퇴근 처리
-  async checkOut(userId, checkOutTime) {
+  /**
+   * 📅 현재 주 통계 조회
+   */
+  async getCurrentWeekStats(userId) {
     try {
-      const todayRecord = await this.getTodayRecord(userId);
+      const weekStart = TimeHelper.getWeekStart();
+      const weekEnd = TimeHelper.getWeekEnd();
 
-      if (!todayRecord) {
-        return {
-          success: false,
-          error: "출근 기록이 없습니다.",
-        };
-      }
+      logger.debug("📅 현재 주 통계 조회", {
+        service: "WorktimeService",
+        userId,
+        weekStart: TimeHelper.format(weekStart, "YYYY-MM-DD"),
+        weekEnd: TimeHelper.format(weekEnd, "YYYY-MM-DD"),
+      });
 
-      if (todayRecord.checkOut) {
-        return {
-          success: false,
-          error: "이미 퇴근하셨습니다.",
-        };
-      }
-
-      // 퇴근 시간 체크 (17:30 기준)
-      const today = TimeHelper.getKoreaTime();
-      const checkOutDate = new Date(`${today.toDateString()} ${checkOutTime}`);
-      const endTime = new Date(`${today.toDateString()} ${this.schedule.end}`);
-      const isOvertime = checkOutDate > endTime;
-
-      // 퇴근 기록 업데이트
-      const result = await this.db.collection("worktime_records").updateOne(
-        { _id: todayRecord._id },
+      const pipeline = [
         {
-          $set: {
-            checkOut: checkOutTime,
-            isOvertime: isOvertime,
-            updatedAt: TimeHelper.getKoreaTime(),
+          $match: {
+            userId,
+            date: { $gte: weekStart, $lte: weekEnd },
+            isActive: true,
+            status: "completed",
           },
+        },
+        {
+          $group: {
+            _id: null,
+            totalHours: { $sum: "$totalHours" },
+            totalBreakTime: { $sum: "$totalBreakTime" },
+            workDays: { $sum: 1 },
+            avgDailyHours: { $avg: "$totalHours" },
+            maxDailyHours: { $max: "$totalHours" },
+            minDailyHours: { $min: "$totalHours" },
+            overtimeDays: {
+              $sum: { $cond: [{ $gt: ["$totalHours", 8] }, 1, 0] },
+            },
+          },
+        },
+      ];
+
+      const [stats] = await this.aggregate(pipeline);
+
+      if (!stats) {
+        return {
+          totalHours: 0,
+          totalBreakTime: 0,
+          workDays: 0,
+          avgDailyHours: 0,
+          maxDailyHours: 0,
+          minDailyHours: 0,
+          overtimeDays: 0,
+        };
+      }
+
+      return stats;
+    } catch (error) {
+      logger.error("❌ 현재 주 통계 조회 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🗓️ 현재 월 통계 조회
+   */
+  async getCurrentMonthStats(userId) {
+    try {
+      const monthStart = TimeHelper.getMonthStart();
+      const monthEnd = TimeHelper.getMonthEnd();
+
+      const pipeline = [
+        {
+          $match: {
+            userId,
+            date: { $gte: monthStart, $lte: monthEnd },
+            isActive: true,
+            status: "completed",
+          },
+        },
+        {
+          $group: {
+            _id: null,
+            totalHours: { $sum: "$totalHours" },
+            totalWorkDays: { $sum: 1 },
+            avgDailyHours: { $avg: "$totalHours" },
+            totalOvertimeHours: {
+              $sum: {
+                $cond: [
+                  { $gt: ["$totalHours", 8] },
+                  { $subtract: ["$totalHours", 8] },
+                  0,
+                ],
+              },
+            },
+            perfectDays: {
+              $sum: {
+                $cond: [
+                  {
+                    $and: [
+                      { $gte: ["$totalHours", 7.5] },
+                      { $lte: ["$totalHours", 8.5] },
+                    ],
+                  },
+                  1,
+                  0,
+                ],
+              },
+            },
+          },
+        },
+      ];
+
+      const [stats] = await this.aggregate(pipeline);
+
+      return (
+        stats || {
+          totalHours: 0,
+          totalWorkDays: 0,
+          avgDailyHours: 0,
+          totalOvertimeHours: 0,
+          perfectDays: 0,
         }
       );
-
-      return {
-        success: true,
-        isOvertime: isOvertime,
-      };
     } catch (error) {
-      logger.error("퇴근 처리 실패:", error);
-      return {
-        success: false,
-        error: "퇴근 처리 중 오류가 발생했습니다.",
-      };
+      logger.error("❌ 현재 월 통계 조회 실패:", error);
+      throw error;
     }
   }
 
-  // 🎯 근무 시간 계산
-  calculateWorkHours(checkIn, checkOut) {
-    if (!checkIn || !checkOut) return null;
-
-    const today = TimeHelper.getKoreaTime().toDateString();
-    const checkInTime = new Date(`${today} ${checkIn}`);
-    const checkOutTime = new Date(`${today} ${checkOut}`);
-
-    // 점심시간 제외 (11:30 ~ 13:00)
-    const lunchStart = new Date(`${today} 11:30`);
-    const lunchEnd = new Date(`${today} 13:00`);
-
-    let totalMinutes = (checkOutTime - checkInTime) / (1000 * 60);
-
-    // 점심시간이 근무시간에 포함되는 경우 제외
-    if (checkInTime < lunchEnd && checkOutTime > lunchStart) {
-      const lunchOverlapStart = Math.max(checkInTime, lunchStart);
-      const lunchOverlapEnd = Math.min(checkOutTime, lunchEnd);
-      const lunchMinutes = (lunchOverlapEnd - lunchOverlapStart) / (1000 * 60);
-      totalMinutes -= lunchMinutes;
+  /**
+   * 🔍 데이터 검증 (Enhanced)
+   */
+  validateWorkSessionData(userId, data) {
+    if (!userId) {
+      throw new Error("사용자 ID가 필요합니다");
     }
 
-    const hours = Math.floor(totalMinutes / 60);
-    const minutes = Math.round(totalMinutes % 60);
+    if (!data.startTime) {
+      throw new Error("시작 시간이 필요합니다");
+    }
 
-    return { hours, minutes, totalMinutes };
+    if (data.type && !this.rules.allowedWorkTypes.includes(data.type)) {
+      throw new Error(`허용되지 않은 근무 유형입니다: ${data.type}`);
+    }
+
+    if (data.status && !this.rules.allowedStatuses.includes(data.status)) {
+      throw new Error(`허용되지 않은 상태입니다: ${data.status}`);
+    }
+
+    // 시간 유효성 검증
+    if (data.endTime && data.endTime <= data.startTime) {
+      throw new Error("종료 시간은 시작 시간보다 늦어야 합니다");
+    }
   }
 
-  // 기존 메서드들 유지
-  getWorktimeInfo() {
-    return {
-      message: "💼 출근 완료! 오늘도 파이팅입니다.",
-      schedule: `출근: ${this.schedule.start}\n점심: ${this.schedule.lunch}\n퇴근: ${this.schedule.end}`,
-    };
+  /**
+   * 🔢 오늘 세션 수 조회
+   */
+  async getTodaySessionCount(userId) {
+    const today = TimeHelper.getKoreanDate();
+    return await this.count({
+      userId,
+      date: today,
+      isActive: true,
+    });
   }
 
-  async calculateWorkingTime(userName) {
-    return `⏰ ${userName}님의 근무시간 정보\n\n${
-      this.getWorktimeInfo().schedule
-    }\n\n총 근무시간: ${this.schedule.total}`;
-  }
+  /**
+   * 🔄 활성 세션들 조회
+   */
+  async getActiveSessions() {
+    try {
+      const activeSessions = await this.find({
+        status: { $in: ["working", "break"] },
+        isActive: true,
+      });
 
-  // 기존 checkInOut 메서드는 폐기 (checkIn, checkOut으로 분리)
+      return activeSessions;
+    } catch (error) {
+      logger.error("❌ 활성 세션 조회 실패:", error);
+      throw error;
+    }
+  }
 }
 
 module.exports = WorktimeService;

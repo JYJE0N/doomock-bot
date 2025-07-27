@@ -1,701 +1,1547 @@
-// src/modules/WorktimeModule.js - ServiceBuilder 연동 리팩토링 v3.0.1
+// ===== 🏢 Enhanced WorktimeModule v3.0.1 - 화려한 근무시간 관리 =====
+// src/modules/WorktimeModule.js
 const BaseModule = require("../core/BaseModule");
-const TimeHelper = require("../utils/TimeHelper");
-const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
+const { getUserName, getUserId } = require("../utils/UserHelper");
+const enhancedResponses = require("../utils/EnhancedBotResponses");
 
 /**
- * 🕐 WorktimeModule v3.0.1 - ServiceBuilder 연동 리팩토링
+ * 🏢 Enhanced WorktimeModule v3.0.1 - 화려한 근무시간 관리 시스템
  *
- * 🎯 주요 변경사항:
- * - ServiceBuilder를 통한 서비스 요청 시스템
- * - 서비스 직접 생성 제거 (new WorktimeService() 삭제)
- * - 느슨한 결합 구현
- * - 표준 매개변수 체계 준수
- * - actionMap 방식 사용
- * - Railway 환경 최적화
+ * 🎨 Enhanced 특징:
+ * - 실시간 근무시간 추적
+ * - 시각적 대시보드
+ * - 자동 초과근무 감지
+ * - 휴식시간 관리
+ * - Enhanced Logger 완벽 연동
+ *
+ * 🎯 표준 플로우 준수:
+ * - ServiceBuilder 의존성 주입
+ * - 표준 매개변수 체계
+ * - actionMap 방식
+ * - NavigationHandler UI 위임
  */
 class WorktimeModule extends BaseModule {
-  constructor(bot, options = {}) {
-    super("WorktimeModule", {
-      bot,
-      serviceBuilder: options.serviceBuilder, // ServiceBuilder 주입
-      moduleManager: options.moduleManager,
-      moduleKey: options.moduleKey,
-      moduleConfig: options.moduleConfig,
-      config: options.config,
-    });
+  constructor(moduleKey, options = {}) {
+    super("WorktimeModule", options);
 
-    // 🔧 서비스 인스턴스들 (ServiceBuilder로 요청)
+    // 🎨 Enhanced Logger - 화려한 모듈 시작
+    logger.moduleStart("WorktimeModule", "3.0.1");
+    console.log("🏢".repeat(20));
+
+    // 🔧 ServiceBuilder를 통한 서비스 의존성 주입
     this.worktimeService = null;
 
-    // 기본 근무 시간 설정
-    this.workSchedule = {
-      startTime: "08:30",
-      lunchStart: "11:30",
-      lunchEnd: "13:00",
-      endTime: "17:30",
-      workDays: [1, 2, 3, 4, 5], // 월~금
-      totalWorkHours: 7.5,
+    // 📊 Railway 환경변수 기반 설정
+    this.config = {
+      // 기본 근무 시간 설정
+      standardWorkHours: parseFloat(process.env.STANDARD_WORK_HOURS) || 8.0,
+      standardStartTime: process.env.STANDARD_START_TIME || "09:00",
+      standardEndTime: process.env.STANDARD_END_TIME || "18:00",
+      lunchBreakDuration: parseInt(process.env.LUNCH_BREAK_MINUTES) || 60,
+
+      // 유연 근무 설정
+      flexibleWorking: process.env.FLEXIBLE_WORKING === "true",
+      coreTimeStart: process.env.CORE_TIME_START || "10:00",
+      coreTimeEnd: process.env.CORE_TIME_END || "16:00",
+
+      // 알림 설정
+      enableNotifications: process.env.WORKTIME_NOTIFICATIONS !== "false",
+      notifyBeforeEndTime:
+        parseInt(process.env.NOTIFY_BEFORE_END_MINUTES) || 30,
+      notifyOvertimeAfter:
+        parseInt(process.env.NOTIFY_OVERTIME_AFTER_MINUTES) || 60,
+
+      // 휴무 설정
+      weekends: [0, 6], // 일요일, 토요일
+      holidays: process.env.HOLIDAYS ? process.env.HOLIDAYS.split(",") : [],
+
+      ...this.config,
     };
 
-    this.progressEmojis = {
-      morning: "🌅",
-      working: "💼",
-      lunch: "🍽️",
-      afternoon: "☕",
-      leaving: "🏃",
-      done: "🏠",
-      weekend: "🎉",
+    // 🏢 근무 상태 정의
+    this.workStates = {
+      NOT_WORKING: {
+        id: "not_working",
+        name: "미출근",
+        emoji: "🏠",
+        color: "gray",
+      },
+      WORKING: { id: "working", name: "근무중", emoji: "💼", color: "green" },
+      BREAK: { id: "break", name: "휴식중", emoji: "☕", color: "yellow" },
+      OVERTIME: { id: "overtime", name: "초과근무", emoji: "🔥", color: "red" },
+      OFF_DUTY: {
+        id: "off_duty",
+        name: "퇴근완료",
+        emoji: "🏠",
+        color: "blue",
+      },
     };
 
-    logger.info("🕐 WorktimeModule v3.0.1 생성됨 (ServiceBuilder 연동)");
+    // 📊 근무 유형 정의
+    this.workTypes = {
+      regular: { name: "정규근무", emoji: "🏢", description: "일반 출퇴근" },
+      remote: { name: "재택근무", emoji: "🏠", description: "집에서 근무" },
+      hybrid: { name: "하이브리드", emoji: "🔄", description: "사무실+재택" },
+      business_trip: { name: "출장", emoji: "✈️", description: "업무 출장" },
+      conference: {
+        name: "컨퍼런스",
+        emoji: "🎤",
+        description: "회의/행사 참석",
+      },
+    };
+
+    // 🎯 실시간 근무 상태 관리
+    this.activeWorkSessions = new Map(); // userId -> workSession
+    this.breakSessions = new Map(); // userId -> breakData
+    this.notificationTimers = new Map(); // userId -> timerId
+
+    // 📈 성과 지표
+    this.performanceMetrics = {
+      punctuality: "출근 정시성",
+      consistency: "근무 일관성",
+      balance: "워라밸 지수",
+      productivity: "생산성 점수",
+    };
+
+    logger.success("🏢 Enhanced WorktimeModule 생성됨", {
+      standardHours: this.config.standardWorkHours,
+      flexibleWorking: this.config.flexibleWorking,
+      notificationsEnabled: this.config.enableNotifications,
+    });
   }
 
   /**
-   * 🎯 모듈 초기화 (ServiceBuilder 활용)
+   * 🎯 모듈 초기화 - ServiceBuilder 활용
    */
   async onInitialize() {
     try {
-      logger.info("🕐 WorktimeModule 초기화 시작 (ServiceBuilder 활용)...");
+      logger.info("🎯 Enhanced WorktimeModule 초기화 시작...", {
+        module: "WorktimeModule",
+        version: "3.0.1",
+      });
 
-      // 🔧 필수 서비스 요청 (실패 시 예외 발생)
+      // 🔧 ServiceBuilder로 WorktimeService 요청
       this.worktimeService = await this.requireService("worktime");
 
       if (!this.worktimeService) {
         throw new Error("WorktimeService 초기화 실패");
       }
 
-      // 📋 액션 설정
-      this.setupActions();
+      // 🔄 활성 근무 세션 복구
+      await this.restoreActiveWorkSessions();
 
-      logger.success("✅ WorktimeModule 초기화 완료");
-      return true;
-    } catch (error) {
-      logger.error("❌ WorktimeModule 초기화 실패:", error);
-
-      // 🛡️ 안전 모드: 기본 기능이라도 제공
-      logger.warn("⚠️ 안전 모드로 WorktimeModule 부분 초기화 시도...");
-
-      try {
-        // 최소한의 액션이라도 설정
-        this.setupBasicActions();
-        logger.warn("⚠️ WorktimeModule 부분 초기화됨 (제한된 기능)");
-        return false; // 부분 초기화 성공
-      } catch (safetyError) {
-        logger.error("❌ WorktimeModule 안전 모드 초기화도 실패:", safetyError);
-        throw error; // 완전 실패
+      // 🔔 알림 시스템 초기화
+      if (this.config.enableNotifications) {
+        this.initializeNotificationSystem();
       }
+
+      logger.success("✅ WorktimeService 연결 완료", {
+        service: "WorktimeService",
+        hasService: !!this.worktimeService,
+        activeSessionsCount: this.activeWorkSessions.size,
+      });
+    } catch (error) {
+      logger.error("❌ Enhanced WorktimeModule 초기화 실패:", error);
+      throw error;
     }
   }
 
   /**
-   * 🎯 액션 설정 (기본 기능)
+   * 🎯 액션 등록 - Enhanced actionMap
    */
   setupActions() {
+    logger.debug("🎯 WorktimeModule Enhanced 액션 등록 시작...");
+
     this.registerActions({
-      // 📋 메인 메뉴
-      menu: this.handleMenuAction.bind(this),
+      // 메인 액션들
+      menu: this.handleMenu.bind(this),
+      help: this.handleHelp.bind(this),
+      dashboard: this.handleDashboard.bind(this),
 
-      // 🕐 근무시간 관리
-      status: this.handleStatusAction.bind(this),
-      checkin: this.handleCheckinAction.bind(this),
-      checkout: this.handleCheckoutAction.bind(this),
-      progress: this.handleProgressAction.bind(this),
+      // 출퇴근 관리
+      checkin: this.handleCheckIn.bind(this),
+      "checkin:confirm": this.handleCheckInConfirm.bind(this),
+      checkout: this.handleCheckOut.bind(this),
+      "checkout:confirm": this.handleCheckOutConfirm.bind(this),
 
-      // 📊 기록 관리
-      history: this.handleHistoryAction.bind(this),
-      "today:record": this.handleTodayRecordAction.bind(this),
+      // 휴식 관리
+      "break:start": this.handleBreakStart.bind(this),
+      "break:end": this.handleBreakEnd.bind(this),
+      "break:lunch": this.handleLunchBreak.bind(this),
 
-      // ⚙️ 설정
-      settings: this.handleSettingsAction.bind(this),
+      // 근무 유형 설정
+      "type:set": this.handleSetWorkType.bind(this),
+      "location:set": this.handleSetLocation.bind(this),
 
-      // 📝 노트 추가
-      "add:checkin_note": this.handleAddCheckinNoteAction.bind(this),
-      "add:checkout_note": this.handleAddCheckoutNoteAction.bind(this),
+      // 조회 및 관리
+      today: this.handleToday.bind(this),
+      weekly: this.handleWeekly.bind(this),
+      monthly: this.handleMonthly.bind(this),
+
+      // 수정 및 조정
+      adjust: this.handleAdjustTime.bind(this),
+      "adjust:save": this.handleAdjustSave.bind(this),
+      correct: this.handleCorrectTime.bind(this),
+
+      // 설정 및 통계
+      settings: this.handleSettings.bind(this),
+      "settings:save": this.handleSettingsSave.bind(this),
+      stats: this.handleStats.bind(this),
+      performance: this.handlePerformance.bind(this),
     });
 
-    logger.debug("🕐 WorktimeModule 액션 등록 완료");
-  }
-
-  /**
-   * 🛡️ 안전 모드용 기본 액션 설정
-   */
-  setupBasicActions() {
-    this.registerActions({
-      menu: this.handleErrorMenuAction.bind(this),
-      error: this.handleErrorAction.bind(this),
+    logger.success(`✅ WorktimeModule Enhanced 액션 등록 완료`, {
+      actionCount: this.actionMap.size,
+      actions: Array.from(this.actionMap.keys()),
     });
-
-    logger.debug("🛡️ WorktimeModule 기본 액션 등록 완료 (안전 모드)");
   }
 
-  /**
-   * 📬 메시지 핸들러 (onHandleMessage 구현)
-   */
-  async onHandleMessage(bot, msg) {
-    try {
-      const { text, from } = msg;
-
-      // 근무시간 관련 키워드 감지
-      if (this.isWorktimeKeyword(text)) {
-        return await this.handleWorktimeKeyword(bot, msg);
-      }
-
-      return false; // 처리하지 않음
-    } catch (error) {
-      logger.error("❌ WorktimeModule 메시지 처리 실패:", error);
-      return false;
-    }
-  }
-
-  // ===== 🎯 액션 핸들러들 =====
+  // ===== 🎯 Enhanced 액션 핸들러들 (표준 매개변수 준수!) =====
 
   /**
-   * 📋 메뉴 액션
+   * 🏠 Enhanced 메뉴 핸들러
+   * 표준 매개변수: (bot, callbackQuery, subAction, params, moduleManager)
    */
-  async handleMenuAction(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleMenu(bot, callbackQuery, subAction, params, moduleManager) {
     try {
-      const chatId = callbackQuery.message.chat.id;
+      const userId = getUserId(callbackQuery);
+      const userName = getUserName(callbackQuery);
 
-      // WorktimeService 상태 확인
-      if (!this.worktimeService) {
-        return await this.handleErrorMenuAction(
-          bot,
-          callbackQuery,
-          subAction,
-          params,
-          moduleManager
-        );
-      }
-
-      const currentTime = TimeHelper.format(new Date(), "time");
-      const todayStatus = await this.getTodayWorkStatus(callbackQuery.from.id);
-
-      const menuText = `🕐 **근무시간 관리** v3.0.1
-
-📅 **오늘 (${TimeHelper.format(new Date(), "date")})**
-🕐 현재 시간: ${currentTime}
-
-📊 **현재 상태:**
-• 근무시간 서비스: ${this.worktimeService ? "✅ 연결됨" : "❌ 비연결"}
-• 출근 상태: ${todayStatus.checkedIn ? "✅ 출근함" : "⭕ 미출근"}
-• 퇴근 상태: ${todayStatus.checkedOut ? "✅ 퇴근함" : "⭕ 미퇴근"}
-
-🕐 **근무시간:**
-• 정규 시간: ${this.workSchedule.startTime} ~ ${this.workSchedule.endTime}
-• 점심 시간: ${this.workSchedule.lunchStart} ~ ${this.workSchedule.lunchEnd}
-
-📱 **주요 기능:**
-• 출근/퇴근 기록
-• 근무시간 진행률
-• 일별/주별 기록 조회`;
-
-      await this.sendMessage(bot, chatId, menuText);
-      return true;
-    } catch (error) {
-      logger.error("❌ 근무시간 메뉴 액션 실패:", error);
-      return await this.handleErrorAction(
-        bot,
-        callbackQuery,
-        subAction,
-        params,
-        moduleManager
-      );
-    }
-  }
-
-  /**
-   * 🛡️ 에러 상황용 메뉴 액션
-   */
-  async handleErrorMenuAction(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    try {
-      const chatId = callbackQuery.message.chat.id;
-
-      const errorMenuText = `🕐 **근무시간 관리** (제한 모드)
-
-❌ **서비스 상태:**
-• 근무시간 서비스: 연결 실패
-• 일부 기능을 사용할 수 없습니다
-
-🔧 **가능한 작업:**
-• 시스템 상태 확인
-• 에러 신고
-• 다른 모듈 이용
-
-⚠️ 관리자에게 문의하거나 잠시 후 다시 시도해주세요.`;
-
-      await this.sendMessage(bot, chatId, errorMenuText);
-      return true;
-    } catch (error) {
-      logger.error("❌ 에러 메뉴 액션도 실패:", error);
-      return false;
-    }
-  }
-
-  /**
-   * 📊 상태 액션
-   */
-  async handleStatusAction(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    try {
-      if (!this.worktimeService) {
-        return await this.handleServiceUnavailableError(bot, callbackQuery);
-      }
-
-      const chatId = callbackQuery.message.chat.id;
-      const userId = callbackQuery.from.id;
-
-      // 오늘 근무 상태 조회
-      const todayStatus = await this.getTodayWorkStatus(userId);
-      const workProgress = this.calculateWorkProgress(todayStatus);
-
-      let statusText = `📊 **근무시간 상태** (${TimeHelper.format(
-        new Date(),
-        "date"
-      )})\n\n`;
-
-      if (todayStatus.checkedIn) {
-        statusText += `✅ **출근**: ${TimeHelper.format(
-          todayStatus.checkinTime,
-          "time"
-        )}\n`;
-
-        if (todayStatus.checkedOut) {
-          statusText += `✅ **퇴근**: ${TimeHelper.format(
-            todayStatus.checkoutTime,
-            "time"
-          )}\n`;
-          statusText += `🕐 **총 근무시간**: ${this.formatDuration(
-            todayStatus.totalWorkTime
-          )}\n`;
-        } else {
-          statusText += `⏳ **현재 근무 중**: ${this.formatDuration(
-            workProgress.currentWorkTime
-          )}\n`;
-          statusText += `📈 **진행률**: ${workProgress.progressPercent}%\n`;
-        }
-      } else {
-        statusText += `⭕ **아직 출근하지 않았습니다**\n`;
-        statusText += `🕐 **정규 출근시간**: ${this.workSchedule.startTime}\n`;
-      }
-
-      await this.sendMessage(bot, chatId, statusText);
-      return true;
-    } catch (error) {
-      logger.error("❌ 근무시간 상태 액션 실패:", error);
-      return false;
-    }
-  }
-
-  /**
-   * 🏠 출근 액션
-   */
-  async handleCheckinAction(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    try {
-      if (!this.worktimeService) {
-        return await this.handleServiceUnavailableError(bot, callbackQuery);
-      }
-
-      const chatId = callbackQuery.message.chat.id;
-      const userId = callbackQuery.from.id;
-      const userName = getUserName(callbackQuery.from);
-
-      // 이미 출근했는지 확인
-      const todayStatus = await this.getTodayWorkStatus(userId);
-
-      if (todayStatus.checkedIn) {
-        const checkinTime = TimeHelper.format(todayStatus.checkinTime, "time");
-        await this.sendMessage(
-          bot,
-          chatId,
-          `⚠️ **이미 출근하셨습니다**\n\n` +
-            `출근 시간: ${checkinTime}\n` +
-            `다시 출근 처리가 필요하시면 관리자에게 문의하세요.`
-        );
-        return true;
-      }
-
-      // 출근 처리
-      const checkinResult = await this.worktimeService.recordCheckin?.(userId, {
+      logger.info("🏠 Enhanced Worktime 메뉴 요청", {
+        module: "WorktimeModule",
+        action: "menu",
+        userId,
         userName,
-        timestamp: new Date(),
-        source: "telegram_bot",
       });
 
-      if (checkinResult?.success) {
-        const checkinTime = TimeHelper.format(new Date(), "time");
-        await this.sendMessage(
-          bot,
-          chatId,
-          `✅ **출근 완료!**\n\n` +
-            `👋 안녕하세요, ${userName}님!\n` +
-            `🕐 출근 시간: ${checkinTime}\n` +
-            `💼 오늘도 좋은 하루 되세요!`
-        );
-      } else {
-        await this.sendMessage(
-          bot,
-          chatId,
-          `❌ 출근 처리 실패: ${checkinResult?.error || "알 수 없는 오류"}`
-        );
-      }
-
-      return true;
-    } catch (error) {
-      logger.error("❌ 출근 액션 실패:", error);
-      return false;
-    }
-  }
-
-  /**
-   * 🏃 퇴근 액션
-   */
-  async handleCheckoutAction(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    try {
-      if (!this.worktimeService) {
-        return await this.handleServiceUnavailableError(bot, callbackQuery);
-      }
-
-      const chatId = callbackQuery.message.chat.id;
-      const userId = callbackQuery.from.id;
-      const userName = getUserName(callbackQuery.from);
-
-      // 출근했는지 확인
-      const todayStatus = await this.getTodayWorkStatus(userId);
-
-      if (!todayStatus.checkedIn) {
-        await this.sendMessage(
-          bot,
-          chatId,
-          `⚠️ **출근 기록이 없습니다**\n\n` +
-            `먼저 출근 처리를 해주세요.\n` +
-            `출근 시간이 누락된 경우 관리자에게 문의하세요.`
-        );
-        return true;
-      }
-
-      if (todayStatus.checkedOut) {
-        const checkoutTime = TimeHelper.format(
-          todayStatus.checkoutTime,
-          "time"
-        );
-        await this.sendMessage(
-          bot,
-          chatId,
-          `⚠️ **이미 퇴근하셨습니다**\n\n` +
-            `퇴근 시간: ${checkoutTime}\n` +
-            `추가 작업이 필요하시면 관리자에게 문의하세요.`
-        );
-        return true;
-      }
-
-      // 퇴근 처리
-      const checkoutResult = await this.worktimeService.recordCheckout?.(
-        userId,
-        {
-          userName,
-          timestamp: new Date(),
-          source: "telegram_bot",
-        }
+      // 📊 현재 근무 상태 수집
+      const currentSession = this.activeWorkSessions.get(userId);
+      const todayStats = await this.worktimeService.getTodayStats(userId);
+      const currentWeekStats = await this.worktimeService.getCurrentWeekStats(
+        userId
       );
+      const currentBreak = this.breakSessions.get(userId);
 
-      if (checkoutResult?.success) {
-        const checkoutTime = TimeHelper.format(new Date(), "time");
-        const totalWorkTime = this.calculateTotalWorkTime(
-          todayStatus.checkinTime,
-          new Date()
-        );
+      // 🎯 근무 상태 분석
+      const workStatus = this.analyzeCurrentWorkStatus(
+        currentSession,
+        currentBreak,
+        todayStats
+      );
+      const dailyProgress = this.calculateDailyProgress(todayStats);
+      const weeklyProgress = this.calculateWeeklyProgress(currentWeekStats);
 
-        await this.sendMessage(
-          bot,
-          chatId,
-          `✅ **퇴근 완료!**\n\n` +
-            `👋 수고하셨습니다, ${userName}님!\n` +
-            `🕐 퇴근 시간: ${checkoutTime}\n` +
-            `⏱️ 총 근무시간: ${this.formatDuration(totalWorkTime)}\n` +
-            `🏠 안전하게 집에 가세요!`
-        );
-      } else {
-        await this.sendMessage(
-          bot,
-          chatId,
-          `❌ 퇴근 처리 실패: ${checkoutResult?.error || "알 수 없는 오류"}`
-        );
-      }
+      logger.debug("📊 Worktime 메뉴 데이터 수집 완료", {
+        hasActiveSession: !!currentSession,
+        workStatus: workStatus.id,
+        todayHours: todayStats.totalHours,
+        weeklyHours: currentWeekStats.totalHours,
+      });
 
-      return true;
+      // 📱 Enhanced UI 데이터
+      const menuData = {
+        userName,
+        currentTime: TimeHelper.getKoreanTime(),
+        workStatus,
+        currentSession: currentSession
+          ? {
+              ...currentSession,
+              elapsedTime: this.calculateElapsedTime(currentSession),
+              formattedStartTime: TimeHelper.format(
+                currentSession.startTime,
+                "HH:mm"
+              ),
+              workDuration: this.formatWorkDuration(
+                this.calculateElapsedTime(currentSession)
+              ),
+            }
+          : null,
+        currentBreak: currentBreak
+          ? {
+              ...currentBreak,
+              elapsedTime: this.calculateElapsedTime(currentBreak),
+              formattedStartTime: TimeHelper.format(
+                currentBreak.startTime,
+                "HH:mm"
+              ),
+            }
+          : null,
+        todayStats: {
+          ...todayStats,
+          progress: dailyProgress,
+          formattedHours: this.formatWorkDuration(todayStats.totalHours * 60),
+          overtime: Math.max(
+            0,
+            todayStats.totalHours - this.config.standardWorkHours
+          ),
+          isOvertime: todayStats.totalHours > this.config.standardWorkHours,
+        },
+        weeklyStats: {
+          ...currentWeekStats,
+          progress: weeklyProgress,
+          targetHours: this.config.standardWorkHours * 5, // 주 5일
+          averageDaily:
+            currentWeekStats.workDays > 0
+              ? currentWeekStats.totalHours / currentWeekStats.workDays
+              : 0,
+        },
+        quickActions: this.getQuickActions(
+          workStatus,
+          currentSession,
+          currentBreak
+        ),
+        workTypes: this.workTypes,
+      };
+
+      // ✅ NavigationHandler에게 데이터 전달
+      return {
+        success: true,
+        action: "show_worktime_menu",
+        data: menuData,
+        uiType: "enhanced_dashboard",
+      };
     } catch (error) {
-      logger.error("❌ 퇴근 액션 실패:", error);
-      return false;
+      logger.error("❌ Enhanced Worktime 메뉴 처리 실패:", error);
+      return {
+        success: false,
+        error: error.message,
+        action: "show_error",
+        suggestion: "근무시간을 새로고침하거나 수동으로 출근 처리해보세요.",
+      };
     }
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 =====
-
   /**
-   * 오늘 근무 상태 조회
+   * 🕐 Enhanced 출근 핸들러
    */
-  async getTodayWorkStatus(userId) {
+  async handleCheckIn(bot, callbackQuery, subAction, params, moduleManager) {
     try {
-      if (!this.worktimeService || !this.worktimeService.getTodayRecord) {
+      const userId = getUserId(callbackQuery);
+      const userName = getUserName(callbackQuery);
+      const workType = params[0] || "regular";
+
+      logger.info("🕐 Enhanced 출근 요청", {
+        module: "WorktimeModule",
+        action: "checkin",
+        userId,
+        userName,
+        workType,
+      });
+
+      // 기존 활성 세션 체크
+      const existingSession = this.activeWorkSessions.get(userId);
+      if (existingSession && existingSession.status === "working") {
         return {
-          checkedIn: false,
-          checkedOut: false,
-          checkinTime: null,
-          checkoutTime: null,
-          totalWorkTime: 0,
+          success: false,
+          error: "이미 출근 상태입니다",
+          action: "show_error",
+          suggestion: "현재 근무 중입니다. 퇴근 처리 후 다시 출근해주세요.",
+          data: { existingSession },
         };
       }
 
-      const todayRecord = await this.worktimeService.getTodayRecord(userId);
+      // 오늘 이미 출근했는지 체크
+      const todaySession = await this.worktimeService.getTodaySession(userId);
+      if (todaySession && todaySession.status !== "completed") {
+        return {
+          success: false,
+          error: "오늘 이미 출근 기록이 있습니다",
+          action: "show_error",
+          suggestion: "기존 세션을 확인하거나 새로운 세션을 시작해주세요.",
+        };
+      }
 
+      // 출근 처리
+      const checkInTime = new Date();
+      const workSession = await this.startWorkSession(userId, {
+        type: workType,
+        startTime: checkInTime,
+        userName,
+      });
+
+      // 출근 시간 분석
+      const punctualityAnalysis = this.analyzePunctuality(checkInTime);
+      const todayPrediction = this.predictTodayWorkHours(checkInTime);
+
+      logger.success("🎯 출근 처리 완료", {
+        module: "WorktimeModule",
+        sessionId: workSession.id,
+        startTime: TimeHelper.format(checkInTime, "HH:mm"),
+        workType,
+        punctuality: punctualityAnalysis.status,
+      });
+
+      // ✅ 출근 성공 응답
       return {
-        checkedIn: !!todayRecord?.checkinTime,
-        checkedOut: !!todayRecord?.checkoutTime,
-        checkinTime: todayRecord?.checkinTime,
-        checkoutTime: todayRecord?.checkoutTime,
-        totalWorkTime: todayRecord?.totalWorkTime || 0,
+        success: true,
+        action: "show_checkin_success",
+        data: {
+          session: workSession,
+          checkInTime: TimeHelper.format(checkInTime, "HH:mm"),
+          punctualityAnalysis,
+          todayPrediction,
+          motivationalMessage: this.getCheckInMessage(punctualityAnalysis),
+          workTypeInfo: this.workTypes[workType],
+          estimatedEndTime: this.calculateEstimatedEndTime(checkInTime),
+        },
+        uiType: "enhanced_checkin_card",
       };
     } catch (error) {
-      logger.error("❌ 오늘 근무 상태 조회 실패:", error);
+      logger.error("❌ Enhanced 출근 처리 실패:", error);
       return {
-        checkedIn: false,
-        checkedOut: false,
-        checkinTime: null,
-        checkoutTime: null,
-        totalWorkTime: 0,
+        success: false,
+        error: error.message,
+        action: "show_error",
       };
     }
   }
 
   /**
-   * 근무 진행률 계산
+   * 🏠 Enhanced 퇴근 핸들러
    */
-  calculateWorkProgress(todayStatus) {
-    if (!todayStatus.checkedIn) {
-      return { currentWorkTime: 0, progressPercent: 0 };
+  async handleCheckOut(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const userId = getUserId(callbackQuery);
+
+      logger.info("🏠 Enhanced 퇴근 요청", {
+        module: "WorktimeModule",
+        action: "checkout",
+        userId,
+      });
+
+      const activeSession = this.activeWorkSessions.get(userId);
+      if (!activeSession) {
+        return {
+          success: false,
+          error: "활성 근무 세션이 없습니다",
+          action: "show_error",
+          suggestion: "먼저 출근 처리를 해주세요.",
+        };
+      }
+
+      // 현재 휴식 중이면 휴식 종료
+      const currentBreak = this.breakSessions.get(userId);
+      if (currentBreak) {
+        await this.endBreak(userId);
+      }
+
+      // 퇴근 처리
+      const checkOutTime = new Date();
+      const completedSession = await this.endWorkSession(userId, checkOutTime);
+
+      // 근무 분석
+      const workAnalysis = this.analyzeWorkSession(completedSession);
+      const performanceScore = await this.calculateDailyPerformance(
+        userId,
+        completedSession
+      );
+
+      logger.success("🎊 퇴근 처리 완료", {
+        module: "WorktimeModule",
+        sessionId: completedSession.id,
+        totalHours: completedSession.totalHours,
+        overtime: workAnalysis.overtimeHours,
+        performance: performanceScore,
+      });
+
+      return {
+        success: true,
+        action: "show_checkout_success",
+        data: {
+          session: completedSession,
+          workAnalysis,
+          performanceScore,
+          celebrationMessage: this.getCheckOutMessage(workAnalysis),
+          weeklyProgress: await this.worktimeService.getCurrentWeekStats(
+            userId
+          ),
+          achievements: await this.checkAchievements(userId, completedSession),
+        },
+        uiType: "enhanced_checkout_card",
+      };
+    } catch (error) {
+      logger.error("❌ Enhanced 퇴근 처리 실패:", error);
+      return {
+        success: false,
+        error: error.message,
+        action: "show_error",
+      };
+    }
+  }
+
+  /**
+   * ☕ Enhanced 휴식 시작 핸들러
+   */
+  async handleBreakStart(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const userId = getUserId(callbackQuery);
+      const breakType = params[0] || "short"; // short, lunch, long
+
+      logger.info("☕ Enhanced 휴식 시작 요청", {
+        module: "WorktimeModule",
+        action: "break_start",
+        userId,
+        breakType,
+      });
+
+      const activeSession = this.activeWorkSessions.get(userId);
+      if (!activeSession) {
+        return {
+          success: false,
+          error: "활성 근무 세션이 없습니다",
+          action: "show_error",
+        };
+      }
+
+      const existingBreak = this.breakSessions.get(userId);
+      if (existingBreak) {
+        return {
+          success: false,
+          error: "이미 휴식 중입니다",
+          action: "show_error",
+        };
+      }
+
+      // 휴식 시작
+      const breakData = await this.startBreak(userId, breakType);
+
+      logger.success("☕ 휴식 시작", {
+        module: "WorktimeModule",
+        breakType,
+        startTime: TimeHelper.format(breakData.startTime, "HH:mm"),
+      });
+
+      return {
+        success: true,
+        action: "show_break_started",
+        data: {
+          breakData,
+          breakTypeInfo: this.getBreakTypeInfo(breakType),
+          workingTime: this.calculateElapsedTime(activeSession),
+          estimatedReturnTime: this.calculateEstimatedReturnTime(breakData),
+          relaxationTips: this.getRelaxationTips(breakType),
+        },
+        uiType: "enhanced_break_card",
+      };
+    } catch (error) {
+      logger.error("❌ Enhanced 휴식 시작 실패:", error);
+      return {
+        success: false,
+        error: error.message,
+        action: "show_error",
+      };
+    }
+  }
+
+  /**
+   * 📊 Enhanced 대시보드 핸들러
+   */
+  async handleDashboard(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const userId = getUserId(callbackQuery);
+
+      logger.info("📊 Enhanced Worktime 대시보드 요청", {
+        module: "WorktimeModule",
+        action: "dashboard",
+        userId,
+      });
+
+      // 종합 데이터 수집
+      const currentSession = this.activeWorkSessions.get(userId);
+      const todayStats = await this.worktimeService.getTodayStats(userId);
+      const weeklyStats = await this.worktimeService.getCurrentWeekStats(
+        userId
+      );
+      const monthlyStats = await this.worktimeService.getCurrentMonthStats(
+        userId
+      );
+      const recentSessions = await this.worktimeService.getRecentSessions(
+        userId,
+        5
+      );
+
+      // 성과 분석
+      const performanceMetrics = await this.calculatePerformanceMetrics(userId);
+      const trends = await this.analyzeWorkTrends(userId);
+      const insights = this.generateWorkInsights(
+        weeklyStats,
+        monthlyStats,
+        trends
+      );
+
+      logger.debug("📈 대시보드 데이터 수집 완료", {
+        todayHours: todayStats.totalHours,
+        weeklyHours: weeklyStats.totalHours,
+        monthlyHours: monthlyStats.totalHours,
+        performanceScore: performanceMetrics.overallScore,
+      });
+
+      return {
+        success: true,
+        action: "show_worktime_dashboard",
+        data: {
+          currentSession: currentSession
+            ? {
+                ...currentSession,
+                elapsedTime: this.calculateElapsedTime(currentSession),
+                realTimeData: true,
+              }
+            : null,
+          stats: {
+            today: todayStats,
+            weekly: weeklyStats,
+            monthly: monthlyStats,
+          },
+          recentSessions: recentSessions.map((session) => ({
+            ...session,
+            formattedDate: TimeHelper.format(session.date, "MM/DD"),
+            formattedHours: this.formatWorkDuration(session.totalHours * 60),
+            efficiency: this.calculateSessionEfficiency(session),
+          })),
+          performanceMetrics,
+          trends,
+          insights,
+          charts: {
+            weeklyHours: trends.weeklyHours,
+            dailyPattern: trends.dailyPattern,
+            overtimePattern: trends.overtimePattern,
+          },
+        },
+        uiType: "enhanced_dashboard_full",
+      };
+    } catch (error) {
+      logger.error("❌ Enhanced 대시보드 조회 실패:", error);
+      return {
+        success: false,
+        error: error.message,
+        action: "show_error",
+      };
+    }
+  }
+
+  // ===== 🛠️ Enhanced 근무시간 핵심 기능들 =====
+
+  /**
+   * 🎯 근무 세션 시작 (내부 로직)
+   */
+  async startWorkSession(userId, sessionData) {
+    try {
+      const startTime = sessionData.startTime || new Date();
+
+      // 근무 세션 생성
+      const workSession = {
+        id: `work_${userId}_${Date.now()}`,
+        userId,
+        startTime,
+        endTime: null,
+        type: sessionData.type || "regular",
+        status: "working",
+        breaks: [],
+        totalBreakTime: 0,
+        location: sessionData.location || "office",
+        notes: sessionData.notes || "",
+        metadata: {
+          userName: sessionData.userName,
+          version: "3.0.1",
+          enhanced: true,
+        },
+      };
+
+      // 메모리에 저장
+      this.activeWorkSessions.set(userId, workSession);
+
+      // 데이터베이스에 저장
+      await this.worktimeService.createWorkSession(userId, workSession);
+
+      // 🔔 출근 알림
+      if (this.config.enableNotifications) {
+        await this.scheduleWorkNotifications(userId, workSession);
+      }
+
+      return workSession;
+    } catch (error) {
+      logger.error("❌ 근무 세션 시작 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🏠 근무 세션 종료 (내부 로직)
+   */
+  async endWorkSession(userId, endTime) {
+    try {
+      const activeSession = this.activeWorkSessions.get(userId);
+      if (!activeSession) {
+        throw new Error("활성 근무 세션이 없습니다");
+      }
+
+      const finalEndTime = endTime || new Date();
+
+      // 세션 완료 처리
+      activeSession.endTime = finalEndTime;
+      activeSession.status = "completed";
+
+      // 근무시간 계산
+      const totalWorkMinutes = Math.floor(
+        (finalEndTime - activeSession.startTime) / (1000 * 60)
+      );
+      const totalWorkHours =
+        (totalWorkMinutes - activeSession.totalBreakTime) / 60;
+
+      activeSession.totalWorkMinutes = totalWorkMinutes;
+      activeSession.totalHours = totalWorkHours;
+      activeSession.completedAt = finalEndTime;
+
+      // 데이터베이스 업데이트
+      await this.worktimeService.completeWorkSession(userId, activeSession.id, {
+        endTime: finalEndTime,
+        totalHours: totalWorkHours,
+        totalBreakTime: activeSession.totalBreakTime,
+        status: "completed",
+      });
+
+      // 알림 타이머 정리
+      const notificationTimer = this.notificationTimers.get(userId);
+      if (notificationTimer) {
+        clearTimeout(notificationTimer);
+        this.notificationTimers.delete(userId);
+      }
+
+      // 메모리에서 제거
+      this.activeWorkSessions.delete(userId);
+
+      return activeSession;
+    } catch (error) {
+      logger.error("❌ 근무 세션 종료 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * ☕ 휴식 시작 (내부 로직)
+   */
+  async startBreak(userId, breakType) {
+    try {
+      const startTime = new Date();
+
+      const breakData = {
+        id: `break_${userId}_${Date.now()}`,
+        userId,
+        type: breakType,
+        startTime,
+        endTime: null,
+        status: "active",
+        expectedDuration: this.getBreakDuration(breakType),
+      };
+
+      // 메모리에 저장
+      this.breakSessions.set(userId, breakData);
+
+      // 활성 세션에 휴식 기록 추가
+      const activeSession = this.activeWorkSessions.get(userId);
+      if (activeSession) {
+        activeSession.breaks.push(breakData);
+      }
+
+      return breakData;
+    } catch (error) {
+      logger.error("❌ 휴식 시작 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🔄 휴식 종료 (내부 로직)
+   */
+  async endBreak(userId) {
+    try {
+      const breakData = this.breakSessions.get(userId);
+      if (!breakData) {
+        throw new Error("활성 휴식이 없습니다");
+      }
+
+      const endTime = new Date();
+      const breakDuration = Math.floor(
+        (endTime - breakData.startTime) / (1000 * 60)
+      );
+
+      breakData.endTime = endTime;
+      breakData.actualDuration = breakDuration;
+      breakData.status = "completed";
+
+      // 활성 세션에 휴식 시간 누적
+      const activeSession = this.activeWorkSessions.get(userId);
+      if (activeSession) {
+        activeSession.totalBreakTime += breakDuration;
+      }
+
+      // 메모리에서 제거
+      this.breakSessions.delete(userId);
+
+      return breakData;
+    } catch (error) {
+      logger.error("❌ 휴식 종료 실패:", error);
+      throw error;
+    }
+  }
+
+  // ===== 🛠️ Enhanced 분석 및 계산 메서드들 =====
+
+  /**
+   * 🎯 현재 근무 상태 분석
+   */
+  analyzeCurrentWorkStatus(session, breakData, todayStats) {
+    if (!session) {
+      return this.workStates.NOT_WORKING;
+    }
+
+    if (breakData) {
+      return this.workStates.BREAK;
+    }
+
+    // 초과근무 체크
+    if (todayStats.totalHours > this.config.standardWorkHours) {
+      return this.workStates.OVERTIME;
+    }
+
+    return this.workStates.WORKING;
+  }
+
+  /**
+   * 📊 일일 진행률 계산
+   */
+  calculateDailyProgress(todayStats) {
+    const progress =
+      (todayStats.totalHours / this.config.standardWorkHours) * 100;
+    return Math.min(Math.max(progress, 0), 150); // 최대 150%
+  }
+
+  /**
+   * 📈 주간 진행률 계산
+   */
+  calculateWeeklyProgress(weeklyStats) {
+    const targetWeeklyHours = this.config.standardWorkHours * 5; // 주 5일
+    const progress = (weeklyStats.totalHours / targetWeeklyHours) * 100;
+    return Math.min(Math.max(progress, 0), 150);
+  }
+
+  /**
+   * ⏱️ 경과 시간 계산
+   */
+  calculateElapsedTime(sessionData) {
+    if (!sessionData || !sessionData.startTime) {
+      return 0;
     }
 
     const now = new Date();
-    const checkinTime = new Date(todayStatus.checkinTime);
-    const currentWorkTime = now.getTime() - checkinTime.getTime();
+    const elapsed = Math.floor((now - sessionData.startTime) / (1000 * 60));
+    return Math.max(elapsed, 0);
+  }
 
-    const targetWorkTime = this.workSchedule.totalWorkHours * 60 * 60 * 1000; // 밀리초
-    const progressPercent = Math.min(
-      Math.round((currentWorkTime / targetWorkTime) * 100),
-      100
+  /**
+   * 🕐 예상 퇴근 시간 계산
+   */
+  calculateEstimatedEndTime(startTime) {
+    const estimatedEnd = new Date(startTime);
+    estimatedEnd.setHours(
+      estimatedEnd.getHours() + this.config.standardWorkHours
+    );
+    estimatedEnd.setMinutes(
+      estimatedEnd.getMinutes() + this.config.lunchBreakDuration
     );
 
+    return TimeHelper.format(estimatedEnd, "HH:mm");
+  }
+
+  /**
+   * 🎯 정시성 분석
+   */
+  analyzePunctuality(checkInTime) {
+    const checkInHour = checkInTime.getHours();
+    const checkInMinute = checkInTime.getMinutes();
+    const standardTime = this.parseTime(this.config.standardStartTime);
+
+    const checkInMinutes = checkInHour * 60 + checkInMinute;
+    const standardMinutes = standardTime.hour * 60 + standardTime.minute;
+    const diffMinutes = checkInMinutes - standardMinutes;
+
+    let status, emoji, message;
+
+    if (diffMinutes <= -30) {
+      status = "very_early";
+      emoji = "🌟";
+      message = "매우 일찍 출근하셨네요! 훌륭합니다!";
+    } else if (diffMinutes <= -10) {
+      status = "early";
+      emoji = "✨";
+      message = "일찍 출근하셨네요! 좋은 습관입니다!";
+    } else if (diffMinutes <= 10) {
+      status = "on_time";
+      emoji = "⏰";
+      message = "정시 출근! 완벽합니다!";
+    } else if (diffMinutes <= 30) {
+      status = "slightly_late";
+      emoji = "⚠️";
+      message = "조금 늦었지만 괜찮아요!";
+    } else {
+      status = "late";
+      emoji = "🚨";
+      message = "늦었지만 오늘 열심히 해봐요!";
+    }
+
     return {
-      currentWorkTime,
-      progressPercent,
+      status,
+      emoji,
+      message,
+      diffMinutes,
+      isEarly: diffMinutes < 0,
+      isLate: diffMinutes > 10,
     };
   }
 
   /**
-   * 총 근무시간 계산
+   * 📊 근무 세션 분석
    */
-  calculateTotalWorkTime(checkinTime, checkoutTime) {
-    if (!checkinTime || !checkoutTime) return 0;
+  analyzeWorkSession(session) {
+    const standardHours = this.config.standardWorkHours;
+    const actualHours = session.totalHours;
+    const overtimeHours = Math.max(0, actualHours - standardHours);
+    const efficiency =
+      actualHours > 0
+        ? (actualHours / (actualHours + session.totalBreakTime / 60)) * 100
+        : 0;
 
-    const checkin = new Date(checkinTime);
-    const checkout = new Date(checkoutTime);
-
-    return checkout.getTime() - checkin.getTime();
+    return {
+      actualHours,
+      standardHours,
+      overtimeHours,
+      isOvertime: overtimeHours > 0,
+      efficiency: Math.round(efficiency),
+      totalBreakTime: session.totalBreakTime,
+      breakEfficiency: this.analyzeBreakEfficiency(session.breaks),
+      workIntensity: this.calculateWorkIntensity(session),
+    };
   }
 
   /**
-   * 시간 포맷팅 (밀리초 -> 시간:분)
+   * 🏆 성과 지표 계산
    */
-  formatDuration(milliseconds) {
-    if (milliseconds <= 0) return "0분";
+  async calculatePerformanceMetrics(userId) {
+    try {
+      const weeklyStats = await this.worktimeService.getCurrentWeekStats(
+        userId
+      );
+      const monthlyStats = await this.worktimeService.getCurrentMonthStats(
+        userId
+      );
+      const recentSessions = await this.worktimeService.getRecentSessions(
+        userId,
+        10
+      );
 
-    const hours = Math.floor(milliseconds / (1000 * 60 * 60));
-    const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
+      // 정시성 점수
+      const punctualityScore = this.calculatePunctualityScore(recentSessions);
 
-    if (hours > 0) {
-      return `${hours}시간 ${minutes}분`;
-    } else {
+      // 일관성 점수 (근무시간의 일정함)
+      const consistencyScore = this.calculateConsistencyScore(recentSessions);
+
+      // 워라밸 점수
+      const balanceScore = this.calculateWorkLifeBalance(
+        weeklyStats,
+        monthlyStats
+      );
+
+      // 생산성 점수
+      const productivityScore = this.calculateProductivityScore(recentSessions);
+
+      // 전체 점수
+      const overallScore = Math.round(
+        (punctualityScore +
+          consistencyScore +
+          balanceScore +
+          productivityScore) /
+          4
+      );
+
+      return {
+        overallScore,
+        punctuality: {
+          score: punctualityScore,
+          grade: this.getGrade(punctualityScore),
+        },
+        consistency: {
+          score: consistencyScore,
+          grade: this.getGrade(consistencyScore),
+        },
+        balance: { score: balanceScore, grade: this.getGrade(balanceScore) },
+        productivity: {
+          score: productivityScore,
+          grade: this.getGrade(productivityScore),
+        },
+        trend: this.calculateScoreTrend(recentSessions),
+      };
+    } catch (error) {
+      logger.error("❌ 성과 지표 계산 실패:", error);
+      return {
+        overallScore: 0,
+        punctuality: { score: 0, grade: "F" },
+        consistency: { score: 0, grade: "F" },
+        balance: { score: 0, grade: "F" },
+        productivity: { score: 0, grade: "F" },
+        trend: "stable",
+      };
+    }
+  }
+
+  /**
+   * 💡 업무 인사이트 생성
+   */
+  generateWorkInsights(weeklyStats, monthlyStats, trends) {
+    const insights = [];
+
+    try {
+      // 근무시간 패턴 분석
+      if (weeklyStats.averageDaily > this.config.standardWorkHours + 1) {
+        insights.push({
+          type: "warning",
+          emoji: "⚠️",
+          title: "과로 주의",
+          message:
+            "주간 평균 근무시간이 표준보다 높습니다. 적절한 휴식을 취하세요.",
+        });
+      } else if (
+        weeklyStats.averageDaily >=
+        this.config.standardWorkHours - 0.5
+      ) {
+        insights.push({
+          type: "positive",
+          emoji: "🎯",
+          title: "균형잡힌 근무",
+          message: "적정 근무시간을 잘 유지하고 있습니다!",
+        });
+      }
+
+      // 정시성 분석
+      if (trends.punctualityTrend === "improving") {
+        insights.push({
+          type: "positive",
+          emoji: "📈",
+          title: "정시성 개선",
+          message: "출근 시간이 점점 좋아지고 있어요!",
+        });
+      }
+
+      // 생산성 패턴
+      if (trends.mostProductiveTime) {
+        insights.push({
+          type: "info",
+          emoji: "⚡",
+          title: "최고 생산성 시간",
+          message: `${trends.mostProductiveTime}에 가장 집중력이 높아요!`,
+        });
+      }
+
+      // 휴식 패턴
+      if (weeklyStats.averageBreakTime < 30) {
+        insights.push({
+          type: "suggestion",
+          emoji: "☕",
+          title: "휴식 부족",
+          message: "충분한 휴식을 취하세요. 생산성 향상에 도움됩니다.",
+        });
+      }
+
+      return insights;
+    } catch (error) {
+      logger.error("❌ 업무 인사이트 생성 실패:", error);
+      return [];
+    }
+  }
+
+  // ===== 🛠️ Enhanced 유틸리티 메서드들 =====
+
+  /**
+   * ⏰ 시간 파싱
+   */
+  parseTime(timeString) {
+    const [hour, minute] = timeString.split(":").map(Number);
+    return { hour, minute };
+  }
+
+  /**
+   * 📏 근무시간 포맷팅
+   */
+  formatWorkDuration(minutes) {
+    if (minutes < 60) {
       return `${minutes}분`;
     }
+
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+
+    if (mins === 0) {
+      return `${hours}시간`;
+    }
+
+    return `${hours}시간 ${mins}분`;
   }
 
   /**
-   * 근무시간 키워드 감지
+   * ☕ 휴식 유형별 지속시간
    */
-  isWorktimeKeyword(text) {
-    if (!text || typeof text !== "string") return false;
+  getBreakDuration(breakType) {
+    const durations = {
+      short: 15, // 15분
+      lunch: 60, // 1시간
+      long: 30, // 30분
+      coffee: 10, // 10분
+    };
 
-    const keywords = [
-      "출근",
-      "퇴근",
-      "근무시간",
-      "worktime",
-      "체크인",
-      "체크아웃",
-      "checkin",
-      "checkout",
-    ];
-
-    return keywords.some((keyword) => text.includes(keyword));
+    return durations[breakType] || 15;
   }
 
   /**
-   * 근무시간 키워드 처리
+   * ☕ 휴식 유형 정보
    */
-  async handleWorktimeKeyword(bot, msg) {
-    try {
-      const {
-        text,
-        chat: { id: chatId },
-      } = msg;
+  getBreakTypeInfo(breakType) {
+    const types = {
+      short: {
+        name: "짧은 휴식",
+        emoji: "☕",
+        duration: 15,
+        description: "간단한 휴식",
+      },
+      lunch: {
+        name: "점심시간",
+        emoji: "🍽️",
+        duration: 60,
+        description: "점심 식사",
+      },
+      long: {
+        name: "긴 휴식",
+        emoji: "🛌",
+        duration: 30,
+        description: "충분한 휴식",
+      },
+      coffee: {
+        name: "커피 타임",
+        emoji: "☕",
+        duration: 10,
+        description: "커피 한 잔",
+      },
+    };
 
-      await this.sendMessage(
-        bot,
-        chatId,
-        "🕐 근무시간 키워드를 감지했습니다!\n\n" +
-          "정확한 출근/퇴근 처리를 위해 근무시간 메뉴를 이용해주세요.\n" +
-          "/worktime 명령어를 사용하세요."
+    return types[breakType] || types.short;
+  }
+
+  /**
+   * 💪 휴식 팁 제공
+   */
+  getRelaxationTips(breakType) {
+    const tips = {
+      short: [
+        "🚶 잠깐 산책해보세요",
+        "💧 물을 마시세요",
+        "🧘 간단한 스트레칭을 해보세요",
+      ],
+      lunch: [
+        "🍱 영양가 있는 식사를 하세요",
+        "🌳 야외에서 식사해보세요",
+        "🎵 좋아하는 음악을 들어보세요",
+      ],
+      long: [
+        "😴 짧은 낮잠을 자보세요",
+        "📚 책을 읽어보세요",
+        "🎮 취미 활동을 해보세요",
+      ],
+      coffee: [
+        "☕ 좋아하는 음료를 마시세요",
+        "👥 동료와 대화해보세요",
+        "🌅 창밖을 바라보세요",
+      ],
+    };
+
+    return tips[breakType] || tips.short;
+  }
+
+  /**
+   * 🎯 빠른 액션 목록 생성
+   */
+  getQuickActions(workStatus, currentSession, currentBreak) {
+    const actions = [];
+
+    if (workStatus.id === "not_working") {
+      actions.push(
+        { text: "🕐 출근", callback_data: "worktime:checkin" },
+        { text: "🏠 재택근무", callback_data: "worktime:checkin:remote" }
       );
+    } else if (workStatus.id === "working") {
+      actions.push(
+        { text: "☕ 휴식", callback_data: "worktime:break:start" },
+        { text: "🍽️ 점심", callback_data: "worktime:break:lunch" },
+        { text: "🏠 퇴근", callback_data: "worktime:checkout" }
+      );
+    } else if (workStatus.id === "break") {
+      actions.push(
+        { text: "🔄 복귀", callback_data: "worktime:break:end" },
+        { text: "📊 현황", callback_data: "worktime:today" }
+      );
+    }
 
-      return true;
-    } catch (error) {
-      logger.error("❌ 근무시간 키워드 처리 실패:", error);
-      return false;
+    return actions;
+  }
+
+  /**
+   * 💬 출근 메시지 생성
+   */
+  getCheckInMessage(punctualityAnalysis) {
+    const messages = {
+      very_early: [
+        "🌟 일찍 시작하는 하루! 멋집니다!",
+        "✨ 성실함이 돋보이네요!",
+        "🚀 오늘도 생산적인 하루 되세요!",
+      ],
+      early: ["👍 좋은 습관이에요!", "⭐ 여유로운 시작!", "💪 오늘도 화이팅!"],
+      on_time: [
+        "⏰ 완벽한 출근 시간!",
+        "🎯 정시성 최고!",
+        "👌 오늘도 좋은 하루!",
+      ],
+      slightly_late: [
+        "😊 괜찮아요! 오늘 힘내세요!",
+        "🌱 내일은 더 일찍!",
+        "💝 늦어도 와주셔서 감사해요!",
+      ],
+      late: ["🔥 늦었지만 열심히!", "⚡ 지금부터 집중!", "🎈 화이팅!"],
+    };
+
+    const messageArray =
+      messages[punctualityAnalysis.status] || messages.on_time;
+    return messageArray[Math.floor(Math.random() * messageArray.length)];
+  }
+
+  /**
+   * 🎊 퇴근 메시지 생성
+   */
+  getCheckOutMessage(workAnalysis) {
+    if (workAnalysis.isOvertime) {
+      return `🔥 ${this.formatWorkDuration(
+        workAnalysis.overtimeHours * 60
+      )} 초과근무! 정말 수고하셨습니다!`;
+    } else if (
+      workAnalysis.actualHours >=
+      this.config.standardWorkHours - 0.5
+    ) {
+      return "🎯 완벽한 근무! 오늘도 수고하셨어요!";
+    } else {
+      return "😊 오늘 하루도 수고하셨습니다!";
     }
   }
 
   /**
-   * 서비스 사용 불가 에러 처리
+   * 🏆 업적 체크
    */
-  async handleServiceUnavailableError(bot, callbackQuery) {
+  async checkAchievements(userId, session) {
     try {
-      const chatId = callbackQuery.message.chat.id;
+      const achievements = [];
 
-      await this.sendMessage(
-        bot,
-        chatId,
-        "❌ **서비스 일시 사용 불가**\n\n" +
-          "근무시간 관리 서비스에 일시적인 문제가 발생했습니다.\n" +
-          "잠시 후 다시 시도해주세요.\n\n" +
-          "문제가 지속되면 관리자에게 문의하세요."
+      // 연속 정시 출근
+      const recentSessions = await this.worktimeService.getRecentSessions(
+        userId,
+        5
       );
+      const consecutivePunctual =
+        this.checkConsecutivePunctuality(recentSessions);
 
-      return true;
+      if (consecutivePunctual >= 5) {
+        achievements.push({
+          id: "punctual_week",
+          name: "정시 출근 달인",
+          description: "5일 연속 정시 출근",
+          emoji: "⏰",
+          unlockedAt: new Date(),
+        });
+      }
+
+      // 과로 경고
+      if (session.totalHours > this.config.standardWorkHours + 2) {
+        achievements.push({
+          id: "overtime_warrior",
+          name: "야근 전사",
+          description: "2시간 이상 초과근무",
+          emoji: "🔥",
+          unlockedAt: new Date(),
+        });
+      }
+
+      // 효율적 근무
+      if (
+        session.totalBreakTime <= 60 &&
+        session.totalHours >= this.config.standardWorkHours
+      ) {
+        achievements.push({
+          id: "efficient_worker",
+          name: "효율적인 근무자",
+          description: "적절한 휴식으로 효율적 근무",
+          emoji: "⚡",
+          unlockedAt: new Date(),
+        });
+      }
+
+      return achievements;
     } catch (error) {
-      logger.error("❌ 서비스 사용 불가 에러 처리 실패:", error);
-      return false;
+      logger.error("❌ 업적 체크 실패:", error);
+      return [];
     }
   }
 
   /**
-   * 일반 에러 처리
+   * 🔄 활성 근무 세션 복구
    */
-  async handleErrorAction(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
+  async restoreActiveWorkSessions() {
     try {
-      const chatId = callbackQuery.message.chat.id;
+      logger.info("🔄 활성 근무 세션 복구 시작...");
 
-      await this.sendMessage(
-        bot,
-        chatId,
-        "❌ **작업 처리 실패**\n\n" +
-          "요청하신 작업을 처리할 수 없습니다.\n" +
-          "잠시 후 다시 시도해주세요."
-      );
+      const activeSessions = await this.worktimeService.getActiveSessions();
+      let restoredCount = 0;
 
-      return true;
+      for (const session of activeSessions) {
+        try {
+          // 세션이 오늘 것인지 확인
+          const sessionDate = new Date(session.startTime);
+          const today = new Date();
+
+          if (!this.isSameDay(sessionDate, today)) {
+            // 어제 세션은 자동 완료 처리
+            await this.worktimeService.autoCompleteSession(
+              session.userId,
+              session.id
+            );
+            continue;
+          }
+
+          // 활성 세션 복구
+          const restoredSession = {
+            id: session.id,
+            userId: session.userId,
+            startTime: new Date(session.startTime),
+            endTime: null,
+            type: session.type,
+            status: session.status,
+            breaks: session.breaks || [],
+            totalBreakTime: session.totalBreakTime || 0,
+            location: session.location,
+            notes: session.notes || "",
+            metadata: session.metadata || {},
+          };
+
+          this.activeWorkSessions.set(session.userId, restoredSession);
+
+          // 알림 재설정
+          if (this.config.enableNotifications) {
+            await this.scheduleWorkNotifications(
+              session.userId,
+              restoredSession
+            );
+          }
+
+          restoredCount++;
+        } catch (error) {
+          logger.error(`❌ 세션 복구 실패 (ID: ${session.id}):`, error);
+        }
+      }
+
+      logger.success(`✅ 활성 근무 세션 복구 완료: ${restoredCount}개`);
     } catch (error) {
-      logger.error("❌ 에러 액션 처리도 실패:", error);
-      return false;
+      logger.error("❌ 활성 근무 세션 복구 실패:", error);
     }
   }
 
-  // 기타 액션 핸들러들은 간단한 스텁으로 구현
-  async handleProgressAction() {
-    return await this.handleNotImplementedAction();
-  }
-  async handleHistoryAction() {
-    return await this.handleNotImplementedAction();
-  }
-  async handleTodayRecordAction() {
-    return await this.handleNotImplementedAction();
-  }
-  async handleSettingsAction() {
-    return await this.handleNotImplementedAction();
-  }
-  async handleAddCheckinNoteAction() {
-    return await this.handleNotImplementedAction();
-  }
-  async handleAddCheckoutNoteAction() {
-    return await this.handleNotImplementedAction();
-  }
+  /**
+   * 🔔 알림 시스템 초기화
+   */
+  initializeNotificationSystem() {
+    logger.info("🔔 근무시간 알림 시스템 초기화...");
 
-  async handleNotImplementedAction() {
-    // 미구현 기능 처리 로직
-    return true;
+    // 일일 체크 (매시간)
+    this.dailyCheckInterval = setInterval(async () => {
+      await this.performDailyCheck();
+    }, 60 * 60 * 1000); // 1시간마다
+
+    logger.success("✅ 근무시간 알림 시스템 초기화 완료");
   }
 
   /**
-   * 📊 상태 조회 (ServiceBuilder 활용)
+   * 🔔 근무 알림 스케줄링
+   */
+  async scheduleWorkNotifications(userId, session) {
+    try {
+      // 퇴근 시간 30분 전 알림
+      const endTime = new Date(session.startTime);
+      endTime.setHours(endTime.getHours() + this.config.standardWorkHours);
+      endTime.setMinutes(
+        endTime.getMinutes() - this.config.notifyBeforeEndTime
+      );
+
+      const now = new Date();
+      const timeToNotification = endTime.getTime() - now.getTime();
+
+      if (timeToNotification > 0) {
+        const timerId = setTimeout(async () => {
+          await this.sendWorkNotification(
+            userId,
+            "end_time_approaching",
+            session
+          );
+        }, timeToNotification);
+
+        this.notificationTimers.set(userId, timerId);
+      }
+    } catch (error) {
+      logger.error("❌ 근무 알림 스케줄링 실패:", error);
+    }
+  }
+
+  /**
+   * 🔔 근무 알림 전송
+   */
+  async sendWorkNotification(userId, type, data) {
+    try {
+      let title, message;
+
+      switch (type) {
+        case "end_time_approaching":
+          title = "퇴근 시간 임박";
+          message = `${this.config.notifyBeforeEndTime}분 후 퇴근 시간입니다!`;
+          break;
+
+        case "overtime_warning":
+          title = "초과근무 시작";
+          message = "표준 근무시간을 초과했습니다. 건강 관리에 유의하세요!";
+          break;
+
+        case "break_reminder":
+          title = "휴식 권장";
+          message = "충분한 휴식을 취하세요. 생산성 향상에 도움됩니다!";
+          break;
+
+        default:
+          return;
+      }
+
+      logger.info(`🔔 근무 알림: ${type}`, {
+        module: "WorktimeModule",
+        userId,
+        type,
+      });
+
+      // NavigationHandler를 통한 알림 (비동기)
+      setImmediate(async () => {
+        try {
+          await enhancedResponses.sendSmartNotification(bot, userId, {
+            id: `worktime_${type}_${Date.now()}`,
+            title,
+            message,
+            urgency: type === "overtime_warning" ? "high" : "medium",
+            time: TimeHelper.getKoreanTime(),
+            type: "worktime",
+            data,
+          });
+        } catch (error) {
+          logger.error("❌ 근무 알림 전송 실패:", error);
+        }
+      });
+    } catch (error) {
+      logger.error("❌ 근무 알림 처리 실패:", error);
+    }
+  }
+
+  /**
+   * 📅 같은 날짜인지 확인
+   */
+  isSameDay(date1, date2) {
+    return (
+      date1.getFullYear() === date2.getFullYear() &&
+      date1.getMonth() === date2.getMonth() &&
+      date1.getDate() === date2.getDate()
+    );
+  }
+
+  /**
+   * 📊 모듈 상태 조회 (Enhanced)
    */
   getStatus() {
     const baseStatus = super.getStatus();
 
     return {
       ...baseStatus,
-      worktimeService: {
-        connected: !!this.worktimeService,
-        status: this.worktimeService?.getStatus?.() || "unknown",
+      version: "3.0.1",
+      type: "Enhanced",
+      features: {
+        markdownV2: true,
+        realTimeDashboard: true,
+        smartNotifications: true,
+        performanceAnalytics: true,
+        enhancedLogging: true,
       },
-      workSchedule: this.workSchedule,
-      config: this.config,
+      activeWorkSessions: {
+        count: this.activeWorkSessions.size,
+        working: Array.from(this.activeWorkSessions.values()).filter(
+          (s) => s.status === "working"
+        ).length,
+      },
+      activeBreaks: {
+        count: this.breakSessions.size,
+      },
+      notificationTimers: {
+        active: this.notificationTimers.size,
+      },
+      serviceStatus: this.worktimeService?.getStatus(),
+      config: {
+        standardWorkHours: this.config.standardWorkHours,
+        flexibleWorking: this.config.flexibleWorking,
+        notificationsEnabled: this.config.enableNotifications,
+      },
     };
   }
 
   /**
-   * 🧹 정리
+   * 🧹 정리 작업 (Enhanced)
    */
   async cleanup() {
     try {
-      // 상위 클래스 정리
+      logger.info("🧹 Enhanced WorktimeModule 정리 시작...");
+
+      // 모든 알림 타이머 정리
+      for (const [userId, timerId] of this.notificationTimers.entries()) {
+        clearTimeout(timerId);
+      }
+      this.notificationTimers.clear();
+
+      // 일일 체크 인터벌 정리
+      if (this.dailyCheckInterval) {
+        clearInterval(this.dailyCheckInterval);
+      }
+
+      // 활성 세션들 일시 저장
+      for (const [userId, session] of this.activeWorkSessions.entries()) {
+        if (session.status === "working") {
+          await this.worktimeService.pauseSession(userId, session.id);
+        }
+      }
+
+      // 메모리 정리
+      this.activeWorkSessions.clear();
+      this.breakSessions.clear();
+
+      // 부모 클래스 정리
       await super.cleanup();
 
-      // 서비스 참조 정리 (ServiceBuilder가 관리하므로 직접 정리하지 않음)
-      this.worktimeService = null;
-
-      logger.info("✅ WorktimeModule 정리 완료");
+      logger.success("✅ Enhanced WorktimeModule 정리 완료");
     } catch (error) {
-      logger.error("❌ WorktimeModule 정리 실패:", error);
+      logger.error("❌ Enhanced WorktimeModule 정리 실패:", error);
     }
   }
 }
