@@ -1,5 +1,5 @@
 // src/utils/TelegrafCompat.js - 호환성 레이어
-const logger = require("./Logger");
+const logger = require("../Logger");
 
 /**
  * 🔄 Telegraf 호환성 레이어

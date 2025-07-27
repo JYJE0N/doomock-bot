@@ -2,7 +2,7 @@
 const templates = require("./MessageTemplates");
 const styler = require("./MessageStyler");
 const chalk = require("chalk");
-const logger = require("./Logger");
+const logger = require("../Logger");
 
 /**
  * 🎨 BotResponses - 모든 봇 응답을 한곳에서 관리
