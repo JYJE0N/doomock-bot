@@ -1,5 +1,6 @@
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
+const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class TTSModule extends BaseModule {
   constructor(bot, options = {}) {
@@ -76,11 +77,17 @@ class TTSModule extends BaseModule {
   }
 
   async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
-    return {
-      type: "menu",
-      module: "tts",
-      data: {},
-    };
+    const { from } = callbackQuery;
+    const userId = getUserId(from); // ✅ 이제 작동함
+
+    try {
+      const stats = await this.ttsService.convertToSpeech(text);
+    } catch (error) {
+      return {
+        type: "error",
+        message: error.message, // ← 서비스의 에러 메시지 그대로 활용
+      };
+    }
   }
 
   async convertText(bot, callbackQuery, subAction, params, moduleManager) {

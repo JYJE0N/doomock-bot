@@ -1,6 +1,7 @@
-// ===== 🏖️ LeaveModule.js =====
+// ===== 🏖️ LeaveModule.js v3.0.1 =====
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
+const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class LeaveModule extends BaseModule {
   constructor(bot, options = {}) {
@@ -9,9 +10,11 @@ class LeaveModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
-    this.serviceBuilder = options.serviceBuilder || null;
 
+    // ✅ 표준: ServiceBuilder 사용
+    this.serviceBuilder = options.serviceBuilder || null;
     this.leaveService = null;
+
     this.config = {
       annualLeaveDays: parseInt(process.env.ANNUAL_LEAVE_DAYS) || 15,
       ...options.config,
@@ -20,13 +23,16 @@ class LeaveModule extends BaseModule {
     logger.module("LeaveModule", "모듈 생성", { version: "3.0.1" });
   }
 
+  // ✅ 표준: onInitialize 패턴
   async onInitialize() {
     try {
-      this.leaveService = new LeaveService({
-        db: this.db,
+      logger.module("LeaveModule", "초기화 시작...");
+
+      // ✅ ServiceBuilder를 통한 서비스 생성
+      this.leaveService = await this.serviceBuilder.getOrCreate("leave", {
         config: this.config,
       });
-      await this.leaveService.initialize();
+
       logger.success("LeaveModule 초기화 완료");
     } catch (error) {
       logger.error("LeaveModule 초기화 실패", error);
@@ -34,6 +40,7 @@ class LeaveModule extends BaseModule {
     }
   }
 
+  // ✅ 표준: setupActions 패턴
   setupActions() {
     this.registerActions({
       menu: this.showMenu,
@@ -44,6 +51,7 @@ class LeaveModule extends BaseModule {
     });
   }
 
+  // ✅ 표준: onHandleMessage 패턴
   async onHandleMessage(bot, msg) {
     const {
       text,
@@ -62,6 +70,8 @@ class LeaveModule extends BaseModule {
     }
     return false;
   }
+
+  // ===== 📋 액션 메서드들 (표준 매개변수 준수) =====
 
   async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const { from } = callbackQuery;
@@ -139,4 +149,5 @@ class LeaveModule extends BaseModule {
     };
   }
 }
-module.exports = LeaveModule; // ✅ 필수!
+
+module.exports = LeaveModule;

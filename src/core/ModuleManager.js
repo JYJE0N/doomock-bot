@@ -118,7 +118,6 @@ class ModuleManager {
    */
   async handleCallback(bot, callbackQuery, action, params, moduleManager) {
     try {
-      // 모듈 키 추출 (action이 모듈 키)
       const moduleKey = action.split(":")[0];
       const subAction = action.substring(moduleKey.length + 1) || "menu";
 
@@ -128,12 +127,11 @@ class ModuleManager {
       const module = this.modules.get(moduleKey);
       if (!module) {
         logger.warn(`모듈을 찾을 수 없음: ${moduleKey}`);
-        // ❌ BotController에서 이미 answerCallbackQuery 처리하므로 제거
-        // await bot.answerCallbackQuery(callbackQuery.id);
+        // ❌ answerCallbackQuery 제거! (이미 BotController에서 처리)
         return;
       }
 
-      // 모듈로 전달
+      // ❌ answerCallbackQuery 제거! 모듈로 바로 전달
       await module.instance.handleCallback(
         bot,
         callbackQuery,
@@ -142,7 +140,6 @@ class ModuleManager {
         moduleManager
       );
 
-      // 통계 업데이트
       this.stats.callbacksHandled++;
     } catch (error) {
       logger.error("모듈 콜백 처리 실패", error);

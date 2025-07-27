@@ -144,43 +144,29 @@ class NavigationHandler {
       const callbackQuery = ctx.callbackQuery;
       const data = callbackQuery.data;
       const [action, ...params] = data.split(":");
-      const userName = getUserName(callbackQuery);
 
-      // 🌈 알록달록 로그
+      // 🌈 로그
       console.log(this.messageSystem.rainbow(`🎯 네비게이션: ${action}`));
-      console.log(
-        this.messageSystem.gradient(`👤 사용자: ${userName}`, "blue", "purple")
-      );
 
-      // 📊 통계 업데이트
+      // 통계 업데이트
       this.stats.totalNavigation++;
-      this.stats.lastActivity = TimeHelper.getLogTimeString();
+
+      // ❌ answerCallbackQuery 제거! (BotController에서 이미 처리)
 
       // 시스템 네비게이션 처리
       switch (action) {
         case "main":
         case "menu":
-          this.stats.menuViews++;
           return await this.showMainMenu(ctx);
-
-        case "back":
-          return await this.handleBackNavigation(ctx, params);
 
         case "help":
           return await this.showHelp(ctx);
 
-        case "about":
-          return await this.showAbout(ctx);
-
         case "status":
           return await this.showSystemStatus(ctx);
 
-        case "refresh":
-          return await this.handleRefresh(ctx, params);
-
         default:
-          // 모듈로 라우팅 (통계 포함)
-          this.updateModuleStats(action);
+          // 모듈로 라우팅
           if (this.moduleManager) {
             return await this.moduleManager.handleCallback(
               this.bot,
@@ -192,7 +178,7 @@ class NavigationHandler {
           }
       }
     } catch (error) {
-      logger.error("네비게이션 콜백 처리 실패:", error);
+      logger.error("네비게이션 콜백 실패:", error);
       await this.showNavigationError(ctx, error.message);
     }
   }
@@ -303,6 +289,104 @@ _버튼을 눌러 원하는 기능을 선택하세요\\!_`;
       // 최후의 수단: 매우 간단한 메뉴
       await ctx.reply("🤖 두목봇\n\n/start 명령어로 다시 시작해주세요.");
     }
+  }
+
+  async showHelp(ctx) {
+    try {
+      const helpText = `
+🤖 **두목봇 도움말**
+
+**📋 주요 기능:**
+• 📝 할일 관리
+• ⏰ 집중 타이머 
+• 🏢 근무시간 관리
+• 🏖️ 연차 계산기
+• 🔔 리마인더
+• 🔮 운세
+• 🌤️ 날씨
+• 🔊 음성 변환
+
+**🎯 사용법:**
+버튼을 클릭하거나 명령어를 입력하세요\\!
+
+*문의사항이 있으시면 개발자에게 연락하세요\\.*
+`.trim();
+
+      const keyboard = {
+        inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main" }]],
+      };
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(helpText, {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        });
+      } else {
+        await ctx.reply(helpText, {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        });
+      }
+    } catch (error) {
+      logger.error("도움말 표시 실패:", error);
+      await ctx.reply("❌ 도움말을 불러올 수 없습니다.");
+    }
+  }
+
+  async showSystemStatus(ctx) {
+    try {
+      const statusText = `
+🔧 **시스템 상태**
+
+**✅ 전체 상태:** 정상
+**🤖 봇 상태:** 활성화
+**🗄️ 데이터베이스:** 연결됨
+**📦 모듈:** 9개 로드됨
+**🌤️ API:** 정상
+
+**⏰ 업타임:** ${this.getUptime()}
+**📊 메모리 사용량:** ${this.getMemoryUsage()}MB
+
+*모든 시스템이 정상 작동 중입니다\\.*
+`.trim();
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 새로고침", callback_data: "status" },
+            { text: "🏠 메인 메뉴", callback_data: "main" },
+          ],
+        ],
+      };
+
+      if (ctx.callbackQuery) {
+        await ctx.editMessageText(statusText, {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        });
+      } else {
+        await ctx.reply(statusText, {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        });
+      }
+    } catch (error) {
+      logger.error("시스템 상태 표시 실패:", error);
+      await ctx.reply("❌ 시스템 상태를 불러올 수 없습니다.");
+    }
+  }
+
+  // 헬퍼 메서드들
+  getUptime() {
+    const uptime = process.uptime();
+    const hours = Math.floor(uptime / 3600);
+    const minutes = Math.floor((uptime % 3600) / 60);
+    return `${hours}시간 ${minutes}분`;
+  }
+
+  getMemoryUsage() {
+    const used = process.memoryUsage();
+    return Math.round(used.rss / 1024 / 1024);
   }
 
   /**

@@ -180,51 +180,46 @@ class ServiceBuilder {
   /**
    * 🏭 서비스 생성 (중앙 관리)
    */
+  /**
+   * 🏭 서비스 생성 (중앙 관리) - 완전 수정된 버전
+   */
   async create(serviceName, options = {}) {
     try {
       const registration = this.serviceRegistry.get(serviceName);
 
       if (!registration) {
-        // TodoService 특별 처리 (임시)
-        if (serviceName === "todo") {
-          logger.warn(`⚠️ TodoService가 등록되지 않음 - 동적 로드 시도`);
-
-          try {
-            const TodoService = require("../services/TodoService");
-            this.register("todo", TodoService, {
-              priority: 1,
-              required: true,
-            });
-
-            return await this.create(serviceName, options);
-          } catch (loadError) {
-            logger.error(`❌ TodoService 동적 로드 실패:`, loadError);
-            throw new Error(`TodoService를 로드할 수 없습니다`);
-          }
-        }
-
         throw new Error(`서비스 '${serviceName}'이 등록되지 않음`);
       }
 
       const { ServiceClass } = registration;
-
-      // 서비스 인스턴스 생성
       let serviceInstance;
       const startTime = Date.now();
 
       try {
-        // 서비스별 매개변수 설정
-        const db = options.db || this.defaultDb;
+        // 🔧 모든 서비스에 대해 표준화된 생성자 옵션
+        const dbConnection = options.db || this.defaultDb;
 
-        // TodoService는 특별한 매개변수 구조 사용
-        if (serviceName === "todo") {
-          serviceInstance = new ServiceClass({
-            db: db,
-            config: registration.config,
-          });
-        } else {
-          // 기타 서비스들은 기본 구조
-          serviceInstance = new ServiceClass(db);
+        const serviceOptions = {
+          db: dbConnection, // 모든 서비스가 options.db로 받음
+          apiKey: options.config?.apiKey, // ← API 키 전달
+          config: {
+            ...registration.config,
+            ...options.config,
+          },
+        };
+
+        // ✅ 모든 서비스를 동일한 방식으로 생성
+        serviceInstance = new ServiceClass(serviceOptions);
+
+        // 🔍 DB 연결 후처리 (TimerService 등을 위해)
+        if (serviceInstance.dbManager) {
+          // DatabaseManager 인스턴스가 있는 경우
+          await serviceInstance.dbManager.ensureConnection();
+
+          // ✅ 핵심: this.db에 실제 DB 연결 할당
+          if (!serviceInstance.db && this.defaultDb) {
+            serviceInstance.db = this.defaultDb;
+          }
         }
 
         // 초기화 메서드가 있으면 실행
@@ -247,52 +242,104 @@ class ServiceBuilder {
 
         return serviceInstance;
       } catch (error) {
-        logger.error(`❌ ${serviceName} 서비스 생성 실패:`, error);
-        this.stats.totalErrors++;
+        // 🎭 실패 시 Mock 서비스 생성 (개발 모드)
+        if (
+          process.env.NODE_ENV === "development" ||
+          process.env.ENABLE_MOCK_SERVICES === "true"
+        ) {
+          logger.warn(`⚠️ Mock 서비스 생성: ${serviceName}`);
 
-        // Mock 서비스 반환으로 안전성 확보
-        return this.createMockService(serviceName);
+          const mockService = this.createMockService(
+            serviceName,
+            serviceOptions
+          );
+
+          if (registration.singleton) {
+            this.serviceInstances.set(serviceName, mockService);
+          }
+
+          return mockService;
+        }
+
+        this.stats.totalErrors++;
+        logger.error(`❌ ${serviceName} 서비스 생성 실패:`, error);
+        throw error;
       }
     } catch (error) {
-      logger.error(`❌ 서비스 생성 실패 (${serviceName}):`, error);
-      this.stats.totalErrors++;
+      logger.error(`❌ create 실패 (${serviceName}):`, error);
       throw error;
     }
   }
 
   /**
-   * 🎭 Mock 서비스 생성 (오류 방지용)
+   * 🎭 Mock 서비스 생성기 (개발/테스트용)
    */
-  createMockService(serviceName) {
-    const mockService = {
-      serviceName,
-      status: "mock",
-      isInitialized: true,
-
-      // 기본 메서드들
-      async initialize() {
-        return true;
+  createMockService(serviceName, options = {}) {
+    const mockMethods = {
+      initialize: async () => {
+        logger.debug(`🎭 Mock ${serviceName} 초기화됨`);
       },
-      async getStatus() {
-        return {
-          serviceName: this.serviceName,
-          status: "mock_active",
-          isConnected: false,
-        };
+      cleanup: async () => {
+        logger.debug(`🎭 Mock ${serviceName} 정리됨`);
       },
-      async cleanup() {
-        return true;
-      },
-      async healthCheck() {
-        return { healthy: false, message: "Mock 서비스" };
-      },
-
-      // 서비스별 Mock 메서드
-      ...this.getServiceSpecificMocks(serviceName),
+      // 기본적인 Mock 메서드들
+      getUserStats: async () => ({ total: 0, active: 0, completed: 0 }),
+      getStatus: async () => ({ isActive: false, message: "Mock 서비스" }),
+      getDetailedStatus: async () => ({ status: "mock", uptime: 0 }),
     };
 
-    logger.warn(`🎭 Mock 서비스 생성: ${serviceName}`);
-    return mockService;
+    // 서비스별 특화 Mock 메서드
+    switch (serviceName) {
+      case "timer":
+        Object.assign(mockMethods, {
+          startTimer: async () => ({
+            success: true,
+            message: "Mock 타이머 시작",
+          }),
+          stopTimer: async () => ({
+            success: true,
+            message: "Mock 타이머 정지",
+          }),
+          getTimerStatus: async () => ({
+            isActive: false,
+            message: "Mock 타이머",
+          }),
+        });
+        break;
+      case "leave":
+        Object.assign(mockMethods, {
+          useLeave: async () => ({ success: true, message: "Mock 연차 사용" }),
+          getLeaveStatus: async () => ({ total: 15, used: 0, remaining: 15 }),
+          getLeaveHistory: async () => [],
+        });
+        break;
+      case "worktime":
+        Object.assign(mockMethods, {
+          checkIn: async () => ({ success: true, message: "Mock 출근" }),
+          checkOut: async () => ({ success: true, message: "Mock 퇴근" }),
+          getWorkStatus: async () => ({
+            isWorking: false,
+            message: "Mock 근무",
+          }),
+        });
+        break;
+    }
+
+    return new Proxy(
+      {},
+      {
+        get(target, prop) {
+          if (mockMethods[prop]) {
+            return mockMethods[prop];
+          }
+          // 정의되지 않은 메서드는 기본 응답 반환
+          return async () => {
+            logger.debug(`🎭 Mock ${serviceName}.${prop}() 호출됨`);
+            return { success: false, message: `Mock ${serviceName} 응답` };
+          };
+        },
+      }
+    );
   }
 
   /**

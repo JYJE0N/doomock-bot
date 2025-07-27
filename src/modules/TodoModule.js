@@ -104,21 +104,13 @@ class TodoModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("todo", "menu", userId);
-
     try {
-      // 통계만 조회 (데이터 제공)
-      const stats = await this.todoService.getUserStats(userId);
-
-      // NavigationHandler에게 데이터 전달 (UI는 NavigationHandler가 처리)
-      return {
-        type: "menu",
-        module: "todo",
-        data: { stats },
-      };
+      const stats = await this.todoService.getTodoStatus(userId);
     } catch (error) {
-      logger.error("todo menu 조회 실패", error);
-      return { type: "error", message: "메뉴를 불러올 수 없습니다." };
+      return {
+        type: "error",
+        message: error.message, // ← 서비스의 에러 메시지 그대로 활용
+      };
     }
   }
 
@@ -130,7 +122,7 @@ class TodoModule extends BaseModule {
     const userId = getUserId(from);
     const page = parseInt(params.page) || 1;
 
-    logger.navigation("todo", "list", userId);
+    logger.debug(`TodoModule: list 호출 (사용자: ${userId})`);
 
     try {
       const result = await this.todoService.getUserTodos(userId, {

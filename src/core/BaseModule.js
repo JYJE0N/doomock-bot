@@ -110,21 +110,25 @@ class BaseModule {
   }
 
   /**
-   * 🎯 콜백 처리 - ❌ answerCallbackQuery 완전 제거!
+   * 🎯 콜백 처리
    */
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     try {
       this.stats.callbacksHandled++;
       this.lastActivity = TimeHelper.now();
 
-      logger.navigation(this.moduleName, subAction, getUserId(callbackQuery));
+      logger.debug(
+        `${this.moduleName}: ${subAction} 호출 (사용자: ${getUserId(
+          callbackQuery
+        )})`
+      );
 
       // 액션 찾기
       const handler = this.actionMap.get(subAction);
       if (!handler) {
         logger.warn(`${this.moduleName}: 알 수 없는 액션 - ${subAction}`);
 
-        // ❌ 직접 응답하지 않음! NavigationHandler가 에러 UI 처리
+        // NavigationHandler가 에러 UI 처리하도록 데이터만 반환
         return {
           type: "error",
           message: "알 수 없는 명령입니다",
@@ -155,7 +159,7 @@ class BaseModule {
       this.stats.errorsCount++;
       logger.error(`${this.moduleName} 콜백 처리 실패`, error);
 
-      // ❌ 직접 응답하지 않음! 에러 데이터만 반환
+      // NavigationHandler가 에러 UI 처리하도록 에러 데이터만 반환
       return {
         type: "error",
         message: "처리 중 오류가 발생했습니다",

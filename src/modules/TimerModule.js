@@ -1,6 +1,7 @@
 // ===== ⏱️ TimerModule.js =====
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
+const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class TimerModule extends BaseModule {
   constructor(bot, options = {}) {
@@ -65,7 +66,7 @@ class TimerModule extends BaseModule {
 
   async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const { from } = callbackQuery;
-    const userId = getUserId(from);
+    const userId = getUserId(from); // ✅ 이제 작동함
 
     try {
       const status = await this.timerService.getTimerStatus(userId);

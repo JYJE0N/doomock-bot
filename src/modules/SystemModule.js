@@ -130,7 +130,7 @@ class SystemModule extends BaseModule {
     const userId = getUserId(from);
     const userName = getUserName(from);
 
-    logger.navigation("system", "menu", userId);
+    logger.debug(`SystemModule: menu 호출 (사용자: ${userId})`);
 
     try {
       // 활성 모듈 목록 조회

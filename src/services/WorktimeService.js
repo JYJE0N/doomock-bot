@@ -1,10 +1,12 @@
+// src/services/WorktimeService.js - Logger.data 문제 해결
 const { getInstance } = require("../database/DatabaseManager");
 const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 
 class WorktimeService {
   constructor(options = {}) {
     this.collectionName = "worktimes";
-    this.dbManager = getInstance(); // 👈 이 부분!
+    this.dbManager = getInstance();
 
     this.db = options.db || null;
     this.collection = null;
@@ -18,7 +20,7 @@ class WorktimeService {
   }
 
   async initialize() {
-    await this.dbManager.ensureConnection(); // 👈 이 부분!
+    await this.dbManager.ensureConnection();
 
     if (!this.db) {
       throw new Error("Database connection required");
@@ -71,14 +73,21 @@ class WorktimeService {
         // 기존 레코드 업데이트
         await this.collection.updateOne(
           { _id: existingRecord._id },
-          { $set: { checkInTime: now, updatedAt: now, $inc: { version: 1 } } }
+          {
+            $set: {
+              checkInTime: now,
+              updatedAt: now,
+            },
+            $inc: { version: 1 },
+          }
         );
       } else {
         // 새 레코드 생성
         await this.collection.insertOne(checkInData);
       }
 
-      logger.data("worktime", "checkin", userId, { date: today });
+      // ✅ logger.data → logger.info로 변경
+      logger.info("출근 처리 완료", { userId, date: today });
       return {
         success: true,
         checkInTime: now,
@@ -119,12 +128,14 @@ class WorktimeService {
             checkOutTime: now,
             workDuration,
             updatedAt: now,
-            $inc: { version: 1 },
           },
+          $inc: { version: 1 },
         }
       );
 
-      logger.data("worktime", "checkout", userId, {
+      // ✅ logger.data → logger.info로 변경
+      logger.info("퇴근 처리 완료", {
+        userId,
         date: today,
         duration: workDuration,
       });
@@ -160,7 +171,8 @@ class WorktimeService {
         workDuration: record?.workDuration || 0,
       };
 
-      logger.data("worktime", "status", userId, status);
+      // ✅ logger.data → logger.debug로 변경
+      logger.debug("근무 상태 조회 완료", { userId, status });
       return status;
     } catch (error) {
       logger.error("오늘 근무 상태 조회 실패", error);

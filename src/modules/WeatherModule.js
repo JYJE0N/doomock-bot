@@ -68,15 +68,18 @@ class WeatherModule extends BaseModule {
     const userId = getUserId(from);
 
     try {
-      const weather = await this.weatherService.getCurrentWeather();
+      const weather = await this.weatherService.getCurrentWeather(city);
       return {
         type: "menu",
         module: "weather",
         data: { weather },
       };
     } catch (error) {
-      logger.error("weather menu 실패", error);
-      return { type: "error", message: "날씨 정보를 불러올 수 없습니다." };
+      return {
+        type: "error",
+        message: error.message || "기본 에러 메시지",
+        error: error.message,
+      };
     }
   }
 

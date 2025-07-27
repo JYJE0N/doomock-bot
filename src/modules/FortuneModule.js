@@ -1,6 +1,7 @@
 // ===== 🔮 FortuneModule.js =====
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
+const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class FortuneModule extends BaseModule {
   constructor(bot, options = {}) {
@@ -10,8 +11,8 @@ class FortuneModule extends BaseModule {
       config: options.config,
     });
     this.serviceBuilder = options.serviceBuilder || null;
-
     this.fortuneService = null;
+
     logger.module("FortuneModule", "모듈 생성", { version: "3.0.1" });
   }
 
@@ -60,11 +61,21 @@ class FortuneModule extends BaseModule {
   }
 
   async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
-    return {
-      type: "menu",
-      module: "fortune",
-      data: {},
-    };
+    const { from } = callbackQuery;
+    const userId = getUserId(from); // ✅ 이제 작동함
+
+    try {
+      // 운세
+      const stats = await this.fortuneService.getFortuneStatus(userId);
+
+      return {
+        type: "menu",
+        module: "fortune",
+        data: { stats },
+      };
+    } catch (error) {
+      return { type: "error", message: "운세 메뉴를 불러올 수 없습니다." };
+    }
   }
 
   async showToday(bot, callbackQuery, subAction, params, moduleManager) {

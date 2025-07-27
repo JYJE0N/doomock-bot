@@ -1,6 +1,7 @@
 // ===== 🏢 WorktimeModule.js =====
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
+const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class WorktimeModule extends BaseModule {
   constructor(bot, options = {}) {
@@ -66,7 +67,7 @@ class WorktimeModule extends BaseModule {
 
   async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const { from } = callbackQuery;
-    const userId = getUserId(from);
+    const userId = getUserId(from); // ✅ 이제 작동함
 
     try {
       const status = await this.worktimeService.getTodayStatus(userId);
@@ -76,7 +77,11 @@ class WorktimeModule extends BaseModule {
         data: { status },
       };
     } catch (error) {
-      return { type: "error", message: "근무시간 메뉴를 불러올 수 없습니다." };
+      return {
+        type: "error",
+        message: error.message || "기본 에러 메시지",
+        error: error.message,
+      };
     }
   }
 

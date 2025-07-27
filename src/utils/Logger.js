@@ -107,6 +107,88 @@ class CompleteLogger {
     }
   }
 
+  /**
+   * 📊 데이터 로그 메서드 (모듈에서 자주 사용)
+   */
+  data(module, action, userId, data) {
+    this.stats.totalLogs++;
+    const timestamp = this.getTimestamp();
+
+    // 사용자 ID 마스킹 (보안)
+    const maskedUserId = userId
+      ? `***${userId.toString().slice(-4)}`
+      : "unknown";
+
+    console.log(
+      chalk.cyan(
+        `${timestamp} 📊 [${module.toUpperCase()}] ${action} (사용자: ${maskedUserId})`
+      )
+    );
+
+    // 데이터가 있으면 출력
+    if (data && Object.keys(data).length > 0) {
+      console.log(
+        chalk.gray("   데이터:"),
+        chalk.cyan(JSON.stringify(data, null, 2))
+      );
+    }
+  }
+
+  /**
+   * 🎯 네비게이션 로그 (콜백 처리용)
+   */
+  navigation(module, action, userId) {
+    const timestamp = this.getTimestamp();
+    const maskedUserId = userId
+      ? `***${userId.toString().slice(-4)}`
+      : "unknown";
+
+    console.log(
+      chalk.blue(`${timestamp} 🔍 📦 모듈 라우팅: ${module} → ${action}`)
+    );
+    console.log(
+      chalk.blue(
+        `${timestamp} 🔍 ${module}Module: ${action} 호출 (사용자: ${userId})`
+      )
+    );
+  }
+
+  /**
+   * 🎨 모듈별 색상 로그
+   */
+  moduleAction(moduleName, action, userId, details = {}) {
+    const timestamp = this.getTimestamp();
+    const maskedUserId = userId
+      ? `***${userId.toString().slice(-4)}`
+      : "unknown";
+
+    // 모듈별 색상 설정
+    const moduleColors = {
+      todo: "blue",
+      timer: "cyan",
+      worktime: "green",
+      weather: "yellow",
+      fortune: "magenta",
+      tts: "purple",
+    };
+
+    const color = moduleColors[moduleName.toLowerCase()] || "white";
+    const colorFunction = chalk[color] || chalk.white;
+
+    console.log(
+      colorFunction(
+        `${timestamp} 📱 [${moduleName.toUpperCase()}] ${action} (${maskedUserId})`
+      )
+    );
+
+    if (Object.keys(details).length > 0) {
+      console.log(
+        chalk.gray("   상세:"),
+        colorFunction(JSON.stringify(details, null, 2))
+      );
+    }
+  }
+
   // ===== 🚀 특수 메서드들 =====
 
   startup(appName, version) {

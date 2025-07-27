@@ -39,7 +39,7 @@ class BotController {
     // this.callbackManager = new CallbackResponseManager();
 
     // 🌈 LoggerEnhancer 활용을 위한 참조
-    //this.messageSystem = logger.messageSystem;
+    //logger = logger.messageSystem;
     //this.enhancer = logger.enhancer;
 
     // 📊 상세 통계 시스템
@@ -338,9 +338,6 @@ class BotController {
   }
 
   /**
-   * 🎯 콜백 쿼리 처리 (알록달록 라우팅!)
-   */
-  /**
    * ✅ 수정된 콜백 처리 - 중복 방지
    */
   async handleCallbackQuery(ctx) {
@@ -351,72 +348,40 @@ class BotController {
       const userId = getUserId(callbackQuery);
       const data = callbackQuery.data;
 
-      // 🎨 콜백 상세 로그
-      console.log(this.messageSystem.rainbow(`📱 콜백 상세:`));
+      // 🌈 로그
+      console.log(logger.rainbow(`📱 콜백: ${data}`));
       console.log(
-        this.messageSystem.gradient(
-          `   👤 사용자: ${getUserName(callbackQuery)}`,
+        logger.gradient(
+          `👤 사용자: ${getUserName(callbackQuery)}`,
           "cyan",
           "blue"
         )
       );
-      console.log(
-        this.messageSystem.gradient(`   🎯 액션: ${data}`, "purple", "pink")
-      );
 
-      // ✅ 즉시 응답 (로딩 효과) - 중앙 관리
-      const loadingEmoji = ["⏳", "⌛", "🔄", "⚡"][
-        Math.floor(Math.random() * 4)
-      ];
+      // ✅ 즉시 콜백 응답 (한 번만!)
+      await ctx.answerCbQuery("⏳ 처리 중...");
 
-      const answered = await this.callbackManager.answerCallback(
-        this.bot,
-        callbackQuery,
-        { text: `${loadingEmoji} 처리 중...` }
-      );
-
-      if (!answered) {
-        logger.warn("콜백 응답 실패 - 이미 처리됨");
-      }
-
-      // 세션 활동 업데이트
+      // 세션 업데이트
       this.updateUserSession(userId, "callback", data);
 
-      // ✅ NavigationHandler 호출 - 응답은 하지 말고 처리만
-      await this.navigationHandler.handleCallback(ctx, { skipAnswer: true });
+      // ✅ NavigationHandler로 라우팅 (응답은 하지 않고 처리만)
+      await this.navigationHandler.handleCallback(ctx);
 
       // 통계 업데이트
       this.stats.totalCallbacks++;
       this.stats.uniqueUsers.add(userId);
 
-      // 🎉 성공 로그
       const responseTime = Date.now() - startTime;
       console.log(
-        this.messageSystem.gradient(
-          `✅ 콜백 처리 완료 (${responseTime}ms)`,
-          "green",
-          "blue"
-        )
+        logger.gradient(`✅ 콜백 완료 (${responseTime}ms)`, "green", "blue")
       );
-
-      // 성능 메트릭 업데이트
-      this.updatePerformanceMetrics(responseTime);
     } catch (error) {
       console.log(
-        this.messageSystem.gradient(
-          `❌ 콜백 처리 실패: ${error.message}`,
-          "red",
-          "orange"
-        )
+        logger.gradient(`❌ 콜백 실패: ${error.message}`, "red", "orange")
       );
       logger.error("콜백 처리 실패:", error);
 
-      // ✅ 에러 응답도 중앙 관리
-      await this.callbackManager.answerCallback(this.bot, ctx.callbackQuery, {
-        text: "❌ 처리 중 오류가 발생했습니다",
-        show_alert: true,
-      });
-
+      // 이미 응답했으므로 추가 응답 안 함
       this.stats.totalErrors++;
     }
   }
@@ -445,7 +410,7 @@ class BotController {
         )
       );
       console.log(
-        logger.gradient(`   📏 길이: ${text.length}자`, "blue", "purple")
+        logger.gradient(`📏 길이: ${text.length}자`, "blue", "purple")
       );
 
       // 세션 활동 업데이트
