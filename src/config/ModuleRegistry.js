@@ -1,25 +1,21 @@
+// src/config/ModuleRegistry.js v3.0.1 - messageSystem 오류 수정
 // ========================================
-// 📋 src/config/ModuleRegistry.js v3.0.1
+// 📋 ModuleRegistry.js v3.0.1 - 수정된 버전
 // ========================================
-// 알록달록 LoggerEnhancer 통합 + 표준 모듈 관리
+// logger 메서드 직접 사용으로 안정성 향상
 // ========================================
 
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 📋 ModuleRegistry v3.0.1 - 알록달록 모듈 관리
+ * 📋 ModuleRegistry v3.0.1 - 안정화된 모듈 관리
  *
- * ✨ 주요 개선사항:
- * - 🌈 LoggerEnhancer 알록달록 로그
- * - 📱 동적 모듈 활성화/비활성화
- * - 🎯 우선순위 기반 로딩
- * - 🔧 환경변수 기반 설정
- * - 📊 모듈 상태 실시간 모니터링
+ * ✨ 수정사항:
+ * - messageSystem 오류 해결
+ * - logger 메서드 직접 사용
+ * - 안정성 향상
  */
-
-// 🌈 LoggerEnhancer 활용을 위한 참조
-const messageSystem = logger.messageSystem;
 
 /**
  * 📦 모듈 정의 (v3.0.1 표준)
@@ -69,7 +65,7 @@ const MODULES = [
         deadline: true,
         categories: true,
         statistics: true,
-        rainbow: true, // 🌈 알록달록 모드!
+        rainbow: true,
       },
     },
   },
@@ -95,7 +91,7 @@ const MODULES = [
         customTimers: true,
         notifications: true,
         statistics: true,
-        rainbow: true, // 🌈 알록달록 애니메이션!
+        rainbow: true,
       },
     },
   },
@@ -122,30 +118,30 @@ const MODULES = [
         overtime: true,
         analytics: true,
         reports: true,
-        rainbow: true, // 🌈 알록달록 통계!
+        rainbow: true,
       },
     },
   },
 
-  // ===== 🏖️ 휴가 관리 =====
+  // ===== 📅 휴가 관리 =====
   {
     key: "leave",
     name: "휴가 관리",
-    description: "휴가 신청 및 관리",
+    description: "휴가 신청 및 관리 시스템",
     path: "./src/modules/LeaveModule",
     priority: 40,
     required: false,
     enabled: process.env.MODULE_LEAVE_ENABLED !== "false",
     enhanced: false,
     config: {
-      icon: "🏖️",
+      icon: "📅",
       commands: ["/leave", "/휴가"],
       showInMenu: true,
-      annualLeaveDays: 15,
-      version: "2.0.0",
+      version: "3.0.1",
       features: {
         approval: true,
         calendar: true,
+        notifications: true,
       },
     },
   },
@@ -154,7 +150,7 @@ const MODULES = [
   {
     key: "reminder",
     name: "리마인더",
-    description: "알림 설정 및 관리",
+    description: "일정 알림 및 리마인더 시스템",
     path: "./src/modules/ReminderModule",
     priority: 50,
     required: false,
@@ -164,10 +160,10 @@ const MODULES = [
       icon: "🔔",
       commands: ["/remind", "/알림"],
       showInMenu: true,
-      maxRemindersPerUser: 20,
-      version: "2.0.0",
+      version: "3.0.1",
       features: {
         recurring: true,
+        notifications: true,
         snooze: true,
       },
     },
@@ -177,7 +173,7 @@ const MODULES = [
   {
     key: "fortune",
     name: "운세",
-    description: "오늘의 운세 확인",
+    description: "오늘의 운세 및 점괘",
     path: "./src/modules/FortuneModule",
     priority: 60,
     required: false,
@@ -187,10 +183,10 @@ const MODULES = [
       icon: "🔮",
       commands: ["/fortune", "/운세"],
       showInMenu: true,
-      updateInterval: 86400000,
-      version: "2.0.0",
+      version: "3.0.1",
       features: {
         daily: true,
+        weekly: true,
         zodiac: true,
       },
     },
@@ -200,7 +196,7 @@ const MODULES = [
   {
     key: "weather",
     name: "날씨",
-    description: "날씨 정보 제공",
+    description: "날씨 정보 및 대기질 조회",
     path: "./src/modules/WeatherModule",
     priority: 70,
     required: false,
@@ -210,17 +206,16 @@ const MODULES = [
       icon: "🌤️",
       commands: ["/weather", "/날씨"],
       showInMenu: true,
-      apiRequired: true,
-      defaultLocation: "Seoul",
-      version: "2.0.0",
+      version: "3.0.1",
       features: {
+        current: true,
         forecast: true,
-        alerts: true,
+        airQuality: true,
       },
     },
   },
 
-  // ===== 🔊 음성 변환 =====
+  // ===== 🔊 TTS =====
   {
     key: "tts",
     name: "음성 변환",
@@ -234,29 +229,24 @@ const MODULES = [
       icon: "🔊",
       commands: ["/tts", "/음성"],
       showInMenu: true,
-      defaultLanguage: "ko-KR",
-      maxLength: 200,
-      version: "2.0.0",
+      version: "3.0.1",
       features: {
-        multiLanguage: true,
-        voiceSelection: true,
+        voices: true,
+        languages: true,
+        download: true,
       },
     },
   },
 ];
 
 /**
- * 📊 레지스트리 설정
+ * 📋 레지스트리 설정
  */
 const REGISTRY_SETTINGS = {
   version: "3.0.1",
-  description: "두목봇 v3.0.1 알록달록 모듈 레지스트리",
-  autoRegister: true,
-  loadOrder: "priority",
-  errorHandling: "continue",
-  logLevel: "info",
-  enhanced: true,
-  rainbow: true, // 🌈 알록달록 모드!
+  maxModules: 50,
+  loadTimeout: 30000,
+  retryAttempts: 3,
   features: {
     dynamicLoading: true,
     hotReload: false,
@@ -266,7 +256,7 @@ const REGISTRY_SETTINGS = {
 };
 
 /**
- * 📦 ModuleRegistry 클래스
+ * 📦 ModuleRegistry 클래스 (수정된 버전)
  */
 class ModuleRegistry {
   constructor() {
@@ -282,24 +272,20 @@ class ModuleRegistry {
       lastUpdate: null,
     };
 
-    // 🌈 초기화 로그
+    // ✅ 수정: logger 메서드 직접 사용
+    console.log(logger.rainbow("📋 ═══ ModuleRegistry v3.0.1 초기화 ═══"));
     console.log(
-      messageSystem.rainbow("📋 ═══ ModuleRegistry v3.0.1 초기화 ═══")
-    );
-    console.log(
-      messageSystem.gradient("알록달록 모듈 시스템 시작!", "cyan", "magenta")
+      logger.gradient("알록달록 모듈 시스템 시작!", "cyan", "magenta")
     );
 
     this.initialize();
   }
 
   /**
-   * 🎯 초기화
+   * 🎯 초기화 (수정된 버전)
    */
   initialize() {
-    console.log(
-      messageSystem.gradient("📦 모듈 정보 로딩...", "blue", "purple")
-    );
+    console.log(logger.gradient("📦 모듈 정보 로딩...", "blue", "purple"));
 
     // 모듈 정보 로드
     MODULES.forEach((moduleConfig) => {
@@ -317,52 +303,48 @@ class ModuleRegistry {
     this.stats.totalModules = MODULES.length;
     this.stats.lastUpdate = TimeHelper.getLogTimeString();
 
-    // 🎉 초기화 완료 로그
-    console.log(messageSystem.rainbow("✅ ModuleRegistry 초기화 완료!"));
+    // 초기화 완료 로그
+    console.log(logger.rainbow("✅ ModuleRegistry 초기화 완료!"));
     this.showRegistryStats();
   }
 
   /**
-   * 📊 레지스트리 통계 표시
+   * 📊 레지스트리 통계 표시 (수정된 버전)
    */
   showRegistryStats() {
-    console.log(messageSystem.rainbow("📊 ═══ 모듈 레지스트리 통계 ═══"));
+    console.log(logger.rainbow("📊 ═══ 모듈 레지스트리 통계 ═══"));
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `📦 총 모듈: ${this.stats.totalModules}개`,
         "blue",
         "cyan"
       )
     );
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `✅ 활성화: ${this.stats.enabledModules}개`,
         "green",
         "blue"
       )
     );
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `⭐ Enhanced: ${this.stats.enhancedModules}개`,
         "yellow",
         "orange"
       )
     );
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `🌈 Rainbow 지원: ${this.getEnhancedModuleNames().length}개`,
         "purple",
         "pink"
       )
     );
     console.log(
-      messageSystem.gradient(
-        `⏰ 업데이트: ${this.stats.lastUpdate}`,
-        "gray",
-        "white"
-      )
+      logger.gradient(`⏰ 업데이트: ${this.stats.lastUpdate}`, "gray", "white")
     );
-    console.log(messageSystem.rainbow("📊 ═══════════════════════"));
+    console.log(logger.rainbow("📊 ═══════════════════════"));
   }
 
   /**
@@ -375,38 +357,36 @@ class ModuleRegistry {
   }
 
   /**
-   * 📋 활성화된 모듈 목록 반환
+   * 📋 활성화된 모듈 목록 반환 (수정된 버전)
    */
   getEnabledModules() {
     const enabledModules = Array.from(this.modules.values())
       .filter((module) => module.enabled)
       .sort((a, b) => a.priority - b.priority);
 
-    // 🌈 로그
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `📋 활성화된 모듈 ${enabledModules.length}개 반환`,
         "green",
         "blue"
       )
     );
-
     return enabledModules;
   }
 
   /**
-   * 🎯 특정 모듈 정보 조회
+   * 🎯 특정 모듈 정보 조회 (수정된 버전)
    */
   getModule(moduleKey) {
     const module = this.modules.get(moduleKey);
 
     if (module) {
       console.log(
-        messageSystem.gradient(`📦 모듈 조회: ${module.name}`, "cyan", "blue")
+        logger.gradient(`📦 모듈 조회: ${module.name}`, "cyan", "blue")
       );
     } else {
       console.log(
-        messageSystem.gradient(`❌ 모듈 없음: ${moduleKey}`, "red", "orange")
+        logger.gradient(`❌ 모듈 없음: ${moduleKey}`, "red", "orange")
       );
     }
 
@@ -414,22 +394,19 @@ class ModuleRegistry {
   }
 
   /**
-   * ⭐ Enhanced 모듈 목록 반환
+   * ⭐ Enhanced 모듈 목록 반환 (수정된 버전)
    */
   getEnhancedModules() {
     const enhanced = Array.from(this.modules.values())
       .filter((module) => module.enabled && module.enhanced)
       .sort((a, b) => a.priority - b.priority);
 
-    console.log(
-      messageSystem.rainbow(`⭐ Enhanced 모듈 ${enhanced.length}개 반환`)
-    );
-
+    console.log(logger.rainbow(`⭐ Enhanced 모듈 ${enhanced.length}개 반환`));
     return enhanced;
   }
 
   /**
-   * 📱 메뉴에 표시할 모듈 목록
+   * 📱 메뉴에 표시할 모듈 목록 (수정된 버전)
    */
   getMenuModules() {
     const menuModules = Array.from(this.modules.values())
@@ -442,18 +419,17 @@ class ModuleRegistry {
       .sort((a, b) => a.priority - b.priority);
 
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `📱 메뉴 모듈 ${menuModules.length}개 반환`,
         "purple",
         "pink"
       )
     );
-
     return menuModules;
   }
 
   /**
-   * 🔍 모듈 검색 (키워드)
+   * 🔍 모듈 검색 (키워드) (수정된 버전)
    */
   searchModules(keyword) {
     const searchResults = Array.from(this.modules.values()).filter(
@@ -464,32 +440,31 @@ class ModuleRegistry {
     );
 
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `🔍 검색 결과: "${keyword}" → ${searchResults.length}개`,
         "yellow",
         "orange"
       )
     );
-
     return searchResults;
   }
 
   /**
-   * 🎛️ 모듈 활성화/비활성화
+   * 🎛️ 모듈 활성화/비활성화 (수정된 버전)
    */
   toggleModule(moduleKey, enabled) {
     const module = this.modules.get(moduleKey);
 
     if (!module) {
       console.log(
-        messageSystem.gradient(`❌ 모듈 없음: ${moduleKey}`, "red", "orange")
+        logger.gradient(`❌ 모듈 없음: ${moduleKey}`, "red", "orange")
       );
       return false;
     }
 
     if (module.required && !enabled) {
       console.log(
-        messageSystem.gradient(
+        logger.gradient(
           `⚠️ 필수 모듈은 비활성화할 수 없음: ${moduleKey}`,
           "yellow",
           "red"
@@ -512,13 +487,12 @@ class ModuleRegistry {
     const emoji = enabled ? "✅" : "❌";
 
     console.log(
-      messageSystem.gradient(
+      logger.gradient(
         `${emoji} 모듈 ${status}: ${module.name}`,
         enabled ? "green" : "red",
         enabled ? "blue" : "orange"
       )
     );
-
     return true;
   }
 
@@ -527,7 +501,6 @@ class ModuleRegistry {
    */
   getModuleStatus(moduleKey) {
     const module = this.modules.get(moduleKey);
-
     if (!module) return null;
 
     return {
@@ -563,28 +536,20 @@ class ModuleRegistry {
   }
 
   /**
-   * 🔄 모듈 로드 상태 업데이트
+   * 🔄 모듈 로드 상태 업데이트 (수정된 버전)
    */
   markModuleLoaded(moduleKey, success = true) {
     if (success) {
       this.loadedModules.add(moduleKey);
       this.failedModules.delete(moduleKey);
       console.log(
-        messageSystem.gradient(
-          `✅ 모듈 로드 성공: ${moduleKey}`,
-          "green",
-          "blue"
-        )
+        logger.gradient(`✅ 모듈 로드 성공: ${moduleKey}`, "green", "blue")
       );
     } else {
       this.failedModules.add(moduleKey);
       this.loadedModules.delete(moduleKey);
       console.log(
-        messageSystem.gradient(
-          `❌ 모듈 로드 실패: ${moduleKey}`,
-          "red",
-          "orange"
-        )
+        logger.gradient(`❌ 모듈 로드 실패: ${moduleKey}`, "red", "orange")
       );
     }
 
@@ -592,10 +557,10 @@ class ModuleRegistry {
   }
 
   /**
-   * 🎨 알록달록 모듈 목록 표시
+   * 🎨 알록달록 모듈 목록 표시 (수정된 버전)
    */
   showRainbowModuleList() {
-    console.log(messageSystem.rainbow("🌈 ═══ 알록달록 모듈 목록 ═══"));
+    console.log(logger.rainbow("🌈 ═══ 알록달록 모듈 목록 ═══"));
 
     const enhancedModules = this.getEnhancedModules();
     enhancedModules.forEach((module, index) => {
@@ -604,7 +569,7 @@ class ModuleRegistry {
       const color2 = colors[(index + 1) % colors.length];
 
       console.log(
-        messageSystem.gradient(
+        logger.gradient(
           `${module.config.icon} ${module.name} (v${module.config.version})`,
           color1,
           color2
@@ -612,21 +577,18 @@ class ModuleRegistry {
       );
     });
 
-    console.log(messageSystem.rainbow("🌈 ══════════════════════"));
+    console.log(logger.rainbow("🌈 ══════════════════════"));
   }
 
   /**
-   * 🧹 정리 작업
+   * 🧹 정리 작업 (수정된 버전)
    */
   cleanup() {
     console.log(
-      messageSystem.gradient("🧹 ModuleRegistry 정리 중...", "yellow", "orange")
+      logger.gradient("🧹 ModuleRegistry 정리 중...", "yellow", "orange")
     );
-
-    // 통계 정보 저장 (필요시)
-    logger.moduleLog("ModuleRegistry", "정리 완료", this.getStats());
-
-    console.log(messageSystem.rainbow("✅ ModuleRegistry 정리 완료"));
+    logger.module("ModuleRegistry", "정리 완료", this.getStats());
+    console.log(logger.rainbow("✅ ModuleRegistry 정리 완료"));
   }
 }
 
@@ -702,5 +664,5 @@ module.exports = {
 
   // 버전 정보
   version: "3.0.1",
-  description: "두목봇 알록달록 모듈 레지스트리",
+  description: "두목봇 안정화된 모듈 레지스트리",
 };

@@ -62,6 +62,32 @@ class BotController {
       interval: null,
       lastHeartbeat: Date.now(),
     };
+    // 🧪 Logger 활성화 테스트 (임시)
+    console.log("\n🧪 BotController에서 Logger 테스트 시작...");
+
+    // 기본 Logger 메서드 테스트
+    logger.info("🎮 BotController에서 Logger.info 테스트");
+    logger.success("✅ BotController에서 Logger.success 테스트");
+    logger.warn("⚠️ BotController에서 Logger.warn 테스트");
+    logger.system("🤖 BotController에서 Logger.system 테스트");
+
+    // 스타일 메서드 테스트
+    console.log("🌈 무지개 텍스트:", logger.rainbow("BotController 테스트"));
+    console.log(
+      "✨ 그라디언트 텍스트:",
+      logger.gradient("BotController 테스트", "blue", "magenta")
+    );
+
+    // Logger 통계 확인
+    const loggerStats = logger.getStats();
+    logger.summary("Logger 상태", {
+      버전: loggerStats.version,
+      총로그: loggerStats.totalLogs,
+      가동시간: loggerStats.uptime,
+      환경: loggerStats.isRailway ? "Railway" : "Local",
+    });
+
+    console.log("🎉 BotController Logger 테스트 완료!\n");
   }
 
   /**
