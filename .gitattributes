@@ -1,0 +1,16 @@
+# 모든 텍스트 파일을 LF로 통일
+* text=auto eol=lf
+
+# JavaScript 파일은 항상 LF 사용
+*.js text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+
+# Windows 배치 파일은 CRLF 유지
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+# 바이너리 파일
+*.png binary
+*.jpg binary
+*.pdf binary
