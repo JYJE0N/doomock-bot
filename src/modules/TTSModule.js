@@ -1,4 +1,5 @@
 const BaseModule = require("../core/BaseModule");
+const logger = require("../utils/Logger");
 
 class TTSModule extends BaseModule {
   constructor(bot, options = {}) {

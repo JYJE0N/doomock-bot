@@ -1,5 +1,6 @@
 // ===== ⏱️ TimerModule.js =====
 const BaseModule = require("../core/BaseModule");
+const logger = require("../utils/Logger");
 
 class TimerModule extends BaseModule {
   constructor(bot, options = {}) {

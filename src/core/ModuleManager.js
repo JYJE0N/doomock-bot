@@ -197,6 +197,11 @@ class ModuleManager {
     };
   }
 
+  // 모듈 카운터래요
+  getModuleCount() {
+    return this.modules.size;
+  }
+
   /**
    * 📊 전체 상태 조회
    */
