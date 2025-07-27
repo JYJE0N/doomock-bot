@@ -1,4 +1,6 @@
 // ===== 🏢 WorktimeModule.js =====
+const BaseModule = require("../core/BaseModule");
+
 class WorktimeModule extends BaseModule {
   constructor(bot, options = {}) {
     super("WorktimeModule", {

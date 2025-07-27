@@ -1,4 +1,6 @@
 // ===== 🏖️ LeaveModule.js =====
+const BaseModule = require("../core/BaseModule");
+
 class LeaveModule extends BaseModule {
   constructor(bot, options = {}) {
     super("LeaveModule", {

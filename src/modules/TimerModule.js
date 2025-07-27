@@ -1,4 +1,6 @@
 // ===== ⏱️ TimerModule.js =====
+const BaseModule = require("../core/BaseModule");
+
 class TimerModule extends BaseModule {
   constructor(bot, options = {}) {
     super("TimerModule", {

@@ -5,7 +5,7 @@ const logger = require("../utils/Logger");
 const { createServiceBuilder } = require("./ServiceBuilder");
 const { getInstance } = require("../database/DatabaseManager");
 const { getEnabledModules } = require("../config/ModuleRegistry");
-// const BaseModule = require("../core/BaseModule");
+const BaseModule = require("./BaseModule");
 
 /**
  * 📦 ModuleManager - 모든 모듈의 중앙 관리자
@@ -89,6 +89,7 @@ class ModuleManager {
         const moduleInstance = new ModuleClass(this.bot, {
           db: this.db,
           moduleManager: this,
+          serviceBuilder: this.serviceBuilder, // 👈 이걸 추가!
           config: config.config,
         });
 
@@ -127,7 +128,10 @@ class ModuleManager {
       const module = this.modules.get(moduleKey);
       if (!module) {
         logger.warn(`모듈을 찾을 수 없음: ${moduleKey}`);
-        await callbackQuery.reply("❌ 해당 기능을 찾을 수 없습니다.");
+        await bot.answerCallbackQuery(
+          callbackQuery.id,
+          "❌ 해당 기능을 찾을 수 없습니다."
+        );
         return;
       }
 

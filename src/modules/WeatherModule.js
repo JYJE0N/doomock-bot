@@ -1,6 +1,6 @@
 // ===== 🌤️ WeatherModule.js =====
 const BaseModule = require("../core/BaseModule");
-const WeatherService = require("../services/WeatherService");
+
 const logger = require("../utils/Logger");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 

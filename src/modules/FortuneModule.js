@@ -1,4 +1,6 @@
 // ===== 🔮 FortuneModule.js =====
+const BaseModule = require("../core/BaseModule");
+
 class FortuneModule extends BaseModule {
   constructor(bot, options = {}) {
     super("FortuneModule", {

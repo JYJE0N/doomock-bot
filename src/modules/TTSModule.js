@@ -1,3 +1,5 @@
+const BaseModule = require("../core/BaseModule");
+
 class TTSModule extends BaseModule {
   constructor(bot, options = {}) {
     super("TTSModule", {

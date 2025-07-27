@@ -1,4 +1,6 @@
 // ===== ⏰ ReminderModule.js =====
+const BaseModule = require("../core/BaseModule");
+
 class ReminderModule extends BaseModule {
   constructor(bot, options = {}) {
     super("ReminderModule", {
