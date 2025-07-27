@@ -206,16 +206,31 @@ class BotController {
    * 🗄️ 데이터베이스 초기화
    */
   async initializeDatabase() {
-    logger.database("데이터베이스 연결 시작...");
-    this.dbManager = getInstance();
-    await this.dbManager.connect();
+    try {
+      logger.database("데이터베이스 연결 시작...");
 
-    // 🌈 연결 상태 알록달록 표시
-    const dbStatus = this.dbManager.isConnected() ? "🟢 연결됨" : "🔴 실패";
-    console.log(
-      this.messageSystem.gradient(`   📊 상태: ${dbStatus}`, "cyan", "green")
-    );
-    logger.database("✅ 데이터베이스 연결 성공");
+      // 1. 싱글톤 인스턴스 가져오기
+      this.dbManager = getInstance();
+
+      // 2. 연결 시도
+      const connected = await this.dbManager.connect();
+
+      // 3. 연결 상태 확인 (속성으로 접근)
+      if (!this.dbManager.isConnected || !connected) {
+        throw new Error("데이터베이스 연결 실패");
+      }
+
+      // 4. 추가 확인 (선택사항)
+      const pingSuccess = await this.dbManager.checkConnection();
+      if (!pingSuccess) {
+        throw new Error("데이터베이스 ping 실패");
+      }
+
+      logger.database("✅ 데이터베이스 연결 및 검증 완료");
+    } catch (error) {
+      logger.error("❌ 데이터베이스 초기화 실패:", error);
+      throw error;
+    }
   }
 
   /**
