@@ -4,6 +4,30 @@ const chalk = require("chalk");
 const path = require("path");
 const fs = require("fs");
 
+// 민감정보 마스킹 함수 추가
+const sanitize = (text) => {
+  if (!text) return text;
+
+  let str = String(text);
+
+  // 봇 토큰
+  str = str.replace(/\d{9,10}:[A-Za-z0-9_-]{35}/g, "BOT_TOKEN_***");
+
+  // MongoDB URI
+  str = str.replace(
+    /mongodb(\+srv)?:\/\/[^:\s]+:[^@\s]+@[^\s]+/g,
+    "mongodb://***:***@***"
+  );
+
+  // 사용자 ID (6자리 이상 숫자)
+  str = str.replace(/\d{6,}/g, (match) => match.substring(0, 3) + "***");
+
+  // API 키 패턴
+  str = str.replace(/[a-zA-Z0-9_-]{32,}/g, "***API_KEY***");
+
+  return str;
+};
+
 // 예쁜 로거 클래스 - 싱글톤 패턴 적용
 class EnhancedLogger {
   static instance = null; // 정적 인스턴스 변수
@@ -104,6 +128,11 @@ class EnhancedLogger {
    * 기본 로그 포맷
    */
   formatLog(level, message, data) {
+    message = sanitize(message);
+    if (data) {
+      data = sanitize(data);
+    }
+
     const style = this.styles[level];
     const timestamp = this.getTimestamp();
 
