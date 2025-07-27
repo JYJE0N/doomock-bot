@@ -1,8 +1,8 @@
 // src/core/ModuleManager.js
 // 📦 모듈 매니저 - 모듈 중앙 관리 (v3.0.1)
 
-const logger = require("../utils/Logger");
-const { getEnabledModules } = require("../config/ModuleRegistry");
+const { createServiceBuilder } = require("./ServiceBuilder");
+const { getInstance } = require("../database/DatabaseManager");
 const BaseModule = require("./BaseModule");
 
 /**
@@ -17,7 +17,8 @@ class ModuleManager {
     this.db = options.db;
     this.modules = new Map();
     this.initialized = false;
-
+    // ServiceBuilder 추가
+    this.serviceBuilder = null;
     // 통계
     this.stats = {
       totalModules: 0,
@@ -33,19 +34,31 @@ class ModuleManager {
    */
   async initialize() {
     try {
-      logger.system("ModuleManager 초기화 시작...");
+      // 1. DatabaseManager 초기화
+      const dbManager = getInstance();
+      await dbManager.ensureConnection();
 
-      // 모듈 로드 및 초기화
-      await this.loadModules();
+      // 2. ServiceBuilder 초기화
+      this.serviceBuilder = createServiceBuilder();
+      this.serviceBuilder.setDefaultDatabase(dbManager.getDb());
+      await this.serviceBuilder.initialize(); // 여기서 모든 서비스 자동 등록!
 
-      this.initialized = true;
-      logger.success(
-        `✅ ModuleManager 초기화 완료 (${this.stats.activeModules}/${this.stats.totalModules} 모듈)`
-      );
+      // 3. 모듈들 초기화
+      await this.initializeModules();
     } catch (error) {
-      logger.error("ModuleManager 초기화 실패", error);
-      throw error;
+      logger.error("ModuleManager 초기화 실패:", error);
     }
+  }
+
+  // 모듈 생성할 때 ServiceBuilder 주입
+  async createModule(moduleKey, ModuleClass, config) {
+    const moduleInstance = new ModuleClass(this.bot, {
+      moduleManager: this,
+      serviceBuilder: this.serviceBuilder, // 👈 여기서 주입!
+      config: config,
+    });
+
+    return moduleInstance;
   }
 
   /**

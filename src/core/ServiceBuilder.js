@@ -391,12 +391,32 @@ class ServiceBuilder {
       const files = fs.readdirSync(servicesDir);
       let registeredCount = 0;
 
+      // 서비스 매핑 정의
+      const serviceMapping = {
+        "TodoService.js": { name: "todo", priority: 1, required: true },
+        "WeatherService.js": { name: "weather", priority: 2, required: false },
+        "ReminderService.js": {
+          name: "reminder",
+          priority: 3,
+          required: false,
+        },
+        "WorktimeService.js": {
+          name: "worktime",
+          priority: 4,
+          required: false,
+        },
+        "FortuneService.js": { name: "fortune", priority: 5, required: false },
+        "TimerService.js": { name: "timer", priority: 6, required: false },
+        "LeaveService.js": { name: "leave", priority: 7, required: false },
+        "TTSService.js": { name: "tts", priority: 8, required: false },
+      };
+
       for (const file of files) {
         // 제외할 파일들
         const excludeFiles = [
           "BaseService.js",
-          "HealthService.js", // 존재하지 않는 파일
-          ".DS_Store", // macOS 시스템 파일
+          "HealthService.js",
+          ".DS_Store",
         ];
 
         if (excludeFiles.includes(file) || !file.endsWith("Service.js")) {
@@ -411,11 +431,28 @@ class ServiceBuilder {
           }
 
           const ServiceClass = require(filePath);
-          // ... 나머지 코드
+          const mapping = serviceMapping[file];
+
+          if (mapping && ServiceClass) {
+            // 서비스 등록
+            this.register(mapping.name, ServiceClass, {
+              priority: mapping.priority,
+              required: mapping.required,
+              singleton: true,
+              config: {},
+            });
+
+            registeredCount++;
+            logger.debug(`📝 자동 등록: ${mapping.name} (${file})`);
+          } else {
+            logger.warn(`⚠️ 매핑 없음: ${file}`);
+          }
         } catch (error) {
           logger.error(`❌ 서비스 자동 등록 실패 (${file}):`, error);
         }
       }
+
+      logger.success(`🎉 ${registeredCount}개 서비스 자동 등록 완료`);
     } catch (error) {
       logger.error("❌ 서비스 자동 등록 중 오류:", error);
     }

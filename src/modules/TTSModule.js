@@ -5,6 +5,7 @@ class TTSModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.ttsService = null;
     this.config = {
@@ -18,10 +19,14 @@ class TTSModule extends BaseModule {
 
   async onInitialize() {
     try {
-      this.ttsService = new TTSService({
-        apiKey: this.config.apiKey,
+      this.ttsService = await this.serviceBuilder.getOrCreate("tts", {
         config: this.config,
       });
+
+      // this.ttsService = new TTSService({
+      //   apiKey: this.config.apiKey,
+      //   config: this.config,
+      // });
       await this.ttsService.initialize();
       logger.success("TTSModule 초기화 완료");
     } catch (error) {

@@ -6,6 +6,7 @@ class TimerModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.timerService = null;
     this.config = {
@@ -18,10 +19,10 @@ class TimerModule extends BaseModule {
 
   async onInitialize() {
     try {
-      this.timerService = new TimerService({
-        db: this.db,
+      this.timerService = await this.serviceBuilder.getOrCreate("timer", {
         config: this.config,
       });
+
       await this.timerService.initialize();
       logger.success("TimerModule 초기화 완료");
     } catch (error) {

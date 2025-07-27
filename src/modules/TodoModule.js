@@ -21,6 +21,7 @@ class TodoModule extends BaseModule {
 
     // 서비스
     this.todoService = null;
+    this.serviceBuilder = options.serviceBuilder || null;
 
     // 모듈 설정 (환경변수 기반)
     this.config = {
@@ -38,9 +39,7 @@ class TodoModule extends BaseModule {
   async onInitialize() {
     try {
       logger.module("TodoModule", "초기화 시작");
-
-      this.todoService = new TodoService({
-        db: this.db,
+      this.todoService = await this.serviceBuilder.getOrCreate("todo", {
         config: this.config,
       });
       await this.todoService.initialize();

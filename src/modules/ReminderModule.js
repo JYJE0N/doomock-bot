@@ -6,6 +6,7 @@ class ReminderModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.reminderService = null;
     this.config = {
@@ -18,10 +19,10 @@ class ReminderModule extends BaseModule {
 
   async onInitialize() {
     try {
-      this.reminderService = new ReminderService({
-        db: this.db,
+      this.reminderService = await this.serviceBuilder.getOrCreate("reminder", {
         config: this.config,
       });
+
       await this.reminderService.initialize();
       logger.success("ReminderModule 초기화 완료");
     } catch (error) {

@@ -6,6 +6,7 @@ class WorktimeModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.worktimeService = null;
     this.config = {
@@ -19,10 +20,10 @@ class WorktimeModule extends BaseModule {
 
   async onInitialize() {
     try {
-      this.worktimeService = new WorktimeService({
-        db: this.db,
+      this.worktimeService = await this.serviceBuilder.getOrCreate("worktime", {
         config: this.config,
       });
+
       await this.worktimeService.initialize();
       logger.success("WorktimeModule 초기화 완료");
     } catch (error) {

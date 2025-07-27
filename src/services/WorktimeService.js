@@ -1,6 +1,10 @@
+const { getInstance } = require("../database/DatabaseManager");
+
 class WorktimeService {
   constructor(options = {}) {
     this.collectionName = "worktimes";
+    this.dbManager = getInstance(); // 👈 이 부분!
+
     this.db = options.db || null;
     this.collection = null;
     this.config = {
@@ -13,6 +17,8 @@ class WorktimeService {
   }
 
   async initialize() {
+    await this.dbManager.ensureConnection(); // 👈 이 부분!
+
     if (!this.db) {
       throw new Error("Database connection required");
     }

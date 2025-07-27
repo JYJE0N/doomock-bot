@@ -1,9 +1,13 @@
+const { getInstance } = require("../database/DatabaseManager");
+
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 class WeatherService {
   constructor(options = {}) {
     this.apiKey = options.apiKey;
+    this.dbManager = getInstance(); // 👈 이 부분!
+
     this.defaultLocation = options.defaultLocation || "서울";
     this.config = {
       enableCache: true,
@@ -18,6 +22,8 @@ class WeatherService {
   }
 
   async initialize() {
+    await this.dbManager.ensureConnection(); // 👈 이 부분!
+
     if (!this.apiKey) {
       logger.warn("날씨 API 키가 설정되지 않음");
     }

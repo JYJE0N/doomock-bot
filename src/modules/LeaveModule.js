@@ -6,6 +6,7 @@ class LeaveModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.leaveService = null;
     this.config = {

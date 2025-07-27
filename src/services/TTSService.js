@@ -1,5 +1,9 @@
+const { getInstance } = require("../database/DatabaseManager");
+
 class TTSService {
   constructor(options = {}) {
+    this.dbManager = getInstance(); // 👈 이 부분!
+
     this.apiKey = options.apiKey;
     this.config = {
       maxTextLength: 500,
@@ -11,6 +15,8 @@ class TTSService {
   }
 
   async initialize() {
+    await this.dbManager.ensureConnection(); // 👈 이 부분!
+
     if (!this.apiKey) {
       logger.warn("TTS API 키가 설정되지 않음");
     }

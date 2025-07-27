@@ -1,12 +1,34 @@
-// ===== 🚀 Enhanced 모듈 통합 및 테스트 시스템 v3.0.1 =====
+// ========================================
+// 📋 src/config/ModuleRegistry.js v3.0.1
+// ========================================
+// 알록달록 LoggerEnhancer 통합 + 표준 모듈 관리
+// ========================================
 
-// ===== 📋 모듈 레지스트리 업데이트 =====
-// src/config/ModuleRegistry.js - Enhanced 모듈들 등록
-const modules = [
+const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
+
+/**
+ * 📋 ModuleRegistry v3.0.1 - 알록달록 모듈 관리
+ *
+ * ✨ 주요 개선사항:
+ * - 🌈 LoggerEnhancer 알록달록 로그
+ * - 📱 동적 모듈 활성화/비활성화
+ * - 🎯 우선순위 기반 로딩
+ * - 🔧 환경변수 기반 설정
+ * - 📊 모듈 상태 실시간 모니터링
+ */
+
+// 🌈 LoggerEnhancer 활용을 위한 참조
+const messageSystem = logger.messageSystem;
+
+/**
+ * 📦 모듈 정의 (v3.0.1 표준)
+ */
+const MODULES = [
   // ===== 🏛️ 시스템 모듈 (최우선) =====
   {
     key: "system",
-    name: "시스템",
+    name: "시스템 관리",
     description: "시스템 관리 및 설정",
     path: "./src/modules/SystemModule",
     priority: 1,
@@ -14,1046 +36,671 @@ const modules = [
     enabled: true,
     enhanced: true,
     config: {
+      icon: "🏛️",
       showInMenu: false,
       version: "3.0.1",
+      commands: [],
+      features: {
+        dashboard: true,
+        monitoring: true,
+        logs: true,
+      },
     },
   },
 
-  // ===== 📱 Enhanced 핵심 기능 모듈들 =====
+  // ===== 📝 할일 관리 (Enhanced) =====
   {
     key: "todo",
     name: "할일 관리",
     description: "Enhanced 할일 관리 시스템",
     path: "./src/modules/TodoModule",
     priority: 10,
+    required: false,
     enabled: process.env.MODULE_TODO_ENABLED !== "false",
     enhanced: true,
     config: {
       icon: "📝",
       commands: ["/todo", "/할일"],
+      showInMenu: true,
+      maxItemsPerUser: 100,
+      version: "3.0.1",
       features: {
         priority: true,
-        dueDate: true,
+        deadline: true,
         categories: true,
         statistics: true,
+        rainbow: true, // 🌈 알록달록 모드!
       },
-      version: "3.0.1",
     },
   },
+
+  // ===== ⏰ 타이머 (Enhanced) =====
   {
     key: "timer",
     name: "타이머",
     description: "Enhanced 타이머 & 포모도로 시스템",
     path: "./src/modules/TimerModule",
     priority: 20,
+    required: false,
     enabled: process.env.MODULE_TIMER_ENABLED !== "false",
     enhanced: true,
     config: {
       icon: "⏰",
       commands: ["/timer", "/타이머", "/pomodoro"],
+      showInMenu: true,
+      defaultDuration: 25,
+      version: "3.0.1",
       features: {
         pomodoro: true,
+        customTimers: true,
         notifications: true,
-        templates: true,
-        realTime: true,
+        statistics: true,
+        rainbow: true, // 🌈 알록달록 애니메이션!
       },
-      version: "3.0.1",
     },
   },
+
+  // ===== 🏢 근무시간 (Enhanced) =====
   {
     key: "worktime",
     name: "근무시간",
-    description: "Enhanced 근무시간 관리 시스템",
+    description: "Enhanced 출퇴근 및 근무시간 관리",
     path: "./src/modules/WorktimeModule",
     priority: 30,
+    required: false,
     enabled: process.env.MODULE_WORKTIME_ENABLED !== "false",
     enhanced: true,
     config: {
       icon: "🏢",
       commands: ["/work", "/출근", "/퇴근"],
-      features: {
-        dashboard: true,
-        analytics: true,
-        performance: true,
-        notifications: true,
-      },
+      showInMenu: true,
+      workStartTime: "09:00",
+      workEndTime: "18:00",
       version: "3.0.1",
+      features: {
+        autoCheckIn: true,
+        overtime: true,
+        analytics: true,
+        reports: true,
+        rainbow: true, // 🌈 알록달록 통계!
+      },
     },
   },
 
-  // ===== 🌟 부가 기능 모듈들 (기존) =====
+  // ===== 🏖️ 휴가 관리 =====
   {
     key: "leave",
     name: "휴가 관리",
     description: "휴가 신청 및 관리",
     path: "./src/modules/LeaveModule",
     priority: 40,
+    required: false,
     enabled: process.env.MODULE_LEAVE_ENABLED !== "false",
     enhanced: false,
     config: {
       icon: "🏖️",
       commands: ["/leave", "/휴가"],
+      showInMenu: true,
+      annualLeaveDays: 15,
       version: "2.0.0",
+      features: {
+        approval: true,
+        calendar: true,
+      },
     },
   },
+
+  // ===== 🔔 리마인더 =====
   {
     key: "reminder",
     name: "리마인더",
     description: "알림 설정 및 관리",
     path: "./src/modules/ReminderModule",
     priority: 50,
+    required: false,
     enabled: process.env.MODULE_REMINDER_ENABLED !== "false",
     enhanced: false,
     config: {
       icon: "🔔",
       commands: ["/remind", "/알림"],
+      showInMenu: true,
+      maxRemindersPerUser: 20,
       version: "2.0.0",
+      features: {
+        recurring: true,
+        snooze: true,
+      },
     },
   },
+
+  // ===== 🔮 운세 =====
   {
     key: "fortune",
     name: "운세",
     description: "오늘의 운세 확인",
     path: "./src/modules/FortuneModule",
     priority: 60,
+    required: false,
     enabled: process.env.MODULE_FORTUNE_ENABLED !== "false",
     enhanced: false,
     config: {
       icon: "🔮",
       commands: ["/fortune", "/운세"],
+      showInMenu: true,
+      updateInterval: 86400000,
       version: "2.0.0",
+      features: {
+        daily: true,
+        zodiac: true,
+      },
     },
   },
+
+  // ===== 🌤️ 날씨 =====
   {
     key: "weather",
     name: "날씨",
     description: "날씨 정보 제공",
     path: "./src/modules/WeatherModule",
     priority: 70,
+    required: false,
     enabled: process.env.MODULE_WEATHER_ENABLED !== "false",
     enhanced: false,
     config: {
       icon: "🌤️",
       commands: ["/weather", "/날씨"],
+      showInMenu: true,
       apiRequired: true,
+      defaultLocation: "Seoul",
       version: "2.0.0",
+      features: {
+        forecast: true,
+        alerts: true,
+      },
     },
   },
+
+  // ===== 🔊 음성 변환 =====
   {
     key: "tts",
-    name: "음성변환",
+    name: "음성 변환",
     description: "텍스트를 음성으로 변환",
     path: "./src/modules/TTSModule",
     priority: 80,
+    required: false,
     enabled: process.env.MODULE_TTS_ENABLED !== "false",
     enhanced: false,
     config: {
       icon: "🔊",
       commands: ["/tts", "/음성"],
-      apiRequired: true,
+      showInMenu: true,
+      defaultLanguage: "ko-KR",
+      maxLength: 200,
       version: "2.0.0",
+      features: {
+        multiLanguage: true,
+        voiceSelection: true,
+      },
     },
   },
 ];
 
-module.exports = {
-  modules,
+/**
+ * 📊 레지스트리 설정
+ */
+const REGISTRY_SETTINGS = {
   version: "3.0.1",
+  description: "두목봇 v3.0.1 알록달록 모듈 레지스트리",
+  autoRegister: true,
+  loadOrder: "priority",
+  errorHandling: "continue",
+  logLevel: "info",
   enhanced: true,
+  rainbow: true, // 🌈 알록달록 모드!
+  features: {
+    dynamicLoading: true,
+    hotReload: false,
+    monitoring: true,
+    statistics: true,
+  },
 };
 
-// ===== 🎯 Enhanced ModuleManager 업데이트 =====
-// src/core/ModuleManager.js - Enhanced 지원 추가
-class EnhancedModuleManager {
-  constructor(options = {}) {
-    // 기존 ModuleManager 코드...
+/**
+ * 📦 ModuleRegistry 클래스
+ */
+class ModuleRegistry {
+  constructor() {
+    this.modules = new Map();
+    this.loadedModules = new Set();
+    this.failedModules = new Set();
+    this.stats = {
+      totalModules: 0,
+      enabledModules: 0,
+      enhancedModules: 0,
+      loadedModules: 0,
+      failedModules: 0,
+      lastUpdate: null,
+    };
 
-    // Enhanced 지원 추가
-    this.enhancedModules = new Map(); // Enhanced 모듈 추적
-    this.serviceBuilder = options.serviceBuilder; // ServiceBuilder 주입
+    // 🌈 초기화 로그
+    console.log(
+      messageSystem.rainbow("📋 ═══ ModuleRegistry v3.0.1 초기화 ═══")
+    );
+    console.log(
+      messageSystem.gradient("알록달록 모듈 시스템 시작!", "cyan", "magenta")
+    );
 
-    logger.moduleStart("EnhancedModuleManager", "3.0.1");
+    this.initialize();
   }
 
   /**
-   * 🚀 Enhanced 모듈 등록 (기존 registerModule 확장)
+   * 🎯 초기화
    */
-  async registerEnhancedModule(moduleKey, ModuleClass, config = {}) {
-    try {
-      logger.info(`📝 Enhanced 모듈 등록: ${moduleKey}`, {
-        enhanced: config.enhanced,
-        version: config.version,
-      });
+  initialize() {
+    console.log(
+      messageSystem.gradient("📦 모듈 정보 로딩...", "blue", "purple")
+    );
 
-      // 기존 등록 프로세스
-      const registered = this.registerModule(moduleKey, ModuleClass, config);
+    // 모듈 정보 로드
+    MODULES.forEach((moduleConfig) => {
+      this.modules.set(moduleConfig.key, moduleConfig);
 
-      if (registered && config.enhanced) {
-        // Enhanced 모듈 추가 설정
-        this.enhancedModules.set(moduleKey, {
-          features: config.features || {},
-          version: config.version || "3.0.1",
-          hasServiceBuilder: !!this.serviceBuilder,
-          uiType: "enhanced",
-        });
-
-        logger.success(`✨ Enhanced 모듈 등록 완료: ${moduleKey}`);
+      if (moduleConfig.enabled) {
+        this.stats.enabledModules++;
       }
 
-      return registered;
-    } catch (error) {
-      logger.error(`❌ Enhanced 모듈 등록 실패 (${moduleKey}):`, error);
+      if (moduleConfig.enhanced) {
+        this.stats.enhancedModules++;
+      }
+    });
+
+    this.stats.totalModules = MODULES.length;
+    this.stats.lastUpdate = TimeHelper.getLogTimeString();
+
+    // 🎉 초기화 완료 로그
+    console.log(messageSystem.rainbow("✅ ModuleRegistry 초기화 완료!"));
+    this.showRegistryStats();
+  }
+
+  /**
+   * 📊 레지스트리 통계 표시
+   */
+  showRegistryStats() {
+    console.log(messageSystem.rainbow("📊 ═══ 모듈 레지스트리 통계 ═══"));
+    console.log(
+      messageSystem.gradient(
+        `📦 총 모듈: ${this.stats.totalModules}개`,
+        "blue",
+        "cyan"
+      )
+    );
+    console.log(
+      messageSystem.gradient(
+        `✅ 활성화: ${this.stats.enabledModules}개`,
+        "green",
+        "blue"
+      )
+    );
+    console.log(
+      messageSystem.gradient(
+        `⭐ Enhanced: ${this.stats.enhancedModules}개`,
+        "yellow",
+        "orange"
+      )
+    );
+    console.log(
+      messageSystem.gradient(
+        `🌈 Rainbow 지원: ${this.getEnhancedModuleNames().length}개`,
+        "purple",
+        "pink"
+      )
+    );
+    console.log(
+      messageSystem.gradient(
+        `⏰ 업데이트: ${this.stats.lastUpdate}`,
+        "gray",
+        "white"
+      )
+    );
+    console.log(messageSystem.rainbow("📊 ═══════════════════════"));
+  }
+
+  /**
+   * 🌈 Enhanced 모듈 이름 목록
+   */
+  getEnhancedModuleNames() {
+    return Array.from(this.modules.values())
+      .filter((m) => m.enhanced && m.config.features?.rainbow)
+      .map((m) => m.name);
+  }
+
+  /**
+   * 📋 활성화된 모듈 목록 반환
+   */
+  getEnabledModules() {
+    const enabledModules = Array.from(this.modules.values())
+      .filter((module) => module.enabled)
+      .sort((a, b) => a.priority - b.priority);
+
+    // 🌈 로그
+    console.log(
+      messageSystem.gradient(
+        `📋 활성화된 모듈 ${enabledModules.length}개 반환`,
+        "green",
+        "blue"
+      )
+    );
+
+    return enabledModules;
+  }
+
+  /**
+   * 🎯 특정 모듈 정보 조회
+   */
+  getModule(moduleKey) {
+    const module = this.modules.get(moduleKey);
+
+    if (module) {
+      console.log(
+        messageSystem.gradient(`📦 모듈 조회: ${module.name}`, "cyan", "blue")
+      );
+    } else {
+      console.log(
+        messageSystem.gradient(`❌ 모듈 없음: ${moduleKey}`, "red", "orange")
+      );
+    }
+
+    return module;
+  }
+
+  /**
+   * ⭐ Enhanced 모듈 목록 반환
+   */
+  getEnhancedModules() {
+    const enhanced = Array.from(this.modules.values())
+      .filter((module) => module.enabled && module.enhanced)
+      .sort((a, b) => a.priority - b.priority);
+
+    console.log(
+      messageSystem.rainbow(`⭐ Enhanced 모듈 ${enhanced.length}개 반환`)
+    );
+
+    return enhanced;
+  }
+
+  /**
+   * 📱 메뉴에 표시할 모듈 목록
+   */
+  getMenuModules() {
+    const menuModules = Array.from(this.modules.values())
+      .filter(
+        (module) =>
+          module.enabled &&
+          module.config.showInMenu !== false &&
+          !module.config.hidden
+      )
+      .sort((a, b) => a.priority - b.priority);
+
+    console.log(
+      messageSystem.gradient(
+        `📱 메뉴 모듈 ${menuModules.length}개 반환`,
+        "purple",
+        "pink"
+      )
+    );
+
+    return menuModules;
+  }
+
+  /**
+   * 🔍 모듈 검색 (키워드)
+   */
+  searchModules(keyword) {
+    const searchResults = Array.from(this.modules.values()).filter(
+      (module) =>
+        module.name.includes(keyword) ||
+        module.description.includes(keyword) ||
+        module.config.commands?.some((cmd) => cmd.includes(keyword))
+    );
+
+    console.log(
+      messageSystem.gradient(
+        `🔍 검색 결과: "${keyword}" → ${searchResults.length}개`,
+        "yellow",
+        "orange"
+      )
+    );
+
+    return searchResults;
+  }
+
+  /**
+   * 🎛️ 모듈 활성화/비활성화
+   */
+  toggleModule(moduleKey, enabled) {
+    const module = this.modules.get(moduleKey);
+
+    if (!module) {
+      console.log(
+        messageSystem.gradient(`❌ 모듈 없음: ${moduleKey}`, "red", "orange")
+      );
       return false;
     }
-  }
 
-  /**
-   * 🔧 Enhanced 모듈 초기화 (ServiceBuilder 포함)
-   */
-  async initializeEnhancedModule(moduleKey) {
-    try {
-      const moduleConfig = this.moduleRegistry.get(moduleKey);
-      if (!moduleConfig) {
-        throw new Error(`등록되지 않은 모듈: ${moduleKey}`);
-      }
-
-      logger.info(`🚀 Enhanced 모듈 초기화: ${moduleKey}`);
-
-      // Enhanced 모듈 인스턴스 생성 (ServiceBuilder 주입)
-      const moduleInstance = new moduleConfig.ModuleClass(moduleKey, {
-        bot: this.bot,
-        db: this.db,
-        moduleManager: this,
-        serviceBuilder: this.serviceBuilder, // ⭐ ServiceBuilder 주입!
-        moduleKey,
-        moduleConfig,
-        config: moduleConfig.config,
-      });
-
-      // 표준 초기화
-      if (typeof moduleInstance.initialize === "function") {
-        await moduleInstance.initialize();
-      }
-
-      // 인스턴스 등록
-      this.moduleInstances.set(moduleKey, moduleInstance);
-
-      // 초기화 완료 표시
-      moduleConfig.initialized = true;
-      moduleConfig.initializedAt = TimeHelper.getTimestamp();
-
-      this.stats.activeModules++;
-
-      logger.success(`✅ Enhanced 모듈 초기화 완료: ${moduleKey}`, {
-        enhanced: this.enhancedModules.has(moduleKey),
-        hasServiceBuilder: !!this.serviceBuilder,
-      });
-    } catch (error) {
-      logger.error(`❌ Enhanced 모듈 초기화 실패 (${moduleKey}):`, error);
-      throw error;
+    if (module.required && !enabled) {
+      console.log(
+        messageSystem.gradient(
+          `⚠️ 필수 모듈은 비활성화할 수 없음: ${moduleKey}`,
+          "yellow",
+          "red"
+        )
+      );
+      return false;
     }
+
+    const oldStatus = module.enabled;
+    module.enabled = enabled;
+
+    // 통계 업데이트
+    if (enabled && !oldStatus) {
+      this.stats.enabledModules++;
+    } else if (!enabled && oldStatus) {
+      this.stats.enabledModules--;
+    }
+
+    const status = enabled ? "활성화" : "비활성화";
+    const emoji = enabled ? "✅" : "❌";
+
+    console.log(
+      messageSystem.gradient(
+        `${emoji} 모듈 ${status}: ${module.name}`,
+        enabled ? "green" : "red",
+        enabled ? "blue" : "orange"
+      )
+    );
+
+    return true;
   }
 
   /**
-   * 📊 Enhanced 모듈 상태 조회
+   * 📊 모듈 상태 정보
    */
-  getEnhancedStatus() {
-    const enhancedModulesList = Array.from(this.enhancedModules.entries()).map(
-      ([key, config]) => {
-        const instance = this.moduleInstances.get(key);
-        return {
-          key,
-          ...config,
-          initialized: !!instance,
-          status: instance?.getStatus() || null,
-        };
-      }
-    );
+  getModuleStatus(moduleKey) {
+    const module = this.modules.get(moduleKey);
+
+    if (!module) return null;
 
     return {
-      totalEnhanced: this.enhancedModules.size,
-      enhancedModules: enhancedModulesList,
-      serviceBuilder: !!this.serviceBuilder,
-      version: "3.0.1",
+      key: module.key,
+      name: module.name,
+      enabled: module.enabled,
+      enhanced: module.enhanced,
+      required: module.required,
+      priority: module.priority,
+      version: module.config.version,
+      features: module.config.features,
+      commands: module.config.commands,
+      loaded: this.loadedModules.has(moduleKey),
+      failed: this.failedModules.has(moduleKey),
     };
   }
-}
 
-// ===== 🎹 Enhanced NavigationHandler 업데이트 =====
-// src/handlers/EnhancedNavigationHandler.js - Enhanced UI 처리
-const TelegramFormatter = require("../utils/TelegramFormatter");
-const EnhancedBotResponses = require("../utils/EnhancedBotResponses");
-const logger = require("../utils/Logger");
-
-class EnhancedNavigationHandler {
-  constructor(options = {}) {
-    // 기존 NavigationHandler 코드...
-
-    // Enhanced 지원 추가
-    this.formatter = new TelegramFormatter();
-    this.enhancedResponses = EnhancedBotResponses;
-    this.enhancedModules = new Set(); // Enhanced 모듈 추적
-
-    logger.moduleStart("EnhancedNavigationHandler", "3.0.1");
+  /**
+   * 📈 전체 통계 정보
+   */
+  getStats() {
+    return {
+      ...this.stats,
+      loadedModules: this.loadedModules.size,
+      failedModules: this.failedModules.size,
+      successRate:
+        this.stats.totalModules > 0
+          ? Math.round(
+              (this.loadedModules.size / this.stats.totalModules) * 100
+            )
+          : 0,
+    };
   }
 
   /**
-   * 🎨 Enhanced UI 처리 (모듈 응답 기반)
+   * 🔄 모듈 로드 상태 업데이트
    */
-  async handleEnhancedResponse(bot, callbackQuery, moduleResponse) {
-    try {
-      const { success, action, data, uiType, error } = moduleResponse;
-      const chatId = callbackQuery.message.chat.id;
-      const messageId = callbackQuery.message.message_id;
-
-      logger.debug("🎨 Enhanced UI 처리", {
-        action,
-        uiType,
-        success,
-        hasData: !!data,
-      });
-
-      if (!success) {
-        // Enhanced 에러 처리
-        return await this.handleEnhancedError(
-          bot,
-          callbackQuery,
-          error,
-          moduleResponse.suggestion
-        );
-      }
-
-      // Enhanced UI 타입별 처리
-      switch (uiType) {
-        case "enhanced_card":
-          return await this.renderEnhancedCard(
-            bot,
-            chatId,
-            messageId,
-            action,
-            data
-          );
-
-        case "enhanced_list":
-          return await this.renderEnhancedList(
-            bot,
-            chatId,
-            messageId,
-            action,
-            data
-          );
-
-        case "enhanced_dashboard":
-          return await this.renderEnhancedDashboard(
-            bot,
-            chatId,
-            messageId,
-            action,
-            data
-          );
-
-        case "enhanced_form":
-          return await this.renderEnhancedForm(
-            bot,
-            chatId,
-            messageId,
-            action,
-            data
-          );
-
-        case "enhanced_success":
-          return await this.renderEnhancedSuccess(
-            bot,
-            chatId,
-            messageId,
-            action,
-            data
-          );
-
-        default:
-          // 기본 Enhanced 처리
-          return await this.renderDefaultEnhanced(
-            bot,
-            chatId,
-            messageId,
-            action,
-            data
-          );
-      }
-    } catch (error) {
-      logger.error("❌ Enhanced UI 처리 실패:", error);
-      return await this.sendFallbackMessage(
-        bot,
-        callbackQuery,
-        "UI 처리 중 오류가 발생했습니다."
+  markModuleLoaded(moduleKey, success = true) {
+    if (success) {
+      this.loadedModules.add(moduleKey);
+      this.failedModules.delete(moduleKey);
+      console.log(
+        messageSystem.gradient(
+          `✅ 모듈 로드 성공: ${moduleKey}`,
+          "green",
+          "blue"
+        )
+      );
+    } else {
+      this.failedModules.add(moduleKey);
+      this.loadedModules.delete(moduleKey);
+      console.log(
+        messageSystem.gradient(
+          `❌ 모듈 로드 실패: ${moduleKey}`,
+          "red",
+          "orange"
+        )
       );
     }
+
+    this.stats.lastUpdate = TimeHelper.getLogTimeString();
   }
 
   /**
-   * 📱 Enhanced Todo 메뉴 렌더링
+   * 🎨 알록달록 모듈 목록 표시
    */
-  async renderEnhancedCard(bot, chatId, messageId, action, data) {
-    try {
-      let content, keyboard;
+  showRainbowModuleList() {
+    console.log(messageSystem.rainbow("🌈 ═══ 알록달록 모듈 목록 ═══"));
 
-      switch (action) {
-        case "show_todo_menu":
-          content = this.formatter.createMenuCard(data.userName, {
-            todos: data.stats.total,
-            completed: data.stats.completed,
-            pending: data.stats.pending,
-          });
+    const enhancedModules = this.getEnhancedModules();
+    enhancedModules.forEach((module, index) => {
+      const colors = ["cyan", "magenta", "yellow", "green", "blue", "purple"];
+      const color1 = colors[index % colors.length];
+      const color2 = colors[(index + 1) % colors.length];
 
-          keyboard = {
-            inline_keyboard: [
-              [
-                { text: "📋 목록 보기", callback_data: "todo:list" },
-                { text: "➕ 새 할일", callback_data: "todo:add" },
-              ],
-              [
-                { text: "✅ 완료 처리", callback_data: "todo:complete" },
-                { text: "📊 통계", callback_data: "todo:stats" },
-              ],
-              [
-                { text: "⚙️ 설정", callback_data: "todo:settings" },
-                { text: "🔙 메인 메뉴", callback_data: "system:menu" },
-              ],
-            ],
-          };
-          break;
-
-        case "show_timer_menu":
-          content = this.createTimerDashboard(data);
-          keyboard = this.createTimerKeyboard(data);
-          break;
-
-        case "show_worktime_menu":
-          content = this.createWorktimeDashboard(data);
-          keyboard = this.createWorktimeKeyboard(data);
-          break;
-
-        default:
-          content = this.formatter.createBox(
-            "Enhanced UI",
-            `액션: ${action}`,
-            "info"
-          );
-          keyboard = {
-            inline_keyboard: [[{ text: "🔙 뒤로", callback_data: "back" }]],
-          };
-      }
-
-      return await bot.editMessageText(content, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "MarkdownV2",
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("❌ Enhanced 카드 렌더링 실패:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 📋 Enhanced Todo 목록 렌더링
-   */
-  async renderEnhancedList(bot, chatId, messageId, action, data) {
-    try {
-      if (action === "show_todo_list") {
-        const content = this.formatter.createTodoListCard(
-          data.todos,
-          data.pagination
-        );
-        const keyboard = this.createTodoListKeyboard(
-          data.pagination,
-          data.filter
-        );
-
-        return await bot.editMessageText(content, {
-          chat_id: chatId,
-          message_id: messageId,
-          parse_mode: "MarkdownV2",
-          reply_markup: keyboard,
-        });
-      }
-
-      // 기본 리스트 처리
-      const content = this.formatter.createBox(
-        "목록",
-        "Enhanced 목록 UI",
-        "info"
+      console.log(
+        messageSystem.gradient(
+          `${module.config.icon} ${module.name} (v${module.config.version})`,
+          color1,
+          color2
+        )
       );
-      return await bot.editMessageText(content, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "MarkdownV2",
-      });
-    } catch (error) {
-      logger.error("❌ Enhanced 리스트 렌더링 실패:", error);
-      throw error;
-    }
+    });
+
+    console.log(messageSystem.rainbow("🌈 ══════════════════════"));
   }
 
   /**
-   * 📊 Enhanced 대시보드 렌더링
+   * 🧹 정리 작업
    */
-  async renderEnhancedDashboard(bot, chatId, messageId, action, data) {
-    try {
-      let content;
-
-      if (action === "show_worktime_dashboard") {
-        content = this.formatter.createWorkDashboard(data.stats.today);
-      } else if (action === "show_timer_dashboard") {
-        content = this.createTimerDashboard(data);
-      } else {
-        content = this.formatter.createBox(
-          "대시보드",
-          "Enhanced 대시보드 UI",
-          "info"
-        );
-      }
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text: "🔄 새로고침",
-              callback_data: `${action.replace("show_", "")}:dashboard`,
-            },
-            {
-              text: "⚙️ 설정",
-              callback_data: `${action.split("_")[1]}:settings`,
-            },
-          ],
-          [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-        ],
-      };
-
-      return await bot.editMessageText(content, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "MarkdownV2",
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("❌ Enhanced 대시보드 렌더링 실패:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 🎊 Enhanced 성공 메시지 렌더링
-   */
-  async renderEnhancedSuccess(bot, chatId, messageId, action, data) {
-    try {
-      let title, message;
-
-      switch (action) {
-        case "show_complete_success":
-          title = "할일 완료!";
-          message = `"${data.completedTodo.title}" 완료되었습니다!`;
-          break;
-
-        case "show_checkin_success":
-          title = "출근 완료!";
-          message = `${data.checkInTime}에 출근 처리되었습니다!`;
-          break;
-
-        case "show_timer_started":
-          title = "타이머 시작!";
-          message = `"${data.timer.name}" 타이머가 시작되었습니다!`;
-          break;
-
-        default:
-          title = "작업 완료!";
-          message = "요청하신 작업이 완료되었습니다!";
-      }
-
-      const content = this.formatter.createSuccessAnimation(title, message);
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            {
-              text: "📊 현황 보기",
-              callback_data: `${action.split("_")[1]}:menu`,
-            },
-            { text: "🔙 메인 메뉴", callback_data: "system:menu" },
-          ],
-        ],
-      };
-
-      return await bot.editMessageText(content, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "MarkdownV2",
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("❌ Enhanced 성공 렌더링 실패:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * ❌ Enhanced 에러 처리
-   */
-  async handleEnhancedError(bot, callbackQuery, error, suggestion) {
-    try {
-      const chatId = callbackQuery.message.chat.id;
-      const messageId = callbackQuery.message.message_id;
-
-      const content = this.formatter.createErrorMessage(
-        error,
-        suggestion || "다시 시도해주세요."
-      );
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "🔄 다시 시도", callback_data: "retry" },
-            { text: "❓ 도움말", callback_data: "system:help" },
-          ],
-          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-        ],
-      };
-
-      return await bot.editMessageText(content, {
-        chat_id: chatId,
-        message_id: messageId,
-        parse_mode: "MarkdownV2",
-        reply_markup: keyboard,
-      });
-    } catch (error) {
-      logger.error("❌ Enhanced 에러 처리 실패:", error);
-      return await this.sendFallbackMessage(
-        bot,
-        callbackQuery,
-        "오류 처리 중 문제가 발생했습니다."
-      );
-    }
-  }
-
-  // ===== 🛠️ Enhanced UI 생성 헬퍼들 =====
-
-  createTimerDashboard(data) {
-    if (data.activeTimer) {
-      return this.formatter.createTimerCard(data.activeTimer);
-    }
-
-    return this.formatter.createBox(
-      "⏰ 타이머",
-      `활성 타이머: 없음\n포모도로 완료: ${
-        data.stats?.pomodoroCompleted || 0
-      }개\n총 집중시간: ${data.stats?.totalFocusTime || 0}분`,
-      "info"
+  cleanup() {
+    console.log(
+      messageSystem.gradient("🧹 ModuleRegistry 정리 중...", "yellow", "orange")
     );
-  }
 
-  createTimerKeyboard(data) {
-    const buttons = [];
+    // 통계 정보 저장 (필요시)
+    logger.moduleLog("ModuleRegistry", "정리 완료", this.getStats());
 
-    if (data.activeTimer) {
-      buttons.push([
-        {
-          text:
-            data.activeTimer.status === "running" ? "⏸️ 일시정지" : "▶️ 재시작",
-          callback_data: `timer:${
-            data.activeTimer.status === "running" ? "pause" : "resume"
-          }`,
-        },
-        { text: "⏹️ 정지", callback_data: "timer:stop" },
-      ]);
-    } else {
-      buttons.push([
-        { text: "🍅 포모도로", callback_data: "timer:pomodoro:start" },
-        { text: "⏰ 커스텀", callback_data: "timer:create" },
-      ]);
-    }
-
-    buttons.push([
-      { text: "📊 통계", callback_data: "timer:stats" },
-      { text: "🔙 메뉴", callback_data: "system:menu" },
-    ]);
-
-    return { inline_keyboard: buttons };
-  }
-
-  createWorktimeDashboard(data) {
-    return this.formatter.createWorkDashboard({
-      checkInTime: data.currentSession?.formattedStartTime || "미출근",
-      currentWorkHours: data.todayStats?.totalHours || 0,
-      targetHours: 8,
-      breaks: [],
-    });
-  }
-
-  createWorktimeKeyboard(data) {
-    const buttons = [];
-
-    if (data.workStatus.id === "not_working") {
-      buttons.push([
-        { text: "🕐 출근", callback_data: "worktime:checkin" },
-        { text: "🏠 재택근무", callback_data: "worktime:checkin:remote" },
-      ]);
-    } else {
-      buttons.push([
-        { text: "☕ 휴식", callback_data: "worktime:break:start" },
-        { text: "🏠 퇴근", callback_data: "worktime:checkout" },
-      ]);
-    }
-
-    buttons.push([
-      { text: "📊 주간통계", callback_data: "worktime:weekly" },
-      { text: "🔙 메뉴", callback_data: "system:menu" },
-    ]);
-
-    return { inline_keyboard: buttons };
-  }
-
-  createTodoListKeyboard(pagination, filter) {
-    const buttons = [];
-
-    // 페이지네이션
-    if (pagination.totalPages > 1) {
-      const pageButtons = [];
-      if (pagination.hasPrev) {
-        pageButtons.push({
-          text: "⬅️ 이전",
-          callback_data: `todo:page:${pagination.currentPage - 1}`,
-        });
-      }
-      pageButtons.push({
-        text: `${pagination.currentPage}/${pagination.totalPages}`,
-        callback_data: "todo:page:info",
-      });
-      if (pagination.hasNext) {
-        pageButtons.push({
-          text: "다음 ➡️",
-          callback_data: `todo:page:${pagination.currentPage + 1}`,
-        });
-      }
-      buttons.push(pageButtons);
-    }
-
-    // 액션 버튼들
-    buttons.push([
-      { text: "➕ 추가", callback_data: "todo:add" },
-      { text: "✅ 완료", callback_data: "todo:complete" },
-    ]);
-
-    buttons.push([{ text: "🔙 메뉴", callback_data: "todo:menu" }]);
-
-    return { inline_keyboard: buttons };
+    console.log(messageSystem.rainbow("✅ ModuleRegistry 정리 완료"));
   }
 }
 
-// ===== 🧪 Enhanced 통합 테스트 시스템 =====
-// test/enhanced-integration-test.js
-class EnhancedIntegrationTest {
-  constructor() {
-    this.testResults = [];
-    this.moduleManager = null;
-    this.navigationHandler = null;
+// ===== 🎯 싱글톤 인스턴스 =====
+let registryInstance = null;
 
-    logger.moduleStart("EnhancedIntegrationTest", "3.0.1");
+/**
+ * 📋 ModuleRegistry 싱글톤 인스턴스
+ */
+function getModuleRegistry() {
+  if (!registryInstance) {
+    registryInstance = new ModuleRegistry();
   }
-
-  /**
-   * 🧪 전체 Enhanced 시스템 테스트
-   */
-  async runFullTest() {
-    try {
-      logger.important("🧪 Enhanced 통합 테스트 시작!");
-
-      // 1. ModuleManager 테스트
-      await this.testModuleManager();
-
-      // 2. Enhanced 모듈 등록 테스트
-      await this.testEnhancedModuleRegistration();
-
-      // 3. ServiceBuilder 연동 테스트
-      await this.testServiceBuilderIntegration();
-
-      // 4. NavigationHandler 연동 테스트
-      await this.testNavigationHandlerIntegration();
-
-      // 5. Enhanced UI 렌더링 테스트
-      await this.testEnhancedUIRendering();
-
-      // 6. 실제 콜백 플로우 테스트
-      await this.testCallbackFlow();
-
-      // 결과 보고
-      this.generateTestReport();
-    } catch (error) {
-      logger.error("❌ Enhanced 통합 테스트 실패:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 📊 테스트 결과 보고서 생성
-   */
-  generateTestReport() {
-    const totalTests = this.testResults.length;
-    const passedTests = this.testResults.filter(
-      (r) => r.status === "PASS"
-    ).length;
-    const failedTests = totalTests - passedTests;
-
-    logger.important("📊 Enhanced 통합 테스트 결과", {
-      total: totalTests,
-      passed: passedTests,
-      failed: failedTests,
-      successRate: `${Math.round((passedTests / totalTests) * 100)}%`,
-    });
-
-    // 실패한 테스트 상세 로그
-    const failed = this.testResults.filter((r) => r.status === "FAIL");
-    if (failed.length > 0) {
-      logger.error("❌ 실패한 테스트들:");
-      failed.forEach((test) => {
-        logger.error(`  - ${test.name}: ${test.error}`);
-      });
-    } else {
-      logger.success("🎊 모든 Enhanced 테스트 통과!");
-    }
-  }
-
-  /**
-   * 📝 테스트 결과 기록
-   */
-  recordTest(name, status, details = {}) {
-    this.testResults.push({
-      name,
-      status,
-      timestamp: new Date(),
-      ...details,
-    });
-
-    const emoji = status === "PASS" ? "✅" : "❌";
-    logger.info(`${emoji} ${name}: ${status}`);
-  }
-
-  /**
-   * 🎯 ModuleManager 테스트
-   */
-  async testModuleManager() {
-    try {
-      // Mock 데이터로 ModuleManager 생성
-      const mockServiceBuilder = { create: () => ({}) };
-      this.moduleManager = new EnhancedModuleManager({
-        serviceBuilder: mockServiceBuilder,
-      });
-
-      this.recordTest("ModuleManager 생성", "PASS");
-
-      // Enhanced 상태 확인
-      const status = this.moduleManager.getEnhancedStatus();
-      this.recordTest("Enhanced 상태 조회", status ? "PASS" : "FAIL");
-    } catch (error) {
-      this.recordTest("ModuleManager 테스트", "FAIL", { error: error.message });
-    }
-  }
-
-  /**
-   * 📝 Enhanced 모듈 등록 테스트
-   */
-  async testEnhancedModuleRegistration() {
-    try {
-      // Mock Enhanced 모듈 등록
-      class MockTodoModule {
-        constructor() {
-          this.moduleName = "MockTodoModule";
-        }
-        async initialize() {
-          return true;
-        }
-        setupActions() {
-          return true;
-        }
-      }
-
-      const registered = await this.moduleManager.registerEnhancedModule(
-        "mock_todo",
-        MockTodoModule,
-        {
-          enhanced: true,
-          version: "3.0.1",
-          features: { priority: true },
-        }
-      );
-
-      this.recordTest("Enhanced 모듈 등록", registered ? "PASS" : "FAIL");
-
-      // Enhanced 모듈 목록 확인
-      const enhancedStatus = this.moduleManager.getEnhancedStatus();
-      const hasEnhanced = enhancedStatus.totalEnhanced > 0;
-
-      this.recordTest("Enhanced 모듈 추적", hasEnhanced ? "PASS" : "FAIL");
-    } catch (error) {
-      this.recordTest("Enhanced 모듈 등록 테스트", "FAIL", {
-        error: error.message,
-      });
-    }
-  }
-
-  /**
-   * 🎹 NavigationHandler 연동 테스트
-   */
-  async testNavigationHandlerIntegration() {
-    try {
-      this.navigationHandler = new EnhancedNavigationHandler();
-
-      // Mock 모듈 응답 테스트
-      const mockResponse = {
-        success: true,
-        action: "show_todo_menu",
-        data: {
-          userName: "테스트사용자",
-          stats: { total: 5, completed: 2, pending: 3 },
-        },
-        uiType: "enhanced_card",
-      };
-
-      // UI 처리 시뮬레이션 (실제 봇 없이)
-      const canProcess =
-        typeof this.navigationHandler.handleEnhancedResponse === "function";
-
-      this.recordTest(
-        "NavigationHandler Enhanced 지원",
-        canProcess ? "PASS" : "FAIL"
-      );
-    } catch (error) {
-      this.recordTest("NavigationHandler 연동 테스트", "FAIL", {
-        error: error.message,
-      });
-    }
-  }
-
-  /**
-   * 🎨 Enhanced UI 렌더링 테스트
-   */
-  async testEnhancedUIRendering() {
-    try {
-      // TelegramFormatter 테스트
-      const formatter = new TelegramFormatter();
-
-      // 메뉴 카드 생성 테스트
-      const menuCard = formatter.createMenuCard("테스트사용자", {
-        todos: 5,
-        timers: 2,
-        workHours: 7.5,
-      });
-
-      const hasContent = menuCard && menuCard.length > 0;
-      this.recordTest("Enhanced 메뉴 카드 생성", hasContent ? "PASS" : "FAIL");
-
-      // 진행률 바 테스트
-      const progressBar = formatter.createProgressBar(75, 100);
-      const hasProgressBar = progressBar && progressBar.includes("▰");
-      this.recordTest(
-        "Enhanced 진행률 바 생성",
-        hasProgressBar ? "PASS" : "FAIL"
-      );
-
-      // 박스 메시지 테스트
-      const boxMessage = formatter.createBox(
-        "테스트",
-        "Enhanced 박스 메시지",
-        "success"
-      );
-      const hasBox = boxMessage && boxMessage.includes("━");
-      this.recordTest("Enhanced 박스 메시지 생성", hasBox ? "PASS" : "FAIL");
-    } catch (error) {
-      this.recordTest("Enhanced UI 렌더링 테스트", "FAIL", {
-        error: error.message,
-      });
-    }
-  }
-
-  /**
-   * 🔄 콜백 플로우 테스트
-   */
-  async testCallbackFlow() {
-    try {
-      // Mock 콜백 데이터
-      const mockCallbackQuery = {
-        id: "test_callback_123",
-        data: "todo:menu",
-        message: {
-          chat: { id: 12345 },
-          message_id: 67890,
-        },
-        from: {
-          id: 98765,
-          first_name: "테스트",
-          username: "testuser",
-        },
-      };
-
-      // 콜백 데이터 파싱 테스트
-      const parsed =
-        this.navigationHandler.parseCallbackData?.("todo:menu:param1");
-      const hasParsing = parsed && parsed.moduleKey === "todo";
-      this.recordTest("콜백 데이터 파싱", hasParsing ? "PASS" : "FAIL");
-
-      // Enhanced 응답 처리 시뮬레이션
-      const mockModuleResponse = {
-        success: true,
-        action: "show_todo_menu",
-        data: { userName: "테스트사용자" },
-        uiType: "enhanced_card",
-      };
-
-      // 처리 함수 존재 확인
-      const canHandle =
-        typeof this.navigationHandler.handleEnhancedResponse === "function";
-      this.recordTest("Enhanced 응답 처리", canHandle ? "PASS" : "FAIL");
-    } catch (error) {
-      this.recordTest("콜백 플로우 테스트", "FAIL", { error: error.message });
-    }
-  }
+  return registryInstance;
 }
 
-// ===== 🚀 Enhanced 시스템 시작 스크립트 =====
-// src/start-enhanced.js
-async function startEnhancedSystem() {
-  try {
-    logger.important("🚀 Enhanced 시스템 v3.0.1 시작!");
-
-    // 1. 통합 테스트 실행
-    const tester = new EnhancedIntegrationTest();
-    await tester.runFullTest();
-
-    // 2. 실제 시스템 시작 (테스트 통과 시)
-    const passedTests = tester.testResults.filter(
-      (r) => r.status === "PASS"
-    ).length;
-    const totalTests = tester.testResults.length;
-
-    if (passedTests === totalTests) {
-      logger.success("✅ 모든 테스트 통과! Enhanced 시스템 시작 준비 완료!");
-
-      // 실제 ModuleManager와 NavigationHandler 초기화
-      // await initializeProductionSystem();
-    } else {
-      logger.error("❌ 테스트 실패로 인해 시스템 시작 중단");
-      process.exit(1);
-    }
-  } catch (error) {
-    logger.fatal("💀 Enhanced 시스템 시작 실패:", error);
-    process.exit(1);
-  }
+/**
+ * 📋 활성화된 모듈 목록 (기존 호환성)
+ */
+function getEnabledModules() {
+  return getModuleRegistry().getEnabledModules();
 }
 
-// 모듈 export
+/**
+ * ⭐ Enhanced 모듈 목록
+ */
+function getEnhancedModules() {
+  return getModuleRegistry().getEnhancedModules();
+}
+
+/**
+ * 📱 메뉴 모듈 목록
+ */
+function getMenuModules() {
+  return getModuleRegistry().getMenuModules();
+}
+
+/**
+ * 📦 특정 모듈 정보
+ */
+function getModule(moduleKey) {
+  return getModuleRegistry().getModule(moduleKey);
+}
+
+/**
+ * 📊 레지스트리 통계
+ */
+function getRegistryStats() {
+  return getModuleRegistry().getStats();
+}
+
+// ========================================
+// 🚀 모듈 내보내기
+// ========================================
+
 module.exports = {
-  EnhancedModuleManager,
-  EnhancedNavigationHandler,
-  EnhancedIntegrationTest,
-  startEnhancedSystem,
+  // 클래스
+  ModuleRegistry,
+
+  // 기본 함수들 (기존 호환성)
+  getEnabledModules,
+  getModule,
+
+  // 새로운 Enhanced 함수들
+  getEnhancedModules,
+  getMenuModules,
+  getRegistryStats,
+  getModuleRegistry,
+
+  // 설정 정보
+  MODULES,
+  REGISTRY_SETTINGS,
+
+  // 버전 정보
+  version: "3.0.1",
+  description: "두목봇 알록달록 모듈 레지스트리",
 };

@@ -6,6 +6,7 @@ class FortuneModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.fortuneService = null;
     logger.module("FortuneModule", "모듈 생성", { version: "3.0.1" });
@@ -13,7 +14,11 @@ class FortuneModule extends BaseModule {
 
   async onInitialize() {
     try {
-      this.fortuneService = new FortuneService();
+      this.fortuneService = await this.serviceBuilder.getOrCreate("fortune", {
+        config: this.config,
+      });
+
+      // this.fortuneService = new FortuneService();
       await this.fortuneService.initialize();
       logger.success("FortuneModule 초기화 완료");
     } catch (error) {

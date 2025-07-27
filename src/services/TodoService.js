@@ -2,18 +2,22 @@
 const logger = require("../utils/Logger"); // LoggerEnhancer 적용
 const TimeHelper = require("../utils/TimeHelper");
 const { ObjectId } = require("mongodb");
+const { getInstance } = require("../database/DatabaseManager"); // DatabaseManager 사용
 
 /**
  * 🔧 TodoService - 할일 관리 데이터 서비스
- * - MongoDB 네이티브 드라이버 사용 (mongoose 금지)
+ * - DatabaseManager 중앙 관리 방식
+ * - 스키마는 DatabaseManager에서 주입받음
  * - 순수 데이터 처리만 담당 (UI 금지)
- * - LoggerEnhancer 활용
  * - Railway 환경 최적화
  */
 class TodoService {
   constructor(options = {}) {
     this.collectionName = "todos";
-    this.db = options.db || null;
+
+    // DatabaseManager 인스턴스 (중앙 관리)
+    this.dbManager = getInstance();
+    this.db = null;
     this.collection = null;
 
     // 설정 (환경변수 기반)
@@ -40,18 +44,18 @@ class TodoService {
   }
 
   /**
-   * 🎯 서비스 초기화
+   * 🎯 서비스 초기화 (DatabaseManager 연동)
    */
   async initialize() {
     try {
-      if (!this.db) {
-        throw new Error("Database connection required");
-      }
+      // DatabaseManager 연결 보장
+      await this.dbManager.ensureConnection();
 
-      // 컬렉션 초기화
+      // DB 인스턴스 가져오기
+      this.db = this.dbManager.getDb();
       this.collection = this.db.collection(this.collectionName);
 
-      // 인덱스 생성 (Railway 환경 고려)
+      // DatabaseManager의 스키마 시스템 활용
       await this.createIndexes();
 
       logger.success("TodoService 초기화 완료");
@@ -62,19 +66,25 @@ class TodoService {
   }
 
   /**
-   * 📊 인덱스 생성 (Railway 최적화)
+   * 📊 인덱스 생성 (DatabaseManager 스키마 활용)
    */
   async createIndexes() {
     try {
-      const indexes = [
-        // 핵심 인덱스만 (담백하게)
-        { userId: 1, createdAt: -1 },
-        { userId: 1, completed: 1 },
-        { isActive: 1, userId: 1 },
-      ];
+      // DatabaseManager에서 스키마 정보 가져오기
+      if (this.dbManager.schemaManager) {
+        const indexes = this.dbManager.schemaManager.getIndexes(
+          this.collectionName
+        );
 
-      for (const index of indexes) {
-        await this.collection.createIndex(index);
+        for (const indexDef of indexes) {
+          const { fields, ...options } = indexDef;
+          await this.collection.createIndex(fields, options);
+        }
+      } else {
+        // 기본 인덱스 (스키마 없을 때)
+        await this.collection.createIndex({ userId: 1, createdAt: -1 });
+        await this.collection.createIndex({ userId: 1, completed: 1 });
+        await this.collection.createIndex({ isActive: 1, userId: 1 });
       }
 
       logger.debug("TodoService 인덱스 생성 완료");
@@ -121,6 +131,24 @@ class TodoService {
         version: 1,
         isActive: true,
       };
+
+      // DatabaseManager의 스키마 검증 활용 (있으면)
+      if (this.dbManager.schemaManager) {
+        const validationResult =
+          await this.dbManager.schemaManager.validateDocument(
+            this.collectionName,
+            todo
+          );
+
+        if (!validationResult.isValid) {
+          throw new Error(
+            `데이터 검증 실패: ${validationResult.errors.join(", ")}`
+          );
+        }
+
+        // 검증된 데이터 사용
+        todo = validationResult.document;
+      }
 
       const result = await this.collection.insertOne(todo);
       const createdTodo = await this.collection.findOne({
@@ -267,6 +295,59 @@ class TodoService {
   }
 
   /**
+   * ✏️ 할일 수정
+   */
+  async updateTodo(userId, todoId, updateData) {
+    try {
+      const objectId = new ObjectId(todoId);
+
+      // 기존 할일 확인
+      const existingTodo = await this.collection.findOne({
+        _id: objectId,
+        userId,
+        isActive: true,
+      });
+
+      if (!existingTodo) {
+        throw new Error("할일을 찾을 수 없습니다.");
+      }
+
+      // 업데이트 데이터 준비
+      const updateDoc = {
+        updatedAt: TimeHelper.now(),
+        $inc: { version: 1 },
+      };
+
+      // 허용된 필드만 업데이트
+      const allowedFields = ["title", "priority"];
+
+      for (const field of allowedFields) {
+        if (updateData.hasOwnProperty(field)) {
+          updateDoc[field] = updateData[field];
+        }
+      }
+
+      const result = await this.collection.updateOne(
+        { _id: objectId, userId },
+        { $set: updateDoc }
+      );
+
+      if (result.modifiedCount === 0) {
+        throw new Error("할일 수정에 실패했습니다.");
+      }
+
+      // 캐시 무효화
+      this.invalidateUserCache(userId);
+
+      logger.data("todo", "update", userId, { todoId });
+      return await this.collection.findOne({ _id: objectId });
+    } catch (error) {
+      logger.error("할일 수정 실패", error);
+      throw error;
+    }
+  }
+
+  /**
    * 🗑️ 할일 삭제 (소프트 삭제)
    */
   async deleteTodo(userId, todoId) {
@@ -300,7 +381,7 @@ class TodoService {
     }
   }
 
-  // ===== 📊 통계 메서드들 (기본만) =====
+  // ===== 📊 통계 메서드들 =====
 
   /**
    * 📈 사용자 기본 통계
@@ -419,6 +500,7 @@ class TodoService {
       cacheEnabled: this.config.enableCache,
       cacheSize: this.cache.size,
       railway: this.isRailway,
+      dbManager: this.dbManager ? "connected" : "disconnected",
     };
   }
 

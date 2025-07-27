@@ -11,6 +11,7 @@ class WeatherModule extends BaseModule {
       moduleManager: options.moduleManager,
       config: options.config,
     });
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.weatherService = null;
     this.config = {
@@ -24,10 +25,10 @@ class WeatherModule extends BaseModule {
 
   async onInitialize() {
     try {
-      this.weatherService = new WeatherService({
-        apiKey: this.config.apiKey,
-        defaultLocation: this.config.defaultLocation,
+      this.weatherService = await this.serviceBuilder.getOrCreate("weather", {
+        config: this.config,
       });
+
       await this.weatherService.initialize();
       logger.success("WeatherModule 초기화 완료");
     } catch (error) {

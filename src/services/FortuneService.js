@@ -1,5 +1,11 @@
+const logger = require("../utils/Logger"); // LoggerEnhancer 적용
+const TimeHelper = require("../utils/TimeHelper");
+const { ObjectId } = require("mongodb");
+const { getInstance } = require("../database/DatabaseManager");
+
 class FortuneService {
   constructor() {
+    this.dbManager = getInstance(); // 👈 이 부분!
     this.fortunes = {
       today: [
         "오늘은 좋은 일이 있을 것입니다.",
@@ -22,6 +28,8 @@ class FortuneService {
   }
 
   async initialize() {
+    await this.dbManager.ensureConnection();
+
     logger.success("FortuneService 초기화 완료");
   }
 
