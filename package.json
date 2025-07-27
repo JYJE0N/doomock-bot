@@ -32,6 +32,7 @@
     "url": "https://github.com/JYJE0N/doomock-bot.git"
   },
   "dependencies": {
+    "@ffmpeg-installer/ffmpeg": "^1.1.0",
     "@google-cloud/text-to-speech": "^6.2.0",
     "axios": "^1.6.2",
     "chalk": "^4.1.2",
@@ -48,9 +49,6 @@
   },
   "devDependencies": {
     "nodemon": "^3.0.2"
-  },
-  "optionalDependencies": {
-    "fluent-ffmpeg": "^2.1.2"
   },
   "railway": {
     "build": {
