@@ -21,7 +21,7 @@ docs/
 temp/
 
 # scripts
-scripts/
+scripts/*.log
 
 # OS-specific
 .DS_Store
