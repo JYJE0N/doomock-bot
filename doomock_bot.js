@@ -14,6 +14,13 @@ const TimeHelper = require("./src/utils/TimeHelper");
  * - Railway 최적화
  * - 우아한 종료 처리
  */
+
+console.log("Logger 타입:", typeof logger);
+console.log(
+  "Logger 메서드들:",
+  Object.getOwnPropertyNames(Object.getPrototypeOf(logger))
+);
+
 class DooMockBot {
   constructor() {
     this.botController = null;
