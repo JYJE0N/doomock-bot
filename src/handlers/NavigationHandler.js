@@ -180,6 +180,7 @@ class NavigationHandler {
 
       const systemButtons = [
         [
+          { text: "❓ 메인메뉴", callback_data: "system:main:menu" },
           { text: "❓ 도움말", callback_data: "system:help" },
           { text: "ℹ️ 정보", callback_data: "system:about" },
           { text: "📊 상태", callback_data: "system:status" },

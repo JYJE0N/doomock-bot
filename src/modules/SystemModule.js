@@ -141,7 +141,7 @@ class SystemModule extends BaseModule {
 
       // NavigationHandler에게 데이터 전달
       return {
-        type: "main_menu",
+        type: "main:menu",
         module: "system",
         data: {
           userName,
