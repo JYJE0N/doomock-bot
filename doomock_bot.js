@@ -1,19 +1,18 @@
-// doomock_bot.js - 수정된 버전 (임포트 통일)
+// doomock_bot.js - v3.0.1 안정화 버전
 require("dotenv").config();
 const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
-// ✅ 수정: 임포트 방식 통일 (필요한 함수만 디스트럭처링)
 const { getRegistryStats } = require("./src/config/ModuleRegistry");
 const TimeHelper = require("./src/utils/TimeHelper");
 
 /**
- * 🚀 DooMockBot v3.0.1 - 수정된 버전
+ * 🚀 DooMockBot v3.0.1 - 안정화 버전
  *
- * ✨ 수정사항:
- * - 임포트 방식 통일
- * - 변수명 일관성 확보
- * - logger 메서드 직접 사용
- * - 안정성 향상
+ * ✨ 주요 기능:
+ * - 텔레그램 봇 서비스
+ * - 모듈형 아키텍처
+ * - Railway 최적화
+ * - 우아한 종료 처리
  */
 class DooMockBot {
   constructor() {
@@ -31,101 +30,11 @@ class DooMockBot {
       gracefulShutdowns: 0,
     };
 
-    // 🎭 시작 애니메이션 준비
-    this.startupAnimations = {
-      loading: ["⏳", "⌛", "🔄", "⚡", "🚀"],
-      success: ["✅", "🎉", "🌟", "💫", "🎊"],
-      error: ["❌", "💥", "🚨", "⚠️", "🔥"],
-    };
-
-    // ✅ 수정: logger 메서드 직접 사용
-    console.log(logger.rainbow("🤖 DooMockBot v3.0.1 인스턴스 생성됨"));
+    console.log("🤖 DooMockBot v3.0.1 인스턴스 생성됨");
   }
 
   /**
-   * 📦 모듈 레지스트리 확인 (수정된 버전)
-   *
-   * ✅ 수정사항:
-   * - 올바른 함수 호출
-   * - 변수명 통일
-   * - 상세한 검증 로직
-   */
-  async checkModuleRegistry() {
-    try {
-      // ✅ 수정: getRegistryStats() 직접 호출
-      const registryStats = getRegistryStats();
-
-      console.log(
-        logger.gradient("   📋 모듈 레지스트리 검증 중...", "cyan", "purple")
-      );
-
-      console.log(
-        logger.gradient(
-          `   📊 총 모듈: ${registryStats.totalModules}개`,
-          "blue",
-          "cyan"
-        )
-      );
-      console.log(
-        logger.gradient(
-          `   ✅ 활성화: ${registryStats.enabledModules}개`,
-          "green",
-          "blue"
-        )
-      );
-      console.log(
-        logger.gradient(
-          `   ⭐ Enhanced: ${registryStats.enhancedModules}개`,
-          "yellow",
-          "orange"
-        )
-      );
-
-      // ✅ 검증 로직
-      if (registryStats.totalModules === 0) {
-        throw new Error(
-          "🚨 등록된 모듈이 없습니다. ModuleRegistry.js를 확인하세요."
-        );
-      }
-
-      if (registryStats.enabledModules === 0) {
-        throw new Error("⚠️ 활성화된 모듈이 없습니다. 환경변수를 확인하세요.");
-      }
-
-      // 📈 성능 지표
-      const successRate =
-        registryStats.totalModules > 0
-          ? Math.round(
-              (registryStats.enabledModules / registryStats.totalModules) * 100
-            )
-          : 0;
-
-      console.log(
-        logger.gradient(
-          `   📈 모듈 활성화율: ${successRate}%`,
-          successRate > 80 ? "green" : successRate > 50 ? "yellow" : "red",
-          "blue"
-        )
-      );
-
-      // ✅ 검증 완료
-      console.log(logger.rainbow("   🎯 모듈 레지스트리 검증 완료!"));
-
-      return registryStats;
-    } catch (error) {
-      console.log(
-        logger.gradient(
-          `   ❌ 모듈 레지스트리 검증 실패: ${error.message}`,
-          "red",
-          "orange"
-        )
-      );
-      throw error;
-    }
-  }
-
-  /**
-   * 🎯 봇 시작 (수정된 시작 시퀀스)
+   * 🎯 봇 시작
    */
   async start() {
     try {
@@ -139,18 +48,17 @@ class DooMockBot {
 
       this.showStartupComplete();
     } catch (error) {
-      logger.fatal("💥 봇 시작 실패", error);
+      logger.error("💥 봇 시작 실패", error);
       await this.handleStartupError(error);
     }
   }
 
   /**
-   * 🌈 화려한 환영 배너 (수정된 버전)
+   * 🌈 환영 배너
    */
   showWelcomeBanner() {
     console.clear();
 
-    // ASCII 아트 배너
     const bannerLines = [
       "██████╗  ██████╗  ██████╗ ███╗   ███╗ ██████╗  ██████╗██╗  ██╗",
       "██╔══██╗██╔═══██╗██╔═══██╗████╗ ████║██╔═══██╗██╔════╝██║ ██╔╝",
@@ -160,81 +68,47 @@ class DooMockBot {
       "╚═════╝  ╚═════╝  ╚═════╝ ╚═╝     ╚═╝ ╚═════╝  ╚═════╝╚═╝  ╚═╝",
     ];
 
-    // ✅ 수정: logger 메서드 직접 사용
     bannerLines.forEach((line) => {
-      console.log(logger.gradient(line, "cyan", "magenta"));
+      console.log(line);
     });
 
     console.log();
     console.log(
-      logger.rainbow(
-        "🌈 ═══════════════════════════════════════════════════════════════ 🌈"
-      )
+      "🌈 ═══════════════════════════════════════════════════════════════ 🌈"
     );
+    console.log("                      🚀 두목봇 v3.0.1 시작 🚀");
+    console.log("                   직장인을 위한 스마트 어시스턴트");
     console.log(
-      logger.gradient(
-        "                    두목봇 v3.0.1 알록달록 에디션",
-        "cyan",
-        "magenta"
-      )
-    );
-    console.log(
-      logger.gradient(
-        "                     Enhanced with SimpleLogger",
-        "purple",
-        "blue"
-      )
-    );
-    console.log(
-      logger.rainbow(
-        "🌈 ═══════════════════════════════════════════════════════════════ 🌈"
-      )
+      "🌈 ═══════════════════════════════════════════════════════════════ 🌈"
     );
     console.log();
   }
 
   /**
-   * 📋 환경 정보 표시 (수정된 버전)
+   * 🌍 환경 정보 표시
    */
   showEnvironmentInfo() {
-    console.log(logger.rainbow("📋 ═══ 환경 정보 ═══"));
-
-    const envInfo = {
-      "🌍 환경": process.env.NODE_ENV || "production",
-      "🟢 Node.js": process.version,
-      "💾 메모리": `${Math.round(
-        process.memoryUsage().heapUsed / 1024 / 1024
-      )}MB`,
-      "🖥️ 플랫폼": `${process.platform} ${process.arch}`,
-      "🆔 PID": process.pid,
-      "⏰ 시작 시간": TimeHelper.format(new Date(), "full"),
-    };
-
-    for (const [key, value] of Object.entries(envInfo)) {
-      console.log(logger.gradient(`   ${key}: ${value}`, "blue", "cyan"));
-    }
-
-    // Railway 환경 감지
-    if (process.env.RAILWAY_ENVIRONMENT_NAME) {
-      console.log();
-      console.log(logger.gradient("🚂 Railway 환경 감지!", "green", "blue"));
-      console.log(
-        logger.gradient(
-          `   프로젝트: ${process.env.RAILWAY_ENVIRONMENT_NAME}`,
-          "cyan",
-          "purple"
-        )
-      );
-    }
-
-    console.log(logger.rainbow("📋 ═══════════════"));
+    console.log("📋 ═══ 환경 정보 ═══");
+    console.log(`🌍 NODE_ENV: ${process.env.NODE_ENV || "development"}`);
+    console.log(
+      `🚂 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "활성" : "비활성"}`
+    );
+    console.log(`📊 Node.js: ${process.version}`);
+    console.log(
+      `💾 메모리: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+    );
+    console.log(`⏰ 시간대: ${TimeHelper.getTimeZone()}`);
+    console.log(`📅 현재: ${TimeHelper.format(new Date(), "full")}`);
+    console.log("📋 ═════════════════");
     console.log();
   }
 
   /**
-   * 🚀 시작 시퀀스 실행 (수정된 버전)
+   * 🚀 시작 시퀀스 실행
    */
   async executeStartupSequence() {
+    console.log("🚀 ═══ 시작 시퀀스 ═══");
+
     const steps = [
       { name: "환경 변수 검증", fn: () => this.validateEnvironment() },
       { name: "모듈 레지스트리 확인", fn: () => this.checkModuleRegistry() },
@@ -243,48 +117,35 @@ class DooMockBot {
         name: "BotController 초기화",
         fn: () => this.initializeBotController(),
       },
-      { name: "봇 시작", fn: () => this.startBot() },
+      { name: "봇 서비스 시작", fn: () => this.startBot() },
       { name: "프로세스 핸들러 설정", fn: () => this.setupProcessHandlers() },
     ];
 
-    console.log(logger.rainbow("🚀 ═══ 시작 시퀀스 ═══"));
-
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
-
       try {
-        console.log(
-          logger.gradient(`${i + 1}. ${step.name} 중...`, "yellow", "orange")
-        );
+        console.log(`   ⚙️ ${step.name} 중...`);
 
         if (typeof step.fn === "function") {
           await step.fn();
         }
 
-        console.log(
-          logger.gradient(`   ✅ ${step.name} 완료`, "green", "blue")
-        );
+        console.log(`   ✅ ${step.name} 완료`);
 
         // 진행률 표시
         this.showProgressBar(i + 1, steps.length);
       } catch (error) {
-        console.log(
-          logger.gradient(
-            `   ❌ ${step.name} 실패: ${error.message}`,
-            "red",
-            "orange"
-          )
-        );
+        console.log(`   ❌ ${step.name} 실패: ${error.message}`);
         throw error;
       }
     }
 
     this.isInitialized = true;
-    console.log(logger.rainbow("🚀 ═════════════════"));
+    console.log("🚀 ═════════════════");
   }
 
   /**
-   * 📊 진행률 바 표시 (수정된 버전)
+   * 📊 진행률 바 표시
    */
   showProgressBar(current, total, width = 30) {
     const percentage = Math.round((current / total) * 100);
@@ -294,13 +155,7 @@ class DooMockBot {
     const filledBar = "█".repeat(filled);
     const emptyBar = "░".repeat(empty);
 
-    console.log(
-      logger.gradient(
-        `   [${filledBar}${emptyBar}] ${percentage}%`,
-        "cyan",
-        "purple"
-      )
-    );
+    console.log(`   [${filledBar}${emptyBar}] ${percentage}%`);
   }
 
   /**
@@ -323,49 +178,54 @@ class DooMockBot {
       throw new Error("유효하지 않은 텔레그램 봇 토큰 형식");
     }
 
-    console.log(
-      logger.gradient("   ✅ 모든 환경 변수 검증 완료", "green", "blue")
-    );
+    console.log("   ✅ 모든 환경 변수 검증 완료");
+  }
+
+  /**
+   * 📦 모듈 레지스트리 확인
+   */
+  async checkModuleRegistry() {
+    const registryStats = getRegistryStats();
+
+    console.log(`   📊 총 모듈: ${registryStats.totalModules}개`);
+    console.log(`   ✅ 활성화: ${registryStats.enabledModules}개`);
+    console.log(`   ⭐ Enhanced: ${registryStats.enhancedModules}개`);
+
+    if (registryStats.totalModules === 0) {
+      throw new Error("등록된 모듈이 없습니다");
+    }
+
+    if (registryStats.enabledModules === 0) {
+      throw new Error("활성화된 모듈이 없습니다");
+    }
   }
 
   /**
    * 🤖 BotController 생성
    */
   async createBotController() {
-    console.log(
-      logger.gradient(
-        "   🔧 BotController 인스턴스 생성 중...",
-        "purple",
-        "pink"
-      )
-    );
+    console.log("   🔧 BotController 인스턴스 생성 중...");
     this.botController = new BotController();
-    console.log(
-      logger.gradient("   ✅ BotController 생성 완료", "green", "blue")
-    );
+    console.log("   ✅ BotController 생성 완료");
   }
 
   /**
    * 🎯 BotController 초기화
    */
   async initializeBotController() {
-    console.log(
-      logger.gradient("   ⚙️ BotController 초기화 중...", "blue", "purple")
-    );
+    console.log("   ⚙️ BotController 초기화 중...");
     await this.botController.initialize();
-    console.log(
-      logger.gradient("   ✅ BotController 초기화 완료", "green", "blue")
-    );
+    console.log("   ✅ BotController 초기화 완료");
   }
 
   /**
    * 🚀 봇 시작
    */
   async startBot() {
-    console.log(logger.gradient("   🚀 봇 서비스 시작 중...", "green", "blue"));
+    console.log("   🚀 봇 서비스 시작 중...");
     await this.botController.start();
     this.isRunning = true;
-    console.log(logger.gradient("   ✅ 봇 서비스 시작 완료", "green", "blue"));
+    console.log("   ✅ 봇 서비스 시작 완료");
   }
 
   /**
@@ -378,48 +238,30 @@ class DooMockBot {
 
     // 예외 처리
     process.on("uncaughtException", (error) => {
-      logger.fatal("예상치 못한 예외:", error);
+      logger.error("예상치 못한 예외:", error);
       this.handleCriticalError(error);
     });
 
     process.on("unhandledRejection", (reason, promise) => {
-      logger.fatal("처리되지 않은 Promise 거부:", { reason, promise });
+      logger.error("처리되지 않은 Promise 거부:", { reason, promise });
       this.handleCriticalError(new Error(`Unhandled rejection: ${reason}`));
     });
 
-    console.log(
-      logger.gradient("   ✅ 프로세스 핸들러 설정 완료", "green", "blue")
-    );
+    console.log("   ✅ 프로세스 핸들러 설정 완료");
   }
 
   /**
-   * 🎉 시작 완료 표시 (수정된 버전)
+   * 🎉 시작 완료 표시
    */
   showStartupComplete() {
     console.log();
     console.log(
-      logger.rainbow(
-        "🎉 ═══════════════════════════════════════════════════════════════ 🎉"
-      )
+      "🎉 ═══════════════════════════════════════════════════════════════ 🎉"
     );
+    console.log("                    🎊 두목봇 시작 완료! 🎊");
+    console.log("                 텔레그램에서 봇과 대화하세요!");
     console.log(
-      logger.gradient(
-        "                    🎊 두목봇 시작 완료! 🎊",
-        "green",
-        "blue"
-      )
-    );
-    console.log(
-      logger.gradient(
-        "                 텔레그램에서 봇과 대화하세요!",
-        "cyan",
-        "purple"
-      )
-    );
-    console.log(
-      logger.rainbow(
-        "🎉 ═══════════════════════════════════════════════════════════════ 🎉"
-      )
+      "🎉 ═══════════════════════════════════════════════════════════════ 🎉"
     );
     console.log();
 
@@ -431,7 +273,7 @@ class DooMockBot {
   }
 
   /**
-   * 🎊 시작 성공 통계 (수정된 버전)
+   * 🎊 시작 성공 통계
    */
   showStartupSuccess() {
     const startupTime = Date.now() - this.startTime;
@@ -439,41 +281,25 @@ class DooMockBot {
       process.memoryUsage().heapUsed / 1024 / 1024
     );
 
-    console.log(logger.rainbow("📊 ═══ 시작 통계 ═══"));
-    console.log(
-      logger.gradient(`⚡ 시작 시간: ${startupTime}ms`, "green", "blue")
-    );
-    console.log(
-      logger.gradient(`💾 메모리 사용: ${memoryUsage}MB`, "cyan", "purple")
-    );
-    console.log(
-      logger.gradient(
-        `🔄 재시작 횟수: ${this.stats.restartCount}회`,
-        "yellow",
-        "orange"
-      )
-    );
-    console.log(
-      logger.gradient(
-        `❌ 크리티컬 오류: ${this.stats.criticalErrors}건`,
-        "red",
-        "orange"
-      )
-    );
-    console.log(logger.rainbow("📊 ═════════════════"));
+    console.log("📊 ═══ 시작 통계 ═══");
+    console.log(`⚡ 시작 시간: ${startupTime}ms`);
+    console.log(`💾 메모리 사용: ${memoryUsage}MB`);
+    console.log(`🔄 재시작 횟수: ${this.stats.restartCount}회`);
+    console.log(`❌ 크리티컬 오류: ${this.stats.criticalErrors}건`);
+    console.log("📊 ═════════════════");
   }
 
   /**
-   * 🎨 운영 상태 표시 (수정된 버전)
+   * 🎨 운영 상태 표시
    */
   showOperationalStatus() {
     console.log();
-    console.log(logger.rainbow("🎨 ═══ 운영 상태 ═══"));
-    console.log(logger.gradient("🟢 봇 서비스: 정상 운영", "green", "blue"));
-    console.log(logger.gradient("🌈 Logger: 활성화", "purple", "pink"));
-    console.log(logger.gradient("📱 사용자 요청: 대기 중", "cyan", "purple"));
-    console.log(logger.gradient("💫 상태: 최적화됨", "yellow", "orange"));
-    console.log(logger.rainbow("🎨 ═════════════════"));
+    console.log("🎨 ═══ 운영 상태 ═══");
+    console.log("🟢 봇 서비스: 정상 운영");
+    console.log("🌈 Logger: 활성화");
+    console.log("📱 사용자 요청: 대기 중");
+    console.log("💫 상태: 최적화됨");
+    console.log("🎨 ═════════════════");
     console.log();
   }
 
@@ -496,47 +322,27 @@ class DooMockBot {
    * 🔥 시작 오류 처리
    */
   async handleStartupError(error) {
-    console.log(
-      logger.gradient(
-        "💥 ══════════════════════════════════════════════════",
-        "red",
-        "orange"
-      )
-    );
-    console.log(
-      logger.gradient(
-        "💀 FATAL ERROR - 애플리케이션 시작 실패",
-        "red",
-        "darkred"
-      )
-    );
-    console.log(logger.gradient(`💀 오류: ${error.message}`, "red", "orange"));
+    console.log("💥 ══════════════════════════════════════════════════");
+    console.log("💀 FATAL ERROR - 애플리케이션 시작 실패");
+    console.log(`💀 오류: ${error.message}`);
 
     if (error.stack) {
       console.log("📋 스택 트레이스:");
       console.log(error.stack);
     }
 
-    console.log(
-      logger.gradient("💀 프로세스를 종료합니다...", "red", "darkred")
-    );
-    console.log(
-      logger.gradient(
-        "💀 ══════════════════════════════════════════════════",
-        "red",
-        "orange"
-      )
-    );
+    console.log("💀 프로세스를 종료합니다...");
+    console.log("💀 ══════════════════════════════════════════════════");
 
     process.exit(1);
   }
 
   /**
-   * 🛑 우아한 종료 (수정된 버전)
+   * 🛑 우아한 종료
    */
   async shutdown(signal) {
-    console.log(logger.rainbow(`🛑 ═══ ${signal} 신호 수신 ═══`));
-    console.log(logger.gradient("우아한 종료 시작...", "yellow", "red"));
+    console.log(`🛑 ═══ ${signal} 신호 수신 ═══`);
+    console.log("우아한 종료 시작...");
 
     try {
       this.stats.gracefulShutdowns++;
@@ -544,22 +350,20 @@ class DooMockBot {
       // 정리 작업
       await this.cleanup();
 
-      console.log(logger.gradient("✅ 우아한 종료 완료", "green", "blue"));
-      console.log(logger.rainbow("✅ ══════════════════"));
+      console.log("✅ 우아한 종료 완료");
+      console.log("✅ ══════════════════");
 
       logger.success("✅ 정상 종료 완료");
       process.exit(0);
     } catch (error) {
-      console.log(
-        logger.gradient(`❌ 종료 중 오류: ${error.message}`, "red", "orange")
-      );
+      console.log(`❌ 종료 중 오류: ${error.message}`);
       logger.error("종료 중 오류:", error);
       process.exit(1);
     }
   }
 
   /**
-   * 🧹 정리 작업 (수정된 버전)
+   * 🧹 정리 작업
    */
   async cleanup() {
     try {
