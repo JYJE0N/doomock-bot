@@ -1,15 +1,17 @@
-// doomock_bot.js - messageSystem 오류 수정된 버전
+// doomock_bot.js - 수정된 버전 (임포트 통일)
 require("dotenv").config();
 const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
-const ModuleRegistry = require("./src/config/ModuleRegistry");
+// ✅ 수정: 임포트 방식 통일 (필요한 함수만 디스트럭처링)
+const { getRegistryStats } = require("./src/config/ModuleRegistry");
 const TimeHelper = require("./src/utils/TimeHelper");
 
 /**
  * 🚀 DooMockBot v3.0.1 - 수정된 버전
  *
  * ✨ 수정사항:
- * - messageSystem 오류 해결
+ * - 임포트 방식 통일
+ * - 변수명 일관성 확보
  * - logger 메서드 직접 사용
  * - 안정성 향상
  */
@@ -38,6 +40,88 @@ class DooMockBot {
 
     // ✅ 수정: logger 메서드 직접 사용
     console.log(logger.rainbow("🤖 DooMockBot v3.0.1 인스턴스 생성됨"));
+  }
+
+  /**
+   * 📦 모듈 레지스트리 확인 (수정된 버전)
+   *
+   * ✅ 수정사항:
+   * - 올바른 함수 호출
+   * - 변수명 통일
+   * - 상세한 검증 로직
+   */
+  async checkModuleRegistry() {
+    try {
+      // ✅ 수정: getRegistryStats() 직접 호출
+      const registryStats = getRegistryStats();
+
+      console.log(
+        logger.gradient("   📋 모듈 레지스트리 검증 중...", "cyan", "purple")
+      );
+
+      console.log(
+        logger.gradient(
+          `   📊 총 모듈: ${registryStats.totalModules}개`,
+          "blue",
+          "cyan"
+        )
+      );
+      console.log(
+        logger.gradient(
+          `   ✅ 활성화: ${registryStats.enabledModules}개`,
+          "green",
+          "blue"
+        )
+      );
+      console.log(
+        logger.gradient(
+          `   ⭐ Enhanced: ${registryStats.enhancedModules}개`,
+          "yellow",
+          "orange"
+        )
+      );
+
+      // ✅ 검증 로직
+      if (registryStats.totalModules === 0) {
+        throw new Error(
+          "🚨 등록된 모듈이 없습니다. ModuleRegistry.js를 확인하세요."
+        );
+      }
+
+      if (registryStats.enabledModules === 0) {
+        throw new Error("⚠️ 활성화된 모듈이 없습니다. 환경변수를 확인하세요.");
+      }
+
+      // 📈 성능 지표
+      const successRate =
+        registryStats.totalModules > 0
+          ? Math.round(
+              (registryStats.enabledModules / registryStats.totalModules) * 100
+            )
+          : 0;
+
+      console.log(
+        logger.gradient(
+          `   📈 모듈 활성화율: ${successRate}%`,
+          successRate > 80 ? "green" : successRate > 50 ? "yellow" : "red",
+          "blue"
+        )
+      );
+
+      // ✅ 검증 완료
+      console.log(logger.rainbow("   🎯 모듈 레지스트리 검증 완료!"));
+
+      return registryStats;
+    } catch (error) {
+      console.log(
+        logger.gradient(
+          `   ❌ 모듈 레지스트리 검증 실패: ${error.message}`,
+          "red",
+          "orange"
+        )
+      );
+      throw error;
+    }
   }
 
   /**
@@ -242,43 +326,6 @@ class DooMockBot {
     console.log(
       logger.gradient("   ✅ 모든 환경 변수 검증 완료", "green", "blue")
     );
-  }
-
-  /**
-   * 📦 모듈 레지스트리 확인
-   */
-  async checkModuleRegistry() {
-    const stats = ModuleRegistry.getRegistryStats();
-
-    console.log(
-      logger.gradient(
-        `   📊 총 모듈: ${registryStats.totalModules}개`,
-        "blue",
-        "cyan"
-      )
-    );
-    console.log(
-      logger.gradient(
-        `   ✅ 활성화: ${registryStats.enabledModules}개`,
-        "green",
-        "blue"
-      )
-    );
-    console.log(
-      logger.gradient(
-        `   ⭐ Enhanced: ${registryStats.enhancedModules}개`,
-        "yellow",
-        "orange"
-      )
-    );
-
-    if (registryStats.totalModules === 0) {
-      throw new Error("등록된 모듈이 없습니다");
-    }
-
-    if (registryStats.enabledModules === 0) {
-      throw new Error("활성화된 모듈이 없습니다");
-    }
   }
 
   /**
