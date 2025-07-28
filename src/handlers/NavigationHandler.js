@@ -162,37 +162,57 @@ class NavigationHandler {
   }
 
   async showMainMenu(ctx) {
-    try {
-      const modules = getEnabledModules().filter((m) => m.key !== "system");
-      const userName = getUserName(ctx.from || ctx.callbackQuery.from);
-      const version = this.escapeMarkdownV2("3.0.1");
-      const menuText = `🤖 *두목봇 ${version}*\n\n안녕하세요 ${this.escapeMarkdownV2(
-        userName
-      )}님\\! 👋\n\n무엇을 도와드릴까요\\?\n\n_모듈을 선택하세요:_`;
+    const userName = getUserName(ctx.from);
+    const chatId = ctx.chat?.id || ctx.from.id;
 
-      const moduleButtons = [];
-      for (let i = 0; i < modules.length; i += 2) {
-        const row = modules.slice(i, i + 2).map((module) => {
-          const icon = module.config?.icon || "▫️";
-          return {
-            text: `${icon} ${module.name}`,
-            callback_data: `${module.key}:menu`,
-          };
+    const menuText = `🤖 *두목봇 3\\.0\\.1*
+
+안녕하세요 ${this.escapeMarkdownV2(userName)}님\\! 👋
+
+무엇을 도와드릴까요\\?
+
+모듈을 선택하세요\\:`;
+
+    const enabledModules = getEnabledModules();
+    const keyboard = { inline_keyboard: [] };
+
+    // 모듈 버튼 생성 (2열씩)
+    for (let i = 0; i < enabledModules.length; i += 2) {
+      const row = [];
+
+      // 첫 번째 모듈
+      const module1 = enabledModules[i];
+      const icon1 = this.getModuleIcon(module1.key);
+      const name1 = this.getModuleName(module1.key);
+
+      row.push({
+        text: `${icon1} ${name1}`,
+        callback_data: `${module1.key}:menu`,
+      });
+
+      // 두 번째 모듈 (있으면)
+      if (i + 1 < enabledModules.length) {
+        const module2 = enabledModules[i + 1];
+        const icon2 = this.getModuleIcon(module2.key);
+        const name2 = this.getModuleName(module2.key);
+
+        row.push({
+          text: `${icon2} ${name2}`,
+          callback_data: `${module2.key}:menu`,
         });
-        moduleButtons.push(row);
       }
 
-      const systemButtons = [
-        [
-          { text: "❓ 도움말", callback_data: "system:help" },
-          { text: "ℹ️ 정보", callback_data: "system:about" },
-          { text: "📊 상태", callback_data: "system:status" },
-        ],
-      ];
-      const keyboard = {
-        inline_keyboard: [...moduleButtons, ...systemButtons],
-      };
+      keyboard.inline_keyboard.push(row);
+    }
 
+    // 하단 시스템 버튼들
+    keyboard.inline_keyboard.push([
+      { text: "❓ 도움말", callback_data: "system:help" },
+      { text: "ℹ️ 정보", callback_data: "system:info" },
+      { text: "📊 상태", callback_data: "system:status" },
+    ]);
+
+    try {
       if (ctx.callbackQuery) {
         await ctx.editMessageText(menuText, {
           parse_mode: "MarkdownV2",
@@ -205,13 +225,41 @@ class NavigationHandler {
         });
       }
     } catch (error) {
-      if (error.message.includes("message is not modified")) {
-        logger.warn("내용이 동일하여 메시지를 수정하지 않았습니다.");
-      } else {
-        logger.error("메인 메뉴 표시 실패:", error);
-        await this.showNavigationError(ctx, error);
-      }
+      logger.error("메인 메뉴 표시 오류:", error);
+      await ctx.reply("메뉴를 표시하는 중 오류가 발생했습니다.");
     }
+  }
+
+  // 모듈 아이콘 가져오기
+  getModuleIcon(moduleKey) {
+    const icons = {
+      system: "⚙️",
+      todo: "📋",
+      timer: "⏰",
+      worktime: "🏢",
+      leave: "🏖️",
+      reminder: "🔔",
+      fortune: "🔮",
+      weather: "🌤️",
+      tts: "🔊",
+    };
+    return icons[moduleKey] || "📱";
+  }
+
+  // 모듈 이름 가져오기
+  getModuleName(moduleKey) {
+    const names = {
+      system: "시스템",
+      todo: "할일 관리",
+      timer: "타이머",
+      worktime: "근무시간 관리",
+      leave: "휴가 관리",
+      reminder: "리마인더",
+      fortune: "운세",
+      weather: "날씨",
+      tts: "음성 변환",
+    };
+    return names[moduleKey] || moduleKey;
   }
 
   async showNavigationError(ctx, error) {
