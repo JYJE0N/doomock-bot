@@ -10,10 +10,20 @@ class TodoModule extends BaseModule {
   }
 
   async onInitialize() {
-    // TodoService는 ServiceBuilder를 통해 주입됩니다.
-    this.todoService = this.serviceBuilder.getService("todo");
-    this.setupActions();
-    logger.success("✅ TodoModule 초기화 완료.");
+    try {
+      logger.module("TodoModule", "초기화 시작");
+
+      // TodoService 초기화
+      this.todoService = await this.serviceBuilder.getOrCreate("todo", {
+        config: this.config,
+      });
+      await this.todoService.initialize();
+
+      logger.success("TodoSModule 초기화 완료");
+    } catch (error) {
+      logger.error("TodoModule 초기화 실패", error);
+      throw error;
+    }
   }
 
   setupActions() {

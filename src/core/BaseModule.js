@@ -1,149 +1,130 @@
-// src/core/BaseModule.js - 간단한 버전
+// src/core/BaseModule.js - 최종 수정 버전
+
 const logger = require("../utils/Logger");
 
 /**
- * 🏗️ BaseModule - 모든 모듈의 부모 클래스
+ * 모든 모듈의 기반이 되는 클래스.
+ * 공통 기능(초기화, 액션 등록, 상태 관리 등)을 제공합니다.
  */
 class BaseModule {
-  constructor(moduleName, options = {}) {
-    this.moduleName = moduleName;
-    this.bot = options.bot;
-    this.db = options.db;
-    this.moduleManager = options.moduleManager;
-    this.config = options.config || {};
+  /**
+   * @param {string} moduleName 모듈의 이름
+   * @param {object} options 모듈에 필요한 옵션 객체
+   * @param {Telegraf} options.bot Telegraf 봇 인스턴스
+   * @param {ModuleManager} options.moduleManager 모듈 매니저 인스턴스
+   * @param {ServiceBuilder} options.serviceBuilder 서비스 빌더 인스턴스
+   * @param {object} options.config 모듈 설정 객체
+   */
+  constructor(moduleName, { bot, moduleManager, config, serviceBuilder }) {
+    // <--- serviceBuilder를 받도록 수정
+    if (new.target === BaseModule) {
+      throw new TypeError("BaseModule은 직접 인스턴스화할 수 없습니다.");
+    }
 
-    // 액션 맵
+    this.moduleName = moduleName;
+    this.bot = bot;
+    this.moduleManager = moduleManager;
+    this.serviceBuilder = serviceBuilder; // <--- 전달받은 serviceBuilder를 저장
+    this.config = config || {};
+    this.isInitialized = false;
     this.actionMap = new Map();
 
-    // 사용자 상태
-    this.userStates = new Map();
-
-    // 통계
     this.stats = {
-      callbacksHandled: 0,
       messagesHandled: 0,
+      callbacksHandled: 0,
       errorsCount: 0,
     };
-
-    this.isInitialized = false;
-    logger.info(`🏗️ ${moduleName} 모듈 생성됨`);
   }
 
   /**
-   * 초기화
+   * 모듈의 초기화 로직을 수행합니다.
+   * 이 메서드는 ModuleManager에 의해 자동으로 호출됩니다.
    */
   async initialize() {
-    if (this.isInitialized) {
-      return;
-    }
-
     try {
-      logger.info(`🎯 ${this.moduleName} 초기화 시작...`);
-
-      // 자식 클래스의 초기화
-      if (this.onInitialize) {
-        await this.onInitialize();
-      }
-
-      // 액션 설정
-      if (this.setupActions) {
-        this.setupActions();
-      }
-
+      await this.onInitialize();
       this.isInitialized = true;
-      logger.success(`✅ ${this.moduleName} 초기화 완료`);
     } catch (error) {
-      logger.error(`❌ ${this.moduleName} 초기화 실패:`, error);
+      logger.error(`[${this.moduleName}] 초기화 중 오류 발생:`, error);
       throw error;
     }
   }
 
   /**
-   * 액션 등록
+   * 각 모듈에서 재정의할 실제 초기화 로직.
+   */
+  async onInitialize() {
+    // 각 하위 모듈에서 이 메서드를 구현합니다.
+  }
+
+  /**
+   * 액션을 등록하여 콜백 데이터와 핸들러 함수를 매핑합니다.
+   * @param {object} actions - { actionName: handlerFunction } 형태의 객체
    */
   registerActions(actions) {
-    for (const [action, handler] of Object.entries(actions)) {
-      this.actionMap.set(action, handler.bind(this));
+    for (const [actionName, handler] of Object.entries(actions)) {
+      if (typeof handler === "function") {
+        this.actionMap.set(actionName, handler.bind(this));
+      }
     }
   }
 
   /**
-   * 콜백 처리
+   * 콜백 쿼리를 처리하는 중앙 핸들러.
+   * 콜백 데이터를 기반으로 등록된 액션을 찾아 실행합니다.
    */
-  /**
-   * 콜백 처리
-   */
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleCallback(bot, callbackQuery, subAction, params) {
     try {
-      this.stats.callbacksHandled++;
-
       const handler = this.actionMap.get(subAction);
       if (handler) {
-        // [수정] 핸들러의 결과(UI 데이터)를 반환하도록 변경
-        return await handler(
-          bot,
-          callbackQuery,
-          subAction,
-          params,
-          moduleManager
-        );
+        // 핸들러의 결과(UI 렌더링을 위한 데이터)를 반환합니다.
+        return await handler(bot, callbackQuery, params);
       } else {
-        logger.warn(`알 수 없는 액션: ${this.moduleName}:${subAction}`);
-        // [수정] 직접 응답하는 대신 에러 객체 반환
-        return { type: "error", message: "알 수 없는 명령입니다." };
+        logger.warn(`[${this.moduleName}] 알 수 없는 액션: ${subAction}`);
+        return {
+          type: "error",
+          message: `알 수 없는 명령입니다: ${subAction}`,
+        };
       }
     } catch (error) {
-      logger.error(`${this.moduleName} 콜백 처리 오류:`, error);
+      logger.error(`[${this.moduleName}] 콜백 처리 오류:`, error);
       this.stats.errorsCount++;
-
-      // [수정] 중복 호출되던 answerCallbackQuery 제거하고 에러 객체 반환
-      return { type: "error", message: "처리 중 오류가 발생했습니다." };
+      // 오류 발생 시에도 일관된 객체를 반환하여 NavigationHandler가 처리하도록 합니다.
+      return { type: "error", message: "모듈 처리 중 오류가 발생했습니다." };
     }
   }
 
-  /**
-   * 메시지 처리 가능 여부
-   */
-  async canHandleMessage(msg) {
-    // 기본적으로 false, 자식 클래스에서 구현
-    return false;
+  // 사용자별 모듈 상태 관련 헬퍼 함수
+  async getModuleState(userId) {
+    if (
+      this.moduleManager &&
+      typeof this.moduleManager.getUserState === "function"
+    ) {
+      return await this.moduleManager.getUserState(this.moduleName, userId);
+    }
+    return null;
   }
 
-  /**
-   * 메시지 편집 헬퍼
-   */
-  async editMessage(bot, chatId, messageId, text, options = {}) {
-    try {
-      await bot.telegram.editMessageText(chatId, messageId, null, text, {
-        parse_mode: "MarkdownV2",
-        ...options,
-      });
-    } catch (error) {
-      logger.error("메시지 편집 실패:", error);
+  async setModuleState(userId, state) {
+    if (
+      this.moduleManager &&
+      typeof this.moduleManager.setUserState === "function"
+    ) {
+      return await this.moduleManager.setUserState(
+        this.moduleName,
+        userId,
+        state
+      );
     }
   }
 
-  /**
-   * 메시지 전송 헬퍼
-   */
-  async sendMessage(bot, chatId, text, options = {}) {
-    try {
-      return await bot.telegram.sendMessage(chatId, text, {
-        parse_mode: "MarkdownV2",
-        ...options,
-      });
-    } catch (error) {
-      logger.error("메시지 전송 실패:", error);
+  async clearModuleState(userId) {
+    if (
+      this.moduleManager &&
+      typeof this.moduleManager.clearUserState === "function"
+    ) {
+      return await this.moduleManager.clearUserState(this.moduleName, userId);
     }
-  }
-
-  /**
-   * 정리
-   */
-  async cleanup() {
-    logger.info(`🧹 ${this.moduleName} 정리 중...`);
-    this.userStates.clear();
-    this.actionMap.clear();
   }
 }
 
