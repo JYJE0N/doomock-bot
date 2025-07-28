@@ -64,32 +64,37 @@ class ModuleManager {
 
     for (const config of moduleConfigs) {
       try {
-        logger.module(`${config.key}`, "로드 중...");
+        logger.module(config.key, "로드 중...");
 
-        // 🔧 수정: 절대 경로로 변경
-        const modulePath = path.join(__dirname, config.path);
+        // 모듈 클래스 로드 - 더 안전한 방식
+        let ModuleClass;
 
-        // 모듈이 존재하는지 먼저 확인
         try {
-          require.resolve(modulePath);
-        } catch (e) {
-          logger.warn(
-            `❌ ${config.key} 모듈 파일을 찾을 수 없음: ${modulePath}`
-          );
-
-          // SystemModule이 없어도 계속 진행
-          if (config.key === "system") {
-            logger.info("시스템 모듈 스킵 (선택사항)");
-            continue;
+          // 경로 확인 및 로드
+          if (!config.path) {
+            throw new Error(`${config.key} 모듈의 경로가 정의되지 않음`);
           }
 
-          this.stats.failedModules++;
-          continue;
+          // 경로 디버깅
+          logger.debug(`📁 ${config.key} 모듈 경로: ${config.path}`);
+
+          // require는 .js 확장자를 자동으로 추가함
+          ModuleClass = require(config.path);
+        } catch (requireError) {
+          // 모듈 파일을 찾을 수 없는 경우
+          if (requireError.code === "MODULE_NOT_FOUND") {
+            logger.warn(
+              `❌ ${config.key} 모듈 파일을 찾을 수 없음: ${config.path}`
+            );
+
+            // SystemModule은 선택사항
+            if (config.key === "system") {
+              logger.info("시스템 모듈 스킵 (선택사항)");
+              continue;
+            }
+          }
+          throw requireError;
         }
-
-        // 모듈 클래스 로드
-
-        const ModuleClass = require(modulePath);
 
         // 모듈 인스턴스 생성
         const moduleInstance = new ModuleClass(this.bot, {
@@ -115,6 +120,12 @@ class ModuleManager {
       } catch (error) {
         logger.error(`❌ ${config.key} 모듈 로드 실패`, error);
         this.stats.failedModules++;
+
+        // 필수 모듈이 실패하면 전체 중단
+        if (config.enhanced) {
+          logger.error(`필수 모듈 ${config.key} 로드 실패로 초기화 중단`);
+          throw error;
+        }
       }
     }
 

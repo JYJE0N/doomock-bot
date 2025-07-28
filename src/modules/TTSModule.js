@@ -262,6 +262,100 @@ class TTSModule extends BaseModule {
   }
 
   /**
+   * 변환 기록 표시
+   */
+  async showHistory(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    logger.navigation("tts", "history", userId);
+
+    try {
+      // 변환 기록 조회 (서비스에 구현되어 있다면)
+      const history = (await this.ttsService.getUserHistory?.(userId)) || [];
+
+      if (history.length === 0) {
+        return {
+          type: "empty",
+          module: "tts",
+          message: "아직 변환 기록이 없습니다.",
+        };
+      }
+
+      return {
+        type: "list",
+        module: "tts",
+        data: {
+          title: "🕒 변환 기록",
+          items: history.map((item) => ({
+            id: item._id,
+            title:
+              item.text.substring(0, 50) + (item.text.length > 50 ? "..." : ""),
+            description: `${item.language} | ${new Date(
+              item.createdAt
+            ).toLocaleDateString()}`,
+          })),
+        },
+      };
+    } catch (error) {
+      logger.error("변환 기록 조회 실패", error);
+      return { type: "error", message: "기록을 불러올 수 없습니다." };
+    }
+  }
+
+  /**
+   * 설정 표시
+   */
+  async showSettings(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    logger.navigation("tts", "settings", userId);
+
+    try {
+      // 사용자 설정 조회
+      const userSettings = (await this.ttsService.getUserSettings?.(
+        userId
+      )) || {
+        defaultLanguage: this.config.defaultLanguage,
+        defaultVoice: this.config.voiceName,
+        autoDelete: false,
+      };
+
+      return {
+        type: "settings",
+        module: "tts",
+        data: {
+          title: "⚙️ TTS 설정",
+          settings: [
+            {
+              key: "language",
+              label: "기본 언어",
+              value: userSettings.defaultLanguage,
+              options: ["ko-KR", "en-US", "ja-JP", "zh-CN"],
+            },
+            {
+              key: "voice",
+              label: "기본 음성",
+              value: userSettings.defaultVoice,
+              options: ["Wavenet-A", "Wavenet-B", "Wavenet-C", "Wavenet-D"],
+            },
+            {
+              key: "autoDelete",
+              label: "자동 삭제",
+              value: userSettings.autoDelete,
+              type: "boolean",
+            },
+          ],
+        },
+      };
+    } catch (error) {
+      logger.error("설정 조회 실패", error);
+      return { type: "error", message: "설정을 불러올 수 없습니다." };
+    }
+  }
+
+  /**
    * 도움말
    */
   async showHelp(bot, callbackQuery, subAction, params, moduleManager) {

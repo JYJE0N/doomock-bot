@@ -51,6 +51,8 @@ class TTSService {
     });
   }
 
+  // src/services/TTSService.js의 initialize() 메서드를 이 코드로 교체하세요
+
   /**
    * 초기화
    */
@@ -61,72 +63,108 @@ class TTSService {
       logger.info("🚂 TTS 서비스 초기화", {
         environment: isRailway ? "Railway" : "Local",
         hasProjectId: !!this.config.projectId,
-        hasCredentials: !!(
-          process.env.GOOGLE_CLIENT_EMAIL ||
-          process.env.GOOGLE_APPLICATION_CREDENTIALS
-        ),
+        hasClientEmail: !!process.env.GOOGLE_CLIENT_EMAIL,
+        hasPrivateKey: !!process.env.GOOGLE_PRIVATE_KEY,
+        hasCredentialsFile: !!process.env.GOOGLE_APPLICATION_CREDENTIALS,
       });
 
-      if (isRailway) {
-        // Railway 환경
-        if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
-          const credentials = {
-            type: "service_account",
-            project_id: this.config.projectId,
-            client_email: process.env.GOOGLE_CLIENT_EMAIL,
-            private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
-          };
+      // 방법 1: 환경변수 직접 사용 (Railway, Local 모두 가능)
+      if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+        logger.info("🔑 환경변수 방식으로 인증 시도");
 
-          // 텍스트→음성 클라이언트 생성
-          this.googleTTSClient = new GoogleTextToSpeech.TextToSpeechClient({
-            projectId: this.config.projectId,
-            credentials: credentials,
-          });
+        const credentials = {
+          type: "service_account",
+          project_id: this.config.projectId,
+          private_key_id: process.env.GOOGLE_PRIVATE_KEY_ID || "",
+          private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+          client_email: process.env.GOOGLE_CLIENT_EMAIL,
+          client_id: process.env.GOOGLE_CLIENT_ID || "",
+          auth_uri: "https://accounts.google.com/o/oauth2/auth",
+          token_uri: "https://oauth2.googleapis.com/token",
+          auth_provider_x509_cert_url:
+            "https://www.googleapis.com/oauth2/v1/certs",
+          client_x509_cert_url: `https://www.googleapis.com/robot/v1/metadata/x509/${encodeURIComponent(
+            process.env.GOOGLE_CLIENT_EMAIL
+          )}`,
+        };
 
-          // 음성→텍스트 클라이언트 생성 (선택사항)
-          this.googleSTTClient = new GoogleSpeechToText.SpeechClient({
-            projectId: this.config.projectId,
-            credentials: credentials,
-          });
+        // 텍스트→음성 클라이언트 생성
+        this.googleTTSClient = new GoogleTextToSpeech.TextToSpeechClient({
+          credentials: credentials,
+        });
 
-          logger.success("✅ Google Cloud 연결 성공", {
-            ttsClient: "활성화",
-            sttClient: "활성화",
-            projectId: this.maskString(this.config.projectId),
-          });
-        } else {
-          throw new Error("필수 환경변수가 설정되지 않았습니다");
-        }
-      } else {
-        // 로컬 환경
+        // 음성→텍스트 클라이언트 생성 (선택사항)
+        this.googleSTTClient = new GoogleSpeechToText.SpeechClient({
+          credentials: credentials,
+        });
+
+        logger.success("✅ Google Cloud 연결 성공 (환경변수 방식)");
+      } else if (process.env.GOOGLE_APPLICATION_CREDENTIALS) {
+        // 방법 2: 서비스 계정 키 파일 사용
+        logger.info("📄 파일 방식으로 인증 시도");
+
         const keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
 
-        if (!keyFilename) {
+        // 파일 존재 확인
+        const fs = require("fs");
+        if (!fs.existsSync(keyFilename)) {
           throw new Error(
-            "GOOGLE_APPLICATION_CREDENTIALS가 설정되지 않았습니다"
+            `서비스 계정 키 파일을 찾을 수 없습니다: ${keyFilename}`
           );
         }
 
         // 텍스트→음성 클라이언트
         this.googleTTSClient = new GoogleTextToSpeech.TextToSpeechClient({
-          projectId: this.config.projectId,
           keyFilename: keyFilename,
         });
 
         // 음성→텍스트 클라이언트
         this.googleSTTClient = new GoogleSpeechToText.SpeechClient({
-          projectId: this.config.projectId,
           keyFilename: keyFilename,
         });
 
-        logger.success("✅ Google Cloud 연결 성공 (로컬)");
+        logger.success("✅ Google Cloud 연결 성공 (파일 방식)");
+      } else {
+        // 인증 정보가 없는 경우
+        logger.warn("⚠️ Google Cloud 인증 정보가 없습니다");
+        logger.warn("다음 중 하나를 설정해주세요:");
+        logger.warn("1. GOOGLE_CLIENT_EMAIL과 GOOGLE_PRIVATE_KEY 환경변수");
+        logger.warn("2. GOOGLE_APPLICATION_CREDENTIALS 환경변수 (파일 경로)");
+
+        // 모의 클라이언트로 대체 (봇은 계속 실행)
+        this.googleTTSClient = {
+          synthesizeSpeech: async () => {
+            throw new Error(
+              "TTS 서비스가 설정되지 않았습니다. Google Cloud 인증이 필요합니다."
+            );
+          },
+          listVoices: async () => ({ voices: [] }),
+        };
+
+        this.googleSTTClient = null;
+
+        logger.warn("⚠️ TTS 서비스가 모의 모드로 실행됩니다");
       }
 
       // 캐시 디렉토리 생성
       await this.ensureCacheDirectory();
+
+      logger.success("✅ TTSService 초기화 완료");
     } catch (error) {
-      this.logSafeError("❌ TTSService 초기화 실패", error);
-      throw new Error("TTS 서비스 초기화에 실패했습니다");
+      this.logSafeError("❌ TTSService 초기화 중 오류", error);
+
+      // 초기화 실패해도 봇은 계속 실행되도록
+      logger.warn("⚠️ TTS 기능이 제한됩니다");
+
+      // 모의 클라이언트로 대체
+      this.googleTTSClient = {
+        synthesizeSpeech: async () => {
+          throw new Error("TTS 서비스를 사용할 수 없습니다");
+        },
+        listVoices: async () => ({ voices: [] }),
+      };
+
+      this.googleSTTClient = null;
     }
   }
 

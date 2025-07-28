@@ -333,44 +333,68 @@ class SystemModule extends BaseModule {
   // ===== 🔧 시스템 유틸리티 메서드들 =====
 
   /**
-   * 시스템 헬스 체크
+   * 🔍 시스템 헬스 체크 (수정된 버전)
    */
   async performSystemHealthCheck() {
     try {
-      const health = {
+      const checks = {
         database: false,
         modules: false,
         memory: false,
-        uptime: true,
+        uptime: false,
       };
 
-      // DB 연결 체크
-      if (this.db) {
+      // 1. 데이터베이스 체크
+      if (this.moduleManager?.db) {
         try {
-          await this.db.admin().ping();
-          health.database = true;
-        } catch (error) {
-          logger.warn("DB 연결 상태 불량", error.message);
+          await this.moduleManager.db.admin().ping();
+          checks.database = true;
+        } catch (e) {
+          logger.warn("DB 헬스 체크 실패");
         }
       }
 
-      // 모듈 상태 체크
-      if (this.moduleManager) {
+      // 2. 모듈 체크 - 초기화 중에는 건너뛰기
+      if (this.moduleManager?.getModuleCount) {
         const moduleCount = this.moduleManager.getModuleCount();
-        health.modules = moduleCount > 0;
+        checks.modules = moduleCount > 0;
+        logger.debug(`등록된 모듈: ${moduleCount}개`);
+      } else {
+        // 초기화 중이므로 모듈 체크 건너뛰기
+        checks.modules = true;
+        logger.debug("모듈 체크 건너뜀 (초기화 중)");
       }
 
-      // 메모리 체크 (1GB 이하)
+      // 3. 메모리 체크
       const memUsage = process.memoryUsage();
-      health.memory = memUsage.heapUsed < 1024 * 1024 * 1024;
+      const heapUsedMB = Math.round(memUsage.heapUsed / 1024 / 1024);
+      checks.memory = heapUsedMB < 500; // 500MB 미만
 
-      const overallHealth = Object.values(health).every((status) => status);
+      // 4. 업타임 체크
+      const uptimeSeconds = process.uptime();
+      checks.uptime = uptimeSeconds > 0;
 
-      logger.system("헬스 체크 완료", { health, overall: overallHealth });
-      return { ...health, overall: overallHealth };
+      // 결과 로깅
+      const healthStatus = Object.values(checks).every((v) => v)
+        ? "정상"
+        : "경고";
+
+      logger.module("SystemModule", `헬스 체크 완료: ${healthStatus}`, {
+        database: checks.database ? "✅" : "❌",
+        modules: checks.modules ? "✅" : "❌",
+        memory: `${heapUsedMB}MB`,
+        uptime: `${Math.round(uptimeSeconds)}초`,
+      });
+
+      return checks;
     } catch (error) {
       logger.error("헬스 체크 실패", error);
-      return { overall: false, error: error.message };
+      return {
+        database: false,
+        modules: false,
+        memory: false,
+        uptime: false,
+      };
     }
   }
 
