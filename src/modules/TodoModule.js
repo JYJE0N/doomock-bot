@@ -10,20 +10,18 @@ class TodoModule extends BaseModule {
   }
 
   async onInitialize() {
-    try {
-      logger.module("TodoModule", "초기화 시작");
+    // ServiceBuilder가 미리 만들어 둔 서비스 인스턴스를 이름으로 찾아옵니다.
+    this.todoService = this.serviceBuilder.getServiceInstance("todo");
 
-      // TodoService 초기화
-      this.todoService = await this.serviceBuilder.getOrCreate("todo", {
-        config: this.config,
-      });
-      await this.todoService.initialize();
-
-      logger.success("TodoSModule 초기화 완료");
-    } catch (error) {
-      logger.error("TodoModule 초기화 실패", error);
-      throw error;
+    if (!this.todoService) {
+      // 만약 서비스를 찾지 못했다면, 봇이 시작되지 않도록 치명적인 오류를 발생시킵니다.
+      throw new Error(
+        "TodoService 인스턴스를 ServiceBuilder에서 찾을 수 없습니다."
+      );
     }
+
+    this.setupActions();
+    logger.success("✅ TodoModule 초기화 완료.");
   }
 
   setupActions() {
