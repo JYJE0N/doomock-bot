@@ -159,17 +159,20 @@ class NavigationHandler {
    */
   async showMainMenu(ctx) {
     try {
-      const modules = getEnabledModules().filter((m) => !m.hidden);
+      const modules = getEnabledModules().filter((m) => m.key !== "system");
       const userName = getUserName(ctx.from || ctx.callbackQuery.from);
-      const version = this.escapeMarkdownV2("v3.0.1");
+      const version = this.escapeMarkdownV2(
+        process.env.npm_package_version || "3.0.1"
+      );
       const menuText = `🤖 *두목봇 ${version}*\n\n안녕하세요 ${this.escapeMarkdownV2(
         userName
       )}님\\! 👋\n\n무엇을 도와드릴까요\\?\n\n_모듈을 선택하세요:_`;
 
+      // ... (버튼 생성 로직은 동일) ...
       const moduleButtons = [];
       for (let i = 0; i < modules.length; i += 2) {
         const row = modules.slice(i, i + 2).map((module) => {
-          const icon = module.config?.icon || "▫️";
+          const icon = module.icon || "▫️";
           return {
             text: `${icon} ${module.name}`,
             callback_data: `${module.key}:menu`,
@@ -189,7 +192,6 @@ class NavigationHandler {
         inline_keyboard: [...moduleButtons, ...systemButtons],
       };
 
-      // 메시지 전송 (수정 또는 새로 보내기)
       if (ctx.callbackQuery) {
         await ctx.editMessageText(menuText, {
           parse_mode: "MarkdownV2",
@@ -205,6 +207,7 @@ class NavigationHandler {
       // [FIX] "message is not modified" 오류는 정상적인 상황이므로 무시합니다.
       if (error.message.includes("message is not modified")) {
         logger.warn("내용이 동일하여 메시지를 수정하지 않았습니다.");
+        // 여기서 아무것도 하지 않고 함수를 종료합니다.
       } else {
         logger.error("메인 메뉴 표시 실패:", error);
         await this.showNavigationError(ctx, error);
@@ -216,7 +219,8 @@ class NavigationHandler {
    * 🚨 사용자에게 오류 메시지를 안전하게 보여주는 기능
    */
   async showNavigationError(ctx, error) {
-    const errorText = `🚨 *오류 발생*\n\n요청을 처리하는 중 문제가 발생했습니다\.\n\n다시 시도하거나 메인 메뉴로 돌아가세요\.`;
+    // [FIX] 2차 오류 방지를 위해 모든 특수문자를 제거한 단순 텍스트로 변경
+    const errorText = `🚨 오류 발생\n\n요청 처리 중 문제가 발생했습니다.\n\n메인 메뉴로 돌아가 다시 시도해 주세요.`;
     const keyboard = {
       inline_keyboard: [
         [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
@@ -228,14 +232,11 @@ class NavigationHandler {
           ctx.chat.id,
           ctx.callbackQuery.message.message_id,
           undefined,
-          errorText,
-          { parse_mode: "MarkdownV2", reply_markup: keyboard }
+          errorText, // 일반 텍스트이므로 parse_mode 제거
+          { reply_markup: keyboard }
         );
       } else {
-        await ctx.reply(errorText, {
-          parse_mode: "MarkdownV2",
-          reply_markup: keyboard,
-        });
+        await ctx.reply(errorText, { reply_markup: keyboard });
       }
     } catch (sendError) {
       logger.error("최종 오류 메시지 전송 실패:", sendError);
