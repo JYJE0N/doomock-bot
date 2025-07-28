@@ -1,114 +1,156 @@
-// src/services/TodoService.js - 할일 관리 서비스 (표준 준수)
+// src/services/TodoService.js - 할일 관리 데이터 서비스 (표준 준수)
 const logger = require("../utils/Logger");
-
 const TimeHelper = require("../utils/TimeHelper");
 const { ObjectId } = require("mongodb");
-const { getInstance } = require("../database/DatabaseManager"); // DatabaseManager 사용
 
 /**
  * 🔧 TodoService - 할일 관리 데이터 서비스
- * - DatabaseManager 중앙 관리 방식
- * - 스키마는 DatabaseManager에서 주입받음
- * - 순수 데이터 처리만 담당 (UI 금지)
+ * - 순수 데이터 처리만 담당 (UI/메시지 금지)
+ * - MongoDB 네이티브 드라이버 사용
+ * - 표준 필드 준수: userId, createdAt, updatedAt, version, isActive
  * - Railway 환경 최적화
+ * - 메모리 캐싱 시스템
  */
 class TodoService {
   constructor(options = {}) {
     this.collectionName = "todos";
-
-    // DatabaseManager 인스턴스 (중앙 관리)
-    this.dbManager = getInstance();
-    this.db = null;
+    this.db = options.db || null;
     this.collection = null;
 
-    // 설정 (환경변수 기반)
+    // Railway 환경변수 기반 설정
     this.config = {
-      enableCache: true,
-      cacheTimeout: parseInt(process.env.CACHE_TIMEOUT) || 300000,
-      maxRetries: 3,
-      defaultPageSize: 5,
+      enableCache: process.env.ENABLE_TODO_CACHE !== "false",
+      cacheTimeout: parseInt(process.env.TODO_CACHE_TIMEOUT) || 300000, // 5분
+      maxRetries: parseInt(process.env.DB_MAX_RETRIES) || 3,
+      retryDelay: parseInt(process.env.DB_RETRY_DELAY) || 1000,
+      defaultPageSize: parseInt(process.env.TODO_PAGE_SIZE) || 5,
       maxItemsPerUser: parseInt(process.env.MAX_TODO_PER_USER) || 50,
+      autoCleanupDays: parseInt(process.env.TODO_CLEANUP_DAYS) || 30,
       ...options.config,
     };
 
-    // 메모리 캐시
+    // 메모리 캐시 시스템
     this.cache = new Map();
     this.cacheTimestamps = new Map();
 
     // Railway 환경 체크
-    this.isRailway = !process.env.NODE_ENV || process.env.RAILWAY_ENVIRONMENT;
+    this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
 
-    logger.info("🔧 TodoService", "서비스 생성", {
-      railway: this.isRailway,
-      config: this.config,
-    });
+    // 통계 및 모니터링
+    this.stats = {
+      operationsCount: 0,
+      successCount: 0,
+      errorCount: 0,
+      cacheHits: 0,
+      cacheMisses: 0,
+      lastOperation: null,
+    };
+
+    // 할일 상태 상수
+    this.STATUS = {
+      PENDING: "pending",
+      COMPLETED: "completed",
+      DELETED: "deleted",
+    };
+
+    // 우선순위 상수
+    this.PRIORITY = {
+      LOW: "low",
+      NORMAL: "normal",
+      HIGH: "high",
+      URGENT: "urgent",
+    };
+
+    logger.info("🔧 TodoService 생성됨", { railway: this.isRailway });
   }
 
   /**
-   * 🎯 서비스 초기화 (DatabaseManager 연동)
+   * 🎯 서비스 초기화
    */
   async initialize() {
     try {
-      // DatabaseManager 연결 보장
-      await this.dbManager.ensureConnection();
+      if (!this.db) {
+        throw new Error("데이터베이스 인스턴스가 필요합니다");
+      }
 
-      // DB 인스턴스 가져오기
-      this.db = this.dbManager.getDb();
       this.collection = this.db.collection(this.collectionName);
 
-      // DatabaseManager의 스키마 시스템 활용
+      // 인덱스 생성
       await this.createIndexes();
 
-      logger.success("TodoService 초기화 완료");
+      // 자동 정리 작업 스케줄링 (Railway에서는 비활성화)
+      if (!this.isRailway && this.config.autoCleanupDays > 0) {
+        this.scheduleCleanup();
+      }
+
+      logger.success("✅ TodoService 초기화 완료");
     } catch (error) {
-      logger.error("TodoService 초기화 실패", error);
+      logger.error("❌ TodoService 초기화 실패:", error);
       throw error;
     }
   }
 
   /**
-   * 📊 인덱스 생성 (DatabaseManager 스키마 활용)
+   * 📊 인덱스 생성 (성능 최적화)
    */
   async createIndexes() {
     try {
-      // DatabaseManager에서 스키마 정보 가져오기
-      if (this.dbManager.schemaManager) {
-        const indexes = this.dbManager.schemaManager.getIndexes(
-          this.collectionName
-        );
+      // 기본 쿼리 최적화 인덱스
+      await this.collection.createIndex(
+        { userId: 1, createdAt: -1 },
+        { background: true }
+      );
+      await this.collection.createIndex(
+        { userId: 1, status: 1, createdAt: -1 },
+        { background: true }
+      );
+      await this.collection.createIndex(
+        { userId: 1, isActive: 1 },
+        { background: true }
+      );
 
-        for (const indexDef of indexes) {
-          const { fields, ...options } = indexDef;
-          await this.collection.createIndex(fields, options);
-        }
-      } else {
-        // 기본 인덱스 (스키마 없을 때)
-        await this.collection.createIndex({ userId: 1, createdAt: -1 });
-        await this.collection.createIndex({ userId: 1, completed: 1 });
-        await this.collection.createIndex({ isActive: 1, userId: 1 });
-      }
+      // 검색 최적화 인덱스
+      await this.collection.createIndex(
+        { title: "text" },
+        { background: true }
+      );
 
-      logger.debug("TodoService 인덱스 생성 완료");
+      // 정리 작업 최적화 인덱스
+      await this.collection.createIndex(
+        { completedAt: 1, status: 1 },
+        { background: true }
+      );
+
+      // 통계 최적화 인덱스
+      await this.collection.createIndex(
+        { userId: 1, status: 1, priority: 1 },
+        { background: true }
+      );
+
+      logger.debug("📊 TodoService 인덱스 생성 완료");
     } catch (error) {
-      // Railway에서는 인덱스 생성 실패를 warning으로 처리
+      // Railway에서는 인덱스 생성 실패를 경고로 처리
       if (this.isRailway) {
-        logger.warn("인덱스 생성 실패 (Railway 환경)", error.message);
+        logger.warn("⚠️ 인덱스 생성 실패 (Railway 환경):", error.message);
       } else {
+        logger.error("❌ 인덱스 생성 실패:", error);
         throw error;
       }
     }
   }
 
-  // ===== 📝 할일 CRUD 메서드들 (담백한 기능만) =====
+  // ===== 📝 할일 CRUD 메서드들 =====
 
   /**
    * ✏️ 할일 생성
    */
   async createTodo(userId, todoData) {
+    this.stats.operationsCount++;
+
     try {
-      // 사용자 할일 개수 체크
+      // 사용자 할일 개수 제한 체크
       const userTodoCount = await this.collection.countDocuments({
-        userId,
+        userId: userId.toString(),
         isActive: true,
       });
 
@@ -118,11 +160,26 @@ class TodoService {
         );
       }
 
-      // 할일 문서 생성 (표준 필드)
+      // 제목 검증
+      if (!todoData.title || todoData.title.trim().length === 0) {
+        throw new Error("할일 제목은 필수입니다.");
+      }
+
+      if (todoData.title.length > 100) {
+        throw new Error("할일 제목은 100자를 초과할 수 없습니다.");
+      }
+
+      // 할일 문서 생성 (표준 필드 준수)
       const todo = {
-        userId,
+        userId: userId.toString(),
         title: todoData.title.trim(),
-        priority: todoData.priority || "medium",
+        description: todoData.description?.trim() || "",
+        status: this.STATUS.PENDING,
+        priority: todoData.priority || this.PRIORITY.NORMAL,
+        category: todoData.category?.trim() || "일반",
+        tags: Array.isArray(todoData.tags) ? todoData.tags : [],
+
+        // 완료 관련
         completed: false,
         completedAt: null,
 
@@ -131,25 +188,11 @@ class TodoService {
         updatedAt: TimeHelper.now(),
         version: 1,
         isActive: true,
+
+        // 환경 정보
+        environment: this.isRailway ? "railway" : "development",
+        timezone: "Asia/Seoul",
       };
-
-      // DatabaseManager의 스키마 검증 활용 (있으면)
-      if (this.dbManager.schemaManager) {
-        const validationResult =
-          await this.dbManager.schemaManager.validateDocument(
-            this.collectionName,
-            todo
-          );
-
-        if (!validationResult.isValid) {
-          throw new Error(
-            `데이터 검증 실패: ${validationResult.errors.join(", ")}`
-          );
-        }
-
-        // 검증된 데이터 사용
-        todo = validationResult.document;
-      }
 
       const result = await this.collection.insertOne(todo);
       const createdTodo = await this.collection.findOne({
@@ -159,18 +202,23 @@ class TodoService {
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
-      logger.data("todo", "create", userId, { title: todo.title });
+      this.stats.successCount++;
+      logger.info(`📝 할일 생성: ${createdTodo.title} (사용자: ${userId})`);
+
       return createdTodo;
     } catch (error) {
-      logger.error("할일 생성 실패", error);
+      this.stats.errorCount++;
+      logger.error("❌ 할일 생성 실패:", error);
       throw error;
     }
   }
 
   /**
-   * 📋 사용자 할일 목록 조회
+   * 📋 사용자 할일 목록 조회 (페이지네이션 지원)
    */
   async getUserTodos(userId, options = {}) {
+    this.stats.operationsCount++;
+
     try {
       const {
         page = 1,
@@ -178,6 +226,7 @@ class TodoService {
         status = null, // 'pending', 'completed', 'all'
         sortBy = "createdAt",
         sortOrder = -1,
+        search = null,
       } = options;
 
       // 캐시 키 생성
@@ -187,33 +236,40 @@ class TodoService {
       if (this.config.enableCache) {
         const cached = this.getFromCache(cacheKey);
         if (cached) {
-          logger.debug("할일 목록 캐시 히트");
+          this.stats.cacheHits++;
           return cached;
         }
+        this.stats.cacheMisses++;
       }
 
       // 쿼리 조건 구성
       const query = {
-        userId,
+        userId: userId.toString(),
         isActive: true,
       };
 
       // 상태 필터
-      if (status === "pending") {
-        query.completed = false;
-      } else if (status === "completed") {
-        query.completed = true;
+      if (status && status !== "all") {
+        query.status = status;
       }
 
-      // 정렬 옵션
+      // 검색 조건
+      if (search && search.trim()) {
+        query.$or = [
+          { title: { $regex: search.trim(), $options: "i" } },
+          { description: { $regex: search.trim(), $options: "i" } },
+        ];
+      }
+
+      // 정렬 조건
       const sort = {};
       sort[sortBy] = sortOrder;
 
       // 페이지네이션 계산
       const skip = (page - 1) * limit;
 
-      // 병렬 실행
-      const [todos, totalCount] = await Promise.all([
+      // 쿼리 실행
+      const [todos, total] = await Promise.all([
         this.collection
           .find(query)
           .sort(sort)
@@ -223,127 +279,98 @@ class TodoService {
         this.collection.countDocuments(query),
       ]);
 
+      // 결과 구성
       const result = {
         todos,
-        currentPage: page,
-        totalPages: Math.ceil(totalCount / limit),
-        totalCount,
-        hasMore: page * limit < totalCount,
+        pagination: {
+          currentPage: page,
+          totalPages: Math.ceil(total / limit),
+          totalItems: total,
+          itemsPerPage: limit,
+          hasNext: page * limit < total,
+          hasPrev: page > 1,
+        },
       };
 
       // 캐시 저장
       if (this.config.enableCache) {
-        this.saveToCache(cacheKey, result);
+        this.setCache(cacheKey, result);
       }
 
-      logger.data("todo", "list", userId, { count: todos.length });
+      this.stats.successCount++;
+      this.stats.lastOperation = "getUserTodos";
+
       return result;
     } catch (error) {
-      logger.error("할일 목록 조회 실패", error);
+      this.stats.errorCount++;
+      logger.error("❌ 할일 목록 조회 실패:", error);
       throw error;
     }
   }
 
   /**
-   * 🔄 할일 상태 토글
+   * 🔄 할일 상태 토글 (완료/미완료)
    */
-  async toggleTodo(userId, todoId) {
+  async toggleTodoStatus(userId, todoId) {
+    this.stats.operationsCount++;
+
     try {
+      // ObjectId 변환
       const objectId = new ObjectId(todoId);
 
       // 현재 할일 조회
-      const todo = await this.collection.findOne({
+      const currentTodo = await this.collection.findOne({
         _id: objectId,
-        userId,
+        userId: userId.toString(),
         isActive: true,
       });
 
-      if (!todo) {
+      if (!currentTodo) {
         throw new Error("할일을 찾을 수 없습니다.");
       }
 
       // 상태 토글
-      const newCompleted = !todo.completed;
+      const newStatus =
+        currentTodo.status === this.STATUS.PENDING
+          ? this.STATUS.COMPLETED
+          : this.STATUS.PENDING;
+
+      const newCompleted = newStatus === this.STATUS.COMPLETED;
+      const now = TimeHelper.now();
+
+      // 업데이트 데이터
       const updateData = {
+        status: newStatus,
         completed: newCompleted,
-        completedAt: newCompleted ? TimeHelper.now() : null,
-        updatedAt: TimeHelper.now(),
-        $inc: { version: 1 },
+        completedAt: newCompleted ? now : null,
+        updatedAt: now,
+        version: currentTodo.version + 1,
       };
 
       const result = await this.collection.updateOne(
-        { _id: objectId, userId },
+        { _id: objectId, userId: userId.toString(), isActive: true },
         { $set: updateData }
       );
 
-      if (result.modifiedCount === 0) {
-        throw new Error("할일 상태 변경에 실패했습니다.");
+      if (result.matchedCount === 0) {
+        throw new Error("할일 업데이트에 실패했습니다.");
       }
+
+      // 업데이트된 할일 조회
+      const updatedTodo = await this.collection.findOne({ _id: objectId });
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
-      logger.data("todo", "toggle", userId, {
-        todoId,
-        status: newCompleted ? "completed" : "pending",
-      });
-
-      return await this.collection.findOne({ _id: objectId });
-    } catch (error) {
-      logger.error("할일 토글 실패", error);
-      throw error;
-    }
-  }
-
-  /**
-   * ✏️ 할일 수정
-   */
-  async updateTodo(userId, todoId, updateData) {
-    try {
-      const objectId = new ObjectId(todoId);
-
-      // 기존 할일 확인
-      const existingTodo = await this.collection.findOne({
-        _id: objectId,
-        userId,
-        isActive: true,
-      });
-
-      if (!existingTodo) {
-        throw new Error("할일을 찾을 수 없습니다.");
-      }
-
-      // 업데이트 데이터 준비
-      const updateDoc = {
-        updatedAt: TimeHelper.now(),
-        $inc: { version: 1 },
-      };
-
-      // 허용된 필드만 업데이트
-      const allowedFields = ["title", "priority"];
-
-      for (const field of allowedFields) {
-        if (updateData.hasOwnProperty(field)) {
-          updateDoc[field] = updateData[field];
-        }
-      }
-
-      const result = await this.collection.updateOne(
-        { _id: objectId, userId },
-        { $set: updateDoc }
+      this.stats.successCount++;
+      logger.info(
+        `🔄 할일 상태 변경: ${currentTodo.title} -> ${newStatus} (사용자: ${userId})`
       );
 
-      if (result.modifiedCount === 0) {
-        throw new Error("할일 수정에 실패했습니다.");
-      }
-
-      // 캐시 무효화
-      this.invalidateUserCache(userId);
-
-      logger.data("todo", "update", userId, { todoId });
-      return await this.collection.findOne({ _id: objectId });
+      return updatedTodo;
     } catch (error) {
-      logger.error("할일 수정 실패", error);
+      this.stats.errorCount++;
+      logger.error("❌ 할일 상태 토글 실패:", error);
       throw error;
     }
   }
@@ -352,40 +379,128 @@ class TodoService {
    * 🗑️ 할일 삭제 (소프트 삭제)
    */
   async deleteTodo(userId, todoId) {
+    this.stats.operationsCount++;
+
     try {
       const objectId = new ObjectId(todoId);
+      const now = TimeHelper.now();
 
       const result = await this.collection.updateOne(
-        { _id: objectId, userId, isActive: true },
+        {
+          _id: objectId,
+          userId: userId.toString(),
+          isActive: true,
+        },
         {
           $set: {
             isActive: false,
-            deletedAt: TimeHelper.now(),
-            updatedAt: TimeHelper.now(),
-            $inc: { version: 1 },
+            status: this.STATUS.DELETED,
+            deletedAt: now,
+            updatedAt: now,
+            version: { $inc: 1 },
           },
         }
       );
 
-      if (result.modifiedCount === 0) {
-        throw new Error("할일을 찾을 수 없거나 삭제에 실패했습니다.");
+      if (result.matchedCount === 0) {
+        throw new Error("할일을 찾을 수 없습니다.");
       }
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
-      logger.data("todo", "delete", userId, { todoId });
-      return true;
+      this.stats.successCount++;
+      logger.info(`🗑️ 할일 삭제: ${todoId} (사용자: ${userId})`);
+
+      return { success: true, deletedId: todoId };
     } catch (error) {
-      logger.error("할일 삭제 실패", error);
+      this.stats.errorCount++;
+      logger.error("❌ 할일 삭제 실패:", error);
       throw error;
     }
   }
 
-  // ===== 📊 통계 메서드들 =====
+  /**
+   * ✏️ 할일 수정
+   */
+  async updateTodo(userId, todoId, updateData) {
+    this.stats.operationsCount++;
+
+    try {
+      const objectId = new ObjectId(todoId);
+
+      // 현재 할일 조회
+      const currentTodo = await this.collection.findOne({
+        _id: objectId,
+        userId: userId.toString(),
+        isActive: true,
+      });
+
+      if (!currentTodo) {
+        throw new Error("할일을 찾을 수 없습니다.");
+      }
+
+      // 업데이트할 필드 준비
+      const allowedFields = [
+        "title",
+        "description",
+        "priority",
+        "category",
+        "tags",
+      ];
+      const updateFields = {};
+
+      for (const field of allowedFields) {
+        if (updateData.hasOwnProperty(field)) {
+          updateFields[field] = updateData[field];
+        }
+      }
+
+      // 제목 검증
+      if (updateFields.title) {
+        if (updateFields.title.trim().length === 0) {
+          throw new Error("할일 제목은 필수입니다.");
+        }
+        if (updateFields.title.length > 100) {
+          throw new Error("할일 제목은 100자를 초과할 수 없습니다.");
+        }
+        updateFields.title = updateFields.title.trim();
+      }
+
+      // 메타데이터 업데이트
+      updateFields.updatedAt = TimeHelper.now();
+      updateFields.version = currentTodo.version + 1;
+
+      const result = await this.collection.updateOne(
+        { _id: objectId, userId: userId.toString(), isActive: true },
+        { $set: updateFields }
+      );
+
+      if (result.matchedCount === 0) {
+        throw new Error("할일 업데이트에 실패했습니다.");
+      }
+
+      // 업데이트된 할일 조회
+      const updatedTodo = await this.collection.findOne({ _id: objectId });
+
+      // 캐시 무효화
+      this.invalidateUserCache(userId);
+
+      this.stats.successCount++;
+      logger.info(`✏️ 할일 수정: ${updatedTodo.title} (사용자: ${userId})`);
+
+      return updatedTodo;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("❌ 할일 수정 실패:", error);
+      throw error;
+    }
+  }
+
+  // ===== 📊 통계 및 분석 메서드들 =====
 
   /**
-   * 📈 사용자 기본 통계
+   * 📊 사용자 기본 통계
    */
   async getUserStats(userId) {
     try {
@@ -393,105 +508,237 @@ class TodoService {
 
       if (this.config.enableCache) {
         const cached = this.getFromCache(cacheKey);
-        if (cached) {
-          return cached;
-        }
+        if (cached) return cached;
       }
 
       const pipeline = [
-        { $match: { userId, isActive: true } },
+        { $match: { userId: userId.toString(), isActive: true } },
         {
           $group: {
-            _id: null,
-            total: { $sum: 1 },
-            completed: { $sum: { $cond: ["$completed", 1, 0] } },
-            pending: { $sum: { $cond: ["$completed", 0, 1] } },
+            _id: "$status",
+            count: { $sum: 1 },
           },
         },
       ];
 
-      const result = await this.collection.aggregate(pipeline).toArray();
-      const stats = result[0] || { total: 0, completed: 0, pending: 0 };
+      const results = await this.collection.aggregate(pipeline).toArray();
 
-      // 완료율 계산
-      stats.completionRate =
-        stats.total > 0 ? Math.round((stats.completed / stats.total) * 100) : 0;
+      const stats = {
+        total: 0,
+        pending: 0,
+        completed: 0,
+        todayAdded: 0,
+      };
+
+      // 결과 파싱
+      results.forEach((result) => {
+        stats.total += result.count;
+        stats[result._id] = result.count;
+      });
+
+      // 오늘 추가된 할일 개수
+      const today = TimeHelper.startOfDay();
+      const todayCount = await this.collection.countDocuments({
+        userId: userId.toString(),
+        isActive: true,
+        createdAt: { $gte: today },
+      });
+      stats.todayAdded = todayCount;
 
       if (this.config.enableCache) {
-        this.saveToCache(cacheKey, stats, 60000); // 1분 캐시
+        this.setCache(cacheKey, stats, 60000); // 1분 캐시
       }
 
-      logger.data("todo", "stats", userId, stats);
       return stats;
     } catch (error) {
-      logger.error("사용자 통계 조회 실패", error);
-      return { total: 0, completed: 0, pending: 0, completionRate: 0 };
+      logger.error("❌ 사용자 통계 조회 실패:", error);
+      throw error;
     }
   }
 
-  // ===== 🔧 유틸리티 메서드들 =====
+  /**
+   * 📈 상세 통계 (주간, 월간)
+   */
+  async getDetailedStats(userId) {
+    try {
+      const now = TimeHelper.now();
+      const weekAgo = TimeHelper.subtract(now, 7, "days");
+      const monthAgo = TimeHelper.subtract(now, 30, "days");
+
+      const [weeklyStats, monthlyStats, categoryStats] = await Promise.all([
+        this.getStatsForPeriod(userId, weekAgo, now),
+        this.getStatsForPeriod(userId, monthAgo, now),
+        this.getCategoryStats(userId),
+      ]);
+
+      return {
+        weekly: weeklyStats,
+        monthly: monthlyStats,
+        categories: categoryStats,
+        completionRate: this.calculateCompletionRate(weeklyStats),
+      };
+    } catch (error) {
+      logger.error("❌ 상세 통계 조회 실패:", error);
+      throw error;
+    }
+  }
 
   /**
-   * 캐시에서 조회
+   * 📅 기간별 통계
    */
+  async getStatsForPeriod(userId, startDate, endDate) {
+    const pipeline = [
+      {
+        $match: {
+          userId: userId.toString(),
+          isActive: true,
+          createdAt: { $gte: startDate, $lte: endDate },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            date: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+            status: "$status",
+          },
+          count: { $sum: 1 },
+        },
+      },
+      { $sort: { "_id.date": 1 } },
+    ];
+
+    const results = await this.collection.aggregate(pipeline).toArray();
+
+    // 일별 데이터 구성
+    const daily = {};
+    results.forEach((result) => {
+      const date = result._id.date;
+      if (!daily[date]) {
+        daily[date] = { pending: 0, completed: 0, total: 0 };
+      }
+      daily[date][result._id.status] = result.count;
+      daily[date].total += result.count;
+    });
+
+    return { daily };
+  }
+
+  /**
+   * 🏷️ 카테고리별 통계
+   */
+  async getCategoryStats(userId) {
+    const pipeline = [
+      { $match: { userId: userId.toString(), isActive: true } },
+      {
+        $group: {
+          _id: "$category",
+          total: { $sum: 1 },
+          completed: {
+            $sum: {
+              $cond: [{ $eq: ["$status", this.STATUS.COMPLETED] }, 1, 0],
+            },
+          },
+        },
+      },
+      { $sort: { total: -1 } },
+    ];
+
+    return await this.collection.aggregate(pipeline).toArray();
+  }
+
+  // ===== 🔧 유틸리티 및 헬퍼 메서드들 =====
+
+  /**
+   * 💾 캐시 관리
+   */
+  setCache(key, value, customTtl = null) {
+    if (!this.config.enableCache) return;
+
+    this.cache.set(key, value);
+    this.cacheTimestamps.set(
+      key,
+      Date.now() + (customTtl || this.config.cacheTimeout)
+    );
+  }
+
   getFromCache(key) {
     if (!this.config.enableCache) return null;
 
-    const data = this.cache.get(key);
     const timestamp = this.cacheTimestamps.get(key);
-
-    if (
-      data &&
-      timestamp &&
-      Date.now() - timestamp < this.config.cacheTimeout
-    ) {
-      return data;
-    }
-
-    // 만료된 캐시 제거
-    this.cache.delete(key);
-    this.cacheTimestamps.delete(key);
-    return null;
-  }
-
-  /**
-   * 캐시에 저장
-   */
-  saveToCache(key, data, customTimeout = null) {
-    if (!this.config.enableCache) return;
-
-    this.cache.set(key, data);
-    this.cacheTimestamps.set(key, Date.now());
-
-    // 커스텀 타임아웃 적용
-    if (customTimeout) {
-      setTimeout(() => {
-        this.cache.delete(key);
-        this.cacheTimestamps.delete(key);
-      }, customTimeout);
-    }
-  }
-
-  /**
-   * 사용자 캐시 무효화
-   */
-  invalidateUserCache(userId) {
-    const keysToDelete = [];
-
-    for (const key of this.cache.keys()) {
-      if (key.includes(userId)) {
-        keysToDelete.push(key);
-      }
-    }
-
-    keysToDelete.forEach((key) => {
+    if (!timestamp || Date.now() > timestamp) {
       this.cache.delete(key);
       this.cacheTimestamps.delete(key);
-    });
+      return null;
+    }
+
+    return this.cache.get(key);
+  }
+
+  invalidateUserCache(userId) {
+    if (!this.config.enableCache) return;
+
+    const userPrefix = `user_${userId}`;
+    for (const key of this.cache.keys()) {
+      if (key.includes(userPrefix)) {
+        this.cache.delete(key);
+        this.cacheTimestamps.delete(key);
+      }
+    }
   }
 
   /**
-   * 서비스 상태 조회
+   * 📊 완료율 계산
+   */
+  calculateCompletionRate(stats) {
+    if (!stats.daily) return 0;
+
+    let totalTodos = 0;
+    let completedTodos = 0;
+
+    Object.values(stats.daily).forEach((day) => {
+      totalTodos += day.total;
+      completedTodos += day.completed;
+    });
+
+    return totalTodos > 0 ? Math.round((completedTodos / totalTodos) * 100) : 0;
+  }
+
+  /**
+   * 🧹 자동 정리 작업 스케줄링
+   */
+  scheduleCleanup() {
+    // 매일 자정에 오래된 완료된 할일 정리
+    setInterval(async () => {
+      try {
+        await this.cleanupOldTodos();
+      } catch (error) {
+        logger.error("❌ 자동 정리 작업 실패:", error);
+      }
+    }, 24 * 60 * 60 * 1000); // 24시간
+  }
+
+  /**
+   * 🧹 오래된 할일 정리
+   */
+  async cleanupOldTodos() {
+    const cutoffDate = TimeHelper.subtract(
+      TimeHelper.now(),
+      this.config.autoCleanupDays,
+      "days"
+    );
+
+    const result = await this.collection.deleteMany({
+      status: this.STATUS.COMPLETED,
+      completedAt: { $lt: cutoffDate },
+    });
+
+    if (result.deletedCount > 0) {
+      logger.info(`🧹 자동 정리: ${result.deletedCount}개의 오래된 할일 삭제`);
+    }
+  }
+
+  /**
+   * 📊 서비스 상태 조회
    */
   getStatus() {
     return {
@@ -500,21 +747,25 @@ class TodoService {
       isConnected: !!this.collection,
       cacheEnabled: this.config.enableCache,
       cacheSize: this.cache.size,
-      railway: this.isRailway,
-      dbManager: this.dbManager ? "connected" : "disconnected",
+      stats: this.stats,
+      config: {
+        maxItemsPerUser: this.config.maxItemsPerUser,
+        defaultPageSize: this.config.defaultPageSize,
+        autoCleanupDays: this.config.autoCleanupDays,
+      },
     };
   }
 
   /**
-   * 정리 작업
+   * 🧹 서비스 정리
    */
   async cleanup() {
     try {
       this.cache.clear();
       this.cacheTimestamps.clear();
-      logger.info("TodoService 정리 완료");
+      logger.info("✅ TodoService 정리 완료");
     } catch (error) {
-      logger.error("TodoService 정리 실패", error);
+      logger.error("❌ TodoService 정리 실패:", error);
     }
   }
 }
