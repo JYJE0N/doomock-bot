@@ -79,24 +79,80 @@ class NavigationHandler {
     }
   }
 
+  /**
+   * 🎨 모듈의 결과를 받아 UI를 렌더링하는 중앙 함수
+   */
   async renderResponse(ctx, result) {
     const chatId = ctx.chat.id;
     const messageId = ctx.callbackQuery.message.message_id;
 
     if (!result || result.type === "error") {
-      return this.showNavigationError(
-        ctx,
-        new Error(result?.message || "알 수 없는 오류")
-      );
+      const errorMessage = result ? result.message : "알 수 없는 오류";
+      return this.showNavigationError(ctx, new Error(errorMessage));
     }
 
     let text = `*${this.escapeMarkdownV2(result.module)} 모듈*\n\n`;
-    let keyboard = { inline_keyboard: [] };
+    const keyboard = { inline_keyboard: [] };
 
-    // 여기에 각 모듈별 화면을 그리는 로직을 추가합니다.
-    text += `작업 *${this.escapeMarkdownV2(
-      result.type
-    )}* 이\\(가\\) 완료되었습니다\\.`;
+    // --- ⬇️ 이 switch 블록이 핵심 ⬇️ ---
+    switch (`${result.module}:${result.type}`) {
+      // 1-Depth: 근무시간 관리 메인 메뉴
+      case "worktime:menu":
+        text += "🏢 *근무시간 관리*\n\n무엇을 할까요?";
+        keyboard.inline_keyboard.push(
+          [{ text: "🚀 출근하기", callback_data: "worktime:checkin" }],
+          [{ text: "📊 리포트 보기", callback_data: "worktime:show_report" }] // 2-depth로 가는 버튼
+        );
+        break;
+
+      // 2-Depth: 리포트 선택 화면
+      case "worktime:show_report":
+        text += "📊 *리포트 보기*\n\n어떤 리포트를 보시겠어요?";
+        keyboard.inline_keyboard.push(
+          [
+            {
+              text: "📅 월간 리포트",
+              callback_data: "worktime:show_report:monthly",
+            },
+          ], // 3-depth로 가는 버튼
+          [
+            {
+              text: "🗓️ 연간 리포트",
+              callback_data: "worktime:show_report:yearly",
+            },
+          ]
+        );
+        // '뒤로 가기' 버튼을 추가하여 이전 메뉴(worktime:menu)로 돌아갈 수 있게 합니다.
+        keyboard.inline_keyboard.push([
+          { text: "◀️ 뒤로 가기", callback_data: "worktime:menu" },
+        ]);
+        break;
+
+      // 3-Depth: 월간 리포트 표시 화면
+      case "worktime:show_report:monthly":
+        text += "📅 *월간 리포트*\n\n";
+        // result.data에서 월간 리포트 데이터를 가져와 표시합니다.
+        text += `총 근무 시간: ${this.escapeMarkdownV2(
+          result.data.totalHours
+        )}시간\n`;
+        text += `평균 근무 시간: ${this.escapeMarkdownV2(
+          result.data.avgHours
+        )}시간`;
+
+        // '뒤로 가기' 버튼으로 2-depth 메뉴(리포트 선택)로 돌아갑니다.
+        keyboard.inline_keyboard.push([
+          { text: "◀️ 뒤로 가기", callback_data: "worktime:show_report" },
+        ]);
+        break;
+
+      // 다른 모든 모듈을 위한 기본 화면
+      default:
+        text += `작업 *${this.escapeMarkdownV2(
+          result.type
+        )}* 이\\(가\\) 완료되었습니다.`;
+        break;
+    }
+    // --- ⬆️ 여기까지가 핵심 ⬆️ ---
 
     keyboard.inline_keyboard.push([
       { text: "🏠 메인 메뉴", callback_data: "system:menu" },
