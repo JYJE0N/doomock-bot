@@ -1,19 +1,14 @@
 // src/handlers/NavigationHandler.js - 간단한 버전
 const logger = require("../utils/Logger");
-const { getUserName } = require("../utils/UserHelper");
+const { getUserName, getUserId } = require("../utils/UserHelper");
 const { getEnabledModules } = require("../config/ModuleRegistry");
+const { MENU_CONFIG } = require("../config/MenuConfig"); // 메뉴 설정 import
 
-/**
- * 🎹 NavigationHandler - 간단한 버전
- * messageSystem 없이 기본 기능만 구현
- */
 class NavigationHandler {
   constructor() {
     this.bot = null;
     this.moduleManager = null;
     this.initialized = false;
-
-    // 📊 네비게이션 통계
     this.stats = {
       totalNavigation: 0,
       menuViews: 0,
@@ -21,26 +16,38 @@ class NavigationHandler {
     };
   }
 
-  /**
-   * 🎯 초기화
-   */
-  async initialize(bot, moduleManager) {
+  // MarkdownV2 이스케이프 헬퍼 함수
+  escapeMarkdownV2(text) {
+    if (typeof text !== "string") return "";
+    const escapeChars = [
+      "_",
+      "*",
+      "[",
+      "]",
+      "(",
+      ")",
+      "~",
+      "`",
+      ">",
+      "#",
+      "+",
+      "-",
+      "=",
+      "|",
+      "{",
+      "}",
+      ".",
+      "!",
+    ];
+    return text.replace(new RegExp(`[${escapeChars.join("\\")}]`, "g"), "\\$&");
+  }
+
+  async initialize(bot) {
     try {
       this.bot = bot;
-      this.moduleManager = moduleManager;
-
-      // 🌈 알록달록 초기화 메시지
+      // ModuleManager는 BotController에서 나중에 주입됩니다.
       console.log(logger.rainbow("🎹 ═══ NavigationHandler 초기화 ═══"));
-      console.log(
-        logger.gradient("🎨 알록달록 UI 시스템 로딩...", "cyan", "magenta")
-      );
-      console.log(logger.rainbow("📱 MarkdownV2 파서 준비..."));
-      console.log(
-        logger.gradient("✨ 사용자 친화적 인터페이스 활성화!", "green", "blue")
-      );
-
       this.initialized = true;
-
       logger.celebration("NavigationHandler 알록달록 초기화 완료!");
     } catch (error) {
       logger.error("NavigationHandler 초기화 실패:", error);
@@ -48,120 +55,210 @@ class NavigationHandler {
     }
   }
 
-  /**
-   * 🎯 콜백 처리 (중앙 라우터)
-   */
   async handleCallback(ctx) {
     try {
       const callbackQuery = ctx.callbackQuery;
       const data = callbackQuery.data;
-      const [action, ...params] = data.split(":");
+      const [moduleKey, ...params] = data.split(":");
+      const subAction = params[0] || "menu";
+      const actionParams = params.slice(1).join(":");
+
       const userName = getUserName(callbackQuery);
-
-      logger.info(`🎯 네비게이션: ${action} (사용자: ${userName})`);
-
-      // 🌈 알록달록 로그
-      console.log(logger.rainbow(`🎯 네비게이션: ${action}`));
-      console.log(logger.gradient(`👤 사용자: ${userName}`, "blue", "purple"));
-
-      // 📊 통계 업데이트
+      logger.info(`🎯 네비게이션: ${data} (사용자: ${userName})`);
       this.stats.totalNavigation++;
 
-      // 시스템 네비게이션 처리
-      switch (action) {
-        case "main":
-        case "menu":
-          this.stats.menuViews++;
-          return await this.showMainMenu(ctx);
+      let result;
 
-        case "help":
-          return await this.showHelp(ctx);
+      // 시스템 모듈 직접 처리
+      if (moduleKey === "system") {
+        const systemModule = this.moduleManager.modules.get("system")?.instance;
+        if (systemModule) {
+          result = await systemModule.handleCallback(
+            this.bot,
+            callbackQuery,
+            subAction,
+            actionParams,
+            this.moduleManager
+          );
+        }
+      } else {
+        // 다른 모듈로 라우팅
+        result = await this.moduleManager.handleCallback(
+          this.bot,
+          callbackQuery,
+          moduleKey,
+          subAction,
+          actionParams
+        );
+      }
 
-        case "about":
-          return await this.showAbout(ctx);
-
-        case "status":
-          return await this.showSystemStatus(ctx);
-
-        default:
-          // 모듈로 라우팅
-          if (this.moduleManager) {
-            return await this.moduleManager.handleCallback(
-              this.bot,
-              callbackQuery,
-              action,
-              params.join(":"),
-              this.moduleManager
-            );
-          }
+      // 결과 렌더링
+      if (result) {
+        await this.renderResponse(ctx, result);
       }
     } catch (error) {
       logger.error("네비게이션 콜백 처리 실패:", error);
-      await this.showNavigationError(ctx, error.message);
+      await this.showNavigationError(ctx, error);
     }
   }
 
-  /**
-   * 🏠 메인 메뉴 표시
-   */
-  async showMainMenu(ctx) {
-    try {
-      const modules = getEnabledModules();
-      const userName = getUserName(ctx.from || ctx.callbackQuery.from);
+  // 모듈의 결과를 받아 UI를 렌더링하는 중앙 함수
+  async renderResponse(ctx, result) {
+    const chatId = ctx.chat.id;
+    const messageId = ctx.callbackQuery.message.message_id;
 
-      // 메인 메뉴 텍스트
-      const menuText = `🤖 *두목봇 v3\\.0\\.1*
+    if (result.type === "error") {
+      return this.showNavigationError(ctx, new Error(result.message));
+    }
 
-안녕하세요 ${userName}님\\! 👋
+    if (result.type === "input") {
+      const text = this.escapeMarkdownV2(result.message);
+      return this.bot.telegram.editMessageText(
+        chatId,
+        messageId,
+        undefined,
+        text,
+        { parse_mode: "MarkdownV2" }
+      );
+    }
 
-무엇을 도와드릴까요\\?
+    // 각 모듈의 메뉴 텍스트와 키보드를 생성
+    const moduleConfig = MENU_CONFIG.moduleMenus[result.module];
+    if (!moduleConfig) return;
 
-_모듈을 선택하세요:_`.trim();
+    let text = this.escapeMarkdownV2(moduleConfig.title);
+    if (moduleConfig.subtitle)
+      text += `\n${this.escapeMarkdownV2(moduleConfig.subtitle)}`;
+    text += `\n\n`;
 
-      // 모듈 버튼 생성 (2열)
-      const moduleButtons = [];
-      for (let i = 0; i < modules.length; i += 2) {
-        const row = [];
+    const keyboard = { inline_keyboard: [] };
 
-        // 첫 번째 버튼
-        const module1 = modules[i];
-        if (module1 && module1.config) {
-          row.push({
-            text: `${module1.config.icon || "📱"} ${module1.name}`,
-            callback_data: `${module1.key}:menu`,
+    switch (`${result.module}:${result.type}`) {
+      case "todo:list":
+        text += "📋 *할 일 목록*";
+        if (result.data.todos.length === 0) {
+          text += "\n\n할 일이 없습니다\\.";
+        } else {
+          result.data.todos.forEach((todo) => {
+            const status = todo.completed ? "✅" : "⬜️";
+            text += `\n${status} ${this.escapeMarkdownV2(todo.text)}`;
+            keyboard.inline_keyboard.push([
+              {
+                text: `${status} ${todo.text}`,
+                callback_data: `todo:toggle:${todo._id}`,
+              },
+              { text: `🗑️`, callback_data: `todo:delete:${todo._id}` },
+            ]);
           });
         }
+        break;
 
-        // 두 번째 버튼 (있으면)
-        if (i + 1 < modules.length) {
-          const module2 = modules[i + 1];
-          if (module2 && module2.config) {
-            row.push({
-              text: `${module2.config.icon || "📱"} ${module2.name}`,
-              callback_data: `${module2.key}:menu`,
-            });
-          }
-        }
+      // 다른 모듈들의 케이스를 여기에 추가할 수 있습니다.
+      // 예: worktime:menu, timer:status 등
 
-        if (row.length > 0) {
-          moduleButtons.push(row);
+      default:
+        text += `*${this.escapeMarkdownV2(result.module)} 메뉴*`;
+        if (result.data && result.data.status) {
+          text += `\n\n*상태:* ${this.escapeMarkdownV2(
+            JSON.stringify(result.data.status)
+          )}`;
         }
+        break;
+    }
+
+    // 공통 버튼 추가
+    const footerButtons = MENU_CONFIG.subMenuTemplate.commonFooter.map(
+      (btn) => ({
+        text: btn.name,
+        callback_data: btn.callback.replace("{module}", result.module),
+      })
+    );
+    keyboard.inline_keyboard.push(footerButtons);
+
+    await this.bot.telegram.editMessageText(
+      chatId,
+      messageId,
+      undefined,
+      text,
+      {
+        parse_mode: "MarkdownV2",
+        reply_markup: keyboard,
+      }
+    );
+  }
+
+  async sendModuleMenu(bot, chatId, moduleKey) {
+    const moduleMenu = MENU_CONFIG.moduleMenus[moduleKey];
+    if (!moduleMenu) {
+      logger.warn(`${moduleKey} 모듈 메뉴 설정 없음`);
+      return;
+    }
+
+    let text = `*${this.escapeMarkdownV2(moduleMenu.title)}*\n`;
+    if (moduleMenu.subtitle)
+      text += `${this.escapeMarkdownV2(moduleMenu.subtitle)}\n`;
+    text += `\n원하는 기능을 선택하세요\\.`;
+
+    const keyboard = this.buildModuleMenuKeyboard(moduleKey);
+
+    await bot.sendMessage(chatId, text, {
+      parse_mode: "MarkdownV2",
+      reply_markup: keyboard,
+    });
+  }
+
+  buildModuleMenuKeyboard(moduleName) {
+    const moduleMenu = MENU_CONFIG.moduleMenus[moduleName];
+    if (!moduleMenu) return { inline_keyboard: [] };
+
+    const keyboard = { inline_keyboard: [] };
+    for (let i = 0; i < moduleMenu.buttons.length; i += 2) {
+      const row = moduleMenu.buttons.slice(i, i + 2).map((btn) => ({
+        text: btn[0],
+        callback_data: btn[1],
+      }));
+      keyboard.inline_keyboard.push(row);
+    }
+    keyboard.inline_keyboard.push(
+      MENU_CONFIG.subMenuTemplate.commonFooter.map((btn) => ({
+        text: btn.name,
+        callback_data: btn.callback.replace("{module}", moduleName),
+      }))
+    );
+    return keyboard;
+  }
+
+  async showMainMenu(ctx) {
+    try {
+      const modules = getEnabledModules().filter((m) => !m.hidden);
+      const userName = getUserName(ctx.from || ctx.callbackQuery.from);
+
+      const version = this.escapeMarkdownV2("v3.0.1");
+      const menuText = `🤖 *두목봇 ${version}*\n\n안녕하세요 ${this.escapeMarkdownV2(
+        userName
+      )}님\\! 👋\n\n무엇을 도와드릴까요\\?\n\n_모듈을 선택하세요:_`;
+
+      const moduleButtons = [];
+      for (let i = 0; i < modules.length; i += 2) {
+        const row = modules.slice(i, i + 2).map((module) => ({
+          text: `${module.config.icon || "📱"} ${module.name}`,
+          callback_data: `${module.key}:menu`,
+        }));
+        moduleButtons.push(row);
       }
 
-      // 시스템 버튼들
       const systemButtons = [
         [
-          { text: "❓ 도움말", callback_data: "help" },
-          { text: "ℹ️ 정보", callback_data: "about" },
+          { text: "❓ 도움말", callback_data: "system:help" },
+          { text: "ℹ️ 정보", callback_data: "system:about" },
+          { text: "📊 상태", callback_data: "system:status" },
         ],
-        [{ text: "📊 상태", callback_data: "status" }],
       ];
 
       const keyboard = {
         inline_keyboard: [...moduleButtons, ...systemButtons],
       };
 
-      // 메시지 전송 또는 수정
       if (ctx.callbackQuery) {
         await ctx.editMessageText(menuText, {
           parse_mode: "MarkdownV2",
@@ -173,140 +270,45 @@ _모듈을 선택하세요:_`.trim();
           reply_markup: keyboard,
         });
       }
-
-      logger.info(`메인 메뉴 표시됨 (사용자: ${userName})`);
     } catch (error) {
       logger.error("메인 메뉴 표시 실패:", error);
-      await ctx.reply("❌ 메뉴를 표시하는 중 오류가 발생했습니다.");
+      await this.showNavigationError(ctx, error);
     }
   }
 
-  /**
-   * ❓ 도움말 표시
-   */
-  async showHelp(ctx) {
-    const helpText = `❓ *도움말*
-
-*기본 명령어:*
-/start \\- 봇 시작
-/help \\- 도움말 보기
-/menu \\- 메인 메뉴
-
-*사용 방법:*
-1\\. 메인 메뉴에서 원하는 모듈 선택
-2\\. 각 모듈의 기능 사용
-3\\. 뒤로가기 버튼으로 이전 메뉴로 이동
-
-*문의사항:*
-문제가 있으시면 관리자에게 문의하세요\\!`.trim();
-
-    const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main" }]],
-    };
-
-    await ctx.editMessageText(helpText, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * ℹ️ 정보 표시
-   */
-  async showAbout(ctx) {
-    const aboutText = `ℹ️ *두목봇 정보*
-
-*버전:* v3\\.0\\.1
-*개발:* DoomockBro
-*설명:* 직장인을 위한 스마트 어시스턴트
-
-*주요 기능:*
-• 📝 할일 관리
-• ⏰ 타이머 \\& 포모도로
-• 🏢 근무시간 관리
-• 🌴 휴가 관리
-• 🔔 리마인더
-• 🔮 운세
-• 🌤️ 날씨
-• 🔊 TTS
-
-_지속적으로 업데이트 중입니다\\!_`.trim();
-
-    const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main" }]],
-    };
-
-    await ctx.editMessageText(aboutText, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 📊 시스템 상태 표시
-   */
-  async showSystemStatus(ctx) {
-    const uptime = Math.floor(process.uptime() / 60);
-    const memoryUsage = Math.round(
-      process.memoryUsage().heapUsed / 1024 / 1024
+  async showNavigationError(ctx, error) {
+    const errorMessage = this.escapeMarkdownV2(
+      error.message || "알 수 없는 오류"
     );
-
-    const statusText = `📊 *시스템 상태*
-
-*가동시간:* ${uptime}분
-*메모리 사용:* ${memoryUsage}MB
-*환경:* ${process.env.NODE_ENV || "development"}
-*Node\\.js:* ${process.version}
-
-*통계:*
-• 총 네비게이션: ${this.stats.totalNavigation}회
-• 메뉴 조회: ${this.stats.menuViews}회`.trim();
-
+    const errorText = `🚨 *네비게이션 오류*\n\n요청을 처리하는 중에 문제가 발생했습니다\.\n\n*오류:* \`${errorMessage}\`\n\n다시 시도하거나 메인 메뉴로 돌아가세요\.`;
     const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main" }]],
-    };
-
-    await ctx.editMessageText(statusText, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 🚨 네비게이션 오류 표시
-   */
-  async showNavigationError(ctx, errorMessage) {
-    const errorText = `🚨 *네비게이션 오류*
-
-요청을 처리하는 중에 문제가 발생했습니다\\.
-
-*오류:* ${errorMessage.replace(/([_*[\]()~`>#+\-=|{}.!])/g, "\\$1")}
-
-다시 시도하거나 메인 메뉴로 돌아가세요\\.`.trim();
-
-    const keyboard = {
-      inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "main" }]],
+      inline_keyboard: [
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
+      ],
     };
 
     try {
+      const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+      const messageId = ctx.callbackQuery?.message?.message_id;
+
       if (ctx.callbackQuery) {
-        await ctx.editMessageText(errorText, {
-          parse_mode: "MarkdownV2",
-          reply_markup: keyboard,
-        });
+        await ctx.telegram.editMessageText(
+          chatId,
+          messageId,
+          undefined,
+          errorText,
+          { parse_mode: "MarkdownV2", reply_markup: keyboard }
+        );
       } else {
         await ctx.reply(errorText, {
           parse_mode: "MarkdownV2",
           reply_markup: keyboard,
         });
       }
-    } catch (error) {
-      await ctx.reply(
-        "❌ 오류가 발생했습니다. /start 명령어로 다시 시작해주세요."
-      );
+    } catch (sendError) {
+      logger.error("오류 메시지 전송 실패:", sendError);
     }
   }
-
   /**
    * 📊 상태 조회
    */

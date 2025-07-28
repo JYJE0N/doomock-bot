@@ -137,35 +137,33 @@ class ModuleManager {
   /**
    * 🎯 콜백 쿼리 처리 (라우팅)
    */
-  async handleCallback(bot, callbackQuery, action, params, moduleManager) {
+  async handleCallback(bot, callbackQuery, moduleKey, subAction, params) {
     try {
-      // 모듈 키 추출
-      const moduleKey = action.split(":")[0];
-      const subAction = action.substring(moduleKey.length + 1) || "menu";
-
       logger.debug(`📦 모듈 라우팅: ${moduleKey} → ${subAction}`);
-
-      // 모듈 찾기
       const module = this.modules.get(moduleKey);
       if (!module) {
         logger.warn(`모듈을 찾을 수 없음: ${moduleKey}`);
-        return;
+        return {
+          type: "error",
+          message: `모듈(${moduleKey})을 찾을 수 없습니다.`,
+        };
       }
 
-      // 모듈로 전달
-      await module.instance.handleCallback(
+      this.stats.callbacksHandled++;
+      // [수정] 모듈 핸들러의 결과를 반환하도록 변경
+      return await module.instance.handleCallback(
         bot,
         callbackQuery,
         subAction,
         params,
-        moduleManager
+        this // moduleManager 인스턴스를 넘겨줍니다.
       );
-
-      // 통계 업데이트
-      this.stats.callbacksHandled++;
     } catch (error) {
       logger.error("모듈 콜백 처리 실패", error);
-      throw error;
+      return {
+        type: "error",
+        message: "모듈 콜백 처리 중 오류가 발생했습니다.",
+      };
     }
   }
 

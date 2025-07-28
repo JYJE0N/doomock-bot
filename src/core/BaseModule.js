@@ -70,27 +70,34 @@ class BaseModule {
   /**
    * 콜백 처리
    */
+  /**
+   * 콜백 처리
+   */
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     try {
       this.stats.callbacksHandled++;
 
       const handler = this.actionMap.get(subAction);
       if (handler) {
-        await handler(bot, callbackQuery, params, moduleManager);
+        // [수정] 핸들러의 결과(UI 데이터)를 반환하도록 변경
+        return await handler(
+          bot,
+          callbackQuery,
+          subAction,
+          params,
+          moduleManager
+        );
       } else {
         logger.warn(`알 수 없는 액션: ${this.moduleName}:${subAction}`);
-        await bot.answerCallbackQuery(callbackQuery.id, {
-          text: "알 수 없는 명령입니다.",
-        });
+        // [수정] 직접 응답하는 대신 에러 객체 반환
+        return { type: "error", message: "알 수 없는 명령입니다." };
       }
     } catch (error) {
       logger.error(`${this.moduleName} 콜백 처리 오류:`, error);
       this.stats.errorsCount++;
 
-      await bot.answerCallbackQuery(callbackQuery.id, {
-        text: "처리 중 오류가 발생했습니다.",
-        show_alert: true,
-      });
+      // [수정] 중복 호출되던 answerCallbackQuery 제거하고 에러 객체 반환
+      return { type: "error", message: "처리 중 오류가 발생했습니다." };
     }
   }
 
