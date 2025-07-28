@@ -2,7 +2,7 @@
 require("dotenv").config();
 const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
-const { getRegistryStats } = require("./src/config/ModuleRegistry");
+const ModuleRegistry = require("./src/config/ModuleRegistry");
 const TimeHelper = require("./src/utils/TimeHelper");
 
 /**
@@ -248,7 +248,7 @@ class DooMockBot {
    * 📦 모듈 레지스트리 확인
    */
   async checkModuleRegistry() {
-    const registryStats = getRegistryStats();
+    const stats = ModuleRegistry.getRegistryStats();
 
     console.log(
       logger.gradient(

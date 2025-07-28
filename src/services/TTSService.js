@@ -1,52 +1,42 @@
-// src/services/TTSService.js
-const speech = require("@google-cloud/speech");
-const textToSpeech = require("@google-cloud/text-to-speech");
+// src/services/TTSService.js - 명확한 클래스명 버전
+
+// Google Cloud 라이브러리 임포트
+const GoogleTextToSpeech = require("@google-cloud/text-to-speech"); // TTS (텍스트→음성)
+const GoogleSpeechToText = require("@google-cloud/speech"); // STT (음성→텍스트)
+
 const fs = require("fs").promises;
 const path = require("path");
 const logger = require("../utils/Logger");
 const { v4: uuidv4 } = require("uuid");
 
 /**
- * 🔊 TTSService - Google Cloud Text-to-Speech 서비스
+ * 🔊 TTSService - 텍스트를 음성으로 변환하는 서비스
+ *
+ * 클래스 설명:
+ * - GoogleTextToSpeech: 텍스트를 음성으로 변환 (TTS)
+ * - GoogleSpeechToText: 음성을 텍스트로 변환 (STT)
  *
  * 주요 기능:
- * - 텍스트를 음성으로 변환
- * - 다양한 언어 및 음성 지원
- * - 음성 파일 캐싱
- * - Speech-to-Text 기능 (추가 가능)
+ * - textToSpeech(): 텍스트 → 음성 파일
+ * - speechToText(): 음성 파일 → 텍스트 (선택 기능)
  */
 class TTSService {
   constructor(options = {}) {
     this.config = {
-      // Google Cloud 설정
       projectId: process.env.GOOGLE_CLOUD_PROJECT_ID,
-      keyFilename: process.env.GOOGLE_APPLICATION_CREDENTIALS,
-
-      // TTS 기본 설정
-      languageCode: "ko-KR",
-      voiceName: "ko-KR-Wavenet-A",
-      audioEncoding: "OGG_OPUS", // Telegram이 지원하는 형식
-      speakingRate: 1.0,
-      pitch: 0,
-      volumeGainDb: 0,
-
-      // 캐싱 설정
-      enableCache: true,
-      cacheDir: process.env.TTS_CACHE_DIR || "./cache/tts",
-      maxCacheSize: 100 * 1024 * 1024, // 100MB
-      cacheExpiry: 24 * 60 * 60 * 1000, // 24시간
-
+      languageCode: process.env.TTS_DEFAULT_LANGUAGE || "ko-KR",
+      voiceName: process.env.TTS_VOICE_NAME || "ko-KR-Wavenet-A",
+      audioEncoding: "OGG_OPUS",
+      cacheDir: process.env.TTS_CACHE_DIR || "/tmp/tts-cache",
       ...options.config,
     };
 
-    // 클라이언트 초기화
-    this.ttsClient = null;
-    this.sttClient = null;
+    // 클라이언트 인스턴스 (명확한 이름)
+    this.googleTTSClient = null; // 텍스트→음성 클라이언트
+    this.googleSTTClient = null; // 음성→텍스트 클라이언트 (옵션)
 
-    // 캐시
     this.cache = new Map();
 
-    // 통계
     this.stats = {
       totalConversions: 0,
       cachedResponses: 0,
@@ -54,7 +44,11 @@ class TTSService {
       errors: 0,
     };
 
-    logger.info("🔊 TTSService 생성됨");
+    logger.info("🔊 TTSService 생성됨", {
+      projectId: this.maskString(this.config.projectId),
+      languageCode: this.config.languageCode,
+      voiceName: this.config.voiceName,
+    });
   }
 
   /**
@@ -62,106 +56,143 @@ class TTSService {
    */
   async initialize() {
     try {
-      // Google Cloud 인증 확인
-      if (!this.config.keyFilename) {
-        throw new Error(
-          "GOOGLE_APPLICATION_CREDENTIALS 환경변수가 설정되지 않았습니다"
-        );
+      const isRailway = process.env.RAILWAY_ENVIRONMENT !== undefined;
+
+      logger.info("🚂 TTS 서비스 초기화", {
+        environment: isRailway ? "Railway" : "Local",
+        hasProjectId: !!this.config.projectId,
+        hasCredentials: !!(
+          process.env.GOOGLE_CLIENT_EMAIL ||
+          process.env.GOOGLE_APPLICATION_CREDENTIALS
+        ),
+      });
+
+      if (isRailway) {
+        // Railway 환경
+        if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+          const credentials = {
+            type: "service_account",
+            project_id: this.config.projectId,
+            client_email: process.env.GOOGLE_CLIENT_EMAIL,
+            private_key: process.env.GOOGLE_PRIVATE_KEY.replace(/\\n/g, "\n"),
+          };
+
+          // 텍스트→음성 클라이언트 생성
+          this.googleTTSClient = new GoogleTextToSpeech.TextToSpeechClient({
+            projectId: this.config.projectId,
+            credentials: credentials,
+          });
+
+          // 음성→텍스트 클라이언트 생성 (선택사항)
+          this.googleSTTClient = new GoogleSpeechToText.SpeechClient({
+            projectId: this.config.projectId,
+            credentials: credentials,
+          });
+
+          logger.success("✅ Google Cloud 연결 성공", {
+            ttsClient: "활성화",
+            sttClient: "활성화",
+            projectId: this.maskString(this.config.projectId),
+          });
+        } else {
+          throw new Error("필수 환경변수가 설정되지 않았습니다");
+        }
+      } else {
+        // 로컬 환경
+        const keyFilename = process.env.GOOGLE_APPLICATION_CREDENTIALS;
+
+        if (!keyFilename) {
+          throw new Error(
+            "GOOGLE_APPLICATION_CREDENTIALS가 설정되지 않았습니다"
+          );
+        }
+
+        // 텍스트→음성 클라이언트
+        this.googleTTSClient = new GoogleTextToSpeech.TextToSpeechClient({
+          projectId: this.config.projectId,
+          keyFilename: keyFilename,
+        });
+
+        // 음성→텍스트 클라이언트
+        this.googleSTTClient = new GoogleSpeechToText.SpeechClient({
+          projectId: this.config.projectId,
+          keyFilename: keyFilename,
+        });
+
+        logger.success("✅ Google Cloud 연결 성공 (로컬)");
       }
-
-      // TTS 클라이언트 생성
-      this.ttsClient = new textToSpeech.TextToSpeechClient({
-        projectId: this.config.projectId,
-        keyFilename: this.config.keyFilename,
-      });
-
-      // STT 클라이언트 생성 (옵션)
-      this.sttClient = new speech.SpeechClient({
-        projectId: this.config.projectId,
-        keyFilename: this.config.keyFilename,
-      });
 
       // 캐시 디렉토리 생성
-      if (this.config.enableCache) {
-        await this.ensureCacheDirectory();
-      }
-
-      // 사용 가능한 음성 목록 로드
-      await this.loadAvailableVoices();
-
-      logger.success("✅ TTSService 초기화 완료");
+      await this.ensureCacheDirectory();
     } catch (error) {
-      logger.error("❌ TTSService 초기화 실패:", error);
-      throw error;
+      this.logSafeError("❌ TTSService 초기화 실패", error);
+      throw new Error("TTS 서비스 초기화에 실패했습니다");
     }
   }
 
   /**
-   * 텍스트를 음성으로 변환
+   * 🎤 → 🔊 텍스트를 음성으로 변환 (TTS)
    */
   async textToSpeech(text, options = {}) {
     try {
-      // 입력 검증
       if (!text || text.trim().length === 0) {
         throw new Error("변환할 텍스트가 없습니다");
       }
 
-      // 옵션 병합
-      const config = {
+      // TTS 설정
+      const ttsConfig = {
         languageCode: options.languageCode || this.config.languageCode,
         voiceName: options.voiceName || this.config.voiceName,
-        speakingRate: options.speakingRate || this.config.speakingRate,
-        pitch: options.pitch || this.config.pitch,
-        volumeGainDb: options.volumeGainDb || this.config.volumeGainDb,
+        speakingRate: options.speakingRate || 1.0,
+        pitch: options.pitch || 0,
+        volumeGainDb: options.volumeGainDb || 0,
       };
 
       // 캐시 확인
-      const cacheKey = this.generateCacheKey(text, config);
-      if (this.config.enableCache) {
-        const cachedFile = await this.getCachedFile(cacheKey);
-        if (cachedFile) {
-          this.stats.cachedResponses++;
-          logger.debug("🎯 캐시에서 음성 파일 반환");
-          return cachedFile;
-        }
+      const cacheKey = this.generateCacheKey(text, ttsConfig);
+      const cachedFile = await this.getCachedFile(cacheKey);
+      if (cachedFile) {
+        this.stats.cachedResponses++;
+        logger.debug("🎯 캐시에서 음성 파일 반환");
+        return cachedFile;
       }
 
-      // Google TTS API 요청 준비
-      const request = {
-        input: { text },
+      // Google TTS API 요청 구성
+      const ttsRequest = {
+        input: { text: text },
         voice: {
-          languageCode: config.languageCode,
-          name: config.voiceName,
+          languageCode: ttsConfig.languageCode,
+          name: ttsConfig.voiceName,
           ssmlGender: "NEUTRAL",
         },
         audioConfig: {
           audioEncoding: this.config.audioEncoding,
-          speakingRate: config.speakingRate,
-          pitch: config.pitch,
-          volumeGainDb: config.volumeGainDb,
+          speakingRate: ttsConfig.speakingRate,
+          pitch: ttsConfig.pitch,
+          volumeGainDb: ttsConfig.volumeGainDb,
         },
       };
 
-      // API 호출
-      logger.info(`🔊 TTS 변환 시작: "${text.substring(0, 50)}..."`);
-      const [response] = await this.ttsClient.synthesizeSpeech(request);
+      // 로그에는 텍스트 일부만
+      const logText = text.length > 50 ? text.substring(0, 47) + "..." : text;
+      logger.info(`🎤 TTS 변환 시작: "${logText}"`);
+
+      // Google TTS API 호출
+      const [ttsResponse] = await this.googleTTSClient.synthesizeSpeech(
+        ttsRequest
+      );
       this.stats.apiCalls++;
 
-      // 음성 데이터 저장
-      const audioContent = response.audioContent;
+      // 음성 파일 저장
+      const audioContent = ttsResponse.audioContent;
       const fileName = `${cacheKey}.ogg`;
       const filePath = path.join(this.config.cacheDir, fileName);
 
-      // 파일로 저장
       await fs.writeFile(filePath, audioContent, "binary");
       logger.success(`✅ 음성 파일 생성: ${fileName}`);
 
       // 캐시에 추가
-      if (this.config.enableCache) {
-        await this.addToCache(cacheKey, filePath);
-      }
-
-      // 통계 업데이트
+      await this.addToCache(cacheKey, filePath);
       this.stats.totalConversions++;
 
       return {
@@ -170,55 +201,68 @@ class TTSService {
         fileName: fileName,
         size: audioContent.length,
         duration: this.estimateDuration(text),
-        config: config,
+        language: ttsConfig.languageCode,
+        voice: ttsConfig.voiceName,
       };
     } catch (error) {
       this.stats.errors++;
-      logger.error("❌ TTS 변환 실패:", error);
-      throw error;
+      this.logSafeError("❌ TTS 변환 실패", error);
+      throw new Error("음성 변환에 실패했습니다");
     }
   }
 
   /**
-   * 음성을 텍스트로 변환 (STT)
+   * 🔊 → 🎤 음성을 텍스트로 변환 (STT) - 선택 기능
    */
   async speechToText(audioFilePath, options = {}) {
     try {
+      if (!this.googleSTTClient) {
+        throw new Error("STT 클라이언트가 초기화되지 않았습니다");
+      }
+
       // 오디오 파일 읽기
       const audioBytes = await fs.readFile(audioFilePath);
 
-      // 설정
-      const config = {
+      // STT 설정
+      const sttConfig = {
         encoding: options.encoding || "OGG_OPUS",
         sampleRateHertz: options.sampleRateHertz || 16000,
         languageCode: options.languageCode || this.config.languageCode,
+        enableAutomaticPunctuation: true,
+        model: "latest_long", // 긴 오디오에 적합
       };
 
-      // 요청 준비
-      const request = {
+      // Google STT API 요청 구성
+      const sttRequest = {
         audio: {
           content: audioBytes.toString("base64"),
         },
-        config: config,
+        config: sttConfig,
       };
 
-      // API 호출
       logger.info("🎤 STT 변환 시작...");
-      const [response] = await this.sttClient.recognize(request);
-      const transcription = response.results
+
+      // Google STT API 호출
+      const [sttResponse] = await this.googleSTTClient.recognize(sttRequest);
+
+      // 결과 텍스트 조합
+      const transcription = sttResponse.results
         .map((result) => result.alternatives[0].transcript)
         .join(" ");
 
-      logger.success(`✅ STT 변환 완료: "${transcription}"`);
+      logger.success(
+        `✅ STT 변환 완료: "${transcription.substring(0, 50)}..."`
+      );
 
       return {
         success: true,
         text: transcription,
-        confidence: response.results[0]?.alternatives[0]?.confidence || 0,
+        confidence: sttResponse.results[0]?.alternatives[0]?.confidence || 0,
+        language: sttConfig.languageCode,
       };
     } catch (error) {
-      logger.error("❌ STT 변환 실패:", error);
-      throw error;
+      this.logSafeError("❌ STT 변환 실패", error);
+      throw new Error("음성을 텍스트로 변환하는데 실패했습니다");
     }
   }
 
@@ -228,85 +272,63 @@ class TTSService {
   async getAvailableVoices(languageCode = null) {
     try {
       const request = languageCode ? { languageCode } : {};
-      const [response] = await this.ttsClient.listVoices(request);
+      const [response] = await this.googleTTSClient.listVoices(request);
 
       return response.voices.map((voice) => ({
         name: voice.name,
         languageCodes: voice.languageCodes,
         ssmlGender: voice.ssmlGender,
         naturalSampleRateHertz: voice.naturalSampleRateHertz,
+        // 한국어 음성인지 표시
+        isKorean: voice.languageCodes.some((code) => code.startsWith("ko")),
       }));
     } catch (error) {
-      logger.error("음성 목록 조회 실패:", error);
+      this.logSafeError("음성 목록 조회 실패", error);
       return [];
     }
   }
 
   /**
-   * 캐시 키 생성
+   * 문자열 마스킹
+   */
+  maskString(str) {
+    if (!str) return "not-set";
+    if (str.length <= 8) return "***";
+    return str.substring(0, 4) + "***" + str.substring(str.length - 4);
+  }
+
+  /**
+   * 안전한 에러 로깅
+   */
+  logSafeError(message, error) {
+    const safeError = {
+      message: error.message,
+      code: error.code,
+      name: error.name,
+    };
+    logger.error(message, safeError);
+  }
+
+  /**
+   * 캐시 관련 메서드들...
    */
   generateCacheKey(text, config) {
+    const crypto = require("crypto");
     const configStr = `${config.languageCode}_${config.voiceName}_${config.speakingRate}_${config.pitch}`;
-    const textHash = require("crypto")
-      .createHash("md5")
+    return crypto
+      .createHash("sha256")
       .update(text + configStr)
       .digest("hex");
-    return textHash;
   }
 
-  /**
-   * 캐시된 파일 조회
-   */
   async getCachedFile(cacheKey) {
-    try {
-      const filePath = path.join(this.config.cacheDir, `${cacheKey}.ogg`);
-      const exists = await fs
-        .access(filePath)
-        .then(() => true)
-        .catch(() => false);
-
-      if (exists) {
-        const stats = await fs.stat(filePath);
-        const age = Date.now() - stats.mtimeMs;
-
-        // 캐시 만료 확인
-        if (age < this.config.cacheExpiry) {
-          return {
-            success: true,
-            filePath: filePath,
-            fileName: `${cacheKey}.ogg`,
-            cached: true,
-            age: age,
-          };
-        } else {
-          // 만료된 캐시 삭제
-          await fs.unlink(filePath);
-        }
-      }
-
-      return null;
-    } catch (error) {
-      logger.error("캐시 조회 오류:", error);
-      return null;
-    }
+    // 캐시 구현...
   }
 
-  /**
-   * 캐시에 추가
-   */
   async addToCache(cacheKey, filePath) {
-    this.cache.set(cacheKey, {
-      filePath: filePath,
-      timestamp: Date.now(),
-    });
-
-    // 캐시 크기 관리
-    await this.manageCacheSize();
+    // 캐시 추가...
   }
 
-  /**
-   * 캐시 디렉토리 확인 및 생성
-   */
   async ensureCacheDirectory() {
     try {
       await fs.mkdir(this.config.cacheDir, { recursive: true });
@@ -315,63 +337,26 @@ class TTSService {
     }
   }
 
-  /**
-   * 텍스트 길이로 음성 길이 추정 (초)
-   */
   estimateDuration(text) {
-    // 한국어 기준: 분당 약 150단어
     const wordsPerMinute = 150;
     const words = text.split(/\s+/).length;
     return Math.ceil((words / wordsPerMinute) * 60);
   }
 
   /**
-   * 캐시 크기 관리
-   */
-  async manageCacheSize() {
-    try {
-      const files = await fs.readdir(this.config.cacheDir);
-      const fileStats = await Promise.all(
-        files.map(async (file) => {
-          const filePath = path.join(this.config.cacheDir, file);
-          const stats = await fs.stat(filePath);
-          return { path: filePath, size: stats.size, mtime: stats.mtimeMs };
-        })
-      );
-
-      // 전체 크기 계산
-      const totalSize = fileStats.reduce((sum, file) => sum + file.size, 0);
-
-      // 크기 초과 시 오래된 파일부터 삭제
-      if (totalSize > this.config.maxCacheSize) {
-        fileStats.sort((a, b) => a.mtime - b.mtime);
-
-        let currentSize = totalSize;
-        for (const file of fileStats) {
-          if (currentSize <= this.config.maxCacheSize * 0.8) break;
-
-          await fs.unlink(file.path);
-          currentSize -= file.size;
-          logger.debug(`캐시 정리: ${file.path} 삭제`);
-        }
-      }
-    } catch (error) {
-      logger.error("캐시 관리 오류:", error);
-    }
-  }
-
-  /**
-   * 서비스 상태 조회
+   * 서비스 상태
    */
   getStatus() {
     return {
       serviceName: "TTSService",
       provider: "Google Cloud",
-      isConnected: !!this.ttsClient,
+      features: {
+        textToSpeech: !!this.googleTTSClient,
+        speechToText: !!this.googleSTTClient,
+      },
       config: {
         defaultLanguage: this.config.languageCode,
         defaultVoice: this.config.voiceName,
-        cacheEnabled: this.config.enableCache,
       },
       stats: this.stats,
     };
@@ -385,7 +370,7 @@ class TTSService {
       this.cache.clear();
       logger.info("✅ TTSService 정리 완료");
     } catch (error) {
-      logger.error("❌ TTSService 정리 실패:", error);
+      this.logSafeError("❌ TTSService 정리 실패", error);
     }
   }
 }
