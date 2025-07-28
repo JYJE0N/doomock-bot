@@ -1,5 +1,4 @@
-// src/modules/TodoModule.js - 안정화된 최종 버전
-
+// src/modules/TodoModule.js - 완전한 Todo 모듈
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserId } = require("../utils/UserHelper");
@@ -9,12 +8,14 @@ class TodoModule extends BaseModule {
     super("TodoModule", { bot, ...options });
   }
 
+  /**
+   * 모듈 초기화
+   */
   async onInitialize() {
-    // ServiceBuilder가 미리 만들어 둔 서비스 인스턴스를 이름으로 찾아옵니다.
+    // ServiceBuilder가 미리 만들어 둔 서비스 인스턴스를 찾습니다
     this.todoService = this.serviceBuilder.getServiceInstance("todo");
 
     if (!this.todoService) {
-      // 만약 서비스를 찾지 못했다면, 봇이 시작되지 않도록 치명적인 오류를 발생시킵니다.
       throw new Error(
         "TodoService 인스턴스를 ServiceBuilder에서 찾을 수 없습니다."
       );
@@ -24,9 +25,12 @@ class TodoModule extends BaseModule {
     logger.success("✅ TodoModule 초기화 완료.");
   }
 
+  /**
+   * 액션 등록
+   */
   setupActions() {
     this.registerActions({
-      menu: this.showList, // 'menu' 요청이 오면 리스트를 보여줍니다.
+      menu: this.showList,
       list: this.showList,
       add_prompt: this.promptAdd,
       toggle: this.toggleTodo,
@@ -34,71 +38,186 @@ class TodoModule extends BaseModule {
     });
   }
 
+  /**
+   * 메시지 처리 (할일 입력 대기 상태 처리)
+   */
   async onHandleMessage(bot, msg) {
     const userId = getUserId(msg.from);
     const state = await this.getModuleState(userId);
 
     if (state?.awaitingInput) {
-      logger.info(`TodoModule: 새 할 일 입력 받음 (사용자: ${userId})`);
+      logger.info(`TodoModule: 새 할일 입력 받음 (사용자: ${userId})`);
       const text = msg.text;
-      await this.todoService.addTodo(userId, text);
-      await this.clearModuleState(userId); // 상태 초기화
 
-      // 할 일 추가 후, 자동으로 목록을 다시 보여줍니다.
-      const listData = await this.showList(bot, { from: { id: userId } });
-      // 중요: 메시지를 새로 보내거나 수정해야 하므로 NavigationHandler에 렌더링을 위임합니다.
-      // 이 부분은 BotController나 NavigationHandler에서 후처리가 필요할 수 있습니다.
-      // 지금은 일단 추가만 되도록 단순화합니다.
-      await bot.telegram.sendMessage(
-        userId,
-        `✅ 할 일 '${text}'이(가) 추가되었습니다.`
-      );
-      return true;
+      try {
+        await this.todoService.addTodo(userId, text);
+        await this.clearModuleState(userId); // 상태 초기화
+
+        // 할일 추가 성공 메시지
+        await bot.telegram.sendMessage(
+          userId,
+          `✅ 할일 '${text}'이(가) 추가되었습니다.`
+        );
+
+        return true;
+      } catch (error) {
+        logger.error("할일 추가 실패:", error);
+        await bot.telegram.sendMessage(
+          userId,
+          "❌ 할일 추가에 실패했습니다. 다시 시도해주세요."
+        );
+        return true;
+      }
     }
+
     return false;
   }
 
-  // 할 일 목록을 보여주는 표준 함수
+  /**
+   * 할일 목록 표시
+   */
   async showList(bot, callbackQuery) {
     const userId = getUserId(callbackQuery.from);
     logger.info(`TodoModule: 목록 표시 요청 (사용자: ${userId})`);
-    const todos = await this.todoService.getTodos(userId);
-    return {
-      module: "todo",
-      type: "list", // NavigationHandler가 이 타입을 보고 화면을 그립니다.
-      data: { todos },
-    };
+
+    try {
+      const todos = await this.todoService.getTodos(userId);
+
+      return {
+        module: "todo",
+        type: "list",
+        data: { todos },
+      };
+    } catch (error) {
+      logger.error("할일 목록 조회 실패:", error);
+      return {
+        module: "todo",
+        type: "error",
+        data: { message: "할일 목록을 불러올 수 없습니다." },
+      };
+    }
   }
 
-  // 할 일 추가를 안내하는 함수
+  /**
+   * 할일 추가 안내
+   */
   async promptAdd(bot, callbackQuery) {
     const userId = getUserId(callbackQuery.from);
     logger.info(`TodoModule: 추가 안내 (사용자: ${userId})`);
+
     await this.setModuleState(userId, { awaitingInput: true });
+
     return {
       module: "todo",
-      type: "add_prompt", // 'add_prompt' 타입으로 렌더링 요청
+      type: "add_prompt",
       data: {},
     };
   }
 
-  // 할 일 완료/미완료 처리
+  /**
+   * 할일 완료/미완료 토글
+   */
   async toggleTodo(bot, callbackQuery, params) {
     const userId = getUserId(callbackQuery.from);
-    const todoId = params; // 'todo:toggle:some_id' 에서 some_id 부분
+    const todoId = params; // 'todo:toggle:todoId' 에서 todoId 부분
+
     logger.info(`TodoModule: 토글 요청 (사용자: ${userId}, ID: ${todoId})`);
-    await this.todoService.toggleTodo(userId, todoId);
-    // 처리 후, 최신 목록 데이터를 다시 반환하여 화면을 갱신합니다.
-    return await this.showList(bot, callbackQuery);
+
+    try {
+      const result = await this.todoService.toggleTodo(userId, todoId);
+
+      if (!result) {
+        return {
+          module: "todo",
+          type: "error",
+          data: { message: "할일을 찾을 수 없습니다." },
+        };
+      }
+
+      // 토글 후 목록 다시 표시
+      return await this.showList(bot, callbackQuery);
+    } catch (error) {
+      logger.error("할일 토글 실패:", error);
+      return {
+        module: "todo",
+        type: "error",
+        data: { message: "할일 상태 변경에 실패했습니다." },
+      };
+    }
   }
 
-  // 할 일 삭제
+  /**
+   * 할일 삭제
+   */
   async deleteTodo(bot, callbackQuery, params) {
     const userId = getUserId(callbackQuery.from);
-    const todoId = params;
+    const todoId = params; // 'todo:delete:todoId' 에서 todoId 부분
+
     logger.info(`TodoModule: 삭제 요청 (사용자: ${userId}, ID: ${todoId})`);
-    await this.todoService.deleteTodo(userId, todoId);
-    return await this.showList(bot, callbackQuery);
+
+    try {
+      const result = await this.todoService.deleteTodo(userId, todoId);
+
+      if (!result) {
+        return {
+          module: "todo",
+          type: "error",
+          data: { message: "할일을 찾을 수 없습니다." },
+        };
+      }
+
+      // 삭제 후 목록 다시 표시
+      return await this.showList(bot, callbackQuery);
+    } catch (error) {
+      logger.error("할일 삭제 실패:", error);
+      return {
+        module: "todo",
+        type: "error",
+        data: { message: "할일 삭제에 실패했습니다." },
+      };
+    }
+  }
+
+  /**
+   * 모듈 상태 가져오기 (BaseModule에서 상속받은 메서드 활용)
+   */
+  async getModuleState(userId) {
+    // BaseModule의 userStates Map을 사용
+    return this.userStates.get(String(userId));
+  }
+
+  /**
+   * 모듈 상태 설정
+   */
+  async setModuleState(userId, state) {
+    this.userStates.set(String(userId), state);
+  }
+
+  /**
+   * 모듈 상태 초기화
+   */
+  async clearModuleState(userId) {
+    this.userStates.delete(String(userId));
+  }
+
+  /**
+   * 명령어 추출 헬퍼
+   */
+  extractCommand(text) {
+    if (!text) return null;
+
+    // /command 형식
+    if (text.startsWith("/")) {
+      return text.split(" ")[0].substring(1).toLowerCase();
+    }
+
+    // 일반 텍스트 명령어
+    const lowerText = text.trim().toLowerCase();
+    const commands = ["todo", "할일", "todos", "할일목록"];
+
+    return commands.find(
+      (cmd) => lowerText === cmd || lowerText.startsWith(cmd + " ")
+    );
   }
 }
 

@@ -1,7 +1,7 @@
 // src/core/ServiceBuilder.js - Mongoose 지원 버전
 const path = require("path");
 const fs = require("fs");
-const logger = require("../utils/Logger");
+const logger = require("../../utils/Logger");
 
 class ServiceBuilder {
   constructor() {
