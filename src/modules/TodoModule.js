@@ -154,7 +154,7 @@ class TodoModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("todo", "add", userId);
+    logger.info("todo", "add", userId);
 
     // 사용자 상태 설정 (입력 대기)
     this.setUserState(userId, {
@@ -228,7 +228,7 @@ class TodoModule extends BaseModule {
    * 도움말
    */
   async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
-    logger.navigation("todo", "help");
+    logger.info("todo", "help");
 
     return {
       type: "help",

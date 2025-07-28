@@ -116,7 +116,7 @@ class TTSModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("tts", "menu", userId);
+    logger.info("tts", "menu", userId);
 
     try {
       // 사용자 통계 조회
@@ -150,7 +150,7 @@ class TTSModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("tts", "convert", userId);
+    logger.info("tts", "convert", userId);
 
     // 사용자 상태 설정
     this.setUserState(userId, {
@@ -237,7 +237,7 @@ class TTSModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("tts", "voices", userId);
+    logger.info("tts", "voices", userId);
 
     try {
       // 사용 가능한 음성 목록 조회
@@ -268,7 +268,7 @@ class TTSModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("tts", "history", userId);
+    logger.info("tts", "history", userId);
 
     try {
       // 변환 기록 조회 (서비스에 구현되어 있다면)
@@ -310,7 +310,7 @@ class TTSModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("tts", "settings", userId);
+    logger.info("tts", "settings", userId);
 
     try {
       // 사용자 설정 조회

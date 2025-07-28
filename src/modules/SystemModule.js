@@ -161,7 +161,7 @@ class SystemModule extends BaseModule {
    * ❓ 도움말 데이터 제공
    */
   async showHelp(bot, callbackQuery, subAction, params) {
-    // [FIX] logger.navigation -> logger.info 로 수정
+    // [FIX] logger.info -> logger.info 로 수정
     logger.info(
       `SystemModule: 도움말 표시 (사용자: ${getUserId(callbackQuery.from)})`
     );
@@ -178,7 +178,7 @@ class SystemModule extends BaseModule {
    * 📊 시스템 상태 데이터 제공
    */
   async showStatus(bot, callbackQuery, subAction, params) {
-    // [FIX] logger.navigation -> logger.info 로 수정
+    // [FIX] logger.info -> logger.info 로 수정
     logger.info(
       `SystemModule: 상태 표시 (사용자: ${getUserId(callbackQuery.from)})`
     );
@@ -197,7 +197,7 @@ class SystemModule extends BaseModule {
    * ℹ️ 정보 데이터 제공
    */
   async showAbout(bot, callbackQuery, subAction, params) {
-    // [FIX] logger.navigation -> logger.info 로 수정
+    // [FIX] logger.info -> logger.info 로 수정
     logger.info(
       `SystemModule: 정보 표시 (사용자: ${getUserId(callbackQuery.from)})`
     );
