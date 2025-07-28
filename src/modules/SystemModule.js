@@ -160,7 +160,7 @@ class SystemModule extends BaseModule {
    * ❓ 도움말 데이터 제공
    */
   async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
-    logger.navigation("system", "help");
+    logger.info("system", "help");
 
     return {
       type: "help",
@@ -188,7 +188,7 @@ class SystemModule extends BaseModule {
    * 📊 시스템 상태 데이터 제공
    */
   async showStatus(bot, callbackQuery, subAction, params, moduleManager) {
-    logger.navigation("system", "status");
+    logger.info("system", "status");
 
     try {
       // 헬스 체크 실행
@@ -220,7 +220,7 @@ class SystemModule extends BaseModule {
    * ℹ️ 정보 데이터 제공
    */
   async showAbout(bot, callbackQuery, subAction, params, moduleManager) {
-    logger.navigation("system", "about");
+    logger.info("system", "about");
 
     return {
       type: "about",
@@ -249,7 +249,7 @@ class SystemModule extends BaseModule {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
-    logger.navigation("system", "settings", userId);
+    logger.info("system", "settings", userId);
 
     try {
       // 사용자별 설정 조회 (추후 구현)
@@ -288,7 +288,7 @@ class SystemModule extends BaseModule {
     params,
     moduleManager
   ) {
-    logger.navigation("system", "stats");
+    logger.info("system", "stats");
 
     try {
       const moduleUsage = await this.getModuleUsageStats();
@@ -314,7 +314,7 @@ class SystemModule extends BaseModule {
    * 🏥 헬스 체크 데이터 제공
    */
   async showHealthCheck(bot, callbackQuery, subAction, params, moduleManager) {
-    logger.navigation("system", "health");
+    logger.info("system", "health");
 
     try {
       const healthCheck = await this.performSystemHealthCheck();
