@@ -1,17 +1,12 @@
-// src/core/ModuleManager.js
-// 📦 모듈 매니저 - 모듈 중앙 관리 (v3.0.1)
-
+// src/core/ModuleManager.js - 수정된 버전
+const path = require("path");
 const logger = require("../utils/Logger");
 const { createServiceBuilder } = require("./ServiceBuilder");
 const { getInstance } = require("../database/DatabaseManager");
 const { getEnabledModules } = require("../config/ModuleRegistry");
-const BaseModule = require("./BaseModule");
 
 /**
  * 📦 ModuleManager - 모든 모듈의 중앙 관리자
- *
- * 역할: 모듈 생명주기 관리, 라우팅, 통신 조율
- * 비유: 쇼핑몰의 매장 총관리자
  */
 class ModuleManager {
   constructor(bot, options = {}) {
@@ -19,8 +14,8 @@ class ModuleManager {
     this.db = options.db;
     this.modules = new Map();
     this.initialized = false;
-    // ServiceBuilder 추가
     this.serviceBuilder = null;
+
     // 통계
     this.stats = {
       totalModules: 0,
@@ -29,7 +24,7 @@ class ModuleManager {
       callbacksHandled: 0,
       messagesHandled: 0,
     };
-    // ✅ 생성자에서 logger 사용 가능 확인
+
     logger.info("📦 ModuleManager 생성됨");
   }
 
@@ -47,10 +42,10 @@ class ModuleManager {
       // 2. ServiceBuilder 초기화
       this.serviceBuilder = createServiceBuilder();
       this.serviceBuilder.setDefaultDatabase(dbManager.getDb());
-      await this.serviceBuilder.initialize(); // 여기서 모든 서비스 자동 등록!
+      await this.serviceBuilder.initialize();
 
-      // 3. 모듈들 초기화 - ✅ 이 메서드를 loadModules로 변경
-      await this.loadModules(); // ✅ initializeModules → loadModules
+      // 3. 모듈들 로드
+      await this.loadModules();
 
       this.initialized = true;
       logger.success("✅ ModuleManager 초기화 완료");
@@ -58,17 +53,6 @@ class ModuleManager {
       logger.error("ModuleManager 초기화 실패:", error);
       throw error;
     }
-  }
-
-  // 모듈 생성할 때 ServiceBuilder 주입
-  async createModule(moduleKey, ModuleClass, config) {
-    const moduleInstance = new ModuleClass(this.bot, {
-      moduleManager: this,
-      serviceBuilder: this.serviceBuilder, // 👈 여기서 주입!
-      config: config,
-    });
-
-    return moduleInstance;
   }
 
   /**
@@ -80,16 +64,38 @@ class ModuleManager {
 
     for (const config of moduleConfigs) {
       try {
-        logger.module(config.key, "로드 중...");
+        logger.module(`${config.key}`, "로드 중...");
+
+        // 🔧 수정: 절대 경로로 변경
+        const modulePath = path.join(__dirname, config.path);
+
+        // 모듈이 존재하는지 먼저 확인
+        try {
+          require.resolve(modulePath);
+        } catch (e) {
+          logger.warn(
+            `❌ ${config.key} 모듈 파일을 찾을 수 없음: ${modulePath}`
+          );
+
+          // SystemModule이 없어도 계속 진행
+          if (config.key === "system") {
+            logger.info("시스템 모듈 스킵 (선택사항)");
+            continue;
+          }
+
+          this.stats.failedModules++;
+          continue;
+        }
 
         // 모듈 클래스 로드
-        const ModuleClass = require(config.path);
+
+        const ModuleClass = require(modulePath);
 
         // 모듈 인스턴스 생성
         const moduleInstance = new ModuleClass(this.bot, {
           db: this.db,
           moduleManager: this,
-          serviceBuilder: this.serviceBuilder, // 👈 이걸 추가!
+          serviceBuilder: this.serviceBuilder,
           config: config.config,
         });
 
@@ -111,59 +117,44 @@ class ModuleManager {
         this.stats.failedModules++;
       }
     }
+
+    logger.info(
+      `📦 모듈 로드 완료: ${this.stats.activeModules}/${this.stats.totalModules}`
+    );
   }
 
   /**
    * 🎯 콜백 쿼리 처리 (라우팅)
    */
-  async handleCallback(
-    bot,
-    callbackQuery,
-    moduleName,
-    subAction,
-    moduleManager
-  ) {
+  async handleCallback(bot, callbackQuery, action, params, moduleManager) {
     try {
-      // 🔍 모듈 찾기
-      const module = this.modules.get(moduleName);
+      // 모듈 키 추출
+      const moduleKey = action.split(":")[0];
+      const subAction = action.substring(moduleKey.length + 1) || "menu";
+
+      logger.debug(`📦 모듈 라우팅: ${moduleKey} → ${subAction}`);
+
+      // 모듈 찾기
+      const module = this.modules.get(moduleKey);
       if (!module) {
-        logger.warn(`모듈을 찾을 수 없음: ${moduleName}`);
-        return {
-          type: "error",
-          message: `'${moduleName}' 모듈을 찾을 수 없습니다.`,
-          module: moduleName,
-        };
+        logger.warn(`모듈을 찾을 수 없음: ${moduleKey}`);
+        return;
       }
 
-      logger.navigation(moduleName, subAction, getUserId(callbackQuery));
-
-      // ✅ 표준 매개변수로 모듈 콜백 호출
-      const result = await module.handleCallback(
+      // 모듈로 전달
+      await module.instance.handleCallback(
         bot,
         callbackQuery,
         subAction,
-        {}, // params - 빈 객체로 통일
-        moduleManager || this
+        params,
+        moduleManager
       );
 
-      // ✅ 결과 데이터 반환 (NavigationHandler가 UI 처리)
-      return (
-        result || {
-          type: "success",
-          module: moduleName,
-          action: subAction,
-        }
-      );
+      // 통계 업데이트
+      this.stats.callbacksHandled++;
     } catch (error) {
-      logger.error(`모듈 콜백 처리 실패 (${moduleName}:${subAction}):`, error);
-
-      return {
-        type: "error",
-        message: `${moduleName} 처리 중 오류가 발생했습니다.`,
-        module: moduleName,
-        action: subAction,
-        error: error.message,
-      };
+      logger.error("모듈 콜백 처리 실패", error);
+      throw error;
     }
   }
 
@@ -208,37 +199,26 @@ class ModuleManager {
       name: module.config.name,
       active: true,
       healthy: module.instance.isHealthy ? module.instance.isHealthy() : true,
-      stats: module.instance.getStats ? module.instance.getStats() : {},
+      stats: module.instance.stats || {},
     };
-  }
-
-  // 모듈 카운터래요
-  getModuleCount() {
-    return this.modules.size;
   }
 
   /**
    * 📊 전체 상태 조회
    */
   getStatus() {
-    const moduleStatuses = {};
-
-    for (const [key, module] of this.modules) {
-      moduleStatuses[key] = this.getModuleStatus(key);
-    }
-
     return {
       initialized: this.initialized,
+      modules: Array.from(this.modules.keys()),
       stats: this.stats,
-      modules: moduleStatuses,
     };
   }
 
   /**
-   * 🧹 정리 작업
+   * 🧹 정리
    */
   async cleanup() {
-    logger.system("ModuleManager 정리 시작...");
+    logger.info("📦 ModuleManager 정리 시작...");
 
     // 모든 모듈 정리
     for (const [key, module] of this.modules) {
@@ -246,16 +226,12 @@ class ModuleManager {
         if (module.instance.cleanup) {
           await module.instance.cleanup();
         }
-        logger.debug(`${key} 모듈 정리됨`);
       } catch (error) {
-        logger.error(`${key} 모듈 정리 실패`, error);
+        logger.error(`${key} 모듈 정리 실패:`, error);
       }
     }
 
-    this.modules.clear();
-    this.initialized = false;
-
-    logger.success("✅ ModuleManager 정리 완료");
+    logger.info("📦 ModuleManager 정리 완료");
   }
 }
 
