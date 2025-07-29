@@ -1,4 +1,4 @@
-// src/core/BaseModule.js - 최종 수정 버전
+// src/core/BaseModule.js - extractCommand 메서드 추가된 버전
 
 const logger = require("../utils/Logger");
 
@@ -16,7 +16,6 @@ class BaseModule {
    * @param {object} options.config 모듈 설정 객체
    */
   constructor(moduleName, { bot, moduleManager, config, serviceBuilder }) {
-    // <--- serviceBuilder를 받도록 수정
     if (new.target === BaseModule) {
       throw new TypeError("BaseModule은 직접 인스턴스화할 수 없습니다.");
     }
@@ -24,7 +23,7 @@ class BaseModule {
     this.moduleName = moduleName;
     this.bot = bot;
     this.moduleManager = moduleManager;
-    this.serviceBuilder = serviceBuilder; // <--- 전달받은 serviceBuilder를 저장
+    this.serviceBuilder = serviceBuilder;
     this.config = config || {};
     this.isInitialized = false;
     this.actionMap = new Map();
@@ -58,6 +57,92 @@ class BaseModule {
   }
 
   /**
+   * 🔍 명령어 추출 (모든 모듈에서 사용)
+   * 표준화된 명령어 추출 로직
+   */
+  extractCommand(text) {
+    if (!text || typeof text !== "string") {
+      return null;
+    }
+
+    // 슬래시 명령어 처리 (/command)
+    if (text.startsWith("/")) {
+      return text.substring(1).split(" ")[0].toLowerCase();
+    }
+
+    // 한국어 키워드 명령어 매핑
+    const commandMap = {
+      할일: "todo",
+      todo: "todo",
+      투두: "todo",
+      태스크: "todo",
+
+      날씨: "weather",
+      weather: "weather",
+      기상: "weather",
+      온도: "weather",
+
+      음성변환: "tts",
+      tts: "tts",
+      음성: "tts",
+      "text to speech": "tts",
+
+      타이머: "timer",
+      timer: "timer",
+      시간: "timer",
+      알람: "timer",
+
+      근무시간: "worktime",
+      worktime: "worktime",
+      출퇴근: "worktime",
+      근무: "worktime",
+
+      계산기: "calculator",
+      calculator: "calculator",
+      calc: "calculator",
+      계산: "calculator",
+
+      번역: "translate",
+      translate: "translate",
+      번역기: "translate",
+
+      도움말: "help",
+      help: "help",
+      도움: "help",
+
+      메뉴: "menu",
+      menu: "menu",
+      시작: "start",
+      start: "start",
+    };
+
+    const normalizedText = text.trim().toLowerCase();
+    return commandMap[normalizedText] || null;
+  }
+
+  /**
+   * 🛡️ 사용자 상태 관리 헬퍼
+   */
+  setUserState(userId, state) {
+    this.userStates.set(userId.toString(), {
+      ...state,
+      timestamp: Date.now(),
+      module: this.moduleName,
+    });
+  }
+
+  getUserState(userId) {
+    return this.userStates.get(userId.toString()) || null;
+  }
+
+  clearUserState(userId) {
+    const existed = this.userStates.delete(userId.toString());
+    if (existed) {
+      logger.debug(`🗑️ 사용자 상태 삭제: ${userId} (${this.moduleName})`);
+    }
+  }
+
+  /**
    * 액션을 등록하여 콜백 데이터와 핸들러 함수를 매핑합니다.
    * @param {object} actions - { actionName: handlerFunction } 형태의 객체
    */
@@ -78,7 +163,13 @@ class BaseModule {
       const handler = this.actionMap.get(subAction);
       if (handler) {
         // 핸들러의 결과(UI 렌더링을 위한 데이터)를 반환합니다.
-        return await handler(bot, callbackQuery, params);
+        return await handler(
+          bot,
+          callbackQuery,
+          subAction,
+          params,
+          this.moduleManager
+        );
       } else {
         logger.warn(`[${this.moduleName}] 알 수 없는 액션: ${subAction}`);
         return {

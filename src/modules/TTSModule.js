@@ -207,117 +207,58 @@ class TTSModule extends BaseModule {
     } = msg;
 
     try {
-      // 사용자 상태 확인
-      const userState = this.getUserState(userId);
-      if (!userState || userState.waitingFor !== "tts_text") {
-        return; // 상태가 맞지 않으면 처리하지 않음
-      }
-
-      // 텍스트 길이 검증
-      if (!text || text.trim().length === 0) {
-        await bot.sendMessage(
-          chatId,
-          "❌ 빈 텍스트는 변환할 수 없습니다. 다시 입력해주세요."
-        );
-        return;
-      }
-
+      // 길이 검증
       if (text.length > this.config.maxTextLength) {
-        await bot.sendMessage(
+        await bot.telegram.sendMessage(
           chatId,
-          `❌ 텍스트가 너무 깁니다. 최대 ${this.config.maxTextLength}자까지 입력 가능합니다.\n\n현재 입력: ${text.length}자`
+          `❌ 텍스트가 너무 깁니다. 최대 ${this.config.maxTextLength}자까지 입력 가능합니다.`
         );
         return;
       }
 
       // 처리 중 메시지
-      const processingMsg = await bot.sendMessage(
+      const processingMsg = await bot.telegram.sendMessage(
         chatId,
         "🔊 음성 변환 중... 잠시만 기다려주세요."
       );
 
-      try {
-        // TTS 변환 요청
-        const result = await this.ttsService.textToSpeech(text, {
-          languageCode: userState.language,
-          voiceName: userState.voiceName || this.config.voiceName,
+      // 사용자 상태 가져오기
+      const userState = this.getUserState(userId);
+
+      // TTS 변환 요청
+      const result = await this.ttsService.textToSpeech(text, {
+        languageCode: userState.language,
+      });
+
+      if (result.success) {
+        // 음성 파일 전송
+        await bot.telegram.sendVoice(chatId, result.filePath, {
+          caption: `🎵 변환 완료!\\n길이: 약 ${result.duration}초`,
+          reply_markup: {
+            inline_keyboard: [
+              [
+                { text: "🔊 다시 변환", callback_data: "tts:convert" },
+                { text: "🎭 음성 변경", callback_data: "tts:voices" },
+              ],
+              [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
+            ],
+          },
         });
 
-        if (result && result.success) {
-          // 음성 파일 전송
-          await bot.sendVoice(chatId, result.filePath, {
-            caption: `🎵 변환 완료!\n\n📝 텍스트: "${text.substring(0, 50)}${
-              text.length > 50 ? "..." : ""
-            }"\n⏱️ 길이: 약 ${result.duration || "알 수 없음"}초`,
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: "🔊 다시 변환", callback_data: "tts:convert" },
-                  { text: "🎭 음성 변경", callback_data: "tts:voices" },
-                ],
-                [
-                  { text: "📋 TTS 메뉴", callback_data: "tts:menu" },
-                  { text: "🏠 메인", callback_data: "system:menu" },
-                ],
-              ],
-            },
-          });
-
-          // 처리 중 메시지 삭제
-          try {
-            await bot.deleteMessage(chatId, processingMsg.message_id);
-          } catch (deleteError) {
-            // 삭제 실패는 무시 (메시지가 이미 삭제되었을 수 있음)
-          }
-        } else {
-          await bot.editMessageText(
-            "❌ 음성 변환에 실패했습니다. 다시 시도해주세요.",
-            {
-              chat_id: chatId,
-              message_id: processingMsg.message_id,
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: "🔄 다시 시도", callback_data: "tts:convert" },
-                    { text: "📋 메뉴", callback_data: "tts:menu" },
-                  ],
-                ],
-              },
-            }
-          );
-        }
-      } catch (ttsError) {
-        logger.error("TTS 변환 실패:", ttsError);
-
-        await bot.editMessageText(
-          "❌ 음성 변환 중 오류가 발생했습니다. 나중에 다시 시도해주세요.",
-          {
-            chat_id: chatId,
-            message_id: processingMsg.message_id,
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  { text: "🔄 다시 시도", callback_data: "tts:convert" },
-                  { text: "📋 메뉴", callback_data: "tts:menu" },
-                ],
-              ],
-            },
-          }
-        );
+        // 처리 중 메시지 삭제
+        await bot.telegram.deleteMessage(chatId, processingMsg.message_id);
+      } else {
+        await bot.telegram.sendMessage(chatId, "❌ 음성 변환에 실패했습니다.");
       }
 
       // 사용자 상태 초기화
       this.clearUserState(userId);
     } catch (error) {
-      logger.error("TTS 텍스트 입력 처리 오류:", error);
-
-      await bot.sendMessage(chatId, "❌ 텍스트 처리 중 오류가 발생했습니다.", {
-        reply_markup: {
-          inline_keyboard: [
-            [{ text: "📋 TTS 메뉴", callback_data: "tts:menu" }],
-          ],
-        },
-      });
+      logger.error("TTS 변환 오류:", error);
+      await bot.telegram.sendMessage(
+        chatId,
+        "❌ 음성 변환 중 오류가 발생했습니다."
+      );
 
       // 사용자 상태 초기화
       this.clearUserState(userId);
