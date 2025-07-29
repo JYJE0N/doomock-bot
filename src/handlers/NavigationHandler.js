@@ -8,11 +8,22 @@ class NavigationHandler {
   constructor() {
     this.bot = null;
     this.moduleManager = null;
+    this.renderers = new Map(); // 렌더러 캐시
   }
 
   initialize(bot) {
     this.bot = bot;
+    // 렌더러 등록
+    this.registerRenderer("fortune", new FortuneRenderer(bot, this));
+    this.registerRenderer("todo", new TodoRenderer(bot, this));
+    this.registerRenderer("system", new SystemRenderer(bot, this));
+    // ... 다른 모듈 렌더러들 ... //
     logger.info("🎹 NavigationHandler가 초기화되었습니다.");
+  }
+
+  registerRenderer(moduleName, renderer) {
+    this.renderers.set(moduleName, renderer);
+    logger.debug(`📱 ${moduleName} 렌더러 등록됨`);
   }
 
   setModuleManager(moduleManager) {
@@ -65,6 +76,8 @@ class NavigationHandler {
       }
 
       const [moduleKey, subAction = "menu", ...params] = data.split(":");
+
+      // 1. 모듈에서 데이터 가져오기
       const result = await this.moduleManager.handleCallback(
         this.bot,
         callbackQuery,
@@ -74,11 +87,14 @@ class NavigationHandler {
       );
 
       if (result) {
-        await this.renderResponse(ctx, result);
-      } else {
-        logger.warn(
-          `모듈 [${moduleKey}]에서 콜백 [${subAction}]에 대한 렌더링 결과가 없습니다.`
-        );
+        // 2. 해당 모듈의 렌더러로 위임
+        const renderer = this.renderers.get(result.module || moduleKey);
+        if (renderer) {
+          await renderer.render(result, ctx);
+        } else {
+          logger.warn(`렌더러를 찾을 수 없음: ${result.module || moduleKey}`);
+          await this.showFallbackError(ctx);
+        }
       }
     } catch (error) {
       logger.error("네비게이션 콜백 처리 실패:", error);
@@ -105,311 +121,8 @@ class NavigationHandler {
 
     // --- ⬇️ 여기에 TodoModule을 위한 case를 추가합니다 ⬇️ ---
     switch (`${result.module}:${result.type}`) {
-      // [추가] TodoModule 목록 렌더링
-      case "todo:list":
-        text += "📋 *할 일 목록*\n";
-        const todos = result.data?.todos || [];
+      // [추가] 케이스 목록 렌더링
 
-        if (todos.length === 0) {
-          text += "\n할 일이 없습니다\\. 새 할 일을 추가해보세요\\!";
-        } else {
-          todos.forEach((todo) => {
-            const statusIcon = todo.completed ? "✅" : "⬜️";
-            // 각 할 일에 대한 토글/삭제 버튼
-            keyboard.inline_keyboard.push([
-              {
-                text: `${statusIcon} ${this.escapeMarkdownV2(todo.text)}`,
-                callback_data: `todo:toggle:${todo.id}`,
-              },
-              { text: "🗑️", callback_data: `todo:delete:${todo.id}` },
-            ]);
-          });
-        }
-        // 목록 하단에 '할 일 추가' 버튼 추가
-        keyboard.inline_keyboard.push([
-          { text: "➕ 할 일 추가", callback_data: "todo:add_prompt" },
-        ]);
-        break;
-
-      // [추가] TodoModule 추가 안내 렌더링
-      case "todo:add_prompt":
-        text =
-          "✍️ *할 일 추가*\n\n채팅창에 새로운 할 일 내용을 입력해주세요\\.";
-        // '뒤로 가기' 버튼만 표시
-        keyboard.inline_keyboard.push([
-          { text: "◀️ 목록으로 돌아가기", callback_data: "todo:list" },
-        ]);
-        break;
-
-      // ... 다른 모듈들의 case ...
-
-      case "weather:menu":
-        const menuWeather = result.data?.weather;
-        text = `🌤️ **날씨 정보**\n\n`;
-
-        if (menuWeather) {
-          // ✅ 안전한 이스케이프 처리
-          const safeLocation = this.escapeMarkdownV2(menuWeather.location);
-          const safeDescription = this.escapeMarkdownV2(
-            menuWeather.description
-          );
-
-          text += `📍 **${safeLocation}**\n`;
-          text += `🌡️ ${menuWeather.temperature}°C ${menuWeather.icon}\n`;
-          text += `💭 ${safeDescription}\n\n`;
-          text += `💧 습도: ${menuWeather.humidity}%\n`;
-          text += `💨 바람: ${menuWeather.windSpeed}m/s\n`;
-          text += `📊 기압: ${menuWeather.pressure}hPa\n\n`;
-
-          if (menuWeather.isDummy) {
-            text += `⚠️ *더미 데이터입니다*\n`;
-          } else if (menuWeather.source === "openweathermap") {
-            text += `📡 *실시간 날씨 정보*\n`;
-          }
-        }
-
-        text += `원하는 기능을 선택해주세요\\!`;
-        break;
-
-      case "weather:current":
-        const currentWeather = result.data?.weather;
-        text = `🌡️ **현재 날씨**\n\n`;
-
-        if (currentWeather) {
-          // ✅ 안전한 이스케이프 처리
-          const safeLocation = this.escapeMarkdownV2(currentWeather.location);
-          const safeDescription = this.escapeMarkdownV2(
-            currentWeather.description
-          );
-
-          text += `📍 **${safeLocation}**`;
-          if (currentWeather.country) {
-            text += ` \\(${currentWeather.country}\\)`;
-          }
-          text += `\n\n`;
-
-          text += `${currentWeather.icon} **${currentWeather.temperature}°C**\n`;
-          text += `💭 ${safeDescription}\n\n`;
-
-          // 상세 정보 (숫자는 이스케이프 불필요)
-          text += `**📊 상세 정보**\n`;
-          text += `🌡️ 체감온도: ${
-            currentWeather.feelsLike || currentWeather.temperature
-          }°C\n`;
-          text += `💧 습도: ${currentWeather.humidity}%\n`;
-          text += `💨 바람: ${currentWeather.windSpeed}m/s\n`;
-          text += `📊 기압: ${currentWeather.pressure}hPa\n`;
-
-          if (currentWeather.visibility) {
-            text += `👁️ 가시거리: ${currentWeather.visibility}km\n`;
-          }
-
-          if (currentWeather.cloudiness !== undefined) {
-            text += `☁️ 구름: ${currentWeather.cloudiness}%\n`;
-          }
-
-          text += `\n`;
-
-          // 시간 정보
-          if (currentWeather.sunrise && currentWeather.sunset) {
-            const sunrise = new Date(currentWeather.sunrise).toLocaleTimeString(
-              "ko-KR",
-              {
-                hour: "2-digit",
-                minute: "2-digit",
-              }
-            );
-            const sunset = new Date(currentWeather.sunset).toLocaleTimeString(
-              "ko-KR",
-              {
-                hour: "2-digit",
-                minute: "2-digit",
-              }
-            );
-            text += `🌅 일출: ${sunrise}\n`;
-            text += `🌇 일몰: ${sunset}\n\n`;
-          }
-
-          // 데이터 출처
-          if (currentWeather.source === "openweathermap") {
-            text += `📡 *OpenWeatherMap 제공*\n`;
-          } else if (currentWeather.isDummy) {
-            text += `⚠️ *더미 데이터*\n`;
-          }
-
-          // ✅ 안전한 시간 포맷팅
-          const updateTime = new Date(currentWeather.timestamp).toLocaleString(
-            "ko-KR"
-          );
-          const safeUpdateTime = this.escapeMarkdownV2(updateTime);
-          text += `⏰ 업데이트: ${safeUpdateTime}`;
-        } else {
-          text += `❌ 날씨 정보를 가져올 수 없습니다\\.`;
-        }
-        break;
-
-      //TTS 인라인 키보드
-      // TTS 메인 메뉴
-      case "tts:menu":
-        const ttsData = result.data;
-        text = `🔊 **TTS 음성변환**\n\n`;
-
-        if (ttsData?.isServiceActive) {
-          text += `✅ **서비스 상태**: 정상 동작\n`;
-          text += `🌍 **기본 언어**: ${ttsData.defaultLanguage || "ko-KR"}\n\n`;
-
-          if (ttsData.stats) {
-            text += `📊 **변환 통계**\n`;
-            text += `🔢 총 변환 횟수: ${ttsData.stats.totalConversions}회\n`;
-            if (ttsData.stats.lastConversion) {
-              const lastDate = new Date(
-                ttsData.stats.lastConversion
-              ).toLocaleDateString("ko-KR");
-              text += `📅 마지막 변환: ${lastDate}\n`;
-            }
-            text += `\n`;
-          }
-        } else {
-          text += `⚠️ **서비스 상태**: 비활성\n\n`;
-        }
-
-        text += `원하는 기능을 선택해주세요\\!`;
-
-        keyboard.inline_keyboard = [
-          [
-            { text: "🎤 텍스트 변환", callback_data: "tts:convert" },
-            { text: "🎭 음성 선택", callback_data: "tts:voices" },
-          ],
-          [
-            { text: "📚 변환 기록", callback_data: "tts:history" },
-            { text: "⚙️ 설정", callback_data: "tts:settings" },
-          ],
-          [
-            { text: "❓ 도움말", callback_data: "tts:help" },
-            { text: "🔙 메인 메뉴", callback_data: "system:menu" },
-          ],
-        ];
-        break;
-
-      // TTS 텍스트 입력 요청
-      case "tts:input":
-        text =
-          result.message ||
-          `📝 **텍스트 입력**\n\n변환할 텍스트를 입력하세요\\.\n\n최대 5000자까지 입력 가능합니다\\.`;
-
-        keyboard.inline_keyboard = [
-          [
-            { text: "🔙 메뉴로", callback_data: "tts:menu" },
-            { text: "🏠 메인", callback_data: "system:menu" },
-          ],
-        ];
-        break;
-
-      // TTS 음성 목록
-      case "tts:list":
-        const listData = result.data;
-        text = `🎭 **${listData?.title || "음성 목록"}**\n\n`;
-
-        if (listData?.items && listData.items.length > 0) {
-          listData.items.forEach((item, index) => {
-            text += `${index + 1}\\. **${this.escapeMarkdownV2(
-              item.title
-            )}**\n`;
-            if (item.description) {
-              text += `   ${this.escapeMarkdownV2(item.description)}\n`;
-            }
-            text += `\n`;
-          });
-        } else {
-          text += `목록이 비어있습니다\\.`;
-        }
-
-        keyboard.inline_keyboard = [
-          [
-            { text: "🔙 메뉴로", callback_data: "tts:menu" },
-            { text: "🏠 메인", callback_data: "system:menu" },
-          ],
-        ];
-        break;
-
-      // TTS 설정
-      case "tts:settings":
-        const settingsData = result.data;
-        text = `⚙️ **${settingsData?.title || "TTS 설정"}**\n\n`;
-
-        if (settingsData?.settings) {
-          settingsData.settings.forEach((setting) => {
-            text += `**${this.escapeMarkdownV2(setting.label)}**: `;
-            if (setting.type === "boolean") {
-              text += setting.value ? "✅ 활성" : "❌ 비활성";
-            } else {
-              text += this.escapeMarkdownV2(String(setting.value));
-            }
-            text += `\n`;
-          });
-        }
-
-        keyboard.inline_keyboard = [
-          [
-            { text: "🔧 설정 변경", callback_data: "tts:settings:edit" },
-            { text: "🔄 초기화", callback_data: "tts:settings:reset" },
-          ],
-          [
-            { text: "🔙 메뉴로", callback_data: "tts:menu" },
-            { text: "🏠 메인", callback_data: "system:menu" },
-          ],
-        ];
-        break;
-
-      // TTS 도움말
-      case "tts:help":
-        const helpData = result.data;
-        text = `❓ **${helpData?.title || "TTS 도움말"}**\n\n`;
-
-        if (helpData?.features) {
-          text += `**🎯 주요 기능**\n`;
-          helpData.features.forEach((feature) => {
-            text += `• ${this.escapeMarkdownV2(feature)}\n`;
-          });
-          text += `\n`;
-        }
-
-        if (helpData?.commands) {
-          text += `**⌨️ 사용법**\n`;
-          helpData.commands.forEach((command) => {
-            text += `• ${this.escapeMarkdownV2(command)}\n`;
-          });
-          text += `\n`;
-        }
-
-        if (helpData?.tips) {
-          text += `**💡 팁**\n`;
-          helpData.tips.forEach((tip) => {
-            text += `• ${this.escapeMarkdownV2(tip)}\n`;
-          });
-        }
-
-        keyboard.inline_keyboard = [
-          [
-            { text: "🔊 TTS 메뉴", callback_data: "tts:menu" },
-            { text: "🏠 메인", callback_data: "system:menu" },
-          ],
-        ];
-        break;
-
-      // TTS 빈 목록
-      case "tts:empty":
-        text =
-          result.message ||
-          `📭 **목록이 비어있습니다**\n\n아직 변환 기록이 없습니다\\.\n\n새로운 텍스트를 변환해보세요\\!`;
-
-        keyboard.inline_keyboard = [
-          [
-            { text: "🎤 텍스트 변환", callback_data: "tts:convert" },
-            { text: "🔙 메뉴로", callback_data: "tts:menu" },
-          ],
-        ];
-        break;
       // 다른 케이스 추가
       default:
         text += `작업 *${this.escapeMarkdownV2(
