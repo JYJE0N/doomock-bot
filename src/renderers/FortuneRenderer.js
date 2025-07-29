@@ -1,8 +1,22 @@
+// src/renderers/FortuneRenderer.js - MarkdownV2 완벽 이스케이프 버전
+
 const BaseRenderer = require("./BaseRenderer");
 const DoomockMessageGenerator = require("../utils/DoomockMessageGenerator");
 const AnimationHelper = require("../utils/AnimationHelper");
 const { getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/Logger");
 
+/**
+ * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 전담
+ *
+ * ✅ 단순화된 기능:
+ * - 원카드 뽑기 (1장)
+ * - 트리플카드 뽑기 (3장: 과거/현재/미래)
+ * - 카드 셔플
+ * - 통계 및 도움말
+ *
+ * ✅ MarkdownV2 완벽 이스케이프 처리
+ */
 class FortuneRenderer extends BaseRenderer {
   constructor(bot, navigationHandler) {
     super(bot, navigationHandler);
@@ -10,47 +24,62 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 🎯 메인 렌더링 메서드 - 결과 타입별 분기
+   * 🎯 메인 렌더링 메서드
    */
   async render(result, ctx) {
     const { type, data } = result;
 
-    switch (type) {
-      case "menu":
-        return await this.renderMenu(data, ctx);
+    logger.debug(`🔮 FortuneRenderer: ${type} 타입 렌더링`);
 
-      case "today":
-      case "love":
-      case "money":
-        return await this.renderSingleCard(data, ctx, type);
+    try {
+      switch (type) {
+        case "menu":
+          return await this.renderMenu(data, ctx);
 
-      case "triple":
-        return await this.renderTripleCards(data, ctx);
+        case "single":
+          return await this.renderSingleCard(data, ctx);
 
-      case "shuffle_only":
-        return await this.renderShuffleOnly(data, ctx);
+        case "triple":
+          return await this.renderTripleCards(data, ctx);
 
-      case "stats":
-        return await this.renderStats(data, ctx);
+        case "shuffle_only":
+          return await this.renderShuffleOnly(data, ctx);
 
-      case "help":
-        return await this.renderHelp(data, ctx);
+        case "stats":
+          return await this.renderStats(data, ctx);
 
-      default:
-        return await this.renderError("지원하지 않는 기능입니다.", ctx);
+        case "help":
+          return await this.renderHelp(data, ctx);
+
+        case "error":
+          return await this.renderError(
+            data.message || "알 수 없는 오류가 발생했습니다\\.",
+            ctx
+          );
+
+        default:
+          logger.warn(`🔮 FortuneRenderer: 지원하지 않는 타입 - ${type}`);
+          return await this.renderError("지원하지 않는 기능입니다\\.", ctx);
+      }
+    } catch (error) {
+      logger.error(`🔮 FortuneRenderer 렌더링 오류 (${type}):`, error);
+      return await this.renderError("렌더링 중 오류가 발생했습니다\\.", ctx);
     }
   }
 
   /**
-   * 🔮 운세 메뉴 렌더링
+   * 🔮 타로 메뉴 렌더링 - ✅ MarkdownV2 완벽 처리
    */
   async renderMenu(data, ctx) {
-    let text = "🔮 *타로 운세 \\- 두목봇*\n\n";
-    text += "안녕하세요\\! 오늘의 운세를 알아보시겠어요\\?\n\n";
+    logger.debug("🔮 타로 메뉴 렌더링");
 
+    let text = "🔮 *타로 카드 \\- 두목봇*\n\n";
+    text += "🎴 *신비로운 타로의 세계에 오신 것을 환영합니다\\!*\n\n";
+
+    // 통계 정보 (있으면 표시)
     if (data?.stats) {
       const stats = data.stats;
-      text += `📊 *개인 통계*\n`;
+      text += "📊 *나의 타로 기록*\n";
       text += `• 총 뽑기 횟수: ${this.escapeMarkdownV2(
         String(stats.totalDraws || 0)
       )}회\n`;
@@ -62,35 +91,32 @@ class FortuneRenderer extends BaseRenderer {
       )}일\n\n`;
 
       if (!stats.canDrawToday) {
-        text += "⏰ 오늘은 이미 뽑으셨네요\\! 내일 다시 오세요\\.\n\n";
+        text += "⏰ *오늘은 이미 뽑으셨네요\\!* 내일 다시 오세요\\.\n\n";
       }
     }
 
-    text += "원하시는 운세를 선택해주세요\\:";
+    text += "✨ *어떤 카드를 뽑아보시겠어요\\?*";
 
+    // ✅ 단순화된 키보드
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🌟 오늘의 운세", callback_data: "fortune:today" },
-          { text: "💕 애정운", callback_data: "fortune:love" },
+          { text: "🎴 원카드 뽑기", callback_data: "fortune:single" },
+          { text: "🎴🎴🎴 트리플카드", callback_data: "fortune:triple" },
         ],
         [
-          { text: "💰 금전운", callback_data: "fortune:money" },
-          { text: "🎴🎴🎴 3장 뽑기", callback_data: "fortune:triple" },
+          { text: "🔀 카드 셔플", callback_data: "fortune:shuffle" },
+          { text: "📊 내 기록", callback_data: "fortune:stats" },
         ],
         [
-          { text: "🔀 카드 셔플하기", callback_data: "fortune:shuffle" },
-          { text: "📊 내 통계", callback_data: "fortune:stats" },
-        ],
-        [
-          { text: "❓ 도움말", callback_data: "fortune:help" },
+          { text: "❓ 사용법", callback_data: "fortune:help" },
           { text: "🔙 메인 메뉴", callback_data: "system:menu" },
         ],
       ],
     };
 
     await this.sendMessage(
-      ctx.chat.id,
+      ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id,
       text,
       keyboard,
       ctx.callbackQuery?.message?.message_id
@@ -98,102 +124,124 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 🎴 단일 카드 렌더링 (셔플 + 결과)
+   * 🎴 원카드 렌더링 - ✅ 완전 단순화
    */
-  async renderSingleCard(data, ctx, drawType) {
-    const {
-      from,
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = ctx.callbackQuery;
-    const userName = getUserName(from);
+  async renderSingleCard(data, ctx) {
+    logger.debug("🎴 원카드 렌더링", { data });
 
-    // 셔플이 필요한 경우 애니메이션 실행
-    if (data.needsShuffle) {
-      const shuffleMessageId = await AnimationHelper.performShuffle(
-        this.bot,
-        chatId,
-        messageId
-      );
+    const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id;
+    const userName = getUserName(ctx.from || ctx.callbackQuery?.from);
 
-      // 실패한 경우 오류 메시지 표시
-      if (!data.fortune.success) {
-        const errorMessage = this.getErrorMessage(data.fortune.type, userName);
-        await this.sendMessage(
-          chatId,
-          errorMessage,
-          this.createBackToMenuKeyboard(),
-          shuffleMessageId
-        );
+    try {
+      // 데이터 구조 파싱
+      let cardData;
+      let needsShuffle = false;
+      let isSuccess = true;
+
+      if (data?.fortune) {
+        isSuccess = data.fortune.success;
+        cardData = data.fortune.card;
+        needsShuffle = data.fortune.needsShuffle !== false; // 기본값 true
+      } else {
+        throw new Error("카드 데이터를 찾을 수 없습니다");
+      }
+
+      // 실패한 경우 (일일 제한 등)
+      if (!isSuccess) {
+        const errorMessage =
+          data.fortune.message || "카드를 뽑을 수 없습니다\\.";
+        await this.renderErrorWithKeyboard(ctx, errorMessage);
         return;
       }
 
-      // 성공한 경우 카드 결과 렌더링
-      await this.renderCardResult(
-        data.fortune.card,
-        drawType,
+      // 셔플 애니메이션 실행
+      let finalMessageId = messageId;
+      if (needsShuffle) {
+        try {
+          finalMessageId = await AnimationHelper.performShuffle(
+            this.bot,
+            chatId,
+            messageId
+          );
+        } catch (shuffleError) {
+          logger.warn("셔플 애니메이션 실패, 계속 진행:", shuffleError);
+        }
+      }
+
+      // 카드 결과 표시
+      await this.renderSingleCardResult(
+        cardData,
         chatId,
-        shuffleMessageId,
+        finalMessageId,
         userName
+      );
+    } catch (error) {
+      logger.error("원카드 렌더링 오류:", error);
+      await this.renderErrorWithKeyboard(
+        ctx,
+        "카드를 뽑는 중 오류가 발생했습니다\\."
       );
     }
   }
 
   /**
-   * 🎴 카드 결과 렌더링
+   * 🎴 원카드 결과 표시 - ✅ MarkdownV2 완벽 처리
    */
-  async renderCardResult(card, drawType, chatId, messageId, userName) {
-    let text = "";
-
-    switch (drawType) {
-      case "today":
-        text = "🌟 *오늘의 운세*\n\n";
-        break;
-      case "love":
-        text = "💕 *애정운*\n\n";
-        break;
-      case "money":
-        text = "💰 *금전운*\n\n";
-        break;
+  async renderSingleCardResult(card, chatId, messageId, userName) {
+    if (!card) {
+      throw new Error("카드 데이터가 없습니다");
     }
 
-    text += `🎴 *뽑힌 카드*: ${this.escapeMarkdownV2(card.koreanName)}\n`;
-    text += `🔮 *영문명*: ${this.escapeMarkdownV2(card.cardName)}\n`;
+    let text = "🎴 *당신의 타로 카드*\n\n";
+
+    // 카드 기본 정보
+    text += `✨ *뽑힌 카드*: ${this.escapeMarkdownV2(
+      card.koreanName || card.cardName || "알 수 없음"
+    )}\n`;
+
+    if (card.cardName && card.koreanName) {
+      text += `🔮 *영문명*: ${this.escapeMarkdownV2(card.cardName)}\n`;
+    }
+
     text += `${card.isReversed ? "🔄" : "✨"} *방향*: ${
       card.isReversed ? "역방향" : "정방향"
     }\n\n`;
-    text += `📝 *카드 의미*:\n${this.escapeMarkdownV2(
-      card.interpretation.message
-    )}\n\n`;
 
-    if (card.interpretation.advice) {
-      text += `💡 *조언*:\n${this.escapeMarkdownV2(
+    // 카드 의미
+    if (card.interpretation?.message) {
+      text += `📝 *카드의 메시지*:\n${this.escapeMarkdownV2(
+        card.interpretation.message
+      )}\n\n`;
+    }
+
+    // 조언
+    if (card.interpretation?.advice) {
+      text += `💡 *타로의 조언*:\n${this.escapeMarkdownV2(
         card.interpretation.advice
       )}\n\n`;
     }
 
-    // 두목봇 멘트 추가
-    const doomockComment = DoomockMessageGenerator.getContextualMessage(
-      "cardDrawn",
-      userName,
-      card
-    );
-    text += `💬 ${this.escapeMarkdownV2(doomockComment)}`;
+    // 두목봇 멘트
+    try {
+      const doomockComment = this.generateDoomockComment(userName, card);
+      text += `💬 ${this.escapeMarkdownV2(doomockComment)}`;
+    } catch (msgError) {
+      logger.warn("두목봇 멘트 생성 실패:", msgError);
+      text += `💬 👔 두목: '${this.escapeMarkdownV2(
+        userName
+      )}형씨, 좋은 카드네요\\!'`;
+    }
 
+    // 키보드
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🌟 오늘의 운세", callback_data: "fortune:today" },
-          { text: "💕 애정운", callback_data: "fortune:love" },
+          { text: "🎴 새 카드 뽑기", callback_data: "fortune:single" },
+          { text: "🎴🎴🎴 트리플카드", callback_data: "fortune:triple" },
         ],
         [
-          { text: "💰 금전운", callback_data: "fortune:money" },
-          { text: "🎴🎴🎴 3장 뽑기", callback_data: "fortune:triple" },
-        ],
-        [
-          { text: "🔮 운세 메뉴", callback_data: "fortune:menu" },
+          { text: "🔮 타로 메뉴", callback_data: "fortune:menu" },
           { text: "🔙 메인 메뉴", callback_data: "system:menu" },
         ],
       ],
@@ -203,43 +251,151 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 🎴🎴🎴 3장 카드 렌더링
+   * 🎴🎴🎴 트리플카드 렌더링 - ✅ MarkdownV2 완벽 처리
    */
   async renderTripleCards(data, ctx) {
-    // 3장 뽑기 렌더링 로직 (기존과 동일하지만 분리됨)
-    // ... 구현 생략 (길어서)
+    logger.debug("🎴🎴🎴 트리플카드 렌더링", { data });
+
+    const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id;
+    const userName = getUserName(ctx.from || ctx.callbackQuery?.from);
+
+    try {
+      // 데이터 구조 파싱
+      let cards;
+      let summary;
+      let needsShuffle = false;
+      let isSuccess = true;
+
+      if (data?.fortune) {
+        isSuccess = data.fortune.success;
+        cards = data.fortune.cards;
+        summary = data.fortune.summary;
+        needsShuffle = data.fortune.needsShuffle !== false;
+      } else {
+        throw new Error("트리플카드 데이터를 찾을 수 없습니다");
+      }
+
+      // 실패한 경우
+      if (!isSuccess || !cards || cards.length !== 3) {
+        const errorMessage =
+          data.fortune?.message || "트리플카드를 뽑을 수 없습니다\\.";
+        await this.renderErrorWithKeyboard(ctx, errorMessage);
+        return;
+      }
+
+      // 셔플 애니메이션
+      let finalMessageId = messageId;
+      if (needsShuffle) {
+        try {
+          finalMessageId = await AnimationHelper.performShuffle(
+            this.bot,
+            chatId,
+            messageId
+          );
+        } catch (shuffleError) {
+          logger.warn("셔플 애니메이션 실패:", shuffleError);
+        }
+      }
+
+      // 트리플카드 결과 표시
+      await this.renderTripleCardResult(
+        cards,
+        summary,
+        chatId,
+        finalMessageId,
+        userName
+      );
+    } catch (error) {
+      logger.error("트리플카드 렌더링 오류:", error);
+      await this.renderErrorWithKeyboard(
+        ctx,
+        "트리플카드를 뽑는 중 오류가 발생했습니다\\."
+      );
+    }
   }
 
   /**
-   * 🔀 셔플만 렌더링
+   * 🎴🎴🎴 트리플카드 결과 표시 - ✅ MarkdownV2 완벽 처리
+   */
+  async renderTripleCardResult(cards, summary, chatId, messageId, userName) {
+    let text = "🎴🎴🎴 *타로 트리플카드*\n\n";
+    text += "✨ *과거\\, 현재\\, 미래를 보여주는 세 장의 카드입니다*\n\n";
+
+    // 각 카드 정보
+    const positions = [
+      { name: "과거", emoji: "🕰️" },
+      { name: "현재", emoji: "⭐" },
+      { name: "미래", emoji: "🌟" },
+    ];
+
+    cards.forEach((card, index) => {
+      const pos = positions[index];
+      text += `${pos.emoji} *${pos.name}*: ${this.escapeMarkdownV2(
+        card.koreanName || card.cardName
+      )}\n`;
+      text += `   ${card.isReversed ? "🔄 역방향" : "✨ 정방향"}\n`;
+
+      if (card.interpretation?.message) {
+        text += `   📝 ${this.escapeMarkdownV2(card.interpretation.message)}\n`;
+      }
+      text += "\n";
+    });
+
+    // 종합 해석
+    if (summary) {
+      text += `🔮 *종합 해석*:\n${this.escapeMarkdownV2(summary)}\n\n`;
+    }
+
+    // 두목봇 멘트
+    const doomockComment = `👔 두목: '${userName}형씨, 과거와 현재를 바탕으로 미래를 준비하세요\\!'`;
+    text += `💬 ${this.escapeMarkdownV2(doomockComment)}`;
+
+    // 키보드
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🎴 원카드 뽑기", callback_data: "fortune:single" },
+          { text: "🎴🎴🎴 새 트리플카드", callback_data: "fortune:triple" },
+        ],
+        [
+          { text: "🔮 타로 메뉴", callback_data: "fortune:menu" },
+          { text: "🔙 메인 메뉴", callback_data: "system:menu" },
+        ],
+      ],
+    };
+
+    await this.sendMessage(chatId, text, keyboard, messageId);
+  }
+
+  /**
+   * 🔀 셔플만 렌더링 - ✅ MarkdownV2 완벽 처리
    */
   async renderShuffleOnly(data, ctx) {
-    const {
-      message: {
-        chat: { id: chatId },
-        message_id: messageId,
-      },
-    } = ctx.callbackQuery;
+    logger.debug("🔀 카드 셔플 렌더링");
 
-    // 셔플 애니메이션 실행
-    await AnimationHelper.performShuffle(this.bot, chatId, messageId);
+    const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id;
+
+    try {
+      // 셔플 애니메이션 실행
+      await AnimationHelper.performShuffle(this.bot, chatId, messageId);
+    } catch (error) {
+      logger.warn("셔플 애니메이션 실패:", error);
+    }
 
     // 완료 메시지
     const text =
-      "✨ *카드 셔플 완료*\\!\n\n이제 원하시는 운세를 선택해주세요\\:";
+      "🔀 *카드 셔플 완료*\\!\n\n✨ 카드들이 새롭게 섞였습니다\\.\n이제 원하시는 뽑기를 선택해주세요:";
 
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🌟 오늘의 운세", callback_data: "fortune:today" },
-          { text: "💕 애정운", callback_data: "fortune:love" },
+          { text: "🎴 원카드 뽑기", callback_data: "fortune:single" },
+          { text: "🎴🎴🎴 트리플카드", callback_data: "fortune:triple" },
         ],
         [
-          { text: "💰 금전운", callback_data: "fortune:money" },
-          { text: "🎴🎴🎴 3장 뽑기", callback_data: "fortune:triple" },
-        ],
-        [
-          { text: "🔮 운세 메뉴", callback_data: "fortune:menu" },
+          { text: "🔮 타로 메뉴", callback_data: "fortune:menu" },
           { text: "🔙 메인 메뉴", callback_data: "system:menu" },
         ],
       ],
@@ -249,33 +405,150 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 오류 메시지 생성
+   * 📊 통계 렌더링 - ✅ MarkdownV2 완벽 처리
    */
-  getErrorMessage(errorType, userName) {
-    if (errorType === "daily_limit") {
-      return this.escapeMarkdownV2(
-        DoomockMessageGenerator.getContextualMessage(
-          "dailyLimitReached",
-          userName
-        )
-      );
+  async renderStats(data, ctx) {
+    logger.debug("📊 타로 통계 렌더링");
+
+    const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id;
+
+    let text = "📊 *나의 타로 기록*\n\n";
+
+    if (data?.stats) {
+      const stats = data.stats;
+      text += `🎴 *총 뽑기 횟수*: ${this.escapeMarkdownV2(
+        String(stats.totalDraws || 0)
+      )}회\n`;
+      text += `⚡ *연속 뽑기*: ${this.escapeMarkdownV2(
+        String(stats.currentStreak || 0)
+      )}일\n`;
+      text += `🏆 *최고 연속*: ${this.escapeMarkdownV2(
+        String(stats.longestStreak || 0)
+      )}일\n`;
+      text += `📅 *이번달 뽑기*: ${this.escapeMarkdownV2(
+        String(stats.thisMonthDraws || 0)
+      )}회\n\n`;
+
+      if (stats.canDrawToday) {
+        text += "✅ *오늘 뽑기 가능합니다\\!*";
+      } else {
+        text += "⏰ *오늘은 이미 뽑으셨네요\\.*";
+      }
+    } else {
+      text += "아직 타로 기록이 없습니다\\.\n";
+      text += "카드를 뽑아보시면 기록이 쌓여요\\! 🎴✨";
     }
-    return this.escapeMarkdownV2(
-      "시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-    );
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🎴 카드 뽑기", callback_data: "fortune:single" },
+          { text: "🔮 타로 메뉴", callback_data: "fortune:menu" },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
+      ],
+    };
+
+    await this.sendMessage(chatId, text, keyboard, messageId);
   }
 
   /**
-   * 통계, 도움말 등 기타 렌더링 메서드들...
+   * ❓ 도움말 렌더링 - ✅ MarkdownV2 완벽 처리
    */
-  async renderStats(data, ctx) {
-    /* 구현 */
-  }
   async renderHelp(data, ctx) {
-    /* 구현 */
+    logger.debug("❓ 타로 도움말 렌더링");
+
+    const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id;
+
+    let text = "❓ *타로 카드 사용법*\n\n";
+    text += "🔮 *두목봇의 신비로운 타로 카드 기능입니다\\!*\n\n";
+
+    text += "📋 *주요 기능*:\n";
+    text += "• 🎴 *원카드 뽑기* \\- 하나의 카드로 간단한 메시지\n";
+    text += "• 🎴🎴🎴 *트리플카드* \\- 과거\\, 현재\\, 미래 3장\n";
+    text += "• 🔀 *카드 셔플* \\- 카드를 다시 섞기\n";
+    text += "• 📊 *내 기록* \\- 뽑기 통계 확인\n\n";
+
+    text += "💡 *사용 팁*:\n";
+    text += "• 마음을 집중하고 질문을 떠올려보세요\n";
+    text += "• 하루에 한 번만 뽑을 수 있어요\n";
+    text += "• 정방향과 역방향의 의미가 달라요\n";
+    text += "• 트리플카드는 더 자세한 해석을 제공해요\n\n";
+
+    text += "🎯 *타로는 참고용입니다\\. 즐거운 마음으로 이용하세요\\!*";
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🎴 원카드 뽑기", callback_data: "fortune:single" },
+          { text: "🎴🎴🎴 트리플카드", callback_data: "fortune:triple" },
+        ],
+        [
+          { text: "🔮 타로 메뉴", callback_data: "fortune:menu" },
+          { text: "🔙 메인 메뉴", callback_data: "system:menu" },
+        ],
+      ],
+    };
+
+    await this.sendMessage(chatId, text, keyboard, messageId);
   }
+
+  /**
+   * ❌ 오류 메시지 렌더링 - ✅ MarkdownV2 완벽 처리
+   */
   async renderError(message, ctx) {
-    /* 구현 */
+    await this.renderErrorWithKeyboard(ctx, message);
+  }
+
+  /**
+   * ❌ 오류 메시지 + 키보드 - ✅ MarkdownV2 완벽 처리
+   */
+  async renderErrorWithKeyboard(ctx, message) {
+    logger.debug("❌ 타로 오류 메시지 렌더링", { message });
+
+    const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+    const messageId = ctx.callbackQuery?.message?.message_id;
+
+    let text = "❌ *타로 오류*\n\n";
+    text += `${this.escapeMarkdownV2(message)}\n\n`;
+    text += "잠시 후 다시 시도해주세요\\.";
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "🔄 다시 시도", callback_data: "fortune:menu" },
+          { text: "🔙 메인 메뉴", callback_data: "system:menu" },
+        ],
+      ],
+    };
+
+    await this.sendMessage(chatId, text, keyboard, messageId);
+  }
+
+  /**
+   * 🎭 두목봇 멘트 생성 - ✅ MarkdownV2 완벽 처리
+   */
+  generateDoomockComment(userName, card) {
+    const comments = [
+      `👔 두목: '${userName}형씨, ${card.koreanName} 카드가 나왔네요\\!'`,
+      `👔 두목: '${userName}형씨, 좋은 메시지를 담은 카드입니다\\.'`,
+      `👔 두목: '${userName}형씨, 이 카드의 조언을 참고해보세요\\.'`,
+      `👔 두목: '${userName}형씨, 타로가 전하는 메시지를 마음에 새기세요\\.'`,
+      `👔 두목: '${userName}형씨, 신중하게 생각해보시길 바랍니다\\.'`,
+    ];
+
+    // 카드별 특별 멘트 (옵션)
+    if (card.cardName === "The Fool") {
+      return `👔 두목: '${userName}형씨, 새로운 시작의 카드네요\\! 용기를 내세요\\.'`;
+    }
+    if (card.cardName === "The Sun") {
+      return `👔 두목: '${userName}형씨, 태양 카드\\! 오늘은 좋은 일이 있을 것 같아요\\.'`;
+    }
+
+    return comments[Math.floor(Math.random() * comments.length)];
   }
 }
+
 module.exports = FortuneRenderer;

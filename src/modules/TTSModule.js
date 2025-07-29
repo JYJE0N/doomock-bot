@@ -2,6 +2,7 @@
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserName, getUserId } = require("../utils/UserHelper");
+const fs = require("fs");
 
 /**
  * 🔊 TTSModule - Text-to-Speech 모듈
@@ -231,22 +232,65 @@ class TTSModule extends BaseModule {
       });
 
       if (result.success) {
-        // 음성 파일 전송
-        await bot.telegram.sendVoice(chatId, result.filePath, {
-          caption: `🎵 변환 완료!\\n길이: 약 ${result.duration}초`,
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "🔊 다시 변환", callback_data: "tts:convert" },
-                { text: "🎭 음성 변경", callback_data: "tts:voices" },
-              ],
-              [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
-            ],
-          },
-        });
+        try {
+          // 🔧 파일 스트림으로 전송 (올바른 방식)
+          const audioStream = fs.createReadStream(result.filePath);
 
-        // 처리 중 메시지 삭제
-        await bot.telegram.deleteMessage(chatId, processingMsg.message_id);
+          await bot.telegram.sendVoice(
+            chatId,
+            {
+              source: audioStream,
+              filename: "voice.ogg", // 파일명 지정
+            },
+            {
+              caption: `🎵 변환 완료!\n길이: 약 ${result.duration}초`,
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: "🔊 다시 변환", callback_data: "tts:convert" },
+                    { text: "🎭 음성 변경", callback_data: "tts:voices" },
+                  ],
+                  [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
+                ],
+              },
+            }
+          );
+
+          // 처리 중 메시지 삭제
+          await bot.telegram.deleteMessage(chatId, processingMsg.message_id);
+
+          // 🧹 임시 파일 정리 (선택사항)
+          try {
+            fs.unlinkSync(result.filePath);
+            logger.debug("🧹 임시 음성 파일 삭제됨");
+          } catch (cleanupError) {
+            logger.warn("임시 파일 삭제 실패:", cleanupError.message);
+          }
+        } catch (sendError) {
+          logger.error("음성 파일 전송 실패:", sendError);
+
+          // 대안: Input Media로 전송 시도
+          try {
+            await bot.telegram.sendDocument(
+              chatId,
+              {
+                source: fs.createReadStream(result.filePath),
+                filename: "voice.ogg",
+              },
+              {
+                caption: `🎵 음성 파일 (${result.duration}초)`,
+                reply_markup: {
+                  inline_keyboard: [
+                    [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
+                  ],
+                },
+              }
+            );
+          } catch (docError) {
+            logger.error("문서 전송도 실패:", docError);
+            throw sendError; // 원래 에러 던지기
+          }
+        }
       } else {
         await bot.telegram.sendMessage(chatId, "❌ 음성 변환에 실패했습니다.");
       }
