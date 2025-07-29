@@ -146,6 +146,24 @@ class ReminderService {
     }
   }
 
+  //로그 상태표시
+  getStatus() {
+    return {
+      serviceName: "ReminderService",
+      collectionName: this.collectionName,
+      isConnected: !!this.collection,
+      activeReminders: this.activeReminders?.size || 0,
+      cacheEnabled: this.config.enableCache,
+      cacheSize: this.cache.size,
+      schedulerRunning: !!this.scheduler,
+      checkInterval: this.config.checkInterval,
+      maxRemindersPerUser: this.config.maxRemindersPerUser,
+      snoozeEnabled: this.config.snoozeEnabled,
+      totalRemindersSet: this.stats?.totalSet || 0,
+      privacyProtected: true,
+    };
+  }
+
   async cleanup() {
     logger.info("ReminderService 정리 완료");
   }

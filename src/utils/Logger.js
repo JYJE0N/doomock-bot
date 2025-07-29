@@ -101,6 +101,27 @@ class HybridLogger {
       nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
     const isTest = nodeEnv === "test";
 
+    // ✅ 수정된 로거 선택 로직 - 개발환경 최우선!
+    let shouldUseWinston = false;
+    let shouldUseChalk = false;
+
+    // 1️⃣ 강제 설정 확인 (최우선)
+    const forceLogger = process.env.FORCE_LOGGER;
+    if (forceLogger === "chalk") {
+      shouldUseChalk = true;
+    } else if (forceLogger === "winston") {
+      shouldUseWinston = true;
+    } else {
+      // 2️⃣ 환경별 자동 선택
+      if (isProduction || isRailway) {
+        // 🏭 프로덕션/Railway: Winston 사용
+        shouldUseWinston = true;
+      } else {
+        // 🏠 개발/테스트: Chalk 사용 (Docker/CI 무시!)
+        shouldUseChalk = true;
+      }
+    }
+
     return {
       name: nodeEnv,
       isProduction,
@@ -109,10 +130,8 @@ class HybridLogger {
       isRailway,
       isDocker,
       isCI,
-
-      // 🎨 로거 전략 결정 (개발환경 우선!)
-      shouldUseWinston: isProduction || isRailway || isDocker || isCI,
-      shouldUseChalk: isDevelopment && !isRailway && !isDocker && !isCI,
+      shouldUseWinston,
+      shouldUseChalk,
     };
   }
 
@@ -155,6 +174,84 @@ class HybridLogger {
         celebration: "rainbow", // 🌈 무지개 색상!
       },
     };
+
+    /**
+     * 📊 현재 문제가 있는 코드
+     */
+    class Logger_Problem {
+      detectEnvironment() {
+        const nodeEnv = process.env.NODE_ENV || "development";
+        const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+        const isDocker = !!process.env.DOCKER_CONTAINER;
+        const isCI = !!process.env.CI;
+
+        const isProduction = nodeEnv === "production";
+        const isDevelopment =
+          nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
+        const isTest = nodeEnv === "test";
+
+        return {
+          // ❌ 문제: Docker나 CI에서도 Winston이 강제 활성화됨
+          shouldUseWinston: isProduction || isRailway,
+          shouldUseChalk: !isProduction && !isRailway,
+        };
+      }
+    }
+
+    /**
+     * ✅ 수정된 환경 감지 로직
+     */
+    class Logger_Fixed {
+      detectEnvironment() {
+        const nodeEnv = process.env.NODE_ENV || "development";
+        const isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+        const isDocker = !!process.env.DOCKER_CONTAINER;
+        const isCI = !!process.env.CI;
+
+        // 🎯 명시적인 환경 우선순위
+        const isProduction = nodeEnv === "production";
+        const isDevelopment =
+          nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
+        const isTest = nodeEnv === "test";
+
+        // 🎯 로거 전략 - 개발환경을 최우선으로!
+        let shouldUseWinston, shouldUseChalk;
+
+        if (isProduction) {
+          // 🏭 프로덕션: 무조건 Winston
+          shouldUseWinston = true;
+          shouldUseChalk = false;
+        } else if (isRailway) {
+          // 🚂 Railway: 프로덕션 배포이므로 Winston
+          shouldUseWinston = true;
+          shouldUseChalk = false;
+        } else if (isDevelopment) {
+          // 🏠 개발환경: 무조건 Chalk (Docker/CI 무시!)
+          shouldUseWinston = false;
+          shouldUseChalk = true;
+        } else if (isTest) {
+          // 🧪 테스트: 간단한 출력
+          shouldUseWinston = false;
+          shouldUseChalk = true;
+        } else {
+          // 🤷‍♂️ 알 수 없는 환경: 안전하게 Winston
+          shouldUseWinston = true;
+          shouldUseChalk = false;
+        }
+
+        return {
+          name: nodeEnv,
+          isProduction,
+          isDevelopment,
+          isTest,
+          isRailway,
+          isDocker,
+          isCI,
+          shouldUseWinston,
+          shouldUseChalk,
+        };
+      }
+    }
 
     // 로그 디렉토리 생성
     const logDir = path.join(process.cwd(), "logs");

@@ -348,8 +348,17 @@ class TodoService {
     return {
       serviceName: "TodoService",
       isReady: !!this.Todo,
+      isConnected: !!this.Todo?.db?.readyState, // Mongoose 연결 상태 추가
       modelName: this.Todo?.modelName || "Not initialized",
       collectionName: this.Todo?.collection?.name || "Not available",
+
+      // 간단한 통계 (기존 메서드 활용)
+      stats: {
+        modelReady: !!this.Todo,
+        hasCollection: !!this.Todo?.collection,
+      },
+
+      privacyProtected: true, // 표준 필드
     };
   }
 }

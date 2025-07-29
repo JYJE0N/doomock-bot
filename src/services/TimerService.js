@@ -185,6 +185,22 @@ class TimerService {
     }
   }
 
+  // 로그 상태 표시
+  getStatus() {
+    return {
+      serviceName: "TimerService",
+      collectionName: this.collectionName,
+      isConnected: !!this.collection,
+      activeTimers: this.activeTimers?.size || 0,
+      cacheEnabled: this.config.enableCache,
+      cacheSize: this.cache.size,
+      maxDuration: this.config.maxDuration,
+      autoSaveInterval: this.config.autoSaveInterval,
+      totalTimersCreated: this.stats?.totalCreated || 0,
+      privacyProtected: true,
+    };
+  }
+
   async cleanup() {
     this.activeTimers.clear();
     logger.info("TimerService 정리 완료");

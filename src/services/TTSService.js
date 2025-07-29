@@ -503,15 +503,16 @@ class TTSService {
   getStatus() {
     return {
       serviceName: "TTSService",
-      isConnected: !!this.googleTTSClient,
-      hasApiKey: !!this.config.projectId,
+      isConnected: !!this.googleTTSClient, // 외부 API 연결 상태
+      hasApiKey: !!this.config.projectId, // 인증 상태
       config: {
+        // 중요 설정들
         defaultLanguage: this.config.languageCode,
         defaultVoice: this.config.voiceName,
         audioEncoding: this.config.audioEncoding,
       },
-      stats: this.stats,
-      cacheSize: this.cache.size,
+      stats: this.stats, // 실시간 통계
+      cacheSize: this.cache.size, // 캐시 상태
     };
   }
 

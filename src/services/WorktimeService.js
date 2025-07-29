@@ -199,6 +199,23 @@ class WorktimeService {
     }
   }
 
+  // 로그 상태 표시
+  getStatus() {
+    return {
+      serviceName: "WorktimeService",
+      collectionName: this.collectionName,
+      isConnected: !!this.collection,
+      activeSessions: this.activeSessions?.size || 0,
+      cacheEnabled: this.config.enableCache,
+      cacheSize: this.cache.size,
+      trackingMode: this.config.trackingMode,
+      autoBreakEnabled: this.config.autoBreakEnabled,
+      dailyGoalHours: this.config.dailyGoalHours,
+      totalSessionsToday: this.todayStats?.sessions || 0,
+      privacyProtected: true,
+    };
+  }
+
   async cleanup() {
     logger.info("WorktimeService 정리 완료");
   }

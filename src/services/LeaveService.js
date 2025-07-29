@@ -154,6 +154,23 @@ class LeaveService {
     }
   }
 
+  //로그 상태 표시
+  getStatus() {
+    return {
+      serviceName: "LeaveService",
+      collectionName: this.collectionName,
+      isConnected: !!this.collection,
+      pendingRequests: this.pendingRequests?.size || 0,
+      cacheEnabled: this.config.enableCache,
+      cacheSize: this.cache.size,
+      approvalRequired: this.config.approvalRequired,
+      maxDaysPerRequest: this.config.maxDaysPerRequest,
+      annualLeaveLimit: this.config.annualLeaveLimit,
+      autoApprovalEnabled: this.config.autoApprovalEnabled,
+      privacyProtected: true,
+    };
+  }
+
   async cleanup() {
     logger.info("LeaveService 정리 완료");
   }

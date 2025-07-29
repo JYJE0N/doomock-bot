@@ -376,13 +376,17 @@ class WeatherService {
   getStatus() {
     return {
       serviceName: "WeatherService",
-      hasApiKey: !!this.apiKey,
-      hasDbManager: !!this.dbManager,
-      baseUrl: this.baseUrl,
+      apiProvider: this.config.apiProvider || "OpenWeatherMap",
+      apiConnected: !!this.apiKey,
+      cacheEnabled: this.config.enableCache,
       cacheSize: this.cache.size,
-      defaultLocation: this.defaultLocation,
-      isConnected: !!this.apiKey,
-      lastUpdate: new Date().toISOString(),
+      lastApiCall: this.lastApiCall || null,
+      rateLimitRemaining: this.rateLimitInfo?.remaining || "알 수 없음",
+      supportedLocations: this.config.supportedLocations?.length || 0,
+      defaultLocation: this.config.defaultLocation,
+      updateInterval: this.config.updateInterval,
+      apiCallsToday: this.stats?.apiCallsToday || 0,
+      privacyProtected: true,
     };
   }
 }
