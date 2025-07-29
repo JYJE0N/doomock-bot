@@ -5,11 +5,8 @@ const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class WorktimeModule extends BaseModule {
   constructor(moduleName, options = {}) {
-    super("WorktimeModule", {
-      bot,
-      moduleManager: options.moduleManager,
-      config: options.config,
-    });
+    super(moduleName, options); // ← 간단하게 options 그대로 전달
+
     this.serviceBuilder = options.serviceBuilder || null;
 
     this.worktimeService = null;

@@ -5,11 +5,8 @@ const { getUserName, getUserId } = require("../utils/UserHelper");
 
 class WeatherModule extends BaseModule {
   constructor(moduleName, options = {}) {
-    super("WeatherModule", {
-      bot,
-      moduleManager: options.moduleManager,
-      config: options.config,
-    });
+    super(moduleName, options); // ← 간단하게 options 그대로 전달
+
     this.serviceBuilder = options.serviceBuilder || null;
     this.weatherService = null;
     this.config = {

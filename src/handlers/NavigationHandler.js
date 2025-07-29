@@ -9,6 +9,7 @@ const FortuneRenderer = require("../renderers/FortuneRenderer");
 const TodoRenderer = require("../renderers/TodoRenderer");
 const SystemRenderer = require("../renderers/SystemRenderer");
 const TTSRenderer = require("../renderers/TTSRenderer"); // 🆕 TTSRenderer 추가!
+const WeatherRenderer = require("../renderers/WeatherRenderer");
 
 class NavigationHandler {
   constructor() {
@@ -25,6 +26,7 @@ class NavigationHandler {
     this.registerRenderer("todo", new TodoRenderer(bot, this));
     this.registerRenderer("system", new SystemRenderer(bot, this));
     this.registerRenderer("tts", new TTSRenderer(bot, this));
+    this.registerRenderer("weather", new WeatherRenderer(bot, this)); // 🆕 추가!
 
     logger.info("🎹 NavigationHandler가 초기화되었습니다.");
   }

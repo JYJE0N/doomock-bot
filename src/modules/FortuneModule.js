@@ -26,13 +26,7 @@ class FortuneModule extends BaseModule {
     ];
   }
   constructor(moduleName, options = {}) {
-    super("FortuneModule", {
-      bot,
-      moduleManager: options.moduleManager,
-      config: options.config,
-    });
-    this.serviceBuilder = options.serviceBuilder || null;
-    this.fortuneService = null;
+    super(moduleName, options); // ← 간단하게 options 그대로 전달
 
     logger.module("FortuneModule", "모듈 생성", { version: "3.0.1" });
   }

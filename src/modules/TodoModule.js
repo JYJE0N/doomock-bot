@@ -1,7 +1,9 @@
-// src/modules/TodoModule.js - 🎯 단순화된 할일 관리 (문법 오류 수정)
+// src/modules/TodoModule.js - 표준화된 최종 수정 버전
+
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
-const { getUserId } = require("../utils/UserHelper");
+const { getUserId, getUserName } = require("../utils/UserHelper");
+const TimeHelper = require("../utils/TimeHelper");
 
 /**
  * 📋 TodoModule - 단순하고 재미있는 할일 관리
@@ -22,17 +24,11 @@ const { getUserId } = require("../utils/UserHelper");
  */
 class TodoModule extends BaseModule {
   /**
-   * 🔑 TodoModule 키워드 정의
+   * 🏗️ 생성자 - 표준 매개변수 구조 준수
    */
-  getModuleKeywords() {
-    return ["todo", "todos", "task", "tasks", "할일", "할일목록", "태스크"];
-  }
   constructor(moduleName, options = {}) {
-    super("TodoModule", {
-      bot,
-      moduleManager: options.moduleManager,
-      config: options.config,
-    });
+    // 🔥 핵심 수정: options 구조 올바르게 사용
+    super(moduleName, options);
 
     // ServiceBuilder에서 서비스 주입
     this.serviceBuilder = options.serviceBuilder || null;
@@ -41,9 +37,6 @@ class TodoModule extends BaseModule {
     // 🔔 ReminderService도 주입받기
     this.reminderService = null;
 
-    // 사용자 입력 상태 관리 (메모리 기반)
-    this.userStates = new Map();
-
     // 모듈 설정
     this.config = {
       maxTodosPerUser: parseInt(process.env.MAX_TODOS_PER_USER) || 50,
@@ -51,7 +44,32 @@ class TodoModule extends BaseModule {
       ...options.config,
     };
 
-    logger.info("📋 TodoModule 생성됨 - 리마인더 통합! 🔔");
+    logger.info("📋 TodoModule 생성됨 - 리마인더 통합! 🔔", {
+      hasBot: !!this.bot,
+      hasModuleManager: !!this.moduleManager,
+      hasServiceBuilder: !!this.serviceBuilder,
+      config: this.config,
+    });
+  }
+
+  /**
+   * 🔑 TodoModule 키워드 정의
+   */
+  getModuleKeywords() {
+    return [
+      // 한국어 키워드
+      "todo",
+      "todos",
+      "task",
+      "tasks",
+      "할일",
+      "할일목록",
+      "태스크",
+      "작업",
+      "업무",
+      "투두",
+      "체크리스트",
+    ];
   }
 
   /**
@@ -97,6 +115,9 @@ class TodoModule extends BaseModule {
         }
       }
 
+      // 액션 등록
+      this.setupActions();
+
       logger.success("✅ TodoModule 초기화 완료 (리마인더 통합)");
     } catch (error) {
       logger.error("❌ TodoModule 초기화 실패:", error);
@@ -110,93 +131,64 @@ class TodoModule extends BaseModule {
   setupActions() {
     this.registerActions({
       // 기본 액션들
-      menu: this.showTodoList.bind(this), // 메인 화면 = 할일 목록
-      list: this.showTodoList.bind(this), // 목록보기
+      menu: this.showTodoList,
+      list: this.showTodoList,
 
       // CRUD 액션들 - 단순화!
-      add: this.promptAddTodo.bind(this), // 추가 입력 대기
-      toggle: this.toggleTodo.bind(this), // 완료/미완료 토글
-      delete: this.deleteTodo.bind(this), // 바로 삭제 (확인 없음)
+      add: this.promptAddTodo,
+      toggle: this.toggleTodo,
+      delete: this.deleteTodo,
 
-      // 🔔 리마인더 관련 액션 추가
-      set_reminder: this.setTodoReminder.bind(this), // 리마인더 설정
-      skip_reminder: this.addTodoWithoutReminder.bind(this), // 리마인더 없이 추가
-      quick_reminder: this.setQuickReminder.bind(this), // 빠른 리마인더 설정
+      // 🔔 리마인더 관련 액션들
+      add_with_reminder: this.promptAddTodoWithReminder,
+      set_reminder: this.setTodoReminder,
+      quick_reminder: this.setQuickReminder,
+      skip_reminder: this.addTodoWithoutReminder,
 
-      // 부가 기능
-      stats: this.showSimpleStats.bind(this), // 간단한 완료율만
-      help: this.showHelp.bind(this), // 도움말
+      // 통계 및 기타
+      stats: this.showSimpleStats,
     });
   }
 
-  /**
-   * ✅ 메시지 처리 (표준 onHandleMessage 패턴)
-   */
-  async onHandleMessage(bot, msg) {
-    const {
-      text,
-      chat: { id: chatId },
-      from: { id: userId },
-    } = msg;
-
-    if (!text) return false;
-
-    // 📝 할일 입력 대기 상태 확인
-    const userState = this.getUserState(userId);
-
-    if (userState?.awaitingTodoInput) {
-      return await this.handleTodoInput(bot, msg, text);
-    }
-
-    // 📋 명령어 확인 (todo, 할일, todos)
-    const keywords = ["할일", "리마인드", "todo"];
-    if (this.isModuleMessage(text, keywords)) {
-      // NavigationHandler를 통해 메뉴 표시
-      await this.moduleManager.navigationHandler.sendModuleMenu(
-        bot,
-        chatId,
-        "todo"
-      );
-      return true;
-    }
-
-    return false;
-  }
-
-  // ===== 🎯 핵심 액션 메서드들 (표준 매개변수 준수) =====
+  // ===== 📋 메뉴 액션들 (표준 매개변수 준수) =====
 
   /**
    * 📋 할일 목록 표시 (메인 화면)
    */
   async showTodoList(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
+    const userName = getUserName(callbackQuery.from);
 
     try {
       logger.info(`📋 할일 목록 요청 (사용자: ${userId})`);
 
-      // 할일 목록 조회
-      const todos = await this.todoService.getTodos(userId, {
-        limit: 20,
-        sort: { completed: 1, createdAt: -1 }, // 미완료 먼저, 최신순
-      });
-
-      // 간단한 통계
+      const todos = await this.todoService.getTodos(userId);
       const completedCount = todos.filter((todo) => todo.completed).length;
       const totalCount = todos.length;
 
+      // ✅ 순수 데이터만 반환 (UI는 NavigationHandler가 처리)
       return {
-        type: "list",
+        type: "list", // ✅ 렌더러가 기대하는 타입
         module: "todo",
         data: {
-          todos,
+          userName,
+          todos: todos.map((todo) => ({
+            id: todo._id ? todo._id.toString() : todo.id || "unknown",
+            text: todo.text || "제목 없음",
+            completed: todo.completed || false,
+            createdAt: todo.createdAt || new Date(),
+            hasReminder: !!todo.reminderId, // 🔔 리마인더 유무
+          })),
           stats: {
-            completed: completedCount,
             total: totalCount,
+            completed: completedCount,
+            pending: totalCount - completedCount,
             completionRate:
               totalCount > 0
                 ? Math.round((completedCount / totalCount) * 100)
                 : 0,
           },
+          enableReminders: this.config.enableReminders, // 🔔 리마인더 기능 활성화 여부
         },
       };
     } catch (error) {
@@ -210,7 +202,7 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * ➕ 할일 추가 입력 대기 (리마인더 옵션 포함)
+   * ➕ 할일 추가 입력 대기 (기본)
    */
   async promptAddTodo(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
@@ -218,12 +210,51 @@ class TodoModule extends BaseModule {
     logger.info(`➕ 할일 추가 프롬프트 (사용자: ${userId})`);
 
     // 사용자 상태를 "입력 대기"로 설정
-    this.setUserState(userId, { awaitingTodoInput: true });
+    this.setUserState(userId, {
+      awaitingInput: true,
+      action: "awaiting_todo_input",
+      withReminder: false,
+    });
 
     return {
-      type: "add_prompt_with_reminder", // 🔔 리마인더 옵션 포함
+      type: "add_prompt",
       module: "todo",
-      data: { inputType: "add" },
+      data: {
+        inputType: "todo_text",
+        message: "새로운 할일을 입력해주세요:",
+      },
+    };
+  }
+
+  /**
+   * ➕ 할일 추가 입력 대기 (리마인더 포함)
+   */
+  async promptAddTodoWithReminder(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    const userId = getUserId(callbackQuery.from);
+
+    logger.info(`➕ 리마인더 포함 할일 추가 프롬프트 (사용자: ${userId})`);
+
+    // 사용자 상태를 "입력 대기"로 설정
+    this.setUserState(userId, {
+      awaitingInput: true,
+      action: "awaiting_todo_input",
+      withReminder: true,
+    });
+
+    return {
+      success: true,
+      action: "prompt_add_todo_with_reminder",
+      data: {
+        type: "add_prompt_with_reminder",
+        inputType: "todo_text",
+        message: "새로운 할일을 입력해주세요 (리마인더 설정 포함):",
+      },
     };
   }
 
@@ -236,9 +267,9 @@ class TodoModule extends BaseModule {
 
     if (!todoId) {
       return {
-        type: "error",
-        module: "todo",
-        data: { message: "할일 ID가 필요합니다" },
+        success: false,
+        error: "할일 ID가 필요합니다",
+        data: { type: "error", message: "할일 ID가 필요합니다" },
       };
     }
 
@@ -249,9 +280,9 @@ class TodoModule extends BaseModule {
 
       if (!updatedTodo) {
         return {
-          type: "error",
-          module: "todo",
-          data: { message: "할일을 찾을 수 없습니다" },
+          success: false,
+          error: "할일을 찾을 수 없습니다",
+          data: { type: "error", message: "할일을 찾을 수 없습니다" },
         };
       }
 
@@ -266,9 +297,9 @@ class TodoModule extends BaseModule {
     } catch (error) {
       logger.error("할일 토글 실패:", error);
       return {
-        type: "error",
-        module: "todo",
-        data: { message: "할일 상태 변경에 실패했습니다" },
+        success: false,
+        error: "할일 상태 변경에 실패했습니다",
+        data: { type: "error", message: "할일 상태 변경에 실패했습니다" },
       };
     }
   }
@@ -282,9 +313,9 @@ class TodoModule extends BaseModule {
 
     if (!todoId) {
       return {
-        type: "error",
-        module: "todo",
-        data: { message: "할일 ID가 필요합니다" },
+        success: false,
+        error: "할일 ID가 필요합니다",
+        data: { type: "error", message: "할일 ID가 필요합니다" },
       };
     }
 
@@ -295,9 +326,9 @@ class TodoModule extends BaseModule {
 
       if (!deleted) {
         return {
-          type: "error",
-          module: "todo",
-          data: { message: "할일을 찾을 수 없습니다" },
+          success: false,
+          error: "할일을 찾을 수 없습니다",
+          data: { type: "error", message: "할일을 찾을 수 없습니다" },
         };
       }
 
@@ -312,54 +343,11 @@ class TodoModule extends BaseModule {
     } catch (error) {
       logger.error("할일 삭제 실패:", error);
       return {
-        type: "error",
-        module: "todo",
-        data: { message: "할일 삭제에 실패했습니다" },
+        success: false,
+        error: "할일 삭제에 실패했습니다",
+        data: { type: "error", message: "할일 삭제에 실패했습니다" },
       };
     }
-  }
-  async handleUserInput(bot, msg, text, userState) {
-    const {
-      chat: { id: chatId },
-      from: { id: userId },
-    } = msg;
-
-    if (userState.action === "awaiting_todo_input") {
-      // 할일 추가 처리
-      const todoText = text.trim();
-
-      if (todoText.length === 0) {
-        await bot.sendMessage(chatId, "할일 내용을 입력해주세요.");
-        return true;
-      }
-
-      try {
-        await this.todoService.addTodo(userId, { text: todoText });
-        this.clearUserState(userId);
-
-        await bot.sendMessage(
-          chatId,
-          `✅ 할일 '${todoText}'이(가) 추가되었습니다!`
-        );
-
-        // 목록 다시 표시
-        setTimeout(() => {
-          this.moduleManager.navigationHandler.sendModuleMenu(
-            bot,
-            chatId,
-            "todo"
-          );
-        }, 1000);
-
-        return true;
-      } catch (error) {
-        logger.error("할일 추가 실패:", error);
-        await bot.sendMessage(chatId, "❌ 할일 추가에 실패했습니다.");
-        return true;
-      }
-    }
-
-    return false;
   }
 
   /**
@@ -385,257 +373,77 @@ class TodoModule extends BaseModule {
       };
 
       return {
-        type: "stats",
-        module: "todo",
-        data: { stats },
+        success: true,
+        action: "show_stats",
+        data: {
+          type: "todo_stats",
+          stats,
+          recentTodos: todos.slice(-5), // 최근 5개
+        },
       };
     } catch (error) {
       logger.error("통계 조회 실패:", error);
       return {
-        type: "error",
-        module: "todo",
-        data: { message: "통계를 불러올 수 없습니다" },
+        success: false,
+        error: "통계를 불러올 수 없습니다",
+        data: { type: "error", message: "통계를 불러올 수 없습니다" },
       };
     }
   }
 
-  /**
-   * ❓ 도움말 표시
-   */
-  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
-    return {
-      type: "help",
-      module: "todo",
-      data: {},
-    };
-  }
-
-  // ===== 🛠️ 유틸리티 메서드들 =====
+  // ===== 🔔 리마인더 관련 액션들 =====
 
   /**
-   * 📝 할일 입력 처리 (리마인더 옵션 통합)
+   * 🔔 빠른 리마인더 설정
    */
-  async handleTodoInput(bot, msg, text) {
-    const {
-      chat: { id: chatId },
-      from: { id: userId },
-    } = msg;
-
-    try {
-      // 상태 정보 확인
-      const userState = this.getUserState(userId);
-
-      // 리마인더 시간 입력 처리에서 Enhanced TimeHelper 활용
-      if (userState?.awaitingReminderTime) {
-        // 🔔 고급 시간 파싱 사용
-        const reminderTime = this.parseReminderTime(text);
-
-        if (!reminderTime) {
-          await bot.sendMessage(
-            chatId,
-            `❌ 시간을 인식할 수 없습니다\\. 다시 입력해주세요\\!\n\n` +
-              `💡 *다양한 표현을 지원합니다*:\n` +
-              `• 상대시간: "30분 후", "2시간 후", "내일"\n` +
-              `• 절대시간: "오후 3시", "월요일 10시"\n` +
-              `• 자연어: "점심시간", "회의시간", "마감일"\n` +
-              `• 특별한 날: "크리스마스", "설날", "주말에"`,
-            { parse_mode: "MarkdownV2" }
-          );
-          return true;
-        }
-
-        // Enhanced TimeHelper로 시간 검증
-        const TimeHelper = require("../utils/TimeHelper");
-        const now = TimeHelper.now().toDate();
-
-        if (reminderTime <= now) {
-          const friendlyTime = TimeHelper.smartFormat(reminderTime, "reminder");
-          await bot.sendMessage(
-            chatId,
-            `❌ 과거 시간으로는 설정할 수 없습니다\\.\n\n` +
-              `입력하신 시간: ${TimeHelper.escapeMarkdownV2(friendlyTime)}\n` +
-              `현재 시간보다 미래의 시간을 입력해주세요\\.`,
-            { parse_mode: "MarkdownV2" }
-          );
-          return true;
-        }
-
-        // 할일과 리마인더 동시 생성
-        const todoText = userState.pendingTodo;
-        const savedTodo = await this.todoService.addTodo(userId, {
-          text: todoText,
-        });
-
-        // 리마인더 생성
-        await this.reminderService.createReminder(userId, {
-          text: `📝 할일 리마인더: ${todoText}`,
-          reminderTime: reminderTime,
-          todoId: savedTodo.id,
-          type: "todo_reminder",
-        });
-
-        // 상태 초기화
-        this.clearUserState(userId);
-
-        // 성공 메시지 (스마트 포맷팅 활용)
-        const friendlyTime = TimeHelper.smartFormat(reminderTime, "reminder");
-        const isWorkingTime = TimeHelper.isWorkingTime(reminderTime);
-        const isWorkday = TimeHelper.isWorkday(reminderTime);
-
-        let extraInfo = "";
-        if (!isWorkday) {
-          extraInfo += "\n🌴 주말/휴일 알림입니다";
-        } else if (!isWorkingTime) {
-          extraInfo += "\n🌙 업무시간 외 알림입니다";
-        } else {
-          extraInfo += "\n💼 업무시간 알림입니다";
-        }
-
-        await bot.sendMessage(
-          chatId,
-          `✅ 할일과 리마인더가 설정되었습니다\\!\n\n` +
-            `📝 할일: ${todoText}\n` +
-            `🔔 알림시간: ${TimeHelper.escapeMarkdownV2(
-              friendlyTime
-            )}${extraInfo}\n\n` +
-            `정확한 시간에 알림을 보내드릴게요\\! 🎯`,
-          { parse_mode: "MarkdownV2" }
-        );
-
-        // 목록 다시 표시
-        setTimeout(() => {
-          this.moduleManager.navigationHandler.sendModuleMenu(
-            bot,
-            chatId,
-            "todo"
-          );
-        }, 2000);
-
-        return true;
-      }
-
-      // 기본 할일 입력 처리
-      const todoText = text.trim();
-
-      // 상태 초기화
-      this.clearUserState(userId);
-
-      // 🔔 리마인더 기능이 활성화되어 있으면 선택 제공
-      if (this.config.enableReminders && this.reminderService) {
-        // 할일 임시 저장
-        this.setUserState(userId, {
-          pendingTodo: todoText,
-          awaitingReminderChoice: true,
-        });
-
-        // 리마인더 선택 UI 표시
-        await bot.sendMessage(
-          chatId,
-          `📝 할일 "${todoText}"이(가) 준비되었습니다!\n\n🔔 리마인더를 설정하시겠어요?`,
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: "⏰ 시간 설정하기",
-                    callback_data: "todo:set_reminder",
-                  },
-                  { text: "➕ 바로 추가", callback_data: "todo:skip_reminder" },
-                ],
-                [{ text: "❌ 취소", callback_data: "todo:menu" }],
-              ],
-            },
-          }
-        );
-
-        return true;
-      } else {
-        // 리마인더 없이 바로 할일 추가
-        await this.todoService.addTodo(userId, { text: todoText });
-
-        await bot.sendMessage(
-          chatId,
-          `✅ 할일 '${todoText}'이(가) 추가되었습니다!`
-        );
-
-        // 목록 다시 표시
-        setTimeout(() => {
-          this.moduleManager.navigationHandler.sendModuleMenu(
-            bot,
-            chatId,
-            "todo"
-          );
-        }, 1000);
-
-        return true;
-      }
-    } catch (error) {
-      logger.error("할일 입력 처리 실패:", error);
-      await bot.sendMessage(
-        chatId,
-        "❌ 할일 추가에 실패했습니다. 다시 시도해주세요."
-      );
-      return true;
-    }
-  }
-
-  /**
-   * 🔔 리마인더 설정 액션
-   */
-  async setTodoReminder(bot, callbackQuery, subAction, params, moduleManager) {
+  async setQuickReminder(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
+    const reminderType = params; // 예: "30m", "1h", "lunch", etc.
 
     try {
       const userState = this.getUserState(userId);
-      const todoText = userState?.pendingTodo;
-
-      if (!todoText) {
+      if (!userState || !userState.todoText) {
         return {
-          type: "error",
-          module: "todo",
-          data: { message: "임시 저장된 할일을 찾을 수 없습니다" },
+          success: false,
+          error: "할일 텍스트가 필요합니다",
+          data: { type: "error", message: "할일 텍스트가 필요합니다" },
         };
       }
 
-      // 리마인더 시간 입력 대기 상태로 변경
-      this.setUserState(userId, {
-        pendingTodo: todoText,
-        awaitingReminderTime: true,
-      });
+      // 빠른 리마인더 시간 계산
+      const reminderTime = this.calculateQuickReminderTime(reminderType);
+      if (!reminderTime) {
+        return {
+          success: false,
+          error: "잘못된 리마인더 타입입니다",
+          data: { type: "error", message: "잘못된 리마인더 타입입니다" },
+        };
+      }
 
-      return {
-        type: "reminder_time_prompt",
-        module: "todo",
-        data: {
-          todoText,
-          supportedExpressions: [
-            // 상대 시간
-            "30분 후",
-            "2시간 후",
-            "내일",
-            "모레",
-            // 절대 시간
-            "오후 3시",
-            "월요일 10시",
-            "금요일 오후 2시",
-            // 자연어
-            "점심시간",
-            "저녁시간",
-            "회의시간",
-            "마감일",
-            // 특별한 날
-            "주말에",
-            "크리스마스",
-            "설날",
-          ],
-        },
-      };
+      // 리마인더와 함께 할일 추가
+      await this.createTodoWithReminder(
+        userId,
+        userState.todoText,
+        reminderTime
+      );
+
+      // 사용자 상태 정리
+      this.clearUserState(userId);
+
+      // 성공 후 목록 표시
+      return await this.showTodoList(
+        bot,
+        callbackQuery,
+        "list",
+        "",
+        moduleManager
+      );
     } catch (error) {
-      logger.error("리마인더 설정 실패:", error);
+      logger.error("빠른 리마인더 설정 실패:", error);
       return {
-        type: "error",
-        module: "todo",
-        data: { message: "리마인더 설정에 실패했습니다" },
+        success: false,
+        error: "리마인더 설정에 실패했습니다",
+        data: { type: "error", message: "리마인더 설정에 실패했습니다" },
       };
     }
   }
@@ -654,25 +462,21 @@ class TodoModule extends BaseModule {
 
     try {
       const userState = this.getUserState(userId);
-      const todoText = userState?.pendingTodo;
-
-      if (!todoText) {
+      if (!userState || !userState.todoText) {
         return {
-          type: "error",
-          module: "todo",
-          data: { message: "임시 저장된 할일을 찾을 수 없습니다" },
+          success: false,
+          error: "할일 텍스트가 필요합니다",
+          data: { type: "error", message: "할일 텍스트가 필요합니다" },
         };
       }
 
-      // 할일 추가
-      await this.todoService.addTodo(userId, { text: todoText });
+      // 리마인더 없이 할일 추가
+      await this.todoService.addTodo(userId, { text: userState.todoText });
 
-      // 상태 초기화
+      // 사용자 상태 정리
       this.clearUserState(userId);
 
-      logger.info(
-        `➕ 리마인더 없이 할일 추가: ${todoText} (사용자: ${userId})`
-      );
+      logger.info(`✅ 할일 추가됨 (리마인더 없음): ${userState.todoText}`);
 
       // 성공 후 목록 표시
       return await this.showTodoList(
@@ -683,217 +487,311 @@ class TodoModule extends BaseModule {
         moduleManager
       );
     } catch (error) {
-      logger.error("리마인더 없이 할일 추가 실패:", error);
+      logger.error("할일 추가 실패:", error);
       return {
-        type: "error",
-        module: "todo",
-        data: { message: "할일 추가에 실패했습니다" },
+        success: false,
+        error: "할일 추가에 실패했습니다",
+        data: { type: "error", message: "할일 추가에 실패했습니다" },
       };
     }
   }
 
+  // ===== 🛠️ 사용자 입력 처리 =====
+
   /**
-   * ⚡ 빠른 리마인더 설정
+   * 📝 사용자 입력 처리 (상태 기반)
    */
-  async setQuickReminder(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-    const quickType = params; // 30m, 1h, lunch, dinner, etc.
+  async handleUserInput(bot, msg, text, userState) {
+    const {
+      chat: { id: chatId },
+      from: { id: userId },
+    } = msg;
 
-    try {
-      const userState = this.getUserState(userId);
-      const todoText = userState?.pendingTodo;
+    if (userState.action === "awaiting_todo_input") {
+      // 할일 텍스트 입력 처리
+      const todoText = text.trim();
 
-      if (!todoText) {
-        return {
-          type: "error",
-          module: "todo",
-          data: { message: "임시 저장된 할일을 찾을 수 없습니다" },
-        };
+      if (todoText.length === 0) {
+        await bot.sendMessage(chatId, "할일 내용을 입력해주세요.");
+        return true;
       }
 
-      // 🕐 빠른 시간 계산 (Enhanced TimeHelper 활용)
-      const TimeHelper = require("../utils/TimeHelper");
-      let reminderTime;
-
-      switch (quickType) {
-        case "30m":
-          reminderTime = TimeHelper.now().add(30, "minutes").toDate();
-          break;
-        case "1h":
-          reminderTime = TimeHelper.now().add(1, "hour").toDate();
-          break;
-        case "lunch":
-          reminderTime = TimeHelper.parseNaturalLanguage("점심시간");
-          break;
-        case "dinner":
-          reminderTime = TimeHelper.parseNaturalLanguage("저녁시간");
-          break;
-        case "tomorrow_9":
-          reminderTime = TimeHelper.parseNaturalLanguage("내일 9시");
-          break;
-        case "tomorrow_19":
-          reminderTime = TimeHelper.parseNaturalLanguage("내일 저녁 7시");
-          break;
-        case "monday_am":
-          reminderTime = TimeHelper.parseNaturalLanguage("월요일 오전 9시");
-          break;
-        case "friday_pm":
-          reminderTime = TimeHelper.parseNaturalLanguage("금요일 오후 2시");
-          break;
-        default:
-          reminderTime = TimeHelper.now().add(1, "hour").toDate();
+      if (todoText.length > 200) {
+        await bot.sendMessage(chatId, "할일 내용이 너무 깁니다. (최대 200자)");
+        return true;
       }
 
-      if (!reminderTime || reminderTime <= new Date()) {
-        return {
-          type: "error",
-          module: "todo",
-          data: { message: "유효하지 않은 리마인더 시간입니다" },
-        };
+      try {
+        if (userState.withReminder && this.config.enableReminders) {
+          // 리마인더 포함 모드
+          this.setUserState(userId, {
+            awaitingInput: true,
+            action: "awaiting_reminder_time",
+            todoText: todoText,
+          });
+
+          // 리마인더 시간 입력 프롬프트 표시
+          if (this.moduleManager?.navigationHandler) {
+            await this.moduleManager.navigationHandler.sendReminderTimePrompt(
+              bot,
+              chatId,
+              { todoText }
+            );
+          } else {
+            await bot.sendMessage(
+              chatId,
+              `📝 할일: ${todoText}\n\n` +
+                "🔔 리마인더 시간을 자연어로 입력해주세요.\n" +
+                "예: '30분 후', '내일 9시', '금요일 오후 2시'"
+            );
+          }
+        } else {
+          // 바로 추가 모드
+          await this.todoService.addTodo(userId, { text: todoText });
+          this.clearUserState(userId);
+
+          await bot.sendMessage(
+            chatId,
+            `✅ 할일 '${todoText}'이(가) 추가되었습니다!`
+          );
+
+          // 목록 다시 표시
+          setTimeout(() => {
+            if (this.moduleManager?.navigationHandler) {
+              this.moduleManager.navigationHandler.sendModuleMenu(
+                bot,
+                chatId,
+                "todo"
+              );
+            }
+          }, 1000);
+        }
+
+        return true;
+      } catch (error) {
+        logger.error("할일 추가 실패:", error);
+        await bot.sendMessage(chatId, "❌ 할일 추가에 실패했습니다.");
+        this.clearUserState(userId);
+        return true;
+      }
+    }
+
+    if (
+      userState.action === "awaiting_reminder_time" &&
+      this.config.enableReminders
+    ) {
+      // 리마인더 시간 입력 처리
+      const reminderTime = this.parseReminderTime(text);
+
+      if (!reminderTime) {
+        await bot.sendMessage(
+          chatId,
+          "⚠️ 시간을 인식할 수 없습니다.\n" +
+            "다시 입력해주세요. 예: '30분 후', '내일 9시', '금요일 오후 2시'"
+        );
+        return true;
       }
 
-      // 할일과 리마인더 동시 생성
-      const savedTodo = await this.todoService.addTodo(userId, {
-        text: todoText,
-      });
+      try {
+        // 리마인더와 함께 할일 추가
+        await this.createTodoWithReminder(
+          userId,
+          userState.todoText,
+          reminderTime
+        );
+        this.clearUserState(userId);
 
-      // 리마인더 생성
-      await this.reminderService.createReminder(userId, {
-        text: `📝 할일 리마인더: ${todoText}`,
-        reminderTime: reminderTime,
-        todoId: savedTodo.id,
-        type: "todo_reminder",
-      });
+        const formattedTime = TimeHelper.format(reminderTime, "full");
+        await bot.sendMessage(
+          chatId,
+          `✅ 할일이 추가되었습니다!\n` +
+            `📝 내용: ${userState.todoText}\n` +
+            `🔔 리마인더: ${formattedTime}`
+        );
 
-      // 상태 초기화
-      this.clearUserState(userId);
+        // 목록 다시 표시
+        setTimeout(() => {
+          if (this.moduleManager?.navigationHandler) {
+            this.moduleManager.navigationHandler.sendModuleMenu(
+              bot,
+              chatId,
+              "todo"
+            );
+          }
+        }, 1000);
 
-      logger.info(
-        `⚡ 빠른 리마인더 설정 완료: ${quickType} (사용자: ${userId})`
-      );
+        return true;
+      } catch (error) {
+        logger.error("리마인더 할일 추가 실패:", error);
+        await bot.sendMessage(chatId, "❌ 할일 추가에 실패했습니다.");
+        this.clearUserState(userId);
+        return true;
+      }
+    }
 
-      // 성공 후 목록 표시
-      return await this.showTodoList(
-        bot,
-        callbackQuery,
-        "list",
-        "",
-        moduleManager
-      );
-    } catch (error) {
-      logger.error("빠른 리마인더 설정 실패:", error);
-      return {
-        type: "error",
-        module: "todo",
-        data: { message: "리마인더 설정에 실패했습니다" },
-      };
+    return false;
+  }
+
+  // ===== 🛠️ 헬퍼 메서드들 =====
+
+  /**
+   * 🔔 리마인더와 함께 할일 생성
+   */
+  async createTodoWithReminder(userId, todoText, reminderTime) {
+    // 할일 먼저 추가
+    const todo = await this.todoService.addTodo(userId, { text: todoText });
+
+    // 리마인더 설정 (ReminderService가 있는 경우)
+    if (this.reminderService && this.config.enableReminders) {
+      try {
+        const reminder = await this.reminderService.createReminder({
+          userId,
+          title: `할일 리마인더: ${todoText}`,
+          message: `📋 할일을 잊지 마세요: ${todoText}`,
+          scheduledTime: reminderTime,
+          type: "todo",
+          relatedId: todo._id.toString(),
+        });
+
+        // 할일에 리마인더 ID 연결
+        await this.todoService.updateTodo(userId, todo._id.toString(), {
+          reminderId: reminder._id.toString(),
+        });
+
+        logger.info(`🔔 할일 리마인더 설정됨: ${todoText} @ ${reminderTime}`);
+      } catch (error) {
+        logger.warn("리마인더 설정 실패:", error);
+        // 리마인더 실패해도 할일은 유지
+      }
+    }
+
+    return todo;
+  }
+
+  /**
+   * ⏰ 빠른 리마인더 시간 계산
+   */
+  calculateQuickReminderTime(reminderType) {
+    const now = TimeHelper.now();
+
+    switch (reminderType) {
+      case "30m":
+        return TimeHelper.addMinutes(now, 30);
+      case "1h":
+        return TimeHelper.addHours(now, 1);
+      case "lunch":
+        const lunch = TimeHelper.setTime(now, 12, 0, 0);
+        return TimeHelper.isBefore(lunch, now)
+          ? TimeHelper.addDays(lunch, 1)
+          : lunch;
+      case "dinner":
+        const dinner = TimeHelper.setTime(now, 19, 0, 0);
+        return TimeHelper.isBefore(dinner, now)
+          ? TimeHelper.addDays(dinner, 1)
+          : dinner;
+      case "tomorrow_9":
+        return TimeHelper.setTime(TimeHelper.addDays(now, 1), 9, 0, 0);
+      case "tomorrow_19":
+        return TimeHelper.setTime(TimeHelper.addDays(now, 1), 19, 0, 0);
+      case "monday_am":
+        return this.getNextWeekday(1, 9, 0); // 월요일 오전 9시
+      case "friday_pm":
+        return this.getNextWeekday(5, 14, 0); // 금요일 오후 2시
+      default:
+        return null;
     }
   }
 
   /**
-   * 🕐 고급 시간 파싱 (Enhanced TimeHelper 통합)
+   * 📅 다음 요일 계산
    */
-  parseReminderTime(input) {
-    const text = input.trim().toLowerCase();
+  getNextWeekday(weekday, hour = 9, minute = 0) {
+    const now = TimeHelper.now();
+    let target = TimeHelper.setTime(now, hour, minute, 0);
 
+    // 이번 주 해당 요일로 설정
+    const currentWeekday = TimeHelper.getWeekday(target);
+    const daysToAdd = (weekday - currentWeekday + 7) % 7;
+
+    if (daysToAdd === 0 && TimeHelper.isBefore(target, now)) {
+      // 오늘이 해당 요일인데 시간이 지났으면 다음 주
+      target = TimeHelper.addDays(target, 7);
+    } else if (daysToAdd > 0) {
+      target = TimeHelper.addDays(target, daysToAdd);
+    }
+
+    return target;
+  }
+
+  /**
+   * 🧠 자연어 리마인더 시간 파싱
+   */
+  parseReminderTime(text) {
     try {
-      // moment 한국어 로케일 설정
-      const moment = require("moment-timezone");
-      moment.locale("ko");
+      const now = TimeHelper.now();
+      const lowerText = text.toLowerCase().trim();
 
-      // 현재 한국 시간
-      const now = moment.tz("Asia/Seoul");
-
-      // === 1. 상대 시간 파싱 (moment의 강력한 기능) ===
-
-      // "N분 후", "N시간 후", "N일 후"
-      const relativeMatch = text.match(/(\d+)(분|시간|일)\s*후/);
+      // 상대적 시간 ("30분 후", "2시간 후", "3일 후")
+      const relativeMatch = lowerText.match(/(\d+)\s*(분|시간|일)\s*후/);
       if (relativeMatch) {
         const amount = parseInt(relativeMatch[1]);
         const unit = relativeMatch[2];
 
-        const unitMap = { 분: "minutes", 시간: "hours", 일: "days" };
-        return now.add(amount, unitMap[unit]).toDate();
-      }
-
-      // === 2. 절대 시간 파싱 (오늘 기준) ===
-
-      // "오전/오후 N시" 패턴
-      const timeMatch = text.match(/(오전|오후)\s*(\d+)시(?:\s*(\d+)분)?/);
-      if (timeMatch) {
-        const period = timeMatch[1];
-        let hour = parseInt(timeMatch[2]);
-        const minute = parseInt(timeMatch[3]) || 0;
-
-        if (period === "오후" && hour !== 12) hour += 12;
-        if (period === "오전" && hour === 12) hour = 0;
-
-        const targetTime = now.clone().hour(hour).minute(minute).second(0);
-
-        // 이미 지난 시간이면 내일로
-        if (targetTime.isBefore(now)) {
-          targetTime.add(1, "day");
-        }
-
-        return targetTime.toDate();
-      }
-
-      // "N시" 패턴 (24시간 형식)
-      const hourMatch = text.match(/(\d+)시(?:\s*(\d+)분)?/);
-      if (hourMatch) {
-        const hour = parseInt(hourMatch[1]);
-        const minute = parseInt(hourMatch[2]) || 0;
-
-        if (hour >= 0 && hour <= 23) {
-          const targetTime = now.clone().hour(hour).minute(minute).second(0);
-
-          if (targetTime.isBefore(now)) {
-            targetTime.add(1, "day");
-          }
-
-          return targetTime.toDate();
+        switch (unit) {
+          case "분":
+            return TimeHelper.addMinutes(now, amount);
+          case "시간":
+            return TimeHelper.addHours(now, amount);
+          case "일":
+            return TimeHelper.addDays(now, amount);
         }
       }
 
-      // === 3. 날짜 기반 파싱 (moment의 유연한 파싱) ===
+      // 절대적 시간 ("오후 3시", "내일 9시")
+      const absoluteMatch = lowerText.match(
+        /(내일|모레)?\s*(오전|오후)?\s*(\d+)시(?:\s*(\d+)분)?/
+      );
+      if (absoluteMatch) {
+        const dayOffset =
+          absoluteMatch[1] === "내일" ? 1 : absoluteMatch[1] === "모레" ? 2 : 0;
+        const period = absoluteMatch[2];
+        let hour = parseInt(absoluteMatch[3]);
+        const minute = parseInt(absoluteMatch[4]) || 0;
 
-      // "내일", "모레", "글피" 등
-      const dayWords = {
-        내일: 1,
-        모레: 2,
-        글피: 3,
-        그글피: 4,
-      };
-
-      for (const [word, days] of Object.entries(dayWords)) {
-        if (text.includes(word)) {
-          const timeMatch = text.match(/(\d+)시(?:\s*(\d+)분)?/);
-          if (timeMatch) {
-            const hour = parseInt(timeMatch[1]);
-            const minute = parseInt(timeMatch[2]) || 0;
-
-            return now
-              .clone()
-              .add(days, "day")
-              .hour(hour)
-              .minute(minute)
-              .second(0)
-              .toDate();
-          } else {
-            // 시간 지정 없으면 오전 9시로 기본 설정
-            return now
-              .clone()
-              .add(days, "day")
-              .hour(9)
-              .minute(0)
-              .second(0)
-              .toDate();
-          }
+        // 오후 처리
+        if (period === "오후" && hour !== 12) {
+          hour += 12;
+        } else if (period === "오전" && hour === 12) {
+          hour = 0;
         }
+
+        let target = TimeHelper.setTime(now, hour, minute, 0);
+        if (dayOffset > 0) {
+          target = TimeHelper.addDays(target, dayOffset);
+        } else if (TimeHelper.isBefore(target, now)) {
+          // 오늘인데 시간이 지났으면 내일
+          target = TimeHelper.addDays(target, 1);
+        }
+
+        return target;
       }
 
-      // === 4. 요일 기반 파싱 (moment의 강력한 요일 처리) ===
+      // 특별한 시간 표현
+      if (lowerText.includes("점심") || lowerText.includes("lunch")) {
+        const lunch = TimeHelper.setTime(now, 12, 0, 0);
+        return TimeHelper.isBefore(lunch, now)
+          ? TimeHelper.addDays(lunch, 1)
+          : lunch;
+      }
 
+      if (lowerText.includes("저녁") || lowerText.includes("dinner")) {
+        const dinner = TimeHelper.setTime(now, 19, 0, 0);
+        return TimeHelper.isBefore(dinner, now)
+          ? TimeHelper.addDays(dinner, 1)
+          : dinner;
+      }
+
+      // 요일 기반 파싱
       const weekdays = {
         월요일: 1,
         월: 1,
@@ -911,80 +809,56 @@ class TodoModule extends BaseModule {
         일: 0,
       };
 
-      for (const [dayName, dayOfWeek] of Object.entries(weekdays)) {
-        if (text.includes(dayName)) {
-          const timeMatch = text.match(/(\d+)시(?:\s*(\d+)분)?/);
+      for (const [dayName, weekday] of Object.entries(weekdays)) {
+        if (lowerText.includes(dayName)) {
+          const timeMatch = lowerText.match(/(\d+)시(?:\s*(\d+)분)?/);
           const hour = timeMatch ? parseInt(timeMatch[1]) : 9;
           const minute = timeMatch ? parseInt(timeMatch[2]) || 0 : 0;
 
-          // 다음 해당 요일 찾기
-          let targetDay = now
-            .clone()
-            .day(dayOfWeek)
-            .hour(hour)
-            .minute(minute)
-            .second(0);
-
-          // 이번 주 해당 요일이 이미 지났으면 다음 주로
-          if (targetDay.isSameOrBefore(now)) {
-            targetDay.add(1, "week");
-          }
-
-          return targetDay.toDate();
+          return this.getNextWeekday(weekday, hour, minute);
         }
-      }
-
-      // === 5. 자연어 파싱 ===
-
-      if (text.includes("점심시간") || text.includes("점심")) {
-        const lunchTime = now.clone().hour(12).minute(0).second(0);
-        if (lunchTime.isBefore(now)) {
-          lunchTime.add(1, "day");
-        }
-        return lunchTime.toDate();
-      }
-
-      if (text.includes("저녁시간") || text.includes("저녁")) {
-        const dinnerTime = now.clone().hour(19).minute(0).second(0);
-        if (dinnerTime.isBefore(now)) {
-          dinnerTime.add(1, "day");
-        }
-        return dinnerTime.toDate();
       }
 
       return null;
     } catch (error) {
-      logger.warn("고급 시간 파싱 실패:", error);
+      logger.warn("리마인더 시간 파싱 실패:", error);
       return null;
     }
   }
 
   /**
-   * 👤 사용자 상태 관리 (메모리 기반)
+   * 📊 모듈 상태 정보
    */
-  getUserState(userId) {
-    return this.userStates.get(String(userId));
-  }
-
-  setUserState(userId, state) {
-    this.userStates.set(String(userId), state);
-  }
-
-  clearUserState(userId) {
-    this.userStates.delete(String(userId));
+  getModuleStatus() {
+    return {
+      ...super.getModuleStatus(),
+      serviceStatus: this.todoService ? "Connected" : "Disconnected",
+      reminderEnabled: this.config.enableReminders,
+      activeUserStates: this.userStates.size,
+      features: {
+        basicTodo: true,
+        reminders: this.config.enableReminders && !!this.reminderService,
+        naturalLanguageParsing: true,
+        quickReminders: true,
+      },
+    };
   }
 
   /**
-   * 📊 모듈 상태 정보
+   * 🧹 모듈 정리
    */
-  getStatus() {
-    return {
-      moduleName: this.moduleName,
-      isInitialized: this.isInitialized,
-      serviceStatus: this.todoService ? "Connected" : "Disconnected",
-      userStatesCount: this.userStates.size,
-      stats: this.stats,
-    };
+  async cleanup() {
+    try {
+      // 모든 사용자 상태 정리
+      this.userStates.clear();
+
+      // 부모 클래스 정리 호출
+      await super.cleanup();
+
+      logger.info("✅ TodoModule 정리 완료");
+    } catch (error) {
+      logger.error("❌ TodoModule 정리 실패:", error);
+    }
   }
 }
 

@@ -4,11 +4,8 @@ const logger = require("../utils/Logger");
 
 class ReminderModule extends BaseModule {
   constructor(moduleName, options = {}) {
-    super("ReminderModule", {
-      bot,
-      moduleManager: options.moduleManager,
-      config: options.config,
-    });
+    super(moduleName, options); // ← 간단하게 options 그대로 전달
+
     this.serviceBuilder = options.serviceBuilder || null;
 
     this.reminderService = null;

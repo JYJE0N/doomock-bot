@@ -5,11 +5,7 @@ const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class LeaveModule extends BaseModule {
   constructor(moduleName, options = {}) {
-    super("LeaveModule", {
-      bot,
-      moduleManager: options.moduleManager,
-      config: options.config,
-    });
+    super(moduleName, options); // ← 간단하게 options 그대로 전달
 
     // ✅ 표준: ServiceBuilder 사용
     this.serviceBuilder = options.serviceBuilder || null;

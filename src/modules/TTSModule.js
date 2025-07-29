@@ -14,11 +14,7 @@ const fs = require("fs");
  */
 class TTSModule extends BaseModule {
   constructor(moduleName, options = {}) {
-    super("TTSModule", {
-      bot,
-      moduleManager: options.moduleManager,
-      config: options.config,
-    });
+    super(moduleName, options); // ← 간단하게 options 그대로 전달
 
     // 서비스
     this.ttsService = null;
