@@ -53,8 +53,8 @@ class WorktimeModule extends BaseModule {
     } = msg;
     if (!text) return false;
 
-    const command = this.extractCommand(text);
-    if (command === "work" || command === "출근" || command === "퇴근") {
+    const keywords = ["퇴근", "집에가고싶어", "포로"];
+    if (this.isModuleMessage(text, keywords)) {
       await this.moduleManager.navigationHandler.sendModuleMenu(
         bot,
         chatId,

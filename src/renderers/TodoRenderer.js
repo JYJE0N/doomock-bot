@@ -1,17 +1,23 @@
-// src/renderers/TodoRenderer.js - 할일 관리 전용 렌더러
+// src/renderers/TodoRenderer.js - 🎯 단순하고 직관적인 할일 UI
 const BaseRenderer = require("./BaseRenderer");
 const DoomockMessageGenerator = require("../utils/DoomockMessageGenerator");
 const { getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/Logger");
 
 /**
- * 📋 TodoRenderer - 할일 관리 UI 렌더링 전담
+ * 📋 TodoRenderer - 단순하고 재미있는 할일 관리 UI
  *
- * ✅ 담당 기능:
- * - 할일 목록 렌더링
- * - 할일 추가/수정/삭제 화면
- * - 할일 완료 표시
- * - 할일 통계 화면
- * - 할일 필터링 및 정렬
+ * 🎯 핵심 기능:
+ * - 할일 목록 (진행중/완료 구분)
+ * - 원터치 완료/삭제
+ * - 간단한 통계
+ * - 도움말
+ *
+ * ✅ UI 원칙:
+ * - 복잡한 메뉴 없이 바로바로 액션
+ * - 이모지로 직관적 표현
+ * - MarkdownV2 완벽 이스케이프
+ * - 사용자 친화적 디자인
  */
 class TodoRenderer extends BaseRenderer {
   constructor(bot, navigationHandler) {
@@ -25,131 +31,168 @@ class TodoRenderer extends BaseRenderer {
   async render(result, ctx) {
     const { type, data } = result;
 
-    switch (type) {
-      case "menu":
-      case "list":
-        return await this.renderTodoList(data, ctx);
+    logger.debug(`📋 TodoRenderer: ${type} 타입 렌더링`);
 
-      case "add":
-        return await this.renderAddTodo(data, ctx);
+    try {
+      switch (type) {
+        case "menu":
+        case "list":
+          return await this.renderTodoList(data, ctx);
 
-      case "edit":
-        return await this.renderEditTodo(data, ctx);
+        case "add_prompt_with_reminder": // 🔔 리마인더 옵션 포함
+          return await this.renderAddPromptWithReminder(data, ctx);
 
-      case "complete":
-        return await this.renderCompleteTodo(data, ctx);
+        case "add_prompt":
+          return await this.renderAddPrompt(data, ctx);
 
-      case "delete":
-        return await this.renderDeleteTodo(data, ctx);
+        case "reminder_time_prompt": // 🔔 리마인더 시간 입력
+          return await this.renderReminderTimePrompt(data, ctx);
 
-      case "stats":
-        return await this.renderTodoStats(data, ctx);
+        case "stats":
+          return await this.renderSimpleStats(data, ctx);
 
-      case "filter":
-        return await this.renderFilterOptions(data, ctx);
+        case "help":
+          return await this.renderHelp(data, ctx);
 
-      case "help":
-        return await this.renderHelp(data, ctx);
+        case "error":
+          return await this.renderError(
+            data.message || "알 수 없는 오류가 발생했습니다",
+            ctx
+          );
 
-      case "input":
-        return await this.renderInputPrompt(data, ctx);
-
-      default:
-        return await this.renderError(
-          "지원하지 않는 할일 관리 기능입니다.",
-          ctx
-        );
+        default:
+          logger.warn(`📋 TodoRenderer: 지원하지 않는 타입 - ${type}`);
+          return await this.renderError("지원하지 않는 기능입니다", ctx);
+      }
+    } catch (error) {
+      logger.error(`📋 TodoRenderer 렌더링 오류 (${type}):`, error);
+      return await this.renderError("렌더링 중 오류가 발생했습니다", ctx);
     }
   }
 
   /**
-   * 📋 할일 목록 렌더링
+   * 📋 할일 목록 렌더링 (메인 화면)
    */
   async renderTodoList(data, ctx) {
     const userName = getUserName(ctx.callbackQuery?.from);
+    const todos = data?.todos || [];
+    const stats = data?.stats || {};
+
+    logger.debug(`📋 할일 목록 렌더링 (${todos.length}개)`);
 
     let text = "📋 *할일 관리*\n\n";
 
-    // 두목봇 환영 인사
+    // 두목봇 인사
     const welcomeMessage = DoomockMessageGenerator.getContextualMessage(
       "todoWelcome",
       userName
     );
-    text += `${this.escapeMarkdownV2(welcomeMessage)}\n\n`;
+    if (welcomeMessage) {
+      text += `${this.escapeMarkdownV2(welcomeMessage)}\n\n`;
+    }
 
-    const todos = data?.todos || [];
+    // 📊 간단한 통계 (완료율만)
+    if (stats.total > 0) {
+      const completionRate = stats.completionRate || 0;
+      const progressBar = this.createProgressBar(completionRate);
 
+      text += `📊 *진행률*: ${stats.completed}/${stats.total} \\(${completionRate}%\\)\n`;
+      text += `${progressBar}\n\n`;
+    }
+
+    // 📝 할일 목록
     if (todos.length === 0) {
-      text += "할일이 없습니다\\. 새 할일을 추가해보세요\\!\n\n";
-      text += "✨ *할일 관리 팁*:\n";
-      text += "• 작은 단위로 나누어 등록하세요\n";
-      text += "• 우선순위를 설정해보세요\n";
-      text += "• 정기적으로 정리하세요\n";
+      text += "🎯 *할일이 없습니다\\!*\n";
+      text += "새로운 할일을 추가해서 생산적인 하루를 시작해보세요\\.\n\n";
+      text += "💡 *팁*: 작은 목표부터 시작하세요\\!";
     } else {
-      // 통계 정보
-      const completedCount = todos.filter((todo) => todo.completed).length;
-      const totalCount = todos.length;
-      const progressPercent = Math.round((completedCount / totalCount) * 100);
+      // 진행중인 할일 먼저 표시
+      const pendingTodos = todos.filter((todo) => !todo.completed);
+      const completedTodos = todos.filter((todo) => todo.completed);
 
-      text += `📊 *진행 상황*: ${completedCount}/${totalCount} \\(${progressPercent}%\\)\n\n`;
+      // ⭕ 진행중인 할일 - 세련된 스타일
+      if (pendingTodos.length > 0) {
+        text += "🎯 *진행중인 할일*:\n";
+        pendingTodos.slice(0, 8).forEach((todo) => {
+          const todoText = this.escapeMarkdownV2(
+            this.truncateText(todo.text, 30)
+          );
+          text += `⬜ ${todoText}\n`;
+        });
 
-      // 할일 목록 표시 (최대 10개)
-      const displayTodos = todos.slice(0, 10);
-
-      displayTodos.forEach((todo, index) => {
-        const statusIcon = todo.completed ? "✅" : "⭕";
-        const priority = this.getPriorityIcon(todo.priority);
-        let todoText = this.escapeMarkdownV2(todo.title);
-
-        // 완료된 할일은 취소선 적용
-        if (todo.completed) {
-          todoText = `~${todoText}~`;
+        if (pendingTodos.length > 8) {
+          text += `⬜ \\.\\.\\. 외 ${pendingTodos.length - 8}개 더\n`;
         }
-
-        text += `${statusIcon} ${priority} ${todoText}`;
-
-        // 마감일이 있는 경우 표시
-        if (todo.dueDate) {
-          const dueDate = new Date(todo.dueDate);
-          const isOverdue = dueDate < new Date() && !todo.completed;
-          const dueDateStr = dueDate.toLocaleDateString("ko-KR");
-
-          if (isOverdue) {
-            text += ` ⚠️ *${this.escapeMarkdownV2(dueDateStr)}*`;
-          } else {
-            text += ` 📅 ${this.escapeMarkdownV2(dueDateStr)}`;
-          }
-        }
-
         text += "\n";
-      });
+      }
 
-      // 더 많은 할일이 있는 경우
-      if (todos.length > 10) {
-        text += `\n\\.\\.\\. 외 ${todos.length - 10}개 더 있습니다\n`;
+      // ✅ 완료된 할일 (최대 3개만) - 세련된 스타일
+      if (completedTodos.length > 0) {
+        text += "🏆 *완료된 할일*:\n";
+        completedTodos.slice(0, 3).forEach((todo) => {
+          const todoText = this.escapeMarkdownV2(
+            this.truncateText(todo.text, 30)
+          );
+          text += `✅ ~${todoText}~\n`;
+        });
+
+        if (completedTodos.length > 3) {
+          text += `✅ \\.\\.\\. 외 ${completedTodos.length - 3}개 더\n`;
+        }
       }
     }
 
-    // 버튼 구성
-    const keyboard = {
-      inline_keyboard: [],
-    };
+    // 🎹 버튼 구성 - 단순하고 직관적으로!
+    const keyboard = { inline_keyboard: [] };
 
-    // 첫 번째 줄: 기본 액션
+    // 첫 번째 줄: 핵심 액션
     keyboard.inline_keyboard.push([
-      { text: "➕ 추가", callback_data: "todo:add" },
-      { text: "✅ 완료", callback_data: "todo:complete" },
-      { text: "✏️ 수정", callback_data: "todo:edit" },
-    ]);
-
-    // 두 번째 줄: 관리 액션
-    keyboard.inline_keyboard.push([
-      { text: "🗑️ 삭제", callback_data: "todo:delete" },
-      { text: "🔍 필터", callback_data: "todo:filter" },
+      { text: "➕ 새 할일", callback_data: "todo:add" },
       { text: "📊 통계", callback_data: "todo:stats" },
     ]);
 
-    // 세 번째 줄: 네비게이션
+    // 할일이 있을 때만 액션 버튼들 표시
+    if (todos.length > 0) {
+      // 진행중인 할일 완료 버튼들 (최대 4개)
+      const pendingTodos = todos.filter((todo) => !todo.completed);
+      if (pendingTodos.length > 0) {
+        const todoButtons = [];
+        pendingTodos.slice(0, 4).forEach((todo) => {
+          const buttonText = `✅ ${this.truncateText(todo.text, 12)}`;
+          todoButtons.push({
+            text: buttonText,
+            callback_data: `todo:toggle:${todo.id}`,
+          });
+        });
+
+        // 2개씩 나누어서 배치
+        for (let i = 0; i < todoButtons.length; i += 2) {
+          const row = todoButtons.slice(i, i + 2);
+          keyboard.inline_keyboard.push(row);
+        }
+      }
+
+      // 삭제 버튼들 (최대 4개)
+      const allTodos = todos.slice(0, 4);
+      if (allTodos.length > 0) {
+        const deleteButtons = [];
+        allTodos.forEach((todo) => {
+          const buttonText = `🗑️ ${this.truncateText(todo.text, 12)}`;
+          deleteButtons.push({
+            text: buttonText,
+            callback_data: `todo:delete:${todo.id}`,
+          });
+        });
+
+        // 2개씩 나누어서 배치
+        for (let i = 0; i < deleteButtons.length; i += 2) {
+          const row = deleteButtons.slice(i, i + 2);
+          keyboard.inline_keyboard.push(row);
+        }
+      }
+    }
+
+    // 마지막 줄: 네비게이션
     keyboard.inline_keyboard.push([
       { text: "❓ 도움말", callback_data: "todo:help" },
       { text: "🔙 메인 메뉴", callback_data: "system:menu" },
@@ -164,331 +207,17 @@ class TodoRenderer extends BaseRenderer {
   }
 
   /**
-   * ➕ 할일 추가 화면 렌더링
+   * ➕ 할일 추가 프롬프트 (리마인더 옵션 포함)
    */
-  async renderAddTodo(data, ctx) {
+  async renderAddPromptWithReminder(data, ctx) {
     let text = "➕ *새 할일 추가*\n\n";
-    text += "새로운 할일을 추가하겠습니다\\.\n";
-    text += "아래 형식으로 입력해주세요\\:\n\n";
-
-    text += "📝 *입력 형식*:\n";
-    text += "`할일 제목`\n";
-    text += "또는\n";
-    text += "`할일 제목 | 우선순위 | 마감일`\n\n";
-
-    text += "📋 *예시*:\n";
-    text += "• `회의 자료 준비`\n";
-    text += "• `보고서 작성 | 높음 | 2025\\-07\\-30`\n";
-    text += "• `코드 리뷰 | 보통 | 내일`\n\n";
-
-    text += "🏷️ *우선순위*: 높음, 보통, 낮음\n";
-    text += "📅 *마감일*: YYYY\\-MM\\-DD 또는 '오늘', '내일', '다음주' 등\n\n";
-
-    text += "할일을 입력해주세요\\:";
-
-    const keyboard = {
-      inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
-    };
-
-    await this.sendMessage(
-      ctx.callbackQuery.message.chat.id,
-      text,
-      keyboard,
-      ctx.callbackQuery.message.message_id
-    );
-  }
-
-  /**
-   * ✅ 할일 완료 화면 렌더링
-   */
-  async renderCompleteTodo(data, ctx) {
-    const userName = getUserName(ctx.callbackQuery?.from);
-
-    if (data?.completedTodo) {
-      // 완료 성공
-      const todo = data.completedTodo;
-
-      let text = "✅ *할일 완료\\!*\n\n";
-      text += `${this.escapeMarkdownV2(todo.title)}\n\n`;
-
-      const completeMessage = DoomockMessageGenerator.getContextualMessage(
-        "todoComplete",
-        userName
-      );
-      text += `💬 ${this.escapeMarkdownV2(completeMessage)}\n\n`;
-
-      // 완료 통계
-      if (data.stats) {
-        text += `📊 *오늘 완료*: ${data.stats.todayCompleted}개\n`;
-        text += `🏆 *총 완료*: ${data.stats.totalCompleted}개`;
-      }
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "📋 목록으로", callback_data: "todo:menu" },
-            { text: "➕ 새 할일", callback_data: "todo:add" },
-          ],
-        ],
-      };
-
-      await this.sendMessage(
-        ctx.callbackQuery.message.chat.id,
-        text,
-        keyboard,
-        ctx.callbackQuery.message.message_id
-      );
-    } else {
-      // 완료할 할일 선택
-      const incompleteTodos = data?.incompleteTodos || [];
-
-      let text = "✅ *완료할 할일 선택*\n\n";
-
-      if (incompleteTodos.length === 0) {
-        text += "완료되지 않은 할일이 없습니다\\.\n";
-        text += "새로운 할일을 추가해보세요\\!";
-
-        const keyboard = {
-          inline_keyboard: [
-            [
-              { text: "➕ 할일 추가", callback_data: "todo:add" },
-              { text: "📋 목록으로", callback_data: "todo:menu" },
-            ],
-          ],
-        };
-
-        await this.sendMessage(
-          ctx.callbackQuery.message.chat.id,
-          text,
-          keyboard,
-          ctx.callbackQuery.message.message_id
-        );
-        return;
-      }
-
-      text += "완료할 할일을 선택해주세요\\:\n\n";
-
-      // 할일 목록 (최대 8개)
-      const displayTodos = incompleteTodos.slice(0, 8);
-      const keyboard = { inline_keyboard: [] };
-
-      displayTodos.forEach((todo, index) => {
-        const priority = this.getPriorityIcon(todo.priority);
-        const todoText =
-          todo.title.length > 25
-            ? todo.title.substring(0, 25) + "..."
-            : todo.title;
-
-        if (index % 2 === 0) {
-          keyboard.inline_keyboard.push([
-            {
-              text: `${priority} ${todoText}`,
-              callback_data: `todo:complete:${todo.id}`,
-            },
-          ]);
-        } else {
-          const lastRow =
-            keyboard.inline_keyboard[keyboard.inline_keyboard.length - 1];
-          lastRow.push({
-            text: `${priority} ${todoText}`,
-            callback_data: `todo:complete:${todo.id}`,
-          });
-        }
-      });
-
-      // 네비게이션 버튼
-      keyboard.inline_keyboard.push([
-        { text: "📋 목록으로", callback_data: "todo:menu" },
-      ]);
-
-      await this.sendMessage(
-        ctx.callbackQuery.message.chat.id,
-        text,
-        keyboard,
-        ctx.callbackQuery.message.message_id
-      );
-    }
-  }
-
-  /**
-   * 📊 할일 통계 렌더링
-   */
-  async renderTodoStats(data, ctx) {
-    const userName = getUserName(ctx.callbackQuery?.from);
-
-    let text = "📊 *할일 관리 통계*\n\n";
-
-    if (data?.stats) {
-      const stats = data.stats;
-
-      text += "📈 *전체 통계*:\n";
-      text += `• 총 할일: ${this.escapeMarkdownV2(
-        String(stats.totalTodos || 0)
-      )}개\n`;
-      text += `• 완료된 할일: ${this.escapeMarkdownV2(
-        String(stats.completedTodos || 0)
-      )}개\n`;
-      text += `• 진행 중인 할일: ${this.escapeMarkdownV2(
-        String(stats.pendingTodos || 0)
-      )}개\n`;
-      text += `• 완료율: ${this.escapeMarkdownV2(
-        String(stats.completionRate || 0)
-      )}%\n\n`;
-
-      text += "📅 *오늘*:\n";
-      text += `• 추가된 할일: ${this.escapeMarkdownV2(
-        String(stats.todayAdded || 0)
-      )}개\n`;
-      text += `• 완료된 할일: ${this.escapeMarkdownV2(
-        String(stats.todayCompleted || 0)
-      )}개\n\n`;
-
-      text += "🏆 *이번 주*:\n";
-      text += `• 완료된 할일: ${this.escapeMarkdownV2(
-        String(stats.weekCompleted || 0)
-      )}개\n`;
-      text += `• 평균 완료율: ${this.escapeMarkdownV2(
-        String(stats.weekAvgRate || 0)
-      )}%\n\n`;
-
-      if (stats.streakDays > 0) {
-        text += `🔥 *연속 사용*: ${this.escapeMarkdownV2(
-          String(stats.streakDays)
-        )}일\n\n`;
-      }
-    }
-
-    const statsMessage = DoomockMessageGenerator.generateMessage(
-      "stats",
-      userName
-    );
-    text += `💬 ${this.escapeMarkdownV2(statsMessage)}`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 할일 목록", callback_data: "todo:menu" },
-          { text: "➕ 새 할일", callback_data: "todo:add" },
-        ],
-        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
-
-    await this.sendMessage(
-      ctx.callbackQuery.message.chat.id,
-      text,
-      keyboard,
-      ctx.callbackQuery.message.message_id
-    );
-  }
-
-  /**
-   * 🔍 필터 옵션 렌더링
-   */
-  async renderFilterOptions(data, ctx) {
-    let text = "🔍 *할일 필터*\n\n";
-    text += "원하는 필터를 선택해주세요\\:\n";
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 전체", callback_data: "todo:filter:all" },
-          { text: "⭕ 진행중", callback_data: "todo:filter:pending" },
-        ],
-        [
-          { text: "✅ 완료됨", callback_data: "todo:filter:completed" },
-          { text: "⚠️ 연체됨", callback_data: "todo:filter:overdue" },
-        ],
-        [
-          { text: "🔴 높은 우선순위", callback_data: "todo:filter:high" },
-          { text: "📅 오늘 마감", callback_data: "todo:filter:today" },
-        ],
-        [{ text: "📋 목록으로", callback_data: "todo:menu" }],
-      ],
-    };
-
-    await this.sendMessage(
-      ctx.callbackQuery.message.chat.id,
-      text,
-      keyboard,
-      ctx.callbackQuery.message.message_id
-    );
-  }
-
-  /**
-   * ❓ 도움말 렌더링
-   */
-  async renderHelp(data, ctx) {
-    let text = "❓ *할일 관리 도움말*\n\n";
-
-    text += "📋 *기본 사용법*:\n";
-    text += "• `➕ 추가` \\- 새로운 할일 등록\n";
-    text += "• `✅ 완료` \\- 할일 완료 표시\n";
-    text += "• `✏️ 수정` \\- 할일 내용 수정\n";
-    text += "• `🗑️ 삭제` \\- 할일 삭제\n\n";
-
-    text += "🏷️ *우선순위 설정*:\n";
-    text += "• 🔴 높음 \\- 긴급하고 중요한 업무\n";
-    text += "• 🟡 보통 \\- 일반적인 업무\n";
-    text += "• 🟢 낮음 \\- 여유 있을 때 처리\n\n";
-
-    text += "📅 *마감일 설정*:\n";
-    text += "• `2025\\-07\\-30` \\- 구체적인 날짜\n";
-    text += "• `오늘`, `내일` \\- 상대적 날짜\n";
-    text += "• `다음주`, `다음달` \\- 기간 설정\n\n";
-
-    text += "🔍 *필터 기능*:\n";
-    text += "• 상태별 필터링 \\(진행중/완료/연체\\)\n";
-    text += "• 우선순위별 정렬\n";
-    text += "• 마감일별 정렬\n\n";
-
-    text += "📊 *통계 확인*:\n";
-    text += "• 완료율 및 진행 상황\n";
-    text += "• 일별/주별 통계\n";
-    text += "• 생산성 분석\n\n";
-
-    text += "💡 *효율적인 사용 팁*:\n";
-    text += "• 할일을 작은 단위로 분할하세요\n";
-    text += "• 우선순위를 명확히 설정하세요\n";
-    text += "• 정기적으로 정리하고 업데이트하세요\n";
-    text += "• 완료된 할일은 바로 체크하세요";
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 할일 목록", callback_data: "todo:menu" },
-          { text: "➕ 새 할일", callback_data: "todo:add" },
-        ],
-        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
-
-    await this.sendMessage(
-      ctx.callbackQuery.message.chat.id,
-      text,
-      keyboard,
-      ctx.callbackQuery.message.message_id
-    );
-  }
-
-  /**
-   * 📝 입력 프롬프트 렌더링
-   */
-  async renderInputPrompt(data, ctx) {
-    let text = "";
-
-    switch (data?.inputType) {
-      case "add":
-        text = "➕ *새 할일 추가*\n\n할일을 입력해주세요\\:";
-        break;
-      case "edit":
-        text = `✏️ *할일 수정*\n\n기존: ${this.escapeMarkdownV2(
-          data.currentTitle
-        )}\n\n새로운 내용을 입력해주세요\\:`;
-        break;
-      default:
-        text = "📝 내용을 입력해주세요\\:";
-    }
+    text += "🎯 어떤 일을 하시겠어요\\?\n\n";
+    text += "💡 *간단하게 입력하세요*:\n";
+    text += "✨ `회의 자료 준비`\n";
+    text += "✨ `운동하기`\n";
+    text += "✨ `책 읽기`\n\n";
+    text += "🔔 *추가 후 리마인더 설정도 가능해요\\!*\n\n";
+    text += "📝 할일을 입력해주세요\\:";
 
     const keyboard = {
       inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
@@ -503,171 +232,203 @@ class TodoRenderer extends BaseRenderer {
   }
 
   /**
-   * ✏️ 할일 수정 렌더링
+   * 🔔 리마인더 시간 입력 프롬프트 (고급 파싱 지원)
    */
-  async renderEditTodo(data, ctx) {
-    const todos = data?.todos || [];
+  async renderReminderTimePrompt(data, ctx) {
+    const todoText = data?.todoText || "할일";
 
-    let text = "✏️ *수정할 할일 선택*\n\n";
+    let text = "⏰ *리마인더 시간 설정*\n\n";
+    text += `📝 할일: ${this.escapeMarkdownV2(todoText)}\n\n`;
+    text += "🔔 언제 알림을 받으시겠어요\\?\n\n";
 
-    if (todos.length === 0) {
-      text += "수정할 할일이 없습니다\\.\n";
-      text += "새로운 할일을 추가해보세요\\!";
+    text += "🧠 *자연어로 편리하게 입력하세요\\!*\n\n";
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "➕ 할일 추가", callback_data: "todo:add" },
-            { text: "📋 목록으로", callback_data: "todo:menu" },
-          ],
+    text += "⏰ *시간 표현*:\n";
+    text += "✨ `30분 후`, `2시간 후`, `3일 후`\n";
+    text += "✨ `오후 3시`, `내일 9시`, `모레 2시`\n";
+    text += "✨ `점심시간`, `저녁시간`, `출근시간`\n\n";
+
+    text += "📅 *요일 표현*:\n";
+    text += "✨ `월요일 10시`, `금요일 오후 2시`\n";
+    text += "✨ `다음주 화요일`, `주말에`\n\n";
+
+    text += "🎯 *특별한 표현*:\n";
+    text += "✨ `회의시간`, `마감일`, `새벽`, `자정`\n";
+    text += "✨ `크리스마스`, `설날`, `어린이날`\n\n";
+
+    text += "💡 *예시*:\n";
+    text += "• `내일 오전 9시 회의 전에`\n";
+    text += "• `금요일 오후 5시 퇴근 전`\n";
+    text += "• `다음주 월요일 점심시간`\n\n";
+
+    text += "⌨️ 원하는 시간을 자연스럽게 입력해주세요\\:";
+
+    const keyboard = {
+      inline_keyboard: [
+        // 첫 번째 줄: 빠른 선택
+        [
+          { text: "⏰ 30분 후", callback_data: "todo:quick_reminder:30m" },
+          { text: "⏰ 1시간 후", callback_data: "todo:quick_reminder:1h" },
         ],
-      };
-
-      await this.sendMessage(
-        ctx.callbackQuery.message.chat.id,
-        text,
-        keyboard,
-        ctx.callbackQuery.message.message_id
-      );
-      return;
-    }
-
-    text += "수정할 할일을 선택해주세요\\:\n\n";
-
-    const keyboard = { inline_keyboard: [] };
-    const displayTodos = todos.slice(0, 8);
-
-    displayTodos.forEach((todo, index) => {
-      const statusIcon = todo.completed ? "✅" : "⭕";
-      const priority = this.getPriorityIcon(todo.priority);
-      const todoText =
-        todo.title.length > 25
-          ? todo.title.substring(0, 25) + "..."
-          : todo.title;
-
-      keyboard.inline_keyboard.push([
-        {
-          text: `${statusIcon} ${priority} ${todoText}`,
-          callback_data: `todo:edit:${todo.id}`,
-        },
-      ]);
-    });
-
-    keyboard.inline_keyboard.push([
-      { text: "📋 목록으로", callback_data: "todo:menu" },
-    ]);
+        // 두 번째 줄: 오늘 시간
+        [
+          { text: "🌅 점심시간", callback_data: "todo:quick_reminder:lunch" },
+          { text: "🌆 저녁시간", callback_data: "todo:quick_reminder:dinner" },
+        ],
+        // 세 번째 줄: 내일
+        [
+          {
+            text: "🌅 내일 아침 9시",
+            callback_data: "todo:quick_reminder:tomorrow_9",
+          },
+          {
+            text: "🌆 내일 저녁 7시",
+            callback_data: "todo:quick_reminder:tomorrow_19",
+          },
+        ],
+        // 네 번째 줄: 요일
+        [
+          {
+            text: "📅 월요일 오전",
+            callback_data: "todo:quick_reminder:monday_am",
+          },
+          {
+            text: "📅 금요일 오후",
+            callback_data: "todo:quick_reminder:friday_pm",
+          },
+        ],
+        // 다섯 번째 줄: 액션
+        [
+          { text: "➕ 바로 추가", callback_data: "todo:skip_reminder" },
+          { text: "❌ 취소", callback_data: "todo:menu" },
+        ],
+      ],
+    };
 
     await this.sendMessage(
-      ctx.callbackQuery.message.chat.id,
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
       text,
       keyboard,
-      ctx.callbackQuery.message.message_id
+      ctx.callbackQuery?.message?.message_id
     );
   }
 
   /**
-   * 🗑️ 할일 삭제 렌더링
+   * 📊 간단한 통계 화면
    */
-  async renderDeleteTodo(data, ctx) {
-    if (data?.deletedTodo) {
-      // 삭제 완료
-      const todo = data.deletedTodo;
+  async renderSimpleStats(data, ctx) {
+    const userName = getUserName(ctx.callbackQuery?.from);
+    const stats = data?.stats || {};
 
-      let text = "🗑️ *할일 삭제 완료*\n\n";
-      text += `삭제된 할일: ${this.escapeMarkdownV2(todo.title)}\n\n`;
-      text += "할일이 성공적으로 삭제되었습니다\\.";
+    let text = "📊 *할일 관리 통계*\n\n";
+    text += `안녕하세요, ${this.escapeMarkdownV2(userName)}님\\!\n\n`;
 
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "📋 목록으로", callback_data: "todo:menu" },
-            { text: "➕ 새 할일", callback_data: "todo:add" },
-          ],
-        ],
-      };
+    if (stats.total === 0) {
+      text += "🎯 *아직 할일이 없습니다*\n";
+      text += "새로운 할일을 추가해서 생산적인 하루를 시작해보세요\\!\n\n";
 
-      await this.sendMessage(
-        ctx.callbackQuery.message.chat.id,
-        text,
-        keyboard,
-        ctx.callbackQuery.message.message_id
+      const motivationalMessage = DoomockMessageGenerator.getContextualMessage(
+        "todoMotivation",
+        userName
       );
-    } else {
-      // 삭제할 할일 선택
-      const todos = data?.todos || [];
-
-      let text = "🗑️ *삭제할 할일 선택*\n\n";
-      text += "⚠️ *주의*: 삭제된 할일은 복구할 수 없습니다\\.\n\n";
-
-      if (todos.length === 0) {
-        text += "삭제할 할일이 없습니다\\.";
-
-        const keyboard = {
-          inline_keyboard: [
-            [{ text: "📋 목록으로", callback_data: "todo:menu" }],
-          ],
-        };
-
-        await this.sendMessage(
-          ctx.callbackQuery.message.chat.id,
-          text,
-          keyboard,
-          ctx.callbackQuery.message.message_id
-        );
-        return;
+      if (motivationalMessage) {
+        text += `💪 ${this.escapeMarkdownV2(motivationalMessage)}`;
       }
+    } else {
+      // 기본 통계 - 세련된 체크박스 스타일
+      text += "📈 *전체 현황*:\n";
+      text += `☑️ 총 할일: *${this.escapeMarkdownV2(String(stats.total))}*개\n`;
+      text += `✅ 완료: *${this.escapeMarkdownV2(
+        String(stats.completed)
+      )}*개\n`;
+      text += `⏳ 진행중: *${this.escapeMarkdownV2(
+        String(stats.pending)
+      )}*개\n`;
+      text += `📊 완료율: *${this.escapeMarkdownV2(
+        String(stats.completionRate)
+      )}*%\n\n`;
 
-      text += "삭제할 할일을 선택해주세요\\:\n\n";
+      // 진행률 막대
+      const progressBar = this.createProgressBar(stats.completionRate);
+      text += `📊 ${progressBar}\n\n`;
 
-      const keyboard = { inline_keyboard: [] };
-      const displayTodos = todos.slice(0, 8);
-
-      displayTodos.forEach((todo, index) => {
-        const statusIcon = todo.completed ? "✅" : "⭕";
-        const priority = this.getPriorityIcon(todo.priority);
-        const todoText =
-          todo.title.length > 25
-            ? todo.title.substring(0, 25) + "..."
-            : todo.title;
-
-        keyboard.inline_keyboard.push([
-          {
-            text: `${statusIcon} ${priority} ${todoText}`,
-            callback_data: `todo:delete:${todo.id}`,
-          },
-        ]);
-      });
-
-      keyboard.inline_keyboard.push([
-        { text: "📋 목록으로", callback_data: "todo:menu" },
-      ]);
-
-      await this.sendMessage(
-        ctx.callbackQuery.message.chat.id,
-        text,
-        keyboard,
-        ctx.callbackQuery.message.message_id
-      );
+      // 격려 메시지
+      if (stats.completionRate >= 80) {
+        text += "🎉 *훌륭합니다\\!* 거의 다 완료하셨네요\\!";
+      } else if (stats.completionRate >= 50) {
+        text += "💪 *잘하고 계십니다\\!* 조금만 더 힘내세요\\!";
+      } else if (stats.completionRate >= 20) {
+        text += "🔥 *시작이 반입니다\\!* 계속 진행해보세요\\!";
+      } else {
+        text += "🎯 *새로운 시작\\!* 작은 할일부터 차근차근\\!";
+      }
     }
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "📋 할일 목록", callback_data: "todo:menu" },
+          { text: "➕ 새 할일", callback_data: "todo:add" },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
+      ],
+    };
+
+    await this.sendMessage(
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      text,
+      keyboard,
+      ctx.callbackQuery?.message?.message_id
+    );
   }
 
   /**
-   * 🏷️ 우선순위 아이콘 반환
+   * ❓ 도움말 화면
    */
-  getPriorityIcon(priority) {
-    switch (priority) {
-      case "high":
-      case "높음":
-        return "🔴";
-      case "medium":
-      case "보통":
-        return "🟡";
-      case "low":
-      case "낮음":
-        return "🟢";
-      default:
-        return "⚪";
-    }
+  async renderHelp(data, ctx) {
+    let text = "❓ *할일 관리 도움말*\n\n";
+
+    text += "🎯 *기본 사용법*:\n";
+    text += "☑️ `➕ 새 할일` \\- 할일 추가\n";
+    text += "☑️ `✅ 할일명` \\- 완료 처리\n";
+    text += "☑️ `🗑️ 할일명` \\- 삭제\n";
+    text += "☑️ `📊 통계` \\- 완료율 확인\n\n";
+
+    text += "🔔 *리마인더 기능*:\n";
+    text += "⚡ 할일 추가 시 알림 시간 설정 가능\n";
+    text += "⚡ 설정된 시간에 텔레그램 메시지 발송\n";
+    text += "⚡ `30분 후`, `오후 3시`, `내일 9시` 등 자연어 지원\n\n";
+
+    text += "💡 *효율적인 사용 팁*:\n";
+    text += "✨ 큰 일을 작은 단위로 나누세요\n";
+    text += "✨ 간단한 할일부터 시작하세요\n";
+    text += "✨ 완료하면 바로 체크하세요\n";
+    text += "✨ 중요한 할일엔 리마인더를 설정하세요\n\n";
+
+    text += "🚀 *명령어*:\n";
+    text += "⚡ `/todo` 또는 `할일` \\- 메뉴 열기\n";
+    text += "⚡ 메뉴에서 할일 입력하고 엔터\n\n";
+
+    text += "🤖 *두목봇과 함께*:\n";
+    text += "단순하고 재미있게 할일을 관리하세요\\!\n";
+    text += "리마인더로 중요한 할일을 놓치지 마세요\\! 🔔";
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          { text: "📋 할일 목록", callback_data: "todo:menu" },
+          { text: "➕ 새 할일", callback_data: "todo:add" },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
+      ],
+    };
+
+    await this.sendMessage(
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      text,
+      keyboard,
+      ctx.callbackQuery?.message?.message_id
+    );
   }
 
   /**
@@ -693,6 +454,51 @@ class TodoRenderer extends BaseRenderer {
       keyboard,
       ctx.callbackQuery?.message?.message_id
     );
+  }
+
+  // ===== 🛠️ 유틸리티 메서드들 =====
+
+  /**
+   * 📊 진행률 막대 생성
+   */
+  createProgressBar(percentage) {
+    const totalBars = 10;
+    const filledBars = Math.round((percentage / 100) * totalBars);
+    const emptyBars = totalBars - filledBars;
+
+    const filled = "🟩".repeat(filledBars);
+    const empty = "⬜".repeat(emptyBars);
+
+    return `${filled}${empty} ${percentage}%`;
+  }
+
+  /**
+   * 텍스트 자르기
+   */
+  truncateText(text, maxLength) {
+    if (!text) return "";
+    return text.length > maxLength
+      ? text.substring(0, maxLength) + "..."
+      : text;
+  }
+
+  /**
+   * 우선순위 아이콘 (향후 확장용)
+   */
+  getPriorityIcon(priority) {
+    switch (priority) {
+      case "high":
+      case "높음":
+        return "🔴";
+      case "medium":
+      case "보통":
+        return "🟡";
+      case "low":
+      case "낮음":
+        return "🟢";
+      default:
+        return "⚪";
+    }
   }
 }
 

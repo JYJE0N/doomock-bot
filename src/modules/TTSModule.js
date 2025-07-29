@@ -106,8 +106,8 @@ class TTSModule extends BaseModule {
     }
 
     // 명령어 처리
-    const command = this.extractCommand(text);
-    if (command === "tts" || text === "음성변환") {
+    const keywords = ["티티에스", "음성변환", "tts"];
+    if (this.isModuleMessage(text, keywords)) {
       await this.moduleManager.navigationHandler.sendModuleMenu(
         bot,
         chatId,

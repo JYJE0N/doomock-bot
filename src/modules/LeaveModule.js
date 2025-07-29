@@ -59,7 +59,7 @@ class LeaveModule extends BaseModule {
     } = msg;
     if (!text) return false;
 
-    const command = this.extractCommand(text);
+    const command = this.(text);
     if (command === "leave" || command === "휴가" || command === "연차") {
       await this.moduleManager.navigationHandler.sendModuleMenu(
         bot,

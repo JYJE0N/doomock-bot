@@ -49,18 +49,54 @@ class TimerModule extends BaseModule {
     const {
       text,
       chat: { id: chatId },
+      from: { id: userId },
     } = msg;
+
     if (!text) return false;
 
-    const command = this.extractCommand(text);
-    if (command === "timer" || command === "타이머") {
+    // ✅ 1. 키워드 매칭으로 모듈 메시지 확인
+    if (this.isModuleMessage(text)) {
+      return await this.handleModuleCommand(bot, msg);
+    }
+
+    // ✅ 2. 사용자 입력 상태 처리
+    const userState = this.getUserState(userId);
+    if (userState?.awaitingInput) {
+      return await this.handleUserInput(bot, msg, text, userState);
+    }
+
+    return false;
+  }
+
+  /**
+   * 🎯 모듈 명령어 처리 (자식 클래스에서 구현 가능)
+   */
+  async handleModuleCommand(bot, msg) {
+    const {
+      chat: { id: chatId },
+    } = msg;
+    const moduleKey = this.moduleName.toLowerCase().replace("module", "");
+
+    // NavigationHandler를 통한 표준 메뉴 표시
+    if (this.moduleManager?.navigationHandler?.sendModuleMenu) {
       await this.moduleManager.navigationHandler.sendModuleMenu(
         bot,
         chatId,
-        "timer"
+        moduleKey
       );
-      return true;
+    } else {
+      // 폴백 메시지
+      await bot.sendMessage(chatId, `${this.moduleName} 메뉴를 불러오는 중...`);
     }
+
+    return true;
+  }
+
+  /**
+   * 📝 사용자 입력 처리 (자식 클래스에서 구현)
+   */
+  async handleUserInput(bot, msg, text, userState) {
+    // 자식 클래스에서 구현
     return false;
   }
 

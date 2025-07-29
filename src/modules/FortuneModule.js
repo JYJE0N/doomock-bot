@@ -4,6 +4,27 @@ const logger = require("../utils/Logger");
 const { getUserId } = require("../utils/UserHelper");
 
 class FortuneModule extends BaseModule {
+  getModuleKeywords() {
+    return [
+      // 한국어 키워드
+      "운세",
+      "타로",
+      "점",
+      "점괘",
+      "운",
+      "오늘운세",
+      "내일운세",
+      // 영어 키워드
+      "fortune",
+      "tarot",
+      "luck",
+      "fate",
+      // 추가 키워드
+      "카드",
+      "미래",
+      "예언",
+    ];
+  }
   constructor(bot, options = {}) {
     super("FortuneModule", {
       bot,
@@ -60,11 +81,26 @@ class FortuneModule extends BaseModule {
     const {
       text,
       chat: { id: chatId },
+      from: { id: userId },
     } = msg;
+
     if (!text) return false;
 
-    const command = this.extractCommand(text);
-    if (command === "fortune" || command === "운세" || command === "타로") {
+    // ✅ 새로운 방식: 직접 키워드 매칭
+    const lowerText = text.toLowerCase().trim();
+    const keywords = this.getModuleKeywords();
+
+    // 키워드 매칭 확인
+    const isFortuneMessage = keywords.some((keyword) => {
+      const lowerKeyword = keyword.toLowerCase();
+      return (
+        lowerText === lowerKeyword ||
+        lowerText.startsWith(lowerKeyword + " ") ||
+        lowerText.includes(lowerKeyword)
+      );
+    });
+
+    if (isFortuneMessage) {
       // ✅ NavigationHandler를 통한 표준 메뉴 호출
       if (this.moduleManager?.navigationHandler?.sendModuleMenu) {
         await this.moduleManager.navigationHandler.sendModuleMenu(
@@ -73,10 +109,62 @@ class FortuneModule extends BaseModule {
           "fortune"
         );
       } else {
+        // 폴백 메시지
         await bot.sendMessage(chatId, "🔮 운세 메뉴를 불러오는 중...");
       }
       return true;
     }
+
+    // 사용자 입력 상태 처리 (운세 관련 입력 대기 등)
+    const userState = this.getUserState(userId);
+    if (userState?.awaitingInput) {
+      return await this.handleUserInput(bot, msg, text, userState);
+    }
+
+    return false;
+  }
+
+  /**
+   * 📝 사용자 입력 처리 (운세 선택 등)
+   */
+  async handleUserInput(bot, msg, text, userState) {
+    const {
+      chat: { id: chatId },
+      from: { id: userId },
+    } = msg;
+
+    // 예시: 운세 타입 선택 대기 상태
+    if (userState.action === "awaiting_fortune_type") {
+      const fortuneType = text.trim().toLowerCase();
+
+      // 운세 타입 매칭
+      const typeMap = {
+        일반: "general",
+        연애: "love",
+        사업: "business",
+        건강: "health",
+        general: "general",
+        love: "love",
+        business: "business",
+        health: "health",
+      };
+
+      const selectedType = typeMap[fortuneType];
+      if (selectedType) {
+        // 운세 처리 로직
+        await this.processFortuneRequest(bot, chatId, userId, selectedType);
+        this.clearUserState(userId);
+        return true;
+      } else {
+        await bot.sendMessage(
+          chatId,
+          "❓ 알 수 없는 운세 타입입니다.\n" +
+            "다음 중에서 선택해주세요: 일반, 연애, 사업, 건강"
+        );
+        return true;
+      }
+    }
+
     return false;
   }
 
@@ -307,21 +395,6 @@ class FortuneModule extends BaseModule {
   }
 
   // ===== 🛠️ 유틸리티 메서드들 =====
-
-  extractCommand(text) {
-    if (!text) return null;
-
-    if (text.startsWith("/")) {
-      return text.split(" ")[0].substring(1).toLowerCase();
-    }
-
-    const lowerText = text.trim().toLowerCase();
-    const commands = ["fortune", "운세", "타로"];
-
-    return commands.find(
-      (cmd) => lowerText === cmd || lowerText.startsWith(cmd + " ")
-    );
-  }
 
   getStatus() {
     return {

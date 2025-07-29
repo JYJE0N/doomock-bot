@@ -1,4 +1,4 @@
-// src/core/BaseModule.js - extractCommand 메서드 추가된 버전
+// src/core/BaseModule.js
 
 const logger = require("../utils/Logger");
 
@@ -15,10 +15,10 @@ class BaseModule {
    * @param {ServiceBuilder} options.serviceBuilder 서비스 빌더 인스턴스
    * @param {object} options.config 모듈 설정 객체
    */
-  constructor(moduleName, { bot, moduleManager, config, serviceBuilder }) {
-    if (new.target === BaseModule) {
-      throw new TypeError("BaseModule은 직접 인스턴스화할 수 없습니다.");
-    }
+  constructor(moduleName, options = {}) {
+    this.moduleName = moduleName;
+    this.bot = options.bot;
+    this.moduleManager = options.moduleManager;
 
     this.moduleName = moduleName;
     this.bot = bot;
@@ -57,67 +57,68 @@ class BaseModule {
   }
 
   /**
-   * 🔍 명령어 추출 (모든 모듈에서 사용)
-   * 표준화된 명령어 추출 로직
+   * 🎯 표준 메시지 처리
    */
-  extractCommand(text) {
-    if (!text || typeof text !== "string") {
-      return null;
+  async onHandleMessage(bot, msg) {
+    const {
+      text,
+      from: { id: userId },
+      chat: { id: chatId },
+    } = msg;
+
+    if (!text) return false;
+
+    // ✅ 직접적인 텍스트 매칭만 사용 (명령어 추출은 CommandHandler가 담당)
+    const lowerText = text.trim().toLowerCase();
+
+    // 모듈 키워드 확인
+    const moduleKeywords = this.getModuleKeywords();
+    const isModuleMessage = moduleKeywords.some(
+      (keyword) => lowerText === keyword || lowerText.startsWith(keyword + " ")
+    );
+
+    if (isModuleMessage) {
+      // NavigationHandler를 통해 모듈 메뉴 표시
+      await this.moduleManager.navigationHandler.sendModuleMenu(
+        bot,
+        chatId,
+        this.moduleName.toLowerCase().replace("module", "")
+      );
+      return true;
     }
 
-    // 슬래시 명령어 처리 (/command)
-    if (text.startsWith("/")) {
-      return text.substring(1).split(" ")[0].toLowerCase();
+    // 사용자 입력 상태 처리
+    const userState = this.getUserState(userId);
+    if (userState?.awaitingInput) {
+      return await this.handleUserInput(bot, msg, text, userState);
     }
 
-    // 한국어 키워드 명령어 매핑
-    const commandMap = {
-      할일: "todo",
-      todo: "todo",
-      투두: "todo",
-      태스크: "todo",
+    return false;
+  }
 
-      날씨: "weather",
-      weather: "weather",
-      기상: "weather",
-      온도: "weather",
+  isModuleMessage(text, keywords) {
+    if (!text || !keywords) return false;
 
-      음성변환: "tts",
-      tts: "tts",
-      음성: "tts",
-      "text to speech": "tts",
+    const lowerText = text.toLowerCase().trim();
+    return keywords.some((keyword) =>
+      lowerText.includes(keyword.toLowerCase())
+    );
+  }
 
-      타이머: "timer",
-      timer: "timer",
-      시간: "timer",
-      알람: "timer",
+  /**
+   * 📝 사용자 입력 처리 (상태 기반)
+   */
+  async handleUserInput(bot, msg, text, userState) {
+    // 자식 클래스에서 구현
+    return false;
+  }
 
-      근무시간: "worktime",
-      worktime: "worktime",
-      출퇴근: "worktime",
-      근무: "worktime",
-
-      계산기: "calculator",
-      calculator: "calculator",
-      calc: "calculator",
-      계산: "calculator",
-
-      번역: "translate",
-      translate: "translate",
-      번역기: "translate",
-
-      도움말: "help",
-      help: "help",
-      도움: "help",
-
-      메뉴: "menu",
-      menu: "menu",
-      시작: "start",
-      start: "start",
-    };
-
-    const normalizedText = text.trim().toLowerCase();
-    return commandMap[normalizedText] || null;
+  /**
+   * 🔑 모듈별 키워드 정의
+   */
+  getModuleKeywords() {
+    // 자식 클래스에서 오버라이드
+    return [];
   }
 
   /**

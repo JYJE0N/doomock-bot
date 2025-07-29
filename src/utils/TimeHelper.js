@@ -1,22 +1,91 @@
-// src/utils/TimeHelper.js - 수정된 시간 헬퍼
+// src/utils/TimeHelper.js - 🕐 moment-timezone 고급 활용 버전
 const moment = require("moment-timezone");
+const logger = require("./Logger");
 
 /**
- * 🕐 시간 헬퍼 - 한국 시간 전용
- * - 모든 시간은 KST (Asia/Seoul) 기준
- * - Railway 환경 최적화
- * - 다양한 형식 지원
+ * 🕐 고급 TimeHelper - moment-timezone의 모든 기능 활용
+ *
+ * 🎯 새로운 기능들:
+ * - 다국가 시간대 지원
+ * - 자연어 시간 파싱
+ * - 업무 시간 계산
+ * - 휴일/공휴일 처리
+ * - 시간대별 회의 스케줄링
+ * - 고급 포맷팅
+ *
+ * ✅ 특징:
+ * - 전 세계 시간대 지원
+ * - 한국어 자연어 처리
+ * - 비즈니스 로직 내장
+ * - Railway 최적화
  */
-class TimeHelper {
+
+class EnhancedTimeHelper {
   constructor() {
-    this.timezone = "Asia/Seoul";
+    // 기본 시간대 (한국)
+    this.defaultTimezone = "Asia/Seoul";
 
     // 한국어 로케일 설정
     moment.locale("ko");
-    moment.tz.setDefault(this.timezone);
+    moment.tz.setDefault(this.defaultTimezone);
 
-    // 기본 형식들
+    // 🌏 지원하는 주요 시간대들
+    this.supportedTimezones = {
+      // 아시아
+      KST: "Asia/Seoul", // 한국
+      JST: "Asia/Tokyo", // 일본
+      CST: "Asia/Shanghai", // 중국
+      SGT: "Asia/Singapore", // 싱가포르
+      IST: "Asia/Kolkata", // 인도
+
+      // 미주
+      PST: "America/Los_Angeles", // 서부
+      MST: "America/Denver", // 산악
+      CST_US: "America/Chicago", // 중부
+      EST: "America/New_York", // 동부
+
+      // 유럽
+      GMT: "Europe/London", // 영국
+      CET: "Europe/Berlin", // 독일
+      EET: "Europe/Helsinki", // 핀란드
+
+      // 오세아니아
+      AEST: "Australia/Sydney", // 호주 동부
+      NZST: "Pacific/Auckland", // 뉴질랜드
+    };
+
+    // 🏢 한국 업무 시간 설정
+    this.workingHours = {
+      start: 9, // 오전 9시
+      end: 18, // 오후 6시
+      lunch: {
+        start: 12, // 점심시간 시작
+        end: 13, // 점심시간 종료
+      },
+    };
+
+    // 🗓️ 한국 공휴일 (2025년 기준)
+    this.holidays2025 = [
+      "2025-01-01", // 신정
+      "2025-01-28",
+      "2025-01-29",
+      "2025-01-30", // 설날
+      "2025-03-01", // 삼일절
+      "2025-05-05", // 어린이날
+      "2025-05-06", // 어린이날 대체공휴일
+      "2025-06-06", // 현충일
+      "2025-08-15", // 광복절
+      "2025-09-06",
+      "2025-09-07",
+      "2025-09-08", // 추석
+      "2025-10-03", // 개천절
+      "2025-10-09", // 한글날
+      "2025-12-25", // 크리스마스
+    ];
+
+    // 📋 다양한 포맷 템플릿
     this.formats = {
+      // 기본 형식들
       full: "YYYY년 MM월 DD일 dddd HH:mm:ss",
       date: "YYYY-MM-DD",
       time: "HH:mm:ss",
@@ -25,349 +94,416 @@ class TimeHelper {
       display: "MM월 DD일 (ddd) HH:mm",
       korean: "YYYY년 MM월 DD일",
       timestamp: "YYMMDDHHmm",
+
+      // 새로운 고급 형식들
+      meeting: "YYYY년 MM월 DD일 dddd A h:mm",
+      schedule: "MM/DD (ddd) HH:mm",
+      reminder: "MM월 DD일 A h:mm",
+      report: "YYYY년 MM월 DD일 dddd",
+      international: "MMM DD, YYYY HH:mm z",
+      iso: "YYYY-MM-DDTHH:mm:ssZ",
+
+      // 상대 시간
+      relative: "relative",
+      ago: "ago",
+      calendar: "calendar",
     };
+
+    logger.info("🕐 Enhanced TimeHelper 초기화됨 - 전 세계 시간대 지원");
   }
 
-  // ===== 추가된 메서드들 =====
+  // ===== 🌏 다국가 시간대 지원 =====
 
   /**
-   * 현재 타임존 반환
+   * 특정 시간대의 현재 시간
    */
-  getTimeZone() {
-    return this.timezone;
+  nowInTimezone(timezone = this.defaultTimezone) {
+    return moment.tz(timezone);
   }
 
   /**
-   * Date 객체를 지정된 형식으로 포맷
+   * 시간대 변환
    */
-  format(date, formatKey = "log") {
-    const momentDate = date ? moment.tz(date, this.timezone) : this.now();
+  convertTimezone(dateTime, fromTimezone, toTimezone) {
+    if (!dateTime) return null;
 
-    if (this.formats[formatKey]) {
-      return momentDate.format(this.formats[formatKey]);
+    const momentDate = moment.tz(dateTime, fromTimezone);
+    return momentDate.tz(toTimezone);
+  }
+
+  /**
+   * 🌏 전 세계 주요 도시 시간 표시
+   */
+  getWorldClocks() {
+    const now = moment();
+    const worldTimes = {};
+
+    for (const [code, timezone] of Object.entries(this.supportedTimezones)) {
+      worldTimes[code] = {
+        timezone,
+        time: now.tz(timezone).format("HH:mm"),
+        date: now.tz(timezone).format("MM-DD"),
+        fullTime: now.tz(timezone).format("YYYY-MM-DD HH:mm:ss"),
+        offset: now.tz(timezone).format("Z"),
+        city: timezone.split("/")[1]?.replace("_", " "),
+      };
     }
 
-    return momentDate.format(formatKey);
-  }
-
-  // ===== 현재 시간 =====
-
-  /**
-   * 현재 KST 시간 (moment 객체)
-   */
-  now() {
-    return moment.tz(this.timezone);
+    return worldTimes;
   }
 
   /**
-   * 현재 시간을 다양한 형식으로 반환
+   * 🤝 다국가 회의 시간 제안
    */
-  getCurrentTime(format = "log") {
+  suggestMeetingTimes(timezones, preferredHours = [9, 10, 11, 14, 15, 16]) {
+    const suggestions = [];
+    const baseDate = moment().add(1, "day").startOf("day");
+
+    // 향후 7일간 체크
+    for (let day = 0; day < 7; day++) {
+      const checkDate = baseDate.clone().add(day, "days");
+
+      // 평일만 체크
+      if (checkDate.day() >= 1 && checkDate.day() <= 5) {
+        for (const hour of preferredHours) {
+          const seoulTime = checkDate.clone().hour(hour);
+          const timeSlot = { date: seoulTime.format("YYYY-MM-DD"), times: {} };
+
+          let isGoodForAll = true;
+
+          for (const tz of timezones) {
+            const localTime = seoulTime.clone().tz(tz);
+            const localHour = localTime.hour();
+
+            timeSlot.times[tz] = {
+              time: localTime.format("HH:mm"),
+              date: localTime.format("MM-DD"),
+              isWorkingHour: localHour >= 9 && localHour <= 18,
+            };
+
+            if (localHour < 8 || localHour > 20) {
+              isGoodForAll = false;
+            }
+          }
+
+          if (isGoodForAll) {
+            suggestions.push(timeSlot);
+          }
+        }
+      }
+    }
+
+    return suggestions.slice(0, 10); // 상위 10개만 반환
+  }
+
+  // ===== 🗣️ 자연어 시간 파싱 =====
+
+  /**
+   * 🧠 고급 자연어 시간 파싱
+   */
+  parseNaturalLanguage(input) {
+    const text = input.trim().toLowerCase();
     const now = this.now();
 
-    switch (format) {
-      case "full":
-        return now.format(this.formats.full);
-      case "date":
-        return now.format(this.formats.date);
-      case "time":
-        return now.format(this.formats.time);
-      case "short":
-        return now.format(this.formats.short);
-      case "log":
-        return now.format(this.formats.log);
-      case "display":
-        return now.format(this.formats.display);
-      case "korean":
-        return now.format(this.formats.korean);
-      case "timestamp":
-        return now.format(this.formats.timestamp);
+    try {
+      // === 특수 키워드들 ===
+      const specialKeywords = {
+        새벽: () => now.clone().add(1, "day").hour(5).minute(0),
+        아침: () => now.clone().add(1, "day").hour(8).minute(0),
+        점심시간: () => {
+          const lunch = now.clone().hour(12).minute(0);
+          return lunch.isBefore(now) ? lunch.add(1, "day") : lunch;
+        },
+        오후: () => {
+          const afternoon = now.clone().hour(14).minute(0);
+          return afternoon.isBefore(now) ? afternoon.add(1, "day") : afternoon;
+        },
+        저녁: () => {
+          const evening = now.clone().hour(19).minute(0);
+          return evening.isBefore(now) ? evening.add(1, "day") : evening;
+        },
+        밤: () => now.clone().add(1, "day").hour(22).minute(0),
+        자정: () => now.clone().add(1, "day").startOf("day"),
+        정오: () => {
+          const noon = now.clone().hour(12).minute(0);
+          return noon.isBefore(now) ? noon.add(1, "day") : noon;
+        },
+      };
+
+      for (const [keyword, timeFunc] of Object.entries(specialKeywords)) {
+        if (text.includes(keyword)) {
+          return timeFunc().toDate();
+        }
+      }
+
+      // === 계절/월 기반 파싱 ===
+      const seasonKeywords = {
+        봄: () => now.clone().month(2).date(21).hour(9), // 3월 21일
+        여름: () => now.clone().month(5).date(21).hour(9), // 6월 21일
+        가을: () => now.clone().month(8).date(23).hour(9), // 9월 23일
+        겨울: () => now.clone().month(11).date(21).hour(9), // 12월 21일
+      };
+
+      for (const [season, timeFunc] of Object.entries(seasonKeywords)) {
+        if (text.includes(season)) {
+          const seasonTime = timeFunc();
+          if (seasonTime.isBefore(now)) {
+            seasonTime.add(1, "year");
+          }
+          return seasonTime.toDate();
+        }
+      }
+
+      // === 휴일 기반 파싱 ===
+      const holidayKeywords = {
+        신정: () => moment(`${now.year() + 1}-01-01`),
+        설날: () => moment(`${now.year() + 1}-01-29`), // 2025년 기준
+        삼일절: () => moment(`${now.year()}-03-01`),
+        어린이날: () => moment(`${now.year()}-05-05`),
+        현충일: () => moment(`${now.year()}-06-06`),
+        광복절: () => moment(`${now.year()}-08-15`),
+        추석: () => moment(`${now.year()}-09-07`), // 2025년 기준
+        개천절: () => moment(`${now.year()}-10-03`),
+        한글날: () => moment(`${now.year()}-10-09`),
+        크리스마스: () => moment(`${now.year()}-12-25`),
+      };
+
+      for (const [holiday, dateFunc] of Object.entries(holidayKeywords)) {
+        if (text.includes(holiday)) {
+          let holidayTime = dateFunc().hour(9).minute(0);
+          if (holidayTime.isBefore(now)) {
+            holidayTime.add(1, "year");
+          }
+          return holidayTime.toDate();
+        }
+      }
+
+      // === 업무 관련 키워드 ===
+      if (text.includes("회의시간") || text.includes("미팅")) {
+        return now.clone().add(1, "day").hour(14).minute(0).toDate();
+      }
+
+      if (text.includes("마감일") || text.includes("데드라인")) {
+        return now.clone().add(1, "day").hour(17).minute(59).toDate();
+      }
+
+      return null;
+    } catch (error) {
+      logger.warn("자연어 시간 파싱 실패:", error);
+      return null;
+    }
+  }
+
+  // ===== 🏢 업무 시간 관련 =====
+
+  /**
+   * 업무 시간 여부 확인 (점심시간 제외)
+   */
+  isWorkingTime(dateTime = null, includeBreaks = false) {
+    const time = dateTime
+      ? moment.tz(dateTime, this.defaultTimezone)
+      : this.now();
+    const hour = time.hour();
+    const dayOfWeek = time.day();
+
+    // 주말 체크
+    if (dayOfWeek === 0 || dayOfWeek === 6) return false;
+
+    // 공휴일 체크
+    if (this.isHoliday(time)) return false;
+
+    // 기본 업무 시간 체크
+    if (hour < this.workingHours.start || hour >= this.workingHours.end) {
+      return false;
+    }
+
+    // 점심시간 체크 (옵션)
+    if (!includeBreaks) {
+      if (
+        hour >= this.workingHours.lunch.start &&
+        hour < this.workingHours.lunch.end
+      ) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  /**
+   * 🗓️ 공휴일 여부 확인
+   */
+  isHoliday(dateTime = null) {
+    const date = dateTime
+      ? moment.tz(dateTime, this.defaultTimezone)
+      : this.now();
+    const dateString = date.format("YYYY-MM-DD");
+
+    return this.holidays2025.includes(dateString);
+  }
+
+  /**
+   * 📊 이번 달 업무일 수 계산
+   */
+  getWorkingDaysInMonth(year = null, month = null) {
+    const targetMonth =
+      year && month
+        ? moment.tz(
+            `${year}-${month.toString().padStart(2, "0")}-01`,
+            this.defaultTimezone
+          )
+        : this.now().startOf("month");
+
+    let workingDays = 0;
+    const daysInMonth = targetMonth.daysInMonth();
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const currentDay = targetMonth.clone().date(day);
+
+      if (this.isWorkday(currentDay) && !this.isHoliday(currentDay)) {
+        workingDays++;
+      }
+    }
+
+    return workingDays;
+  }
+
+  /**
+   * ⏰ 다음 업무 시간 찾기
+   */
+  getNextWorkingTime() {
+    let nextTime = this.now().add(1, "hour").startOf("hour");
+
+    while (!this.isWorkingTime(nextTime)) {
+      nextTime.add(1, "hour");
+
+      // 무한 루프 방지 (최대 1주일)
+      if (nextTime.diff(this.now(), "days") > 7) {
+        break;
+      }
+    }
+
+    return nextTime;
+  }
+
+  // ===== 📊 고급 포맷팅 =====
+
+  /**
+   * 🎨 컨텍스트별 스마트 포맷팅
+   */
+  smartFormat(dateTime, context = "default") {
+    const time = dateTime
+      ? moment.tz(dateTime, this.defaultTimezone)
+      : this.now();
+
+    switch (context) {
+      case "meeting":
+        return `${time.format("MM월 DD일 (ddd)")} ${time.format("A h:mm")}`;
+
+      case "reminder":
+        if (time.isSame(this.now(), "day")) {
+          return `오늘 ${time.format("A h:mm")}`;
+        } else if (time.isSame(this.now().add(1, "day"), "day")) {
+          return `내일 ${time.format("A h:mm")}`;
+        } else {
+          return `${time.format("MM월 DD일")} ${time.format("A h:mm")}`;
+        }
+
+      case "deadline":
+        const diff = time.diff(this.now(), "hours");
+        if (diff < 24) {
+          return `${diff}시간 후 (${time.format("A h:mm")})`;
+        } else {
+          return `${Math.floor(diff / 24)}일 후 (${time.format("MM월 DD일")})`;
+        }
+
+      case "international":
+        return time.format("MMM DD, YYYY HH:mm z");
+
+      case "calendar":
+        return time.calendar();
+
+      case "relative":
+        return time.fromNow();
+
       default:
-        return now.format(format);
+        return time.format(this.formats.display);
     }
   }
 
   /**
-   * 로그용 시간 문자열
+   * 📈 시간 구간별 통계 포맷
    */
-  getLogTimeString() {
-    return this.getCurrentTime("log");
+  formatDuration(startTime, endTime, includeSeconds = false) {
+    const start = moment.tz(startTime, this.defaultTimezone);
+    const end = moment.tz(endTime, this.defaultTimezone);
+    const duration = moment.duration(end.diff(start));
+
+    const days = Math.floor(duration.asDays());
+    const hours = duration.hours();
+    const minutes = duration.minutes();
+    const seconds = duration.seconds();
+
+    let result = "";
+
+    if (days > 0) result += `${days}일 `;
+    if (hours > 0) result += `${hours}시간 `;
+    if (minutes > 0) result += `${minutes}분 `;
+    if (includeSeconds && seconds > 0) result += `${seconds}초`;
+
+    return result.trim() || "0분";
+  }
+
+  // ===== 🎯 편의 메서드들 =====
+
+  /**
+   * 현재 시간 (기본)
+   */
+  now() {
+    return moment.tz(this.defaultTimezone);
   }
 
   /**
-   * 짧은 시간 문자열
+   * 업무일 여부 (주말 + 공휴일 체크)
    */
-  getShortTimeString() {
-    return this.getCurrentTime("short");
+  isWorkday(dateTime = null) {
+    const time = dateTime
+      ? moment.tz(dateTime, this.defaultTimezone)
+      : this.now();
+    const dayOfWeek = time.day();
+
+    return dayOfWeek >= 1 && dayOfWeek <= 5 && !this.isHoliday(time);
   }
 
   /**
-   * 타임스탬프
+   * 📊 서비스 상태 및 정보
    */
-  getTimestamp() {
-    return this.now().valueOf();
-  }
+  getEnhancedInfo() {
+    const worldClocks = this.getWorldClocks();
 
-  /**
-   * 임의의 시간을 KST로 변환
-   */
-  toKST(date) {
-    if (!date) return this.now();
-
-    if (moment.isMoment(date)) {
-      return date.tz(this.timezone);
-    }
-
-    return moment.tz(date, this.timezone);
-  }
-
-  /**
-   * 오늘 날짜 (00:00:00)
-   */
-  today() {
-    return this.now().startOf("day");
-  }
-
-  /**
-   * 어제 날짜
-   */
-  yesterday() {
-    return this.now().subtract(1, "day").startOf("day");
-  }
-
-  /**
-   * 내일 날짜
-   */
-  tomorrow() {
-    return this.now().add(1, "day").startOf("day");
-  }
-
-  /**
-   * 이번 주 시작 (월요일)
-   */
-  thisWeekStart() {
-    return this.now().startOf("isoWeek");
-  }
-
-  /**
-   * 이번 달 시작
-   */
-  thisMonthStart() {
-    return this.now().startOf("month");
-  }
-
-  // ===== 시간 계산 =====
-
-  /**
-   * 두 시간 사이의 차이 계산
-   */
-  diff(startTime, endTime, unit = "minutes") {
-    const start = this.toKST(startTime);
-    const end = this.toKST(endTime);
-
-    return end.diff(start, unit);
-  }
-
-  /**
-   * 시간 더하기
-   */
-  add(date, amount, unit = "minutes") {
-    return this.toKST(date).add(amount, unit);
-  }
-
-  /**
-   * 시간 빼기
-   */
-  subtract(date, amount, unit = "minutes") {
-    return this.toKST(date).subtract(amount, unit);
-  }
-
-  // ===== 업무 관련 =====
-
-  /**
-   * 업무일인지 확인 (월~금)
-   */
-  isWorkday(date = null) {
-    const d = date ? this.toKST(date) : this.now();
-    const dayOfWeek = d.day();
-    return dayOfWeek >= 1 && dayOfWeek <= 5;
-  }
-
-  /**
-   * 주말인지 확인
-   */
-  isWeekend(date = null) {
-    return !this.isWorkday(date);
-  }
-
-  /**
-   * 업무 시간대인지 확인
-   */
-  isWorkTime(date = null, startHour = 9, endHour = 18) {
-    const d = date ? this.toKST(date) : this.now();
-    const hour = d.hour();
-
-    return this.isWorkday(d) && hour >= startHour && hour < endHour;
-  }
-
-  /**
-   * 다음 업무일 찾기
-   */
-  nextWorkday(date = null) {
-    let d = date ? this.toKST(date) : this.now();
-
-    do {
-      d = d.add(1, "day");
-    } while (!this.isWorkday(d));
-
-    return d;
-  }
-
-  /**
-   * 이전 업무일 찾기
-   */
-  previousWorkday(date = null) {
-    let d = date ? this.toKST(date) : this.now();
-
-    do {
-      d = d.subtract(1, "day");
-    } while (!this.isWorkday(d));
-
-    return d;
-  }
-
-  // ===== 상대 시간 =====
-
-  /**
-   * 상대 시간 표시 (예: "3분 전", "2시간 후")
-   */
-  fromNow(date) {
-    return this.toKST(date).fromNow();
-  }
-
-  /**
-   * 시간을 읽기 쉬운 형태로 변환
-   */
-  humanize(duration, unit = "milliseconds") {
-    return moment.duration(duration, unit).humanize();
-  }
-
-  // ===== 파싱 =====
-
-  /**
-   * 날짜 파싱 (다양한 형식 지원)
-   */
-  parse(dateString, format = null) {
-    if (format) {
-      return moment.tz(dateString, format, this.timezone);
-    }
-
-    const formats = [
-      "YYYY-MM-DD",
-      "YYYY/MM/DD",
-      "DD-MM-YYYY",
-      "DD/MM/YYYY",
-      "YYYY-MM-DD HH:mm:ss",
-      "YYYY-MM-DD HH:mm",
-      "MM/DD/YYYY",
-      "MM-DD-YYYY",
-      "HH:mm",
-      "HH:mm:ss",
-    ];
-
-    return moment.tz(dateString, formats, this.timezone);
-  }
-
-  // ===== 검증 =====
-
-  /**
-   * 유효한 날짜인지 확인
-   */
-  isValid(date) {
-    return moment(date).isValid();
-  }
-
-  /**
-   * 오늘인지 확인
-   */
-  isToday(date) {
-    return this.toKST(date).isSame(this.today(), "day");
-  }
-
-  /**
-   * 어제인지 확인
-   */
-  isYesterday(date) {
-    return this.toKST(date).isSame(this.yesterday(), "day");
-  }
-
-  /**
-   * 내일인지 확인
-   */
-  isTomorrow(date) {
-    return this.toKST(date).isSame(this.tomorrow(), "day");
-  }
-
-  /**
-   * 과거인지 확인
-   */
-  isPast(date) {
-    return this.toKST(date).isBefore(this.now());
-  }
-
-  /**
-   * 미래인지 확인
-   */
-  isFuture(date) {
-    return this.toKST(date).isAfter(this.now());
-  }
-
-  // ===== 형식 시간 =====
-
-  /**
-   * Date 객체를 한국 시간 문자열로 포맷
-   */
-  formatTime(date) {
-    return this.format(date, "log");
-  }
-
-  /**
-   * 현재 시간을 표시용으로 포맷
-   */
-  getDisplayTime() {
-    return this.getCurrentTime("display");
-  }
-
-  /**
-   * 간단한 날짜 형식
-   */
-  getSimpleDate() {
-    return this.getCurrentTime("date");
-  }
-
-  /**
-   * 현재 시간만 (HH:mm 형식)
-   */
-  getCurrentTimeOnly() {
-    return this.now().format("HH:mm");
-  }
-
-  // ===== 디버그 및 정보 =====
-
-  /**
-   * 현재 설정 정보
-   */
-  getInfo() {
     return {
-      timezone: this.timezone,
-      currentTime: this.getCurrentTime("full"),
-      formats: this.formats,
-      locale: moment.locale(),
+      currentTime: this.now().format(this.formats.full),
+      timezone: this.defaultTimezone,
+      supportedTimezones: Object.keys(this.supportedTimezones).length,
+      isWorkingTime: this.isWorkingTime(),
+      isWorkday: this.isWorkday(),
+      isHoliday: this.isHoliday(),
+      nextWorkingTime: this.getNextWorkingTime().format(this.formats.display),
+      workingDaysThisMonth: this.getWorkingDaysInMonth(),
+      worldClocks: worldClocks,
+      features: [
+        "Multi-timezone support",
+        "Natural language parsing",
+        "Business hours calculation",
+        "Holiday detection",
+        "Meeting scheduling",
+        "Smart formatting",
+      ],
     };
   }
 }
 
 // 싱글톤 인스턴스
-const timeHelper = new TimeHelper();
+const enhancedTimeHelper = new EnhancedTimeHelper();
 
-module.exports = timeHelper;
+module.exports = enhancedTimeHelper;

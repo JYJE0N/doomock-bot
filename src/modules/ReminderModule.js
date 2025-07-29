@@ -48,35 +48,117 @@ class ReminderModule extends BaseModule {
     const {
       text,
       chat: { id: chatId },
+      from: { id: userId },
     } = msg;
+
     if (!text) return false;
 
-    const command = this.extractCommand(text);
-    if (command === "remind" || command === "알림") {
-      await this.moduleManager.navigationHandler.sendModuleMenu(
-        bot,
-        chatId,
-        "reminder"
-      );
-      return true;
+    // ✅ 1. 키워드 매칭으로 모듈 메시지 확인
+    if (this.isModuleMessage(text)) {
+      return await this.handleModuleCommand(bot, msg);
     }
+
+    // ✅ 2. 사용자 입력 상태 처리
+    const userState = this.getUserState(userId);
+    if (userState?.awaitingInput) {
+      return await this.handleUserInput(bot, msg, text, userState);
+    }
+
     return false;
   }
 
-  async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
+  /**
+   * 🎯 모듈 명령어 처리 (자식 클래스에서 구현 가능)
+   */
+  async onHandleMessage(bot, msg) {
+    const {
+      text,
+      chat: { id: chatId },
+      from: { id: userId },
+    } = msg;
 
-    try {
-      const stats = await this.reminderService.getUserStats(userId);
-      return {
-        type: "menu",
-        module: "reminder",
-        data: { stats },
-      };
-    } catch (error) {
-      return { type: "error", message: "리마인더 메뉴를 불러올 수 없습니다." };
+    if (!text) return false;
+
+    // ✅ 새로운 방식: 직접 키워드 매칭
+    const lowerText = text.toLowerCase().trim();
+    const keywords = this.getModuleKeywords();
+
+    // 키워드 매칭 확인
+    const isFortuneMessage = keywords.some((keyword) => {
+      const lowerKeyword = keyword.toLowerCase();
+      return (
+        lowerText === lowerKeyword ||
+        lowerText.startsWith(lowerKeyword + " ") ||
+        lowerText.includes(lowerKeyword)
+      );
+    });
+
+    if (isReminderMessage) {
+      // ✅ NavigationHandler를 통한 표준 메뉴 호출
+      if (this.moduleManager?.navigationHandler?.sendModuleMenu) {
+        await this.moduleManager.navigationHandler.sendModuleMenu(
+          bot,
+          chatId,
+          "reminder"
+        );
+      } else {
+        // 폴백 메시지
+        await bot.sendMessage(chatId, "🔮 운세 메뉴를 불러오는 중...");
+      }
+      return true;
     }
+
+    // 사용자 입력 상태 처리 (운세 관련 입력 대기 등)
+    const userState = this.getUserState(userId);
+    if (userState?.awaitingInput) {
+      return await this.handleUserInput(bot, msg, text, userState);
+    }
+
+    return false;
+  }
+
+  /**
+   * 📝 사용자 입력 처리 (운세 선택 등)
+   */
+  async handleUserInput(bot, msg, text, userState) {
+    const {
+      chat: { id: chatId },
+      from: { id: userId },
+    } = msg;
+
+    // 예시: 운세 타입 선택 대기 상태
+    if (userState.action === "awaiting_fortune_type") {
+      const fortuneType = text.trim().toLowerCase();
+
+      // 운세 타입 매칭
+      const typeMap = {
+        일반: "general",
+        연애: "love",
+        사업: "business",
+        건강: "health",
+        general: "general",
+        love: "love",
+        business: "business",
+        health: "health",
+      };
+
+      const selectedType = typeMap[fortuneType];
+      if (selectedType) {
+        // 운세 처리 로직
+        await this.processFortuneRequest(bot, chatId, userId, selectedType);
+        this.clearUserState(userId);
+        return true;
+      } else {
+        await bot.sendMessage(
+          chatId,
+          "❓ 알 수 없는 운세 타입입니다.\n" +
+            "다음 중에서 선택해주세요: 일반, 연애, 사업, 건강"
+        );
+        return true;
+      }
+    }
+
+    return false;
   }
 
   async showList(bot, callbackQuery, subAction, params, moduleManager) {
@@ -100,7 +182,7 @@ class ReminderModule extends BaseModule {
     const userId = getUserId(from);
 
     this.setUserState(userId, {
-      waitingFor: "reminder_text",
+      waitingFor: "reminder_t",
       action: "add",
     });
 

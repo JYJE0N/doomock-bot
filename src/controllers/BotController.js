@@ -11,20 +11,82 @@ const {
 
 class BotController {
   constructor() {
-    const token = process.env.BOT_TOKEN;
-    if (!token) {
-      throw new Error("텔레그램 봇 토큰이 설정되지 않았습니다.");
+    this.bot = null;
+    this.commandHandler = null;
+    this.moduleManager = null;
+
+    // 🎯 중앙 집중식 CommandParser
+    this.commandParser = require("../utils/CommandParser");
+  }
+
+  /**
+   * 🎯 메시지 이벤트 처리 (중앙 집중식 명령어 추출)
+   */
+  /**
+   * 🎯 메시지 처리 - 완전한 중앙 집중식
+   */
+  async handleMessage(ctx) {
+    const msg = ctx.message;
+
+    if (!msg || !msg.text) return;
+
+    try {
+      // ✅ 유일한 파싱 지점 (중앙 집중화)
+      const parseResult = this.commandParser.parseMessage(msg.text);
+
+      if (parseResult.isCommand) {
+        // ✅ 명령어인 경우 → CommandHandler.handleCommand로 직접!
+        return await this.commandHandler.handleCommand(
+          this.bot,
+          msg,
+          parseResult.command,
+          parseResult.args,
+          parseResult // 추가 메타 정보
+        );
+      } else {
+        // ✅ 일반 메시지인 경우 → ModuleManager로
+        return await this.moduleManager.handleMessage(this.bot, msg);
+      }
+    } catch (error) {
+      logger.error("메시지 처리 오류:", error);
+      await ctx.reply(
+        "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+      );
+    }
+  }
+
+  extractCommandInfo(text) {
+    if (!text || typeof text !== "string") {
+      return { isCommand: false };
     }
 
-    this.bot = new Telegraf(token);
-    this.moduleManager = new ModuleManager();
-    this.navigationHandler = new NavigationHandler();
+    const trimmedText = text.trim();
 
-    // 데이터베이스 매니저들
-    this.dbManager = getDbInstance(); // 기존 MongoDB Native (점진적 제거 예정)
-    this.mongooseManager = getMongooseInstance(); // 새로운 Mongoose
+    // 명령어 형식 확인 (/ 로 시작)
+    if (!trimmedText.startsWith("/")) {
+      return { isCommand: false };
+    }
 
-    logger.info("🚀 ═══ 봇 컨트롤러 생성 ═══");
+    // 공백으로 분리
+    const parts = trimmedText.split(/\s+/);
+    const commandPart = parts[0];
+
+    // 명령어 추출 (/ 제거 및 소문자 변환)
+    const command = commandPart.substring(1).toLowerCase();
+
+    // 인수 추출
+    const args = parts.slice(1);
+
+    // 봇 멘션 제거 (@botname 형태)
+    const cleanCommand = command.split("@")[0];
+
+    return {
+      isCommand: true,
+      command: cleanCommand,
+      args: args,
+      original: text,
+      raw: commandPart,
+    };
   }
 
   async initialize() {
@@ -197,6 +259,18 @@ class BotController {
     } catch (error) {
       logger.error("상태 명령 처리 오류:", error);
       await ctx.reply("상태 정보를 가져오는 중 오류가 발생했습니다.");
+    }
+  }
+
+  /**
+   * 🔍 콜백 처리
+   */
+  async handleCallback(ctx) {
+    try {
+      // NavigationHandler로 바로 전달
+      await this.navigationHandler.handleCallback(ctx);
+    } catch (error) {
+      logger.error("콜백 처리 오류:", error);
     }
   }
 

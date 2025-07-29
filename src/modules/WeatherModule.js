@@ -60,7 +60,7 @@ class WeatherModule extends BaseModule {
     } = msg;
     if (!text) return false;
 
-    const command = this.extractCommand(text);
+    const keywords = ["날씨", "기온", "추위"];
     if (command === "weather" || command === "날씨") {
       await this.moduleManager.navigationHandler.sendModuleMenu(
         bot,
