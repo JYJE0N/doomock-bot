@@ -27,7 +27,7 @@ class TodoModule extends BaseModule {
   getModuleKeywords() {
     return ["todo", "todos", "task", "tasks", "할일", "할일목록", "태스크"];
   }
-  constructor(bot, options = {}) {
+  constructor(moduleName, options = {}) {
     super("TodoModule", {
       bot,
       moduleManager: options.moduleManager,

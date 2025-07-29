@@ -15,7 +15,8 @@ class BaseModule {
    * @param {ServiceBuilder} options.serviceBuilder 서비스 빌더 인스턴스
    * @param {object} options.config 모듈 설정 객체
    */
-  constructor(moduleName, options = {}) {
+  constructor(moduleName, { bot, moduleManager, config, serviceBuilder }) {
+    this.bot = bot; // ✅ 이제 bot이 정상적으로 전달됨
     this.moduleName = moduleName;
     this.bot = options.bot;
     this.moduleManager = options.moduleManager;

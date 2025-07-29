@@ -4,7 +4,7 @@ const logger = require("../utils/Logger");
 const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class LeaveModule extends BaseModule {
-  constructor(bot, options = {}) {
+  constructor(moduleName, options = {}) {
     super("LeaveModule", {
       bot,
       moduleManager: options.moduleManager,
@@ -59,8 +59,8 @@ class LeaveModule extends BaseModule {
     } = msg;
     if (!text) return false;
 
-    const command = this.(text);
-    if (command === "leave" || command === "휴가" || command === "연차") {
+    const keywords = ["휴가", "연차", "반차"];
+    if (this.isModuleMessage(text, keywords)) {
       await this.moduleManager.navigationHandler.sendModuleMenu(
         bot,
         chatId,

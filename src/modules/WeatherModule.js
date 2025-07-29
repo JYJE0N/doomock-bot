@@ -4,7 +4,7 @@ const logger = require("../utils/Logger");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 
 class WeatherModule extends BaseModule {
-  constructor(bot, options = {}) {
+  constructor(moduleName, options = {}) {
     super("WeatherModule", {
       bot,
       moduleManager: options.moduleManager,

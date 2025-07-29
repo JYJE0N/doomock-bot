@@ -4,7 +4,7 @@ const logger = require("../utils/Logger");
 const { getUserId } = require("../utils/UserHelper"); // ✅ 추가
 
 class TimerModule extends BaseModule {
-  constructor(bot, options = {}) {
+  constructor(moduleName, options = {}) {
     super("TimerModule", {
       bot,
       moduleManager: options.moduleManager,

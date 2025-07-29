@@ -3,7 +3,7 @@ const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 
 class ReminderModule extends BaseModule {
-  constructor(bot, options = {}) {
+  constructor(moduleName, options = {}) {
     super("ReminderModule", {
       bot,
       moduleManager: options.moduleManager,

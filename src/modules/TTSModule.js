@@ -13,7 +13,7 @@ const fs = require("fs");
  * - 변환 기록 관리
  */
 class TTSModule extends BaseModule {
-  constructor(bot, options = {}) {
+  constructor(moduleName, options = {}) {
     super("TTSModule", {
       bot,
       moduleManager: options.moduleManager,

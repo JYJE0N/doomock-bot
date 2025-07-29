@@ -178,6 +178,8 @@ class DooMockBot {
         }`
       )
     );
+    // 🔥 핵심 수정: TimeHelper.getLogTimeString() → TimeHelper.getLogTimeString()
+    // TimeHelper는 싱글톤 인스턴스이므로 직접 메서드 호출
     console.log(chalk.cyan(`⏰ 시작 시간: ${TimeHelper.getLogTimeString()}`));
     console.log(chalk.magenta(`🔧 노드 버전: ${process.version}`));
     console.log(chalk.blue.bold("📋 ═════════════════"));

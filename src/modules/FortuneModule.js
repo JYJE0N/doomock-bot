@@ -25,7 +25,7 @@ class FortuneModule extends BaseModule {
       "예언",
     ];
   }
-  constructor(bot, options = {}) {
+  constructor(moduleName, options = {}) {
     super("FortuneModule", {
       bot,
       moduleManager: options.moduleManager,

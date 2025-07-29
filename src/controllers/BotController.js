@@ -1,107 +1,86 @@
-// src/controllers/BotController.js - Mongoose 통합 버전
+// src/controllers/BotController.js - 수정된 import 부분
 const { Telegraf, session } = require("telegraf");
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const ModuleManager = require("../core/ModuleManager");
 const NavigationHandler = require("../handlers/NavigationHandler");
-const { getInstance: getDbInstance } = require("../database/DatabaseManager");
+
+// 🔥 핵심 수정: DatabaseManager import 방식 변경
+const {
+  DatabaseManager,
+  getInstance: getDbInstance,
+} = require("../database/DatabaseManager");
 const {
   getInstance: getMongooseInstance,
 } = require("../database/MongooseManager");
 
 class BotController {
   constructor() {
-    this.bot = null;
-    this.commandHandler = null;
-    this.moduleManager = null;
+    const token = process.env.BOT_TOKEN;
+    if (!token) {
+      throw new Error("텔레그램 봇 토큰이 설정되지 않았습니다.");
+    }
 
-    // 🎯 중앙 집중식 CommandParser
-    this.commandParser = require("../utils/CommandParser");
-  }
+    this.bot = new Telegraf(token);
+    this.moduleManager = new ModuleManager();
+    this.navigationHandler = new NavigationHandler();
 
-  /**
-   * 🎯 메시지 이벤트 처리 (중앙 집중식 명령어 추출)
-   */
-  /**
-   * 🎯 메시지 처리 - 완전한 중앙 집중식
-   */
-  async handleMessage(ctx) {
-    const msg = ctx.message;
-
-    if (!msg || !msg.text) return;
-
+    // 🔥 핵심 수정: DatabaseManager 인스턴스 생성 방식 변경
     try {
-      // ✅ 유일한 파싱 지점 (중앙 집중화)
-      const parseResult = this.commandParser.parseMessage(msg.text);
-
-      if (parseResult.isCommand) {
-        // ✅ 명령어인 경우 → CommandHandler.handleCommand로 직접!
-        return await this.commandHandler.handleCommand(
-          this.bot,
-          msg,
-          parseResult.command,
-          parseResult.args,
-          parseResult // 추가 메타 정보
+      this.dbManager = getDbInstance(); // 기존 MongoDB Native
+      if (!this.dbManager) {
+        logger.warn(
+          "⚠️ DatabaseManager getInstance() 반환값이 null, 새 인스턴스 생성"
         );
-      } else {
-        // ✅ 일반 메시지인 경우 → ModuleManager로
-        return await this.moduleManager.handleMessage(this.bot, msg);
+        this.dbManager = new DatabaseManager();
       }
     } catch (error) {
-      logger.error("메시지 처리 오류:", error);
-      await ctx.reply(
-        "일시적인 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-      );
-    }
-  }
-
-  extractCommandInfo(text) {
-    if (!text || typeof text !== "string") {
-      return { isCommand: false };
+      logger.error("❌ DatabaseManager 생성 실패:", error);
+      logger.info("🔄 새 DatabaseManager 인스턴스 생성 시도...");
+      this.dbManager = new DatabaseManager();
     }
 
-    const trimmedText = text.trim();
-
-    // 명령어 형식 확인 (/ 로 시작)
-    if (!trimmedText.startsWith("/")) {
-      return { isCommand: false };
+    try {
+      this.mongooseManager = getMongooseInstance(); // 새로운 Mongoose
+      if (!this.mongooseManager) {
+        logger.warn("⚠️ MongooseManager getInstance() 반환값이 null");
+      }
+    } catch (error) {
+      logger.error("❌ MongooseManager 생성 실패:", error);
     }
 
-    // 공백으로 분리
-    const parts = trimmedText.split(/\s+/);
-    const commandPart = parts[0];
-
-    // 명령어 추출 (/ 제거 및 소문자 변환)
-    const command = commandPart.substring(1).toLowerCase();
-
-    // 인수 추출
-    const args = parts.slice(1);
-
-    // 봇 멘션 제거 (@botname 형태)
-    const cleanCommand = command.split("@")[0];
-
-    return {
-      isCommand: true,
-      command: cleanCommand,
-      args: args,
-      original: text,
-      raw: commandPart,
-    };
+    logger.info("🚀 ═══ 봇 컨트롤러 생성 ═══");
+    logger.debug(`📊 dbManager: ${this.dbManager ? "생성됨" : "null"}`);
+    logger.debug(
+      `📊 mongooseManager: ${this.mongooseManager ? "생성됨" : "null"}`
+    );
   }
 
   async initialize() {
     logger.info("🔄 봇 초기화를 시작합니다...");
     try {
-      // 1. Mongoose 연결 (우선)
-      await this.mongooseManager.connect();
+      // 1. DatabaseManager 연결 확인 및 연결
+      if (this.dbManager) {
+        logger.info("🔌 DatabaseManager 연결 시도...");
+        await this.dbManager.connect();
+        logger.success("✅ DatabaseManager 연결 완료");
+      } else {
+        logger.warn("⚠️ DatabaseManager가 null - 연결 건너뜀");
+      }
 
-      // 2. 기존 DB 연결 (아직 사용하는 서비스들을 위해)
-      await this.dbManager.connect();
+      // 2. MongooseManager 연결 (있는 경우)
+      if (this.mongooseManager) {
+        logger.info("🔌 MongooseManager 연결 시도...");
+        await this.mongooseManager.connect();
+        logger.success("✅ MongooseManager 연결 완료");
+      } else {
+        logger.warn("⚠️ MongooseManager가 null - 연결 건너뜀");
+      }
 
       // 3. NavigationHandler 초기화
       this.navigationHandler.initialize(this.bot);
 
-      // 4. ModuleManager 초기화 (양쪽 DB 전달)
+      // 4. ModuleManager 초기화 (DB 인스턴스 전달)
       await this.moduleManager.initialize(this.bot, {
         dbManager: this.dbManager,
         mongooseManager: this.mongooseManager,
@@ -123,6 +102,7 @@ class BotController {
     }
   }
 
+  // 나머지 메서드들은 동일...
   setupMiddlewares() {
     // 세션 미들웨어
     this.bot.use(session());
@@ -187,8 +167,12 @@ class BotController {
       this.bot.stop(signal);
 
       // 데이터베이스 연결 종료
-      await this.mongooseManager.disconnect();
-      await this.dbManager.disconnect();
+      if (this.mongooseManager) {
+        await this.mongooseManager.disconnect();
+      }
+      if (this.dbManager) {
+        await this.dbManager.disconnect();
+      }
 
       logger.info("✅ 봇이 정상적으로 종료되었습니다.");
     } catch (error) {
@@ -228,29 +212,33 @@ class BotController {
   async handleStatusCommand(ctx) {
     try {
       // 시스템 상태 수집
-      const dbStatus = this.dbManager.getStatus();
-      const mongooseStatus = this.mongooseManager.getStatus();
+      const dbStatus = this.dbManager
+        ? this.dbManager.getStatus()
+        : { connected: false };
+      const mongooseStatus = this.mongooseManager
+        ? this.mongooseManager.getStatus()
+        : { connected: false };
       const moduleStatus = this.moduleManager.getStatus();
 
       const statusText = `
 🔍 *시스템 상태*
 
 *데이터베이스 (Native):*
-• 연결: ${dbStatus.connected ? "✅" : "❌"}
-• DB: ${dbStatus.database || "N/A"}
+▸ 연결: ${dbStatus.connected ? "✅" : "❌"}
+▸ DB: ${dbStatus.database || "N/A"}
 
 *데이터베이스 (Mongoose):*
-• 연결: ${mongooseStatus.connected ? "✅" : "❌"}
-• 상태: ${mongooseStatus.readyState}
-• 모델: ${mongooseStatus.models.length}개
+▸ 연결: ${mongooseStatus.connected ? "✅" : "❌"}
+▸ 상태: ${mongooseStatus.readyState || "N/A"}
+▸ 모델: ${mongooseStatus.models ? mongooseStatus.models.length : 0}개
 
 *모듈:*
-• 로드됨: ${moduleStatus.loadedModules}개
-• 활성: ${moduleStatus.activeModules}개
+▸ 로드됨: ${moduleStatus.loadedModules}개
+▸ 활성: ${moduleStatus.activeModules}개
 
 *메모리:*
-• 사용: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
-• 총계: ${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB
+▸ 사용: ${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB
+▸ 총계: ${Math.round(process.memoryUsage().heapTotal / 1024 / 1024)}MB
 
 *업타임:* ${Math.round(process.uptime() / 60)}분
       `;
@@ -259,18 +247,6 @@ class BotController {
     } catch (error) {
       logger.error("상태 명령 처리 오류:", error);
       await ctx.reply("상태 정보를 가져오는 중 오류가 발생했습니다.");
-    }
-  }
-
-  /**
-   * 🔍 콜백 처리
-   */
-  async handleCallback(ctx) {
-    try {
-      // NavigationHandler로 바로 전달
-      await this.navigationHandler.handleCallback(ctx);
-    } catch (error) {
-      logger.error("콜백 처리 오류:", error);
     }
   }
 

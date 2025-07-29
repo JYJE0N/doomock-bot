@@ -53,7 +53,10 @@ class ModuleManager {
         logger.debug(`📁 ${config.key} 경로: ${config.path}`);
 
         const ModuleClass = require(config.path);
-        const moduleInstance = new ModuleClass(bot, {
+
+        // 🔥 핵심 수정: BaseModule 매개변수 구조에 맞게 수정
+        const moduleInstance = new ModuleClass(config.key, {
+          bot: bot, // bot을 options 안으로 이동
           moduleManager: this,
           serviceBuilder: this.serviceBuilder,
           config: config.config,
@@ -333,7 +336,9 @@ class ModuleManager {
       delete require.cache[require.resolve(config.path)];
       const ModuleClass = require(config.path);
 
-      const moduleInstance = new ModuleClass(this.bot, {
+      // 🔥 수정: 표준 매개변수 구조 적용
+      const moduleInstance = new ModuleClass(moduleKey, {
+        bot: this.bot, // bot을 options 안에 포함
         moduleManager: this,
         serviceBuilder: this.serviceBuilder,
         config: config.config,
@@ -348,6 +353,40 @@ class ModuleManager {
       logger.error(`❌ ${moduleKey} 모듈 재시작 실패:`, error);
       throw error;
     }
+  }
+
+  async loadModules(bot) {
+    const moduleConfigs = getEnabledModules();
+    logger.info(`📦 ${moduleConfigs.length}개의 모듈을 로드합니다...`);
+
+    for (const config of moduleConfigs) {
+      try {
+        logger.debug(`📁 ${config.key} 경로: ${config.path}`);
+
+        const ModuleClass = require(config.path);
+
+        // 🔥 핵심 수정: BaseModule 표준 매개변수 구조에 맞춤
+        const moduleInstance = new ModuleClass(config.key, {
+          bot: bot, // BaseModule이 기대하는 구조
+          moduleManager: this,
+          serviceBuilder: this.serviceBuilder,
+          config: config.config,
+        });
+
+        await moduleInstance.initialize();
+        this.modules.set(config.key, moduleInstance);
+        logger.success(`✅ [${config.key}] 모듈 로드 완료.`);
+      } catch (error) {
+        logger.error(`💥 [${config.key}] 모듈 로드 실패:`, error);
+
+        // enhanced 모듈이 실패하면 전체 실패
+        if (config.enhanced) {
+          throw error;
+        }
+      }
+    }
+
+    logger.success(`✅ ${this.modules.size}개 모듈 로드 완료`);
   }
 
   /**

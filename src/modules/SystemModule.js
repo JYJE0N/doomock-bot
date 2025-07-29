@@ -7,8 +7,17 @@ const { formatMemoryUsage, formatUptime } = require("../utils/SystemHelper");
 const os = require("os");
 
 class SystemModule extends BaseModule {
-  constructor(bot, options) {
-    super("SystemModule", { bot, ...options });
+  // 🔥 핵심 수정: BaseModule 표준 매개변수 구조에 맞춤
+  constructor(moduleName, options = {}) {
+    // moduleName = "system"
+    super(moduleName, options);
+
+    // 시스템 모듈 특화 설정 (필요한 경우)
+    this.systemConfig = {
+      showDetailedStatus: true,
+      enablePerformanceMonitoring: true,
+      ...options.config,
+    };
   }
 
   async onInitialize() {
@@ -24,6 +33,7 @@ class SystemModule extends BaseModule {
     });
   }
 
+  // 나머지 메서드들은 동일...
   async showHelp(bot, callbackQuery) {
     logger.info(
       `SystemModule: 도움말 요청 (사용자: ${getUserId(callbackQuery.from)})`
