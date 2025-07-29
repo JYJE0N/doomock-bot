@@ -2,7 +2,7 @@
 
 const axios = require("axios");
 const logger = require("./Logger");
-const Weather = require("../models/Weather");
+const Weather = require("../database/models/Weather");
 
 /**
  * 🌤️ WeatherHelper - 조율 전용 헬퍼 (SoC 준수)

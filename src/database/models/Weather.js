@@ -1,7 +1,7 @@
-// src/models/Weather.js - 날씨 데이터 모델 (표준 구조)
+// src/models/Weather.js - 날씨 데이터 모델
 
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const logger = require("../../utils/Logger");
+const TimeHelper = require("../../utils/TimeHelper");
 
 /**
  * 🌤️ Weather 모델 - 날씨 데이터 구조 및 변환 담당
@@ -198,7 +198,7 @@ class Weather {
   }
 
   /**
-   * 🎨 날씨 아이콘 매핑 (WeatherService에서 이관)
+   * 🎨 날씨 아이콘 매핑
    */
   static getWeatherIcon(iconCode) {
     const iconMapping = {
@@ -226,7 +226,7 @@ class Weather {
   }
 
   /**
-   * 🗺️ 도시명 매핑 (WeatherService에서 이관)
+   * 🗺️ 도시명 매핑
    */
   static getCityMapping(koreanCity) {
     const cityMapping = {

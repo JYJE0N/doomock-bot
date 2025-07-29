@@ -1,5 +1,6 @@
 // 한국환경공단 대기질 API 서비스
 const BaseService = require("../core/BaseModule");
+const axios = require("axios");
 const logger = require("./Logger");
 const TimeHelper = require("../utils/TimeHelper");
 

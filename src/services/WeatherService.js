@@ -2,7 +2,7 @@
 
 const WeatherHelper = require("../utils/WeatherHelper");
 const AirQualityHelper = require("../utils/AirQualityHelper");
-const Weather = require("../models/Weather");
+const Weather = require("../database/models/Weather");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const axios = require("axios");

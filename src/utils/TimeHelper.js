@@ -29,6 +29,109 @@ class TimeHelper {
   }
 
   /**
+   * 📅 분 더하기
+   */
+  static addMinutes(date, minutes) {
+    const result = new Date(date);
+    result.setMinutes(result.getMinutes() + minutes);
+    return result;
+  }
+
+  /**
+   * 📅 시간 더하기
+   */
+  static addHours(date, hours) {
+    const result = new Date(date);
+    result.setHours(result.getHours() + hours);
+    return result;
+  }
+
+  /**
+   * 📅 일 더하기
+   */
+  static addDays(date, days) {
+    const result = new Date(date);
+    result.setDate(result.getDate() + days);
+    return result;
+  }
+
+  /**
+   * 🇰🇷 한국 시간 문자열 (호환성)
+   */
+  static getKoreaTimeString() {
+    return this.format(this.now(), "full");
+  }
+
+  /**
+   * ⏱️ 경과 시간 계산
+   */
+  static getElapsedTime(startTime) {
+    if (!startTime) return "측정 불가";
+
+    const now = Date.now();
+    const elapsed =
+      now - (startTime instanceof Date ? startTime.getTime() : startTime);
+
+    const seconds = Math.floor(elapsed / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}일 전`;
+    if (hours > 0) return `${hours}시간 전`;
+    if (minutes > 0) return `${minutes}분 전`;
+    return `${seconds}초 전`;
+  }
+
+  /**
+   * ⏳ 기간 포맷팅
+   */
+  static formatDuration(milliseconds) {
+    const seconds = Math.floor(milliseconds / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `${days}일 ${hours % 24}시간`;
+    if (hours > 0) return `${hours}시간 ${minutes % 60}분`;
+    if (minutes > 0) return `${minutes}분 ${seconds % 60}초`;
+    return `${seconds}초`;
+  }
+
+  /**
+   * 📅 시간 설정
+   */
+  static setTime(date, hour, minute, second = 0) {
+    const result = new Date(date);
+    result.setHours(hour, minute, second, 0);
+    return result;
+  }
+
+  /**
+   * 📅 요일 가져오기 (0=일요일, 1=월요일...)
+   */
+  static getWeekday(date) {
+    return date.getDay();
+  }
+
+  /**
+   * 📅 시간 비교
+   */
+  static isBefore(date1, date2) {
+    return date1.getTime() < date2.getTime();
+  }
+
+  static addMinutes(date, minutes) {
+    const result = new Date(date);
+    result.setMinutes(result.getMinutes() + minutes);
+    return result;
+  }
+
+  static getKoreaTimeString() {
+    return this.format(this.now(), "full");
+  }
+
+  /**
    * 현재 타임존 반환
    */
   getTimeZone() {
