@@ -116,20 +116,61 @@ class NavigationHandler {
     } catch (error) {
       logger.error("💥 NavigationHandler 콜백 처리 오류:", error);
 
+      // ✅ 수정: 에러 메시지 전송 시에도 안전한 처리
       try {
-        // 오류 발생 시 사용자에게 친화적인 메시지 전송
-        await ctx.editMessageText(
-          "죄송합니다. 처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.",
-          {
-            reply_markup: {
-              inline_keyboard: [
-                [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-              ],
-            },
-          }
-        );
-      } catch (editError) {
-        logger.error("💥 오류 메시지 전송 실패:", editError);
+        await this.sendSafeErrorMessage(ctx, "처리 중 오류가 발생했습니다.");
+      } catch (errorSendError) {
+        logger.error("💥 오류 메시지 전송 실패:", errorSendError);
+        // 최후의 수단: answerCbQuery로 알림
+        try {
+          await ctx.answerCbQuery("처리 중 오류가 발생했습니다.", {
+            show_alert: true,
+          });
+        } catch (finalError) {
+          logger.error("💥 최종 오류 알림도 실패:", finalError);
+        }
+      }
+    }
+  }
+
+  /**
+   * 🛡️ 안전한 에러 메시지 전송
+   */
+  async sendSafeErrorMessage(ctx, message) {
+    const text = `❌ *오류 발생*\n\n${this.escapeMarkdownV2(message)}`;
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
+      ],
+    };
+
+    try {
+      // 메시지 편집 시도
+      if (ctx.callbackQuery?.message?.message_id) {
+        await ctx.editMessageText(text, {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        });
+      } else {
+        // 새 메시지 전송
+        await ctx.reply(text, {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        });
+      }
+    } catch (error) {
+      // 마크다운 실패 시 일반 텍스트로 전송
+      const plainText = `❌ 오류 발생\n\n${message}`;
+
+      try {
+        if (ctx.callbackQuery?.message?.message_id) {
+          await ctx.editMessageText(plainText, { reply_markup: keyboard });
+        } else {
+          await ctx.reply(plainText, { reply_markup: keyboard });
+        }
+      } catch (finalError) {
+        // 모든 시도 실패 시 answerCbQuery로 알림
+        await ctx.answerCbQuery(message, { show_alert: true });
       }
     }
   }

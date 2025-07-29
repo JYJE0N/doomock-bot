@@ -284,13 +284,8 @@ class TTSRenderer extends BaseRenderer {
         inline_keyboard: [[{ text: "📋 TTS 메뉴", callback_data: "tts:menu" }]],
       };
 
-      await this.sendMessage(
-        ctx.callbackQuery.message.chat.id,
-        text,
-        keyboard,
-        ctx.callbackQuery.message.message_id
-      );
-      return;
+      // ✅ 수정: 안전한 메시지 전송
+      return await this.sendSafeMessage(ctx, text, keyboard);
     }
 
     text += "원하는 음성을 선택해주세요\\:\n\n";
@@ -303,34 +298,68 @@ class TTSRenderer extends BaseRenderer {
     displayVoices.forEach((voice, index) => {
       const genderIcon = this.getGenderIcon(voice.description);
       const voiceName = voice.title || voice.id;
-      const description = voice.description ? ` (${voice.description})` : "";
+      const description = voice.description
+        ? ` (${this.escapeMarkdownV2(voice.description)})`
+        : "";
 
-      keyboard.inline_keyboard.push([
-        {
-          text: `${genderIcon} ${voiceName}${description}`,
-          callback_data: `tts:voice:${voice.id}`,
-        },
-      ]);
+      text += `${genderIcon} *${this.escapeMarkdownV2(
+        voiceName
+      )}*${description}\n`;
+
+      // 음성 선택 버튼 (2열 배치)
+      if (index % 2 === 0) {
+        keyboard.inline_keyboard.push([]);
+      }
+
+      const currentRow =
+        keyboard.inline_keyboard[keyboard.inline_keyboard.length - 1];
+      currentRow.push({
+        text: `${genderIcon} ${voiceName}`,
+        callback_data: `tts:voice:${voice.id}`,
+      });
     });
 
-    // 더 많은 음성이 있는 경우
-    if (voices.length > 8) {
-      keyboard.inline_keyboard.push([
-        { text: "➡️ 더 보기", callback_data: "tts:voices:more" },
-      ]);
-    }
-
-    // 네비게이션 버튼
+    // 추가 메뉴 버튼
     keyboard.inline_keyboard.push([
+      { text: "🔄 새로고침", callback_data: "tts:voices" },
       { text: "📋 TTS 메뉴", callback_data: "tts:menu" },
     ]);
 
-    await this.sendMessage(
-      ctx.callbackQuery.message.chat.id,
-      text,
-      keyboard,
-      ctx.callbackQuery.message.message_id
-    );
+    // ✅ 수정: 안전한 메시지 전송
+    return await this.sendSafeMessage(ctx, text, keyboard);
+  }
+
+  /**
+   * 🛡️ 안전한 메시지 전송 메서드 (편집 실패 시 새 메시지 전송)
+   */
+  async sendSafeMessage(ctx, text, keyboard) {
+    try {
+      // 우선 메시지 편집 시도
+      if (ctx.callbackQuery?.message?.message_id) {
+        await this.sendMessage(
+          ctx.callbackQuery.message.chat.id,
+          text,
+          keyboard,
+          ctx.callbackQuery.message.message_id
+        );
+      } else {
+        // 편집할 메시지가 없으면 새 메시지 전송
+        await this.sendMessage(
+          ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id,
+          text,
+          keyboard
+        );
+      }
+    } catch (error) {
+      logger.warn("메시지 편집 실패, 새 메시지로 전송:", error.message);
+
+      // 편집 실패 시 새 메시지로 전송
+      await this.sendMessage(
+        ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id,
+        text,
+        keyboard
+      );
+    }
   }
 
   /**

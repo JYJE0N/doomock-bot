@@ -112,11 +112,13 @@ class BaseRenderer {
   async sendMessage(chatId, text, keyboard = null, messageId = null) {
     this.errorStats.totalMessages++;
 
-    // 1단계: MarkdownV2로 시도
-    try {
-      const escapedText = this.escapeMarkdownV2(text);
+    // ✅ 수정: 메시지 편집 시 추가 검증
+    if (messageId) {
+      try {
+        // 편집할 메시지가 텍스트를 포함하는지 확인하는 로직 추가
+        // 텔레그램 API는 텍스트가 없는 메시지(예: 음성, 스티커 등)는 편집할 수 없음
 
-      if (messageId) {
+        const escapedText = this.escapeMarkdownV2(text);
         await this.bot.telegram.editMessageText(
           chatId,
           messageId,
@@ -127,81 +129,76 @@ class BaseRenderer {
             reply_markup: keyboard,
           }
         );
-      } else {
-        await this.bot.telegram.sendMessage(chatId, escapedText, {
-          parse_mode: "MarkdownV2",
-          reply_markup: keyboard,
-        });
-      }
+        return; // 성공하면 여기서 종료
+      } catch (editError) {
+        // 편집 실패 시 로그 출력 및 새 메시지로 폴백
+        if (
+          editError.message.includes("there is no text in the message to edit")
+        ) {
+          logger.warn("⚠️ 편집할 텍스트가 없는 메시지, 새 메시지로 전송");
+        } else if (editError.message.includes("message is not modified")) {
+          logger.debug("📝 메시지가 이미 동일함, 편집 생략");
+          return; // 이미 같은 내용이면 종료
+        } else {
+          logger.warn(
+            "🔄 메시지 편집 실패, 새 메시지로 전송:",
+            editError.message
+          );
+        }
 
+        // 편집 실패 시 messageId를 null로 설정하여 새 메시지 전송
+        messageId = null;
+      }
+    }
+
+    // 1단계: MarkdownV2로 새 메시지 시도
+    try {
+      const escapedText = this.escapeMarkdownV2(text);
+      await this.bot.telegram.sendMessage(chatId, escapedText, {
+        parse_mode: "MarkdownV2",
+        reply_markup: keyboard,
+      });
       return; // 성공하면 여기서 종료
     } catch (error) {
       this.errorStats.markdownErrors++;
       logger.warn(
         "🚨 MarkdownV2 전송 실패, 일반 마크다운으로 재시도:",
-        error.message
+        `"${error.message}"`
       );
     }
 
-    // 2단계: 일반 Markdown으로 시도
+    // 2단계: 일반 마크다운으로 시도
     try {
       const escapedText = this.escapeMarkdown(text);
-
-      if (messageId) {
-        await this.bot.telegram.editMessageText(
-          chatId,
-          messageId,
-          undefined,
-          escapedText,
-          {
-            parse_mode: "Markdown",
-            reply_markup: keyboard,
-          }
-        );
-      } else {
-        await this.bot.telegram.sendMessage(chatId, escapedText, {
-          parse_mode: "Markdown",
-          reply_markup: keyboard,
-        });
-      }
-
+      await this.bot.telegram.sendMessage(chatId, escapedText, {
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
       this.errorStats.fallbackUsed++;
-      logger.info("✅ 일반 마크다운으로 전송 성공");
       return; // 성공하면 여기서 종료
     } catch (error) {
       logger.warn(
         "🚨 일반 마크다운도 실패, 일반 텍스트로 최종 시도:",
-        error.message
+        `"${error.message}"`
       );
     }
 
-    // 3단계: 일반 텍스트로 최종 시도 (마크다운 없음)
+    // 3단계: 일반 텍스트로 최종 시도
     try {
-      const cleanedText = this.cleanText(text);
-
-      if (messageId) {
-        await this.bot.telegram.editMessageText(
-          chatId,
-          messageId,
-          undefined,
-          cleanedText,
-          {
-            reply_markup: keyboard,
-            // parse_mode 없음
-          }
-        );
-      } else {
-        await this.bot.telegram.sendMessage(chatId, cleanedText, {
-          reply_markup: keyboard,
-          // parse_mode 없음
-        });
-      }
-
+      const cleanText = this.cleanText(text);
+      await this.bot.telegram.sendMessage(chatId, cleanText, {
+        reply_markup: keyboard,
+      });
       this.errorStats.fallbackUsed++;
-      logger.success("✅ 일반 텍스트로 전송 성공");
+
+      logger.warn("⚠️ 일반 텍스트로 전송됨 (마크다운 실패)");
     } catch (error) {
-      logger.error("❌ 모든 전송 방법 실패:", error);
-      throw error; // 마지막 에러를 던짐
+      this.errorStats.fallbackUsed++;
+      logger.error(
+        "❌ 모든 전송 방법 실패:",
+        `  스택: ${error.stack || error.message}`
+      );
+      throw error; // 모든 방법이 실패하면 에러를 다시 던짐
     }
   }
 

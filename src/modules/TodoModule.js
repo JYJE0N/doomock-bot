@@ -1,4 +1,4 @@
-// src/modules/TodoModule.js - 완전한 Todo 모듈
+// src/modules/TodoModule.js - 수정된 완전한 Todo 모듈
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserId } = require("../utils/UserHelper");
@@ -6,6 +6,9 @@ const { getUserId } = require("../utils/UserHelper");
 class TodoModule extends BaseModule {
   constructor(bot, options) {
     super("TodoModule", { bot, ...options });
+
+    // ✅ 수정: userStates Map 초기화 추가
+    this.userStates = new Map();
   }
 
   /**
@@ -43,7 +46,9 @@ class TodoModule extends BaseModule {
    */
   async onHandleMessage(bot, msg) {
     const userId = getUserId(msg.from);
-    const state = await this.getModuleState(userId);
+
+    // ✅ 수정: 안전한 상태 확인
+    const state = this.getModuleState(userId);
 
     if (state?.awaitingInput) {
       logger.info(`TodoModule: 새 할일 입력 받음 (사용자: ${userId})`);
@@ -51,7 +56,7 @@ class TodoModule extends BaseModule {
 
       try {
         await this.todoService.addTodo(userId, text);
-        await this.clearModuleState(userId); // 상태 초기화
+        this.clearModuleState(userId); // 상태 초기화
 
         // 할일 추가 성공 메시지
         await bot.telegram.sendMessage(
@@ -105,7 +110,7 @@ class TodoModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
     logger.info(`TodoModule: 추가 안내 (사용자: ${userId})`);
 
-    await this.setModuleState(userId, { awaitingInput: true });
+    this.setModuleState(userId, { awaitingInput: true });
 
     return {
       module: "todo",
@@ -119,7 +124,7 @@ class TodoModule extends BaseModule {
    */
   async toggleTodo(bot, callbackQuery, params) {
     const userId = getUserId(callbackQuery.from);
-    const todoId = params; // 'todo:toggle:todoId' 에서 todoId 부분
+    const todoId = params;
 
     logger.info(`TodoModule: 토글 요청 (사용자: ${userId}, ID: ${todoId})`);
 
@@ -151,7 +156,7 @@ class TodoModule extends BaseModule {
    */
   async deleteTodo(bot, callbackQuery, params) {
     const userId = getUserId(callbackQuery.from);
-    const todoId = params; // 'todo:delete:todoId' 에서 todoId 부분
+    const todoId = params;
 
     logger.info(`TodoModule: 삭제 요청 (사용자: ${userId}, ID: ${todoId})`);
 
@@ -179,24 +184,17 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * 모듈 상태 가져오기 (BaseModule에서 상속받은 메서드 활용)
+   * ✅ 수정: 동기적 모듈 상태 관리 메서드들
    */
-  async getModuleState(userId) {
-    // BaseModule의 userStates Map을 사용
+  getModuleState(userId) {
     return this.userStates.get(String(userId));
   }
 
-  /**
-   * 모듈 상태 설정
-   */
-  async setModuleState(userId, state) {
+  setModuleState(userId, state) {
     this.userStates.set(String(userId), state);
   }
 
-  /**
-   * 모듈 상태 초기화
-   */
-  async clearModuleState(userId) {
+  clearModuleState(userId) {
     this.userStates.delete(String(userId));
   }
 
@@ -219,12 +217,16 @@ class TodoModule extends BaseModule {
       (cmd) => lowerText === cmd || lowerText.startsWith(cmd + " ")
     );
   }
-  // 로그 상태값을 위한 메서드
+
+  /**
+   * 로그 상태값을 위한 메서드
+   */
   getStatus() {
     return {
       moduleName: this.moduleName,
       isInitialized: this.isInitialized,
-      serviceStatus: this.serviceInstance ? "Ready" : "Not Connected",
+      serviceStatus: this.todoService ? "Ready" : "Not Connected",
+      userStatesCount: this.userStates.size,
       stats: this.stats,
     };
   }
