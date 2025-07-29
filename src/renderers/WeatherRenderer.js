@@ -1,14 +1,17 @@
-// src/renderers/WeatherRenderer.js - 날씨 모듈 렌더러
+// src/renderers/WeatherRenderer.js - 데이터 매핑 수정 버전
 
 const BaseRenderer = require("./BaseRenderer");
 const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
 
 /**
- * 🌤️ WeatherRenderer - 날씨 정보 UI 렌더러
- * - 현재 날씨 표시
- * - 미세먼지 정보
- * - 간단하고 직관적인 디자인
+ * 🌤️ WeatherRenderer - 날씨 정보 UI 렌더러 (데이터 매핑 수정)
+ *
+ * 🔧 수정사항:
+ * - Weather 모델의 속성명과 일치하도록 매핑 수정
+ * - temperature, feelsLike, windSpeed 등 정확한 속성명 사용
+ * - 데이터 존재 여부 안전하게 확인
+ * - 일관된 데이터 접근 패턴 적용
  */
 class WeatherRenderer extends BaseRenderer {
   constructor(bot, navigationHandler) {
@@ -55,7 +58,7 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * 🌤️ 날씨 메인 메뉴 렌더링
+   * 🌤️ 날씨 메인 메뉴 렌더링 (수정됨)
    */
   async renderWeatherMenu(data, ctx) {
     const userName = getUserName(ctx.callbackQuery?.from);
@@ -64,9 +67,15 @@ class WeatherRenderer extends BaseRenderer {
     let text = "🌤️ *날씨 정보*\n\n";
 
     if (weather) {
-      // 현재 날씨 정보 포함된 메뉴
+      // ✅ 수정: Weather 모델의 정확한 속성명 사용
       text += `📍 *${this.escapeMarkdownV2(weather.location || "서울")}*\n`;
-      text += `🌡️ **${weather.temp}°C**\n`;
+
+      // 🌡️ temperature 속성 사용 (temp가 아닌!)
+      if (weather.temperature !== undefined && weather.temperature !== null) {
+        text += `🌡️ **${weather.temperature}°C**\n`;
+      } else {
+        text += `🌡️ **측정중**\n`;
+      }
 
       if (weather.description) {
         text += `☁️ ${this.escapeMarkdownV2(weather.description)}\n`;
@@ -105,7 +114,7 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * 🌡️ 현재 날씨 상세 렌더링
+   * 🌡️ 현재 날씨 상세 렌더링 (완전 수정됨)
    */
   async renderCurrentWeather(data, ctx) {
     const weather = data?.weather;
@@ -113,40 +122,89 @@ class WeatherRenderer extends BaseRenderer {
     let text = "🌡️ *현재 날씨*\n\n";
 
     if (weather) {
+      // 📍 위치 정보
       text += `📍 **${this.escapeMarkdownV2(weather.location || "서울")}**\n\n`;
 
-      // 온도 정보
-      text += `🌡️ **온도**: ${weather.temp}°C\n`;
-
-      if (weather.feels_like) {
-        text += `🤗 **체감온도**: ${weather.feels_like}°C\n`;
+      // 🌡️ 온도 정보 - 정확한 속성명 사용
+      if (weather.temperature !== undefined && weather.temperature !== null) {
+        const tempEmoji = this.getTemperatureEmoji(weather.temperature);
+        text += `🌡️ **온도**: ${weather.temperature}°C ${tempEmoji}\n`;
+      } else {
+        text += `🌡️ **온도**: 측정중\n`;
       }
 
-      // 날씨 설명
+      // 🤗 체감온도 - Weather 모델의 feelsLike 속성 사용
+      if (
+        weather.feelsLike !== undefined &&
+        weather.feelsLike !== null &&
+        weather.feelsLike !== weather.temperature
+      ) {
+        text += `🤗 **체감온도**: ${weather.feelsLike}°C\n`;
+      }
+
+      // 🌡️ 최저/최고 온도
+      if (weather.tempMin !== undefined && weather.tempMax !== undefined) {
+        text += `📊 **최저/최고**: ${weather.tempMin}°C / ${weather.tempMax}°C\n`;
+      }
+
+      // ☁️ 날씨 설명
       if (weather.description) {
-        text += `☁️ **날씨**: ${this.escapeMarkdownV2(weather.description)}\n`;
+        const weatherEmoji = this.getWeatherEmoji(weather.description);
+        text += `☁️ **날씨**: ${this.escapeMarkdownV2(
+          weather.description
+        )} ${weatherEmoji}\n`;
       }
 
-      // 추가 정보
+      text += "\n";
+
+      // 💨 환경 정보
       if (weather.humidity) {
         text += `💧 **습도**: ${weather.humidity}%\n`;
       }
 
-      if (weather.wind_speed) {
-        text += `🌬️ **풍속**: ${weather.wind_speed}m/s\n`;
+      // 🌬️ 바람 정보 - Weather 모델의 windSpeed 속성 사용
+      if (weather.windSpeed !== undefined && weather.windSpeed > 0) {
+        text += `🌬️ **풍속**: ${weather.windSpeed}m/s`;
+        if (weather.windDirection) {
+          text += ` (${weather.windDirection})`;
+        }
+        text += "\n";
       }
 
       if (weather.pressure) {
         text += `📊 **기압**: ${weather.pressure}hPa\n`;
       }
 
-      // 일출/일몰 정보 (있는 경우)
+      // 👁️ 가시거리
+      if (weather.visibility) {
+        text += `👁️ **가시거리**: ${weather.visibility}km\n`;
+      }
+
+      // ☁️ 구름량
+      if (weather.cloudiness !== undefined) {
+        text += `☁️ **구름량**: ${weather.cloudiness}%\n`;
+      }
+
+      // 🌅 일출/일몰 정보
       if (weather.sunrise && weather.sunset) {
         text += `\n🌅 **일출**: ${weather.sunrise}\n`;
         text += `🌇 **일몰**: ${weather.sunset}\n`;
       }
 
-      text += `\n⏰ 마지막 업데이트: ${new Date().toLocaleTimeString("ko-KR")}`;
+      // 💡 날씨 조언
+      if (weather.advice) {
+        text += `\n💡 **조언**: ${this.escapeMarkdownV2(weather.advice)}\n`;
+      }
+
+      // ⏰ 업데이트 시간
+      text += `\n⏰ **업데이트**: ${
+        weather.lastUpdate || new Date().toLocaleTimeString("ko-KR")
+      }`;
+
+      // 📡 데이터 출처
+      if (weather.meta?.source) {
+        text += `\n📡 **출처**: ${weather.meta.source}`;
+      }
     } else {
       text += "❌ 날씨 정보를 불러올 수 없습니다\\.\n";
       text += "잠시 후 다시 시도해주세요\\.";
@@ -171,7 +229,7 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * 💨 미세먼지 정보 렌더링
+   * 💨 미세먼지 정보 렌더링 (기존 유지)
    */
   async renderDustInfo(data, ctx) {
     const dust = data?.dust;
@@ -220,7 +278,7 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * ❓ 도움말 렌더링
+   * ❓ 도움말 렌더링 (기존 유지)
    */
   async renderHelp(data, ctx) {
     let text = "❓ *날씨 모듈 도움말*\n\n";
@@ -231,7 +289,7 @@ class WeatherRenderer extends BaseRenderer {
     text += "• 🔄 실시간 업데이트\n\n";
 
     text += "📍 **지역 설정**:\n";
-    text += "기본적으로 서울 지역의 정보를 제공합니다\\.\n\n";
+    text += "GPS 기반으로 현재 위치의 날씨를 제공합니다\\.\n\n";
 
     text += "⏰ **업데이트 주기**:\n";
     text += "날씨 정보는 10분마다 자동 갱신됩니다\\.";
@@ -255,7 +313,7 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * ❌ 에러 화면 렌더링
+   * ❌ 에러 화면 렌더링 (기존 유지)
    */
   async renderError(message, ctx) {
     let text = "❌ *날씨 정보 오류*\n\n";
@@ -279,12 +337,14 @@ class WeatherRenderer extends BaseRenderer {
     );
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 =====
+  // ===== 🛠️ 유틸리티 메서드들 (기존 유지) =====
 
   /**
    * 🌤️ 날씨 이모지 선택
    */
   getWeatherEmoji(description) {
+    if (!description) return "🌤️";
+
     const desc = description.toLowerCase();
 
     if (desc.includes("맑")) return "☀️";
@@ -294,12 +354,18 @@ class WeatherRenderer extends BaseRenderer {
     if (desc.includes("눈")) return "❄️";
     if (desc.includes("천둥")) return "⛈️";
     if (desc.includes("안개")) return "🌫️";
+    if (desc.includes("clear")) return "☀️";
+    if (desc.includes("cloud")) return "☁️";
+    if (desc.includes("rain")) return "🌧️";
+    if (desc.includes("snow")) return "❄️";
+    if (desc.includes("storm")) return "⛈️";
+    if (desc.includes("mist") || desc.includes("fog")) return "🌫️";
 
     return "🌤️";
   }
 
   /**
-   * 💨 미세먼지 등급 판정
+   * 💨 미세먼지 등급 판정 (기존 유지)
    */
   getDustLevel(value, type) {
     const levels = {
@@ -369,15 +435,20 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * 🌡️ 온도별 이모지
+   * 🌡️ 온도별 이모지 (개선됨)
    */
   getTemperatureEmoji(temp) {
-    if (temp >= 30) return "🔥";
-    if (temp >= 25) return "😎";
-    if (temp >= 20) return "😊";
-    if (temp >= 10) return "😐";
-    if (temp >= 0) return "🥶";
-    return "🧊";
+    if (temp === null || temp === undefined) return "❓";
+
+    if (temp >= 35) return "🔥"; // 매우 더움
+    if (temp >= 30) return "😵"; // 더움
+    if (temp >= 25) return "😎"; // 따뜻함
+    if (temp >= 20) return "😊"; // 좋음
+    if (temp >= 15) return "🙂"; // 약간 시원
+    if (temp >= 10) return "😐"; // 시원
+    if (temp >= 5) return "🥶"; // 춥다
+    if (temp >= 0) return "🧊"; // 매우 춥다
+    return "❄️"; // 극한 추위
   }
 }
 
