@@ -323,6 +323,53 @@ class CompleteLogger {
     console.log(chalk.green("✅ CompleteLogger 테스트 완료!\n"));
   }
 
+  // ===== 📊 진행률 및 애니메이션 =====
+
+  /**
+   * 📊 진행률 바 표시
+   */
+  progress(label, current, total) {
+    const progressBar = this.messageSystem.consoleStyles.progressBar(
+      current,
+      total
+    );
+    console.log(`📊 ${label}: ${progressBar}`);
+  }
+
+  /**
+   * 🎉 축하 애니메이션
+   */
+  celebration(message) {
+    console.log(this.rainbow("🎉 ✨ 🎊 ✨ 🎉 ✨ 🎊 ✨ 🎉"));
+    console.log(this.rainbow(`     ${message}     `));
+    console.log(this.rainbow("🎉 ✨ 🎊 ✨ 🎉 ✨ 🎊 ✨ 🎉"));
+  }
+
+  /**
+   * ⏳ 로딩 애니메이션 시작
+   */
+  startLoading(message) {
+    try {
+      const ora = require("ora");
+      return ora({
+        text: message,
+        spinner: {
+          interval: 80,
+          frames: ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"],
+        },
+        color: "cyan",
+      }).start();
+    } catch (error) {
+      // ora 없으면 심플한 로딩
+      console.log(chalk.blue(`⏳ ${message}...`));
+      return {
+        stop: () => {},
+        succeed: (msg) => this.success(msg || message),
+        fail: (msg) => this.error(msg || `${message} 실패`),
+      };
+    }
+  }
+
   // ===== 📱 텔레그램 메시지 메서드들 =====
 
   async sendLoading(bot, chatId, message = "처리 중...") {

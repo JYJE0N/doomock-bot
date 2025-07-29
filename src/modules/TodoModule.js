@@ -219,6 +219,15 @@ class TodoModule extends BaseModule {
       (cmd) => lowerText === cmd || lowerText.startsWith(cmd + " ")
     );
   }
+  // 로그 상태값을 위한 메서드
+  getStatus() {
+    return {
+      moduleName: this.moduleName,
+      isInitialized: this.isInitialized,
+      serviceStatus: this.serviceInstance ? "Ready" : "Not Connected",
+      stats: this.stats,
+    };
+  }
 }
 
 module.exports = TodoModule;

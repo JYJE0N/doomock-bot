@@ -76,19 +76,146 @@ class ModuleManager {
   }
 
   /**
-   * 서비스 상태 로깅
+   * 📊 서비스 상태별 이모지 결정
    */
-  logServiceStatus() {
-    const serviceStatus = this.serviceBuilder.getAllServiceStatus();
-
-    logger.info("📊 ═══ 서비스 상태 ═══");
-    for (const [name, status] of Object.entries(serviceStatus)) {
-      const emoji = status.isReady ? "✅" : "❌";
-      logger.info(`${emoji} ${name}: ${status.message || "Ready"}`);
+  getServiceStatusEmoji(status, moduleKey) {
+    // 상태가 없거나 null인 경우
+    if (!status) {
+      return "❌";
     }
-    logger.info("📊 ═════════════════");
+
+    // 상태가 객체인 경우 (일부 서비스는 객체로 상태 반환)
+    if (typeof status === "object" && status !== null) {
+      // isConnected 체크
+      if (status.isConnected === true) {
+        return "✅";
+      } else if (status.isConnected === false) {
+        return "❌";
+      }
+
+      // status 필드 체크
+      if (status.status === "Ready" || status.status === "ready") {
+        return "✅";
+      } else if (status.status === "error" || status.status === "Error") {
+        return "❌";
+      }
+
+      // healthy 필드 체크
+      if (status.healthy === true) {
+        return "✅";
+      } else if (status.healthy === false) {
+        return "❌";
+      }
+
+      // serviceName만 있는 경우 (기본 getStatus)
+      if (status.serviceName && !status.status) {
+        return "✅"; // 기본 상태 객체는 정상으로 간주
+      }
+
+      return "⚠️"; // 기타 객체 상태
+    }
+
+    // 상태가 문자열인 경우
+    if (typeof status === "string") {
+      const statusLower = status.toLowerCase();
+
+      if (
+        statusLower === "ready" ||
+        statusLower === "정상" ||
+        statusLower === "ok"
+      ) {
+        return "✅";
+      } else if (
+        statusLower === "error" ||
+        statusLower === "오류" ||
+        statusLower === "failed"
+      ) {
+        return "❌";
+      } else if (
+        statusLower.includes("status method not implemented") ||
+        statusLower.includes("not implemented")
+      ) {
+        return "⚠️"; // 구현되지 않은 메서드는 경고
+      } else {
+        return "⚠️"; // 기타 문자열 상태
+      }
+    }
+
+    // boolean인 경우
+    if (typeof status === "boolean") {
+      return status ? "✅" : "❌";
+    }
+
+    // 기타 모든 경우
+    return "⚠️";
   }
 
+  /**
+   * 📊 서비스 상태 출력 (수정된 버전)
+   */
+  logServiceStatus() {
+    logger.info("📊 ═══ 서비스 상태 ═══");
+
+    this.modules.forEach((module, key) => {
+      let status = "Status method not implemented";
+      let emoji = "⚠️"; // 기본값을 경고로 변경!
+
+      try {
+        if (typeof module.getStatus === "function") {
+          status = module.getStatus();
+          emoji = this.getServiceStatusEmoji(status, key);
+        } else {
+          // getStatus 메서드가 없으면 경고 이모지
+          emoji = "⚠️";
+        }
+      } catch (error) {
+        status = `Error: ${error.message}`;
+        emoji = "❌";
+      }
+
+      // 상태 문자열 정리
+      const statusString =
+        typeof status === "object"
+          ? this.formatStatusObject(status)
+          : String(status);
+
+      logger.info(`${emoji} ${key}: ${statusString}`);
+    });
+
+    logger.info("📊 ═════════════════");
+  }
+  /**
+   * 📊 상태 객체 포맷팅
+   */
+  formatStatusObject(status) {
+    if (!status || typeof status !== "object") {
+      return String(status);
+    }
+
+    // 주요 정보만 추출해서 표시
+    const parts = [];
+
+    if (status.status) {
+      parts.push(status.status);
+    } else if (status.isConnected !== undefined) {
+      parts.push(status.isConnected ? "Connected" : "Disconnected");
+    } else if (status.healthy !== undefined) {
+      parts.push(status.healthy ? "Healthy" : "Unhealthy");
+    } else if (status.serviceName) {
+      parts.push("Ready"); // 기본 상태 객체는 Ready로 표시
+    }
+
+    // 추가 정보 (선택사항)
+    if (status.cacheSize !== undefined) {
+      parts.push(`Cache: ${status.cacheSize}`);
+    }
+
+    if (status.collectionName) {
+      parts.push(`DB: ${status.collectionName}`);
+    }
+
+    return parts.length > 0 ? parts.join(", ") : JSON.stringify(status);
+  }
   /**
    * 콜백 쿼리 처리
    */

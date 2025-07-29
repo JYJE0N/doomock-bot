@@ -144,5 +144,14 @@ class WorktimeModule extends BaseModule {
       },
     };
   }
+  // 로그 상태값을 위한 메서드
+  getStatus() {
+    return {
+      moduleName: this.moduleName,
+      isInitialized: this.isInitialized,
+      serviceStatus: this.serviceInstance ? "Ready" : "Not Connected",
+      stats: this.stats,
+    };
+  }
 }
 module.exports = WorktimeModule; // ✅ 필수!

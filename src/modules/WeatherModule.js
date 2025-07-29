@@ -1,4 +1,4 @@
-// ===== 🌤️ WeatherModule.js =====
+// src/modules/WeatherModule.js - 완전 수정 버전
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserName, getUserId } = require("../utils/UserHelper");
@@ -23,11 +23,16 @@ class WeatherModule extends BaseModule {
 
   async onInitialize() {
     try {
+      // 1. 서비스 초기화
       this.weatherService = await this.serviceBuilder.getOrCreate("weather", {
         config: this.config,
       });
 
       await this.weatherService.initialize();
+
+      // 2. ✅ 액션 등록 (중요!)
+      this.setupActions();
+
       logger.success("WeatherModule 초기화 완료");
     } catch (error) {
       logger.error("WeatherModule 초기화 실패", error);
@@ -41,6 +46,10 @@ class WeatherModule extends BaseModule {
       current: this.showCurrent,
       dust: this.showDust,
       help: this.showHelp,
+    });
+
+    logger.debug("WeatherModule 액션 등록 완료:", {
+      registeredActions: Array.from(this.actionMap.keys()),
     });
   }
 
@@ -68,16 +77,18 @@ class WeatherModule extends BaseModule {
     const userId = getUserId(from);
 
     try {
-      const weather = await this.weatherService.getCurrentWeather(city);
+      // ✅ 수정: city 변수 제거
+      const weather = await this.weatherService.getCurrentWeather();
       return {
         type: "menu",
         module: "weather",
         data: { weather },
       };
     } catch (error) {
+      logger.error("weather menu 실패", error);
       return {
         type: "error",
-        message: error.message || "기본 에러 메시지",
+        message: error.message || "날씨 메뉴를 불러올 수 없습니다.",
         error: error.message,
       };
     }
@@ -123,4 +134,5 @@ class WeatherModule extends BaseModule {
     };
   }
 }
+
 module.exports = WeatherModule;

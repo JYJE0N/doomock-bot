@@ -23,6 +23,9 @@ class TTSModule extends BaseModule {
     this.ttsService = null;
     this.serviceBuilder = options.serviceBuilder || null;
 
+    // ✅ 사용자 상태 관리 추가
+    this.userStates = new Map();
+
     // 모듈 설정
     this.config = {
       maxTextLength: parseInt(process.env.TTS_MAX_TEXT_LENGTH) || 5000,
@@ -46,6 +49,14 @@ class TTSModule extends BaseModule {
         config: this.config,
       });
       await this.ttsService.initialize();
+
+      // ✅ 액션 등록
+      this.setupActions();
+
+      // ✅ 만료된 상태 정리 스케줄러 (10분마다)
+      this.cleanupInterval = setInterval(() => {
+        this.cleanupExpiredStates();
+      }, 10 * 60 * 1000);
 
       logger.success("TTSModule 초기화 완료");
     } catch (error) {
@@ -152,18 +163,37 @@ class TTSModule extends BaseModule {
 
     logger.info("tts", "convert", userId);
 
-    // 사용자 상태 설정
-    this.setUserState(userId, {
-      waitingFor: "tts_text",
-      action: "convert",
-      language: params.language || this.config.defaultLanguage,
-    });
+    try {
+      // ✅ 안전한 params 처리
+      let language = this.config.defaultLanguage;
 
-    return {
-      type: "input",
-      module: "tts",
-      message: `📝 변환할 텍스트를 입력하세요:\\n\\n최대 ${this.config.maxTextLength}자까지 입력 가능합니다\\.`,
-    };
+      if (params && typeof params === "string" && params.length > 0) {
+        // params가 "ko-KR" 같은 언어 코드인 경우
+        if (params.match(/^[a-z]{2}-[A-Z]{2}$/)) {
+          language = params;
+        }
+      }
+
+      // 사용자 상태 설정
+      this.setUserState(userId, {
+        waitingFor: "tts_text",
+        action: "convert",
+        language: language,
+        moduleId: "tts",
+      });
+
+      return {
+        type: "input",
+        module: "tts",
+        message: `📝 **텍스트 입력**\n\n변환할 텍스트를 입력하세요\\!\n\n• 최대 ${this.config.maxTextLength}자까지 가능\n• 언어: ${language}\n\n텍스트를 보내주세요\\:`,
+      };
+    } catch (error) {
+      logger.error("startConvert 오류:", error);
+      return {
+        type: "error",
+        message: "텍스트 변환 요청 중 오류가 발생했습니다.",
+      };
+    }
   }
 
   /**
@@ -177,11 +207,25 @@ class TTSModule extends BaseModule {
     } = msg;
 
     try {
-      // 길이 검증
+      // 사용자 상태 확인
+      const userState = this.getUserState(userId);
+      if (!userState || userState.waitingFor !== "tts_text") {
+        return; // 상태가 맞지 않으면 처리하지 않음
+      }
+
+      // 텍스트 길이 검증
+      if (!text || text.trim().length === 0) {
+        await bot.sendMessage(
+          chatId,
+          "❌ 빈 텍스트는 변환할 수 없습니다. 다시 입력해주세요."
+        );
+        return;
+      }
+
       if (text.length > this.config.maxTextLength) {
         await bot.sendMessage(
           chatId,
-          `❌ 텍스트가 너무 깁니다. 최대 ${this.config.maxTextLength}자까지 입력 가능합니다.`
+          `❌ 텍스트가 너무 깁니다. 최대 ${this.config.maxTextLength}자까지 입력 가능합니다.\n\n현재 입력: ${text.length}자`
         );
         return;
       }
@@ -192,40 +236,90 @@ class TTSModule extends BaseModule {
         "🔊 음성 변환 중... 잠시만 기다려주세요."
       );
 
-      // 사용자 상태 가져오기
-      const userState = this.getUserState(userId);
-
-      // TTS 변환 요청
-      const result = await this.ttsService.textToSpeech(text, {
-        languageCode: userState.language,
-      });
-
-      if (result.success) {
-        // 음성 파일 전송
-        await bot.sendVoice(chatId, result.filePath, {
-          caption: `🎵 변환 완료!\\n길이: 약 ${result.duration}초`,
-          reply_markup: {
-            inline_keyboard: [
-              [
-                { text: "🔊 다시 변환", callback_data: "tts:convert" },
-                { text: "🎭 음성 변경", callback_data: "tts:voices" },
-              ],
-              [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
-            ],
-          },
+      try {
+        // TTS 변환 요청
+        const result = await this.ttsService.textToSpeech(text, {
+          languageCode: userState.language,
+          voiceName: userState.voiceName || this.config.voiceName,
         });
 
-        // 처리 중 메시지 삭제
-        await bot.deleteMessage(chatId, processingMsg.message_id);
-      } else {
-        await bot.sendMessage(chatId, "❌ 음성 변환에 실패했습니다.");
+        if (result && result.success) {
+          // 음성 파일 전송
+          await bot.sendVoice(chatId, result.filePath, {
+            caption: `🎵 변환 완료!\n\n📝 텍스트: "${text.substring(0, 50)}${
+              text.length > 50 ? "..." : ""
+            }"\n⏱️ 길이: 약 ${result.duration || "알 수 없음"}초`,
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "🔊 다시 변환", callback_data: "tts:convert" },
+                  { text: "🎭 음성 변경", callback_data: "tts:voices" },
+                ],
+                [
+                  { text: "📋 TTS 메뉴", callback_data: "tts:menu" },
+                  { text: "🏠 메인", callback_data: "system:menu" },
+                ],
+              ],
+            },
+          });
+
+          // 처리 중 메시지 삭제
+          try {
+            await bot.deleteMessage(chatId, processingMsg.message_id);
+          } catch (deleteError) {
+            // 삭제 실패는 무시 (메시지가 이미 삭제되었을 수 있음)
+          }
+        } else {
+          await bot.editMessageText(
+            "❌ 음성 변환에 실패했습니다. 다시 시도해주세요.",
+            {
+              chat_id: chatId,
+              message_id: processingMsg.message_id,
+              reply_markup: {
+                inline_keyboard: [
+                  [
+                    { text: "🔄 다시 시도", callback_data: "tts:convert" },
+                    { text: "📋 메뉴", callback_data: "tts:menu" },
+                  ],
+                ],
+              },
+            }
+          );
+        }
+      } catch (ttsError) {
+        logger.error("TTS 변환 실패:", ttsError);
+
+        await bot.editMessageText(
+          "❌ 음성 변환 중 오류가 발생했습니다. 나중에 다시 시도해주세요.",
+          {
+            chat_id: chatId,
+            message_id: processingMsg.message_id,
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "🔄 다시 시도", callback_data: "tts:convert" },
+                  { text: "📋 메뉴", callback_data: "tts:menu" },
+                ],
+              ],
+            },
+          }
+        );
       }
 
       // 사용자 상태 초기화
       this.clearUserState(userId);
     } catch (error) {
-      logger.error("TTS 변환 오류:", error);
-      await bot.sendMessage(chatId, "❌ 음성 변환 중 오류가 발생했습니다.");
+      logger.error("TTS 텍스트 입력 처리 오류:", error);
+
+      await bot.sendMessage(chatId, "❌ 텍스트 처리 중 오류가 발생했습니다.", {
+        reply_markup: {
+          inline_keyboard: [
+            [{ text: "📋 TTS 메뉴", callback_data: "tts:menu" }],
+          ],
+        },
+      });
+
+      // 사용자 상태 초기화
       this.clearUserState(userId);
     }
   }
@@ -356,6 +450,86 @@ class TTSModule extends BaseModule {
   }
 
   /**
+   * 🏷️ 사용자 상태 설정
+   */
+  setUserState(userId, state) {
+    this.userStates.set(userId.toString(), {
+      ...state,
+      timestamp: Date.now(),
+    });
+
+    logger.debug(`사용자 상태 설정: ${userId}`, state);
+  }
+
+  /**
+   * 🔍 사용자 상태 조회
+   */
+  getUserState(userId) {
+    const state = this.userStates.get(userId.toString());
+
+    // 상태가 너무 오래된 경우 (30분) 자동 삭제
+    if (state && Date.now() - state.timestamp > 30 * 60 * 1000) {
+      this.clearUserState(userId);
+      return null;
+    }
+
+    return state;
+  }
+
+  /**
+   * 🧹 사용자 상태 초기화
+   */
+  clearUserState(userId) {
+    const deleted = this.userStates.delete(userId.toString());
+    if (deleted) {
+      logger.debug(`사용자 상태 초기화: ${userId}`);
+    }
+    return deleted;
+  }
+
+  /**
+   * 모듈 정리 (봇 종료시 호출)
+   */
+  async cleanup() {
+    try {
+      // 스케줄러 정리
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+      }
+
+      // 모든 사용자 상태 정리
+      this.userStates.clear();
+
+      logger.info("TTSModule 정리 완료");
+    } catch (error) {
+      logger.error("TTSModule 정리 실패:", error);
+    }
+  }
+
+  /**
+   * 🧹 모든 만료된 상태 정리
+   */
+  cleanupExpiredStates() {
+    const now = Date.now();
+    const expiredUsers = [];
+
+    for (const [userId, state] of this.userStates.entries()) {
+      if (now - state.timestamp > 30 * 60 * 1000) {
+        // 30분
+        expiredUsers.push(userId);
+      }
+    }
+
+    expiredUsers.forEach((userId) => {
+      this.userStates.delete(userId);
+    });
+
+    if (expiredUsers.length > 0) {
+      logger.debug(`만료된 사용자 상태 ${expiredUsers.length}개 정리됨`);
+    }
+  }
+
+  /**
    * 도움말
    */
   async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
@@ -375,6 +549,15 @@ class TTSModule extends BaseModule {
           "구두점을 적절히 사용하면 음성이 더 자연스러워집니다",
         ],
       },
+    };
+  }
+  // 로그 상태값을 위한 메서드
+  getStatus() {
+    return {
+      moduleName: this.moduleName,
+      isInitialized: this.isInitialized,
+      serviceStatus: this.serviceInstance ? "Ready" : "Not Connected",
+      stats: this.stats,
     };
   }
 }

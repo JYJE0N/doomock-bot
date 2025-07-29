@@ -381,22 +381,137 @@ class TTSService {
     return Math.ceil((words / wordsPerMinute) * 60);
   }
 
+  async getUserStats(userId) {
+    try {
+      // 실제 DB에서 통계를 가져오는 로직
+      // 현재는 더미 데이터 반환
+      return {
+        totalConversions: Math.floor(Math.random() * 50),
+        lastConversion: new Date().toISOString(),
+        favoriteLanguage: "ko-KR",
+        totalDuration: Math.floor(Math.random() * 3600), // 초
+      };
+    } catch (error) {
+      logger.error("사용자 통계 조회 실패:", error);
+      return {
+        totalConversions: 0,
+        lastConversion: null,
+      };
+    }
+  }
+
   /**
-   * 서비스 상태
+   * 🎭 사용 가능한 음성 목록 조회
+   */
+  async getAvailableVoices(languageCode = "ko-KR") {
+    try {
+      if (!this.googleTTSClient) {
+        throw new Error("TTS 클라이언트가 초기화되지 않았습니다.");
+      }
+
+      const [result] = await this.googleTTSClient.listVoices({
+        languageCode: languageCode,
+      });
+
+      return result.voices || [];
+    } catch (error) {
+      logger.error("음성 목록 조회 실패:", error);
+
+      // 기본 음성 목록 반환
+      return [
+        {
+          name: "ko-KR-Wavenet-A",
+          ssmlGender: "FEMALE",
+          naturalSampleRateHertz: 24000,
+        },
+        {
+          name: "ko-KR-Wavenet-B",
+          ssmlGender: "FEMALE",
+          naturalSampleRateHertz: 24000,
+        },
+        {
+          name: "ko-KR-Wavenet-C",
+          ssmlGender: "MALE",
+          naturalSampleRateHertz: 24000,
+        },
+        {
+          name: "ko-KR-Wavenet-D",
+          ssmlGender: "MALE",
+          naturalSampleRateHertz: 24000,
+        },
+      ];
+    }
+  }
+
+  /**
+   * 📚 사용자 변환 기록 조회
+   */
+  async getUserHistory(userId) {
+    try {
+      // 실제 DB에서 기록을 가져오는 로직
+      // 현재는 더미 데이터 반환
+      const dummyHistory = [
+        {
+          _id: "1",
+          text: "안녕하세요, 테스트 음성 변환입니다.",
+          language: "ko-KR",
+          voice: "ko-KR-Wavenet-A",
+          createdAt: new Date(Date.now() - 86400000).toISOString(), // 1일 전
+        },
+        {
+          _id: "2",
+          text: "Hello, this is a test conversion.",
+          language: "en-US",
+          voice: "en-US-Wavenet-D",
+          createdAt: new Date(Date.now() - 172800000).toISOString(), // 2일 전
+        },
+      ];
+
+      return dummyHistory;
+    } catch (error) {
+      logger.error("변환 기록 조회 실패:", error);
+      return [];
+    }
+  }
+
+  /**
+   * ⚙️ 사용자 설정 조회
+   */
+  async getUserSettings(userId) {
+    try {
+      // 실제 DB에서 설정을 가져오는 로직
+      // 현재는 기본 설정 반환
+      return {
+        defaultLanguage: this.config.languageCode,
+        defaultVoice: this.config.voiceName,
+        autoDelete: false,
+        maxTextLength: 5000,
+      };
+    } catch (error) {
+      logger.error("사용자 설정 조회 실패:", error);
+      return {
+        defaultLanguage: "ko-KR",
+        defaultVoice: "ko-KR-Wavenet-A",
+        autoDelete: false,
+      };
+    }
+  }
+
+  /**
+   * 📊 서비스 상태 조회
    */
   getStatus() {
     return {
       serviceName: "TTSService",
-      provider: "Google Cloud",
-      features: {
-        textToSpeech: !!this.googleTTSClient,
-        speechToText: !!this.googleSTTClient,
-      },
+      isConnected: !!this.googleTTSClient,
+      hasApiKey: !!this.config.projectId,
       config: {
         defaultLanguage: this.config.languageCode,
         defaultVoice: this.config.voiceName,
+        audioEncoding: this.config.audioEncoding,
       },
       stats: this.stats,
+      cacheSize: this.cache.size,
     };
   }
 
