@@ -6,10 +6,10 @@
   "scripts": {
     "start": "NODE_ENV=development node doomock_bot.js",
     "dev": "cross-env NODE_ENV=development nodemon doomock_bot.js",
-    "railway": "NODE_ENV=production node --max-old-space-size=400 doomock_bot.js",
+    "railway": "NODE_ENV=production node --max-old-space-size=450 doomock_bot.js",
     "test": "node --test",
     "health": "node scripts/health-check.js",
-    "railway:start": "NODE_ENV=production node doomock_bot.js",
+    "railway:start": "NODE_ENV=production node --max-old-space-size=450 doomock_bot.js",
     "railway:build": "echo 'Build complete'",
     "cleanup": "pkill -f 'node doomock_bot.js' || true",
     "restart": "npm run cleanup && sleep 5 && npm start"
@@ -66,6 +66,7 @@
       "path": "/health",
       "interval": 30000,
       "timeout": 10000
-    }
+    },
+    "restartPolicyMaxRetries": 10
   }
 }
