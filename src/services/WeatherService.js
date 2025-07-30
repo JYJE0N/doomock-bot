@@ -5,6 +5,7 @@ const AirQualityHelper = require("../utils/AirQualityHelper");
 const Weather = require("../database/models/Weather");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const LocationHelper = require("../utils/LocationHelper");
 const axios = require("axios");
 
 /**
@@ -42,6 +43,7 @@ class WeatherService {
     // 헬퍼들
     this.weatherHelper = null;
     this.airQualityHelper = null;
+    this.locationHelper = new LocationHelper();
 
     // 📍 사용자별 위치 캐시 (메모리 기반)
     this.userLocationCache = new Map();
@@ -100,107 +102,24 @@ class WeatherService {
    */
   async getCurrentLocation(userId = null, forceRefresh = false) {
     try {
-      // 캐시 확인 (사용자별)
-      if (userId && !forceRefresh) {
-        const cacheKey = `location_${userId}`;
-        const cached = this.getLocationCache(cacheKey);
-        if (cached) {
-          this.stats.locationCacheHits++;
-          logger.info(
-            `📦 캐시된 위치 사용: ${cached.city} (사용자: ${userId})`
-          );
-          return { success: true, data: cached, source: "cache" };
-        }
-      }
+      // 🔥 LocationHelper 사용하도록 변경
+      const location = await this.locationHelper.detectLocation(userId);
 
-      if (!this.config.enableGPS) {
-        logger.info("🚫 GPS 비활성화 - 기본 위치 사용");
-        return {
-          success: true,
-          data: {
-            city: this.config.fallbackLocation,
-            region: "경기도",
-            country: "KR",
-            source: "fallback",
-          },
-          source: "fallback",
-        };
-      }
-
-      this.stats.gpsRequests++;
-      logger.info("🌍 IP 기반 위치 감지 시작...");
-
-      // IP API를 통한 위치 감지
-      const response = await axios.get(this.config.ipApiUrl, {
-        timeout: 5000,
-        headers: {
-          "User-Agent": "DoomockBot/1.0 (Weather Service)",
-        },
-      });
-
-      const locationData = response.data;
-
-      if (!locationData || !locationData.city) {
-        throw new Error("위치 정보를 찾을 수 없습니다");
-      }
-
-      // 한국 위치인지 확인
-      const isKorea =
-        locationData.country_code === "KR" ||
-        locationData.country === "South Korea";
-
-      const detectedLocation = {
-        city: isKorea ? locationData.city : this.config.fallbackLocation,
-        region: isKorea ? locationData.region : "경기도",
-        country: isKorea ? "KR" : locationData.country_code || "KR",
-        latitude: locationData.latitude || 37.1989,
-        longitude: locationData.longitude || 127.0056,
-        timezone: locationData.timezone || "Asia/Seoul",
-        source: "gps",
-        detectedAt: new Date().toISOString(),
-      };
-
-      // 🇰🇷 한국이 아닌 경우 기본 위치 사용
-      if (!isKorea) {
-        logger.warn(
-          `⚠️ 해외 위치 감지됨 (${locationData.country}), 기본 위치 사용`
-        );
-        detectedLocation.city = this.config.fallbackLocation;
-        detectedLocation.source = "fallback_foreign";
-      }
-
-      // 사용자별 위치 캐싱
-      if (userId) {
-        this.setLocationCache(`location_${userId}`, detectedLocation);
-      }
-
-      logger.success(
-        `✅ 위치 감지 성공: ${detectedLocation.city}, ${detectedLocation.region}`
+      logger.info(
+        `📍 위치 감지 결과: ${location.city} (${location.method}, 신뢰도: ${location.confidence})`
       );
 
       return {
         success: true,
-        data: detectedLocation,
-        source: "gps",
+        data: location,
+        source: location.method,
       };
     } catch (error) {
-      logger.warn("⚠️ GPS 위치 감지 실패, 기본 위치 사용:", error.message);
-
-      // GPS 실패시 기본 위치 반환
-      const fallbackLocation = {
-        city: this.config.fallbackLocation,
-        region: "경기도",
-        country: "KR",
-        latitude: 37.1989,
-        longitude: 127.0056,
-        source: "fallback_error",
-        error: error.message,
-      };
-
+      logger.error("위치 감지 실패:", error);
       return {
-        success: true,
-        data: fallbackLocation,
-        source: "fallback",
+        success: false,
+        error: error.message,
+        data: this.locationHelper.getDefaultLocation(),
       };
     }
   }
@@ -211,22 +130,22 @@ class WeatherService {
   async getCurrentWeather(location = null, userId = null) {
     try {
       this.stats.weatherRequests++;
-
       let targetLocation = location;
 
-      // 위치가 지정되지 않으면 GPS로 자동 감지
       if (!targetLocation) {
         const locationResult = await this.getCurrentLocation(userId);
         if (locationResult.success) {
-          targetLocation = locationResult.data.city;
-          logger.info(`🌍 GPS 위치 기반 날씨 조회: ${targetLocation}`);
+          // 🔥 날씨 API용 단순 도시명 사용
+          targetLocation =
+            locationResult.data.simpleCity || locationResult.data.city;
+          logger.info(
+            `🌍 GPS 위치 기반 날씨 조회: ${targetLocation} (원본: ${locationResult.data.city})`
+          );
         } else {
           targetLocation = this.config.fallbackLocation;
-          logger.warn(`⚠️ GPS 실패, 기본 위치 사용: ${targetLocation}`);
         }
       }
 
-      // WeatherHelper를 통해 날씨 정보 조회
       const weatherResult = await this.weatherHelper.getCurrentWeather(
         targetLocation
       );
@@ -294,14 +213,14 @@ class WeatherService {
   async getDustInfo(location = null, userId = null) {
     try {
       this.stats.dustRequests++;
-
       let targetLocation = location;
 
-      // 위치가 지정되지 않으면 GPS로 자동 감지
       if (!targetLocation) {
         const locationResult = await this.getCurrentLocation(userId);
         if (locationResult.success) {
-          targetLocation = locationResult.data.city;
+          // 🔥 미세먼지 API용 단순 도시명 사용
+          targetLocation =
+            locationResult.data.simpleCity || locationResult.data.city;
           logger.info(`🌍 GPS 위치 기반 미세먼지 조회: ${targetLocation}`);
         } else {
           targetLocation = this.config.fallbackLocation;

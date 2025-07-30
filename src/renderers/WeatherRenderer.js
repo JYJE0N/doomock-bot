@@ -237,23 +237,55 @@ class WeatherRenderer extends BaseRenderer {
     let text = "💨 *미세먼지 정보*\n\n";
 
     if (dust) {
-      text += `📍 **${this.escapeMarkdownV2(dust.location || "서울")}**\n\n`;
+      // 🔥 수정: dust.location이 아니라 data.location 사용!
+      const displayLocation = data.location || dust.location || "서울";
+      text += `📍 **${this.escapeMarkdownV2(displayLocation)}**\n\n`;
 
+      // 🚨 수정: dust.pm25.value 사용 (dust.pm25가 아닌!)
       // PM2.5 정보
       if (dust.pm25) {
-        const pm25Level = this.getDustLevel(dust.pm25, "pm25");
-        text += `🔸 **PM2\\.5**: ${dust.pm25}㎍/㎥ ${pm25Level.emoji}\n`;
+        // value 속성을 명시적으로 가져옴
+        const pm25Value = dust.pm25.value || dust.pm25;
+        const pm25Level = this.getDustLevel(pm25Value, "pm25");
+        text += `🔸 **PM2\\.5**: ${pm25Value}㎍/㎥ ${pm25Level.emoji}\n`;
         text += `   ${this.escapeMarkdownV2(pm25Level.description)}\n\n`;
       }
 
       // PM10 정보
       if (dust.pm10) {
-        const pm10Level = this.getDustLevel(dust.pm10, "pm10");
-        text += `🔹 **PM10**: ${dust.pm10}㎍/㎥ ${pm10Level.emoji}\n`;
+        // value 속성을 명시적으로 가져옴
+        const pm10Value = dust.pm10.value || dust.pm10;
+        const pm10Level = this.getDustLevel(pm10Value, "pm10");
+        text += `🔹 **PM10**: ${pm10Value}㎍/㎥ ${pm10Level.emoji}\n`;
         text += `   ${this.escapeMarkdownV2(pm10Level.description)}\n\n`;
       }
 
-      text += `⏰ 마지막 업데이트: ${new Date().toLocaleTimeString("ko-KR")}`;
+      // 종합 상태
+      if (dust.overall) {
+        text += `📊 **종합**: ${this.escapeMarkdownV2(
+          dust.overall.grade || dust.overall
+        )} ${dust.overall.emoji || ""}\n\n`;
+      }
+
+      // 행동 요령
+      if (dust.advice) {
+        text += `💡 **행동요령**:\n${this.escapeMarkdownV2(dust.advice)}\n\n`;
+      }
+
+      // 업데이트 시간
+      text += `⏰ **업데이트**: ${
+        dust.timestamp || TimeHelper.format(TimeHelper.now(), "time")
+      }`;
+
+      // 데이터 출처
+      if (data.source) {
+        text += `\n📡 **출처**: ${this.escapeMarkdownV2(data.source)}`;
+      }
+
+      // GPS 위치 정보
+      if (data.locationInfo) {
+        text += `\n${this.escapeMarkdownV2(data.locationInfo)}`;
+      }
     } else {
       text += "❌ 미세먼지 정보를 불러올 수 없습니다\\.\n";
       text += "잠시 후 다시 시도해주세요\\.";

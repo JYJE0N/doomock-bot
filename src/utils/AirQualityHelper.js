@@ -78,56 +78,115 @@ class AirQualityHelper {
     this.cacheTimeout = 60 * 60 * 1000; // 1시간
 
     // 🗺️ 지역별 측정소 매핑 (영문 → 한글)
+    // 🗺️ 지역별 측정소 매핑 (영문 → 실제 측정소명)
     this.locationMapping = {
-      // 경기도 주요 도시
-      "Yongin-si": "용인시",
-      Yongin: "용인시",
-      용인시: "용인시",
-      용인: "용인시",
+      // 용인시
+      용인시: "수지", // ✅ 정확한 측정소명
+      "용인시 수지구": "수지",
+      "용인시 기흥구": "기흥",
+      "용인시 처인구": "김량장",
 
-      // 주요 도시들
-      Seoul: "서울",
-      서울: "서울",
-      Busan: "부산",
-      부산: "부산",
-      Daegu: "대구",
-      대구: "대구",
-      Incheon: "인천",
-      인천: "인천",
-      Gwangju: "광주",
-      광주: "광주",
-      Daejeon: "대전",
-      대전: "대전",
-      Ulsan: "울산",
-      울산: "울산",
+      // 수원시
+      수원시: "인계동",
+      "수원시 영통구": "영통동",
+      "수원시 장안구": "천천동",
+      "수원시 권선구": "고색동",
+      "수원시 팔달구": "인계동",
 
-      // 경기도
-      Suwon: "수원",
-      수원: "수원",
-      Goyang: "고양시",
-      고양시: "고양시",
-      Seongnam: "성남시",
-      성남시: "성남시",
-      Hwaseong: "화성시",
-      화성시: "화성시",
-      "Hwaseong-si": "화성시",
+      // 화성시
+      화성시: "동탄",
+      "화성시 동탄": "동탄",
+      "화성시 남양": "남양읍",
+      "화성시 향남": "향남읍",
 
-      // 기본값
-      화성: "화성시",
+      // 성남시
+      성남시: "성남",
+      "성남시 분당구": "정자1동",
+      "성남시 수정구": "신흥동",
+      "성남시 중원구": "성남대로",
+
+      // 경기도 - 고양시
+      Goyang: "주엽동",
+      "Goyang-si": "주엽동",
+      고양시: "주엽동",
+      고양: "주엽동",
+
+      // 경기도 - 안산시
+      Ansan: "고잔동",
+      "Ansan-si": "고잔동",
+      안산시: "고잔동",
+      안산: "고잔동",
+
+      // 서울
+      Seoul: "종로구",
+      서울: "종로구",
+      서울시: "종로구",
+      서울특별시: "종로구",
+
+      // 부산
+      Busan: "광복동",
+      부산: "광복동",
+      부산시: "광복동",
+      부산광역시: "광복동",
+
+      // 대구
+      Daegu: "수창동",
+      대구: "수창동",
+      대구시: "수창동",
+      대구광역시: "수창동",
+
+      // 인천
+      Incheon: "구월동",
+      인천: "구월동",
+      인천시: "구월동",
+      인천광역시: "구월동",
+
+      // 광주
+      Gwangju: "농성동",
+      광주: "농성동",
+      광주시: "농성동",
+      광주광역시: "농성동",
+
+      // 대전
+      Daejeon: "문창동",
+      대전: "문창동",
+      대전시: "문창동",
+      대전광역시: "문창동",
+
+      // 울산
+      Ulsan: "삼산동",
+      울산: "삼산동",
+      울산시: "삼산동",
+      울산광역시: "삼산동",
     };
 
-    // 🎯 지역별 대체 측정소 (핵심 수정 - "안산" 오류 해결!)
+    // 🎯 지역별 대체 측정소 (실제 측정소명 사용)
     this.fallbackStations = {
-      용인시: ["용인시", "수원", "성남시", "화성시"],
-      화성시: ["화성시", "수원", "용인시", "오산", "평택"], // "안산" 제거하고 대안 추가
-      화성: ["화성시", "수원", "용인시", "오산", "평택"],
-      서울: ["서울", "종로구", "중구", "강남구"],
-      부산: ["부산", "중구", "해운대구"],
-      대구: ["대구", "중구", "수성구"],
-      인천: ["인천", "연수구", "남동구"],
-      광주: ["광주", "서구", "북구"],
-      대전: ["대전", "서구", "유성구"],
-      울산: ["울산", "남구", "중구"],
+      // 용인시 주변
+      용인시: ["용인수지", "용인기흥", "김량장동", "수지구", "기흥구"],
+
+      용인시: ["용인수지", "용인기흥", "김량장동", "수지구", "기흥구"],
+      수원시: ["인계동", "영통동", "천천동", "권선구"],
+      화성시: ["동탄", "남양", "향남", "병점"],
+
+      // 화성시 주변
+      동탄: ["동탄", "남양", "향남", "병점", "영통동", "인계동"],
+      남양: ["남양", "동탄", "향남", "병점", "안산동", "고잔동"],
+
+      // 수원시 주변
+      인계동: ["인계동", "영통동", "천천동", "신풍", "권선구", "팔달구"],
+      영통동: ["영통동", "인계동", "천천동", "신풍", "용인수지", "동탄"],
+
+      // 성남시 주변
+      수정구: ["수정구", "분당구", "중원구", "복정동", "모란", "야탑동"],
+      분당구: ["분당구", "수정구", "중원구", "야탑동", "서현동", "정자동"],
+
+      // 서울 주요 측정소
+      종로구: ["종로구", "중구", "용산구", "서대문구", "종로", "세종대로"],
+      강남구: ["강남구", "서초구", "송파구", "강동구", "역삼동", "삼성동"],
+
+      // 기본 폴백
+      default: ["종로구", "인계동", "분당구", "동탄"],
     };
 
     logger.info("🌬️ AirQualityHelper 초기화됨 (Mongoose 버전)", {
@@ -180,11 +239,11 @@ class AirQualityHelper {
   /**
    * 🌫️ 실시간 대기질 현황 조회 (사용자 ID 지원 추가)
    */
-  async getCurrentAirQuality(location = "화성시", userId = null) {
+  async getCurrentAirQuality(location = "용인시") {
     try {
       // 1️⃣ 위치명 정규화
       const koreanLocation = this.normalizeLocation(location);
-      const cacheKey = `current_${koreanLocation}`;
+      const cacheKey = `current_${koreanLocation}`; // 🔥 빠진 부분!
 
       // 2️⃣ 캐시 확인
       const cached = this.getFromCache(cacheKey);
@@ -205,7 +264,7 @@ class AirQualityHelper {
 
         const fallbackData = this.getEstimatedAirQualityData(koreanLocation);
         return {
-          success: true, // 폴백이지만 데이터는 제공
+          success: true,
           data: fallbackData,
           source: "estimated",
           warning:
@@ -232,19 +291,15 @@ class AirQualityHelper {
           if (result.success) {
             // 성공시 캐시 저장
             this.setCache(cacheKey, result.data);
-
-            // 사용자 위치 DB 저장 (Mongoose 사용)
-            if (userId && this.checkMongooseConnection()) {
-              await this.saveUserLocationWithMongoose(userId, koreanLocation);
-            }
-
             logger.success(
               `✅ 대기질 조회 성공: ${station} (${koreanLocation} 요청)`
             );
+
             return {
               ...result,
-              originalLocation: koreanLocation,
-              actualStation: station,
+              originalLocation: koreanLocation, // 🔥 원래 도시명
+              actualStation: station, // 실제 측정소명
+              location: koreanLocation, // 🔥 표시할 도시명
               source: "api",
             };
           }
@@ -265,11 +320,11 @@ class AirQualityHelper {
       const estimatedData = this.getEstimatedAirQualityData(koreanLocation);
 
       return {
-        success: true, // 추정이지만 데이터는 제공
+        success: true,
         data: estimatedData,
+        location: koreanLocation, // 🔥 도시명 유지
         source: "estimated",
-        originalLocation: koreanLocation,
-        warning: `${koreanLocation} 지역의 실시간 데이터를 가져올 수 없어 추정 데이터를 제공합니다. API 키나 측정소명을 확인해주세요.`,
+        warning: `${koreanLocation} 지역의 실시간 데이터를 가져올 수 없어 추정 데이터를 제공합니다.`,
       };
     } catch (error) {
       logger.error("대기질 조회 전체 실패:", error);
@@ -278,6 +333,7 @@ class AirQualityHelper {
         success: false,
         error: this.formatError(error),
         data: this.getEstimatedAirQualityData(location),
+        location: location, // 🔥 도시명 유지
       };
     }
   }
@@ -456,7 +512,8 @@ class AirQualityHelper {
   /**
    * 🎨 대기질 데이터 포맷팅
    */
-  formatAirQualityData(item, station) {
+  formatAirQualityData(item, station, originalLocation) {
+    // 🔥 originalLocation 추가
     try {
       const pm25Value = this.parseValue(item.pm25Value);
       const pm10Value = this.parseValue(item.pm10Value);
@@ -469,8 +526,9 @@ class AirQualityHelper {
       const overallStatus = this.getGradeStatus(overallGrade);
 
       return {
-        station: station,
-        location: station,
+        station: station, // 실제 측정소명 (인계동)
+        location: originalLocation || station, // 🔥 도시명 표시 (수원시)
+        displayLocation: originalLocation || station, // 🔥 표시용 위치
         timestamp: TimeHelper.format(TimeHelper.now(), "full"),
 
         pm25: {
@@ -523,8 +581,9 @@ class AirQualityHelper {
         },
       };
     } catch (error) {
-      logger.error("대기질 데이터 포맷팅 실패:", error);
-      return this.getEstimatedAirQualityData(station);
+      // 에러 처리
+      // logger.error("대기질 데이터 포맷팅 실패:", error);
+      // return this.getEstimatedAirQualityData(station);
     }
   }
 

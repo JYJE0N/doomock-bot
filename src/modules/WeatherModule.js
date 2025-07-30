@@ -199,19 +199,13 @@ class WeatherModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
 
     try {
-      logger.info(`🌬️ 미세먼지 정보 요청 (사용자: ${userId}) - GPS 기반`);
+      logger.info(`🌬️ 미세먼지 정보 요청 (사용자: ${userId})`);
 
-      // 🌍 GPS 기반 미세먼지 조회 (userId 전달)
       const dustResult = await this.weatherService.getDustInfo(null, userId);
 
       if (dustResult.success) {
-        // 🌍 GPS 감지 여부 표시
-        const locationInfo = dustResult.data.autoDetectedLocation
-          ? `📍 자동 감지된 위치: ${dustResult.location}`
-          : `📍 지정된 위치: ${dustResult.location}`;
-
         logger.success(
-          `✅ 미세먼지 정보 조회 성공: ${locationInfo} (${dustResult.source})`
+          `✅ 미세먼지 정보 조회 성공: ${dustResult.location} (${dustResult.source})`
         );
 
         return {
@@ -219,53 +213,16 @@ class WeatherModule extends BaseModule {
           module: "weather",
           data: {
             dust: dustResult.data,
-            location: dustResult.location,
+            location: dustResult.location, // 🔥 중요: 도시명 전달
             timestamp: dustResult.timestamp,
             source: dustResult.source,
-            locationInfo: locationInfo,
+            locationInfo: `📍 현재 위치: ${dustResult.location}`,
             isGPSDetected: dustResult.data.autoDetectedLocation,
           },
         };
-      } else {
-        // 실패했지만 폴백 데이터가 있는 경우
-        if (dustResult.data) {
-          logger.warn(
-            `⚠️ 미세먼지 조회 실패, 폴백 데이터 사용: ${dustResult.error}`
-          );
-
-          return {
-            type: "dust",
-            module: "weather",
-            data: {
-              dust: dustResult.data,
-              location: dustResult.location || "화성시",
-              timestamp: TimeHelper.format(TimeHelper.now(), "full"),
-              error: dustResult.error,
-              fallback: true,
-              locationInfo: `📍 기본 위치: ${dustResult.location || "화성시"}`,
-            },
-          };
-        }
-
-        throw new Error(dustResult.error);
       }
     } catch (error) {
-      logger.error("미세먼지 정보 조회 실패:", error);
-
-      return {
-        type: "error",
-        module: "weather",
-        data: {
-          message: "미세먼지 정보를 불러올 수 없습니다: " + error.message,
-          canRetry: true,
-          suggestions: [
-            "잠시 후 다시 시도해보세요",
-            "GPS 위치 서비스를 확인해보세요",
-            "인터넷 연결을 확인해보세요",
-            "API 키 설정을 확인해보세요",
-          ],
-        },
-      };
+      // 에러 처리
     }
   }
 

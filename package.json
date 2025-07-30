@@ -5,7 +5,7 @@
   "main": "doomock_bot.js",
   "scripts": {
     "start": "NODE_ENV=development node doomock_bot.js",
-    "dev": "NODE_ENV=development nodemon doomock_bot.js",
+    "dev": "cross-env NODE_ENV=development nodemon doomock_bot.js",
     "railway": "NODE_ENV=production node --max-old-space-size=400 doomock_bot.js",
     "test": "node --test",
     "health": "node scripts/health-check.js",
@@ -52,6 +52,7 @@
     "winston-daily-rotate-file": "^5.0.0"
   },
   "devDependencies": {
+    "cross-env": "^7.0.3",
     "nodemon": "^3.0.2"
   },
   "railway": {
