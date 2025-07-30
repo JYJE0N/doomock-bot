@@ -96,6 +96,7 @@ class MongooseManager {
         Leave: require("./models/Leave"),
         Reminder: require("./models/Reminder"),
         UserSetting: require("./models/UserSetting"),
+        TTSHistory: require("./models/TTSHistory"),
       };
 
       for (const [name, model] of Object.entries(models)) {

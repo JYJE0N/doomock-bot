@@ -34,6 +34,7 @@ class TTSService {
     // 클라이언트 인스턴스 (명확한 이름)
     this.googleTTSClient = null; // 텍스트→음성 클라이언트
     this.googleSTTClient = null; // 음성→텍스트 클라이언트 (옵션)
+    this.TTSHistory = null; // ⭐️ 모델을 담을 변수 추가
 
     this.cache = new Map();
 
@@ -70,6 +71,12 @@ class TTSService {
 
       // 방법 1: 환경변수 직접 사용 (Railway, Local 모두 가능)
       if (process.env.GOOGLE_CLIENT_EMAIL && process.env.GOOGLE_PRIVATE_KEY) {
+        // ... (인증 로직은 동일)
+        // ⭐️ Mongoose 모델을 가져옵니다.
+        const { getInstance } = require("../database/MongooseManager");
+        const mongooseManager = getInstance();
+        this.TTSHistory = mongooseManager.getModel("TTSHistory");
+
         logger.info("🔑 환경변수 방식으로 인증 시도");
 
         const credentials = {
@@ -229,6 +236,11 @@ class TTSService {
       await fs.writeFile(filePath, audioContent, "binary");
       logger.success(`✅ 음성 파일 생성: ${fileName}`);
 
+      // ⭐️ 데이터베이스에 변환 기록 저장
+      if (options.userId) {
+        await this.saveHistory(options.userId, text, result);
+      }
+
       // 캐시에 추가
       await this.addToCache(cacheKey, filePath);
       this.stats.totalConversions++;
@@ -383,20 +395,20 @@ class TTSService {
 
   async getUserStats(userId) {
     try {
-      // 실제 DB에서 통계를 가져오는 로직
-      // 현재는 더미 데이터 반환
+      const totalConversions = await this.TTSHistory.countDocuments({ userId });
+      const lastConversion = await this.TTSHistory.findOne({ userId }).sort({
+        createdAt: -1,
+      });
+
       return {
-        totalConversions: Math.floor(Math.random() * 50),
-        lastConversion: new Date().toISOString(),
-        favoriteLanguage: "ko-KR",
-        totalDuration: Math.floor(Math.random() * 3600), // 초
+        totalConversions: totalConversions,
+        lastConversion: lastConversion
+          ? lastConversion.createdAt.toISOString()
+          : null,
       };
     } catch (error) {
       logger.error("사용자 통계 조회 실패:", error);
-      return {
-        totalConversions: 0,
-        lastConversion: null,
-      };
+      return { totalConversions: 0, lastConversion: null };
     }
   }
 
@@ -448,26 +460,17 @@ class TTSService {
    */
   async getUserHistory(userId) {
     try {
-      // 실제 DB에서 기록을 가져오는 로직
-      // 현재는 더미 데이터 반환
-      const dummyHistory = [
-        {
-          _id: "1",
-          text: "안녕하세요, 테스트 음성 변환입니다.",
-          language: "ko-KR",
-          voice: "ko-KR-Wavenet-A",
-          createdAt: new Date(Date.now() - 86400000).toISOString(), // 1일 전
-        },
-        {
-          _id: "2",
-          text: "Hello, this is a test conversion.",
-          language: "en-US",
-          voice: "en-US-Wavenet-D",
-          createdAt: new Date(Date.now() - 172800000).toISOString(), // 2일 전
-        },
-      ];
+      const history = await this.TTSHistory.find({ userId })
+        .sort({ createdAt: -1 })
+        .limit(10); // 최근 10개만 조회
 
-      return dummyHistory;
+      return history.map((item) => ({
+        _id: item._id.toString(),
+        text: item.text,
+        language: item.languageCode,
+        voice: item.voiceName,
+        createdAt: item.createdAt.toISOString(),
+      }));
     } catch (error) {
       logger.error("변환 기록 조회 실패:", error);
       return [];

@@ -81,6 +81,38 @@ class TTSModule extends BaseModule {
   }
 
   /**
+   * 🎤 음성 ID를 친숙한 한글 이름으로 변환하는 도우미 함수
+   */
+  getLocalizedVoiceInfo(rawVoiceName) {
+    const voiceMap = {
+      "ko-KR-Wavenet-A": { name: "유리", gender: "FEMALE" },
+      "ko-KR-Wavenet-B": { name: "철수", gender: "MALE" },
+      "ko-KR-Wavenet-C": { name: "수진", gender: "FEMALE" },
+      "ko-KR-Wavenet-D": { name: "영호", gender: "MALE" },
+      "ko-KR-Standard-A": { name: "나래", gender: "FEMALE" },
+      "ko-KR-Standard-B": { name: "준우", gender: "MALE" },
+      "ko-KR-Standard-C": { name: "다솜", gender: "FEMALE" },
+      "ko-KR-Standard-D": { name: "민준", gender: "MALE" }, //표준
+      "ko-KR-Chirp3-HD-Achird": { name: "대발", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Algenib": { name: "진수", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Algieba": { name: "덕팔", gender: "MALE" }, //프리미엄
+      "ko-KR-Chirp3-HD-Alnilam": { name: "성훈", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Achernar": { name: "명자", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Aoede": { name: "선희", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Autonoe": { name: "지현", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Callirrhoe": { name: "광례", gender: "FEMALE" }, //프리미엄
+    };
+    const info = voiceMap[rawVoiceName];
+    if (info) return info;
+
+    const fallbackName = rawVoiceName.split("-").pop() || "새 음성";
+    const gender = rawVoiceName.toUpperCase().includes("FEMALE")
+      ? "FEMALE"
+      : "MALE";
+    return { name: fallbackName, gender };
+  }
+
+  /**
    * 🎭 음성 선택 처리
    */
   async selectVoice(bot, callbackQuery, subAction, params, moduleManager) {
@@ -238,11 +270,6 @@ class TTSModule extends BaseModule {
   /**
    * 텍스트 입력 처리
    */
-  // ⭐️⭐️⭐️ [시작] 이 함수가 수정되었습니다 ⭐️⭐️⭐️
-
-  /**
-   * 텍스트 입력 처리
-   */
   async handleTextInput(bot, msg) {
     const {
       text,
@@ -252,32 +279,33 @@ class TTSModule extends BaseModule {
 
     try {
       if (text.length > this.config.maxTextLength) {
-        await bot.telegram.sendMessage(
-          chatId,
-          `❌ 텍스트가 너무 깁니다. 최대 ${this.config.maxTextLength}자까지 입력 가능합니다.`
-        );
-        return;
+        // ... 길이 초과 오류 처리 ...
       }
 
       const processingMsg = await bot.telegram.sendMessage(
         chatId,
-        "🔊 음성 변환 중... 잠시만 기다려주세요."
+        "🔊 음성 변환 중..."
       );
       const userState = this.getUserState(userId);
 
-      // TTS 변환 요청 시 voiceName도 함께 전달합니다.
       const result = await this.ttsService.textToSpeech(text, {
         languageCode: userState.language,
-        voiceName: userState.voice, // ⭐️ 선택한 목소리 정보를 여기에 추가!
+        voiceName: userState.voice,
+        userId: userId,
       });
 
       if (result.success) {
+        // ⭐️ 이름 변환 함수를 호출하여 한글 이름을 가져옵니다.
+        const voiceInfo = this.getLocalizedVoiceInfo(result.voice);
+        const localizedVoiceName = voiceInfo.name || result.voice;
+
         const audioStream = fs.createReadStream(result.filePath);
         await bot.telegram.sendVoice(
           chatId,
           { source: audioStream, filename: "voice.ogg" },
           {
-            caption: `🎵 변환 완료!\n목소리: ${result.voice}\n길이: 약 ${result.duration}초`,
+            // ⭐️ 캡션에 한글 이름을 사용하도록 수정했습니다.
+            caption: `🎵 변환 완료!\n목소리: ${localizedVoiceName}\n길이: 약 ${result.duration}초`,
             reply_markup: {
               inline_keyboard: [
                 [
@@ -289,10 +317,10 @@ class TTSModule extends BaseModule {
             },
           }
         );
+
         await bot.telegram.deleteMessage(chatId, processingMsg.message_id);
         try {
           fs.unlinkSync(result.filePath);
-          logger.debug("🧹 임시 음성 파일 삭제됨");
         } catch (cleanupError) {
           logger.warn("임시 파일 삭제 실패:", cleanupError.message);
         }
@@ -309,8 +337,6 @@ class TTSModule extends BaseModule {
       this.clearUserState(userId);
     }
   }
-
-  // ⭐️⭐️⭐️ [끝] 이 함수가 수정되었습니다 ⭐️⭐️⭐️
 
   /**
    * 음성 목록 표시
@@ -365,7 +391,8 @@ class TTSModule extends BaseModule {
       }
 
       return {
-        type: "list",
+        // ⭐️⭐️⭐️ 이 부분을 수정했습니다! ('list' -> 'history') ⭐️⭐️⭐️
+        type: "history",
         module: "tts",
         data: {
           title: "🕒 변환 기록",

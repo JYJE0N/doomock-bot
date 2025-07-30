@@ -26,7 +26,6 @@ class TTSRenderer extends BaseRenderer {
    */
   async render(result, ctx) {
     const { type, data } = result;
-
     switch (type) {
       case "menu":
         return await this.renderTTSMenu(data, ctx);
@@ -50,116 +49,6 @@ class TTSRenderer extends BaseRenderer {
       default:
         return await this.renderError("지원하지 않는 TTS 기능입니다.", ctx);
     }
-  }
-
-  /**
-   * 🎤 음성 ID를 친숙한 한글 이름과 성별 정보로 변환합니다.
-   */
-  getLocalizedVoiceInfo(rawVoiceName) {
-    const voiceMap = {
-      "ko-KR-Chirp3-HD-Achird": { name: "대발", gender: "MALE" },
-      "ko-KR-Chirp3-HD-Algenib": { name: "진수", gender: "MALE" },
-      "ko-KR-Chirp3-HD-Algleba": { name: "민준", gender: "MALE" },
-      "ko-KR-Chirp3-HD-Alnilam": { name: "성훈", gender: "MALE" },
-      "ko-KR-Chirp3-HD-Achernar": { name: "명자", gender: "FEMALE" },
-      "ko-KR-Chirp3-HD-Aoede": { name: "선희", gender: "FEMALE" },
-      "ko-KR-Chirp3-HD-Autonoe": { name: "지현", gender: "FEMALE" },
-      "ko-KR-Chirp3-HD-Callirrhoe": { name: "수진", gender: "FEMALE" },
-    };
-    const info = voiceMap[rawVoiceName];
-    if (info) return { localizedName: info.name, gender: info.gender };
-
-    const fallbackName = rawVoiceName.split("-").pop() || "새로운 목소리";
-    const isFemale = fallbackName.endsWith("a") || fallbackName.endsWith("e");
-    return {
-      localizedName: fallbackName,
-      gender: isFemale ? "FEMALE" : "MALE",
-    };
-  }
-
-  /**
-   * 🎭 음성 목록 렌더링 (성별 좌우 정렬 UI)
-   */
-  async renderVoiceList(data, ctx) {
-    let text = "🎭 *음성 선택*\n\n";
-    text += "원하는 목소리를 선택해주세요\\.\n";
-    text += "왼쪽은 *남성*, 오른쪽은 *여성* 음성입니다\\.\n\n";
-
-    const voices = data?.items || [];
-    if (voices.length === 0) {
-      text += "현재 사용 가능한 음성이 없습니다\\.";
-      const keyboard = {
-        inline_keyboard: [[{ text: "📋 TTS 메뉴", callback_data: "tts:menu" }]],
-      };
-      return await this.sendMessage(
-        ctx.callbackQuery.message.chat.id,
-        text,
-        keyboard,
-        ctx.callbackQuery.message.message_id
-      );
-    }
-
-    const maleVoices = [];
-    const femaleVoices = [];
-
-    voices.forEach((voice) => {
-      const rawVoiceName = voice.id || voice.title;
-      const { localizedName, gender } =
-        this.getLocalizedVoiceInfo(rawVoiceName);
-      const genderIcon = this.getGenderIcon(gender);
-      const voiceInfo = {
-        id: rawVoiceName,
-        name: localizedName,
-        icon: genderIcon,
-      };
-      if (gender === "MALE") maleVoices.push(voiceInfo);
-      else femaleVoices.push(voiceInfo);
-    });
-
-    text += "*(남성 음성)*\n";
-    maleVoices.forEach(
-      (v) => (text += `${v.icon} ${this.escapeMarkdownV2(v.name)}\n`)
-    );
-    text += "\n*(여성 음성)*\n";
-    femaleVoices.forEach(
-      (v) => (text += `${v.icon} ${this.escapeMarkdownV2(v.name)}\n`)
-    );
-
-    const keyboard = { inline_keyboard: [] };
-    const maxRows = Math.max(maleVoices.length, femaleVoices.length);
-
-    for (let i = 0; i < maxRows; i++) {
-      const row = [];
-      if (maleVoices[i]) {
-        row.push({
-          text: `${maleVoices[i].icon} ${maleVoices[i].name}`,
-          callback_data: `tts:voice:${maleVoices[i].id}`,
-        });
-      } else {
-        row.push({ text: " ", callback_data: "tts:no_op" });
-      }
-      if (femaleVoices[i]) {
-        row.push({
-          text: `${femaleVoices[i].icon} ${femaleVoices[i].name}`,
-          callback_data: `tts:voice:${femaleVoices[i].id}`,
-        });
-      } else {
-        row.push({ text: " ", callback_data: "tts:no_op" });
-      }
-      keyboard.inline_keyboard.push(row);
-    }
-
-    keyboard.inline_keyboard.push([
-      { text: "🔄 새로고침", callback_data: "tts:voices" },
-      { text: "📋 TTS 메뉴", callback_data: "tts:menu" },
-    ]);
-
-    await this.sendMessage(
-      ctx.callbackQuery.message.chat.id,
-      text,
-      keyboard,
-      ctx.callbackQuery.message.message_id
-    );
   }
 
   /**
@@ -373,63 +262,179 @@ class TTSRenderer extends BaseRenderer {
   /**
    * 🎭 음성 목록 렌더링
    */
+
+  /**
+   * 🎤 음성 ID를 친숙한 한글 이름과 성별 정보로 변환합니다.
+   */
+  getLocalizedVoiceInfo(rawVoiceName) {
+    const voiceMap = {
+      "ko-KR-Wavenet-A": { name: "유리", gender: "FEMALE" },
+      "ko-KR-Wavenet-B": { name: "철수", gender: "MALE" },
+      "ko-KR-Wavenet-C": { name: "수진", gender: "FEMALE" },
+      "ko-KR-Wavenet-D": { name: "영호", gender: "MALE" },
+      "ko-KR-Standard-A": { name: "나래", gender: "FEMALE" },
+      "ko-KR-Standard-B": { name: "준우", gender: "MALE" },
+      "ko-KR-Standard-C": { name: "다솜", gender: "FEMALE" },
+      "ko-KR-Standard-D": { name: "민준", gender: "MALE" }, //표준
+      "ko-KR-Chirp3-HD-Achird": { name: "대발", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Algenib": { name: "진수", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Algieba": { name: "덕팔", gender: "MALE" }, //프리미엄
+      "ko-KR-Chirp3-HD-Alnilam": { name: "성훈", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Achernar": { name: "명자", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Aoede": { name: "선희", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Autonoe": { name: "지현", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Callirrhoe": { name: "광례", gender: "FEMALE" }, //프리미엄
+    };
+    const info = voiceMap[rawVoiceName];
+    if (info) return { localizedName: info.name, gender: info.gender };
+
+    const fallbackName = rawVoiceName.split("-").pop() || "새 음성";
+    const gender = rawVoiceName.toUpperCase().includes("FEMALE")
+      ? "FEMALE"
+      : "MALE";
+    return { localizedName: fallbackName, gender };
+  }
+
+  /**
+   * 🎭 음성 목록 렌더링 (8개 제한 및 좌우 정렬)
+   */
   async renderVoiceList(data, ctx) {
-    let text = "🎭 *사용 가능한 음성*\n\n";
+    let text = "🎭 *음성 선택*\n\n";
+    text += "원하는 목소리를 선택해주세요\\.\n";
+    text += "왼쪽은 *남성*, 오른쪽은 *여성* 음성입니다\\.\n";
 
-    const voices = data?.items || [];
-
-    if (voices.length === 0) {
-      text += "현재 사용 가능한 음성이 없습니다\\.\n";
-      text += "잠시 후 다시 시도해주세요\\.";
-
+    const allVoices = data?.items || [];
+    if (allVoices.length === 0) {
+      text += "현재 사용 가능한 음성이 없습니다\\.";
       const keyboard = {
         inline_keyboard: [[{ text: "📋 TTS 메뉴", callback_data: "tts:menu" }]],
       };
-
-      // ✅ 수정: 안전한 메시지 전송
-      return await this.sendSafeMessage(ctx, text, keyboard);
+      return await this.sendMessage(
+        ctx.callbackQuery.message.chat.id,
+        text,
+        keyboard,
+        ctx.callbackQuery.message.message_id
+      );
     }
 
-    text += "원하는 음성을 선택해주세요\\:\n\n";
+    // ⭐️⭐️⭐️ 이 부분을 수정했습니다! ⭐️⭐️⭐️
+    // 전체 목소리 목록에서 최대 8개만 사용하도록 제한합니다.
+    const voices = allVoices.slice(0, 8);
+    // ⭐️⭐️⭐️ 수정 끝 ⭐️⭐️⭐️
 
-    const keyboard = { inline_keyboard: [] };
+    const maleVoices = [];
+    const femaleVoices = [];
 
-    // 음성 목록 표시 (최대 8개)
-    const displayVoices = voices.slice(0, 8);
+    voices.forEach((voice) => {
+      const rawVoiceName = voice.id || voice.title;
+      const { localizedName, gender } =
+        this.getLocalizedVoiceInfo(rawVoiceName);
+      const genderIcon = this.getGenderIcon(gender);
+      const voiceInfo = {
+        id: rawVoiceName,
+        name: localizedName,
+        icon: genderIcon,
+      };
 
-    displayVoices.forEach((voice, index) => {
-      const genderIcon = this.getGenderIcon(voice.description);
-      const voiceName = voice.title || voice.id;
-      const description = voice.description
-        ? ` (${this.escapeMarkdownV2(voice.description)})`
-        : "";
-
-      text += `${genderIcon} *${this.escapeMarkdownV2(
-        voiceName
-      )}*${description}\n`;
-
-      // 음성 선택 버튼 (2열 배치)
-      if (index % 2 === 0) {
-        keyboard.inline_keyboard.push([]);
-      }
-
-      const currentRow =
-        keyboard.inline_keyboard[keyboard.inline_keyboard.length - 1];
-      currentRow.push({
-        text: `${genderIcon} ${voiceName}`,
-        callback_data: `tts:voice:${voice.id}`,
-      });
+      if (gender === "MALE") maleVoices.push(voiceInfo);
+      else femaleVoices.push(voiceInfo);
     });
 
-    // 추가 메뉴 버튼
+    const keyboard = { inline_keyboard: [] };
+    const maxRows = Math.max(maleVoices.length, femaleVoices.length);
+
+    for (let i = 0; i < maxRows; i++) {
+      const row = [];
+      if (maleVoices[i]) {
+        row.push({
+          text: `${maleVoices[i].icon} ${maleVoices[i].name}`,
+          callback_data: `tts:voice:${maleVoices[i].id}`,
+        });
+      } else {
+        row.push({ text: " ", callback_data: "tts:no_op" });
+      }
+      if (femaleVoices[i]) {
+        row.push({
+          text: `${femaleVoices[i].icon} ${femaleVoices[i].name}`,
+          callback_data: `tts:voice:${femaleVoices[i].id}`,
+        });
+      } else {
+        row.push({ text: " ", callback_data: "tts:no_op" });
+      }
+      keyboard.inline_keyboard.push(row);
+    }
+
     keyboard.inline_keyboard.push([
       { text: "🔄 새로고침", callback_data: "tts:voices" },
       { text: "📋 TTS 메뉴", callback_data: "tts:menu" },
     ]);
 
-    // ✅ 수정: 안전한 메시지 전송
-    return await this.sendSafeMessage(ctx, text, keyboard);
+    text += `\n총 ${voices.length}개의 추천 목소리가 있습니다\\.`;
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      text,
+      keyboard,
+      ctx.callbackQuery.message.message_id
+    );
   }
+  // async renderVoiceList(data, ctx) {
+  //   let text = "🎭 *사용 가능한 음성*\n\n";
+
+  //   const voices = data?.items || [];
+
+  //   if (voices.length === 0) {
+  //     text += "현재 사용 가능한 음성이 없습니다\\.\n";
+  //     text += "잠시 후 다시 시도해주세요\\.";
+
+  //     const keyboard = {
+  //       inline_keyboard: [[{ text: "📋 TTS 메뉴", callback_data: "tts:menu" }]],
+  //     };
+
+  //     // ✅ 수정: 안전한 메시지 전송
+  //     return await this.sendSafeMessage(ctx, text, keyboard);
+  //   }
+
+  //   text += "원하는 음성을 선택해주세요\\:\n\n";
+
+  //   const keyboard = { inline_keyboard: [] };
+
+  //   // 음성 목록 표시 (최대 8개)
+  //   const displayVoices = voices.slice(0, 8);
+
+  //   displayVoices.forEach((voice, index) => {
+  //     const genderIcon = this.getGenderIcon(voice.description);
+  //     const voiceName = voice.title || voice.id;
+  //     const description = voice.description
+  //       ? ` (${this.escapeMarkdownV2(voice.description)})`
+  //       : "";
+
+  //     text += `${genderIcon} *${this.escapeMarkdownV2(
+  //       voiceName
+  //     )}*${description}\n`;
+
+  //     // 음성 선택 버튼 (2열 배치)
+  //     if (index % 2 === 0) {
+  //       keyboard.inline_keyboard.push([]);
+  //     }
+
+  //     const currentRow =
+  //       keyboard.inline_keyboard[keyboard.inline_keyboard.length - 1];
+  //     currentRow.push({
+  //       text: `${genderIcon} ${voiceName}`,
+  //       callback_data: `tts:voice:${voice.id}`,
+  //     });
+  //   });
+
+  //   // 추가 메뉴 버튼
+  //   keyboard.inline_keyboard.push([
+  //     { text: "🔄 새로고침", callback_data: "tts:voices" },
+  //     { text: "📋 TTS 메뉴", callback_data: "tts:menu" },
+  //   ]);
+
+  //   // ✅ 수정: 안전한 메시지 전송
+  //   return await this.sendSafeMessage(ctx, text, keyboard);
+  // }
 
   /**
    * 🛡️ 안전한 메시지 전송 메서드 (편집 실패 시 새 메시지 전송)
