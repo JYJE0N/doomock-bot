@@ -180,72 +180,43 @@ class TTSService {
    */
   async textToSpeech(text, options = {}) {
     try {
-      if (!text || text.trim().length === 0) {
+      if (!text || text.trim().length === 0)
         throw new Error("변환할 텍스트가 없습니다");
-      }
 
-      // TTS 설정
       const ttsConfig = {
         languageCode: options.languageCode || this.config.languageCode,
         voiceName: options.voiceName || this.config.voiceName,
-        speakingRate: options.speakingRate || 1.0,
-        pitch: options.pitch || 0,
-        volumeGainDb: options.volumeGainDb || 0,
       };
 
-      // 캐시 확인
       const cacheKey = this.generateCacheKey(text, ttsConfig);
       const cachedFile = await this.getCachedFile(cacheKey);
       if (cachedFile) {
         this.stats.cachedResponses++;
-        logger.debug("🎯 캐시에서 음성 파일 반환");
         return cachedFile;
       }
 
-      // Google TTS API 요청 구성
       const ttsRequest = {
-        input: { text: text },
+        input: { text },
         voice: {
           languageCode: ttsConfig.languageCode,
           name: ttsConfig.voiceName,
-          ssmlGender: "NEUTRAL",
         },
-        audioConfig: {
-          audioEncoding: this.config.audioEncoding,
-          speakingRate: ttsConfig.speakingRate,
-          pitch: ttsConfig.pitch,
-          volumeGainDb: ttsConfig.volumeGainDb,
-        },
+        audioConfig: { audioEncoding: this.config.audioEncoding },
       };
 
-      // 로그에는 텍스트 일부만
-      const logText = text.length > 50 ? text.substring(0, 47) + "..." : text;
-      logger.info(`🎤 TTS 변환 시작: "${logText}"`);
-
-      // Google TTS API 호출
       const [ttsResponse] = await this.googleTTSClient.synthesizeSpeech(
         ttsRequest
       );
       this.stats.apiCalls++;
 
-      // 음성 파일 저장
       const audioContent = ttsResponse.audioContent;
       const fileName = `${cacheKey}.ogg`;
       const filePath = path.join(this.config.cacheDir, fileName);
-
       await fs.writeFile(filePath, audioContent, "binary");
       logger.success(`✅ 음성 파일 생성: ${fileName}`);
 
-      // ⭐️ 데이터베이스에 변환 기록 저장
-      if (options.userId) {
-        await this.saveHistory(options.userId, text, result);
-      }
-
-      // 캐시에 추가
-      await this.addToCache(cacheKey, filePath);
-      this.stats.totalConversions++;
-
-      return {
+      // ⭐️ result 변수에 결과를 먼저 담습니다.
+      const result = {
         success: true,
         filePath: filePath,
         fileName: fileName,
@@ -254,10 +225,21 @@ class TTSService {
         language: ttsConfig.languageCode,
         voice: ttsConfig.voiceName,
       };
+
+      // ⭐️ 이제 result 변수를 사용해 기록을 저장합니다.
+      if (options.userId) {
+        await this.saveHistory(options.userId, text, result);
+      }
+
+      await this.addToCache(cacheKey, filePath); // 캐시 로직 수정
+      this.stats.totalConversions++;
+
+      return result;
     } catch (error) {
       this.stats.errors++;
       this.logSafeError("❌ TTS 변환 실패", error);
-      throw new Error("음성 변환에 실패했습니다");
+      // ⭐️ 에러 발생 시에도 일관된 에러 객체를 반환하도록 수정
+      return { success: false, error: "음성 변환에 실패했습니다." };
     }
   }
 
@@ -393,13 +375,29 @@ class TTSService {
     return Math.ceil((words / wordsPerMinute) * 60);
   }
 
+  async saveHistory(userId, text, result) {
+    try {
+      const historyEntry = new this.TTSHistory({
+        userId: userId,
+        text: text,
+        languageCode: result.language,
+        voiceName: result.voice,
+        durationSeconds: result.duration,
+        fileSize: result.size,
+      });
+      await historyEntry.save();
+      logger.debug(`[DB] TTS 기록 저장 완료: User ${userId}`);
+    } catch (dbError) {
+      logger.error("[DB] TTS 기록 저장 실패", dbError);
+    }
+  }
+
   async getUserStats(userId) {
     try {
       const totalConversions = await this.TTSHistory.countDocuments({ userId });
       const lastConversion = await this.TTSHistory.findOne({ userId }).sort({
         createdAt: -1,
       });
-
       return {
         totalConversions: totalConversions,
         lastConversion: lastConversion
@@ -407,7 +405,6 @@ class TTSService {
           : null,
       };
     } catch (error) {
-      logger.error("사용자 통계 조회 실패:", error);
       return { totalConversions: 0, lastConversion: null };
     }
   }
@@ -462,8 +459,7 @@ class TTSService {
     try {
       const history = await this.TTSHistory.find({ userId })
         .sort({ createdAt: -1 })
-        .limit(10); // 최근 10개만 조회
-
+        .limit(10);
       return history.map((item) => ({
         _id: item._id.toString(),
         text: item.text,
@@ -472,7 +468,6 @@ class TTSService {
         createdAt: item.createdAt.toISOString(),
       }));
     } catch (error) {
-      logger.error("변환 기록 조회 실패:", error);
       return [];
     }
   }
