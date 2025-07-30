@@ -1,209 +1,180 @@
-// src/renderers/WeatherRenderer.js - 데이터 매핑 수정 버전
+// src/renderers/WeatherRenderer.js - 현재 위치 표시 개선
 
 const BaseRenderer = require("./BaseRenderer");
-const { getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🌤️ WeatherRenderer - 날씨 정보 UI 렌더러 (데이터 매핑 수정)
- *
- * 🔧 수정사항:
- * - Weather 모델의 속성명과 일치하도록 매핑 수정
- * - temperature, feelsLike, windSpeed 등 정확한 속성명 사용
- * - 데이터 존재 여부 안전하게 확인
- * - 일관된 데이터 접근 패턴 적용
+ * 🌤️ WeatherRenderer - GPS 위치 표시 개선
  */
 class WeatherRenderer extends BaseRenderer {
-  constructor(bot, navigationHandler) {
-    super(bot, navigationHandler);
-    this.moduleName = "weather";
+  constructor() {
+    super();
+    logger.info("🌤️ WeatherRenderer 생성됨");
   }
 
   /**
-   * 🎯 메인 렌더링 메서드
+   * 🎯 타입별 렌더링 처리
    */
-  async render(result, ctx) {
-    const { type, data } = result;
-
-    logger.debug(`🌤️ WeatherRenderer: ${type} 타입 렌더링`);
+  async render(data, ctx) {
+    if (!data || !data.type) {
+      logger.error("렌더링 데이터 없음");
+      return;
+    }
 
     try {
-      switch (type) {
+      switch (data.type) {
         case "menu":
-          return await this.renderWeatherMenu(data, ctx);
-
+          await this.renderMenu(data, ctx);
+          break;
         case "current":
-          return await this.renderCurrentWeather(data, ctx);
-
+          await this.renderCurrentWeather(data, ctx);
+          break;
         case "dust":
-          return await this.renderDustInfo(data, ctx);
-
+          await this.renderDustInfo(data, ctx);
+          break;
+        case "complete":
+          await this.renderCompleteInfo(data, ctx);
+          break;
         case "help":
-          return await this.renderHelp(data, ctx);
-
+          await this.renderHelp(data, ctx);
+          break;
+        case "status":
+          await this.renderStatus(data, ctx);
+          break;
         case "error":
-          return await this.renderError(
-            data.message || "날씨 정보를 불러올 수 없습니다",
-            ctx
-          );
-
+          await this.renderError(data, ctx);
+          break;
         default:
-          logger.warn(`🌤️ WeatherRenderer: 지원하지 않는 타입 - ${type}`);
-          return await this.renderError("지원하지 않는 기능입니다", ctx);
+          logger.warn(`알 수 없는 렌더링 타입: ${data.type}`);
       }
     } catch (error) {
-      logger.error(`🌤️ WeatherRenderer 렌더링 오류 (${type}):`, error);
-      return await this.renderError("렌더링 중 오류가 발생했습니다", ctx);
+      logger.error("WeatherRenderer 오류:", error);
+      await this.renderError({ message: error.message }, ctx);
     }
   }
 
   /**
-   * 🌤️ 날씨 메인 메뉴 렌더링 (수정됨)
+   * 📍 위치 정보 포맷팅
    */
-  async renderWeatherMenu(data, ctx) {
-    const userName = getUserName(ctx.callbackQuery?.from);
-    const weather = data?.weather;
+  formatLocationInfo(data) {
+    let locationText = "";
 
-    let text = "🌤️ *날씨 정보*\n\n";
+    // GPS 감지 여부에 따른 아이콘
+    const locationIcon = data.isGPSDetected ? "📍" : "📌";
 
-    if (weather) {
-      // ✅ 수정: Weather 모델의 정확한 속성명 사용
-      text += `📍 *${this.escapeMarkdownV2(weather.location || "서울")}*\n`;
-
-      // 🌡️ temperature 속성 사용 (temp가 아닌!)
-      if (weather.temperature !== undefined && weather.temperature !== null) {
-        text += `🌡️ **${weather.temperature}°C**\n`;
-      } else {
-        text += `🌡️ **측정중**\n`;
-      }
-
-      if (weather.description) {
-        text += `☁️ ${this.escapeMarkdownV2(weather.description)}\n`;
-      }
-
-      if (weather.humidity) {
-        text += `💧 습도: ${weather.humidity}%\n`;
-      }
-
-      text += "\n";
-    } else {
-      text += `안녕하세요, ${this.escapeMarkdownV2(userName)}님\\!\n`;
-      text += "원하는 날씨 정보를 선택해주세요\\.\n\n";
+    // 전체 주소가 있으면 사용
+    if (data.fullAddress) {
+      locationText = `${locationIcon} **${this.escapeMarkdownV2(
+        data.fullAddress
+      )}**`;
+    } else if (data.location) {
+      locationText = `${locationIcon} **${this.escapeMarkdownV2(
+        data.location
+      )}**`;
     }
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🌡️ 현재 날씨", callback_data: "weather:current" },
-          { text: "💨 미세먼지", callback_data: "weather:dust" },
-        ],
-        [
-          { text: "❓ 도움말", callback_data: "weather:help" },
-          { text: "🔄 새로고침", callback_data: "weather:menu" },
-        ],
-        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
+    // GPS 감지 방법 표시 (사용자 친화적으로)
+    if (data.locationInfo?.method) {
+      const methodText =
+        {
+          kakao_api: "현재 위치",
+          kakao_search: "지역 검색",
+          auto: "자동 감지",
+          cache: "저장된 위치",
+          default: "기본 위치",
+          manual: "직접 입력",
+          user_input: "설정 위치",
+        }[data.locationInfo.method] || "";
 
-    await this.sendMessage(
-      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
-      text,
-      keyboard,
-      ctx.callbackQuery?.message?.message_id
-    );
+      if (methodText) {
+        locationText += ` \\(${methodText}\\)`;
+      }
+    }
+
+    return locationText;
   }
 
   /**
-   * 🌡️ 현재 날씨 상세 렌더링 (완전 수정됨)
+   * 🌡️ 현재 날씨 렌더링 (개선)
    */
   async renderCurrentWeather(data, ctx) {
-    const weather = data?.weather;
+    const weather = data?.data?.weather || data?.data;
 
-    let text = "🌡️ *현재 날씨*\n\n";
+    let text = "🌤️ *현재 날씨*\n\n";
 
     if (weather) {
-      // 📍 위치 정보
-      text += `📍 **${this.escapeMarkdownV2(weather.location || "서울")}**\n\n`;
+      // 위치 정보 표시
+      text += this.formatLocationInfo(data.data) + "\n\n";
 
-      // 🌡️ 온도 정보 - 정확한 속성명 사용
-      if (weather.temperature !== undefined && weather.temperature !== null) {
-        const tempEmoji = this.getTemperatureEmoji(weather.temperature);
-        text += `🌡️ **온도**: ${weather.temperature}°C ${tempEmoji}\n`;
-      } else {
-        text += `🌡️ **온도**: 측정중\n`;
-      }
-
-      // 🤗 체감온도 - Weather 모델의 feelsLike 속성 사용
-      if (
-        weather.feelsLike !== undefined &&
-        weather.feelsLike !== null &&
-        weather.feelsLike !== weather.temperature
-      ) {
-        text += `🤗 **체감온도**: ${weather.feelsLike}°C\n`;
-      }
-
-      // 🌡️ 최저/최고 온도
-      if (weather.tempMin !== undefined && weather.tempMax !== undefined) {
-        text += `📊 **최저/최고**: ${weather.tempMin}°C / ${weather.tempMax}°C\n`;
-      }
-
-      // ☁️ 날씨 설명
+      // 날씨 아이콘 및 설명
       if (weather.description) {
-        const weatherEmoji = this.getWeatherEmoji(weather.description);
-        text += `☁️ **날씨**: ${this.escapeMarkdownV2(
+        const weatherEmoji = this.getWeatherEmoji(weather.main);
+        text += `${weatherEmoji} **${this.escapeMarkdownV2(
           weather.description
-        )} ${weatherEmoji}\n`;
+        )}**\n\n`;
       }
 
+      // 온도 정보
+      text += `🌡️ **온도**: ${weather.temperature}°C`;
+      if (weather.feelsLike) {
+        text += ` \\(체감 ${weather.feelsLike}°C\\)`;
+      }
       text += "\n";
 
-      // 💨 환경 정보
+      // 습도
       if (weather.humidity) {
         text += `💧 **습도**: ${weather.humidity}%\n`;
       }
 
-      // 🌬️ 바람 정보 - Weather 모델의 windSpeed 속성 사용
+      // 바람
       if (weather.windSpeed !== undefined && weather.windSpeed > 0) {
         text += `🌬️ **풍속**: ${weather.windSpeed}m/s`;
         if (weather.windDirection) {
-          text += ` (${weather.windDirection})`;
+          text += ` \\(${weather.windDirection}\\)`;
         }
         text += "\n";
       }
 
+      // 기압
       if (weather.pressure) {
         text += `📊 **기압**: ${weather.pressure}hPa\n`;
       }
 
-      // 👁️ 가시거리
+      // 가시거리
       if (weather.visibility) {
         text += `👁️ **가시거리**: ${weather.visibility}km\n`;
       }
 
-      // ☁️ 구름량
+      // 구름량
       if (weather.cloudiness !== undefined) {
         text += `☁️ **구름량**: ${weather.cloudiness}%\n`;
       }
 
-      // 🌅 일출/일몰 정보
+      // 일출/일몰
       if (weather.sunrise && weather.sunset) {
         text += `\n🌅 **일출**: ${weather.sunrise}\n`;
         text += `🌇 **일몰**: ${weather.sunset}\n`;
       }
 
-      // 💡 날씨 조언
+      // 날씨 조언
       if (weather.advice) {
         text += `\n💡 **조언**: ${this.escapeMarkdownV2(weather.advice)}\n`;
       }
 
-      // ⏰ 업데이트 시간
+      // 업데이트 시간
       text += `\n⏰ **업데이트**: ${
-        weather.lastUpdate || new Date().toLocaleTimeString("ko-KR")
+        data.timestamp || TimeHelper.format(TimeHelper.now(), "time")
       }`;
 
-      // 📡 데이터 출처
-      if (weather.meta?.source) {
-        text += `\n📡 **출처**: ${weather.meta.source}`;
+      // 데이터 출처
+      if (data.source) {
+        text += `\n📡 **출처**: ${this.escapeMarkdownV2(data.source)}`;
+      }
+
+      // 경고 메시지
+      if (data.warning) {
+        text += `\n⚠️ ${this.escapeMarkdownV2(data.warning)}`;
       }
     } else {
       text += "❌ 날씨 정보를 불러올 수 없습니다\\.\n";
@@ -229,42 +200,89 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * 💨 미세먼지 정보 렌더링 (기존 유지)
+   * 💨 미세먼지 정보 렌더링 (개선)
    */
   async renderDustInfo(data, ctx) {
-    const dust = data?.dust;
+    const dust = data?.data?.dust || data?.data;
 
     let text = "💨 *미세먼지 정보*\n\n";
 
     if (dust) {
-      // 🔥 수정: dust.location이 아니라 data.location 사용!
-      const displayLocation = data.location || dust.location || "서울";
-      text += `📍 **${this.escapeMarkdownV2(displayLocation)}**\n\n`;
+      // 위치 정보 표시
+      text += this.formatLocationInfo(data.data || data) + "\n";
 
-      // 🚨 수정: dust.pm25.value 사용 (dust.pm25가 아닌!)
+      // 측정소 정보
+      if (dust.stationName) {
+        text += `🏢 측정소: ${this.escapeMarkdownV2(dust.stationName)}\n\n`;
+      } else {
+        text += "\n";
+      }
+
       // PM2.5 정보
       if (dust.pm25) {
-        // value 속성을 명시적으로 가져옴
-        const pm25Value = dust.pm25.value || dust.pm25;
-        const pm25Level = this.getDustLevel(pm25Value, "pm25");
-        text += `🔸 **PM2\\.5**: ${pm25Value}㎍/㎥ ${pm25Level.emoji}\n`;
-        text += `   ${this.escapeMarkdownV2(pm25Level.description)}\n\n`;
+        // 값 안전하게 추출
+        let pm25Value = "-";
+        let pm25Grade = "알 수 없음";
+
+        if (typeof dust.pm25 === "object" && dust.pm25.value !== undefined) {
+          pm25Value = dust.pm25.value;
+          pm25Grade = dust.pm25.grade || this.getDustGrade(pm25Value, "pm25");
+        } else if (
+          typeof dust.pm25 === "string" ||
+          typeof dust.pm25 === "number"
+        ) {
+          pm25Value = dust.pm25;
+          pm25Grade = this.getDustGrade(pm25Value, "pm25");
+        }
+
+        const pm25Emoji = this.getDustEmoji(pm25Grade);
+        text += `🔸 **초미세먼지\\(PM2\\.5\\)**: ${pm25Value}㎍/㎥ ${pm25Emoji}\n`;
+        text += `   상태: ${this.escapeMarkdownV2(pm25Grade)}\n\n`;
       }
 
       // PM10 정보
       if (dust.pm10) {
-        // value 속성을 명시적으로 가져옴
-        const pm10Value = dust.pm10.value || dust.pm10;
-        const pm10Level = this.getDustLevel(pm10Value, "pm10");
-        text += `🔹 **PM10**: ${pm10Value}㎍/㎥ ${pm10Level.emoji}\n`;
-        text += `   ${this.escapeMarkdownV2(pm10Level.description)}\n\n`;
+        // 값 안전하게 추출
+        let pm10Value = "-";
+        let pm10Grade = "알 수 없음";
+
+        if (typeof dust.pm10 === "object" && dust.pm10.value !== undefined) {
+          pm10Value = dust.pm10.value;
+          pm10Grade = dust.pm10.grade || this.getDustGrade(pm10Value, "pm10");
+        } else if (
+          typeof dust.pm10 === "string" ||
+          typeof dust.pm10 === "number"
+        ) {
+          pm10Value = dust.pm10;
+          pm10Grade = this.getDustGrade(pm10Value, "pm10");
+        }
+
+        const pm10Emoji = this.getDustEmoji(pm10Grade);
+        text += `🔹 **미세먼지\\(PM10\\)**: ${pm10Value}㎍/㎥ ${pm10Emoji}\n`;
+        text += `   상태: ${this.escapeMarkdownV2(pm10Grade)}\n\n`;
       }
 
       // 종합 상태
       if (dust.overall) {
-        text += `📊 **종합**: ${this.escapeMarkdownV2(
-          dust.overall.grade || dust.overall
-        )} ${dust.overall.emoji || ""}\n\n`;
+        let overallGrade = "알 수 없음";
+        let overallEmoji = "❓";
+
+        if (typeof dust.overall === "object") {
+          overallGrade = dust.overall.grade || "알 수 없음";
+          overallEmoji = dust.overall.emoji || this.getDustEmoji(overallGrade);
+        } else if (typeof dust.overall === "string") {
+          overallGrade = dust.overall;
+          overallEmoji = this.getDustEmoji(overallGrade);
+        }
+
+        text += `📊 **종합 대기질**: ${this.escapeMarkdownV2(
+          overallGrade
+        )} ${overallEmoji}\n`;
+
+        if (dust.overall.value && dust.overall.value !== "-") {
+          text += `   통합지수: ${dust.overall.value}\n`;
+        }
+        text += "\n";
       }
 
       // 행동 요령
@@ -273,18 +291,25 @@ class WeatherRenderer extends BaseRenderer {
       }
 
       // 업데이트 시간
-      text += `⏰ **업데이트**: ${
+      text += `⏰ **측정시간**: ${
         dust.timestamp || TimeHelper.format(TimeHelper.now(), "time")
       }`;
 
       // 데이터 출처
       if (data.source) {
-        text += `\n📡 **출처**: ${this.escapeMarkdownV2(data.source)}`;
+        const sourceText =
+          {
+            api: "한국환경공단",
+            estimated: "추정 데이터",
+            cache: "캐시 데이터",
+            fallback: "대체 데이터",
+          }[data.source] || data.source;
+        text += `\n📡 **출처**: ${this.escapeMarkdownV2(sourceText)}`;
       }
 
-      // GPS 위치 정보
-      if (data.locationInfo) {
-        text += `\n${this.escapeMarkdownV2(data.locationInfo)}`;
+      // 경고 메시지
+      if (data.warning) {
+        text += `\n⚠️ ${this.escapeMarkdownV2(data.warning)}`;
       }
     } else {
       text += "❌ 미세먼지 정보를 불러올 수 없습니다\\.\n";
@@ -310,27 +335,70 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * ❓ 도움말 렌더링 (기존 유지)
+   * 🌍 통합 정보 렌더링
    */
-  async renderHelp(data, ctx) {
-    let text = "❓ *날씨 모듈 도움말*\n\n";
+  async renderCompleteInfo(data, ctx) {
+    let text = "🌍 *날씨 & 미세먼지 통합 정보*\n\n";
 
-    text += "🌤️ **사용 가능한 기능**:\n";
-    text += "• 🌡️ 현재 날씨 조회\n";
-    text += "• 💨 미세먼지 정보\n";
-    text += "• 🔄 실시간 업데이트\n\n";
+    // 위치 정보
+    if (data.data) {
+      text += this.formatLocationInfo(data.data) + "\n\n";
+    }
 
-    text += "📍 **지역 설정**:\n";
-    text += "GPS 기반으로 현재 위치의 날씨를 제공합니다\\.\n\n";
+    // 날씨 정보
+    if (data.data?.weather) {
+      const weather = data.data.weather;
+      text += "━━━ *날씨 정보* ━━━\n";
+      text += `${this.getWeatherEmoji(weather.main)} ${this.escapeMarkdownV2(
+        weather.description
+      )}\n`;
+      text += `🌡️ ${weather.temperature}°C \\(체감 ${
+        weather.feelsLike || weather.temperature
+      }°C\\)\n`;
+      text += `💧 습도 ${weather.humidity}%\n`;
+      if (weather.windSpeed) {
+        text += `🌬️ 풍속 ${weather.windSpeed}m/s\n`;
+      }
+      text += "\n";
+    }
 
-    text += "⏰ **업데이트 주기**:\n";
-    text += "날씨 정보는 10분마다 자동 갱신됩니다\\.";
+    // 미세먼지 정보
+    if (data.data?.dust) {
+      const dust = data.data.dust;
+      text += "━━━ *대기질 정보* ━━━\n";
+
+      if (dust.pm25) {
+        const pm25Value = dust.pm25.value || dust.pm25;
+        text += `🔸 PM2\\.5: ${pm25Value}㎍/㎥ \\(${
+          dust.pm25.grade || "보통"
+        }\\)\n`;
+      }
+
+      if (dust.pm10) {
+        const pm10Value = dust.pm10.value || dust.pm10;
+        text += `🔹 PM10: ${pm10Value}㎍/㎥ \\(${
+          dust.pm10.grade || "보통"
+        }\\)\n`;
+      }
+
+      if (dust.overall) {
+        text += `📊 종합: ${dust.overall.grade || "보통"} ${
+          dust.overall.emoji || ""
+        }\n`;
+      }
+    }
+
+    // 업데이트 시간
+    text += `\n⏰ **업데이트**: ${
+      data.data?.timestamp || TimeHelper.format(TimeHelper.now(), "full")
+    }`;
 
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🌡️ 현재 날씨", callback_data: "weather:current" },
-          { text: "💨 미세먼지", callback_data: "weather:dust" },
+          { text: "🔄 새로고침", callback_data: "weather:complete" },
+          { text: "🌡️ 날씨만", callback_data: "weather:current" },
+          { text: "💨 미세먼지만", callback_data: "weather:dust" },
         ],
         [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
       ],
@@ -345,19 +413,25 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * ❌ 에러 화면 렌더링 (기존 유지)
+   * 📋 메뉴 렌더링
    */
-  async renderError(message, ctx) {
-    let text = "❌ *날씨 정보 오류*\n\n";
-    text += `${this.escapeMarkdownV2(message)}\n\n`;
-    text += "잠시 후 다시 시도해주세요\\.";
+  async renderMenu(data, ctx) {
+    let text = "🌤️ *날씨 정보 메뉴*\n\n";
+    text += "GPS 기반으로 현재 위치의 날씨 정보를 제공합니다\\.\n\n";
+    text += "원하는 정보를 선택해주세요:";
 
     const keyboard = {
       inline_keyboard: [
         [
-          { text: "🔄 다시 시도", callback_data: "weather:menu" },
-          { text: "🔙 메인 메뉴", callback_data: "system:menu" },
+          { text: "🌡️ 현재 날씨", callback_data: "weather:current" },
+          { text: "💨 미세먼지", callback_data: "weather:dust" },
         ],
+        [{ text: "🌍 통합 정보", callback_data: "weather:complete" }],
+        [
+          { text: "❓ 도움말", callback_data: "weather:help" },
+          { text: "📊 상태", callback_data: "weather:status" },
+        ],
+        [{ text: "🔙 메인 메뉴", callback_data: "menu:main" }],
       ],
     };
 
@@ -369,119 +443,255 @@ class WeatherRenderer extends BaseRenderer {
     );
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 (기존 유지) =====
-
   /**
-   * 🌤️ 날씨 이모지 선택
+   * 🌤️ 날씨 아이콘 매핑
    */
-  getWeatherEmoji(description) {
-    if (!description) return "🌤️";
-
-    const desc = description.toLowerCase();
-
-    if (desc.includes("맑")) return "☀️";
-    if (desc.includes("구름")) return "☁️";
-    if (desc.includes("흐림")) return "☁️";
-    if (desc.includes("비")) return "🌧️";
-    if (desc.includes("눈")) return "❄️";
-    if (desc.includes("천둥")) return "⛈️";
-    if (desc.includes("안개")) return "🌫️";
-    if (desc.includes("clear")) return "☀️";
-    if (desc.includes("cloud")) return "☁️";
-    if (desc.includes("rain")) return "🌧️";
-    if (desc.includes("snow")) return "❄️";
-    if (desc.includes("storm")) return "⛈️";
-    if (desc.includes("mist") || desc.includes("fog")) return "🌫️";
-
-    return "🌤️";
+  getWeatherEmoji(condition) {
+    const emojiMap = {
+      Clear: "☀️",
+      Clouds: "☁️",
+      Rain: "🌧️",
+      Drizzle: "🌦️",
+      Thunderstorm: "⛈️",
+      Snow: "❄️",
+      Mist: "🌫️",
+      Fog: "🌫️",
+      Haze: "🌫️",
+    };
+    return emojiMap[condition] || "🌤️";
   }
 
   /**
-   * 💨 미세먼지 등급 판정 (기존 유지)
+   * 😷 미세먼지 등급별 이모지
    */
-  getDustLevel(value, type) {
-    const levels = {
-      pm25: [
-        {
-          max: 15,
-          level: "좋음",
-          emoji: "😊",
-          description: "좋음 - 외출하기 좋은 날씨입니다",
-        },
-        {
-          max: 35,
-          level: "보통",
-          emoji: "😐",
-          description: "보통 - 일반적인 야외활동 가능합니다",
-        },
-        {
-          max: 75,
-          level: "나쁨",
-          emoji: "😷",
-          description: "나쁨 - 마스크 착용을 권장합니다",
-        },
-        {
-          max: Infinity,
-          level: "매우나쁨",
-          emoji: "😨",
-          description: "매우나쁨 - 외출을 자제해주세요",
-        },
-      ],
-      pm10: [
-        {
-          max: 30,
-          level: "좋음",
-          emoji: "😊",
-          description: "좋음 - 외출하기 좋은 날씨입니다",
-        },
-        {
-          max: 80,
-          level: "보통",
-          emoji: "😐",
-          description: "보통 - 일반적인 야외활동 가능합니다",
-        },
-        {
-          max: 150,
-          level: "나쁨",
-          emoji: "😷",
-          description: "나쁨 - 마스크 착용을 권장합니다",
-        },
-        {
-          max: Infinity,
-          level: "매우나쁨",
-          emoji: "😨",
-          description: "매우나쁨 - 외출을 자제해주세요",
-        },
+  getDustEmoji(grade) {
+    const emojiMap = {
+      좋음: "😊",
+      보통: "🙂",
+      나쁨: "😷",
+      매우나쁨: "🚨",
+    };
+    return emojiMap[grade] || "❓";
+  }
+
+  /**
+   * 🎯 미세먼지 등급 판정
+   */
+  getDustGrade(value, type) {
+    const numValue = parseInt(value);
+    if (isNaN(numValue)) return "알 수 없음";
+
+    if (type === "pm25") {
+      if (numValue <= 15) return "좋음";
+      if (numValue <= 35) return "보통";
+      if (numValue <= 75) return "나쁨";
+      return "매우나쁨";
+    } else {
+      if (numValue <= 30) return "좋음";
+      if (numValue <= 80) return "보통";
+      if (numValue <= 150) return "나쁨";
+      return "매우나쁨";
+    }
+  }
+
+  /**
+   * ❓ 도움말 렌더링
+   */
+  async renderHelp(data, ctx) {
+    let text = "❓ *날씨 모듈 도움말*\n\n";
+
+    text += "🌤️ **사용 가능한 기능**:\n";
+    text += "• 🌡️ 현재 날씨 조회\n";
+    text += "• 💨 미세먼지 정보\n";
+    text += "• 🌍 통합 대시보드\n";
+    text += "• 🔄 실시간 업데이트\n\n";
+
+    text += "📍 **위치 감지 방법**:\n";
+    text += "• 자동으로 대략적인 위치를 파악합니다\n";
+    text += "• 더 정확한 위치는 직접 설정 가능합니다\n";
+    text += "• 위치 정보는 1시간 동안 저장됩니다\n\n";
+
+    text += "⏰ **업데이트 주기**:\n";
+    text += "• 날씨: 10분마다 갱신\n";
+    text += "• 미세먼지: 실시간 조회\n";
+    text += "• 위치 캐시: 1시간 유지\n\n";
+
+    text += "💡 **팁**:\n";
+    text += "• GPS 위치는 자동으로 감지됩니다\n";
+    text += "• 새로고침으로 최신 정보를 확인하세요\n";
+    text += "• 미세먼지 나쁨 이상일 때 마스크 착용을 권장합니다";
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
       ],
     };
 
-    const thresholds = levels[type] || levels.pm25;
-
-    for (const threshold of thresholds) {
-      if (value <= threshold.max) {
-        return threshold;
-      }
-    }
-
-    return thresholds[thresholds.length - 1];
+    await this.sendMessage(
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      text,
+      keyboard,
+      ctx.callbackQuery?.message?.message_id
+    );
   }
 
   /**
-   * 🌡️ 온도별 이모지 (개선됨)
+   * 📊 상태 렌더링
    */
-  getTemperatureEmoji(temp) {
-    if (temp === null || temp === undefined) return "❓";
+  async renderStatus(data, ctx) {
+    let text = "📊 *날씨 서비스 상태*\n\n";
 
-    if (temp >= 35) return "🔥"; // 매우 더움
-    if (temp >= 30) return "😵"; // 더움
-    if (temp >= 25) return "😎"; // 따뜻함
-    if (temp >= 20) return "😊"; // 좋음
-    if (temp >= 15) return "🙂"; // 약간 시원
-    if (temp >= 10) return "😐"; // 시원
-    if (temp >= 5) return "🥶"; // 춥다
-    if (temp >= 0) return "🧊"; // 매우 춥다
-    return "❄️"; // 극한 추위
+    if (data.data) {
+      const status = data.data;
+
+      text += "**서비스 상태**:\n";
+      text += `• 초기화: ${status.initialized ? "✅" : "❌"}\n`;
+      text += `• 날씨 서비스: ${status.services?.weather || "Unknown"}\n`;
+      text += `• 미세먼지 서비스: ${status.services?.dust || "Unknown"}\n`;
+      text += `• 위치 서비스: ${status.services?.location || "Unknown"}\n\n`;
+
+      if (status.stats) {
+        text += "**통계**:\n";
+        text += `• 날씨 요청: ${status.stats.weatherRequests || 0}회\n`;
+        text += `• 미세먼지 요청: ${status.stats.dustRequests || 0}회\n`;
+        text += `• GPS 요청: ${status.stats.gpsRequests || 0}회\n`;
+        text += `• 위치 캐시 히트: ${status.stats.locationCacheHits || 0}회\n`;
+        text += `• 오류: ${status.stats.errors || 0}회\n\n`;
+      }
+
+      if (status.cache) {
+        text += "**캐시 정보**:\n";
+        text += `• 사용자 위치: ${status.cache.userLocations || 0}개\n\n`;
+      }
+
+      text += `**마지막 업데이트**: ${status.lastUpdate || "없음"}`;
+    }
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
+      ],
+    };
+
+    await this.sendMessage(
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      text,
+      keyboard,
+      ctx.callbackQuery?.message?.message_id
+    );
+  }
+
+  /**
+   * ❌ 에러 렌더링
+   */
+  async renderError(data, ctx) {
+    let text = "❌ *오류 발생*\n\n";
+    text += this.escapeMarkdownV2(
+      data.message || "알 수 없는 오류가 발생했습니다."
+    );
+
+    if (data.data?.canRetry) {
+      text += "\n\n다시 시도해주세요\\.";
+    }
+
+    if (data.data?.suggestions) {
+      text += "\n\n💡 **제안사항**:\n";
+      data.data.suggestions.forEach((suggestion) => {
+        text += `• ${this.escapeMarkdownV2(suggestion)}\n`;
+      });
+    }
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
+      ],
+    };
+
+    await this.sendMessage(
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      text,
+      keyboard,
+      ctx.callbackQuery?.message?.message_id
+    );
+  }
+
+  /**
+   * 📊 상태 렌더링
+   */
+  async renderStatus(data, ctx) {
+    let text = "📊 *날씨 서비스 상태*\n\n";
+
+    if (data.data) {
+      const status = data.data;
+
+      text += "**서비스 상태**:\n";
+      text += `• 초기화: ${status.initialized ? "✅" : "❌"}\n`;
+      text += `• 날씨 서비스: ${status.services?.weather || "Unknown"}\n`;
+      text += `• 미세먼지 서비스: ${status.services?.dust || "Unknown"}\n`;
+      text += `• 위치 서비스: ${status.services?.location || "Unknown"}\n\n`;
+
+      if (status.stats) {
+        text += "**통계**:\n";
+        text += `• 날씨 요청: ${status.stats.weatherRequests || 0}회\n`;
+        text += `• 미세먼지 요청: ${status.stats.dustRequests || 0}회\n`;
+        text += `• GPS 요청: ${status.stats.gpsRequests || 0}회\n`;
+        text += `• 위치 캐시 히트: ${status.stats.locationCacheHits || 0}회\n`;
+        text += `• 오류: ${status.stats.errors || 0}회\n\n`;
+      }
+
+      if (status.cache) {
+        text += "**캐시 정보**:\n";
+        text += `• 사용자 위치: ${status.cache.userLocations || 0}개\n\n`;
+      }
+
+      text += `**마지막 업데이트**: ${status.lastUpdate || "없음"}`;
+    }
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
+      ],
+    };
+
+    await this.sendMessage(
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      text,
+      keyboard,
+      ctx.callbackQuery?.message?.message_id
+    );
+  }
+  /**
+   * ❌ 에러 렌더링
+   */
+  async renderError(data, ctx) {
+    let text = "❌ *오류 발생*\n\n";
+    text += this.escapeMarkdownV2(
+      data.message || "알 수 없는 오류가 발생했습니다."
+    );
+
+    if (data.data?.canRetry) {
+      text += "\n\n다시 시도해주세요\\.";
+    }
+
+    if (data.data?.suggestions) {
+      text += "\n\n💡 **제안사항**:\n";
+      data.data.suggestions.forEach((suggestion) => {
+        text += `• ${this.escapeMarkdownV2(suggestion)}\n`;
+      });
+    }
+
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
+      ],
+    };
+
+    await this.sendMessage(
+      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      text,
+      keyboard,
+      ctx.callbackQuery?.message?.message_id
+    );
   }
 }
-
 module.exports = WeatherRenderer;

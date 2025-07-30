@@ -53,7 +53,7 @@ const MODULES = [
   {
     key: "reminder",
     name: "리마인더",
-    enabled: true,
+    enabled: false,
     enhanced: false,
     path: path.join(__dirname, "../modules/ReminderModule"),
     description: "알림 설정, 반복 알림",
@@ -64,7 +64,7 @@ const MODULES = [
     enabled: true,
     enhanced: false,
     path: path.join(__dirname, "../modules/FortuneModule"),
-    description: "오늘의 운세, 타로 카드",
+    description: "타로 카드",
   },
   {
     key: "weather",
@@ -72,7 +72,7 @@ const MODULES = [
     enabled: true,
     enhanced: false,
     path: path.join(__dirname, "../modules/WeatherModule"),
-    description: "현재 날씨, 주간 예보",
+    description: "현재 날씨, 미세 먼지",
   },
   {
     key: "tts",
