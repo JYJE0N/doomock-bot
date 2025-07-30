@@ -1,4 +1,4 @@
-// src/utils/LocationHelper.js - GPS 위치 감지 개선
+// src/utils/LocationHelper.js - Railway 환경 대응 수정
 
 const axios = require("axios");
 const logger = require("./Logger");
@@ -9,10 +9,18 @@ const logger = require("./Logger");
 class LocationHelper {
   constructor() {
     this.cache = new Map();
-    this.cacheTimeout = 10 * 60 * 1000; // 10분 (실시간성을 위해 짧게)
+    this.cacheTimeout = 10 * 60 * 1000; // 10분
     this.kakaoApiKey = process.env.KAKAO_API_KEY;
 
-    // IP 기반 위치 서비스 URL들 (백업용)
+    // Railway 환경 확인
+    this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
+    this.isProduction = process.env.NODE_ENV === "production";
+
+    // 환경변수에서 기본 위치 설정
+    this.defaultLocation = process.env.DEFAULT_LOCATION || "화성시";
+    this.defaultRegion = process.env.DEFAULT_REGION || "경기도";
+
+    // IP 기반 위치 서비스 URL들
     this.ipServices = [
       "https://ipapi.co/json/",
       "http://ip-api.com/json/",
@@ -21,18 +29,14 @@ class LocationHelper {
 
     logger.info("📍 LocationHelper 초기화", {
       hasKakaoKey: !!this.kakaoApiKey,
+      isRailway: this.isRailway,
+      defaultLocation: this.defaultLocation,
       cacheTimeout: this.cacheTimeout,
     });
   }
 
   /**
    * 🎯 자동 위치 감지 - 사용자별 저장된 위치 우선
-   *
-   * 우선순위:
-   * 1. 사용자가 설정한 위치 (DB)
-   * 2. 캐시된 위치
-   * 3. IP 기반 위치 감지
-   * 4. 기본값 (화성시)
    */
   async detectLocation(userId, userPreferredLocation = null) {
     try {
@@ -51,10 +55,18 @@ class LocationHelper {
         return cached;
       }
 
-      // 3. IP 기반 위치 감지 (실제로는 이것만 사용)
+      // 3. Railway 프로덕션 환경에서는 IP 감지 스킵하고 기본값 사용
+      if (this.isRailway && this.isProduction) {
+        logger.info(
+          `🚂 Railway 환경 - 기본 위치 사용: ${this.defaultLocation}`
+        );
+        return this.getDefaultLocation();
+      }
+
+      // 4. 개발 환경에서만 IP 기반 위치 감지
       try {
         const location = await this.detectByIP();
-        if (location && location.city) {
+        if (location && location.city && location.city !== "Singapore") {
           logger.info(`📡 IP 위치 감지 성공: ${location.city}`);
           this.setCache(userId, location);
           return location;
@@ -63,8 +75,8 @@ class LocationHelper {
         logger.warn("IP 위치 감지 실패:", error.message);
       }
 
-      // 4. 기본값
-      logger.info("📌 기본 위치 사용: 화성시");
+      // 5. 기본값 사용
+      logger.info(`📌 기본 위치 사용: ${this.defaultLocation}`);
       return this.getDefaultLocation();
     } catch (error) {
       logger.error("위치 감지 전체 실패:", error);
@@ -113,6 +125,106 @@ class LocationHelper {
   }
 
   /**
+   * 🌐 IP 기반 위치 감지 (개선됨)
+   */
+  async detectByIP() {
+    // Railway 환경에서는 스킵
+    if (this.isRailway) {
+      logger.debug("Railway 환경에서 IP 감지 스킵");
+      return null;
+    }
+
+    for (const serviceUrl of this.ipServices) {
+      try {
+        logger.debug(`IP 서비스 시도: ${serviceUrl}`);
+
+        const response = await axios.get(serviceUrl, {
+          timeout: 3000,
+          headers: { "User-Agent": "DoomockBot/1.0" },
+        });
+
+        const data = response.data;
+
+        // 각 서비스별 응답 형식 처리
+        if (serviceUrl.includes("ipapi.co")) {
+          if (data.city && data.country === "KR") {
+            const cityName = data.city;
+            const regionName = data.region;
+
+            // 싱가포르나 외국 도시는 무시
+            if (cityName === "Singapore" || data.country !== "KR") {
+              logger.debug("외국 IP 감지됨, 스킵");
+              continue;
+            }
+
+            const cityMap = {
+              Seoul: "서울",
+              Busan: "부산",
+              Daegu: "대구",
+              Incheon: "인천",
+              Gwangju: "광주",
+              Daejeon: "대전",
+              Ulsan: "울산",
+              Suwon: "수원시",
+              "Suwon-si": "수원시",
+              Yongin: "용인시",
+              "Yongin-si": "용인시",
+              Seongnam: "성남시",
+              "Seongnam-si": "성남시",
+              Hwaseong: "화성시",
+              "Hwaseong-si": "화성시",
+              Anyang: "안양시",
+              "Anyang-si": "안양시",
+              Yangju: "양주시",
+              "Yangju-si": "양주시",
+            };
+
+            const city = cityMap[cityName] || cityName;
+
+            return {
+              city: city,
+              simpleCity: city,
+              district: "",
+              fullAddress: city,
+              region: regionName || this.getRegionByCity(city),
+              country: "KR",
+              lat: data.latitude || 37.5665,
+              lon: data.longitude || 126.978,
+              confidence: 0.6,
+              method: "ip_detection",
+              timestamp: new Date(),
+            };
+          }
+        } else if (serviceUrl.includes("ip-api.com")) {
+          if (data.status === "success" && data.countryCode === "KR") {
+            // 비슷한 처리...
+            if (data.city === "Singapore") continue;
+
+            return {
+              city: data.city,
+              simpleCity: data.city,
+              district: "",
+              fullAddress: data.city,
+              region: data.regionName || this.getRegionByCity(data.city),
+              country: "KR",
+              lat: data.lat,
+              lon: data.lon,
+              confidence: 0.6,
+              method: "ip_detection",
+              timestamp: new Date(),
+            };
+          }
+        }
+      } catch (error) {
+        logger.debug(`IP 서비스 실패 (${serviceUrl}):`, error.message);
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * 🗺️ 도시명으로 지역(도) 추정
    */
   getRegionByCity(city) {
@@ -138,192 +250,57 @@ class LocationHelper {
       고양시: "경기도",
       남양주시: "경기도",
       파주시: "경기도",
+      김포시: "경기도",
+      광명시: "경기도",
+      군포시: "경기도",
+      하남시: "경기도",
+      오산시: "경기도",
+      이천시: "경기도",
+      안성시: "경기도",
+      의왕시: "경기도",
+      양평군: "경기도",
+      여주시: "경기도",
+      과천시: "경기도",
       // 다른 지역들...
     };
 
-    return regionMap[city] || "경기도";
+    return regionMap[city] || this.defaultRegion;
   }
 
   /**
-   * 🗺️ 카카오 API로 지역명 검색 (향후 구현용)
-   *
-   * 참고: 현재는 IP 기반 위치만 사용
-   * 향후 사용자가 입력한 지역명으로 좌표를 찾는 기능 추가 가능
-   */
-  async searchLocationByKakao(locationName) {
-    if (!this.kakaoApiKey) {
-      logger.warn("카카오 API 키가 없어 지역 검색 불가");
-      return null;
-    }
-
-    try {
-      // 카카오 주소 검색 API
-      const response = await axios.get(
-        "https://dapi.kakao.com/v2/local/search/address.json",
-        {
-          params: {
-            query: locationName,
-            size: 1,
-          },
-          headers: {
-            Authorization: `KakaoAK ${this.kakaoApiKey}`,
-          },
-          timeout: 5000,
-        }
-      );
-
-      if (response.data.documents && response.data.documents.length > 0) {
-        const doc = response.data.documents[0];
-
-        return {
-          city: doc.address_name,
-          simpleCity: doc.address_name.split(" ")[1] || doc.address_name,
-          district: "",
-          fullAddress: doc.address_name,
-          region: doc.address_name.split(" ")[0],
-          country: "KR",
-          lat: parseFloat(doc.y),
-          lon: parseFloat(doc.x),
-          confidence: 0.8,
-          method: "kakao_search",
-          timestamp: new Date(),
-        };
-      }
-
-      return null;
-    } catch (error) {
-      logger.error("카카오 지역 검색 실패:", error.message);
-      return null;
-    }
-  }
-
-  /**
-   * 🌐 IP 기반 위치 감지 (개선)
-   */
-  async detectByIP() {
-    // 여러 IP 서비스 시도
-    for (const serviceUrl of this.ipServices) {
-      try {
-        const response = await axios.get(serviceUrl, {
-          timeout: 3000,
-          headers: {
-            "User-Agent": "TelegramBot/1.0",
-          },
-        });
-
-        if (response.data) {
-          // 서비스별 데이터 정규화
-          let cityName, regionName, lat, lon;
-
-          if (serviceUrl.includes("ipapi.co")) {
-            cityName = response.data.city;
-            regionName = response.data.region;
-            lat = response.data.latitude;
-            lon = response.data.longitude;
-          } else if (serviceUrl.includes("ip-api.com")) {
-            cityName = response.data.city;
-            regionName = response.data.regionName;
-            lat = response.data.lat;
-            lon = response.data.lon;
-          } else if (serviceUrl.includes("ipinfo.io")) {
-            cityName = response.data.city;
-            regionName = response.data.region;
-            const [latStr, lonStr] = (response.data.loc || "").split(",");
-            lat = parseFloat(latStr);
-            lon = parseFloat(lonStr);
-          }
-
-          if (cityName) {
-            // 영문 도시명을 한글로 매핑 (확장)
-            const cityMap = {
-              Seoul: "서울",
-              Busan: "부산",
-              Incheon: "인천",
-              Daegu: "대구",
-              Daejeon: "대전",
-              Gwangju: "광주",
-              Ulsan: "울산",
-              Suwon: "수원시",
-              "Suwon-si": "수원시",
-              Yongin: "용인시",
-              "Yongin-si": "용인시",
-              Seongnam: "성남시",
-              "Seongnam-si": "성남시",
-              Hwaseong: "화성시",
-              "Hwaseong-si": "화성시",
-              Ansan: "안산시",
-              "Ansan-si": "안산시",
-              Anyang: "안양시",
-              "Anyang-si": "안양시",
-              Bucheon: "부천시",
-              "Bucheon-si": "부천시",
-              Pyeongtaek: "평택시",
-              "Pyeongtaek-si": "평택시",
-              Goyang: "고양시",
-              "Goyang-si": "고양시",
-              Namyangju: "남양주시",
-              "Namyangju-si": "남양주시",
-              Uijeongbu: "의정부시",
-              "Uijeongbu-si": "의정부시",
-              Paju: "파주시",
-              "Paju-si": "파주시",
-              Gimpo: "김포시",
-              "Gimpo-si": "김포시",
-              Gwangmyeong: "광명시",
-              "Gwangmyeong-si": "광명시",
-              Siheung: "시흥시",
-              "Siheung-si": "시흥시",
-              Gunpo: "군포시",
-              "Gunpo-si": "군포시",
-              Uiwang: "의왕시",
-              "Uiwang-si": "의왕시",
-              Hanam: "하남시",
-              "Hanam-si": "하남시",
-              Osan: "오산시",
-              "Osan-si": "오산시",
-              Yangju: "양주시",
-              "Yangju-si": "양주시",
-            };
-
-            const city = cityMap[cityName] || cityName;
-
-            return {
-              city: city,
-              simpleCity: city,
-              district: "",
-              fullAddress: city,
-              region: regionName || "경기도",
-              country: "KR",
-              lat: lat || 37.5665,
-              lon: lon || 126.978,
-              confidence: 0.6,
-              method: "ip_detection",
-              timestamp: new Date(),
-            };
-          }
-        }
-      } catch (error) {
-        logger.debug(`IP 서비스 실패 (${serviceUrl}):`, error.message);
-        continue; // 다음 서비스 시도
-      }
-    }
-
-    return null;
-  }
-
-  /**
-   * 🏠 기본 위치
+   * 🏠 기본 위치 (환경변수 기반)
    */
   getDefaultLocation() {
-    return {
-      city: "화성시",
-      simpleCity: "화성시",
-      district: "동탄",
-      fullAddress: "화성시 동탄",
-      region: "경기도",
-      country: "KR",
+    const defaultCity = this.defaultLocation;
+    const defaultRegion = this.getRegionByCity(defaultCity);
+
+    // 주요 도시별 좌표
+    const cityCoordinates = {
+      서울: { lat: 37.5665, lon: 126.978 },
+      수원시: { lat: 37.2636, lon: 127.0286 },
+      용인시: { lat: 37.2411, lon: 127.1775 },
+      성남시: { lat: 37.42, lon: 127.1267 },
+      화성시: { lat: 37.2063, lon: 127.0728 },
+      안양시: { lat: 37.3943, lon: 126.9568 },
+      부천시: { lat: 37.5037, lon: 126.766 },
+      평택시: { lat: 36.9921, lon: 127.1125 },
+      안산시: { lat: 37.3219, lon: 126.8309 },
+    };
+
+    const coords = cityCoordinates[defaultCity] || {
       lat: 37.2063,
       lon: 127.0728,
+    };
+
+    return {
+      city: defaultCity,
+      simpleCity: defaultCity,
+      district: "",
+      fullAddress: defaultCity,
+      region: defaultRegion,
+      country: "KR",
+      lat: coords.lat,
+      lon: coords.lon,
       confidence: 0.3,
       method: "default",
       timestamp: new Date(),
@@ -371,6 +348,8 @@ class LocationHelper {
     return {
       size: this.cache.size,
       timeout: this.cacheTimeout,
+      isRailway: this.isRailway,
+      defaultLocation: this.defaultLocation,
     };
   }
 }

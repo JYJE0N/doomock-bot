@@ -4,3 +4,5 @@ replicas = 1
 
 [env]
 NODE_ENV = "production"
+DEFAULT_LOCATION = "수원시"  # 기본 위치 설정
+DEFAULT_REGION = "경기도"
