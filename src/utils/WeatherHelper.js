@@ -37,6 +37,44 @@ class WeatherHelper {
   }
 
   /**
+   * 🗺️ 도시명 매핑 (한국 도시 우선 처리)
+   */
+  static getCityMapping(city) {
+    const cityMapping = {
+      서울: "Seoul,KR",
+      서울시: "Seoul,KR",
+      부산: "Busan,KR",
+      부산시: "Busan,KR",
+      대구: "Daegu,KR",
+      대구시: "Daegu,KR",
+      인천: "Incheon,KR",
+      인천시: "Incheon,KR",
+      광주: "Gwangju,KR",
+      광주시: "Gwangju,KR",
+      대전: "Daejeon,KR",
+      대전시: "Daejeon,KR",
+      울산: "Ulsan,KR",
+      울산시: "Ulsan,KR",
+      화성: "Hwaseong,KR",
+      화성시: "Hwaseong,KR",
+      수원: "Suwon,KR",
+      수원시: "Suwon,KR",
+      용인: "Yongin,KR",
+      용인시: "Yongin,KR",
+      안산: "Ansan,KR",
+      안산시: "Ansan,KR",
+      부천: "Bucheon,KR",
+      부천시: "Bucheon,KR",
+    };
+
+    const normalized = city.trim();
+    const mapped = cityMapping[normalized] || cityMapping[normalized + "시"];
+
+    // 매핑 테이블에 있으면 그 값을 사용하고, 없으면 국가 코드 없이 도시 이름만 반환
+    return mapped || normalized;
+  }
+
+  /**
    * 🎯 핵심 메서드: API 호출 + Weather 모델 조율
    */
   async getCurrentWeather(location) {
@@ -57,7 +95,7 @@ class WeatherHelper {
       }
 
       // 3. 도시명 변환 (Weather 모델 활용)
-      const mappedCity = Weather.getCityMapping(location);
+      const mappedCity = WeatherHelper.getCityMapping(location);
       logger.info(`🌐 날씨 API 요청: ${location} → ${mappedCity}`);
 
       // 4. API 호출 (순수 HTTP 통신)
