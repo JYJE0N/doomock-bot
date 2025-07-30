@@ -8,8 +8,9 @@ const TimeHelper = require("../utils/TimeHelper");
  * 🌤️ WeatherRenderer - GPS 위치 표시 개선
  */
 class WeatherRenderer extends BaseRenderer {
-  constructor() {
-    super();
+  constructor(bot, navigationHandler) {
+    // ⭐️ 이 부분을 수정했습니다!
+    super(bot, navigationHandler); // ⭐️ bot과 navigationHandler를 부모로 전달합니다.
     logger.info("🌤️ WeatherRenderer 생성됨");
   }
 
@@ -220,65 +221,36 @@ class WeatherRenderer extends BaseRenderer {
 
       // PM2.5 정보
       if (dust.pm25) {
-        // 값 안전하게 추출
-        let pm25Value = "-";
-        let pm25Grade = "알 수 없음";
-
-        if (typeof dust.pm25 === "object" && dust.pm25.value !== undefined) {
-          pm25Value = dust.pm25.value;
-          pm25Grade = dust.pm25.grade || this.getDustGrade(pm25Value, "pm25");
-        } else if (
-          typeof dust.pm25 === "string" ||
-          typeof dust.pm25 === "number"
-        ) {
-          pm25Value = dust.pm25;
-          pm25Grade = this.getDustGrade(pm25Value, "pm25");
-        }
-
+        const pm25Value = dust.pm25.value || dust.pm25;
+        const pm25Grade =
+          dust.pm25.grade || this.getDustGrade(pm25Value, "pm25");
         const pm25Emoji = this.getDustEmoji(pm25Grade);
-        text += `🔸 **초미세먼지\\(PM2\\.5\\)**: ${pm25Value}㎍/㎥ ${pm25Emoji}\n`;
+        text += `🔸 **초미세먼지\\(PM2\\.5\\)**: ${pm25Value}${
+          dust.pm25.unit || "㎍/㎥"
+        } ${pm25Emoji}\n`;
         text += `   상태: ${this.escapeMarkdownV2(pm25Grade)}\n\n`;
       }
 
       // PM10 정보
       if (dust.pm10) {
-        // 값 안전하게 추출
-        let pm10Value = "-";
-        let pm10Grade = "알 수 없음";
-
-        if (typeof dust.pm10 === "object" && dust.pm10.value !== undefined) {
-          pm10Value = dust.pm10.value;
-          pm10Grade = dust.pm10.grade || this.getDustGrade(pm10Value, "pm10");
-        } else if (
-          typeof dust.pm10 === "string" ||
-          typeof dust.pm10 === "number"
-        ) {
-          pm10Value = dust.pm10;
-          pm10Grade = this.getDustGrade(pm10Value, "pm10");
-        }
-
+        const pm10Value = dust.pm10.value || dust.pm10;
+        const pm10Grade =
+          dust.pm10.grade || this.getDustGrade(pm10Value, "pm10");
         const pm10Emoji = this.getDustEmoji(pm10Grade);
-        text += `🔹 **미세먼지\\(PM10\\)**: ${pm10Value}㎍/㎥ ${pm10Emoji}\n`;
+        text += `🔹 **미세먼지\\(PM10\\)**: ${pm10Value}${
+          dust.pm10.unit || "㎍/㎥"
+        } ${pm10Emoji}\n`;
         text += `   상태: ${this.escapeMarkdownV2(pm10Grade)}\n\n`;
       }
 
       // 종합 상태
       if (dust.overall) {
-        let overallGrade = "알 수 없음";
-        let overallEmoji = "❓";
-
-        if (typeof dust.overall === "object") {
-          overallGrade = dust.overall.grade || "알 수 없음";
-          overallEmoji = dust.overall.emoji || this.getDustEmoji(overallGrade);
-        } else if (typeof dust.overall === "string") {
-          overallGrade = dust.overall;
-          overallEmoji = this.getDustEmoji(overallGrade);
-        }
-
+        const overallGrade = dust.overall.grade || dust.overall;
+        const overallEmoji =
+          dust.overall.emoji || this.getDustEmoji(overallGrade);
         text += `📊 **종합 대기질**: ${this.escapeMarkdownV2(
           overallGrade
         )} ${overallEmoji}\n`;
-
         if (dust.overall.value && dust.overall.value !== "-") {
           text += `   통합지수: ${dust.overall.value}\n`;
         }
@@ -431,7 +403,7 @@ class WeatherRenderer extends BaseRenderer {
           { text: "❓ 도움말", callback_data: "weather:help" },
           { text: "📊 상태", callback_data: "weather:status" },
         ],
-        [{ text: "🔙 메인 메뉴", callback_data: "menu:main" }],
+        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
       ],
     };
 
@@ -614,84 +586,6 @@ class WeatherRenderer extends BaseRenderer {
       ctx.callbackQuery?.message?.message_id
     );
   }
-
-  /**
-   * 📊 상태 렌더링
-   */
-  async renderStatus(data, ctx) {
-    let text = "📊 *날씨 서비스 상태*\n\n";
-
-    if (data.data) {
-      const status = data.data;
-
-      text += "**서비스 상태**:\n";
-      text += `• 초기화: ${status.initialized ? "✅" : "❌"}\n`;
-      text += `• 날씨 서비스: ${status.services?.weather || "Unknown"}\n`;
-      text += `• 미세먼지 서비스: ${status.services?.dust || "Unknown"}\n`;
-      text += `• 위치 서비스: ${status.services?.location || "Unknown"}\n\n`;
-
-      if (status.stats) {
-        text += "**통계**:\n";
-        text += `• 날씨 요청: ${status.stats.weatherRequests || 0}회\n`;
-        text += `• 미세먼지 요청: ${status.stats.dustRequests || 0}회\n`;
-        text += `• GPS 요청: ${status.stats.gpsRequests || 0}회\n`;
-        text += `• 위치 캐시 히트: ${status.stats.locationCacheHits || 0}회\n`;
-        text += `• 오류: ${status.stats.errors || 0}회\n\n`;
-      }
-
-      if (status.cache) {
-        text += "**캐시 정보**:\n";
-        text += `• 사용자 위치: ${status.cache.userLocations || 0}개\n\n`;
-      }
-
-      text += `**마지막 업데이트**: ${status.lastUpdate || "없음"}`;
-    }
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
-      ],
-    };
-
-    await this.sendMessage(
-      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
-      text,
-      keyboard,
-      ctx.callbackQuery?.message?.message_id
-    );
-  }
-  /**
-   * ❌ 에러 렌더링
-   */
-  async renderError(data, ctx) {
-    let text = "❌ *오류 발생*\n\n";
-    text += this.escapeMarkdownV2(
-      data.message || "알 수 없는 오류가 발생했습니다."
-    );
-
-    if (data.data?.canRetry) {
-      text += "\n\n다시 시도해주세요\\.";
-    }
-
-    if (data.data?.suggestions) {
-      text += "\n\n💡 **제안사항**:\n";
-      data.data.suggestions.forEach((suggestion) => {
-        text += `• ${this.escapeMarkdownV2(suggestion)}\n`;
-      });
-    }
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔙 날씨 메뉴", callback_data: "weather:menu" }],
-      ],
-    };
-
-    await this.sendMessage(
-      ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
-      text,
-      keyboard,
-      ctx.callbackQuery?.message?.message_id
-    );
-  }
 }
+
 module.exports = WeatherRenderer;

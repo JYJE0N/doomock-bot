@@ -2,6 +2,7 @@
 const BaseRenderer = require("./BaseRenderer");
 const DoomockMessageGenerator = require("../utils/DoomockMessageGenerator");
 const { getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/Logger");
 
 /**
  * 🔊 TTSRenderer - TTS 음성변환 UI 렌더링 전담
@@ -29,35 +30,136 @@ class TTSRenderer extends BaseRenderer {
     switch (type) {
       case "menu":
         return await this.renderTTSMenu(data, ctx);
-
       case "input":
         return await this.renderTextInput(data, ctx);
-
       case "processing":
         return await this.renderProcessing(data, ctx);
-
       case "success":
         return await this.renderSuccess(data, ctx);
-
       case "voices":
       case "list":
         return await this.renderVoiceList(data, ctx);
-
       case "history":
         return await this.renderHistory(data, ctx);
-
       case "settings":
         return await this.renderSettings(data, ctx);
-
       case "help":
         return await this.renderHelp(data, ctx);
-
       case "empty":
         return await this.renderEmpty(data, ctx);
-
       default:
         return await this.renderError("지원하지 않는 TTS 기능입니다.", ctx);
     }
+  }
+
+  /**
+   * 🎤 음성 ID를 친숙한 한글 이름과 성별 정보로 변환합니다.
+   */
+  getLocalizedVoiceInfo(rawVoiceName) {
+    const voiceMap = {
+      "ko-KR-Chirp3-HD-Achird": { name: "대발", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Algenib": { name: "진수", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Algleba": { name: "민준", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Alnilam": { name: "성훈", gender: "MALE" },
+      "ko-KR-Chirp3-HD-Achernar": { name: "명자", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Aoede": { name: "선희", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Autonoe": { name: "지현", gender: "FEMALE" },
+      "ko-KR-Chirp3-HD-Callirrhoe": { name: "수진", gender: "FEMALE" },
+    };
+    const info = voiceMap[rawVoiceName];
+    if (info) return { localizedName: info.name, gender: info.gender };
+
+    const fallbackName = rawVoiceName.split("-").pop() || "새로운 목소리";
+    const isFemale = fallbackName.endsWith("a") || fallbackName.endsWith("e");
+    return {
+      localizedName: fallbackName,
+      gender: isFemale ? "FEMALE" : "MALE",
+    };
+  }
+
+  /**
+   * 🎭 음성 목록 렌더링 (성별 좌우 정렬 UI)
+   */
+  async renderVoiceList(data, ctx) {
+    let text = "🎭 *음성 선택*\n\n";
+    text += "원하는 목소리를 선택해주세요\\.\n";
+    text += "왼쪽은 *남성*, 오른쪽은 *여성* 음성입니다\\.\n\n";
+
+    const voices = data?.items || [];
+    if (voices.length === 0) {
+      text += "현재 사용 가능한 음성이 없습니다\\.";
+      const keyboard = {
+        inline_keyboard: [[{ text: "📋 TTS 메뉴", callback_data: "tts:menu" }]],
+      };
+      return await this.sendMessage(
+        ctx.callbackQuery.message.chat.id,
+        text,
+        keyboard,
+        ctx.callbackQuery.message.message_id
+      );
+    }
+
+    const maleVoices = [];
+    const femaleVoices = [];
+
+    voices.forEach((voice) => {
+      const rawVoiceName = voice.id || voice.title;
+      const { localizedName, gender } =
+        this.getLocalizedVoiceInfo(rawVoiceName);
+      const genderIcon = this.getGenderIcon(gender);
+      const voiceInfo = {
+        id: rawVoiceName,
+        name: localizedName,
+        icon: genderIcon,
+      };
+      if (gender === "MALE") maleVoices.push(voiceInfo);
+      else femaleVoices.push(voiceInfo);
+    });
+
+    text += "*(남성 음성)*\n";
+    maleVoices.forEach(
+      (v) => (text += `${v.icon} ${this.escapeMarkdownV2(v.name)}\n`)
+    );
+    text += "\n*(여성 음성)*\n";
+    femaleVoices.forEach(
+      (v) => (text += `${v.icon} ${this.escapeMarkdownV2(v.name)}\n`)
+    );
+
+    const keyboard = { inline_keyboard: [] };
+    const maxRows = Math.max(maleVoices.length, femaleVoices.length);
+
+    for (let i = 0; i < maxRows; i++) {
+      const row = [];
+      if (maleVoices[i]) {
+        row.push({
+          text: `${maleVoices[i].icon} ${maleVoices[i].name}`,
+          callback_data: `tts:voice:${maleVoices[i].id}`,
+        });
+      } else {
+        row.push({ text: " ", callback_data: "tts:no_op" });
+      }
+      if (femaleVoices[i]) {
+        row.push({
+          text: `${femaleVoices[i].icon} ${femaleVoices[i].name}`,
+          callback_data: `tts:voice:${femaleVoices[i].id}`,
+        });
+      } else {
+        row.push({ text: " ", callback_data: "tts:no_op" });
+      }
+      keyboard.inline_keyboard.push(row);
+    }
+
+    keyboard.inline_keyboard.push([
+      { text: "🔄 새로고침", callback_data: "tts:voices" },
+      { text: "📋 TTS 메뉴", callback_data: "tts:menu" },
+    ]);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      text,
+      keyboard,
+      ctx.callbackQuery.message.message_id
+    );
   }
 
   /**
@@ -491,7 +593,7 @@ class TTSRenderer extends BaseRenderer {
     text += "• 언어별 최적화된 음성\n\n";
 
     text += "📏 *제한사항*:\n";
-    text += "• 최대 5000자까지 변환 가능\n";
+    text += "• 최대 5\\,000자까지 변환 가능\n";
     text += "• 한 번에 하나의 텍스트만 처리\n";
     text += "• 일부 특수문자는 지원되지 않음\n\n";
 
@@ -580,24 +682,12 @@ class TTSRenderer extends BaseRenderer {
   /**
    * 👤 성별 아이콘 반환
    */
-  getGenderIcon(description) {
-    if (!description) return "🎭";
-
-    const desc = description.toLowerCase();
-    if (
-      desc.includes("female") ||
-      desc.includes("woman") ||
-      desc.includes("여성")
-    ) {
-      return "👩";
-    } else if (
-      desc.includes("male") ||
-      desc.includes("man") ||
-      desc.includes("남성")
-    ) {
-      return "👨";
-    }
-    return "🎭";
+  getGenderIcon(genderString) {
+    if (!genderString) return "👤";
+    const gender = genderString.toUpperCase();
+    if (gender.includes("FEMALE")) return "👩";
+    if (gender.includes("MALE")) return "👨";
+    return "👤";
   }
 
   /**

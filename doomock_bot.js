@@ -5,58 +5,6 @@ const BotController = require("./src/controllers/BotController");
 const { getRegistryStats } = require("./src/config/ModuleRegistry");
 const TimeHelper = require("./src/utils/TimeHelper");
 
-// 로그때문에 별짓을 다한다
-const originalStringify = JSON.stringify;
-JSON.stringify = function (value, replacer, space) {
-  // getStatus 결과인지 확인
-  if (
-    value &&
-    typeof value === "object" &&
-    (value.moduleName ||
-      value.serviceStatus ||
-      value.isInitialized !== undefined)
-  ) {
-    // 간단한 상태로 변환
-    let simpleStatus = "알 수 없음";
-
-    if (value.isInitialized === false) {
-      simpleStatus = "⏳ 준비 중";
-    } else if (value.serviceStatus) {
-      switch (value.serviceStatus.toLowerCase()) {
-        case "connected":
-          simpleStatus = "✅ 준비됨";
-          break;
-        case "not connected":
-          simpleStatus = "🔌 연결 대기";
-          break;
-        case "connecting":
-          simpleStatus = "🔄 연결 중";
-          break;
-        case "error":
-          simpleStatus = "❌ 오류";
-          break;
-        default:
-          simpleStatus = value.serviceStatus;
-          break;
-      }
-    } else if (value.isConnected !== undefined) {
-      simpleStatus = value.isConnected ? "✅ 준비됨" : "🔌 연결 대기";
-    } else if (value.errorsCount > 0 || value.stats?.errorsCount > 0) {
-      const errorCount = value.errorsCount || value.stats.errorsCount;
-      simpleStatus = `❌ 오류 (${errorCount}건)`;
-    } else if (value.isInitialized === true) {
-      simpleStatus = "✅ 준비됨";
-    } else if (value.moduleName) {
-      simpleStatus = "🟢 활성";
-    }
-
-    return simpleStatus;
-  }
-
-  // 일반 객체는 원래대로
-  return originalStringify.call(this, value, replacer, space);
-};
-
 /**
  * 🚀 DooMockBot v3.0.1 - 안정화 버전
  *
@@ -66,12 +14,6 @@ JSON.stringify = function (value, replacer, space) {
  * - Railway 최적화
  * - 우아한 종료 처리
  */
-
-console.log("Logger 타입:", typeof logger);
-console.log(
-  "Logger 메서드들:",
-  Object.getOwnPropertyNames(Object.getPrototypeOf(logger))
-);
 
 class DooMockBot {
   constructor() {

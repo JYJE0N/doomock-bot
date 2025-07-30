@@ -70,13 +70,55 @@ class TTSModule extends BaseModule {
       menu: this.showMenu,
       convert: this.startConvert,
       voices: this.showVoices,
+      voice: this.selectVoice, // ⭐️ 음성 선택 액션을 여기에 추가했습니다!
       history: this.showHistory,
       settings: this.showSettings,
       help: this.showHelp,
     });
-
     logger.module("TTSModule", "액션 등록 완료", {
       count: this.actionMap.size,
+    });
+  }
+
+  /**
+   * 🎭 음성 선택 처리
+   */
+  async selectVoice(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+    const selectedVoice = params;
+    logger.info("tts", "voice_selected", { userId, selectedVoice });
+    try {
+      this.setUserState(userId, {
+        waitingFor: "tts_text",
+        action: "convert",
+        voice: selectedVoice,
+        language: this.config.defaultLanguage,
+      });
+      return {
+        type: "input",
+        module: "tts",
+        data: {
+          maxLength: this.config.maxTextLength,
+          language: this.config.defaultLanguage,
+        },
+      };
+    } catch (error) {
+      logger.error("음성 선택 처리 실패", error);
+      return { type: "error", message: "음성 선택 처리에 실패했습니다." };
+    }
+  }
+
+  isModuleMessage(text, keywords) {
+    if (!text || !keywords || keywords.length === 0) {
+      return false;
+    }
+    const lowerText = text.trim().toLowerCase();
+    return keywords.some((keyword) => {
+      const lowerKeyword = keyword.toLowerCase();
+      return (
+        lowerText === lowerKeyword || lowerText.startsWith(lowerKeyword + " ")
+      );
     });
   }
 
@@ -196,6 +238,11 @@ class TTSModule extends BaseModule {
   /**
    * 텍스트 입력 처리
    */
+  // ⭐️⭐️⭐️ [시작] 이 함수가 수정되었습니다 ⭐️⭐️⭐️
+
+  /**
+   * 텍스트 입력 처리
+   */
   async handleTextInput(bot, msg) {
     const {
       text,
@@ -204,7 +251,6 @@ class TTSModule extends BaseModule {
     } = msg;
 
     try {
-      // 길이 검증
       if (text.length > this.config.maxTextLength) {
         await bot.telegram.sendMessage(
           chatId,
@@ -213,85 +259,46 @@ class TTSModule extends BaseModule {
         return;
       }
 
-      // 처리 중 메시지
       const processingMsg = await bot.telegram.sendMessage(
         chatId,
         "🔊 음성 변환 중... 잠시만 기다려주세요."
       );
-
-      // 사용자 상태 가져오기
       const userState = this.getUserState(userId);
 
-      // TTS 변환 요청
+      // TTS 변환 요청 시 voiceName도 함께 전달합니다.
       const result = await this.ttsService.textToSpeech(text, {
         languageCode: userState.language,
+        voiceName: userState.voice, // ⭐️ 선택한 목소리 정보를 여기에 추가!
       });
 
       if (result.success) {
-        try {
-          // 🔧 파일 스트림으로 전송 (올바른 방식)
-          const audioStream = fs.createReadStream(result.filePath);
-
-          await bot.telegram.sendVoice(
-            chatId,
-            {
-              source: audioStream,
-              filename: "voice.ogg", // 파일명 지정
-            },
-            {
-              caption: `🎵 변환 완료!\n길이: 약 ${result.duration}초`,
-              reply_markup: {
-                inline_keyboard: [
-                  [
-                    { text: "🔊 다시 변환", callback_data: "tts:convert" },
-                    { text: "🎭 음성 변경", callback_data: "tts:voices" },
-                  ],
-                  [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
+        const audioStream = fs.createReadStream(result.filePath);
+        await bot.telegram.sendVoice(
+          chatId,
+          { source: audioStream, filename: "voice.ogg" },
+          {
+            caption: `🎵 변환 완료!\n목소리: ${result.voice}\n길이: 약 ${result.duration}초`,
+            reply_markup: {
+              inline_keyboard: [
+                [
+                  { text: "🔊 다시 변환", callback_data: "tts:convert" },
+                  { text: "🎭 음성 변경", callback_data: "tts:voices" },
                 ],
-              },
-            }
-          );
-
-          // 처리 중 메시지 삭제
-          await bot.telegram.deleteMessage(chatId, processingMsg.message_id);
-
-          // 🧹 임시 파일 정리 (선택사항)
-          try {
-            fs.unlinkSync(result.filePath);
-            logger.debug("🧹 임시 음성 파일 삭제됨");
-          } catch (cleanupError) {
-            logger.warn("임시 파일 삭제 실패:", cleanupError.message);
+                [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
+              ],
+            },
           }
-        } catch (sendError) {
-          logger.error("음성 파일 전송 실패:", sendError);
-
-          // 대안: Input Media로 전송 시도
-          try {
-            await bot.telegram.sendDocument(
-              chatId,
-              {
-                source: fs.createReadStream(result.filePath),
-                filename: "voice.ogg",
-              },
-              {
-                caption: `🎵 음성 파일 (${result.duration}초)`,
-                reply_markup: {
-                  inline_keyboard: [
-                    [{ text: "📋 메뉴로", callback_data: "tts:menu" }],
-                  ],
-                },
-              }
-            );
-          } catch (docError) {
-            logger.error("문서 전송도 실패:", docError);
-            throw sendError; // 원래 에러 던지기
-          }
+        );
+        await bot.telegram.deleteMessage(chatId, processingMsg.message_id);
+        try {
+          fs.unlinkSync(result.filePath);
+          logger.debug("🧹 임시 음성 파일 삭제됨");
+        } catch (cleanupError) {
+          logger.warn("임시 파일 삭제 실패:", cleanupError.message);
         }
       } else {
         await bot.telegram.sendMessage(chatId, "❌ 음성 변환에 실패했습니다.");
       }
-
-      // 사용자 상태 초기화
       this.clearUserState(userId);
     } catch (error) {
       logger.error("TTS 변환 오류:", error);
@@ -299,11 +306,11 @@ class TTSModule extends BaseModule {
         chatId,
         "❌ 음성 변환 중 오류가 발생했습니다."
       );
-
-      // 사용자 상태 초기화
       this.clearUserState(userId);
     }
   }
+
+  // ⭐️⭐️⭐️ [끝] 이 함수가 수정되었습니다 ⭐️⭐️⭐️
 
   /**
    * 음성 목록 표시
