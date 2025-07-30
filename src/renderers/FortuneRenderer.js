@@ -261,30 +261,50 @@ class FortuneRenderer extends BaseRenderer {
     const userName = getUserName(ctx.from || ctx.callbackQuery?.from);
 
     try {
-      // 데이터 구조 파싱
+      // 데이터 구조 안전하게 파싱
       let cards;
       let summary;
       let needsShuffle = false;
       let isSuccess = true;
 
+      // 🚨 수정: 더 안전한 데이터 파싱
       if (data?.fortune) {
-        isSuccess = data.fortune.success;
-        cards = data.fortune.cards;
-        summary = data.fortune.summary;
-        needsShuffle = data.fortune.needsShuffle !== false;
-      } else {
-        throw new Error("트리플카드 데이터를 찾을 수 없습니다");
+        isSuccess = data.fortune.success !== false;
+
+        if (data.fortune.type === "triple_cards") {
+          cards = data.fortune.cards;
+          summary = data.fortune.interpretation || data.fortune.summary;
+          needsShuffle = data.fortune.needsShuffle !== false;
+        } else if (
+          data.fortune.type === "error" ||
+          data.fortune.type === "daily_limit"
+        ) {
+          // 에러나 일일 제한의 경우
+          const errorMessage =
+            data.fortune.message || "트리플카드를 뽑을 수 없습니다\\.";
+          await this.renderErrorWithKeyboard(ctx, errorMessage);
+          return;
+        } else if (Array.isArray(data.fortune)) {
+          // 레거시 포맷 지원
+          cards = data.fortune;
+          isSuccess = true;
+        }
       }
 
-      // 실패한 경우
-      if (!isSuccess || !cards || cards.length !== 3) {
-        const errorMessage =
-          data.fortune?.message || "트리플카드를 뽑을 수 없습니다\\.";
+      // 카드 데이터 검증
+      if (!isSuccess || !cards || !Array.isArray(cards) || cards.length !== 3) {
+        logger.error("트리플카드 데이터 검증 실패", {
+          isSuccess,
+          cardsType: typeof cards,
+          cardsLength: cards?.length,
+        });
+
+        const errorMessage = "트리플카드 데이터를 불러올 수 없습니다\\.";
         await this.renderErrorWithKeyboard(ctx, errorMessage);
         return;
       }
 
-      // 셔플 애니메이션
+      // 셔플 애니메이션 (에러 발생해도 계속 진행)
       let finalMessageId = messageId;
       if (needsShuffle) {
         try {
@@ -294,7 +314,7 @@ class FortuneRenderer extends BaseRenderer {
             messageId
           );
         } catch (shuffleError) {
-          logger.warn("셔플 애니메이션 실패:", shuffleError);
+          logger.warn("셔플 애니메이션 실패 (계속 진행):", shuffleError);
         }
       }
 
@@ -310,7 +330,7 @@ class FortuneRenderer extends BaseRenderer {
       logger.error("트리플카드 렌더링 오류:", error);
       await this.renderErrorWithKeyboard(
         ctx,
-        "트리플카드를 뽑는 중 오류가 발생했습니다\\."
+        "트리플카드를 표시하는 중 오류가 발생했습니다\\."
       );
     }
   }

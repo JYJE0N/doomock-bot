@@ -194,6 +194,33 @@ class FortuneService {
   async draw3Cards(userId, userName) {
     const userInfo = this.createSafeUserInfo(userId, userName);
 
+    // 🚨 타임아웃 추가
+    const timeout = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error("3장 뽑기 타임아웃")), 10000)
+    );
+
+    try {
+      // Promise.race로 타임아웃 처리
+      return await Promise.race([
+        this._performDraw3Cards(userId, userName, userInfo),
+        timeout,
+      ]);
+    } catch (error) {
+      logger.error("❌ 3장 뽑기 실패", {
+        user: getSafeUserName(userInfo),
+        error: error.message,
+      });
+
+      return {
+        success: false,
+        type: "error",
+        message: `👔 두목: '${userName}씨, 시스템 오류가 발생했네요. 잠시 후 다시 시도해주세요.'`,
+      };
+    }
+  }
+
+  // 실제 3장 뽑기 로직을 별도 메서드로 분리
+  async _performDraw3Cards(userId, userName, userInfo) {
     try {
       logger.fortuneLog("3장 뽑기 요청", userInfo);
 
@@ -216,27 +243,56 @@ class FortuneService {
       // 셔플링 메시지
       const shuffleMessage = FortuneUser.getDoomockMessage("shuffle", userName);
 
-      // 3장 카드 뽑기 (중복 방지)
+      // 🚨 수정: 무한 루프 방지를 위한 안전한 카드 뽑기
       const drawnCards = [];
       const cards = this.getMajorArcana();
-      const usedIds = new Set();
+      const availableCardIds = cards.map((c) => c.id); // 모든 카드 ID 목록
+
+      // Fisher-Yates 셔플 알고리즘으로 3장 랜덤 선택
+      for (let i = availableCardIds.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [availableCardIds[i], availableCardIds[j]] = [
+          availableCardIds[j],
+          availableCardIds[i],
+        ];
+      }
+
+      // 상위 3장 선택
+      const selectedCardIds = availableCardIds.slice(0, 3);
+      const positions = ["past", "present", "future"];
 
       for (let i = 0; i < 3; i++) {
-        let cardData;
-        do {
-          cardData = this.drawRandomCard();
-        } while (usedIds.has(cardData.cardId));
+        const selectedCard = cards.find((c) => c.id === selectedCardIds[i]);
+        const isReversed = Math.random() < 0.5;
 
-        usedIds.add(cardData.cardId);
-        cardData.drawType = "triple";
-        cardData.position = ["past", "present", "future"][i];
+        const cardData = {
+          cardId: selectedCard.id,
+          cardName: selectedCard.name,
+          koreanName: selectedCard.koreanName,
+          emoji: selectedCard.emoji,
+          isReversed,
+          interpretation: isReversed
+            ? selectedCard.reversed
+            : selectedCard.upright,
+          drawType: "triple",
+          position: positions[i],
+        };
+
         drawnCards.push(cardData);
       }
 
-      // 각 카드 기록 저장
-      const user = await FortuneUser.findOrCreateUser(userId, userName);
+      // 각 카드 기록 저장 (타임아웃 추가)
+      const saveTimeout = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error("DB 저장 타임아웃")), 5000)
+      );
+
+      const user = await Promise.race([
+        FortuneUser.findOrCreateUser(userId, userName),
+        saveTimeout,
+      ]);
+
       for (const card of drawnCards) {
-        await user.recordDraw(card, userName);
+        await Promise.race([user.recordDraw(card, userName), saveTimeout]);
       }
 
       // 3장 종합 해석 생성
@@ -256,19 +312,12 @@ class FortuneService {
         shuffleMessage,
         cards: drawnCards,
         interpretation: overallInterpretation,
+        summary: overallInterpretation, // FortuneRenderer가 기대하는 필드 추가
+        needsShuffle: true,
         nextDrawTime: this.getNextDrawTime(),
       };
     } catch (error) {
-      logger.error("❌ 3장 뽑기 실패", {
-        user: getSafeUserName(userInfo),
-        error: error.message,
-      });
-
-      return {
-        success: false,
-        type: "error",
-        message: `👔 두목: '${userName}씨, 시스템 오류가 발생했네요. 잠시 후 다시 시도해주세요.'`,
-      };
+      throw error; // 상위로 에러 전파
     }
   }
 
