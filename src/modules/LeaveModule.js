@@ -934,9 +934,9 @@ class LeaveModule extends BaseModule {
   /**
    * 📊 모듈 상태 조회
    */
-  getModuleStatus() {
+  getStatus() {
     return {
-      ...super.getModuleStatus(),
+      ...super.getStatus(), // BaseModule의 getStatus 호출
       serviceConnected: !!this.leaveService,
       activeInputStates: this.inputStates.size,
       config: {

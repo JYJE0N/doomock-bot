@@ -12,6 +12,7 @@ const path = require("path");
 const ENABLED_MODULES = [
   // 🏠 시스템 모듈 (필수)
   {
+    key: "system",
     name: "SystemModule",
     path: path.join(__dirname, "../modules/SystemModule.js"),
     enabled: true,
@@ -22,6 +23,7 @@ const ENABLED_MODULES = [
 
   // 📝 할일 관리 모듈 (새로 추가!)
   {
+    key: "todo",
     name: "TodoModule",
     path: path.join(__dirname, "../modules/TodoModule.js"),
     enabled: true,
@@ -35,6 +37,7 @@ const ENABLED_MODULES = [
 
   // ⏰ 타이머 모듈
   {
+    key: "timer",
     name: "TimerModule",
     path: path.join(__dirname, "../modules/TimerModule.js"),
     enabled: true,
@@ -48,6 +51,7 @@ const ENABLED_MODULES = [
 
   // 🏢 근무시간 모듈
   {
+    key: "worktime",
     name: "WorktimeModule",
     path: path.join(__dirname, "../modules/WorktimeModule.js"),
     enabled: true,
@@ -61,6 +65,7 @@ const ENABLED_MODULES = [
 
   // 🏖️ 휴가 관리 모듈
   {
+    key: "leave",
     name: "LeaveModule",
     path: path.join(__dirname, "../modules/LeaveModule.js"),
     enabled: true,
@@ -74,6 +79,7 @@ const ENABLED_MODULES = [
 
   // ⏰ 리마인더 모듈
   {
+    key: "reminder",
     name: "ReminderModule",
     path: path.join(__dirname, "../modules/ReminderModule.js"),
     enabled: false,
@@ -87,6 +93,7 @@ const ENABLED_MODULES = [
 
   // 🔮 운세 모듈
   {
+    key: "fortune",
     name: "FortuneModule",
     path: path.join(__dirname, "../modules/FortuneModule.js"),
     enabled: true,
@@ -100,6 +107,7 @@ const ENABLED_MODULES = [
 
   // 🌤️ 날씨 모듈
   {
+    key: "weather",
     name: "WeatherModule",
     path: path.join(__dirname, "../modules/WeatherModule.js"),
     enabled: true,
@@ -113,6 +121,7 @@ const ENABLED_MODULES = [
 
   // 🔊 TTS 모듈
   {
+    key: "tts",
     name: "TTSModule",
     path: path.join(__dirname, "../modules/TTSModule.js"),
     enabled: true,

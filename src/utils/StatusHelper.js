@@ -18,57 +18,19 @@ class StatusHelper {
       return status || "알 수 없음";
     }
 
-    // 🎯 초기화 상태 체크
-    if (status.isInitialized === false) {
-      return "준비 중";
-    }
-
-    // 🔌 연결 상태 체크
-    if (status.serviceStatus) {
-      switch (status.serviceStatus.toLowerCase()) {
-        case "connected":
-          return "준비됨";
-        case "not connected":
-          return "연결 대기";
-        case "connecting":
-          return "연결 중";
-        case "error":
-          return "오류";
-        default:
-          return status.serviceStatus;
-      }
-    }
-
-    // 🔌 boolean 연결 상태
-    if (status.isConnected !== undefined) {
-      return status.isConnected ? "준비됨" : "연결 대기";
-    }
-
-    // ❌ 에러 체크
-    if (status.errorsCount > 0 || status.stats?.errorsCount > 0) {
-      const errorCount = status.errorsCount || status.stats.errorsCount;
-      return `오류 (${errorCount}건)`;
-    }
-
-    // ✅ 정상적으로 초기화되었으면
-    if (status.isInitialized === true) {
+    if (status.isInitialized === false) return "준비 중";
+    if (status.serviceStatus === "Not Connected") return "연결 대기";
+    if (status.serviceConnected === false) return "연결 대기";
+    if (status.isConnected === false) return "연결 대기";
+    if (
+      status.serviceStatus === "Ready" ||
+      status.serviceConnected === true ||
+      status.isConnected === true
+    )
       return "준비됨";
-    }
+    if (status.isInitialized === true) return "준비됨";
+    if (status.moduleName) return "활성";
 
-    // 🔧 모듈 이름만 있는 경우
-    if (status.moduleName) {
-      return "활성";
-    }
-
-    // 📊 통계만 있는 경우
-    if (status.stats) {
-      const { messagesHandled = 0, callbacksHandled = 0 } = status.stats;
-      if (messagesHandled + callbacksHandled > 0) {
-        return "활성";
-      }
-    }
-
-    // 🤷‍♂️ 기본값
     return "알 수 없음";
   }
 
@@ -82,16 +44,9 @@ class StatusHelper {
       준비됨: "✅ 준비됨",
       "준비 중": "⏳ 준비 중",
       "연결 대기": "🔌 연결 대기",
-      "연결 중": "🔄 연결 중",
-      오류: "❌ 오류",
       활성: "🟢 활성",
       "알 수 없음": "❓ 알 수 없음",
     };
-
-    // 오류 건수 포함된 경우
-    if (simpleStatus.startsWith("오류")) {
-      return `❌ ${simpleStatus}`;
-    }
 
     return emojiMap[simpleStatus] || `📦 ${simpleStatus}`;
   }

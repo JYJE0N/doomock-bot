@@ -571,7 +571,8 @@ class TTSModule extends BaseModule {
     return {
       moduleName: this.moduleName,
       isInitialized: this.isInitialized,
-      serviceStatus: this.serviceInstance ? "Ready" : "Not Connected",
+      // ✅ 수정: serviceInstance -> ttsService
+      serviceStatus: this.ttsService ? "Ready" : "Not Connected",
       stats: this.stats,
     };
   }

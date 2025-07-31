@@ -3,6 +3,7 @@ const path = require("path");
 const logger = require("../utils/Logger");
 const { createServiceBuilder } = require("./ServiceBuilder");
 const { getEnabledModules } = require("../config/ModuleRegistry");
+const { StatusHelper } = require("../utils/StatusHelper");
 
 class ModuleManager {
   constructor() {
@@ -160,33 +161,28 @@ class ModuleManager {
     logger.info("📊 ═══ 서비스 상태 ═══");
 
     this.modules.forEach((module, key) => {
-      let status = "Status method not implemented";
-      let emoji = "⚠️"; // 기본값을 경고로 변경!
-
+      let statusString = "❓ 알 수 없음";
       try {
         if (typeof module.getStatus === "function") {
-          status = module.getStatus();
-          emoji = this.getServiceStatusEmoji(status, key);
+          const status = module.getStatus();
+          // ✅ StatusHelper를 사용해 상태를 예쁘게 변환합니다.
+          statusString = StatusHelper.getStatusWithEmoji(status);
         } else {
-          // getStatus 메서드가 없으면 경고 이모지
-          emoji = "⚠️";
+          statusString = "⚠️  Status method not implemented";
         }
       } catch (error) {
-        status = `Error: ${error.message}`;
-        emoji = "❌";
+        statusString = `❌ Error: ${error.message}`;
       }
 
-      // 상태 문자열 정리
-      const statusString =
-        typeof status === "object"
-          ? this.formatStatusObject(status)
-          : String(status);
-
-      logger.info(`${emoji} ${key}: ${statusString}`);
+      // ✅ 모듈 키와 변환된 상태 문자열을 함께 로그로 남깁니다.
+      // 띄어쓰기를 맞추기 위해 padEnd를 사용합니다.
+      const moduleKey = key.padEnd(10, " ");
+      logger.info(`${moduleKey}: ${statusString}`);
     });
 
     logger.info("📊 ═════════════════");
   }
+
   /**
    * 📊 상태 객체 포맷팅
    */

@@ -146,7 +146,8 @@ class WorktimeModule extends BaseModule {
     return {
       moduleName: this.moduleName,
       isInitialized: this.isInitialized,
-      serviceStatus: this.serviceInstance ? "Ready" : "Not Connected",
+      // ✅ 수정: serviceInstance -> worktimeService
+      serviceStatus: this.worktimeService ? "Ready" : "Not Connected",
       stats: this.stats,
     };
   }

@@ -251,7 +251,7 @@ class BaseModule {
   /**
    * 📊 모듈 상태 정보 반환
    */
-  getModuleStatus() {
+  getStatus() {
     return {
       moduleName: this.moduleName,
       isInitialized: this.isInitialized,

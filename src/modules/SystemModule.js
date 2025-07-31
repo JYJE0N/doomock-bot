@@ -289,6 +289,18 @@ class SystemModule extends BaseModule {
   // ===== 🛠️ 헬퍼 메서드들 =====
 
   /**
+   * 📊 모듈 상태 조회 (추가)
+   */
+  getStatus() {
+    return {
+      moduleName: this.moduleName,
+      isInitialized: this.isInitialized,
+      stats: this.systemStats,
+      config: this.systemConfig,
+    };
+  }
+
+  /**
    * 시스템 가동시간 포맷팅
    */
   getFormattedUptime() {

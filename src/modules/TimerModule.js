@@ -690,6 +690,18 @@ class TimerModule extends BaseModule {
 
     logger.info("🍅 TimerModule 정리 완료");
   }
+  /**
+   * 📊 모듈 상태 정보 (추가)
+   */
+  getStatus() {
+    return {
+      moduleName: this.moduleName,
+      isInitialized: this.isInitialized,
+      serviceStatus: this.timerService ? "Ready" : "Not Connected",
+      activeTimers: this.activeTimers.size,
+      stats: this.stats,
+    };
+  }
 }
 
 module.exports = TimerModule;
