@@ -1,7 +1,7 @@
 // ===== 🔮 FortuneModule.js - 단순화된 버전 =====
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
-const { getUserId } = require("../utils/UserHelper");
+const { getUserId, getUserName } = require("../utils/UserHelper");
 
 class FortuneModule extends BaseModule {
   getModuleKeywords() {
@@ -230,8 +230,6 @@ class FortuneModule extends BaseModule {
 
   async showTripleCards(bot, callbackQuery, subAction, params, moduleManager) {
     const { from } = callbackQuery;
-    // 🚨 수정: import 추가 필요
-    const { getUserId, getUserName } = require("../utils/UserHelper");
     const userId = getUserId(from);
     const userName = getUserName(from);
 
@@ -263,11 +261,11 @@ class FortuneModule extends BaseModule {
       };
     } catch (error) {
       logger.error("트리플카드 뽑기 오류:", error);
+      // ✅ 수정: 더 간결한 오류 처리
       return {
         type: "error",
         module: "fortune",
         data: {
-          // 🚨 수정: message를 data 객체 안에 포함
           message: error.message.includes("타임아웃")
             ? "카드를 뽑는 데 시간이 너무 오래 걸렸습니다. 다시 시도해주세요."
             : "3장 뽑기를 진행할 수 없습니다.",

@@ -4,7 +4,8 @@ const logger = require("../utils/Logger");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 
 // 핵심 매니저들
-const DatabaseManager = require("../database/DatabaseManager");
+// ✅ 수정: DatabaseManager를 getInstance로 가져오도록 변경
+const { getInstance: getDbManager } = require("../database/DatabaseManager");
 const {
   getInstance: getMongooseManager,
 } = require("../database/MongooseManager");
@@ -116,7 +117,8 @@ class BotController {
       logger.info("🗄️ 데이터베이스 초기화 중...");
 
       // MongoDB Native Driver 초기화
-      this.dbManager = new DatabaseManager();
+      // ✅ 수정: new DatabaseManager() 대신 getInstance() 사용
+      this.dbManager = getDbManager();
       await this.dbManager.connect();
       logger.success("✅ MongoDB Native 연결 완료");
 
