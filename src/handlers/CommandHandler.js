@@ -1,184 +1,187 @@
-// src/handlers/CommandHandler.js - ✨ 완전히 순수한 명령어 처리 전용 v4.0
+// src/handlers/CommandHandler.js - ⌨️ 명령어 핸들러 (순수 라우팅 전용)
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { getUserName, getUserId } = require("../utils/UserHelper");
 
 /**
- * ⌨️ CommandHandler v4.0 - 완전히 순수한 명령어 처리 전용
+ * ⌨️ CommandHandler - 순수 명령어 라우팅 전용 핸들러
+ *
+ * ✅ SoC 준수: 순수 라우팅 로직만 담당
+ * ✅ 표준 매개변수: (bot, msg, command, args, parseInfo)
+ * ✅ NavigationHandler와 ModuleManager로 완전 위임
  *
  * 🎯 단 하나의 책임: "명령어 라우팅"
- * - 명령어 파싱 및 검증
+ * - 명령어 분류 및 검증
  * - 적절한 핸들러로 라우팅만!
- * - 사용자 상태 관리
- * - 통계 수집
+ * - 사용자 상태 관리 (순수 데이터)
+ * - 성능 통계 수집
  *
  * ❌ 절대 하지 않는 일:
- * - 메시지 생성 (NavigationHandler 담당)
- * - UI 렌더링 (NavigationHandler 담당)
- * - 키보드 생성 (NavigationHandler 담당)
- * - 텍스트 포맷팅 (NavigationHandler 담당)
- *
- * 🎪 비유: 교통 경찰 - 방향만 알려주고 끝!
+ * - 메시지 생성/전송
+ * - UI 렌더링
+ * - 키보드 생성
+ * - 텍스트 포맷팅
  */
 class CommandHandler {
-  constructor(bot, options = {}) {
-    this.bot = bot;
+  constructor(options = {}) {
     this.moduleManager = options.moduleManager;
     this.navigationHandler = options.navigationHandler;
 
-    // 📊 통계
+    // 📊 명령어 처리 통계
     this.stats = {
       commandsProcessed: 0,
       validCommands: 0,
       invalidCommands: 0,
       systemCommands: 0,
       moduleCommands: 0,
+      unknownCommands: 0,
+      responseTimeMs: [],
+      errorCount: 0,
+      startTime: Date.now(),
     };
+
+    // 👤 사용자 상태 관리 (순수 데이터)
+    this.userStates = new Map();
+
+    // ⚙️ 설정
+    this.config = {
+      maxUserStates: parseInt(process.env.COMMAND_MAX_USER_STATES) || 1000,
+      stateTimeoutMs: parseInt(process.env.COMMAND_STATE_TIMEOUT) || 1800000, // 30분
+      enableDetailedLogging: process.env.COMMAND_DETAILED_LOGGING === "true",
+      enablePerformanceTracking:
+        process.env.COMMAND_PERFORMANCE_TRACKING !== "false",
+    };
+
+    // 🧹 주기적 정리 (10분마다)
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupExpiredStates();
+    }, 10 * 60 * 1000);
+
+    logger.info("⌨️ CommandHandler 초기화 완료 - 순수 라우팅 전용");
   }
 
   /**
-   * 🎯 핵심 메서드: 이미 파싱된 명령어만 처리 (권장!)
-   *
-   * BotController에서 파싱한 결과를 받아서 처리
-   * 더 이상 파싱 로직을 포함하지 않음
+   * 🎯 핵심 메서드: 명령어 라우팅 (표준 매개변수)
    */
   async handleCommand(bot, msg, command, args = [], parseInfo = null) {
     const timer = this.createPerformanceTimer();
+    const userId = getUserId(msg.from);
+    const userName = getUserName(msg.from);
 
     try {
-      logger.info(`⌨️ 명령어 라우팅: /${command} ${args.join(" ")}`);
+      // 통계 업데이트
       this.stats.commandsProcessed++;
 
-      // 명령어 분류 및 라우팅
-      const commandType =
-        parseInfo?.commandType || this.classifyCommand(command);
+      if (this.config.enableDetailedLogging) {
+        logger.debug(`⌨️ 명령어 라우팅: /${command} ${args.join(" ")}`, {
+          userId,
+          userName,
+          parseInfo,
+        });
+      }
 
+      // 명령어 분류
+      const commandType = this.classifyCommand(command, parseInfo);
+
+      // 라우팅 실행
       let handled = false;
 
       switch (commandType) {
         case "system":
-          handled = await this.routeSystemCommand(bot, msg, command, args);
+          handled = await this.routeSystemCommand(
+            bot,
+            msg,
+            command,
+            args,
+            parseInfo
+          );
           this.stats.systemCommands++;
           break;
 
         case "module":
-          handled = await this.routeModuleCommand(bot, msg, command, args);
+          handled = await this.routeModuleCommand(
+            bot,
+            msg,
+            command,
+            args,
+            parseInfo
+          );
           this.stats.moduleCommands++;
           break;
 
         default:
-          handled = await this.routeUnknownCommand(bot, msg, command, args);
+          handled = await this.routeUnknownCommand(
+            bot,
+            msg,
+            command,
+            args,
+            parseInfo
+          );
           this.stats.unknownCommands++;
+      }
+
+      // 결과 처리
+      if (handled) {
+        this.stats.validCommands++;
+      } else {
+        this.stats.invalidCommands++;
       }
 
       return handled;
     } catch (error) {
-      logger.error(`명령어 라우팅 실패: /${command}`, error);
+      this.stats.errorCount++;
+      logger.error(`❌ 명령어 라우팅 실패: /${command}`, {
+        userId,
+        userName,
+        error: error.message,
+      });
       return false;
     } finally {
+      // 성능 측정
       const responseTime = timer.end();
-      this.updateResponseTimeStats(responseTime);
-    }
-  }
-
-  /**
-   * 🔍 간단한 명령어 분류 (개선된 버전)
-   */
-  classifyCommand(command) {
-    const systemCommands = ["start", "help", "status", "cancel", "menu"];
-
-    if (systemCommands.includes(command)) {
-      return "system";
-    }
-
-    return "module";
-  }
-
-  /**
-   * 🔗 명령어 별칭 매핑
-   */
-  getCommandAliases() {
-    return {
-      // 한글 별칭
-      할일: "todo",
-      타이머: "timer",
-      날씨: "weather",
-      운세: "fortune",
-      휴가: "leave",
-      근무: "worktime",
-
-      // 영문 별칭
-      todos: "todo",
-      task: "todo",
-      tasks: "todo",
-      time: "timer",
-      remind: "reminder",
-      tts: "voice",
-    };
-  }
-
-  /**
-   * 🎯 기존 핸들러 (이미 파싱된 명령어 처리)
-   */
-  async handleCommand(bot, msg, command, args = [], parseInfo = null) {
-    const timer = this.createPerformanceTimer();
-
-    try {
-      logger.info(`⌨️ 명령어 라우팅: /${command} ${args.join(" ")}`);
-      this.stats.commandsProcessed++;
-
-      // 파싱 정보 활용
-      const commandType =
-        parseInfo?.commandType || this.classifyCommand(command);
-
-      let handled = false;
-
-      switch (commandType) {
-        case "system":
-          handled = await this.routeSystemCommand(bot, msg, command, args);
-          this.stats.systemCommands++;
-          break;
-
-        case "module":
-          handled = await this.routeModuleCommand(bot, msg, command, args);
-          this.stats.moduleCommands++;
-          break;
-
-        default:
-          handled = await this.routeUnknownCommand(bot, msg, command, args);
-          this.stats.unknownCommands++;
+      if (this.config.enablePerformanceTracking) {
+        this.updateResponseTimeStats(responseTime);
       }
-
-      return handled;
-    } catch (error) {
-      logger.error(`명령어 라우팅 실패: /${command}`, error);
-      return false;
-    } finally {
-      const responseTime = timer.end();
-      this.updateResponseTimeStats(responseTime);
     }
   }
 
   /**
    * 🔍 명령어 분류 (순수 로직)
    */
-  classifyCommand(command) {
-    const systemCommands = ["start", "help", "status", "cancel", "menu"];
+  classifyCommand(command, parseInfo = null) {
+    // parseInfo가 있으면 우선 사용
+    if (parseInfo?.commandType) {
+      return parseInfo.commandType;
+    }
+
+    // 시스템 명령어 체크
+    const systemCommands = [
+      "start",
+      "help",
+      "status",
+      "cancel",
+      "menu",
+      "about",
+      "settings",
+      "ping",
+      "version",
+    ];
 
     if (systemCommands.includes(command)) {
       return "system";
     }
 
+    // 기본적으로 모듈 명령어로 분류
     return "module";
   }
 
   /**
    * 🏛️ 시스템 명령어 라우팅 (NavigationHandler로 완전 위임)
    */
-  async routeSystemCommand(bot, msg, command, args) {
+  async routeSystemCommand(bot, msg, command, args, parseInfo) {
     const userId = getUserId(msg.from);
     const chatId = msg.chat.id;
-    const userName = getUserName(msg);
+    const userName = getUserName(msg.from);
 
     logger.debug(`🏛️ 시스템 명령어 라우팅: /${command}`);
 
@@ -188,29 +191,33 @@ class CommandHandler {
         this.clearUserState(userId);
       }
 
-      // ✅ NavigationHandler로 완전 위임 - UI는 전혀 건드리지 않음
-      if (this.navigationHandler) {
-        const routingResult = await this.navigationHandler.handleCommandRouting(
-          bot,
-          {
-            type: "system",
-            command,
-            args,
-            msg,
-            userId,
-            chatId,
-            userName,
-          }
+      // ✅ NavigationHandler로 완전 위임
+      if (!this.navigationHandler) {
+        logger.warn(
+          "⚠️ NavigationHandler가 설정되지 않음 - 시스템 명령어 처리 불가"
         );
-
-        return routingResult !== false;
+        return false;
       }
 
-      // NavigationHandler가 없으면 실패
-      logger.warn(
-        "⚠️ NavigationHandler가 설정되지 않음 - 시스템 명령어 처리 불가"
+      // 표준 라우팅 정보 구성
+      const routingInfo = {
+        type: "system_command",
+        command,
+        args,
+        parseInfo,
+        msg,
+        userId,
+        chatId,
+        userName,
+      };
+
+      // NavigationHandler에 라우팅 위임
+      const result = await this.navigationHandler.handleSystemCommand(
+        bot,
+        routingInfo
       );
-      return false;
+
+      return result !== false;
     } catch (error) {
       logger.error(`❌ 시스템 명령어 라우팅 실패 (${command}):`, error);
       return false;
@@ -220,8 +227,9 @@ class CommandHandler {
   /**
    * 📱 모듈 명령어 라우팅 (ModuleManager로 완전 위임)
    */
-  async routeModuleCommand(bot, msg, command, args) {
+  async routeModuleCommand(bot, msg, command, args, parseInfo) {
     const userId = getUserId(msg.from);
+    const userName = getUserName(msg.from);
 
     logger.debug(`📱 모듈 명령어 라우팅: /${command}`);
 
@@ -231,41 +239,46 @@ class CommandHandler {
         return false;
       }
 
-      // 🔍 CommandsRegistry에서 명령어 정보 조회
-      let moduleInstance = null;
-
-      if (this.commandsRegistry?.hasCommand(command)) {
-        const commandInfo = this.commandsRegistry.getCommand(command);
-        if (commandInfo.module) {
-          moduleInstance = this.moduleManager.getModule(
-            commandInfo.module.toLowerCase()
-          );
-        }
-      }
-
-      // 직접 모듈명으로 시도
-      if (!moduleInstance) {
-        moduleInstance = this.moduleManager.getModule(command);
-      }
+      // 🔍 모듈 인스턴스 찾기
+      let moduleInstance = this.findModuleForCommand(command);
 
       if (!moduleInstance) {
         logger.debug(`📱 모듈 인스턴스를 찾을 수 없음: ${command}`);
         return false;
       }
 
-      // 📞 모듈의 메시지 핸들러 호출 (표준 패턴 우선)
+      // 📞 모듈의 메시지 핸들러 호출 (표준 패턴)
       if (typeof moduleInstance.onHandleMessage === "function") {
-        return await moduleInstance.onHandleMessage(bot, msg);
+        // 명령어 정보를 메시지에 포함하여 전달
+        const enhancedMsg = {
+          ...msg,
+          commandInfo: {
+            command,
+            args,
+            parseInfo,
+            isCommand: true,
+          },
+        };
+
+        const result = await moduleInstance.onHandleMessage(bot, enhancedMsg);
+        return result !== false;
       }
 
       // 레거시 핸들러 지원
       if (typeof moduleInstance.handleMessage === "function") {
-        return await moduleInstance.handleMessage(bot, msg);
+        const result = await moduleInstance.handleMessage(bot, msg);
+        return result !== false;
       }
 
       // 전용 명령어 핸들러 지원
       if (typeof moduleInstance.handleCommand === "function") {
-        return await moduleInstance.handleCommand(bot, msg, command, args);
+        const result = await moduleInstance.handleCommand(
+          bot,
+          msg,
+          command,
+          args
+        );
+        return result !== false;
       }
 
       logger.debug(`📱 모듈에 적절한 핸들러가 없음: ${command}`);
@@ -279,144 +292,178 @@ class CommandHandler {
   /**
    * ❓ 알 수 없는 명령어 라우팅 (NavigationHandler로 위임)
    */
-  async routeUnknownCommand(bot, msg, command, args) {
-    const userId = getUserId(msg.from);
-    const chatId = msg.chat.id;
-    const userName = getUserName(msg);
+  async routeUnknownCommand(bot, msg, command, args, parseInfo) {
+    logger.debug(`❓ 알 수 없는 명령어: /${command}`);
 
-    logger.debug(`❓ 알 수 없는 명령어 라우팅: /${command} (${userName})`);
+    try {
+      if (!this.navigationHandler) {
+        return false;
+      }
 
-    // ✅ NavigationHandler로 완전 위임
-    if (this.navigationHandler) {
-      return await this.navigationHandler.handleCommandRouting(bot, {
-        type: "unknown",
+      // NavigationHandler에 알 수 없는 명령어 처리 위임
+      const routingInfo = {
+        type: "unknown_command",
         command,
         args,
+        parseInfo,
         msg,
-        userId,
-        chatId,
-        userName,
-      });
-    }
+        userId: getUserId(msg.from),
+        chatId: msg.chat.id,
+        userName: getUserName(msg.from),
+      };
 
-    // NavigationHandler가 없으면 기본 처리 (최소한만)
-    logger.warn("⚠️ NavigationHandler가 설정되지 않음 - 기본 오류 처리");
-    return false;
-  }
+      const result = await this.navigationHandler.handleUnknownCommand(
+        bot,
+        routingInfo
+      );
 
-  /**
-   * 📢 NavigationHandler에게 알림 (UI 생성 요청)
-   */
-  async notifyNavigationHandler(eventType, data) {
-    if (
-      this.navigationHandler &&
-      typeof this.navigationHandler.handleCommandEvent === "function"
-    ) {
-      try {
-        await this.navigationHandler.handleCommandEvent(eventType, data);
-      } catch (error) {
-        logger.error("NavigationHandler 알림 실패:", error);
-      }
+      return result !== false;
+    } catch (error) {
+      logger.error(`❌ 알 수 없는 명령어 라우팅 실패 (${command}):`, error);
+      return false;
     }
   }
 
-  // ===== 📊 사용자 상태 관리 (순수 데이터만) =====
+  // ===== 🛠️ 헬퍼 메서드들 (순수 로직) =====
 
   /**
-   * 📝 사용자 상태 설정
+   * 🔍 명령어에 대한 모듈 찾기
    */
-  setUserState(userId, state) {
-    const userKey = String(userId);
-    const stateData = {
-      ...state,
-      timestamp: Date.now(),
-      updatedAt: TimeHelper.now().toISOString(),
+  findModuleForCommand(command) {
+    if (!this.moduleManager) return null;
+
+    // 1. 직접 모듈명으로 시도
+    let moduleInstance = this.moduleManager.getModule(command);
+    if (moduleInstance) return moduleInstance;
+
+    // 2. 명령어 별칭 매핑 확인 (추후 구현 가능)
+    const commandAliases = {
+      todo: "todo",
+      task: "todo",
+      tasks: "todo",
+      timer: "timer",
+      time: "timer",
+      weather: "weather",
+      fortune: "fortune",
+      leave: "leave",
+      worktime: "worktime",
+      work: "worktime",
+      tts: "tts",
+      voice: "tts",
     };
 
-    this.userStates.set(userKey, stateData);
-    logger.debug(
-      `📝 사용자 상태 설정: ${userId} -> ${state.action || "unknown"}`
-    );
+    const mappedModule = commandAliases[command];
+    if (mappedModule) {
+      moduleInstance = this.moduleManager.getModule(mappedModule);
+      if (moduleInstance) return moduleInstance;
+    }
 
-    return stateData;
+    // 3. 한글 명령어 매핑 확인
+    const koreanAliases = {
+      할일: "todo",
+      타이머: "timer",
+      날씨: "weather",
+      운세: "fortune",
+      연차: "leave",
+      휴가: "leave",
+      근무: "worktime",
+      음성: "tts",
+    };
+
+    const koreanMapped = koreanAliases[command];
+    if (koreanMapped) {
+      moduleInstance = this.moduleManager.getModule(koreanMapped);
+      if (moduleInstance) return moduleInstance;
+    }
+
+    return null;
+  }
+
+  /**
+   * 🏷️ 사용자 상태 설정 (순수 데이터)
+   */
+  setUserState(userId, state) {
+    // 상태 개수 제한 확인
+    if (this.userStates.size >= this.config.maxUserStates) {
+      this.cleanupExpiredStates();
+
+      // 여전히 초과하면 가장 오래된 것 제거
+      if (this.userStates.size >= this.config.maxUserStates) {
+        const oldestKey = this.userStates.keys().next().value;
+        this.userStates.delete(oldestKey);
+      }
+    }
+
+    this.userStates.set(userId.toString(), {
+      ...state,
+      timestamp: Date.now(),
+      lastAccessed: Date.now(),
+    });
+
+    logger.debug(`사용자 상태 설정: ${userId}`, state);
   }
 
   /**
    * 🔍 사용자 상태 조회
    */
   getUserState(userId) {
-    const userKey = String(userId);
-    return this.userStates.get(userKey) || null;
-  }
+    const state = this.userStates.get(userId.toString());
 
-  /**
-   * 🗑️ 사용자 상태 삭제
-   */
-  clearUserState(userId) {
-    const userKey = String(userId);
-    const existed = this.userStates.delete(userKey);
+    if (!state) return null;
 
-    if (existed) {
-      logger.debug(`🗑️ 사용자 상태 삭제: ${userId}`);
+    // 만료 확인
+    if (Date.now() - state.timestamp > this.config.stateTimeoutMs) {
+      this.clearUserState(userId);
+      return null;
     }
 
-    return existed;
+    // 최근 접근 시간 업데이트
+    state.lastAccessed = Date.now();
+    return state;
   }
 
   /**
-   * 📊 활성 상태 수 조회
+   * 🧹 사용자 상태 초기화
    */
-  getActiveUserStatesCount() {
-    return this.userStates.size;
+  clearUserState(userId) {
+    const deleted = this.userStates.delete(userId.toString());
+    if (deleted && this.config.enableDetailedLogging) {
+      logger.debug(`사용자 상태 초기화: ${userId}`);
+    }
+    return deleted;
   }
 
   /**
-   * 🧹 만료된 상태 정리 (30분 타임아웃)
+   * 🧹 만료된 상태 정리
    */
   cleanupExpiredStates() {
     const now = Date.now();
-    const timeout = 30 * 60 * 1000; // 30분
-    let cleanedCount = 0;
+    const expiredUsers = [];
 
     for (const [userId, state] of this.userStates.entries()) {
-      if (now - state.timestamp > timeout) {
-        this.userStates.delete(userId);
-        cleanedCount++;
+      if (now - state.timestamp > this.config.stateTimeoutMs) {
+        expiredUsers.push(userId);
       }
     }
 
-    if (cleanedCount > 0) {
-      logger.debug(`🧹 만료된 사용자 상태 정리: ${cleanedCount}개`);
+    expiredUsers.forEach((userId) => {
+      this.userStates.delete(userId);
+    });
+
+    if (expiredUsers.length > 0) {
+      logger.debug(`만료된 사용자 상태 ${expiredUsers.length}개 정리됨`);
     }
-
-    return cleanedCount;
   }
 
   /**
-   * 🧹 상태 정리 스케줄러 시작
-   */
-  startStateCleanupScheduler() {
-    // 5분마다 만료된 상태 정리
-    setInterval(() => {
-      this.cleanupExpiredStates();
-    }, 5 * 60 * 1000);
-
-    logger.debug("🧹 상태 정리 스케줄러 시작됨 (5분 간격)");
-  }
-
-  // ===== 📊 성능 통계 관리 =====
-
-  /**
-   * ⏱️ 성능 측정 타이머 생성
+   * ⏱️ 성능 타이머 생성
    */
   createPerformanceTimer() {
-    const start = process.hrtime.bigint();
+    const startTime = Date.now();
 
     return {
       end: () => {
-        const end = process.hrtime.bigint();
-        const duration = Number(end - start) / 1_000_000; // nanoseconds to milliseconds
-        return Math.round(duration * 100) / 100;
+        return Date.now() - startTime;
       },
     };
   }
@@ -425,14 +472,11 @@ class CommandHandler {
    * 📊 응답 시간 통계 업데이트
    */
   updateResponseTimeStats(responseTime) {
-    this.stats.totalResponseTime += responseTime;
+    this.stats.responseTimeMs.push(responseTime);
 
-    // 지수 이동 평균 계산 (새로운 값에 10% 가중치)
-    if (this.stats.averageResponseTime === 0) {
-      this.stats.averageResponseTime = responseTime;
-    } else {
-      this.stats.averageResponseTime =
-        this.stats.averageResponseTime * 0.9 + responseTime * 0.1;
+    // 최근 1000개만 유지 (메모리 관리)
+    if (this.stats.responseTimeMs.length > 1000) {
+      this.stats.responseTimeMs = this.stats.responseTimeMs.slice(-1000);
     }
   }
 
@@ -441,119 +485,46 @@ class CommandHandler {
    */
   getDetailedStats() {
     const uptime = Date.now() - this.stats.startTime;
-    const memoryUsage = process.memoryUsage();
+    const avgResponseTime =
+      this.stats.responseTimeMs.length > 0
+        ? this.stats.responseTimeMs.reduce((a, b) => a + b, 0) /
+          this.stats.responseTimeMs.length
+        : 0;
 
     return {
-      // 명령어 통계
       commands: {
         total: this.stats.commandsProcessed,
-        successful: this.stats.successfulCommands,
-        failed: this.stats.failedCommands,
-        unknown: this.stats.unknownCommands,
+        valid: this.stats.validCommands,
+        invalid: this.stats.invalidCommands,
         system: this.stats.systemCommands,
         module: this.stats.moduleCommands,
+        unknown: this.stats.unknownCommands,
         successRate:
           this.stats.commandsProcessed > 0
-            ? Math.round(
-                (this.stats.successfulCommands / this.stats.commandsProcessed) *
-                  100
-              )
+            ? (
+                (this.stats.validCommands / this.stats.commandsProcessed) *
+                100
+              ).toFixed(1)
             : 0,
+        errors: this.stats.errorCount,
       },
-
-      // 성능 통계
       performance: {
-        averageResponseTime:
-          Math.round(this.stats.averageResponseTime * 100) / 100,
-        totalResponseTime: Math.round(this.stats.totalResponseTime * 100) / 100,
-        uptime: Math.round(uptime / 1000), // seconds
-        memoryUsageMB: Math.round(memoryUsage.heapUsed / 1024 / 1024),
+        uptime: uptime,
+        averageResponseTime: Math.round(avgResponseTime),
+        totalResponseTimes: this.stats.responseTimeMs.length,
+        memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
       },
-
-      // 사용자 상태
       userStates: {
         active: this.userStates.size,
-        total: this.userStates.size,
+        max: this.config.maxUserStates,
+        timeoutMs: this.config.stateTimeoutMs,
       },
-
-      // 메타 정보
-      meta: {
-        version: "4.0",
-        startTime: new Date(this.stats.startTime).toISOString(),
-        lastUpdate: TimeHelper.now().toISOString(),
-      },
+      config: this.config,
     };
   }
 
   /**
-   * 📊 기본 통계 조회 (간단한 버전)
-   */
-  getStats() {
-    return {
-      commandsProcessed: this.stats.commandsProcessed,
-      successfulCommands: this.stats.successfulCommands,
-      failedCommands: this.stats.failedCommands,
-      unknownCommands: this.stats.unknownCommands,
-      averageResponseTime:
-        Math.round(this.stats.averageResponseTime * 100) / 100,
-      activeUserStates: this.userStates.size,
-      successRate:
-        this.stats.commandsProcessed > 0
-          ? Math.round(
-              (this.stats.successfulCommands / this.stats.commandsProcessed) *
-                100
-            )
-          : 0,
-    };
-  }
-
-  /**
-   * 🔄 통계 초기화
-   */
-  resetStats() {
-    const oldStats = { ...this.stats };
-
-    this.stats = {
-      commandsProcessed: 0,
-      successfulCommands: 0,
-      failedCommands: 0,
-      unknownCommands: 0,
-      systemCommands: 0,
-      moduleCommands: 0,
-      averageResponseTime: 0,
-      totalResponseTime: 0,
-      startTime: Date.now(),
-    };
-
-    logger.info("🔄 CommandHandler 통계 초기화됨", {
-      previous: oldStats,
-      reset: this.stats,
-    });
-
-    return oldStats;
-  }
-
-  // ===== 🔧 유틸리티 메서드들 =====
-
-  /**
-   * ⏱️ 업타임 포맷팅
-   */
-  formatUptime(seconds) {
-    const days = Math.floor(seconds / 86400);
-    const hours = Math.floor((seconds % 86400) / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
-
-    if (days > 0) {
-      return `${days}일 ${hours}시간 ${minutes}분`;
-    } else if (hours > 0) {
-      return `${hours}시간 ${minutes}분`;
-    } else {
-      return `${minutes}분`;
-    }
-  }
-
-  /**
-   * 🔍 시스템 상태 확인
+   * 🏥 시스템 헬스 체크
    */
   getSystemHealth() {
     const stats = this.getDetailedStats();
@@ -563,7 +534,7 @@ class CommandHandler {
       score: 100,
     };
 
-    // 성공율 체크
+    // 성공률 체크
     if (stats.commands.successRate < 90) {
       health.issues.push("명령어 성공률이 낮음");
       health.score -= 20;
@@ -600,11 +571,69 @@ class CommandHandler {
   }
 
   /**
+   * ⏱️ 가동 시간 포맷
+   */
+  formatUptime(uptimeMs) {
+    const seconds = Math.floor(uptimeMs / 1000);
+    const minutes = Math.floor(seconds / 60);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) {
+      return `${days}일 ${hours % 24}시간`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes % 60}분`;
+    } else if (minutes > 0) {
+      return `${minutes}분 ${seconds % 60}초`;
+    } else {
+      return `${seconds}초`;
+    }
+  }
+
+  /**
+   * 📋 현재 상태 요약
+   */
+  getStatusSummary() {
+    const stats = this.getDetailedStats();
+    const health = this.getSystemHealth();
+
+    return {
+      version: "4.1",
+      role: "순수 명령어 라우팅 전용",
+      health: health.status,
+      stats: {
+        totalCommands: stats.commands.total,
+        successRate: `${stats.commands.successRate}%`,
+        avgResponseTime: `${stats.performance.averageResponseTime}ms`,
+        activeStates: stats.userStates.active,
+        uptime: this.formatUptime(stats.performance.uptime),
+      },
+      responsibilities: [
+        "명령어 분류 및 검증",
+        "적절한 핸들러로 라우팅",
+        "사용자 상태 관리",
+        "성능 통계 수집",
+      ],
+      notResponsible: [
+        "UI 생성 및 렌더링",
+        "메시지 텍스트 구성",
+        "키보드 생성",
+        "직접적인 사용자 응답",
+      ],
+    };
+  }
+
+  /**
    * 🧹 정리 (종료 시 호출)
    */
   async cleanup() {
     try {
       logger.info("🧹 CommandHandler 정리 시작...");
+
+      // 인터벌 정리
+      if (this.cleanupInterval) {
+        clearInterval(this.cleanupInterval);
+      }
 
       // 사용자 상태 정리
       const stateCount = this.userStates.size;
@@ -618,39 +647,6 @@ class CommandHandler {
     } catch (error) {
       logger.error("❌ CommandHandler 정리 실패:", error);
     }
-  }
-
-  /**
-   * 📋 현재 상태 요약
-   */
-  getStatusSummary() {
-    const stats = this.getDetailedStats();
-    const health = this.getSystemHealth();
-
-    return {
-      version: "4.0",
-      role: "순수 명령어 라우팅 전용",
-      health: health.status,
-      stats: {
-        totalCommands: stats.commands.total,
-        successRate: `${stats.commands.successRate}%`,
-        avgResponseTime: `${stats.performance.averageResponseTime}ms`,
-        activeStates: stats.userStates.active,
-        uptime: this.formatUptime(stats.performance.uptime),
-      },
-      responsibilities: [
-        "명령어 파싱 및 검증",
-        "적절한 핸들러로 라우팅",
-        "사용자 상태 관리",
-        "성능 통계 수집",
-      ],
-      notResponsible: [
-        "UI 생성 및 렌더링",
-        "메시지 텍스트 구성",
-        "키보드 생성",
-        "직접적인 사용자 응답",
-      ],
-    };
   }
 }
 

@@ -1,38 +1,27 @@
-// src/modules/LeaveModule.js - 🏖️ 연차 관리 모듈 (리팩토링 버전)
+// src/modules/LeaveModule.js - 🏖️ 연차 관리 모듈 (순수 비즈니스 로직)
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserId, getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🏖️ LeaveModule - 연차 관리 모듈 (단순화된 콜백 파서 대응)
+ * 🏖️ LeaveModule - 연차 관리 모듈
  *
- * 🎯 새로운 콜백 체계:
- * - leave:menu → 메인 메뉴
- * - leave:use:full → use 액션에 params="full"
- * - leave:use:half → use 액션에 params="half"
- * - leave:use:quarter → use 액션에 params="quarter"
- * - leave:history:month → history 액션에 params="month"
- *
- * ✅ 표준 준수:
- * - 단순화된 actionMap
- * - params 매개변수 적극 활용
- * - SRP 준수 (각 액션의 단일 책임)
+ * ✅ SoC 준수: 순수 비즈니스 로직만 담당
+ * ✅ 표준 콜백: leave:action:params
+ * ✅ 렌더링은 Renderer가 담당
  */
 class LeaveModule extends BaseModule {
   constructor(moduleName, options = {}) {
     super(moduleName, options);
 
-    // ServiceBuilder 연결
     this.serviceBuilder = options.serviceBuilder || null;
     this.leaveService = null;
 
     // 모듈 설정
     this.config = {
-      // 기본 연차일수
       defaultAnnualLeave: parseInt(process.env.DEFAULT_ANNUAL_LEAVE) || 15,
 
-      // 연차 사용 단위 (새로운 매핑)
       leaveTypes: {
         full: { value: 1.0, label: "연차 (1일)", schemaType: "연차" },
         half: { value: 0.5, label: "반차 (0.5일)", schemaType: "반차" },
@@ -43,21 +32,13 @@ class LeaveModule extends BaseModule {
         },
       },
 
-      // 연차 년도 관리
-      yearStartMonth: 1,
-      yearStartDay: 1,
-
-      // 기능 설정
       enableHistory: true,
       enableStats: true,
-      maxHistoryItems: 100,
-
+      maxHistoryItems: 50,
       ...options.config,
     };
 
-    logger.info("[LeaveModule] 모듈 생성 (v4.0 - 단순화된 파서)", {
-      version: "4.0.0",
-    });
+    logger.info(`🏖️ LeaveModule 생성 완료 (v4.1)`);
   }
 
   /**
@@ -65,9 +46,6 @@ class LeaveModule extends BaseModule {
    */
   async onInitialize() {
     try {
-      logger.info("[LeaveModule] 초기화 시작...");
-
-      // ServiceBuilder를 통한 서비스 생성
       if (this.serviceBuilder) {
         this.leaveService = await this.serviceBuilder.getOrCreate("leave", {
           config: this.config,
@@ -86,30 +64,17 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * 🎯 액션 등록 (단순화된 버전!)
+   * 🎯 액션 등록
    */
   setupActions() {
     this.registerActions({
-      // 🏠 메인 메뉴
       menu: this.showMenu,
-
-      // 🏖️ 연차 사용 (통합된 단일 액션)
       use: this.handleUseLeave,
-
-      // 📊 연차 현황
       status: this.showStatus,
       remaining: this.showRemaining,
-
-      // 📋 연차 이력 (통합된 단일 액션)
       history: this.handleHistory,
-
-      // ⚙️ 설정
       settings: this.showSettings,
-
-      // 📈 통계
       stats: this.showStats,
-
-      // ❓ 도움말
       help: this.showHelp,
     });
 
@@ -132,12 +97,14 @@ class LeaveModule extends BaseModule {
     const keywords = ["연차", "휴가", "반차", "반반차", "leave", "vacation"];
 
     if (this.isModuleMessage(text, keywords)) {
-      await this.moduleManager.navigationHandler.sendModuleMenu(
-        bot,
-        chatId,
-        "leave"
-      );
-      return true;
+      // 렌더러에게 메뉴 렌더링 요청
+      return {
+        type: "render_request",
+        module: "leave",
+        action: "menu",
+        chatId: chatId,
+        data: await this.getMenuData(userId),
+      };
     }
 
     // 사용자 입력 상태 처리
@@ -149,76 +116,58 @@ class LeaveModule extends BaseModule {
     return false;
   }
 
-  // ===== 🎯 핵심 액션 메서드들 =====
+  // ===== 🎯 핵심 액션 메서드들 (순수 비즈니스 로직) =====
 
   /**
-   * 🏠 메인 메뉴 표시
+   * 🏠 메인 메뉴 데이터 반환
    */
-  async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
+  async showMenu(bot, callbackQuery, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
     const userName = getUserName(from);
 
     try {
-      // 현재 연차 상태 조회
-      const status = await this.leaveService.getLeaveStatus(userId);
-      const todayUsage = await this.leaveService.getTodayUsage(userId);
+      const menuData = await this.getMenuData(userId);
 
       return {
         type: "menu",
         module: "leave",
         data: {
+          ...menuData,
           userName,
-          status,
-          todayUsage,
-          config: this.config,
         },
       };
     } catch (error) {
-      logger.error("연차 메뉴 조회 실패:", error);
+      logger.error("연차 메뉴 데이터 조회 실패:", error);
       return {
         type: "error",
-        message: "연차 메뉴를 불러올 수 없습니다.",
+        message: "메뉴를 불러올 수 없습니다.",
       };
     }
   }
 
   /**
-   * 🏖️ 연차 사용 처리 (통합된 단일 액션!)
-   *
-   * 콜백 예시:
-   * - leave:use → 사용 타입 선택 메뉴
-   * - leave:use:full → 연차 1일 사용
-   * - leave:use:half → 반차 사용
-   * - leave:use:quarter → 반반차 사용
-   * - leave:use:custom → 커스텀 일수 입력
+   * 🏖️ 연차 사용 처리
    */
-  async handleUseLeave(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleUseLeave(bot, callbackQuery, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
     const userName = getUserName(from);
 
-    logger.debug(`🏖️ 연차 사용 처리 시작`, {
-      userId,
-      userName,
-      params,
-      action: "use",
-    });
+    logger.debug(`🏖️ 연차 사용 처리`, { userId, userName, params });
 
     try {
-      // 잔여 연차 확인
       const status = await this.leaveService.getLeaveStatus(userId);
 
       if (status.remaining <= 0) {
         return {
-          type: "info",
+          type: "error",
           message: "사용 가능한 연차가 없습니다.",
-          data: { status },
         };
       }
 
-      // 파라미터가 없으면 선택 메뉴 표시
-      if (!params || params.trim() === "") {
+      // 파라미터가 없으면 선택 메뉴 데이터 반환
+      if (!params || params[0] === undefined) {
         return {
           type: "use_select",
           module: "leave",
@@ -229,8 +178,9 @@ class LeaveModule extends BaseModule {
         };
       }
 
-      // 파라미터에 따른 연차 사용 처리
-      return await this.processLeaveByType(callbackQuery, params.trim());
+      // 연차 타입별 사용 처리
+      const leaveType = params[0];
+      return await this.processLeaveByType(userId, userName, leaveType, status);
     } catch (error) {
       logger.error("연차 사용 처리 실패:", error);
       return {
@@ -241,23 +191,20 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * 📋 연차 이력 처리 (통합된 단일 액션!)
-   *
-   * 콜백 예시:
-   * - leave:history → 전체 이력
-   * - leave:history:month → 월별 이력
-   * - leave:history:year → 연도별 이력
+   * 📋 이력 조회 처리
    */
-  async handleHistory(bot, callbackQuery, subAction, params, moduleManager) {
+  async handleHistory(bot, callbackQuery, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
     try {
       const currentYear = new Date().getFullYear();
-      let historyData;
+      const filterType = params[0] || "recent";
 
-      // 파라미터에 따른 이력 조회
-      switch (params) {
+      let historyData;
+      let title;
+
+      switch (filterType) {
         case "month":
           const currentMonth = new Date().getMonth() + 1;
           historyData = await this.leaveService.getMonthlyHistory(
@@ -265,6 +212,7 @@ class LeaveModule extends BaseModule {
             currentYear,
             currentMonth
           );
+          title = `${currentYear}년 ${currentMonth}월 이력`;
           break;
 
         case "year":
@@ -272,14 +220,15 @@ class LeaveModule extends BaseModule {
             userId,
             currentYear
           );
+          title = `${currentYear}년 전체 이력`;
           break;
 
         default:
-          // 기본: 최근 이력
           historyData = await this.leaveService.getRecentHistory(
             userId,
             this.config.maxHistoryItems
           );
+          title = "최근 사용 이력";
       }
 
       return {
@@ -287,7 +236,8 @@ class LeaveModule extends BaseModule {
         module: "leave",
         data: {
           history: historyData,
-          filterType: params || "recent",
+          title,
+          filterType,
           year: currentYear,
         },
       };
@@ -295,17 +245,18 @@ class LeaveModule extends BaseModule {
       logger.error("연차 이력 조회 실패:", error);
       return {
         type: "error",
-        message: "연차 이력을 불러올 수 없습니다.",
+        message: "이력을 불러올 수 없습니다.",
       };
     }
   }
 
   /**
-   * 📊 연차 현황 표시
+   * 📊 현황 표시
    */
-  async showStatus(bot, callbackQuery, subAction, params, moduleManager) {
+  async showStatus(bot, callbackQuery, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
+    const userName = getUserName(from);
 
     try {
       const currentYear = new Date().getFullYear();
@@ -322,16 +273,18 @@ class LeaveModule extends BaseModule {
         type: "status",
         module: "leave",
         data: {
+          userName,
           status,
           monthlyUsage,
           year: currentYear,
+          recommendation: this.getUsageRecommendation(status),
         },
       };
     } catch (error) {
       logger.error("연차 현황 조회 실패:", error);
       return {
         type: "error",
-        message: "연차 현황을 불러올 수 없습니다.",
+        message: "현황을 불러올 수 없습니다.",
       };
     }
   }
@@ -339,7 +292,7 @@ class LeaveModule extends BaseModule {
   /**
    * 📈 통계 표시
    */
-  async showStats(bot, callbackQuery, subAction, params, moduleManager) {
+  async showStats(bot, callbackQuery, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
@@ -359,7 +312,7 @@ class LeaveModule extends BaseModule {
       logger.error("연차 통계 조회 실패:", error);
       return {
         type: "error",
-        message: "연차 통계를 불러올 수 없습니다.",
+        message: "통계를 불러올 수 없습니다.",
       };
     }
   }
@@ -367,7 +320,7 @@ class LeaveModule extends BaseModule {
   /**
    * ❓ 도움말 표시
    */
-  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
+  async showHelp(bot, callbackQuery, params, moduleManager) {
     return {
       type: "help",
       module: "leave",
@@ -383,26 +336,24 @@ class LeaveModule extends BaseModule {
     };
   }
 
-  // ===== 🛠️ 헬퍼 메서드들 =====
+  // ===== 🛠️ 헬퍼 메서드들 (순수 로직) =====
 
   /**
-   * 🎯 타입별 연차 사용 처리 (핵심 로직!)
+   * 🎯 타입별 연차 사용 처리 (핵심 비즈니스 로직)
    */
-  async processLeaveByType(callbackQuery, leaveType) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-    const userName = getUserName(from);
+  async processLeaveByType(userId, userName, leaveType, status) {
+    // 커스텀 입력 처리
+    if (leaveType === "custom") {
+      return {
+        type: "custom_input_request",
+        module: "leave",
+        data: { status },
+      };
+    }
 
-    logger.debug(`🎯 타입별 연차 사용 처리`, {
-      userId,
-      userName,
-      leaveType,
-    });
-
-    // 연차 타입 검증
+    // 표준 타입 처리
     const typeConfig = this.config.leaveTypes[leaveType];
     if (!typeConfig) {
-      logger.warn(`❌ 알 수 없는 연차 타입: ${leaveType}`);
       return {
         type: "error",
         message: `지원하지 않는 연차 타입입니다: ${leaveType}`,
@@ -435,14 +386,10 @@ class LeaveModule extends BaseModule {
             amount: typeConfig.value,
             currentRemaining: result.currentRemaining,
             usageRecord: result.record,
+            date: TimeHelper.format(new Date(), "YYYY-MM-DD"),
           },
         };
       } else {
-        logger.warn(`❌ 연차 사용 실패`, {
-          userId,
-          reason: result.reason,
-        });
-
         return {
           type: "error",
           message: result.reason || "연차 사용에 실패했습니다.",
@@ -458,57 +405,43 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * 📝 사용자 입력 처리 (커스텀 연차 등)
+   * 📝 커스텀 연차 입력 처리
    */
   async handleUserInput(bot, msg, text, userState) {
-    const { action } = userState;
+    const { action, chatId, status } = userState;
     const {
       from: { id: userId },
-      chat: { id: chatId },
     } = msg;
 
-    switch (action) {
-      case "custom_leave":
-        return await this.handleCustomLeaveInput(bot, msg, text, userState);
-
-      default:
-        logger.warn(`알 수 없는 입력 액션: ${action}`);
-        this.clearUserState(userId);
-        return false;
-    }
-  }
-
-  /**
-   * 🎯 커스텀 연차 입력 처리
-   */
-  async handleCustomLeaveInput(bot, msg, text, userState) {
-    const {
-      from: { id: userId },
-      chat: { id: chatId },
-    } = msg;
+    if (action !== "custom_leave") return false;
 
     const days = parseFloat(text.trim());
 
     // 입력 검증
     if (isNaN(days) || days <= 0 || days > 5) {
-      await bot.sendMessage(
-        chatId,
-        "❌ 올바른 연차 일수를 입력해주세요 (0.25 - 5.0일)"
-      );
-      return true;
+      return {
+        type: "input_error",
+        message: "올바른 연차 일수를 입력해주세요 (0.25 - 5.0일)",
+      };
     }
 
-    // 0.25 단위 검증
     if ((days * 4) % 1 !== 0) {
-      await bot.sendMessage(
-        chatId,
-        "❌ 연차는 0.25일 단위로만 사용 가능합니다 (예: 0.25, 0.5, 1.0, 1.5)"
-      );
-      return true;
+      return {
+        type: "input_error",
+        message:
+          "연차는 0.25일 단위로만 사용 가능합니다\n(예: 0.25, 0.5, 1.0, 1.5)",
+      };
+    }
+
+    if (days > status.remaining) {
+      return {
+        type: "input_error",
+        message: `잔여 연차(${status.remaining}일)보다 많이 사용할 수 없습니다.`,
+      };
     }
 
     try {
-      // 커스텀 연차 사용 처리
+      // 타입 결정
       const schemaType =
         days >= 1.0 ? "연차" : days === 0.5 ? "반차" : "반반차";
 
@@ -519,27 +452,67 @@ class LeaveModule extends BaseModule {
         date: TimeHelper.now().toISOString(),
       });
 
+      this.clearUserState(userId);
+
       if (result.success) {
-        await bot.sendMessage(
-          chatId,
-          `✅ ${days}일 연차가 성공적으로 사용되었습니다.\n잔여 연차: ${result.currentRemaining}일`
-        );
+        return {
+          type: "custom_use_success",
+          module: "leave",
+          data: {
+            amount: days,
+            currentRemaining: result.currentRemaining,
+            date: TimeHelper.format(new Date(), "YYYY-MM-DD"),
+          },
+        };
       } else {
-        await bot.sendMessage(
-          chatId,
-          `❌ 연차 사용에 실패했습니다: ${result.reason}`
-        );
+        return {
+          type: "error",
+          message: result.reason || "연차 사용에 실패했습니다.",
+        };
       }
     } catch (error) {
       logger.error("커스텀 연차 사용 처리 실패:", error);
-      await bot.sendMessage(chatId, "❌ 연차 사용 중 오류가 발생했습니다.");
+      this.clearUserState(userId);
+      return {
+        type: "error",
+        message: "연차 사용 중 오류가 발생했습니다.",
+      };
     }
-
-    this.clearUserState(userId);
-    return true;
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 =====
+  /**
+   * 🏠 메뉴 데이터 조회
+   */
+  async getMenuData(userId) {
+    const status = await this.leaveService.getLeaveStatus(userId);
+    const todayUsage = await this.leaveService.getTodayUsage(userId);
+
+    return {
+      status,
+      todayUsage,
+      config: this.config,
+    };
+  }
+
+  /**
+   * 💡 사용 권장사항 생성
+   */
+  getUsageRecommendation(status) {
+    const { remaining, usageRate, annual } = status;
+    const currentMonth = new Date().getMonth() + 1;
+    const remainingMonths = 12 - currentMonth + 1;
+
+    if (usageRate < 30 && currentMonth > 6) {
+      return "연차 사용이 부족합니다. 적절한 휴식을 취하세요!";
+    } else if (usageRate > 80 && currentMonth < 10) {
+      return "연차 사용이 많습니다. 계획적으로 사용하세요.";
+    } else if (remaining > 0 && currentMonth === 12) {
+      return "올해 남은 연차를 모두 사용하세요!";
+    } else {
+      const monthlyRecommend = (remaining / remainingMonths).toFixed(1);
+      return `월 평균 ${monthlyRecommend}일씩 사용하시면 적절합니다.`;
+    }
+  }
 
   /**
    * 🔍 모듈 키워드 확인
@@ -573,9 +546,11 @@ class LeaveModule extends BaseModule {
   /**
    * 🧹 모듈 정리
    */
-  async cleanup() {
+  async onCleanup() {
     try {
-      await super.cleanup();
+      if (this.leaveService && this.leaveService.cleanup) {
+        await this.leaveService.cleanup();
+      }
       logger.info("✅ LeaveModule 정리 완료");
     } catch (error) {
       logger.error("❌ LeaveModule 정리 실패:", error);

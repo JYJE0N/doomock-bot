@@ -1,12 +1,15 @@
-// src/modules/WeatherModule.js - 심플한 주요 도시 날씨
-
+// src/modules/WeatherModule.js - 🌤️ 날씨 모듈 (순수 비즈니스 로직)
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserId, getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🌤️ WeatherModule - 주요 8개 도시 날씨 정보
+ * 🌤️ WeatherModule - 날씨 정보 모듈
+ *
+ * ✅ SoC 준수: 순수 비즈니스 로직만 담당
+ * ✅ 표준 콜백: weather:action:params
+ * ✅ 렌더링은 Renderer가 담당
  */
 class WeatherModule extends BaseModule {
   constructor(moduleName, options = {}) {
@@ -17,44 +20,48 @@ class WeatherModule extends BaseModule {
 
     // 주요 8개 도시 설정
     this.majorCities = [
-      { id: "seoul", name: "서울", emoji: "🏛️" },
-      { id: "suwon", name: "수원", emoji: "🏰" },
-      { id: "incheon", name: "인천", emoji: "✈️" },
-      { id: "daejeon", name: "대전", emoji: "🚄" },
-      { id: "daegu", name: "대구", emoji: "🍎" },
-      { id: "busan", name: "부산", emoji: "🌊" },
-      { id: "gwangju", name: "광주", emoji: "🌻" },
-      { id: "jeju", name: "제주", emoji: "🏝️" },
+      { id: "seoul", name: "서울", emoji: "🏛️", fullName: "서울시" },
+      { id: "suwon", name: "수원", emoji: "🏰", fullName: "수원시" },
+      { id: "incheon", name: "인천", emoji: "✈️", fullName: "인천시" },
+      { id: "daejeon", name: "대전", emoji: "🚄", fullName: "대전시" },
+      { id: "daegu", name: "대구", emoji: "🍎", fullName: "대구시" },
+      { id: "busan", name: "부산", emoji: "🌊", fullName: "부산시" },
+      { id: "gwangju", name: "광주", emoji: "🌻", fullName: "광주시" },
+      { id: "jeju", name: "제주", emoji: "🏝️", fullName: "제주시" },
     ];
 
-    // 사용자별 선호 도시 저장
+    // 모듈 설정
+    this.config = {
+      defaultCity: process.env.DEFAULT_WEATHER_CITY || "서울",
+      enableDustInfo: process.env.WEATHER_ENABLE_DUST !== "false",
+      cacheTimeout: parseInt(process.env.WEATHER_CACHE_TIMEOUT) || 300000, // 5분
+      enableForecast: process.env.WEATHER_ENABLE_FORECAST !== "false",
+      ...options.config,
+    };
+
+    // 사용자별 선호 도시 저장 (메모리 캐시)
     this.userPreferredCity = new Map();
 
-    logger.info("🌤️ WeatherModule 생성됨");
+    logger.info(`🌤️ WeatherModule 생성 완료 (v4.1)`);
   }
 
   /**
-   * ✅ 모듈 초기화
+   * 🎯 모듈 초기화
    */
   async onInitialize() {
     try {
-      logger.info("🌤️ WeatherModule 초기화 시작...");
-
-      if (!this.serviceBuilder) {
-        throw new Error("ServiceBuilder가 필요합니다");
+      if (this.serviceBuilder) {
+        this.weatherService = await this.serviceBuilder.getOrCreate("weather", {
+          config: {
+            defaultLocation: this.config.defaultCity + "시",
+            enableDustInfo: this.config.enableDustInfo,
+          },
+        });
       }
-
-      // WeatherService 연결
-      this.weatherService = await this.serviceBuilder.getOrCreate("weather", {
-        config: { defaultLocation: "서울시" },
-      });
 
       if (!this.weatherService) {
-        throw new Error("WeatherService를 찾을 수 없습니다");
+        throw new Error("WeatherService 생성 실패");
       }
-
-      // 액션 등록
-      this.setupActions();
 
       logger.success("✅ WeatherModule 초기화 완료");
     } catch (error) {
@@ -64,45 +71,121 @@ class WeatherModule extends BaseModule {
   }
 
   /**
-   * ✅ 액션 등록
+   * 🎯 액션 등록
    */
   setupActions() {
     this.registerActions({
-      menu: this.showWeatherMenu,
+      // 기본 액션
+      menu: this.showMenu,
+
+      // 날씨 조회
       city: this.showCityWeather,
       cities: this.showCityList,
+      current: this.showCurrentWeather,
+
+      // 설정
       setdefault: this.setDefaultCity,
+
+      // 기타
+      forecast: this.showForecast,
       help: this.showHelp,
     });
+
+    logger.info(`✅ WeatherModule 액션 등록 완료 (${this.actionMap.size}개)`);
   }
 
   /**
-   * 📋 날씨 메뉴 표시
+   * 🎯 메시지 처리
    */
-  async showWeatherMenu(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-    const defaultCity = this.userPreferredCity.get(userId) || "서울";
+  async onHandleMessage(bot, msg) {
+    const {
+      text,
+      chat: { id: chatId },
+      from: { id: userId },
+    } = msg;
 
-    return {
-      type: "menu",
-      module: "weather",
-      data: {
-        title: "날씨 정보",
-        description: `주요 도시의 날씨를 확인하세요.\n기본 도시: ${defaultCity}`,
-        defaultCity: defaultCity,
-      },
-    };
+    if (!text) return false;
+
+    const lowerText = text.toLowerCase();
+
+    // 날씨 키워드 확인
+    const weatherKeywords = ["날씨", "weather", "온도", "습도"];
+    const hasWeatherKeyword = weatherKeywords.some((keyword) =>
+      lowerText.includes(keyword)
+    );
+
+    if (hasWeatherKeyword) {
+      logger.info(`💬 날씨 키워드 감지: "${text}"`);
+
+      // 특정 도시 날씨 요청 확인
+      for (const city of this.majorCities) {
+        if (lowerText.includes(city.name)) {
+          return {
+            type: "render_request",
+            module: "weather",
+            action: "city_weather_direct",
+            chatId: chatId,
+            data: await this.getCityWeatherData(city.id),
+          };
+        }
+      }
+
+      // 기본 도시 날씨 표시
+      const defaultCityId = this.getDefaultCityId(userId);
+      return {
+        type: "render_request",
+        module: "weather",
+        action: "default_weather_direct",
+        chatId: chatId,
+        data: await this.getCityWeatherData(defaultCityId),
+      };
+    }
+
+    return false;
+  }
+
+  // ===== 🎯 핵심 액션 메서드들 (순수 비즈니스 로직) =====
+
+  /**
+   * 🏠 메인 메뉴 데이터 반환
+   */
+  async showMenu(bot, callbackQuery, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+    const userName = getUserName(from);
+
+    try {
+      const defaultCity = this.getUserPreferredCity(userId);
+
+      return {
+        type: "menu",
+        module: "weather",
+        data: {
+          userName,
+          defaultCity,
+          majorCities: this.majorCities,
+          config: this.config,
+        },
+      };
+    } catch (error) {
+      logger.error("날씨 메뉴 데이터 조회 실패:", error);
+      return {
+        type: "error",
+        message: "메뉴를 불러올 수 없습니다.",
+      };
+    }
   }
 
   /**
    * 🏙️ 도시 목록 표시
    */
-  async showCityList(bot, callbackQuery, subAction, params, moduleManager) {
+  async showCityList(bot, callbackQuery, params, moduleManager) {
     return {
       type: "cities",
       module: "weather",
       data: {
         cities: this.majorCities,
+        config: this.config,
       },
     };
   }
@@ -110,18 +193,179 @@ class WeatherModule extends BaseModule {
   /**
    * 🌡️ 특정 도시 날씨 표시
    */
-  async showCityWeather(bot, callbackQuery, subAction, params, moduleManager) {
-    const cityId = params;
+  async showCityWeather(bot, callbackQuery, params, moduleManager) {
+    const cityId = params[0];
+
+    if (!cityId) {
+      return {
+        type: "error",
+        message: "도시 정보가 필요합니다.",
+      };
+    }
+
+    try {
+      const weatherData = await this.getCityWeatherData(cityId);
+
+      return {
+        type: "weather",
+        module: "weather",
+        data: weatherData,
+      };
+    } catch (error) {
+      logger.error(`도시 날씨 조회 실패 (${cityId}):`, error);
+      return {
+        type: "error",
+        message: "날씨 정보를 불러올 수 없습니다.",
+      };
+    }
+  }
+
+  /**
+   * 🌤️ 현재 날씨 표시 (기본 도시)
+   */
+  async showCurrentWeather(bot, callbackQuery, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      const defaultCityId = this.getDefaultCityId(userId);
+      const weatherData = await this.getCityWeatherData(defaultCityId);
+
+      return {
+        type: "current_weather",
+        module: "weather",
+        data: weatherData,
+      };
+    } catch (error) {
+      logger.error("현재 날씨 조회 실패:", error);
+      return {
+        type: "error",
+        message: "현재 날씨를 불러올 수 없습니다.",
+      };
+    }
+  }
+
+  /**
+   * ⭐ 기본 도시 설정
+   */
+  async setDefaultCity(bot, callbackQuery, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+    const cityId = params[0];
+
     const city = this.majorCities.find((c) => c.id === cityId);
 
     if (!city) {
       return {
         type: "error",
+        message: "알 수 없는 도시입니다.",
+      };
+    }
+
+    try {
+      // 사용자 선호 도시 설정
+      this.userPreferredCity.set(userId, city.name);
+
+      logger.info(`⭐ 기본 도시 설정`, { userId, city: city.name });
+
+      return {
+        type: "default_set",
         module: "weather",
         data: {
-          message: "알 수 없는 도시입니다.",
+          city,
+          message: `기본 도시가 ${city.name}(으)로 설정되었습니다.`,
         },
       };
+    } catch (error) {
+      logger.error("기본 도시 설정 실패:", error);
+      return {
+        type: "error",
+        message: "도시 설정에 실패했습니다.",
+      };
+    }
+  }
+
+  /**
+   * 📅 날씨 예보 표시
+   */
+  async showForecast(bot, callbackQuery, params, moduleManager) {
+    const cityId =
+      params[0] || this.getDefaultCityId(getUserId(callbackQuery.from));
+
+    if (!this.config.enableForecast) {
+      return {
+        type: "error",
+        message: "날씨 예보 기능이 비활성화되어 있습니다.",
+      };
+    }
+
+    try {
+      const city = this.majorCities.find((c) => c.id === cityId);
+      if (!city) {
+        return {
+          type: "error",
+          message: "알 수 없는 도시입니다.",
+        };
+      }
+
+      // 날씨 예보 조회 (서비스에서 구현)
+      const forecastResult = await this.weatherService.getForecast(
+        city.fullName
+      );
+
+      if (forecastResult.success) {
+        return {
+          type: "forecast",
+          module: "weather",
+          data: {
+            city,
+            forecast: forecastResult.data,
+            timestamp: TimeHelper.format(TimeHelper.now(), "full"),
+          },
+        };
+      } else {
+        throw new Error(forecastResult.error || "예보 조회 실패");
+      }
+    } catch (error) {
+      logger.error("날씨 예보 조회 실패:", error);
+      return {
+        type: "error",
+        message: "날씨 예보를 불러올 수 없습니다.",
+      };
+    }
+  }
+
+  /**
+   * ❓ 도움말 표시
+   */
+  async showHelp(bot, callbackQuery, params, moduleManager) {
+    return {
+      type: "help",
+      module: "weather",
+      data: {
+        config: this.config,
+        majorCities: this.majorCities,
+        features: {
+          weather: "실시간 날씨 정보",
+          cities: "주요 8개 도시 지원",
+          dust: "미세먼지 정보 (선택)",
+          forecast: "날씨 예보 (선택)",
+          setting: "기본 도시 설정",
+        },
+      },
+    };
+  }
+
+  // ===== 🛠️ 헬퍼 메서드들 (순수 로직) =====
+
+  /**
+   * 🌡️ 도시 날씨 데이터 조회 (핵심 로직)
+   */
+  async getCityWeatherData(cityId) {
+    const city = this.majorCities.find((c) => c.id === cityId);
+
+    if (!city) {
+      throw new Error(`알 수 없는 도시: ${cityId}`);
     }
 
     try {
@@ -129,24 +373,26 @@ class WeatherModule extends BaseModule {
 
       // 날씨 정보 조회
       const weatherResult = await this.weatherService.getCurrentWeather(
-        city.name + "시"
+        city.fullName
       );
 
-      // 미세먼지 정보 조회
-      const dustResult = await this.weatherService.getDustInfo(
-        city.name + "시"
-      );
+      // 미세먼지 정보 조회 (선택사항)
+      let dustResult = null;
+      if (this.config.enableDustInfo) {
+        try {
+          dustResult = await this.weatherService.getDustInfo(city.fullName);
+        } catch (dustError) {
+          logger.warn(`미세먼지 정보 조회 실패 (${city.name}):`, dustError);
+        }
+      }
 
       if (weatherResult.success) {
         return {
-          type: "weather",
-          module: "weather",
-          data: {
-            city: city,
-            weather: weatherResult.data,
-            dust: dustResult.success ? dustResult.data : null,
-            timestamp: TimeHelper.format(TimeHelper.now(), "full"),
-          },
+          city,
+          weather: weatherResult.data,
+          dust: dustResult?.success ? dustResult.data : null,
+          timestamp: TimeHelper.format(TimeHelper.now(), "full"),
+          hasError: false,
         };
       } else {
         throw new Error(
@@ -155,177 +401,80 @@ class WeatherModule extends BaseModule {
       }
     } catch (error) {
       logger.error(`${city.name} 날씨 조회 실패:`, error);
+
+      // 에러 상황에서도 기본 구조 반환
       return {
-        type: "error",
-        module: "weather",
-        data: {
-          message: `${city.name} 날씨 정보를 불러올 수 없습니다.`,
-          canRetry: true,
-        },
+        city,
+        weather: null,
+        dust: null,
+        timestamp: TimeHelper.format(TimeHelper.now(), "full"),
+        hasError: true,
+        errorMessage: error.message || "날씨 정보를 불러올 수 없습니다",
       };
     }
   }
 
   /**
-   * ⭐ 기본 도시 설정
+   * 👤 사용자 선호 도시 가져오기
    */
-  async setDefaultCity(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-    const cityId = params;
-    const city = this.majorCities.find((c) => c.id === cityId);
+  getUserPreferredCity(userId) {
+    return this.userPreferredCity.get(userId) || this.config.defaultCity;
+  }
 
-    if (city) {
-      this.userPreferredCity.set(userId, city.name);
+  /**
+   * 🆔 기본 도시 ID 가져오기
+   */
+  getDefaultCityId(userId) {
+    const preferredCityName = this.getUserPreferredCity(userId);
+    const city = this.majorCities.find((c) => c.name === preferredCityName);
+    return city?.id || "seoul";
+  }
 
-      return {
-        type: "default_set",
-        module: "weather",
-        data: {
-          city: city,
-          message: `기본 도시가 ${city.name}(으)로 설정되었습니다.`,
-        },
-      };
-    }
+  /**
+   * 🔍 도시 검색
+   */
+  findCityByKeyword(keyword) {
+    const lowerKeyword = keyword.toLowerCase();
+    return this.majorCities.find(
+      (city) =>
+        city.name.toLowerCase().includes(lowerKeyword) ||
+        city.id.toLowerCase().includes(lowerKeyword)
+    );
+  }
 
+  /**
+   * 📊 모듈 상태 조회
+   */
+  getStatus() {
     return {
-      type: "error",
-      module: "weather",
-      data: {
-        message: "도시 설정에 실패했습니다.",
+      ...super.getStatus(),
+      serviceConnected: !!this.weatherService,
+      citiesCount: this.majorCities.length,
+      userPreferences: this.userPreferredCity.size,
+      config: {
+        defaultCity: this.config.defaultCity,
+        enableDustInfo: this.config.enableDustInfo,
+        enableForecast: this.config.enableForecast,
+        cacheTimeout: this.config.cacheTimeout,
       },
     };
   }
 
   /**
-   * 💬 메시지 핸들러
+   * 🧹 모듈 정리
    */
-  async onHandleMessage(bot, msg) {
-    const text = msg.text?.toLowerCase() || "";
-    const chatId = msg.chat.id;
-    const userId = getUserId(msg.from);
+  async onCleanup() {
+    try {
+      // 사용자 선호도 정리
+      this.userPreferredCity.clear();
 
-    // 날씨 키워드 감지
-    if (text.includes("날씨") || text.includes("weather")) {
-      logger.info(`💬 날씨 키워드 감지: "${text}"`);
-
-      // 특정 도시 날씨 요청 확인
-      for (const city of this.majorCities) {
-        if (text.includes(city.name)) {
-          const weatherResult = await this.weatherService.getCurrentWeather(
-            city.name + "시"
-          );
-
-          if (weatherResult.success) {
-            const weather = weatherResult.data;
-            await bot.sendMessage(
-              chatId,
-              `${city.emoji} *${city.name} 날씨*\n\n` +
-                `${weather.description}\n` +
-                `🌡️ 온도: ${weather.temperature}°C (체감 ${
-                  weather.feelsLike || weather.temperature
-                }°C)\n` +
-                `💧 습도: ${weather.humidity}%\n` +
-                `🌬️ 풍속: ${weather.windSpeed || 0}m/s`,
-              {
-                parse_mode: "Markdown",
-                reply_markup: {
-                  inline_keyboard: [
-                    [
-                      {
-                        text: "🔄 새로고침",
-                        callback_data: `weather:city:${city.id}`,
-                      },
-                      { text: "📋 도시 목록", callback_data: "weather:cities" },
-                    ],
-                    [
-                      {
-                        text: "⭐ 기본 도시로 설정",
-                        callback_data: `weather:setdefault:${city.id}`,
-                      },
-                    ],
-                  ],
-                },
-              }
-            );
-            return true;
-          }
-        }
+      if (this.weatherService && this.weatherService.cleanup) {
+        await this.weatherService.cleanup();
       }
-
-      // 기본 도시 날씨 표시
-      const defaultCity = this.userPreferredCity.get(userId) || "서울";
-      const weatherResult = await this.weatherService.getCurrentWeather(
-        defaultCity + "시"
-      );
-
-      if (weatherResult.success) {
-        const weather = weatherResult.data;
-        const cityInfo = this.majorCities.find((c) => c.name === defaultCity);
-
-        await bot.sendMessage(
-          chatId,
-          `${cityInfo?.emoji || "🌤️"} *${defaultCity} 날씨*\n\n` +
-            `${weather.description}\n` +
-            `🌡️ 온도: ${weather.temperature}°C (체감 ${
-              weather.feelsLike || weather.temperature
-            }°C)\n` +
-            `💧 습도: ${weather.humidity}%\n` +
-            `🌬️ 풍속: ${weather.windSpeed || 0}m/s\n\n` +
-            `💡 다른 도시: "서울 날씨", "부산 날씨" 등으로 검색`,
-          {
-            parse_mode: "Markdown",
-            reply_markup: {
-              inline_keyboard: [
-                [
-                  {
-                    text: "📋 전체 도시 날씨",
-                    callback_data: "weather:cities",
-                  },
-                ],
-                [
-                  {
-                    text: "🔄 새로고침",
-                    callback_data: `weather:city:${cityInfo?.id || "seoul"}`,
-                  },
-                ],
-              ],
-            },
-          }
-        );
-      }
-
-      return true;
+      logger.info("✅ WeatherModule 정리 완료");
+    } catch (error) {
+      logger.error("❌ WeatherModule 정리 실패:", error);
     }
-
-    return false;
-  }
-
-  /**
-   * ❓ 도움말
-   */
-  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
-    return {
-      type: "help",
-      module: "weather",
-      data: {
-        title: "날씨 도움말",
-        features: [
-          "🏛️ 서울, 수원 등 주요 8개 도시 날씨",
-          "🌡️ 실시간 온도, 습도, 풍속 정보",
-          "💨 미세먼지 정보 (PM2.5, PM10)",
-          "⭐ 기본 도시 설정 가능",
-        ],
-        usage: [
-          '"날씨" - 기본 도시 날씨',
-          '"서울 날씨" - 특정 도시 날씨',
-          '"부산 날씨" - 부산 날씨 확인',
-        ],
-        tips: [
-          "자주 확인하는 도시를 기본으로 설정하세요",
-          "8개 주요 도시 날씨를 빠르게 확인 가능",
-        ],
-      },
-    };
   }
 }
 
