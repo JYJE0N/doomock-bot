@@ -1,8 +1,7 @@
 // src/services/TimerService.js - 뽀모도로 타이머 데이터 서비스
 
-const BaseService = require("./BaseService");
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const logger = require("../../utils/Logger");
+const TimeHelper = require("../../utils/TimeHelper");
 const {
   TimerSession,
   TimerStats,
