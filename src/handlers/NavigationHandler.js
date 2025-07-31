@@ -11,6 +11,7 @@ const SystemRenderer = require("../renderers/SystemRenderer");
 const TTSRenderer = require("../renderers/TTSRenderer"); // 🆕 TTSRenderer 추가!
 const WeatherRenderer = require("../renderers/WeatherRenderer");
 const TimerRenderer = require("../renderers/TimerRenderer");
+const LeaveRenderer = require("../renderers/LeaveRenderer");
 
 class NavigationHandler {
   constructor() {
@@ -29,6 +30,7 @@ class NavigationHandler {
     this.registerRenderer("tts", new TTSRenderer(bot, this));
     this.registerRenderer("weather", new WeatherRenderer(bot, this)); // 🆕 추가!
     this.registerRenderer("timer", new TimerRenderer(bot, this)); // 🆕 추가!
+    this.registerRenderer("leave", new LeaveRenderer(bot, this)); // 🆕 추가!
 
     logger.info("🎹 NavigationHandler가 초기화되었습니다.");
   }
