@@ -1,688 +1,529 @@
-// src/renderers/LeaveRenderer.js - 🏖️ 연차 관리 UI 렌더러
+// src/renderers/LeaveRenderer.js - 연차 관리 UI 렌더러
+
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const { getUserName } = require("../utils/UserHelper");
 
 /**
- * 🏖️ LeaveRenderer - 연차 관리 UI 렌더러
+ * 🏖️ LeaveRenderer - 연차 관리 UI 렌더링 전담
  *
- * 🎯 렌더링 타입:
- * - menu: 메인 메뉴
- * - status: 연차 현황
- * - use_select: 연차 사용 선택
- * - use_success: 연차 사용 완료
- * - history: 사용 이력
- * - stats: 통계
- * - settings: 설정
- * - help: 도움말
+ * 🎯 책임:
+ * - 연차 현황 화면 렌더링
+ * - 연차 사용 기록 표시
+ * - 연차 관련 인라인 키보드 생성
+ * - 사용자 친화적 연차 정보 표시
  *
- * ✅ 특징:
- * - 직관적인 이모지 사용
- * - 한국어 친화적 UI
- * - 간단하고 명확한 메뉴 구조
- * - 모바일 최적화된 버튼 배치
+ * ✅ SoC: UI 렌더링만 담당, 비즈니스 로직은 다루지 않음
  */
 class LeaveRenderer extends BaseRenderer {
   constructor(bot, navigationHandler) {
     super(bot, navigationHandler);
+
     this.moduleName = "leave";
+
+    // 연차 관련 이모지
+    this.emojis = {
+      calendar: "📅",
+      used: "🏖️",
+      remaining: "💼",
+      history: "📋",
+      add: "➕",
+      statistics: "📊",
+      help: "❓",
+      warning: "⚠️",
+      success: "✅",
+      error: "❌",
+    };
   }
 
   /**
-   * 🎯 메인 렌더링 분기
+   * 🎯 메인 렌더링 메서드 (BaseRenderer 패턴)
    */
   async render(result, ctx) {
+    const { type, data } = result;
+
     try {
-      switch (result.type) {
+      switch (type) {
         case "menu":
-          return await this.renderMenu(result, ctx);
+          return await this.renderMenuResponse(data, ctx);
+
         case "status":
-          return await this.renderStatus(result, ctx);
-        case "use_select":
-          return await this.renderUseSelect(result, ctx);
-        case "use_success":
-          return await this.renderUseSuccess(result, ctx);
+          return await this.renderStatusResponse(data, ctx);
+
         case "history":
-          return await this.renderHistory(result, ctx);
-        case "stats":
-          return await this.renderStats(result, ctx);
-        case "settings":
-          return await this.renderSettings(result, ctx);
+          return await this.renderHistoryResponse(data, ctx);
+
         case "help":
-          return await this.renderHelp(result, ctx);
+          return await this.renderHelpResponse(data, ctx);
+
+        case "input":
+          return await this.renderInputPrompt(data, ctx);
+
+        case "success":
+          return await this.renderSuccessResponse(data, ctx);
+
         case "error":
-          return await this.renderError(result, ctx);
+          return await this.renderErrorResponse(data, ctx);
+
         default:
-          return await this.renderUnknown(result, ctx);
+          logger.warn(`알 수 없는 연차 렌더링 타입: ${type}`);
+          await this.renderErrorResponse(
+            { message: "지원하지 않는 기능입니다." },
+            ctx
+          );
       }
     } catch (error) {
-      logger.error("LeaveRenderer 렌더링 오류:", error);
-      await this.renderError({ message: "화면을 표시할 수 없습니다." }, ctx);
+      logger.error("LeaveRenderer 오류:", error);
+      await this.renderErrorResponse({ message: error.message }, ctx);
     }
   }
 
   /**
-   * 🏠 메인 메뉴 렌더링
+   * 🏖️ 연차 메뉴 렌더링
    */
-  async renderMenu(result, ctx) {
-    const { data } = result;
-    const { userName, status, todayUsage, config } = data;
+  renderMenu(data) {
+    const userName = data?.userName || "사용자";
 
-    // 상태 표시 이모지
-    const statusEmoji = this.getStatusEmoji(
-      status.remaining,
-      status.annualLeave
-    );
-    const usageRate = Math.round((status.used / status.annualLeave) * 100);
+    let text = `${this.emojis.calendar} *연차 관리*\n\n`;
+    text += `안녕하세요, ${this.escapeMarkdownV2(userName)}님\\!\n`;
+    text += `연차 관리 시스템에 오신 것을 환영합니다\\.\n\n`;
 
-    let text = `🏖️ *연차 관리* ${statusEmoji}\n\n`;
-    text += `👤 *${this.escapeMarkdownV2(userName)}*님의 연차 현황\n\n`;
-
-    // 현재 상태
-    text += `📊 *${status.year}년 연차 현황*\n`;
-    text += `▫️ 총 연차: *${status.annualLeave}일*\n`;
-    text += `▫️ 사용: *${status.used}일* \\(${usageRate}%\\)\n`;
-    text += `▫️ 잔여: *${status.remaining}일*\n\n`;
-
-    // 진행률 바
-    const progressBar = this.createProgressBar(status.used, status.annualLeave);
-    text += `${progressBar}\n\n`;
-
-    // 오늘 사용 여부
-    if (todayUsage.hasUsage) {
-      text += `📅 *오늘 사용*: ${todayUsage.totalDays}일\n\n`;
+    // 간단한 현황 요약 (있는 경우)
+    if (data?.quickStatus) {
+      const status = data.quickStatus;
+      text += `📊 *현재 연차 현황*\n`;
+      text += `• 잔여 연차: ${this.escapeMarkdownV2(
+        String(status.remaining)
+      )}일\n`;
+      text += `• 사용 연차: ${this.escapeMarkdownV2(String(status.used))}일\n`;
+      text += `• 사용률: ${this.escapeMarkdownV2(
+        String(status.usageRate)
+      )}%\n\n`;
     }
 
-    // 빠른 정보
-    const remainingPercent = Math.round(
-      (status.remaining / status.annualLeave) * 100
-    );
-    if (remainingPercent <= 20) {
-      text += `⚠️ 잔여 연차가 얼마 남지 않았습니다\\!\n\n`;
-    } else if (remainingPercent >= 80) {
-      text += `✨ 아직 연차를 많이 사용하지 않으셨네요\\!\n\n`;
-    }
+    text += `어떤 작업을 수행하시겠어요\\?`;
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "🏖️ 연차 사용", callback_data: "leave:use" },
-          { text: "📊 현황 보기", callback_data: "leave:status" },
-        ],
-        [
-          { text: "📋 사용 이력", callback_data: "leave:history" },
-          { text: "📈 통계", callback_data: "leave:stats" },
-        ],
-        [
-          { text: "⚙️ 설정", callback_data: "leave:settings" },
-          { text: "❓ 도움말", callback_data: "leave:help" },
-        ],
-        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-      ],
+    return {
+      text,
+      keyboard: this.createMenuKeyboard(),
     };
-
-    // BaseRenderer의 안전한 메시지 전송 사용
-    try {
-      await this.sendMessage(
-        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
-        text,
-        {
-          parse_mode: "MarkdownV2",
-          reply_markup: keyboard,
-        }
-      );
-    } catch (error) {
-      // 마크다운 실패 시 일반 텍스트로 재시도
-      const plainText = `🏖️ 연차 관리\n\n${userName}님의 연차 현황\n\n${status.year}년 연차 현황:\n총 연차: ${status.annualLeave}일\n사용: ${status.used}일 (${usageRate}%)\n잔여: ${status.remaining}일`;
-
-      await this.sendMessage(
-        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
-        plainText,
-        { reply_markup: keyboard }
-      );
-    }
   }
 
   /**
    * 📊 연차 현황 렌더링
    */
-  async renderStatus(result, ctx) {
-    const { data } = result;
-    const { status, monthlyUsage, year } = data;
+  renderStatus(data) {
+    const { status } = data;
 
-    let text = `📊 *${year}년 연차 현황*\n\n`;
+    let text = `${this.emojis.statistics} *${status.year}년 연차 현황*\n\n`;
 
-    // 전체 요약
-    text += `🎯 *전체 요약*\n`;
-    text += `▫️ 총 연차: *${status.annualLeave}일*\n`;
-    text += `▫️ 사용: *${status.used}일* \\(${status.usageRate}%\\)\n`;
-    text += `▫️ 잔여: *${status.remaining}일*\n\n`;
+    // 메인 현황
+    text += `📋 *전체 현황*\n`;
+    text += `• 연간 총 연차: ${this.escapeMarkdownV2(
+      String(status.total)
+    )}일\n`;
+    text += `• 사용한 연차: ${this.escapeMarkdownV2(String(status.used))}일\n`;
+    text += `• 남은 연차: ${this.escapeMarkdownV2(
+      String(status.remaining)
+    )}일\n`;
+    text += `• 사용률: ${this.escapeMarkdownV2(String(status.usageRate))}%\n\n`;
 
-    // 사용 내역 (타입별)
-    if (status.breakdown.total.count > 0) {
-      text += `📋 *사용 내역*\n`;
+    // 진행률 바
+    text += `📊 *사용 진행률*\n`;
+    text += this.createProgressBar(status.used, status.total);
+    text += `\n\n`;
 
-      if (status.breakdown.full.count > 0) {
-        text += `▫️ 연차: ${status.breakdown.full.count}회 \\(${status.breakdown.full.days}일\\)\n`;
-      }
-      if (status.breakdown.half.count > 0) {
-        text += `▫️ 반차: ${status.breakdown.half.count}회 \\(${status.breakdown.half.days}일\\)\n`;
-      }
-      if (status.breakdown.quarter.count > 0) {
-        text += `▫️ 반반차: ${status.breakdown.quarter.count}회 \\(${status.breakdown.quarter.days}일\\)\n`;
-      }
-      text += `\n`;
+    // 이번 달 사용량 (있는 경우)
+    if (status.thisMonth !== undefined) {
+      text += `📅 *이번 달 사용*\n`;
+      text += `• 사용한 연차: ${this.escapeMarkdownV2(
+        String(status.thisMonth)
+      )}일\n\n`;
     }
 
-    // 월별 사용 현황 (간단하게)
-    const currentMonth = new Date().getMonth() + 1;
-    const thisMonthUsage = monthlyUsage.find((m) => m.month === currentMonth);
-
-    if (thisMonthUsage && thisMonthUsage.totalDays > 0) {
-      text += `📅 *이번 달 사용*: ${thisMonthUsage.totalDays}일 \\(${thisMonthUsage.count}회\\)\n\n`;
+    // 경고 메시지
+    if (status.remaining <= 2) {
+      text += `${this.emojis.warning} *연차가 얼마 남지 않았습니다\\!*\n`;
+      text += `계획적으로 사용하세요\\.\n\n`;
+    } else if (status.usageRate < 20 && this.isYearEnd()) {
+      text += `${this.emojis.warning} *연차 사용률이 낮습니다\\.*\n`;
+      text += `연말 전에 계획을 세워보세요\\.\n\n`;
     }
 
-    // 남은 기간 계산
-    const now = new Date();
-    const yearEnd = new Date(year, 11, 31);
-    const remainingDays = Math.ceil((yearEnd - now) / (1000 * 60 * 60 * 24));
+    text += `${TimeHelper.format(TimeHelper.now(), "YYYY년 MM월 DD일")} 기준`;
 
-    if (remainingDays > 0) {
-      text += `⏰ *올해 남은 기간*: ${remainingDays}일\n`;
-      if (status.remaining > 0) {
-        const avgPerMonth =
-          Math.round((status.remaining / (remainingDays / 30)) * 10) / 10;
-        text += `💡 월 평균 사용 가능: ${avgPerMonth}일\n`;
-      }
-    }
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 상세 이력", callback_data: "leave:history" },
-          { text: "📈 월별 통계", callback_data: "leave:stats" },
-        ],
-        [{ text: "🏖️ 연차 사용", callback_data: "leave:use" }],
-        [{ text: "🔙 연차 메뉴", callback_data: "leave:menu" }],
-      ],
+    return {
+      text,
+      keyboard: this.createStatusKeyboard(),
     };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
   }
 
   /**
-   * 🏖️ 연차 사용 선택 렌더링
+   * 📋 연차 사용 기록 렌더링
    */
-  async renderUseSelect(result, ctx) {
-    const { data } = result;
-    const { status, leaveUnits } = data;
+  renderHistory(data) {
+    const { history } = data;
 
-    let text = `🏖️ *연차 사용하기*\n\n`;
-    text += `현재 잔여 연차: *${status.remaining}일*\n\n`;
-    text += `사용할 연차 종류를 선택해주세요:\n\n`;
+    let text = `${this.emojis.history} *연차 사용 기록*\n\n`;
 
-    const keyboard = {
-      inline_keyboard: [],
-    };
+    if (!history || history.length === 0) {
+      text += `아직 사용한 연차가 없습니다\\.\n`;
+      text += `첫 연차를 계획해보세요\\!`;
 
-    // 사용 가능한 연차 타입들
-    if (status.remaining >= 1.0) {
-      keyboard.inline_keyboard.push([
-        {
-          text: `📅 ${leaveUnits.full.label} (1일)`,
-          callback_data: "leave:use:full",
-        },
-      ]);
-    }
-
-    if (status.remaining >= 0.5) {
-      keyboard.inline_keyboard.push([
-        {
-          text: `🕐 ${leaveUnits.half.label} (0.5일)`,
-          callback_data: "leave:use:half",
-        },
-      ]);
-    }
-
-    if (status.remaining >= 0.25) {
-      keyboard.inline_keyboard.push([
-        {
-          text: `⏰ ${leaveUnits.quarter.label} (0.25일)`,
-          callback_data: "leave:use:quarter",
-        },
-      ]);
-    }
-
-    // 사용 가능한 연차가 없는 경우
-    if (status.remaining === 0) {
-      text += `❌ 사용 가능한 연차가 없습니다\\.\n`;
-    }
-
-    keyboard.inline_keyboard.push([
-      { text: "🔙 연차 메뉴", callback_data: "leave:menu" },
-    ]);
-
-    // BaseRenderer의 안전한 메시지 전송 사용
-    try {
-      await this.sendMessage(
-        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+      return {
         text,
-        {
-          parse_mode: "MarkdownV2",
-          reply_markup: keyboard,
-        }
-      );
-    } catch (error) {
-      // 마크다운 실패 시 일반 텍스트로 재시도
-      await this.sendMessage(
-        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
-        `🏖️ 연차 사용하기\n\n현재 잔여 연차: ${status.remaining}일\n\n사용할 연차 종류를 선택해주세요:`,
-        { reply_markup: keyboard }
-      );
-    }
-  }
-
-  /**
-   * ✅ 연차 사용 완료 렌더링
-   */
-  async renderUseSuccess(result, ctx) {
-    const { data } = result;
-    const {
-      usedDays,
-      leaveType,
-      previousRemaining,
-      currentRemaining,
-      usedDate,
-    } = data;
-
-    let text = `✅ *연차 사용 완료*\n\n`;
-    text += `🎉 ${this.escapeMarkdownV2(
-      leaveType
-    )}이 성공적으로 사용되었습니다\\!\n\n`;
-
-    text += `📋 *사용 내역*\n`;
-    text += `▫️ 사용일: *${usedDate}*\n`;
-    text += `▫️ 사용 연차: *${usedDays}일*\n`;
-    text += `▫️ 이전 잔여: *${previousRemaining}일*\n`;
-    text += `▫️ 현재 잔여: *${currentRemaining}일*\n\n`;
-
-    // 남은 연차에 따른 메시지
-    if (currentRemaining === 0) {
-      text += `⚠️ 연차를 모두 사용하셨습니다\\.\n`;
-    } else if (currentRemaining <= 2) {
-      text += `⚠️ 잔여 연차가 얼마 남지 않았습니다\\.\n`;
-    } else {
-      text += `😊 남은 연차를 계획적으로 사용하세요\\!\n`;
+        keyboard: this.createHistoryKeyboard(false),
+      };
     }
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📊 현황 보기", callback_data: "leave:status" },
-          { text: "📋 이력 보기", callback_data: "leave:history" },
-        ],
-        [{ text: "🏖️ 추가 사용", callback_data: "leave:use" }],
-        [{ text: "🔙 연차 메뉴", callback_data: "leave:menu" }],
-      ],
-    };
+    text += `총 ${this.escapeMarkdownV2(String(history.length))}개의 기록\n\n`;
 
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
+    // 최근 기록들 표시 (최대 10개)
+    const recentHistory = history.slice(0, 10);
+
+    recentHistory.forEach((record, index) => {
+      const date = TimeHelper.format(record.usedDate, "MM/DD");
+      const days = record.days;
+      const reason = record.reason || "개인 사유";
+
+      text += `${index + 1}\\. `;
+      text += `${this.escapeMarkdownV2(date)} \\- `;
+      text += `${this.escapeMarkdownV2(String(days))}일 `;
+      text += `\\(${this.escapeMarkdownV2(reason)}\\)\n`;
     });
-  }
 
-  /**
-   * 📋 사용 이력 렌더링
-   */
-  async renderHistory(result, ctx) {
-    const { data } = result;
-    const { history, year, total, hasMore } = data;
-
-    let text = `📋 *${year}년 연차 사용 이력*\n\n`;
-
-    if (history.length === 0) {
-      text += `📝 아직 사용한 연차가 없습니다\\.\n\n`;
-    } else {
-      text += `총 ${total}건의 사용 이력\n\n`;
-
-      // 최근 10개 이력 표시
-      history.slice(0, 10).forEach((record, index) => {
-        const date = record.formattedDate;
-        const days = record.days;
-        const remaining = record.remainingAtTime;
-        const leaveType = this.getLeaveTypeEmoji(days);
-
-        text += `${leaveType} *${date}* \\- ${days}일 사용\n`;
-        text += `   잔여: ${remaining}일\n`;
-
-        if (record.reason && record.reason.trim()) {
-          text += `   사유: ${this.escapeMarkdownV2(record.reason)}\n`;
-        }
-        text += `\n`;
-      });
-
-      if (hasMore) {
-        text += `\\.\\.\\. 더 많은 이력이 있습니다\n\n`;
-      }
+    if (history.length > 10) {
+      text += `\n\\.\\.\\. 외 ${this.escapeMarkdownV2(
+        String(history.length - 10)
+      )}개 기록`;
     }
 
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📊 현황 보기", callback_data: "leave:status" },
-          { text: "📈 통계 보기", callback_data: "leave:stats" },
-        ],
-        [{ text: "🔙 연차 메뉴", callback_data: "leave:menu" }],
-      ],
+    return {
+      text,
+      keyboard: this.createHistoryKeyboard(true),
     };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 📈 통계 렌더링
-   */
-  async renderStats(result, ctx) {
-    const { data } = result;
-    const { stats, monthlyBreakdown, year } = data;
-
-    let text = `📈 *${year}년 연차 통계*\n\n`;
-
-    // 전체 통계
-    text += `🎯 *전체 통계*\n`;
-    text += `▫️ 총 사용: ${stats.total.days}일 \\(${stats.total.count}회\\)\n`;
-    text += `▫️ 사용률: ${stats.utilizationRate}%\n`;
-    text += `▫️ 월 평균: ${stats.averagePerMonth}일\n\n`;
-
-    // 타입별 통계
-    if (stats.total.count > 0) {
-      text += `📊 *타입별 사용*\n`;
-      if (stats.annual && stats.annual.days > 0) {
-        text += `▫️ 연차: ${stats.annual.days}일 \\(${stats.annual.count}회\\)\n`;
-      }
-      if (stats.sick && stats.sick.days > 0) {
-        text += `▫️ 반차: ${stats.sick.days}일 \\(${stats.sick.count}회\\)\n`;
-      }
-      if (stats.personal && stats.personal.days > 0) {
-        text += `▫️ 반반차: ${stats.personal.days}일 \\(${stats.personal.count}회\\)\n`;
-      }
-      text += `\n`;
-    }
-
-    // 월별 사용 패턴 (상위 3개월)
-    const topMonths = monthlyBreakdown
-      .filter((m) => m.totalDays > 0)
-      .sort((a, b) => b.totalDays - a.totalDays)
-      .slice(0, 3);
-
-    if (topMonths.length > 0) {
-      text += `📅 *주요 사용 월*\n`;
-      topMonths.forEach((month, index) => {
-        text += `${index + 1}\\. ${month.monthName}: ${month.totalDays}일\n`;
-      });
-      text += `\n`;
-    }
-
-    // 연말 예측
-    if (stats.projectedYearEnd) {
-      text += `🔮 *연말 예상*\n`;
-      text += `▫️ 예상 총 사용: ${stats.projectedYearEnd.projected}일\n`;
-      text += `▫️ 진행률: ${stats.projectedYearEnd.progressRate}%\n\n`;
-    }
-
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 상세 이력", callback_data: "leave:history" },
-          { text: "📊 현황 보기", callback_data: "leave:status" },
-        ],
-        [{ text: "🔙 연차 메뉴", callback_data: "leave:menu" }],
-      ],
-    };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * ⚙️ 설정 렌더링
-   */
-  async renderSettings(result, ctx) {
-    const { data } = result;
-    const { settings, defaultAnnualLeave, currentYear } = data;
-
-    let text = `⚙️ *연차 설정*\n\n`;
-
-    const userAnnualLeave = settings?.annualLeave || defaultAnnualLeave;
-
-    text += `📊 *현재 설정*\n`;
-    text += `▫️ 연간 연차: *${userAnnualLeave}일*\n`;
-    text += `▫️ 적용 연도: *${currentYear}년*\n\n`;
-
-    text += `🔧 *설정 가능 항목*\n`;
-    text += `▫️ 연간 연차 일수 변경\n`;
-    text += `▫️ 새해 연차 리셋\n\n`;
-
-    text += `💡 *참고사항*\n`;
-    text += `▫️ 연차는 매년 1월 1일에 새로 시작됩니다\n`;
-    text += `▫️ 이월되지 않으며 12월 31일에 소멸됩니다\n`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "📊 연차 일수 변경", callback_data: "leave:settings:annual" }],
-        [{ text: "🔄 연차 리셋", callback_data: "leave:settings:reset" }],
-        [{ text: "🔙 연차 메뉴", callback_data: "leave:menu" }],
-      ],
-    };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
   }
 
   /**
    * ❓ 도움말 렌더링
    */
-  async renderHelp(result, ctx) {
-    const { data } = result;
-    const { features, leaveUnits } = data;
-
-    let text = `❓ *연차 관리 도움말*\n\n`;
+  renderHelp(data) {
+    let text = `${this.emojis.help} *연차 관리 도움말*\n\n`;
 
     text += `🎯 *주요 기능*\n`;
-    features.forEach((feature) => {
-      text += `▫️ ${this.escapeMarkdownV2(feature)}\n`;
-    });
-    text += `\n`;
+    text += `• 📊 현황 확인 \\- 연차 잔여량과 사용률 확인\n`;
+    text += `• 🏖️ 연차 사용 \\- 새로운 연차 사용 기록\n`;
+    text += `• 📋 사용 기록 \\- 지금까지의 연차 사용 내역\n\n`;
 
-    text += `🏖️ *연차 사용 종류*\n`;
-    Object.values(leaveUnits).forEach((unit) => {
-      const emoji = this.getLeaveTypeEmoji(unit.value);
-      text += `${emoji} *${this.escapeMarkdownV2(unit.label)}*: ${
-        unit.value
-      }일\n`;
-    });
-    text += `\n`;
+    text += `💡 *사용 팁*\n`;
+    text += `• 연차는 0\\.5일 단위로 사용할 수 있습니다\n`;
+    text += `• 사유를 입력하면 기록 관리가 편리합니다\n`;
+    text += `• 정기적으로 현황을 확인하세요\n\n`;
 
-    text += `📋 *사용 방법*\n`;
-    text += `1\\. "연차 사용" 버튼 클릭\n`;
-    text += `2\\. 연차 종류 선택 \\(연차/반차/반반차\\)\n`;
-    text += `3\\. 자동으로 오늘 날짜로 사용 처리\n`;
-    text += `4\\. 잔여 연차에서 자동 차감\n\n`;
+    text += `⚠️ *주의사항*\n`;
+    text += `• 입력한 연차는 수정이 어려우니 신중하게 입력하세요\n`;
+    text += `• 연차는 당해년도에만 유효합니다\n\n`;
 
-    text += `⏰ *연차 관리 규칙*\n`;
-    text += `▫️ 매년 1월 1일에 새 연차 시작\n`;
-    text += `▫️ 12월 31일에 미사용 연차 소멸\n`;
-    text += `▫️ 이월 불가\n`;
-    text += `▫️ 0\\.25일 단위로 사용 가능\n\n`;
+    text += `🔄 *명령어*\n`;
+    text += `• /leave \\- 연차 관리 메뉴 열기`;
 
-    text += `💡 *팁*\n`;
-    text += `▫️ "현황 보기"에서 사용률 확인 가능\n`;
-    text += `▫️ "통계"에서 월별 사용 패턴 분석\n`;
-    text += `▫️ "설정"에서 연간 연차 일수 조정\n`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🏖️ 연차 사용해보기", callback_data: "leave:use" }],
-        [{ text: "📊 현황 확인", callback_data: "leave:status" }],
-        [{ text: "🔙 연차 메뉴", callback_data: "leave:menu" }],
-      ],
+    return {
+      text,
+      keyboard: this.createHelpKeyboard(),
     };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
   }
 
   /**
-   * ❌ 오류 렌더링
+   * ✅ 성공 메시지 렌더링
    */
-  async renderError(result, ctx) {
-    const message = result.message || "알 수 없는 오류가 발생했습니다.";
+  renderSuccess(data) {
+    const { message, details } = data;
 
-    let text = `❌ *오류 발생*\n\n`;
-    text += this.escapeMarkdownV2(message);
+    let text = `${this.emojis.success} *성공\\!*\n\n`;
+    text += `${this.escapeMarkdownV2(message)}\n\n`;
 
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔄 다시 시도", callback_data: "leave:menu" }],
-        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
-
-    // BaseRenderer의 안전한 메시지 전송 사용
-    try {
-      await this.sendMessage(
-        ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id,
-        text,
-        {
-          parse_mode: "MarkdownV2",
-          reply_markup: keyboard,
-        }
-      );
-    } catch (error) {
-      // 마크다운 실패 시 일반 텍스트로 재시도
-      await this.sendMessage(
-        ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id,
-        `❌ 오류 발생\n\n${message}`,
-        { reply_markup: keyboard }
-      );
+    if (details) {
+      text += `📋 *세부 정보*\n`;
+      if (details.days) {
+        text += `• 사용 일수: ${this.escapeMarkdownV2(
+          String(details.days)
+        )}일\n`;
+      }
+      if (details.reason) {
+        text += `• 사유: ${this.escapeMarkdownV2(details.reason)}\n`;
+      }
+      if (details.remaining !== undefined) {
+        text += `• 남은 연차: ${this.escapeMarkdownV2(
+          String(details.remaining)
+        )}일\n`;
+      }
     }
+
+    return {
+      text,
+      keyboard: this.createBackKeyboard(),
+    };
   }
 
   /**
-   * ❓ 알 수 없는 타입 렌더링
+   * 📝 입력 프롬프트 렌더링
    */
-  async renderUnknown(result, ctx) {
-    let text = `❓ *알 수 없는 요청*\n\n`;
-    text += `처리할 수 없는 요청입니다\\.\n`;
-    text += `타입: ${this.escapeMarkdownV2(result.type || "unknown")}`;
+  renderInputPrompt(data) {
+    const { message, inputType } = data;
 
-    const keyboard = {
+    let text = `${this.emojis.add} *연차 사용 등록*\n\n`;
+    text += `${this.escapeMarkdownV2(message)}\n\n`;
+
+    if (inputType === "leave_days") {
+      text += `💡 *입력 예시*\n`;
+      text += `• 1 \\(하루 종일\\)\n`;
+      text += `• 0\\.5 \\(반차\\)\n`;
+      text += `• 2\\.5 \\(이틀 반\\)\n\n`;
+
+      text += `⚠️ 소수점은 0\\.5 단위로만 입력 가능합니다\\.`;
+    } else if (inputType === "leave_reason") {
+      text += `💡 *사유 예시*\n`;
+      text += `• 개인 사유\n`;
+      text += `• 병원 방문\n`;
+      text += `• 가족 행사\n`;
+      text += `• 여행\n\n`;
+
+      text += `선택사항입니다\\. 입력하지 않으면 "개인 사유"로 저장됩니다\\.`;
+    }
+
+    return {
+      text,
+      keyboard: this.createInputKeyboard(),
+    };
+  }
+
+  // ===== 🎹 키보드 생성 메서드 =====
+
+  /**
+   * 🎹 메인 메뉴 키보드
+   */
+  createMenuKeyboard() {
+    return {
       inline_keyboard: [
-        [{ text: "🔙 연차 메뉴", callback_data: "leave:menu" }],
+        [
+          { text: "📊 연차 현황", callback_data: "leave:status" },
+          { text: "🏖️ 연차 사용", callback_data: "leave:use" },
+        ],
+        [
+          { text: "📋 사용 기록", callback_data: "leave:history" },
+          { text: "❓ 도움말", callback_data: "leave:help" },
+        ],
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
       ],
     };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 =====
-
   /**
-   * 📊 상태 이모지 반환
+   * 🎹 현황 화면 키보드
    */
-  getStatusEmoji(remaining, total) {
-    const percentage = (remaining / total) * 100;
-
-    if (percentage >= 80) return "🟢"; // 충분함
-    if (percentage >= 50) return "🟡"; // 보통
-    if (percentage >= 20) return "🟠"; // 주의
-    return "🔴"; // 부족
+  createStatusKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: "🏖️ 연차 사용", callback_data: "leave:use" },
+          { text: "📋 사용 기록", callback_data: "leave:history" },
+        ],
+        [
+          { text: "🔄 새로고침", callback_data: "leave:status" },
+          { text: "◀️ 뒤로", callback_data: "leave:menu" },
+        ],
+      ],
+    };
   }
 
   /**
-   * 📈 진행률 바 생성
+   * 🎹 기록 화면 키보드
+   */
+  createHistoryKeyboard(hasData) {
+    const keyboard = [];
+
+    if (hasData) {
+      keyboard.push([
+        { text: "🏖️ 연차 사용", callback_data: "leave:use" },
+        { text: "📊 현황 보기", callback_data: "leave:status" },
+      ]);
+    } else {
+      keyboard.push([{ text: "🏖️ 첫 연차 사용", callback_data: "leave:use" }]);
+    }
+
+    keyboard.push([{ text: "◀️ 뒤로", callback_data: "leave:menu" }]);
+
+    return { inline_keyboard: keyboard };
+  }
+
+  /**
+   * 🎹 도움말 키보드
+   */
+  createHelpKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: "📊 현황 보기", callback_data: "leave:status" },
+          { text: "🏖️ 연차 사용", callback_data: "leave:use" },
+        ],
+        [{ text: "◀️ 뒤로", callback_data: "leave:menu" }],
+      ],
+    };
+  }
+
+  /**
+   * 🎹 입력 중 키보드
+   */
+  createInputKeyboard() {
+    return {
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "leave:menu" }]],
+    };
+  }
+
+  /**
+   * 🎹 뒤로가기 키보드
+   */
+  createBackKeyboard() {
+    return {
+      inline_keyboard: [[{ text: "◀️ 뒤로", callback_data: "leave:menu" }]],
+    };
+  }
+
+  // ===== 🛠️ 응답 렌더링 메서드 =====
+
+  /**
+   * 📋 메뉴 응답 렌더링
+   */
+  async renderMenuResponse(data, ctx) {
+    const rendered = this.renderMenu(data);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  /**
+   * 📊 현황 응답 렌더링
+   */
+  async renderStatusResponse(data, ctx) {
+    const rendered = this.renderStatus(data);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  /**
+   * 📋 기록 응답 렌더링
+   */
+  async renderHistoryResponse(data, ctx) {
+    const rendered = this.renderHistory(data);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  /**
+   * ❓ 도움말 응답 렌더링
+   */
+  async renderHelpResponse(data, ctx) {
+    const rendered = this.renderHelp(data);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  /**
+   * ✅ 성공 응답 렌더링
+   */
+  async renderSuccessResponse(data, ctx) {
+    const rendered = this.renderSuccess(data);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  /**
+   * ❌ 에러 응답 렌더링
+   */
+  async renderErrorResponse(data, ctx) {
+    const rendered = this.renderError(data);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  /**
+   * 📝 입력 프롬프트 응답 렌더링
+   */
+  async renderInputPrompt(data, ctx) {
+    const rendered = this.renderInputPrompt(data);
+
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  // ===== 🛠️ 헬퍼 메서드 =====
+
+  /**
+   * 📊 진행률 바 생성
    */
   createProgressBar(used, total, length = 10) {
-    const percentage = Math.min((used / total) * 100, 100);
+    const percentage = Math.min(100, Math.max(0, (used / total) * 100));
     const filled = Math.round((percentage / 100) * length);
     const empty = length - filled;
 
-    const filledBar = "█".repeat(filled);
-    const emptyBar = "░".repeat(empty);
-
-    return `\`${filledBar}${emptyBar}\` ${Math.round(percentage)}%`;
+    const bar = "▰".repeat(filled) + "▱".repeat(empty);
+    return `${bar} ${Math.round(percentage)}%`;
   }
 
   /**
-   * 🏷️ 연차 타입 이모지 반환
+   * 📅 연말 체크
    */
-  getLeaveTypeEmoji(days) {
-    const dayValue = parseFloat(days);
-
-    if (dayValue === 0.25) return "⏰"; // 반반차
-    if (dayValue === 0.5) return "🕐"; // 반차
-    if (dayValue === 1.0) return "📅"; // 연차
-    return "🏖️"; // 기본
+  isYearEnd() {
+    const now = TimeHelper.now();
+    const month = now.getMonth() + 1; // 0-based to 1-based
+    return month >= 10; // 10월 이후를 연말로 간주
   }
 
   /**
-   * 📅 월 이름 반환 (한국어)
+   * ❌ 에러 메시지 렌더링
    */
-  getMonthName(month) {
-    const monthNames = [
-      "",
-      "1월",
-      "2월",
-      "3월",
-      "4월",
-      "5월",
-      "6월",
-      "7월",
-      "8월",
-      "9월",
-      "10월",
-      "11월",
-      "12월",
-    ];
-    return monthNames[month] || `${month}월`;
-  }
+  renderError(error) {
+    const message = error?.message || "알 수 없는 오류가 발생했습니다.";
 
-  /**
-   * 📊 렌더러 상태 조회
-   */
-  getStatus() {
     return {
-      rendererName: "LeaveRenderer",
-      version: "3.0.1",
-      supportedTypes: [
-        "menu",
-        "status",
-        "use_select",
-        "use_success",
-        "history",
-        "stats",
-        "settings",
-        "help",
-        "error",
-      ],
-      hasBot: !!this.bot,
-      hasNavigationHandler: !!this.navigationHandler,
+      text: `${this.emojis.error} *오류 발생*\n\n${this.escapeMarkdownV2(
+        message
+      )}`,
+      keyboard: this.createBackKeyboard(),
     };
   }
 }

@@ -1,6 +1,7 @@
 // src/database/MongooseManager.js
 const mongoose = require("mongoose");
 const logger = require("../utils/Logger");
+const UserLeaveSetting = require("./models/UserLeaveSetting");
 
 let instance = null;
 
@@ -96,6 +97,7 @@ class MongooseManager {
         TimerSettings: require("./models/TimerSettings"),
         Worktime: require("./models/Worktime"),
         Leave: require("./models/Leave"),
+        UserLeaveSetting: require("./models/UserLeaveSetting"),
         Reminder: require("./models/Reminder"),
         UserSetting: require("./models/UserSetting"),
         TTSHistory: require("./models/TTSHistory"),
