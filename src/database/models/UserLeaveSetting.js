@@ -1,4 +1,4 @@
-// src/database/models/UserLeaveSetting.js - 사용자 연차 설정 모델
+// src/database/models/UserLeaveSetting.js - 사용자 연차 설정 모델 (완전 버전)
 const mongoose = require("mongoose");
 
 /**
@@ -252,39 +252,52 @@ userLeaveSettingSchema.methods.validateSettings = function () {
   };
 };
 
-// ===== 🎯 정적 메서드 (Static Methods) =====
+// ===== 🚀 핵심 정적 메서드 (Static Methods) =====
 
-// 사용자 설정 조회 또는 생성
+/**
+ * 🎯 사용자 설정 조회 또는 생성 (핵심 메서드!)
+ */
 userLeaveSettingSchema.statics.getOrCreate = async function (
   userId,
   year = null
 ) {
   const currentYear = year || new Date().getFullYear();
 
-  let setting = await this.findOne({
-    userId: userId.toString(),
-    applicableYear: currentYear,
-  });
-
-  if (!setting) {
-    // 기본 설정으로 새 레코드 생성
-    setting = new this({
+  try {
+    let setting = await this.findOne({
       userId: userId.toString(),
       applicableYear: currentYear,
-      annualLeave: 15, // 기본값
-      metadata: {
-        source: "system",
-        notes: "시스템에 의해 자동 생성됨",
-      },
+      isActive: true,
     });
 
-    await setting.save();
-  }
+    if (!setting) {
+      // 기본 설정으로 새 레코드 생성
+      setting = new this({
+        userId: userId.toString(),
+        applicableYear: currentYear,
+        annualLeave: parseInt(process.env.DEFAULT_ANNUAL_LEAVE) || 15, // 환경변수에서 기본값
+        metadata: {
+          source: "system",
+          notes: "시스템에 의해 자동 생성됨",
+        },
+      });
 
-  return setting;
+      await setting.save();
+      console.log(
+        `📋 새 사용자 연차 설정 생성: ${userId} - ${setting.annualLeave}일`
+      );
+    }
+
+    return setting;
+  } catch (error) {
+    console.error("사용자 설정 조회/생성 실패:", error);
+    throw error;
+  }
 };
 
-// 회사/부서별 설정 조회
+/**
+ * 회사/부서별 설정 조회
+ */
 userLeaveSettingSchema.statics.getByOrganization = async function (
   company,
   department = null
@@ -298,7 +311,9 @@ userLeaveSettingSchema.statics.getByOrganization = async function (
   return await this.find(query).sort({ updatedAt: -1 });
 };
 
-// 연차 일수별 사용자 통계
+/**
+ * 연차 일수별 사용자 통계
+ */
 userLeaveSettingSchema.statics.getLeaveDistribution = async function (
   year = null
 ) {
@@ -324,7 +339,9 @@ userLeaveSettingSchema.statics.getLeaveDistribution = async function (
   ]);
 };
 
-// 경력별 평균 연차
+/**
+ * 경력별 평균 연차
+ */
 userLeaveSettingSchema.statics.getAverageLeaveByExperience = async function () {
   return await this.aggregate([
     {

@@ -1,16 +1,17 @@
-// src/services/LeaveService.js - 🏖️ Mongoose 기반 연차 데이터 서비스
+// src/services/LeaveService.js - 🏖️ Mongoose 기반 연차 데이터 서비스 (완전 버전)
 
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🏖️ LeaveService - Mongoose 기반 연차 관리
+ * 🏖️ LeaveService - Mongoose 기반 연차 관리 (완전 버전)
  *
  * 🎯 핵심 기능:
  * - 연차 사용 CRUD (생성/조회/업데이트/삭제)
  * - 사용자별/연도별 연차 추적
  * - 연차 현황 통계
  * - 연차 기록 관리
+ * - 사용자 설정 관리
  *
  * ✅ 표준 준수:
  * - Mongoose 라이브러리 사용 ✨
@@ -21,8 +22,9 @@ const TimeHelper = require("../utils/TimeHelper");
  */
 class LeaveService {
   constructor(options = {}) {
-    // Mongoose 모델 (나중에 주입받음)
+    // Mongoose 모델들 (나중에 주입받음)
     this.Leave = null;
+    this.UserLeaveSetting = null;
 
     // Railway 환경변수 기반 설정
     this.config = {
@@ -62,14 +64,19 @@ class LeaveService {
     try {
       logger.info("🔧 LeaveService 초기화 시작 (Mongoose)...");
 
-      // MongooseManager에서 Leave 모델 가져오기
+      // MongooseManager에서 모델들 가져오기
       const { getInstance } = require("../database/MongooseManager");
       const mongooseManager = getInstance();
 
       this.Leave = mongooseManager.getModel("Leave");
+      this.UserLeaveSetting = mongooseManager.getModel("UserLeaveSetting");
 
       if (!this.Leave) {
         throw new Error("Leave 모델을 찾을 수 없습니다");
+      }
+
+      if (!this.UserLeaveSetting) {
+        throw new Error("UserLeaveSetting 모델을 찾을 수 없습니다");
       }
 
       logger.success("✅ LeaveService 초기화 완료 (Mongoose)");
@@ -82,7 +89,7 @@ class LeaveService {
   // ===== 📊 Mongoose 기반 CRUD 메서드들 =====
 
   /**
-   * 🏖️ 연차 현황 조회 (기본)
+   * 🏖️ 연차 현황 조회 (기본) - 핵심 메서드!
    */
   async getLeaveStatus(userId, year = null) {
     this.stats.operationsCount++;
@@ -122,12 +129,12 @@ class LeaveService {
   /**
    * 🏖️ 연차 상세 현황 조회 (이번 달 포함)
    */
-  async getDetailedStatus(userId) {
+  async getDetailedStatus(userId, year = null) {
     this.stats.operationsCount++;
 
     try {
       // 캐시 확인
-      const cacheKey = `detailed:${userId}:${new Date().getFullYear()}`;
+      const cacheKey = `detailed:${userId}:${year || new Date().getFullYear()}`;
       if (this.config.enableCache && this.isValidCache(cacheKey)) {
         this.stats.cacheHits++;
         return this.cache.get(cacheKey);
@@ -135,81 +142,148 @@ class LeaveService {
 
       this.stats.cacheMisses++;
 
-      // 🎯 Mongoose 정적 메서드 사용
-      const detailedStatus = await this.Leave.getDetailedStatus(userId);
+      // 기본 현황 조회
+      const basicStatus = await this.getLeaveStatus(userId, year);
 
-      // 캐시에 저장 (짧은 시간)
+      // 오늘 사용 현황
+      const todayUsage = await this.getTodayUsage(userId);
+
+      // 이번 달 사용 현황
+      const currentMonth = new Date().getMonth() + 1;
+      const monthlyUsage = await this.getMonthlyUsage(userId, year);
+      const thisMonthUsage = monthlyUsage.find(
+        (m) => m.month === currentMonth
+      ) || { days: 0, count: 0 };
+
+      const detailedStatus = {
+        ...basicStatus,
+        todayUsage,
+        thisMonth: {
+          used: thisMonthUsage.days,
+          count: thisMonthUsage.count,
+        },
+      };
+
+      // 캐시에 저장
       if (this.config.enableCache) {
         this.cache.set(cacheKey, detailedStatus);
         this.cacheTimestamps.set(cacheKey, Date.now());
       }
 
       this.stats.successCount++;
-      logger.debug(`🏖️ 상세 연차 현황 조회됨 (사용자: ${userId}) - Mongoose`);
-
       return detailedStatus;
     } catch (error) {
       this.stats.errorCount++;
-      logger.error("상세 연차 현황 조회 실패 (Mongoose):", error);
+      logger.error("연차 상세 현황 조회 실패 (Mongoose):", error);
       throw error;
     }
   }
 
   /**
-   * 🏖️ 연차 사용 기록
+   * 🏖️ 오늘 사용한 연차 조회
    */
-  async useLeave(userId, days, reason = "개인 사유", options = {}) {
+  async getTodayUsage(userId) {
     this.stats.operationsCount++;
 
     try {
-      // 입력 검증
-      if (!userId) {
-        throw new Error("사용자 ID가 필요합니다");
+      const todayUsage = await this.Leave.getTodayUsage(userId);
+      this.stats.successCount++;
+      return todayUsage;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("오늘 연차 사용 조회 실패 (Mongoose):", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 📊 월별 사용량 조회
+   */
+  async getMonthlyUsage(userId, year = null) {
+    this.stats.operationsCount++;
+
+    try {
+      const monthlyUsage = await this.Leave.getMonthlyUsage(userId, year);
+      this.stats.successCount++;
+      return monthlyUsage;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("월별 연차 사용량 조회 실패 (Mongoose):", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 📊 연도별 통계 조회
+   */
+  async getYearlyStats(userId, year = null) {
+    this.stats.operationsCount++;
+
+    try {
+      const yearlyStats = await this.Leave.getYearlyStats(userId, year);
+      this.stats.successCount++;
+      return yearlyStats;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("연도별 통계 조회 실패 (Mongoose):", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🏖️ 연차 사용 처리
+   */
+  async useLeave(userId, days, options = {}) {
+    this.stats.operationsCount++;
+
+    try {
+      const {
+        leaveType = "연차",
+        usedDate = new Date(),
+        reason = "",
+        requestedBy = "사용자",
+      } = options;
+
+      // 잔여 연차 확인
+      const status = await this.getLeaveStatus(userId);
+      if (status.remaining < days) {
+        return {
+          success: false,
+          error: `잔여 연차가 부족합니다. (필요: ${days}일, 잔여: ${status.remaining}일)`,
+        };
       }
 
-      const parsedDays = parseFloat(days);
-      if (isNaN(parsedDays) || parsedDays <= 0) {
-        throw new Error("올바른 연차 일수를 입력해주세요");
-      }
+      // 연차 사용 기록 생성
+      const leaveRecord = new this.Leave({
+        userId: userId.toString(),
+        days: days,
+        leaveType: leaveType,
+        usedDate: usedDate,
+        reason: reason,
+        metadata: {
+          requestedBy: requestedBy,
+          requestedAt: new Date(),
+          source: "bot",
+        },
+      });
 
-      if (parsedDays > this.config.maxLeaveDaysPerRequest) {
-        throw new Error(
-          `한 번에 최대 ${this.config.maxLeaveDaysPerRequest}일까지만 사용 가능합니다`
-        );
-      }
-
-      // 0.5 단위 검증
-      if ((parsedDays * 2) % 1 !== 0) {
-        throw new Error("연차는 0.5일 단위로만 사용 가능합니다");
-      }
-
-      // 🎯 Mongoose 정적 메서드 사용
-      const leaveData = {
-        days: parsedDays,
-        reason: reason.trim() || "개인 사유",
-        type: options.type || "annual",
-        startDate: options.startDate,
-        endDate: options.endDate,
-      };
-
-      const savedLeave = await this.Leave.useLeave(userId, leaveData);
+      const savedLeave = await leaveRecord.save();
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
       this.stats.successCount++;
       logger.info(
-        `🏖️ 연차 사용 완료: ${parsedDays}일 (사용자: ${userId}) - Mongoose`
+        `🏖️ 연차 사용 처리됨: ${userId} - ${days}일 (${leaveType}) - Mongoose`
       );
 
       return {
+        success: true,
         id: savedLeave._id.toString(),
         userId: savedLeave.userId,
         days: savedLeave.days,
-        reason: savedLeave.reason,
-        year: savedLeave.year,
+        leaveType: savedLeave.leaveType,
         usedDate: savedLeave.usedDate,
-        type: savedLeave.type,
         status: savedLeave.status,
       };
     } catch (error) {
@@ -219,7 +293,10 @@ class LeaveService {
       if (error.name === "ValidationError") {
         this.stats.validationErrors++;
         const firstError = Object.values(error.errors)[0];
-        throw new Error(firstError.message);
+        return {
+          success: false,
+          error: firstError.message,
+        };
       }
 
       logger.error("연차 사용 실패 (Mongoose):", error);
@@ -259,21 +336,11 @@ class LeaveService {
         year: leave.year,
         days: leave.days,
         reason: leave.reason,
-        type: leave.type,
+        leaveType: leave.leaveType,
         status: leave.status,
         usedDate: leave.usedDate,
-        startDate: leave.startDate,
-        endDate: leave.endDate,
         createdAt: leave.createdAt,
-
-        // 가상 속성들
-        formattedPeriod:
-          leave.startDate && leave.endDate
-            ? `${TimeHelper.format(
-                leave.startDate,
-                "MM.DD"
-              )} ~ ${TimeHelper.format(leave.endDate, "MM.DD")}`
-            : TimeHelper.format(leave.usedDate, "YYYY.MM.DD"),
+        formattedUsedDate: TimeHelper.format(leave.usedDate, "YYYY.MM.DD"),
       }));
 
       // 캐시에 저장
@@ -287,7 +354,11 @@ class LeaveService {
         `🏖️ 연차 기록 ${processedHistory.length}개 조회됨 (사용자: ${userId}) - Mongoose`
       );
 
-      return processedHistory;
+      return {
+        data: processedHistory,
+        total: processedHistory.length,
+        hasMore: processedHistory.length === (options.limit || 20),
+      };
     } catch (error) {
       this.stats.errorCount++;
       logger.error("연차 기록 조회 실패 (Mongoose):", error);
@@ -295,112 +366,112 @@ class LeaveService {
     }
   }
 
+  // ===== 🛠️ 사용자 설정 관련 메서드들 =====
+
   /**
-   * 📊 연차 통계 조회
+   * 👤 사용자 연차 설정 조회
    */
-  async getLeaveStats(userId, options = {}) {
+  async getUserSettings(userId, year = null) {
     this.stats.operationsCount++;
 
     try {
-      const { type = "yearly", year = null } = options;
-
-      let stats;
-      if (type === "yearly") {
-        stats = await this.Leave.getYearlyStats(userId, year);
-      } else if (type === "monthly") {
-        stats = await this.Leave.getMonthlyStats(userId, year);
-      } else {
-        throw new Error("지원하지 않는 통계 타입입니다");
-      }
-
+      const setting = await this.UserLeaveSetting.getOrCreate(userId, year);
       this.stats.successCount++;
-      logger.debug(
-        `🏖️ 연차 통계 조회됨 (사용자: ${userId}, 타입: ${type}) - Mongoose`
-      );
 
-      return stats;
+      return {
+        userId: setting.userId,
+        annualLeave: setting.annualLeave,
+        applicableYear: setting.applicableYear,
+        policy: setting.policy,
+        position: setting.position,
+        yearsOfService: setting.yearsOfService,
+      };
     } catch (error) {
       this.stats.errorCount++;
-      logger.error("연차 통계 조회 실패 (Mongoose):", error);
+      logger.error("사용자 설정 조회 실패 (Mongoose):", error);
       throw error;
     }
   }
 
   /**
-   * 🏖️ 연차 기록 수정
+   * 📝 사용자 연간 연차 설정
    */
-  async updateLeave(userId, leaveId, updateData) {
+  async setUserAnnualLeave(userId, annualDays, year = null) {
     this.stats.operationsCount++;
 
     try {
-      const leave = await this.Leave.findOneAndUpdate(
-        {
-          _id: leaveId,
-          userId: String(userId),
-          isActive: true,
-        },
-        {
-          ...updateData,
-          version: { $inc: 1 },
-        },
-        {
-          new: true,
-          runValidators: true,
-        }
-      );
+      const setting = await this.UserLeaveSetting.getOrCreate(userId, year);
+      setting.annualLeave = annualDays;
+      setting.metadata.lastModified = new Date();
+      setting.metadata.modifiedBy = "user";
 
-      if (!leave) {
-        throw new Error("연차 기록을 찾을 수 없습니다");
-      }
+      await setting.save();
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
       this.stats.successCount++;
-      logger.debug(`🏖️ 연차 기록 수정됨: ${leaveId} - Mongoose`);
+      logger.info(`📝 사용자 연차 설정 업데이트: ${userId} - ${annualDays}일`);
 
-      return leave;
+      return {
+        success: true,
+        annualLeave: annualDays,
+        userId: userId,
+      };
     } catch (error) {
       this.stats.errorCount++;
-      logger.error("연차 기록 수정 실패 (Mongoose):", error);
-      throw error;
+      logger.error("사용자 연차 설정 실패 (Mongoose):", error);
+
+      return {
+        success: false,
+        error: error.message,
+      };
     }
   }
 
   /**
-   * 🗑️ 연차 기록 삭제 (소프트 삭제)
+   * 🔄 연차 리셋 (새해)
    */
-  async deleteLeave(userId, leaveId) {
+  async resetYearlyLeave(userId, year = null) {
     this.stats.operationsCount++;
 
     try {
-      const leave = await this.Leave.findOneAndUpdate(
+      const targetYear = year || new Date().getFullYear();
+
+      // 사용자 설정 조회
+      const setting = await this.UserLeaveSetting.getOrCreate(
+        userId,
+        targetYear
+      );
+
+      // 기존 연차 기록들을 비활성화 (소프트 삭제)
+      await this.Leave.updateMany(
         {
-          _id: leaveId,
-          userId: String(userId),
+          userId: userId.toString(),
+          year: targetYear,
           isActive: true,
         },
         {
           isActive: false,
-          version: { $inc: 1 },
-        },
-        { new: true }
+          $inc: { version: 1 },
+        }
       );
-
-      if (!leave) {
-        throw new Error("연차 기록을 찾을 수 없습니다");
-      }
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
       this.stats.successCount++;
-      logger.info(`🏖️ 연차 기록 삭제됨: ${leaveId} - Mongoose`);
+      logger.info(`🔄 연차 리셋 완료: ${userId} - ${targetYear}년`);
 
-      return true;
+      return {
+        success: true,
+        annualLeave: setting.annualLeave,
+        year: targetYear,
+        resetDate: new Date(),
+      };
     } catch (error) {
       this.stats.errorCount++;
-      logger.error("연차 기록 삭제 실패 (Mongoose):", error);
+      logger.error("연차 리셋 실패 (Mongoose):", error);
       throw error;
     }
   }
@@ -468,8 +539,9 @@ class LeaveService {
   getStatus() {
     return {
       serviceName: "LeaveService",
-      isConnected: !!this.Leave,
+      isConnected: !!this.Leave && !!this.UserLeaveSetting,
       modelName: this.Leave?.modelName || null,
+      settingModelName: this.UserLeaveSetting?.modelName || null,
       cacheEnabled: this.config.enableCache,
       cacheSize: this.cache.size,
       stats: { ...this.stats },

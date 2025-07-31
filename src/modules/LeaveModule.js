@@ -1,4 +1,4 @@
-// src/modules/LeaveModule.js - 🏖️ 연차 관리 모듈 v3.0.1
+// src/modules/LeaveModule.js - 🏖️ 연차 관리 모듈 (완전 버전)
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserId, getUserName } = require("../utils/UserHelper");
@@ -271,39 +271,81 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * 📅 연차 사용 (1일)
+   * 📅 연차 사용 (1일) - 스키마 호환 수정!
    */
   async useFullDay(bot, callbackQuery, subAction, params, moduleManager) {
-    return await this.processLeaveUse(callbackQuery, 1.0, "연차 (1일)");
+    logger.info("🏖️ useFullDay 호출됨", {
+      userId: getUserId(callbackQuery.from),
+      userName: getUserName(callbackQuery.from),
+    });
+
+    // ✅ 스키마와 일치하는 연차 타입 사용
+    const result = await this.processLeaveUse(callbackQuery, 1.0, "연차");
+
+    logger.info("🏖️ useFullDay 결과:", {
+      type: result.type,
+      success: result.type === "use_success",
+    });
+
+    return result;
   }
 
   /**
-   * 🕐 반차 사용 (0.5일)
+   * 🕐 반차 사용 (0.5일) - 스키마 호환 수정!
    */
   async useHalfDay(bot, callbackQuery, subAction, params, moduleManager) {
-    return await this.processLeaveUse(callbackQuery, 0.5, "반차 (0.5일)");
+    logger.info("🏖️ useHalfDay 호출됨", {
+      userId: getUserId(callbackQuery.from),
+    });
+
+    // ✅ 스키마와 일치하는 연차 타입 사용
+    return await this.processLeaveUse(callbackQuery, 0.5, "반차");
   }
 
   /**
-   * ⏰ 반반차 사용 (0.25일)
+   * ⏰ 반반차 사용 (0.25일) - 스키마 호환 수정!
    */
   async useQuarterDay(bot, callbackQuery, subAction, params, moduleManager) {
-    return await this.processLeaveUse(callbackQuery, 0.25, "반반차 (0.25일)");
+    logger.info("🏖️ useQuarterDay 호출됨", {
+      userId: getUserId(callbackQuery.from),
+    });
+
+    // ✅ 스키마와 일치하는 연차 타입 사용
+    return await this.processLeaveUse(callbackQuery, 0.25, "반반차");
   }
 
   /**
-   * 🎯 연차 사용 처리 공통 로직
+   * 🎯 연차 사용 처리 공통 로직 - 디버깅 로그 추가!
    */
   async processLeaveUse(callbackQuery, days, leaveType) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
     const userName = getUserName(from);
 
+    logger.info("🎯 processLeaveUse 시작", {
+      userId,
+      userName,
+      days,
+      leaveType,
+    });
+
     try {
       // 잔여 연차 확인
+      logger.debug("1️⃣ 잔여 연차 확인 중...");
       const status = await this.leaveService.getLeaveStatus(userId);
 
+      logger.info("📊 현재 연차 상태", {
+        remaining: status.remaining,
+        used: status.used,
+        total: status.annual,
+      });
+
       if (status.remaining < days) {
+        logger.warn("❌ 잔여 연차 부족", {
+          needed: days,
+          remaining: status.remaining,
+        });
+
         return {
           type: "error",
           message: `잔여 연차가 부족합니다. (필요: ${days}일, 잔여: ${status.remaining}일)`,
@@ -311,35 +353,59 @@ class LeaveModule extends BaseModule {
       }
 
       // 연차 사용 처리
-      const result = await this.leaveService.useLeave(userId, days, {
+      logger.debug("2️⃣ 연차 사용 처리 중...");
+      const leaveOptions = {
         leaveType: leaveType,
         usedDate: new Date(),
         requestedBy: userName,
+      };
+
+      logger.debug("📝 연차 사용 옵션:", leaveOptions);
+
+      const result = await this.leaveService.useLeave(
+        userId,
+        days,
+        leaveOptions
+      );
+
+      logger.info("🔄 LeaveService.useLeave 결과:", {
+        success: result.success,
+        error: result.error,
       });
 
       if (result.success) {
         // 성공 시 업데이트된 상태 조회
+        logger.debug("3️⃣ 업데이트된 상태 조회 중...");
         const updatedStatus = await this.leaveService.getLeaveStatus(userId);
 
-        return {
+        const successResult = {
           type: "use_success",
           module: "leave",
           data: {
             usedDays: days,
-            leaveType: leaveType,
+            leaveType: this.getDisplayLeaveType(leaveType), // ✅ 표시용 타입 변환
             previousRemaining: status.remaining,
             currentRemaining: updatedStatus.remaining,
             usedDate: TimeHelper.format(new Date(), "YYYY-MM-DD"),
           },
         };
+
+        logger.success("✅ 연차 사용 완료!", {
+          usedDays: days,
+          previousRemaining: status.remaining,
+          currentRemaining: updatedStatus.remaining,
+        });
+
+        return successResult;
       } else {
+        logger.error("❌ 연차 사용 실패:", result.error);
         return {
           type: "error",
           message: result.error || "연차 사용 처리에 실패했습니다.",
         };
       }
     } catch (error) {
-      logger.error("연차 사용 처리 실패:", error);
+      logger.error("💥 연차 사용 처리 예외 발생:", error);
       return {
         type: "error",
         message: "연차 사용 중 오류가 발생했습니다.",
@@ -524,6 +590,178 @@ class LeaveModule extends BaseModule {
     };
   }
 
+  // ===== 🆕 누락된 메서드들 추가 =====
+
+  /**
+   * 💼 잔여 연차만 표시
+   */
+  async showRemaining(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      const status = await this.leaveService.getLeaveStatus(userId);
+
+      return {
+        type: "remaining",
+        module: "leave",
+        data: {
+          remaining: status.remaining,
+          used: status.used,
+          total: status.annual,
+          year: status.year,
+        },
+      };
+    } catch (error) {
+      logger.error("잔여 연차 조회 실패:", error);
+      return {
+        type: "error",
+        message: "잔여 연차를 불러올 수 없습니다.",
+      };
+    }
+  }
+
+  /**
+   * 🏖️ 커스텀 연차 사용 시작
+   */
+  async startCustomUse(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      // 사용자 입력 대기 상태로 설정
+      this.setUserState(userId, {
+        awaitingInput: true,
+        inputType: "custom_use",
+        step: "days",
+        data: {},
+      });
+
+      return {
+        type: "input_request",
+        module: "leave",
+        data: {
+          inputType: "custom_use",
+          message: "사용할 연차 일수를 입력해주세요 (예: 1.5)",
+          maxDays: 5.0,
+        },
+      };
+    } catch (error) {
+      logger.error("커스텀 연차 사용 시작 실패:", error);
+      return {
+        type: "error",
+        message: "커스텀 연차 사용을 시작할 수 없습니다.",
+      };
+    }
+  }
+
+  /**
+   * ✅ 연차 사용 확인
+   */
+  async confirmUseLeave(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      // 사용자 상태에서 대기 중인 연차 사용 정보 가져오기
+      const userState = this.getUserState(userId);
+
+      if (!userState || !userState.pendingLeave) {
+        return {
+          type: "error",
+          message: "확인할 연차 사용 정보가 없습니다.",
+        };
+      }
+
+      const { days, leaveType } = userState.pendingLeave;
+
+      // 실제 연차 사용 처리
+      const result = await this.processLeaveUse(callbackQuery, days, leaveType);
+
+      // 사용자 상태 정리
+      this.clearUserState(userId);
+
+      return result;
+    } catch (error) {
+      logger.error("연차 사용 확인 실패:", error);
+      this.clearUserState(userId);
+      return {
+        type: "error",
+        message: "연차 사용 확인 중 오류가 발생했습니다.",
+      };
+    }
+  }
+
+  /**
+   * 📅 월별 이력 표시
+   */
+  async showMonthHistory(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      const monthlyHistory = await this.leaveService.getLeaveHistory(userId, {
+        year: currentYear,
+        month: currentMonth,
+        limit: 50,
+      });
+
+      return {
+        type: "month_history",
+        module: "leave",
+        data: {
+          history: monthlyHistory.data,
+          month: currentMonth,
+          year: currentYear,
+          total: monthlyHistory.total,
+        },
+      };
+    } catch (error) {
+      logger.error("월별 연차 이력 조회 실패:", error);
+      return {
+        type: "error",
+        message: "월별 연차 이력을 불러올 수 없습니다.",
+      };
+    }
+  }
+
+  /**
+   * 📅 연도별 이력 표시
+   */
+  async showYearHistory(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      const currentYear = new Date().getFullYear();
+
+      const yearlyHistory = await this.leaveService.getLeaveHistory(userId, {
+        year: currentYear,
+        limit: 100,
+      });
+
+      return {
+        type: "year_history",
+        module: "leave",
+        data: {
+          history: yearlyHistory.data,
+          year: currentYear,
+          total: yearlyHistory.total,
+          hasMore: yearlyHistory.hasMore,
+        },
+      };
+    } catch (error) {
+      logger.error("연도별 연차 이력 조회 실패:", error);
+      return {
+        type: "error",
+        message: "연도별 연차 이력을 불러올 수 없습니다.",
+      };
+    }
+  }
+
   // ===== 🎯 사용자 입력 처리 =====
 
   /**
@@ -597,7 +835,88 @@ class LeaveModule extends BaseModule {
     return true;
   }
 
+  /**
+   * 🎯 커스텀 연차 사용 입력 처리
+   */
+  async handleCustomUseInput(bot, msg, text, userState) {
+    const {
+      from: { id: userId },
+      chat: { id: chatId },
+    } = msg;
+
+    const days = parseFloat(text.trim());
+
+    if (isNaN(days) || days <= 0 || days > 5) {
+      await bot.sendMessage(
+        chatId,
+        "❌ 올바른 연차 일수를 입력해주세요 (0.25 - 5.0일)"
+      );
+      return true;
+    }
+
+    // 0.25 단위 검증
+    if ((days * 4) % 1 !== 0) {
+      await bot.sendMessage(
+        chatId,
+        "❌ 연차는 0.25일 단위로만 사용 가능합니다 (예: 0.25, 0.5, 1.0, 1.5)"
+      );
+      return true;
+    }
+
+    try {
+      // 커스텀 연차 사용 처리
+      let schemaLeaveType;
+      if (days === 0.25) {
+        schemaLeaveType = "반반차";
+      } else if (days === 0.5) {
+        schemaLeaveType = "반차";
+      } else if (days >= 1.0) {
+        schemaLeaveType = "연차";
+      } else {
+        schemaLeaveType = "연차"; // 기본값
+      }
+
+      const result = await this.processLeaveUse(
+        {
+          from: { id: userId, first_name: msg.from.first_name },
+        },
+        days,
+        schemaLeaveType // ✅ 스키마 호환 타입 사용
+      );
+
+      if (result.type === "use_success") {
+        await bot.sendMessage(
+          chatId,
+          `✅ ${days}일 연차가 성공적으로 사용되었습니다.\n잔여 연차: ${result.data.currentRemaining}일`
+        );
+      } else {
+        await bot.sendMessage(
+          chatId,
+          `❌ 연차 사용에 실패했습니다: ${result.message}`
+        );
+      }
+    } catch (error) {
+      logger.error("커스텀 연차 사용 처리 실패:", error);
+      await bot.sendMessage(chatId, "❌ 연차 사용 중 오류가 발생했습니다.");
+    }
+
+    this.clearUserState(userId);
+    return true;
+  }
+
   // ===== 🛠️ 유틸리티 메서드들 =====
+
+  /**
+   * 🎨 표시용 연차 타입 변환
+   */
+  getDisplayLeaveType(schemaType) {
+    const displayMap = {
+      연차: "연차 (1일)",
+      반차: "반차 (0.5일)",
+      반반차: "반반차 (0.25일)",
+    };
+    return displayMap[schemaType] || schemaType;
+  }
 
   /**
    * 🔍 모듈 키워드 확인

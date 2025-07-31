@@ -1,4 +1,4 @@
-// src/handlers/NavigationHandler.js - 최종 수정 버전
+// src/handlers/NavigationHandler.js - 콜백 파싱 로직 수정 버전
 
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
@@ -8,7 +8,7 @@ const { getEnabledModules } = require("../config/ModuleRegistry");
 const FortuneRenderer = require("../renderers/FortuneRenderer");
 const TodoRenderer = require("../renderers/TodoRenderer");
 const SystemRenderer = require("../renderers/SystemRenderer");
-const TTSRenderer = require("../renderers/TTSRenderer"); // 🆕 TTSRenderer 추가!
+const TTSRenderer = require("../renderers/TTSRenderer");
 const WeatherRenderer = require("../renderers/WeatherRenderer");
 const TimerRenderer = require("../renderers/TimerRenderer");
 const LeaveRenderer = require("../renderers/LeaveRenderer");
@@ -23,13 +23,13 @@ class NavigationHandler {
   initialize(bot) {
     this.bot = bot;
 
-    // ✅ 렌더러 등록 - 이제 import된 클래스들 사용 가능
+    // ✅ 렌더러 등록
     this.registerRenderer("fortune", new FortuneRenderer(bot, this));
     this.registerRenderer("todo", new TodoRenderer(bot, this));
     this.registerRenderer("system", new SystemRenderer(bot, this));
     this.registerRenderer("tts", new TTSRenderer(bot, this));
-    this.registerRenderer("weather", new WeatherRenderer(bot, this)); // 🆕 추가!
-    this.registerRenderer("timer", new TimerRenderer(bot, this)); // 🆕 추가!
+    this.registerRenderer("weather", new WeatherRenderer(bot, this));
+    this.registerRenderer("timer", new TimerRenderer(bot, this));
     this.registerRenderer("leave", new LeaveRenderer(bot, this));
 
     logger.info("🎹 NavigationHandler가 초기화되었습니다.");
@@ -79,6 +79,55 @@ class NavigationHandler {
     return escaped;
   }
 
+  /**
+   * 🔧 콜백 데이터 파싱 개선 (핵심 수정!)
+   */
+  parseCallbackData(data) {
+    const parts = data.split(":");
+
+    if (parts.length < 2) {
+      return {
+        moduleKey: parts[0],
+        subAction: "menu",
+        params: "",
+      };
+    }
+
+    const moduleKey = parts[0];
+
+    // ✅ 핵심 수정: subAction을 올바르게 구성
+    // leave:use:full → moduleKey="leave", subAction="use:full", params=""
+    // leave:use → moduleKey="leave", subAction="use", params=""
+    // leave:status → moduleKey="leave", subAction="status", params=""
+
+    if (parts.length === 2) {
+      return {
+        moduleKey: moduleKey,
+        subAction: parts[1],
+        params: "",
+      };
+    }
+
+    // 3개 이상의 파트가 있는 경우
+    if (parts.length >= 3) {
+      // 모듈:액션:하위액션 형태인지 확인
+      // leave:use:full → subAction = "use:full"
+      const possibleSubAction = `${parts[1]}:${parts[2]}`;
+
+      return {
+        moduleKey: moduleKey,
+        subAction: possibleSubAction,
+        params: parts.length > 3 ? parts.slice(3).join(":") : "",
+      };
+    }
+
+    return {
+      moduleKey: moduleKey,
+      subAction: parts[1] || "menu",
+      params: parts.length > 2 ? parts.slice(2).join(":") : "",
+    };
+  }
+
   async handleCallback(ctx) {
     try {
       // ✅ 한 번만 answerCbQuery 호출 - 텔레그램 표준 준수
@@ -92,7 +141,15 @@ class NavigationHandler {
         return await this.showMainMenu(ctx);
       }
 
-      const [moduleKey, subAction = "menu", ...params] = data.split(":");
+      // ✅ 개선된 콜백 데이터 파싱 사용
+      const { moduleKey, subAction, params } = this.parseCallbackData(data);
+
+      logger.debug(`🎯 콜백 파싱 결과:`, {
+        원본: data,
+        moduleKey,
+        subAction,
+        params,
+      });
 
       // 1. 모듈에서 데이터 가져오기 (비즈니스 로직)
       const result = await this.moduleManager.handleCallback(
@@ -100,7 +157,7 @@ class NavigationHandler {
         callbackQuery,
         moduleKey,
         subAction,
-        params.join(":")
+        params
       );
 
       if (result) {
@@ -182,56 +239,16 @@ class NavigationHandler {
   }
 
   /**
-   * 🏠 메인 메뉴 표시 - ✅ 핵심 수정!
+   * 🏠 메인 메뉴 표시 (SystemRenderer에게 완전 위임)
    */
   async showMainMenu(ctx) {
     try {
       const userName = getUserName(ctx.callbackQuery?.from || ctx.from);
-
-      // ✅ 활성화된 모듈 정보 가져오기
       const enabledModules = getEnabledModules();
 
-      // ✅ SystemRenderer에 전달할 데이터 구성
+      // ✅ SystemRenderer에게 완전 위임
       const systemRenderer = this.renderers.get("system");
       if (systemRenderer) {
-        const result = {
-          type: "main_menu",
-          module: "system",
-          data: {
-            userName,
-            enabledModules, // ✅ 이 부분이 핵심!
-          },
-        };
-        await systemRenderer.render(result, ctx);
-      } else {
-        // 폴백 - 기본 메인 메뉴
-        await this.renderFallbackMainMenu(ctx, userName, enabledModules);
-      }
-    } catch (error) {
-      logger.error("💥 메인 메뉴 표시 오류:", error);
-      await this.renderErrorMessage(ctx, "메뉴를 불러올 수 없습니다.");
-    }
-  }
-
-  /**
-   * 📱 명령어에서 메인 메뉴 표시 (별도 메서드)
-   */
-  async showMainMenuFromCommand(bot, chatId, userName) {
-    try {
-      const enabledModules = getEnabledModules();
-      const systemRenderer = this.renderers.get("system");
-
-      if (systemRenderer) {
-        // 가상 ctx 객체 생성 (명령어용)
-        const mockCtx = {
-          chat: { id: chatId },
-          from: { first_name: userName },
-          callbackQuery: {
-            from: { first_name: userName },
-            message: { chat: { id: chatId } },
-          },
-        };
-
         const result = {
           type: "main_menu",
           module: "system",
@@ -241,202 +258,95 @@ class NavigationHandler {
           },
         };
 
-        await systemRenderer.render(result, mockCtx);
+        await systemRenderer.render(result, ctx);
+        return true;
       } else {
-        // 폴백 - 기본 환영 메시지
-        await this.renderFallbackMainMenuDirect(
-          bot,
-          chatId,
-          userName,
-          enabledModules
-        );
+        logger.warn("📱 SystemRenderer를 찾을 수 없음 - 기본 메시지만 전송");
+        await ctx.editMessageText("❌ 시스템 렌더러를 찾을 수 없습니다.");
+        return false;
       }
     } catch (error) {
-      logger.error("💥 명령어 메인 메뉴 표시 오류:", error);
-      await bot.sendMessage(chatId, "메뉴를 불러오는 중 오류가 발생했습니다.");
+      logger.error("💥 메인 메뉴 표시 오류:", error);
+      await this.sendSafeErrorMessage(ctx, "메인 메뉴를 표시할 수 없습니다.");
+      return false;
     }
   }
 
   /**
-   * 🆘 폴백 메인 메뉴 (렌더러 없을 때) - ✅ 개선된 버전
-   */
-  async renderFallbackMainMenu(ctx, userName, enabledModules) {
-    let text = `🤖 *두목봇 v4\\.0\\.0*\n\n`;
-    text += `안녕하세요, ${this.escapeMarkdownV2(userName)}님\\!\n\n`;
-    text += `무엇을 도와드릴까요\\?\n\n`;
-    text += `모듈을 선택하세요\\:`;
-
-    const keyboard = this.buildModuleKeyboard(enabledModules);
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 📱 명령어용 폴백 메인 메뉴 (직접 전송)
-   */
-  async renderFallbackMainMenuDirect(bot, chatId, userName, enabledModules) {
-    let text = `🤖 *두목봇 v4\\.0\\.0*\n\n`;
-    text += `안녕하세요, ${this.escapeMarkdownV2(userName)}님\\!\n\n`;
-    text += `무엇을 도와드릴까요\\?\n\n`;
-    text += `모듈을 선택하세요\\:`;
-
-    const keyboard = this.buildModuleKeyboard(enabledModules);
-
-    await bot.sendMessage(chatId, text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * ⌨️ 모듈 키보드 생성 헬퍼
-   */
-  buildModuleKeyboard(enabledModules) {
-    const keyboard = { inline_keyboard: [] };
-
-    // 기본 모듈 아이콘과 이름 매핑
-    const moduleInfo = {
-      fortune: { icon: "🔮", name: "운세" },
-      todo: { icon: "📋", name: "할일 관리" },
-      timer: { icon: "⏰", name: "타이머" },
-      worktime: { icon: "🏢", name: "근무시간" },
-      leave: { icon: "🏖️", name: "휴가" },
-      reminder: { icon: "🔔", name: "리마인더" },
-      weather: { icon: "🌤️", name: "날씨" },
-      tts: { icon: "🔊", name: "음성변환" },
-      system: { icon: "⚙️", name: "시스템" },
-    };
-
-    // 시스템 모듈 제외한 사용자 모듈들 처리
-    const userModules = enabledModules.filter((m) => m.key !== "system");
-
-    // 활성화된 모듈들을 2열씩 배치
-    for (let i = 0; i < userModules.length; i += 2) {
-      const row = [];
-
-      // 첫 번째 모듈
-      const module1 = userModules[i];
-      const info1 = moduleInfo[module1.key] || {
-        icon: "📱",
-        name: module1.name || module1.key,
-      };
-      row.push({
-        text: `${info1.icon} ${info1.name}`,
-        callback_data: `${module1.key}:menu`,
-      });
-
-      // 두 번째 모듈 (있으면)
-      if (i + 1 < userModules.length) {
-        const module2 = userModules[i + 1];
-        const info2 = moduleInfo[module2.key] || {
-          icon: "📱",
-          name: module2.name || module2.key,
-        };
-        row.push({
-          text: `${info2.icon} ${info2.name}`,
-          callback_data: `${module2.key}:menu`,
-        });
-      }
-
-      keyboard.inline_keyboard.push(row);
-    }
-
-    // 하단 시스템 버튼들
-    keyboard.inline_keyboard.push([
-      { text: "❓ 도움말", callback_data: "system:help" },
-      { text: "ℹ️ 정보", callback_data: "system:info" },
-      { text: "📊 상태", callback_data: "system:status" },
-    ]);
-
-    return keyboard;
-  }
-
-  /**
-   * 🆘 폴백 메시지 렌더링
-   */
-  async renderFallbackMessage(ctx, result) {
-    const text = `⚠️ 렌더러 없음\\!\n\n모듈: ${this.escapeMarkdownV2(
-      result.module || "알 수 없음"
-    )}\n타입: ${this.escapeMarkdownV2(result.type || "알 수 없음")}`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * ❌ 오류 메시지 렌더링
-   */
-  async renderErrorMessage(ctx, message) {
-    const text = `❌ *오류 발생*\n\n${this.escapeMarkdownV2(message)}`;
-
-    const keyboard = {
-      inline_keyboard: [
-        [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
-      ],
-    };
-
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 📨 모듈별 메뉴 전송 (CommandHandler용)
+   * 📱 모듈 메뉴 전송 (명령어용 - 최소한만)
    */
   async sendModuleMenu(bot, chatId, moduleName) {
     try {
-      const renderer = this.renderers.get(moduleName);
-      if (renderer) {
-        // 가상 ctx 생성
-        const mockCtx = {
-          chat: { id: chatId },
-          callbackQuery: {
-            message: { chat: { id: chatId } },
-          },
-        };
+      // 단순한 안내 메시지만 전송
+      const text = `🎯 ${moduleName} 모듈`;
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "📋 메뉴 열기", callback_data: `${moduleName}:menu` }],
+        ],
+      };
 
-        const result = {
-          type: "menu",
-          module: moduleName,
-          data: {},
-        };
-
-        await renderer.render(result, mockCtx);
-      } else {
-        await bot.sendMessage(
-          chatId,
-          `❌ ${moduleName} 모듈의 렌더러를 찾을 수 없습니다.`
-        );
-      }
+      await bot.sendMessage(chatId, text, {
+        reply_markup: keyboard,
+      });
     } catch (error) {
-      logger.error(`💥 모듈 메뉴 전송 오류 (${moduleName}):`, error);
-      await bot.sendMessage(chatId, "메뉴를 불러오는 중 오류가 발생했습니다.");
+      logger.error(`💥 모듈 메뉴 전송 실패 (${moduleName}):`, error);
+      await bot.sendMessage(
+        chatId,
+        `❌ ${moduleName} 모듈 메뉴를 열 수 없습니다.`
+      );
     }
   }
 
   /**
-   * 📊 디버그 정보 출력
+   * 🎭 폴백 메시지 렌더링 (최소한만)
+   */
+  async renderFallbackMessage(ctx, result) {
+    const text = `⚠️ 렌더러 없음!\n\n모듈: ${
+      result.module || "알 수 없음"
+    }\n타입: ${result.type || "알 수 없음"}`;
+
+    try {
+      await ctx.editMessageText(text);
+    } catch (error) {
+      logger.error("💥 폴백 메시지 렌더링 실패:", error);
+      await ctx.answerCbQuery("처리 완료");
+    }
+  }
+
+  /**
+   * 🎭 에러 메시지 렌더링 (최소한만)
+   */
+  async renderErrorMessage(ctx, message) {
+    await this.sendSafeErrorMessage(ctx, message);
+  }
+
+  /**
+   * 📊 NavigationHandler 상태 조회
    */
   getStatus() {
     return {
-      handlerName: "NavigationHandler",
-      renderersCount: this.renderers.size,
+      serviceName: "NavigationHandler",
+      hasBot: !!this.bot,
+      hasModuleManager: !!this.moduleManager,
+      rendererCount: this.renderers.size,
       registeredRenderers: Array.from(this.renderers.keys()),
-      moduleManagerConnected: !!this.moduleManager,
-      botConnected: !!this.bot,
+      isReady: !!(this.bot && this.moduleManager),
     };
+  }
+
+  /**
+   * 🧹 정리 작업
+   */
+  async cleanup() {
+    try {
+      this.renderers.clear();
+      this.bot = null;
+      this.moduleManager = null;
+
+      logger.info("✅ NavigationHandler 정리 완료");
+    } catch (error) {
+      logger.error("❌ NavigationHandler 정리 실패:", error);
+    }
   }
 }
 
