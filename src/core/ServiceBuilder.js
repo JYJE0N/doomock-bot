@@ -82,7 +82,7 @@ class ServiceBuilder {
     let instance;
 
     // Mongoose를 사용하는 서비스들 (점진적 마이그레이션)
-    const mongooseServices = ["todo", "timer"]; // 일단 할일과 타이머만!
+    const mongooseServices = ["todo", "timer", "leave"]; // 일단 할일과 타이머만!
 
     if (mongooseServices.includes(serviceName)) {
       // Mongoose 서비스는 별도 설정 불필요

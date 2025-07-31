@@ -121,10 +121,26 @@ class LeaveRenderer extends BaseRenderer {
       ],
     };
 
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
+    // BaseRenderer의 안전한 메시지 전송 사용
+    try {
+      await this.sendMessage(
+        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+        text,
+        {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        }
+      );
+    } catch (error) {
+      // 마크다운 실패 시 일반 텍스트로 재시도
+      const plainText = `🏖️ 연차 관리\n\n${userName}님의 연차 현황\n\n${status.year}년 연차 현황:\n총 연차: ${status.annualLeave}일\n사용: ${status.used}일 (${usageRate}%)\n잔여: ${status.remaining}일`;
+
+      await this.sendMessage(
+        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+        plainText,
+        { reply_markup: keyboard }
+      );
+    }
   }
 
   /**
@@ -249,10 +265,24 @@ class LeaveRenderer extends BaseRenderer {
       { text: "🔙 연차 메뉴", callback_data: "leave:menu" },
     ]);
 
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
+    // BaseRenderer의 안전한 메시지 전송 사용
+    try {
+      await this.sendMessage(
+        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+        text,
+        {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        }
+      );
+    } catch (error) {
+      // 마크다운 실패 시 일반 텍스트로 재시도
+      await this.sendMessage(
+        ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id,
+        `🏖️ 연차 사용하기\n\n현재 잔여 연차: ${status.remaining}일\n\n사용할 연차 종류를 선택해주세요:`,
+        { reply_markup: keyboard }
+      );
+    }
   }
 
   /**
@@ -531,10 +561,24 @@ class LeaveRenderer extends BaseRenderer {
       ],
     };
 
-    await ctx.editMessageText(text, {
-      parse_mode: "MarkdownV2",
-      reply_markup: keyboard,
-    });
+    // BaseRenderer의 안전한 메시지 전송 사용
+    try {
+      await this.sendMessage(
+        ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id,
+        text,
+        {
+          parse_mode: "MarkdownV2",
+          reply_markup: keyboard,
+        }
+      );
+    } catch (error) {
+      // 마크다운 실패 시 일반 텍스트로 재시도
+      await this.sendMessage(
+        ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id,
+        `❌ 오류 발생\n\n${message}`,
+        { reply_markup: keyboard }
+      );
+    }
   }
 
   /**

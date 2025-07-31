@@ -75,6 +75,9 @@ class LeaveModule extends BaseModule {
         throw new Error("LeaveService 생성 실패");
       }
 
+      // 🔥 핵심: setupActions 호출!
+      this.setupActions();
+
       logger.success("LeaveModule 초기화 완료");
     } catch (error) {
       logger.error("LeaveModule 초기화 실패:", error);

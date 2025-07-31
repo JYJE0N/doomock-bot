@@ -30,7 +30,7 @@ class NavigationHandler {
     this.registerRenderer("tts", new TTSRenderer(bot, this));
     this.registerRenderer("weather", new WeatherRenderer(bot, this)); // 🆕 추가!
     this.registerRenderer("timer", new TimerRenderer(bot, this)); // 🆕 추가!
-    this.registerRenderer("leave", new LeaveRenderer(bot, this)); // 🆕 추가!
+    this.registerRenderer("leave", new LeaveRenderer(bot, this));
 
     logger.info("🎹 NavigationHandler가 초기화되었습니다.");
   }

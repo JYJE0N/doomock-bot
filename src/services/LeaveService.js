@@ -69,13 +69,20 @@ class LeaveService {
   async initialize() {
     try {
       // Mongoose 모델 동적 로드
-      this.LeaveModel = require("../database/models/Leave");
+      try {
+        this.LeaveModel = require("../database/models/Leave");
+        logger.debug("✅ Leave Mongoose 모델 로드됨");
+      } catch (modelError) {
+        logger.error("❌ Leave 모델 로드 실패:", modelError.message);
+        throw new Error(`Leave 모델을 찾을 수 없습니다: ${modelError.message}`);
+      }
 
-      // UserLeaveSetting 모델도 생성 필요 (별도 구현)
+      // UserLeaveSetting 모델도 로드 (옵션)
       try {
         this.UserLeaveSettingModel = require("../database/models/UserLeaveSetting");
+        logger.debug("✅ UserLeaveSetting 모델 로드됨");
       } catch (error) {
-        logger.warn("UserLeaveSetting 모델 없음 - 기본 설정 사용");
+        logger.warn("⚠️ UserLeaveSetting 모델 없음 - 기본 설정 사용");
       }
 
       // 캐시 정리 스케줄러 시작
