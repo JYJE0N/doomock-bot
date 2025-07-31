@@ -1,49 +1,48 @@
-// src/modules/TodoModule.js - 완성도 높은 할일 관리 모듈
-
+// src/modules/TodoModule.js - 📝 할일 관리 모듈 (표준 준수)
 const BaseModule = require("../core/BaseModule");
+const TodoService = require("../services/TodoService");
 const logger = require("../utils/Logger");
-const { getUserId, getUserName } = require("../utils/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
+const { getUserName, getUserId } = require("../utils/UserHelper");
 
 /**
- * 📋 TodoModule - 완성도 높은 할일 관리 시스템
+ * 📝 TodoModule - 할일 관리 모듈
  *
  * 🎯 핵심 기능:
- * - 📋 할일 목록보기 (완료/미완료 분리)
- * - ➕ 새 할일 추가 (리마인더 옵션)
- * - ✅ 완료처리 (원터치)
- * - 🔍 검색 기능
- * - 📊 간단 통계 (완료율)
- * - 🔔 자동 리마인더 설정
+ * - 할일 추가/완료/삭제
+ * - 깔끔한 라디오버튼 UI
+ * - 글자수 제한으로 UI 보호
+ * - 완성/미완성/삭제 구분
+ * - Mongoose 스키마 활용
  *
  * ✅ 표준 준수:
  * - BaseModule 상속
- * - 표준 매개변수 구조
  * - actionMap 방식
- * - SoC 준수
+ * - 표준 매개변수 체계
+ * - MongooseManager 활용
+ * - SRP & SoC 준수
  */
 class TodoModule extends BaseModule {
-  constructor(moduleName, options = {}) {
-    super(moduleName, options);
+  constructor(options = {}) {
+    super("TodoModule", options);
 
-    // ServiceBuilder 연결
-    this.serviceBuilder = options.serviceBuilder || null;
+    // 서비스 인스턴스
     this.todoService = null;
-    this.reminderService = null;
 
-    // 모듈 설정
+    // UI 설정
     this.config = {
-      maxTodosPerUser: parseInt(process.env.MAX_TODOS_PER_USER) || 50,
-      enableReminders: process.env.ENABLE_TODO_REMINDERS !== "false",
-      enableSearch: true,
-      defaultPriority: 3,
+      maxTextLength: 30, // UI 표시용 최대 글자수
+      maxTodosPerPage: 8, // 페이지당 할일 개수
+      enablePagination: true, // 페이지네이션 활성화
+      showPriority: true, // 우선순위 표시
+      showDueDate: false, // 마감일 표시 (간단한 UI를 위해 비활성화)
       ...options.config,
     };
 
     // 사용자 입력 상태 관리
-    this.inputStates = new Map();
+    this.userInputStates = new Map();
 
-    logger.info("[TodoModule] 모듈 생성", { version: "2.0.0" });
+    logger.info("📝 TodoModule 생성됨 - Mongoose 버전!");
   }
 
   /**
@@ -51,1057 +50,728 @@ class TodoModule extends BaseModule {
    */
   async onInitialize() {
     try {
-      logger.info("[TodoModule] 초기화 시작...");
+      logger.info("📝 TodoModule 초기화 시작...");
 
-      // ServiceBuilder를 통한 서비스 생성
-      if (this.serviceBuilder) {
-        this.todoService = await this.serviceBuilder.getOrCreate("todo", {
-          config: this.config,
-        });
+      // TodoService 초기화
+      this.todoService = new TodoService({
+        config: this.config,
+      });
 
-        // 리마인더 서비스 연결 (옵션)
-        if (this.config.enableReminders) {
-          try {
-            this.reminderService = await this.serviceBuilder.getOrCreate(
-              "reminder",
-              {
-                config: this.config,
-              }
-            );
-            logger.info("🔔 ReminderService 연결됨");
-          } catch (error) {
-            logger.warn(
-              "⚠️ ReminderService 연결 실패, 리마인더 기능 비활성화:",
-              error.message
-            );
-            this.config.enableReminders = false;
-          }
-        }
-      }
+      await this.todoService.initialize();
 
-      if (!this.todoService) {
-        throw new Error("TodoService 생성 실패");
-      }
-
-      // 액션 등록
-      this.setupActions();
-
-      logger.success("TodoModule 초기화 완료");
+      logger.success("✅ TodoModule 초기화 완료!");
     } catch (error) {
-      logger.error("TodoModule 초기화 실패:", error);
+      logger.error("❌ TodoModule 초기화 실패:", error);
       throw error;
     }
   }
 
   /**
-   * 🎯 액션 등록
+   * 🎯 액션 설정
    */
   setupActions() {
     this.registerActions({
-      // 메인 메뉴
-      menu: this.showTodoList,
+      menu: this.showTodoMenu,
       list: this.showTodoList,
-
-      // CRUD 액션들
-      add: this.promptAddTodo,
-      "add:simple": this.promptAddSimple,
-      "add:reminder": this.promptAddWithReminder,
-      toggle: this.toggleTodo,
-      delete: this.deleteTodo,
-
-      // 검색 및 필터
-      search: this.promptSearch,
-      "filter:completed": this.showCompleted,
-      "filter:pending": this.showPending,
-
-      // 통계 및 기타
-      stats: this.showStats,
-      help: this.showHelp,
-
-      // 리마인더 관련
-      "reminder:quick": this.setQuickReminder,
-      "reminder:custom": this.setCustomReminder,
-      "reminder:skip": this.addWithoutReminder,
+      add: this.handleAddTodo,
+      toggle: this.handleToggleTodo,
+      delete: this.handleDeleteTodo,
+      complete: this.handleCompleteTodo,
+      stats: this.showTodoStats,
+      filter: this.handleFilterTodos,
+      page: this.handlePageNavigation,
     });
   }
 
   /**
-   * 🎯 메시지 처리
+   * 🎯 모듈별 키워드
+   */
+  getModuleKeywords() {
+    return ["할일", "todo", "📝"];
+  }
+
+  /**
+   * 🎯 사용자 메시지 처리
    */
   async onHandleMessage(bot, msg) {
-    const {
-      text,
-      chat: { id: chatId },
-      from: { id: userId },
-    } = msg;
+    const userId = getUserId(msg.from);
+    const text = msg.text?.trim();
 
     if (!text) return false;
 
-    // 모듈 키워드 확인
-    const keywords = [
-      "todo",
-      "todos",
-      "task",
-      "tasks",
-      "할일",
-      "할일목록",
-      "태스크",
-      "작업",
-      "업무",
-      "투두",
-      "체크리스트",
-    ];
-
-    if (this.isModuleMessage(text, keywords)) {
-      await this.moduleManager.navigationHandler.sendModuleMenu(
-        bot,
-        chatId,
-        "todo"
-      );
-      return true;
+    // 사용자가 할일 입력 대기 중인지 확인
+    const inputState = this.userInputStates.get(userId);
+    if (inputState?.awaitingInput) {
+      return await this.handleUserInput(bot, msg, text, inputState);
     }
 
-    // 사용자 입력 상태 처리
-    const userState = this.getUserState(userId);
-    if (userState?.awaitingInput) {
-      return await this.handleUserInput(bot, msg, text, userState);
+    // 간단한 할일 추가 (텍스트만 입력)
+    if (text.length > 0 && !text.startsWith("/")) {
+      return await this.handleQuickAdd(bot, msg, text);
     }
 
     return false;
   }
 
-  // ===== 📋 메인 액션 메서드들 =====
+  // ===== 📋 액션 핸들러들 =====
 
   /**
-   * 📋 할일 목록 표시 (메인 화면)
+   * 📋 할일 메뉴 표시
    */
-  async showTodoList(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-    const userName = getUserName(from);
+  async showTodoMenu(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const userName = getUserName(callbackQuery.from);
 
     try {
-      logger.debug(`📋 할일 목록 요청 (사용자: ${userId})`);
-
+      // 간단한 통계 조회
       const todos = await this.todoService.getTodos(userId);
-      const stats = this.calculateStats(todos);
+      const completedCount = todos.filter((t) => t.completed).length;
+      const pendingCount = todos.filter((t) => !t.completed).length;
 
-      return {
-        type: "list",
-        module: "todo",
-        data: {
-          userName,
-          todos: todos.map((todo) => this.formatTodoForDisplay(todo)),
-          stats,
-          enableReminders: this.config.enableReminders,
-          enableSearch: this.config.enableSearch,
-        },
-      };
-    } catch (error) {
-      logger.error("할일 목록 조회 실패:", error);
-      return {
-        type: "error",
-        message: "할일 목록을 불러올 수 없습니다.",
-      };
-    }
-  }
+      const menuText =
+        `📝 **할일 관리**\n\n` +
+        `👋 안녕하세요, ${userName}님!\n\n` +
+        `📊 **현재 상황**\n` +
+        `▸ 미완료: ${pendingCount}개\n` +
+        `▸ 완료: ${completedCount}개\n` +
+        `▸ 총계: ${todos.length}개\n\n` +
+        `🎯 원하는 작업을 선택해주세요:`;
 
-  /**
-   * ➕ 할일 추가 프롬프트 (기본)
-   */
-  async promptAddTodo(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-
-    logger.debug(`➕ 할일 추가 선택 (사용자: ${userId})`);
-
-    return {
-      type: "add_select",
-      module: "todo",
-      data: {
-        enableReminders: this.config.enableReminders,
-        quickReminderOptions: [
-          { key: "30m", label: "30분 후", time: "30분 후" },
-          { key: "1h", label: "1시간 후", time: "1시간 후" },
-          { key: "lunch", label: "점심시간", time: "12:00" },
-          { key: "evening", label: "저녁시간", time: "18:00" },
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📋 할일 목록", callback_data: "todo:list" },
+            { text: "➕ 할일 추가", callback_data: "todo:add" },
+          ],
+          [
+            { text: "📊 통계 보기", callback_data: "todo:stats" },
+            { text: "🔍 필터링", callback_data: "todo:filter" },
+          ],
+          [{ text: "🔙 메인 메뉴", callback_data: "system:menu" }],
         ],
-      },
-    };
-  }
-
-  /**
-   * ➕ 간단 할일 추가
-   */
-  async promptAddSimple(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-
-    this.setUserState(userId, {
-      awaitingInput: true,
-      inputType: "simple_todo",
-      step: "text",
-    });
-
-    return {
-      type: "input_prompt",
-      module: "todo",
-      data: {
-        inputType: "simple_todo",
-        message: "새로운 할일을 입력해주세요:",
-        placeholder: "예: 장보기, 회의 준비, 운동하기",
-      },
-    };
-  }
-
-  /**
-   * 🔔 리마인더와 함께 할일 추가
-   */
-  async promptAddWithReminder(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-
-    this.setUserState(userId, {
-      awaitingInput: true,
-      inputType: "todo_with_reminder",
-      step: "text",
-    });
-
-    return {
-      type: "input_prompt",
-      module: "todo",
-      data: {
-        inputType: "todo_with_reminder",
-        message: "리마인더와 함께 추가할 할일을 입력해주세요:",
-        placeholder: "예: 병원 예약, 프레젠테이션 준비",
-        showReminderNote: true,
-      },
-    };
-  }
-
-  /**
-   * ✅ 할일 완료/미완료 토글
-   */
-  async toggleTodo(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-    const todoId = params;
-
-    if (!todoId) {
-      return {
-        type: "error",
-        message: "할일 ID가 필요합니다.",
       };
+
+      await bot.editMessageText(menuText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return { success: true, module: "todo" };
+    } catch (error) {
+      logger.error("할일 메뉴 표시 실패:", error);
+      await this.sendError(bot, callbackQuery, "메뉴를 불러올 수 없습니다.");
+      return { success: false, error: error.message };
     }
+  }
+
+  /**
+   * 📋 할일 목록 표시 (라디오버튼 스타일)
+   */
+  async showTodoList(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const page = parseInt(params[0]) || 1;
 
     try {
-      logger.debug(`✅ 할일 토글 (사용자: ${userId}, ID: ${todoId})`);
+      const todos = await this.todoService.getTodos(userId, {
+        sort: { completed: 1, createdAt: -1 }, // 미완료 먼저
+      });
 
-      const updatedTodo = await this.todoService.toggleTodo(userId, todoId);
-
-      if (!updatedTodo) {
-        return {
-          type: "error",
-          message: "할일을 찾을 수 없습니다.",
-        };
+      if (todos.length === 0) {
+        return await this.showEmptyTodoList(bot, callbackQuery);
       }
 
-      // 토글 후 목록 다시 표시
-      return await this.showTodoList(
+      // 페이지네이션 계산
+      const itemsPerPage = this.config.maxTodosPerPage;
+      const totalPages = Math.ceil(todos.length / itemsPerPage);
+      const startIndex = (page - 1) * itemsPerPage;
+      const endIndex = startIndex + itemsPerPage;
+      const pageTodos = todos.slice(startIndex, endIndex);
+
+      // 리스트 텍스트 생성
+      let listText = `📋 **할일 목록** (${page}/${totalPages} 페이지)\n\n`;
+
+      pageTodos.forEach((todo, index) => {
+        const globalIndex = startIndex + index;
+        const status = todo.completed ? "✅" : "🔘"; // 입체감 있는 라디오버튼 스타일
+        const truncatedText = this.truncateText(
+          todo.text,
+          this.config.maxTextLength
+        );
+        const priorityIcon = this.getPriorityIcon(todo.priority);
+
+        listText += `${status} ${priorityIcon} ${truncatedText}`;
+        if (todo.completed && todo.completedAt) {
+          const completedTime = TimeHelper.format(todo.completedAt, "time");
+          listText += ` _(${completedTime} 완료)_`;
+        }
+        listText += `\n`;
+      });
+
+      // 키보드 생성
+      const keyboard = this.buildTodoListKeyboard(
+        pageTodos,
+        startIndex,
+        page,
+        totalPages
+      );
+
+      await bot.editMessageText(listText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return { success: true, module: "todo" };
+    } catch (error) {
+      logger.error("할일 목록 표시 실패:", error);
+      await this.sendError(bot, callbackQuery, "목록을 불러올 수 없습니다.");
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * ➕ 할일 추가 처리
+   */
+  async handleAddTodo(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    try {
+      // 사용자 입력 상태 설정
+      this.userInputStates.set(userId, {
+        awaitingInput: true,
+        inputType: "add_todo",
+        chatId: callbackQuery.message.chat.id,
+        messageId: callbackQuery.message.message_id,
+        timestamp: Date.now(),
+      });
+
+      const instructionText =
+        `➕ **새 할일 추가**\n\n` +
+        `📝 할일 내용을 입력해주세요:\n\n` +
+        `💡 **팁:**\n` +
+        `▸ 간단하고 명확하게 작성하세요\n` +
+        `▸ 최대 500자까지 가능합니다\n` +
+        `▸ 취소하려면 /cancel을 입력하세요`;
+
+      const keyboard = {
+        inline_keyboard: [[{ text: "❌ 취소", callback_data: "todo:menu" }]],
+      };
+
+      await bot.editMessageText(instructionText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+
+      return { success: true, module: "todo" };
+    } catch (error) {
+      logger.error("할일 추가 처리 실패:", error);
+      await this.sendError(
         bot,
         callbackQuery,
-        "list",
-        "",
-        moduleManager
+        "할일 추가를 시작할 수 없습니다."
       );
+      return { success: false, error: error.message };
+    }
+  }
+
+  /**
+   * 🔄 할일 완료/미완료 토글
+   */
+  async handleToggleTodo(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params[0];
+
+    if (!todoId) {
+      await this.sendError(bot, callbackQuery, "할일 ID가 필요합니다.");
+      return { success: false, error: "Missing todo ID" };
+    }
+
+    try {
+      const result = await this.todoService.toggleTodo(userId, todoId);
+
+      if (result.success) {
+        const status = result.data.completed ? "완료" : "미완료";
+        const message = `✅ 할일이 ${status} 상태로 변경되었습니다.`;
+
+        // 목록 새로고침
+        await this.showTodoList(bot, callbackQuery, [], moduleManager);
+
+        // 간단한 알림 (선택사항)
+        setTimeout(async () => {
+          try {
+            await bot.answerCallbackQuery(callbackQuery.id, { text: message });
+          } catch (e) {
+            // 무시 (이미 응답된 경우)
+          }
+        }, 100);
+
+        return { success: true, module: "todo", data: result.data };
+      } else {
+        await this.sendError(
+          bot,
+          callbackQuery,
+          result.error || "토글에 실패했습니다."
+        );
+        return { success: false, error: result.error };
+      }
     } catch (error) {
       logger.error("할일 토글 실패:", error);
-      return {
-        type: "error",
-        message: "할일 상태 변경에 실패했습니다.",
-      };
+      await this.sendError(bot, callbackQuery, "상태 변경에 실패했습니다.");
+      return { success: false, error: error.message };
     }
   }
 
   /**
    * 🗑️ 할일 삭제
    */
-  async deleteTodo(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-    const todoId = params;
+  async handleDeleteTodo(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params[0];
 
     if (!todoId) {
-      return {
-        type: "error",
-        message: "할일 ID가 필요합니다.",
-      };
+      await this.sendError(bot, callbackQuery, "할일 ID가 필요합니다.");
+      return { success: false, error: "Missing todo ID" };
     }
 
     try {
-      logger.debug(`🗑️ 할일 삭제 (사용자: ${userId}, ID: ${todoId})`);
+      const result = await this.todoService.deleteTodo(userId, todoId);
 
-      const deleted = await this.todoService.deleteTodo(userId, todoId);
+      if (result.success) {
+        // 목록 새로고침
+        await this.showTodoList(bot, callbackQuery, [], moduleManager);
 
-      if (!deleted) {
-        return {
-          type: "error",
-          message: "할일을 찾을 수 없습니다.",
-        };
+        // 삭제 완료 알림
+        setTimeout(async () => {
+          try {
+            await bot.answerCallbackQuery(callbackQuery.id, {
+              text: "🗑️ 할일이 삭제되었습니다.",
+              show_alert: false,
+            });
+          } catch (e) {
+            // 무시
+          }
+        }, 100);
+
+        return { success: true, module: "todo" };
+      } else {
+        await this.sendError(
+          bot,
+          callbackQuery,
+          result.error || "삭제에 실패했습니다."
+        );
+        return { success: false, error: result.error };
       }
-
-      // 연결된 리마인더도 삭제
-      if (this.reminderService && deleted.reminderId) {
-        try {
-          await this.reminderService.deleteReminder(deleted.reminderId);
-        } catch (reminderError) {
-          logger.warn("리마인더 삭제 실패:", reminderError);
-        }
-      }
-
-      // 삭제 후 목록 다시 표시
-      return await this.showTodoList(
-        bot,
-        callbackQuery,
-        "list",
-        "",
-        moduleManager
-      );
     } catch (error) {
       logger.error("할일 삭제 실패:", error);
-      return {
-        type: "error",
-        message: "할일 삭제에 실패했습니다.",
-      };
+      await this.sendError(bot, callbackQuery, "삭제에 실패했습니다.");
+      return { success: false, error: error.message };
     }
   }
 
   /**
-   * 🔍 검색 프롬프트
+   * 📊 할일 통계 표시
    */
-  async promptSearch(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-
-    this.setUserState(userId, {
-      awaitingInput: true,
-      inputType: "search",
-      step: "keyword",
-    });
-
-    return {
-      type: "input_prompt",
-      module: "todo",
-      data: {
-        inputType: "search",
-        message: "검색할 키워드를 입력해주세요:",
-        placeholder: "예: 회의, 장보기, 운동",
-      },
-    };
-  }
-
-  /**
-   * ✅ 완료된 할일만 표시
-   */
-  async showCompleted(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-
-    try {
-      const todos = await this.todoService.getTodos(userId, {
-        completed: true,
-      });
-      const stats = this.calculateStats(todos);
-
-      return {
-        type: "filtered_list",
-        module: "todo",
-        data: {
-          filter: "completed",
-          filterLabel: "완료된 할일",
-          todos: todos.map((todo) => this.formatTodoForDisplay(todo)),
-          stats,
-        },
-      };
-    } catch (error) {
-      logger.error("완료된 할일 조회 실패:", error);
-      return {
-        type: "error",
-        message: "완료된 할일을 불러올 수 없습니다.",
-      };
-    }
-  }
-
-  /**
-   * 📋 미완료된 할일만 표시
-   */
-  async showPending(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-
-    try {
-      const todos = await this.todoService.getTodos(userId, {
-        completed: false,
-      });
-      const stats = this.calculateStats(todos);
-
-      return {
-        type: "filtered_list",
-        module: "todo",
-        data: {
-          filter: "pending",
-          filterLabel: "미완료 할일",
-          todos: todos.map((todo) => this.formatTodoForDisplay(todo)),
-          stats,
-        },
-      };
-    } catch (error) {
-      logger.error("미완료 할일 조회 실패:", error);
-      return {
-        type: "error",
-        message: "미완료 할일을 불러올 수 없습니다.",
-      };
-    }
-  }
-
-  /**
-   * 📊 통계 표시
-   */
-  async showStats(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
+  async showTodoStats(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
 
     try {
       const todos = await this.todoService.getTodos(userId);
-      const stats = this.calculateDetailedStats(todos);
+      const stats = this.calculateStats(todos);
 
-      return {
-        type: "stats",
-        module: "todo",
-        data: {
-          stats,
-          chartData: this.generateChartData(todos),
-        },
-      };
-    } catch (error) {
-      logger.error("통계 조회 실패:", error);
-      return {
-        type: "error",
-        message: "통계를 불러올 수 없습니다.",
-      };
-    }
-  }
+      const statsText =
+        `📊 **할일 통계**\n\n` +
+        `📈 **전체 현황**\n` +
+        `▸ 총 할일: ${stats.total}개\n` +
+        `▸ 완료: ${stats.completed}개 (${stats.completionRate}%)\n` +
+        `▸ 미완료: ${stats.pending}개\n\n` +
+        `🎯 **우선순위별**\n` +
+        `▸ 높음: ${stats.priority.high}개\n` +
+        `▸ 보통: ${stats.priority.medium}개\n` +
+        `▸ 낮음: ${stats.priority.low}개\n\n` +
+        `📅 **최근 활동**\n` +
+        `▸ 오늘 완료: ${stats.completedToday}개\n` +
+        `▸ 이번 주 완료: ${stats.completedThisWeek}개`;
 
-  /**
-   * ❓ 도움말 표시
-   */
-  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
-    return {
-      type: "help",
-      module: "todo",
-      data: {
-        features: [
-          "📋 할일 목록 관리",
-          "➕ 새 할일 추가",
-          "✅ 완료 처리",
-          "🔍 할일 검색",
-          "📊 완료율 통계",
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📋 목록 보기", callback_data: "todo:list" },
+            { text: "➕ 할일 추가", callback_data: "todo:add" },
+          ],
+          [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
         ],
-        reminderFeatures: this.config.enableReminders
-          ? ["🔔 리마인더 설정", "⏰ 빠른 시간 설정", "📱 텔레그램 알림"]
-          : [],
-        commands: ["/todo - 할일 메뉴 열기", "텍스트 입력으로 할일 추가"],
-      },
-    };
-  }
-
-  // ===== 🔔 리마인더 관련 메서드들 =====
-
-  /**
-   * ⏰ 빠른 리마인더 설정
-   */
-  async setQuickReminder(bot, callbackQuery, subAction, params, moduleManager) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-    const [todoText, reminderType] = params.split("|");
-
-    if (!todoText || !reminderType) {
-      return {
-        type: "error",
-        message: "할일 내용과 리마인더 시간이 필요합니다.",
       };
-    }
 
-    try {
-      const reminderTime = this.calculateQuickReminderTime(reminderType);
-      const todo = await this.createTodoWithReminder(
-        userId,
-        todoText,
-        reminderTime
-      );
+      await bot.editMessageText(statsText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
 
-      return {
-        type: "add_success",
-        module: "todo",
-        data: {
-          todo: this.formatTodoForDisplay(todo),
-          reminderTime: TimeHelper.format(reminderTime, "MM월 DD일 HH:mm"),
-          reminderType,
-        },
-      };
+      return { success: true, module: "todo" };
     } catch (error) {
-      logger.error("빠른 리마인더 설정 실패:", error);
-      return {
-        type: "error",
-        message: "리마인더 설정에 실패했습니다.",
-      };
+      logger.error("할일 통계 표시 실패:", error);
+      await this.sendError(bot, callbackQuery, "통계를 불러올 수 없습니다.");
+      return { success: false, error: error.message };
     }
   }
 
-  /**
-   * 🔔 커스텀 리마인더 설정
-   */
-  async setCustomReminder(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-    const todoText = params;
-
-    if (!todoText) {
-      return {
-        type: "error",
-        message: "할일 내용이 필요합니다.",
-      };
-    }
-
-    this.setUserState(userId, {
-      awaitingInput: true,
-      inputType: "custom_reminder",
-      step: "time",
-      data: { todoText },
-    });
-
-    return {
-      type: "input_prompt",
-      module: "todo",
-      data: {
-        inputType: "custom_reminder",
-        message: "리마인더 시간을 입력해주세요:",
-        placeholder: "예: 오후 3시, 내일 9시, 2시간 후",
-        examples: ["30분 후", "오후 2시", "내일 오전 9시", "금요일 오후 5시"],
-      },
-    };
-  }
+  // ===== 🛠️ 유틸리티 메서드들 =====
 
   /**
-   * ➕ 리마인더 없이 추가
+   * 사용자 입력 처리
    */
-  async addWithoutReminder(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const { from } = callbackQuery;
-    const userId = getUserId(from);
-    const todoText = params;
-
-    if (!todoText) {
-      return {
-        type: "error",
-        message: "할일 내용이 필요합니다.",
-      };
-    }
+  async handleUserInput(bot, msg, text, inputState) {
+    const userId = getUserId(msg.from);
 
     try {
-      const todo = await this.todoService.addTodo(userId, { text: todoText });
-
-      return {
-        type: "add_success",
-        module: "todo",
-        data: {
-          todo: this.formatTodoForDisplay(todo),
-          withReminder: false,
-        },
-      };
-    } catch (error) {
-      logger.error("할일 추가 실패:", error);
-      return {
-        type: "error",
-        message: "할일 추가에 실패했습니다.",
-      };
-    }
-  }
-
-  // ===== 🎯 사용자 입력 처리 =====
-
-  /**
-   * 📝 사용자 입력 처리
-   */
-  async handleUserInput(bot, msg, text, userState) {
-    const {
-      from: { id: userId },
-      chat: { id: chatId },
-    } = msg;
-
-    try {
-      switch (userState.inputType) {
-        case "simple_todo":
-          return await this.handleSimpleTodoInput(bot, msg, text, userState);
-
-        case "todo_with_reminder":
-          return await this.handleTodoWithReminderInput(
-            bot,
-            msg,
-            text,
-            userState
+      if (inputState.inputType === "add_todo") {
+        if (text === "/cancel" || text.toLowerCase() === "취소") {
+          this.userInputStates.delete(userId);
+          await bot.sendMessage(
+            inputState.chatId,
+            "➕ 할일 추가가 취소되었습니다."
           );
+          return true;
+        }
 
-        case "search":
-          return await this.handleSearchInput(bot, msg, text, userState);
+        // 할일 추가 처리
+        const result = await this.todoService.addTodo(userId, {
+          text: text,
+          priority: 3, // 기본 우선순위
+        });
 
-        case "custom_reminder":
-          return await this.handleCustomReminderInput(
-            bot,
-            msg,
-            text,
-            userState
+        if (result.success) {
+          this.userInputStates.delete(userId);
+
+          const successText =
+            `✅ **할일이 추가되었습니다!**\n\n` +
+            `📝 ${result.data.text}\n\n` +
+            `🎯 계속 관리하시겠어요?`;
+
+          const keyboard = {
+            inline_keyboard: [
+              [
+                { text: "📋 목록 보기", callback_data: "todo:list" },
+                { text: "➕ 더 추가", callback_data: "todo:add" },
+              ],
+              [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+            ],
+          };
+
+          await bot.sendMessage(inputState.chatId, successText, {
+            parse_mode: "Markdown",
+            reply_markup: keyboard,
+          });
+
+          return true;
+        } else {
+          await bot.sendMessage(
+            inputState.chatId,
+            `❌ 할일 추가 실패: ${result.error}`
           );
-
-        default:
-          this.clearUserState(userId);
-          return false;
+          return true;
+        }
       }
+
+      return false;
     } catch (error) {
       logger.error("사용자 입력 처리 실패:", error);
-      this.clearUserState(userId);
-
-      await bot.sendMessage(chatId, "❌ 입력 처리 중 오류가 발생했습니다.");
-      return true;
-    }
-  }
-
-  /**
-   * 📝 간단 할일 입력 처리
-   */
-  async handleSimpleTodoInput(bot, msg, text, userState) {
-    const {
-      from: { id: userId },
-      chat: { id: chatId },
-    } = msg;
-
-    const todoText = text.trim();
-
-    if (!todoText || todoText.length < 2) {
-      await bot.sendMessage(chatId, "❌ 할일은 최소 2글자 이상 입력해주세요.");
-      return true;
-    }
-
-    if (todoText.length > 200) {
-      await bot.sendMessage(chatId, "❌ 할일은 200글자 이하로 입력해주세요.");
-      return true;
-    }
-
-    try {
-      const todo = await this.todoService.addTodo(userId, { text: todoText });
-
+      this.userInputStates.delete(userId);
       await bot.sendMessage(
-        chatId,
-        `✅ 할일이 추가되었습니다!\n📋 "${todoText}"`
+        msg.chat.id,
+        "❌ 입력 처리 중 오류가 발생했습니다."
       );
-
-      this.clearUserState(userId);
-      return true;
-    } catch (error) {
-      logger.error("간단 할일 추가 실패:", error);
-      await bot.sendMessage(chatId, "❌ 할일 추가에 실패했습니다.");
-      this.clearUserState(userId);
       return true;
     }
   }
 
   /**
-   * 🔔 리마인더 할일 입력 처리
+   * 빈 할일 목록 표시
    */
-  async handleTodoWithReminderInput(bot, msg, text, userState) {
-    const {
-      from: { id: userId },
-      chat: { id: chatId },
-    } = msg;
+  async showEmptyTodoList(bot, callbackQuery) {
+    const emptyText =
+      `📋 **할일 목록**\n\n` +
+      `🎉 아직 등록된 할일이 없습니다!\n\n` +
+      `💡 첫 번째 할일을 추가해보세요:`;
 
-    const todoText = text.trim();
+    const keyboard = {
+      inline_keyboard: [
+        [{ text: "➕ 할일 추가", callback_data: "todo:add" }],
+        [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+      ],
+    };
 
-    if (!todoText || todoText.length < 2) {
-      await bot.sendMessage(chatId, "❌ 할일은 최소 2글자 이상 입력해주세요.");
-      return true;
-    }
-
-    // 다음 단계: 리마인더 시간 입력 대기
-    this.setUserState(userId, {
-      awaitingInput: true,
-      inputType: "custom_reminder",
-      step: "time",
-      data: { todoText },
+    await bot.editMessageText(emptyText, {
+      chat_id: callbackQuery.message.chat.id,
+      message_id: callbackQuery.message.message_id,
+      parse_mode: "Markdown",
+      reply_markup: keyboard,
     });
 
-    await bot.sendMessage(
-      chatId,
-      `📋 할일: "${todoText}"\n\n🔔 리마인더 시간을 입력해주세요:\n\n💡 예시: 30분 후, 오후 3시, 내일 9시`
-    );
-
-    return true;
+    return { success: true, module: "todo" };
   }
 
   /**
-   * 🔍 검색 입력 처리
+   * 할일 목록 키보드 생성
    */
-  async handleSearchInput(bot, msg, text, userState) {
-    const {
-      from: { id: userId },
-      chat: { id: chatId },
-    } = msg;
+  buildTodoListKeyboard(todos, startIndex, currentPage, totalPages) {
+    const keyboard = [];
 
-    const keyword = text.trim();
+    // 할일 항목들 (라디오버튼 스타일)
+    todos.forEach((todo, index) => {
+      const globalIndex = startIndex + index;
+      const toggleText = todo.completed ? "✅" : "🔘"; // 입체감 있는 스타일
+      const deleteText = "🗑️";
 
-    if (!keyword || keyword.length < 1) {
-      await bot.sendMessage(chatId, "❌ 검색 키워드를 입력해주세요.");
-      return true;
-    }
+      keyboard.push([
+        {
+          text: `${toggleText} ${this.truncateText(todo.text, 25)}`,
+          callback_data: `todo:toggle:${todo.id}`,
+        },
+        {
+          text: deleteText,
+          callback_data: `todo:delete:${todo.id}`,
+        },
+      ]);
+    });
 
-    try {
-      const searchResults = await this.todoService.searchTodos(userId, keyword);
+    // 페이지네이션 버튼
+    if (totalPages > 1) {
+      const paginationRow = [];
 
-      if (searchResults.length === 0) {
-        await bot.sendMessage(
-          chatId,
-          `🔍 "${keyword}"에 대한 검색 결과가 없습니다.`
-        );
-      } else {
-        let message = `🔍 "${keyword}" 검색 결과 (${searchResults.length}개):\n\n`;
-
-        searchResults.forEach((todo, index) => {
-          const status = todo.completed ? "✅" : "📋";
-          message += `${index + 1}. ${status} ${todo.text}\n`;
+      if (currentPage > 1) {
+        paginationRow.push({
+          text: "◀️ 이전",
+          callback_data: `todo:page:${currentPage - 1}`,
         });
-
-        await bot.sendMessage(chatId, message);
       }
 
-      this.clearUserState(userId);
-      return true;
-    } catch (error) {
-      logger.error("검색 실패:", error);
-      await bot.sendMessage(chatId, "❌ 검색 중 오류가 발생했습니다.");
-      this.clearUserState(userId);
-      return true;
-    }
-  }
+      paginationRow.push({
+        text: `${currentPage}/${totalPages}`,
+        callback_data: "todo:list",
+      });
 
-  /**
-   * ⏰ 커스텀 리마인더 시간 입력 처리
-   */
-  async handleCustomReminderInput(bot, msg, text, userState) {
-    const {
-      from: { id: userId },
-      chat: { id: chatId },
-    } = msg;
-
-    const timeText = text.trim();
-    const { todoText } = userState.data;
-
-    try {
-      const reminderTime = this.parseReminderTime(timeText);
-
-      if (!reminderTime) {
-        await bot.sendMessage(
-          chatId,
-          "❌ 시간 형식을 인식할 수 없습니다.\n\n💡 예시: 30분 후, 오후 3시, 내일 9시"
-        );
-        return true;
-      }
-
-      // 과거 시간 체크
-      if (TimeHelper.isBefore(reminderTime, TimeHelper.now())) {
-        await bot.sendMessage(
-          chatId,
-          "❌ 과거 시간으로는 리마인더를 설정할 수 없습니다."
-        );
-        return true;
-      }
-
-      const todo = await this.createTodoWithReminder(
-        userId,
-        todoText,
-        reminderTime
-      );
-
-      await bot.sendMessage(
-        chatId,
-        `✅ 리마인더와 함께 할일이 추가되었습니다!\n\n📋 "${todoText}"\n🔔 ${TimeHelper.format(
-          reminderTime,
-          "MM월 DD일 HH:mm"
-        )}에 알림`
-      );
-
-      this.clearUserState(userId);
-      return true;
-    } catch (error) {
-      logger.error("커스텀 리마인더 설정 실패:", error);
-      await bot.sendMessage(chatId, "❌ 리마인더 설정에 실패했습니다.");
-      this.clearUserState(userId);
-      return true;
-    }
-  }
-
-  // ===== 🛠️ 헬퍼 메서드들 =====
-
-  /**
-   * 🔔 리마인더와 함께 할일 생성
-   */
-  async createTodoWithReminder(userId, todoText, reminderTime) {
-    // 할일 먼저 추가
-    const todo = await this.todoService.addTodo(userId, { text: todoText });
-
-    // 리마인더 설정 (ReminderService가 있는 경우)
-    if (this.reminderService && this.config.enableReminders) {
-      try {
-        const reminder = await this.reminderService.createReminder({
-          userId,
-          title: `📝 할일 리마인더`,
-          message: `📝 리마인더: ${todoText} 시간입니다!`,
-          scheduledTime: reminderTime,
-          type: "todo",
-          relatedId: todo._id.toString(),
+      if (currentPage < totalPages) {
+        paginationRow.push({
+          text: "다음 ▶️",
+          callback_data: `todo:page:${currentPage + 1}`,
         });
-
-        // 할일에 리마인더 ID 연결
-        await this.todoService.updateTodo(userId, todo._id.toString(), {
-          reminderId: reminder._id.toString(),
-        });
-
-        logger.info(`🔔 할일 리마인더 설정: ${todoText} @ ${reminderTime}`);
-      } catch (error) {
-        logger.warn("리마인더 설정 실패:", error);
-        // 리마인더 실패해도 할일은 유지
       }
+
+      keyboard.push(paginationRow);
     }
 
-    return todo;
+    // 하단 메뉴
+    keyboard.push([
+      { text: "➕ 추가", callback_data: "todo:add" },
+      { text: "📊 통계", callback_data: "todo:stats" },
+    ]);
+    keyboard.push([{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }]);
+
+    return { inline_keyboard: keyboard };
   }
 
   /**
-   * ⏰ 빠른 리마인더 시간 계산
+   * 텍스트 자르기 (UI 보호)
    */
-  calculateQuickReminderTime(reminderType) {
-    const now = TimeHelper.now();
+  truncateText(text, maxLength) {
+    if (!text || text.length <= maxLength) {
+      return text || "";
+    }
+    return text.substring(0, maxLength - 3) + "...";
+  }
 
-    switch (reminderType) {
-      case "30m":
-        return TimeHelper.addMinutes(now, 30);
-      case "1h":
-        return TimeHelper.addHours(now, 1);
-      case "lunch":
-        const lunch = TimeHelper.setTime(now, 12, 0, 0);
-        return TimeHelper.isBefore(lunch, now)
-          ? TimeHelper.addDays(lunch, 1)
-          : lunch;
-      case "evening":
-        const evening = TimeHelper.setTime(now, 18, 0, 0);
-        return TimeHelper.isBefore(evening, now)
-          ? TimeHelper.addDays(evening, 1)
-          : evening;
+  /**
+   * 우선순위 아이콘
+   */
+  getPriorityIcon(priority) {
+    switch (priority) {
+      case 5:
+      case 4:
+        return "🔴"; // 높음
+      case 3:
+        return "🟡"; // 보통
+      case 2:
+      case 1:
+        return "🟢"; // 낮음
       default:
-        return TimeHelper.addHours(now, 1);
+        return "⚪"; // 기본
     }
   }
 
   /**
-   * 🕐 리마인더 시간 파싱
-   */
-  parseReminderTime(timeText) {
-    try {
-      const now = TimeHelper.now();
-      const lowerText = timeText.toLowerCase().trim();
-
-      // 상대적 시간 ("30분 후", "2시간 후")
-      const relativeMatch = lowerText.match(/(\d+)\s*(분|시간)\s*후/);
-      if (relativeMatch) {
-        const amount = parseInt(relativeMatch[1]);
-        const unit = relativeMatch[2];
-
-        if (unit === "분") {
-          return TimeHelper.addMinutes(now, amount);
-        } else if (unit === "시간") {
-          return TimeHelper.addHours(now, amount);
-        }
-      }
-
-      // 절대적 시간 ("오후 3시", "내일 9시")
-      const timeMatch = lowerText.match(
-        /(내일|모레)?\s*(오전|오후)?\s*(\d+)시(?:\s*(\d+)분)?/
-      );
-      if (timeMatch) {
-        const dayOffset =
-          timeMatch[1] === "내일" ? 1 : timeMatch[1] === "모레" ? 2 : 0;
-        const period = timeMatch[2];
-        let hour = parseInt(timeMatch[3]);
-        const minute = parseInt(timeMatch[4]) || 0;
-
-        // 오후 처리
-        if (period === "오후" && hour !== 12) {
-          hour += 12;
-        } else if (period === "오전" && hour === 12) {
-          hour = 0;
-        }
-
-        let target = TimeHelper.setTime(now, hour, minute, 0);
-        if (dayOffset > 0) {
-          target = TimeHelper.addDays(target, dayOffset);
-        } else if (TimeHelper.isBefore(target, now)) {
-          // 오늘인데 시간이 지났으면 내일
-          target = TimeHelper.addDays(target, 1);
-        }
-
-        return target;
-      }
-
-      return null;
-    } catch (error) {
-      logger.error("리마인더 시간 파싱 실패:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 📊 통계 계산
+   * 통계 계산
    */
   calculateStats(todos) {
     const total = todos.length;
     const completed = todos.filter((t) => t.completed).length;
     const pending = total - completed;
+    const completionRate =
+      total > 0 ? Math.round((completed / total) * 100) : 0;
+
+    // 우선순위별 통계
+    const priority = {
+      high: todos.filter((t) => t.priority >= 4).length,
+      medium: todos.filter((t) => t.priority === 3).length,
+      low: todos.filter((t) => t.priority <= 2).length,
+    };
+
+    // 시간별 통계
+    const now = new Date();
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const thisWeekStart = new Date(
+      today.getTime() - today.getDay() * 24 * 60 * 60 * 1000
+    );
+
+    const completedToday = todos.filter(
+      (t) => t.completed && t.completedAt && new Date(t.completedAt) >= today
+    ).length;
+
+    const completedThisWeek = todos.filter(
+      (t) =>
+        t.completed && t.completedAt && new Date(t.completedAt) >= thisWeekStart
+    ).length;
 
     return {
       total,
       completed,
       pending,
-      completionRate: total > 0 ? Math.round((completed / total) * 100) : 0,
+      completionRate,
+      priority,
+      completedToday,
+      completedThisWeek,
     };
   }
 
   /**
-   * 📊 상세 통계 계산
+   * 빠른 할일 추가 (메시지로 직접 입력)
    */
-  calculateDetailedStats(todos) {
-    const basicStats = this.calculateStats(todos);
+  async handleQuickAdd(bot, msg, text) {
+    const userId = getUserId(msg.from);
 
-    // 최근 7일간 통계
-    const sevenDaysAgo = TimeHelper.addDays(TimeHelper.now(), -7);
-    const recentTodos = todos.filter(
-      (t) => new Date(t.createdAt) >= sevenDaysAgo
+    try {
+      const result = await this.todoService.addTodo(userId, {
+        text: text,
+        priority: 3,
+      });
+
+      if (result.success) {
+        const successText =
+          `✅ 할일이 추가되었습니다!\n\n` +
+          `📝 ${result.data.text}\n\n` +
+          `할일 관리를 계속하시려면 /todo를 입력하세요.`;
+
+        await bot.sendMessage(msg.chat.id, successText);
+        return true;
+      } else {
+        await bot.sendMessage(
+          msg.chat.id,
+          `❌ 할일 추가 실패: ${result.error}`
+        );
+        return true;
+      }
+    } catch (error) {
+      logger.error("빠른 할일 추가 실패:", error);
+      return false;
+    }
+  }
+
+  /**
+   * 에러 메시지 전송
+   */
+  async sendError(bot, callbackQuery, message) {
+    try {
+      const errorText = `❌ **오류 발생**\n\n${message}\n\n다시 시도해주세요.`;
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 할일 메뉴", callback_data: "todo:menu" }],
+        ],
+      };
+
+      await bot.editMessageText(errorText, {
+        chat_id: callbackQuery.message.chat.id,
+        message_id: callbackQuery.message.message_id,
+        parse_mode: "Markdown",
+        reply_markup: keyboard,
+      });
+    } catch (error) {
+      logger.error("에러 메시지 전송 실패:", error);
+    }
+  }
+
+  /**
+   * 페이지 네비게이션 처리
+   */
+  async handlePageNavigation(bot, callbackQuery, params, moduleManager) {
+    const page = parseInt(params[0]) || 1;
+    return await this.showTodoList(
+      bot,
+      callbackQuery,
+      [page.toString()],
+      moduleManager
     );
-    const recentCompleted = recentTodos.filter((t) => t.completed).length;
-
-    return {
-      ...basicStats,
-      recent: {
-        added: recentTodos.length,
-        completed: recentCompleted,
-        productivity:
-          recentTodos.length > 0
-            ? Math.round((recentCompleted / recentTodos.length) * 100)
-            : 0,
-      },
-      averagePerDay: Math.round(todos.length / 30), // 한달 기준
-    };
   }
 
   /**
-   * 📊 차트 데이터 생성
+   * 필터링 처리 (간단한 버전)
    */
-  generateChartData(todos) {
-    // 간단한 완료율 차트 데이터
-    const stats = this.calculateStats(todos);
-
-    return {
-      labels: ["완료", "미완료"],
-      data: [stats.completed, stats.pending],
-      colors: ["#4CAF50", "#FFC107"],
-    };
+  async handleFilterTodos(bot, callbackQuery, params, moduleManager) {
+    // 향후 구현 예정
+    await this.sendError(bot, callbackQuery, "필터링 기능은 준비 중입니다.");
+    return { success: false, error: "Not implemented" };
   }
 
   /**
-   * 🎨 할일 표시용 포맷팅
+   * 할일 완료 처리 (별도 액션)
    */
-  formatTodoForDisplay(todo) {
-    return {
-      id: todo._id ? todo._id.toString() : todo.id || "unknown",
-      text: todo.text || "제목 없음",
-      completed: todo.completed || false,
-      createdAt: todo.createdAt || new Date(),
-      hasReminder: !!todo.reminderId,
-      displayText:
-        todo.text.length > 50 ? todo.text.substring(0, 47) + "..." : todo.text,
-      createdRelative: TimeHelper.fromNow(todo.createdAt),
-    };
-  }
-
-  /**
-   * 🔍 모듈 키워드 확인
-   */
-  isModuleMessage(text, keywords) {
-    const lowerText = text.trim().toLowerCase();
-    return keywords.some(
-      (keyword) =>
-        lowerText === keyword ||
-        lowerText.startsWith(keyword + " ") ||
-        lowerText.includes(keyword)
+  async handleCompleteTodo(bot, callbackQuery, params, moduleManager) {
+    // toggle과 동일한 로직
+    return await this.handleToggleTodo(
+      bot,
+      callbackQuery,
+      params,
+      moduleManager
     );
   }
 
   /**
-   * 📊 모듈 상태 조회
-   */
-  getModuleStatus() {
-    return {
-      ...super.getModuleStatus(),
-      serviceConnected: !!this.todoService,
-      reminderServiceConnected: !!this.reminderService,
-      activeInputStates: this.inputStates.size,
-      config: {
-        maxTodosPerUser: this.config.maxTodosPerUser,
-        enableReminders: this.config.enableReminders,
-        enableSearch: this.config.enableSearch,
-      },
-    };
-  }
-
-  /**
-   * 🧹 모듈 정리
+   * 모듈 정리
    */
   async cleanup() {
     try {
-      // 입력 상태 정리
-      this.inputStates.clear();
+      // 사용자 입력 상태 정리
+      this.userInputStates.clear();
 
-      // 부모 클래스 정리 호출
-      await super.cleanup();
+      // 서비스 정리
+      if (this.todoService) {
+        await this.todoService.cleanup();
+      }
 
       logger.info("✅ TodoModule 정리 완료");
     } catch (error) {
       logger.error("❌ TodoModule 정리 실패:", error);
     }
+  }
+
+  /**
+   * 모듈 상태 정보
+   */
+  getStatus() {
+    return {
+      ...super.getStatus(),
+      service: {
+        initialized: !!this.todoService,
+        activeInputs: this.userInputStates.size,
+        config: this.config,
+      },
+    };
   }
 }
 

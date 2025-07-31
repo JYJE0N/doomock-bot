@@ -1,10 +1,14 @@
-// src/database/models/Todo.js
+// src/database/models/Todo.js - 인덱스 중복 경고 해결
 const mongoose = require("mongoose");
 
 // Todo 스키마 생성 (독립적인 스키마)
 const todoSchema = new mongoose.Schema(
   {
-    userId: { type: String, required: true, index: true },
+    userId: {
+      type: String,
+      required: true,
+      // ✅ 수정: index: true 제거 (아래 schema.index()와 중복되므로)
+    },
     text: { type: String, required: true, trim: true, maxlength: 500 },
     completed: { type: Boolean, default: false },
     completedAt: { type: Date, default: null },
@@ -17,13 +21,13 @@ const todoSchema = new mongoose.Schema(
   {
     timestamps: true,
     versionKey: false,
-    // collation: "todo",
   }
 );
 
 // ===== 인덱스 =====
-todoSchema.index({ userId: 1, createdAt: -1 });
-todoSchema.index({ userId: 1, completed: 1 });
+// ✅ 수정: 중복 경고를 피하기 위해 복합 인덱스만 사용
+todoSchema.index({ userId: 1, createdAt: -1 }); // 복합 인덱스 (userId 포함)
+todoSchema.index({ userId: 1, completed: 1 }); // 복합 인덱스 (userId 포함)
 todoSchema.index({ text: "text", description: "text" }); // 텍스트 검색
 todoSchema.index({ userId: 1, dueDate: 1 }, { sparse: true });
 todoSchema.index({ tags: 1 });
@@ -224,11 +228,6 @@ todoSchema.statics.getCategoryStats = async function (userId) {
       },
     },
   ]);
-};
-
-todoSchema.methods.toggle = async function () {
-  this.completed = !this.completed;
-  return await this.save();
 };
 
 module.exports = mongoose.model("Todo", todoSchema);

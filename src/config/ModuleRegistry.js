@@ -9,175 +9,245 @@ const path = require("path");
  * - v3.0.1 표준 준수
  */
 
-const MODULES = [
+const ENABLED_MODULES = [
+  // 🏠 시스템 모듈 (필수)
   {
-    key: "system",
-    name: "시스템 관리",
+    name: "SystemModule",
+    path: path.join(__dirname, "../modules/SystemModule.js"),
     enabled: true,
-    enhanced: true,
-    path: path.join(__dirname, "../modules/SystemModule"), // __dirname 기준 상대경로
-    description: "메인 메뉴, 도움말, 시스템 상태 관리",
+    priority: 1,
+    description: "시스템 핵심 기능",
+    dependencies: [],
   },
+
+  // 📝 할일 관리 모듈 (새로 추가!)
   {
-    key: "todo",
-    name: "할일 관리",
+    name: "TodoModule",
+    path: path.join(__dirname, "../modules/TodoModule.js"),
     enabled: true,
-    enhanced: true,
-    path: path.join(__dirname, "../modules/TodoModule"),
-    description: "할일 추가, 완료, 카테고리 관리",
+    priority: 2,
+    description: "할일 관리 및 추적",
+    dependencies: ["MongooseManager"],
+    keywords: ["할일", "todo", "📝"],
+    icon: "📝",
+    category: "productivity",
   },
+
+  // ⏰ 타이머 모듈
   {
-    key: "timer",
-    name: "타이머",
+    name: "TimerModule",
+    path: path.join(__dirname, "../modules/TimerModule.js"),
     enabled: true,
-    enhanced: true,
-    path: path.join(__dirname, "../modules/TimerModule"),
-    description: "포모도로 타이머, 집중 시간 관리",
+    priority: 3,
+    description: "포모도로 타이머",
+    dependencies: ["MongooseManager"],
+    keywords: ["타이머", "timer", "⏰"],
+    icon: "⏰",
+    category: "productivity",
   },
+
+  // 🏢 근무시간 모듈
   {
-    key: "worktime",
-    name: "근무시간 관리",
+    name: "WorktimeModule",
+    path: path.join(__dirname, "../modules/WorktimeModule.js"),
     enabled: true,
-    enhanced: true,
-    path: path.join(__dirname, "../modules/WorktimeModule"),
-    description: "출퇴근 기록, 근무 통계",
+    priority: 4,
+    description: "출퇴근 및 근무시간 관리",
+    dependencies: ["MongooseManager"],
+    keywords: ["출근", "퇴근", "근무", "worktime", "🏢"],
+    icon: "🏢",
+    category: "work",
   },
+
+  // 🏖️ 휴가 관리 모듈
   {
-    key: "leave",
-    name: "휴가 관리",
+    name: "LeaveModule",
+    path: path.join(__dirname, "../modules/LeaveModule.js"),
     enabled: true,
-    enhanced: true,
-    path: path.join(__dirname, "../modules/LeaveModule"),
-    description: "연차 계산, 휴가 신청 관리",
+    priority: 5,
+    description: "연차 및 휴가 관리",
+    dependencies: ["MongooseManager"],
+    keywords: ["휴가", "연차", "leave", "🏖️"],
+    icon: "🏖️",
+    category: "work",
   },
+
+  // ⏰ 리마인더 모듈
   {
-    key: "reminder",
-    name: "리마인더",
+    name: "ReminderModule",
+    path: path.join(__dirname, "../modules/ReminderModule.js"),
     enabled: false,
-    enhanced: false,
-    path: path.join(__dirname, "../modules/ReminderModule"),
-    description: "알림 설정, 반복 알림",
+    priority: 6,
+    description: "알림 및 리마인더",
+    dependencies: ["MongooseManager"],
+    keywords: ["알림", "reminder", "⏰"],
+    icon: "🔔",
+    category: "utility",
   },
+
+  // 🔮 운세 모듈
   {
-    key: "fortune",
-    name: "운세",
+    name: "FortuneModule",
+    path: path.join(__dirname, "../modules/FortuneModule.js"),
     enabled: true,
-    enhanced: false,
-    path: path.join(__dirname, "../modules/FortuneModule"),
-    description: "타로 카드",
+    priority: 7,
+    description: "오늘의 운세",
+    dependencies: [],
+    keywords: ["운세", "fortune", "🔮"],
+    icon: "🔮",
+    category: "entertainment",
   },
+
+  // 🌤️ 날씨 모듈
   {
-    key: "weather",
-    name: "날씨",
+    name: "WeatherModule",
+    path: path.join(__dirname, "../modules/WeatherModule.js"),
     enabled: true,
-    enhanced: false,
-    path: path.join(__dirname, "../modules/WeatherModule"),
-    description: "현재 날씨, 미세 먼지",
+    priority: 8,
+    description: "날씨 정보",
+    dependencies: [],
+    keywords: ["날씨", "weather", "🌤️"],
+    icon: "🌤️",
+    category: "utility",
   },
+
+  // 🔊 TTS 모듈
   {
-    key: "tts",
-    name: "음성 변환",
+    name: "TTSModule",
+    path: path.join(__dirname, "../modules/TTSModule.js"),
     enabled: true,
-    enhanced: false,
-    path: path.join(__dirname, "../modules/TTSModule"),
-    description: "텍스트를 음성으로 변환",
+    priority: 9,
+    description: "텍스트 음성 변환",
+    dependencies: ["MongooseManager"],
+    keywords: ["tts", "음성", "🔊"],
+    icon: "🔊",
+    category: "utility",
   },
 ];
 
 /**
- * 활성화된 모듈 목록 반환
+ * 활성화된 모듈 목록 가져오기
  */
 function getEnabledModules() {
-  const enabledModules = MODULES.filter((m) => m.enabled);
+  return ENABLED_MODULES.filter((module) => module.enabled).sort(
+    (a, b) => a.priority - b.priority
+  );
+}
 
-  // 경로 검증 로그
+/**
+ * 모듈별 카테고리 그룹핑
+ */
+function getModulesByCategory() {
+  const enabledModules = getEnabledModules();
+  const categories = {};
+
   enabledModules.forEach((module) => {
-    logger.debug(`📁 ${module.key} 경로: ${module.path}`);
+    const category = module.category || "other";
+    if (!categories[category]) {
+      categories[category] = [];
+    }
+    categories[category].push(module);
   });
 
-  return enabledModules;
+  return categories;
 }
 
 /**
- * 레지스트리 통계
+ * 모듈 정보 조회
  */
-function getRegistryStats() {
-  const enabledModules = MODULES.filter((m) => m.enabled);
-  const enhancedModules = MODULES.filter((m) => m.enhanced);
-
-  return {
-    totalModules: MODULES.length,
-    enabledModules: enabledModules.length,
-    enhancedModules: enhancedModules.length,
-    disabledModules: MODULES.length - enabledModules.length,
-  };
+function getModuleInfo(moduleName) {
+  return ENABLED_MODULES.find(
+    (module) =>
+      module.name === moduleName ||
+      module.name.toLowerCase() === moduleName.toLowerCase()
+  );
 }
 
 /**
- * 특정 모듈 조회
+ * 모듈 의존성 검증
  */
-function getModule(moduleKey) {
-  return MODULES.find((m) => m.key === moduleKey);
-}
+function validateModuleDependencies() {
+  const errors = [];
 
-/**
- * 모듈 활성화/비활성화
- */
-function setModuleEnabled(moduleKey, enabled) {
-  const module = MODULES.find((m) => m.key === moduleKey);
-  if (module) {
-    module.enabled = enabled;
-    logger.info(`📋 ${moduleKey} 모듈 ${enabled ? "활성화" : "비활성화"}됨`);
-    return true;
-  }
-  return false;
-}
-
-/**
- * 모듈 경로 검증
- */
-function validateModulePaths() {
-  const fs = require("fs");
-  const issues = [];
-
-  MODULES.forEach((module) => {
-    if (!module.path) {
-      issues.push(`${module.key}: path 누락`);
-    } else {
-      // .js 확장자 추가하여 실제 파일 존재 확인
-      const filePath = module.path + ".js";
-      if (!fs.existsSync(filePath)) {
-        issues.push(`${module.key}: 파일 없음 (${filePath})`);
-      }
+  ENABLED_MODULES.forEach((module) => {
+    if (module.dependencies && module.dependencies.length > 0) {
+      module.dependencies.forEach((dep) => {
+        // 의존성 검증 로직 (추후 구현)
+        logger.debug(`📦 ${module.name} 의존성 확인: ${dep}`);
+      });
     }
   });
 
-  if (issues.length > 0) {
-    logger.error("📋 모듈 경로 검증 실패:", issues);
-  } else {
-    logger.success("📋 모든 모듈 경로 검증 완료");
-  }
-
-  return issues;
+  return errors;
 }
 
-// 초기화 시 경로 검증
-logger.info("📋 ModuleRegistry 로드됨");
-const stats = getRegistryStats();
-logger.info(
-  `📊 모듈 통계: 총 ${stats.totalModules}개, 활성 ${stats.enabledModules}개, 향상 ${stats.enhancedModules}개`
-);
+/**
+ * 네비게이션용 모듈 메뉴 생성
+ */
+function buildModuleMenuButtons() {
+  const enabledModules = getEnabledModules();
+  const buttons = [];
 
-// 경로 검증 실행
-if (process.env.NODE_ENV !== "production") {
-  validateModulePaths();
+  // 카테고리별로 그룹핑
+  const categories = getModulesByCategory();
+
+  // 생산성 도구 (첫 번째 줄)
+  if (categories.productivity) {
+    const productivityRow = categories.productivity.map((module) => ({
+      text: `${module.icon} ${module.description}`,
+      callback_data: `${module.name.toLowerCase().replace("module", "")}:menu`,
+    }));
+
+    // 한 줄에 최대 2개씩
+    for (let i = 0; i < productivityRow.length; i += 2) {
+      buttons.push(productivityRow.slice(i, i + 2));
+    }
+  }
+
+  // 업무 관리 (두 번째 줄)
+  if (categories.work) {
+    const workRow = categories.work.map((module) => ({
+      text: `${module.icon} ${module.description}`,
+      callback_data: `${module.name.toLowerCase().replace("module", "")}:menu`,
+    }));
+
+    for (let i = 0; i < workRow.length; i += 2) {
+      buttons.push(workRow.slice(i, i + 2));
+    }
+  }
+
+  // 유틸리티 (세 번째 줄)
+  if (categories.utility) {
+    const utilityRow = categories.utility.map((module) => ({
+      text: `${module.icon} ${module.description}`,
+      callback_data: `${module.name.toLowerCase().replace("module", "")}:menu`,
+    }));
+
+    for (let i = 0; i < utilityRow.length; i += 2) {
+      buttons.push(utilityRow.slice(i, i + 2));
+    }
+  }
+
+  // 엔터테인먼트 (마지막 줄)
+  if (categories.entertainment) {
+    const entertainmentRow = categories.entertainment.map((module) => ({
+      text: `${module.icon} ${module.description}`,
+      callback_data: `${module.name.toLowerCase().replace("module", "")}:menu`,
+    }));
+
+    for (let i = 0; i < entertainmentRow.length; i += 2) {
+      buttons.push(entertainmentRow.slice(i, i + 2));
+    }
+  }
+
+  return buttons;
 }
 
 module.exports = {
+  ENABLED_MODULES,
   getEnabledModules,
-  getRegistryStats,
-  getModule,
-  setModuleEnabled,
-  validateModulePaths,
-  MODULES,
+  getModulesByCategory,
+  getModuleInfo,
+  validateModuleDependencies,
+  buildModuleMenuButtons,
 };
