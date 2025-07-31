@@ -2,12 +2,6 @@
 
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const {
-  TimerSession,
-  TimerStats,
-  TimerSettings,
-  TimerTag,
-} = require("../database/models/Timer");
 
 /**
  * 🍅 TimerService - 뽀모도로 타이머 데이터 관리 서비스
@@ -19,6 +13,8 @@ const {
  * - 사용자 설정 관리
  *
  * ✅ SoC: 데이터 로직만 담당, UI나 타이머 동작은 다루지 않음
+ *
+ * 📌 임시: 기존 더미 모델 사용, 나중에 완전한 모델로 마이그레이션
  */
 class TimerService {
   constructor(options = {}) {
@@ -28,6 +24,11 @@ class TimerService {
     };
 
     this.isInitialized = false;
+
+    // 메모리 기반 임시 저장소 (개발 중)
+    this.sessions = new Map();
+    this.stats = new Map();
+    this.settings = new Map();
   }
 
   /**
@@ -35,9 +36,9 @@ class TimerService {
    */
   async initialize() {
     try {
-      // Mongoose는 자동으로 연결 관리하므로 특별한 초기화 불필요
+      // TODO: 나중에 Mongoose 모델 연결
       this.isInitialized = true;
-      logger.info("🍅 TimerService 초기화 완료");
+      logger.info("🍅 TimerService 초기화 완료 (임시 메모리 저장소 사용)");
     } catch (error) {
       logger.error("TimerService 초기화 실패:", error);
       throw error;
@@ -51,7 +52,8 @@ class TimerService {
    */
   async startSession(userId, options = {}) {
     try {
-      const session = new TimerSession({
+      const session = {
+        _id: `session_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
         userId,
         userName: options.userName || "Unknown",
         type: options.type || "focus",
@@ -60,9 +62,12 @@ class TimerService {
         tags: options.tags || [],
         note: options.note || null,
         cycleNumber: await this.getCurrentCycleNumber(userId),
-      });
+        startedAt: new Date(),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
 
-      await session.save();
+      this.sessions.set(session._id, session);
 
       // 일일 통계 업데이트
       await this.updateDailyStats(userId, "sessionStarted", session.type);
@@ -80,7 +85,7 @@ class TimerService {
    */
   async getSession(sessionId) {
     try {
-      return await TimerSession.findById(sessionId);
+      return this.sessions.get(sessionId);
     } catch (error) {
       logger.error("세션 조회 실패:", error);
       throw error;
@@ -92,13 +97,13 @@ class TimerService {
    */
   async updateSession(sessionId, updates) {
     try {
-      const session = await TimerSession.findByIdAndUpdate(
-        sessionId,
-        { $set: updates },
-        { new: true }
-      );
+      const session = this.sessions.get(sessionId);
+      if (!session) return false;
 
-      return !!session;
+      Object.assign(session, updates, { updatedAt: new Date() });
+      this.sessions.set(sessionId, session);
+
+      return true;
     } catch (error) {
       logger.error("세션 업데이트 실패:", error);
       throw error;
@@ -110,12 +115,15 @@ class TimerService {
    */
   async pauseSession(sessionId) {
     try {
-      const session = await TimerSession.findById(sessionId);
+      const session = this.sessions.get(sessionId);
       if (!session) {
         throw new Error("세션을 찾을 수 없습니다.");
       }
 
-      await session.pause();
+      session.status = "paused";
+      session.pausedAt = new Date();
+      this.sessions.set(sessionId, session);
+
       return true;
     } catch (error) {
       logger.error("세션 일시정지 실패:", error);
@@ -128,12 +136,21 @@ class TimerService {
    */
   async resumeSession(sessionId) {
     try {
-      const session = await TimerSession.findById(sessionId);
+      const session = this.sessions.get(sessionId);
       if (!session) {
         throw new Error("세션을 찾을 수 없습니다.");
       }
 
-      await session.resume();
+      if (session.status !== "paused") {
+        throw new Error("일시정지된 세션만 재개할 수 있습니다.");
+      }
+
+      const pausedTime = Date.now() - new Date(session.pausedAt).getTime();
+      session.pausedDuration = (session.pausedDuration || 0) + pausedTime;
+      session.status = "active";
+      session.resumedAt = new Date();
+      this.sessions.set(sessionId, session);
+
       return true;
     } catch (error) {
       logger.error("세션 재개 실패:", error);
@@ -146,12 +163,15 @@ class TimerService {
    */
   async completeSession(sessionId) {
     try {
-      const session = await TimerSession.findById(sessionId);
+      const session = this.sessions.get(sessionId);
       if (!session) {
         throw new Error("세션을 찾을 수 없습니다.");
       }
 
-      await session.complete();
+      session.status = "completed";
+      session.completedAt = new Date();
+      session.wasCompleted = true;
+      this.sessions.set(sessionId, session);
 
       // 일일 통계 업데이트
       await this.updateDailyStats(
@@ -161,7 +181,7 @@ class TimerService {
       );
 
       // 오늘 완료한 세션 수 반환
-      const todayCount = await TimerSession.countTodayCompleted(session.userId);
+      const todayCount = await this.getTodayCompletedCount(session.userId);
 
       return {
         session,
@@ -179,7 +199,7 @@ class TimerService {
    */
   async endSession(sessionId, details = {}) {
     try {
-      const session = await TimerSession.findById(sessionId);
+      const session = this.sessions.get(sessionId);
       if (!session) {
         throw new Error("세션을 찾을 수 없습니다.");
       }
@@ -188,7 +208,7 @@ class TimerService {
       session.completedAt = new Date();
       session.completedDuration = details.completedDuration || 0;
       session.wasCompleted = false;
-      await session.save();
+      this.sessions.set(sessionId, session);
 
       // 일일 통계 업데이트
       await this.updateDailyStats(
@@ -214,14 +234,16 @@ class TimerService {
    */
   async updateProgress(sessionId, progress) {
     try {
-      return await TimerSession.findByIdAndUpdate(sessionId, {
-        $set: {
-          lastProgress: {
-            remainingTime: progress.remainingTime,
-            updatedAt: new Date(),
-          },
-        },
-      });
+      const session = this.sessions.get(sessionId);
+      if (!session) return null;
+
+      session.lastProgress = {
+        remainingTime: progress.remainingTime,
+        updatedAt: new Date(),
+      };
+      this.sessions.set(sessionId, session);
+
+      return session;
     } catch (error) {
       logger.error("진행 상황 업데이트 실패:", error);
       throw error;
@@ -237,19 +259,32 @@ class TimerService {
     try {
       const today = TimeHelper.getKoreanDate();
       const dateKey = TimeHelper.format(today, "YYYY-MM-DD");
+      const statsKey = `${userId}_${dateKey}`;
 
-      const updates = { $inc: {} };
+      let stats = this.stats.get(statsKey) || {
+        userId,
+        date: dateKey,
+        focusStarted: 0,
+        focusCompleted: 0,
+        focusStopped: 0,
+        totalStarted: 0,
+        totalCompleted: 0,
+        totalStopped: 0,
+        totalMinutes: 0,
+      };
 
       // 액션별 업데이트
       switch (action) {
         case "sessionStarted":
-          updates.$inc[`${sessionType}Started`] = 1;
-          updates.$inc.totalStarted = 1;
+          stats[`${sessionType}Started`] =
+            (stats[`${sessionType}Started`] || 0) + 1;
+          stats.totalStarted++;
           break;
         case "sessionCompleted":
-          updates.$inc[`${sessionType}Completed`] = 1;
-          updates.$inc.totalCompleted = 1;
-          updates.$inc.totalMinutes =
+          stats[`${sessionType}Completed`] =
+            (stats[`${sessionType}Completed`] || 0) + 1;
+          stats.totalCompleted++;
+          stats.totalMinutes +=
             sessionType === "focus"
               ? 25
               : sessionType === "shortBreak"
@@ -257,15 +292,13 @@ class TimerService {
               : 15;
           break;
         case "sessionStopped":
-          updates.$inc[`${sessionType}Stopped`] = 1;
-          updates.$inc.totalStopped = 1;
+          stats[`${sessionType}Stopped`] =
+            (stats[`${sessionType}Stopped`] || 0) + 1;
+          stats.totalStopped++;
           break;
       }
 
-      await TimerStats.findOneAndUpdate({ userId, date: dateKey }, updates, {
-        upsert: true,
-        new: true,
-      });
+      this.stats.set(statsKey, stats);
     } catch (error) {
       logger.error("일일 통계 업데이트 실패:", error);
     }
@@ -278,8 +311,9 @@ class TimerService {
     try {
       const today = TimeHelper.getKoreanDate();
       const dateKey = TimeHelper.format(today, "YYYY-MM-DD");
+      const statsKey = `${userId}_${dateKey}`;
 
-      const stats = await TimerStats.findOne({ userId, date: dateKey });
+      const stats = this.stats.get(statsKey);
 
       if (!stats) {
         return this.getEmptyStats();
@@ -307,30 +341,36 @@ class TimerService {
     try {
       const { startDate, endDate } = this.getDateRange(period);
 
-      const stats = await TimerStats.find({
-        userId,
-        date: {
-          $gte: TimeHelper.format(startDate, "YYYY-MM-DD"),
-          $lte: TimeHelper.format(endDate, "YYYY-MM-DD"),
-        },
-      }).sort({ date: -1 });
+      // 메모리에서 해당 기간의 통계 수집
+      const allStats = [];
+      for (const [key, stats] of this.stats) {
+        if (
+          stats.userId === userId &&
+          stats.date >= TimeHelper.format(startDate, "YYYY-MM-DD") &&
+          stats.date <= TimeHelper.format(endDate, "YYYY-MM-DD")
+        ) {
+          allStats.push(stats);
+        }
+      }
+
+      allStats.sort((a, b) => b.date.localeCompare(a.date));
 
       // 집계
       const summary = {
         period,
         startDate: TimeHelper.format(startDate, "YYYY-MM-DD"),
         endDate: TimeHelper.format(endDate, "YYYY-MM-DD"),
-        totalDays: stats.length,
+        totalDays: allStats.length,
         totalSessions: 0,
         totalMinutes: 0,
         avgSessionsPerDay: 0,
         avgMinutesPerDay: 0,
         bestDay: null,
-        dailyStats: stats,
+        dailyStats: allStats,
       };
 
       // 합계 계산
-      stats.forEach((day) => {
+      allStats.forEach((day) => {
         summary.totalSessions += day.totalCompleted || 0;
         summary.totalMinutes += day.totalMinutes || 0;
 
@@ -366,18 +406,16 @@ class TimerService {
       const limit = options.limit || 20;
       const skip = options.skip || 0;
 
-      const sessions = await TimerSession.find({
-        userId,
-        status: { $in: ["completed", "stopped"] },
-      })
-        .sort({ completedAt: -1 })
-        .skip(skip)
-        .limit(limit);
+      const userSessions = Array.from(this.sessions.values())
+        .filter(
+          (s) =>
+            s.userId === userId &&
+            (s.status === "completed" || s.status === "stopped")
+        )
+        .sort((a, b) => new Date(b.completedAt) - new Date(a.completedAt));
 
-      const total = await TimerSession.countDocuments({
-        userId,
-        status: { $in: ["completed", "stopped"] },
-      });
+      const sessions = userSessions.slice(skip, skip + limit);
+      const total = userSessions.length;
 
       return {
         sessions,
@@ -397,12 +435,25 @@ class TimerService {
    */
   async getUserSettings(userId) {
     try {
-      let settings = await TimerSettings.findOne({ userId });
+      let settings = this.settings.get(userId);
 
       if (!settings) {
-        // 기본 설정으로 생성
-        settings = new TimerSettings({ userId });
-        await settings.save();
+        // 기본 설정
+        settings = {
+          userId,
+          focusDuration: 25,
+          shortBreakDuration: 5,
+          longBreakDuration: 15,
+          sessionsBeforeLongBreak: 4,
+          enableNotifications: true,
+          enableStats: true,
+          autoStartBreak: false,
+          dailyGoal: 8,
+          preferredTags: [],
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        this.settings.set(userId, settings);
       }
 
       return settings;
@@ -417,11 +468,9 @@ class TimerService {
    */
   async updateUserSettings(userId, updates) {
     try {
-      const settings = await TimerSettings.findOneAndUpdate(
-        { userId },
-        { $set: updates },
-        { upsert: true, new: true }
-      );
+      const settings = await this.getUserSettings(userId);
+      Object.assign(settings, updates, { updatedAt: new Date() });
+      this.settings.set(userId, settings);
 
       return settings;
     } catch (error) {
@@ -437,7 +486,9 @@ class TimerService {
    */
   async getActiveSessions() {
     try {
-      return await TimerSession.findActiveSessions();
+      return Array.from(this.sessions.values()).filter(
+        (s) => s.status === "active" || s.status === "paused"
+      );
     } catch (error) {
       logger.error("활성 세션 조회 실패:", error);
       return [];
@@ -449,7 +500,15 @@ class TimerService {
    */
   async getTodayCompletedCount(userId) {
     try {
-      return await TimerSession.countTodayCompleted(userId);
+      const today = TimeHelper.now();
+      const startOfDay = TimeHelper.setTime(today, 0, 0, 0);
+
+      return Array.from(this.sessions.values()).filter(
+        (s) =>
+          s.userId === userId &&
+          s.status === "completed" &&
+          new Date(s.completedAt) >= startOfDay
+      ).length;
     } catch (error) {
       logger.error("오늘 완료 세션 수 조회 실패:", error);
       return 0;
@@ -474,28 +533,24 @@ class TimerService {
    * 📅 기간 계산
    */
   getDateRange(period) {
-    const endDate = TimeHelper.getKoreanDate();
+    const endDate = TimeHelper.now();
     let startDate;
 
     switch (period) {
       case "today":
-        startDate = new Date(endDate);
+        startDate = TimeHelper.setTime(endDate, 0, 0, 0);
         break;
       case "week":
-        startDate = new Date(endDate);
-        startDate.setDate(startDate.getDate() - 6);
+        startDate = TimeHelper.addDays(endDate, -6);
         break;
       case "month":
-        startDate = new Date(endDate);
-        startDate.setMonth(startDate.getMonth() - 1);
+        startDate = TimeHelper.addDays(endDate, -30);
         break;
       case "year":
-        startDate = new Date(endDate);
-        startDate.setFullYear(startDate.getFullYear() - 1);
+        startDate = TimeHelper.addDays(endDate, -365);
         break;
       default:
-        startDate = new Date(endDate);
-        startDate.setDate(startDate.getDate() - 6);
+        startDate = TimeHelper.addDays(endDate, -6);
     }
 
     return { startDate, endDate };
@@ -514,7 +569,7 @@ class TimerService {
    */
   getEmptyStats() {
     return {
-      date: TimeHelper.format(new Date(), "YYYY-MM-DD"),
+      date: TimeHelper.format(null, "date"), // YYYY-MM-DD
       focusCompleted: 0,
       totalCompleted: 0,
       totalMinutes: 0,
@@ -532,12 +587,16 @@ class TimerService {
       const cutoffDate = new Date();
       cutoffDate.setDate(cutoffDate.getDate() - daysToKeep);
 
-      const result = await TimerSession.deleteMany({
-        completedAt: { $lt: cutoffDate },
-      });
+      let deletedCount = 0;
+      for (const [sessionId, session] of this.sessions) {
+        if (session.completedAt && new Date(session.completedAt) < cutoffDate) {
+          this.sessions.delete(sessionId);
+          deletedCount++;
+        }
+      }
 
-      logger.info(`🧹 ${result.deletedCount}개의 오래된 세션 정리 완료`);
-      return result.deletedCount;
+      logger.info(`🧹 ${deletedCount}개의 오래된 세션 정리 완료`);
+      return deletedCount;
     } catch (error) {
       logger.error("오래된 세션 정리 실패:", error);
       return 0;
@@ -551,7 +610,15 @@ class TimerService {
     return {
       serviceName: this.serviceName,
       isInitialized: this.isInitialized,
-      message: "Timer service is running",
+      message: "Timer service is running (memory storage)",
+      stats: {
+        totalSessions: this.sessions.size,
+        activeSessions: Array.from(this.sessions.values()).filter(
+          (s) => s.status === "active"
+        ).length,
+        totalStats: this.stats.size,
+        totalSettings: this.settings.size,
+      },
     };
   }
 
@@ -560,7 +627,11 @@ class TimerService {
    */
   async cleanup() {
     try {
-      // 특별한 정리 작업이 필요한 경우 여기에 추가
+      // 메모리 정리
+      this.sessions.clear();
+      this.stats.clear();
+      this.settings.clear();
+
       logger.info("✅ TimerService 정리 완료");
     } catch (error) {
       logger.error("❌ TimerService 정리 실패:", error);

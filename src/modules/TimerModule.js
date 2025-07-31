@@ -72,6 +72,9 @@ class TimerModule extends BaseModule {
         });
       }
 
+      // 액션 설정 - 중요!
+      this.setupActions();
+
       // 타이머 복구 (서버 재시작 시)
       await this.recoverActiveTimers();
 
@@ -88,29 +91,29 @@ class TimerModule extends BaseModule {
   setupActions() {
     this.registerActions({
       // 메인 액션
-      menu: this.showMenu,
-      start: this.startTimer,
-      pause: this.pauseTimer,
-      resume: this.resumeTimer,
-      stop: this.stopTimer,
+      menu: this.showMenu.bind(this),
+      start: this.startTimer.bind(this),
+      pause: this.pauseTimer.bind(this),
+      resume: this.resumeTimer.bind(this),
+      stop: this.stopTimer.bind(this),
 
       // 상태 및 통계
-      status: this.showStatus,
-      stats: this.showStats,
-      history: this.showHistory,
+      status: this.showStatus.bind(this),
+      stats: this.showStats.bind(this),
+      history: this.showHistory.bind(this),
 
       // 설정
-      settings: this.showSettings,
-      "settings:focus": this.updateFocusDuration,
-      "settings:break": this.updateBreakDuration,
-      "settings:notifications": this.toggleNotifications,
+      settings: this.showSettings.bind(this),
+      "settings:focus": this.updateFocusDuration.bind(this),
+      "settings:break": this.updateBreakDuration.bind(this),
+      "settings:notifications": this.toggleNotifications.bind(this),
 
       // 세션 관리
-      skip: this.skipCurrent,
-      next: this.nextSession,
+      skip: this.skipCurrent.bind(this),
+      next: this.nextSession.bind(this),
 
       // 도움말
-      help: this.showHelp,
+      help: this.showHelp.bind(this),
     });
   }
 
@@ -390,6 +393,144 @@ class TimerModule extends BaseModule {
     }
   }
 
+  /**
+   * ❓ 도움말 표시
+   */
+  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
+    return {
+      type: "help",
+      module: "timer",
+    };
+  }
+
+  /**
+   * 📜 히스토리 표시
+   */
+  async showHistory(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      const page = params.page || 0;
+      const limit = 20;
+      const history = await this.timerService.getHistory(userId, {
+        skip: page * limit,
+        limit,
+      });
+
+      return {
+        type: "history",
+        module: "timer",
+        data: history,
+      };
+    } catch (error) {
+      logger.error("히스토리 조회 오류:", error);
+      return { type: "error", message: "히스토리를 조회할 수 없습니다." };
+    }
+  }
+
+  /**
+   * ⚙️ 설정 표시
+   */
+  async showSettings(bot, callbackQuery, subAction, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    try {
+      const settings = await this.timerService.getUserSettings(userId);
+
+      return {
+        type: "settings",
+        module: "timer",
+        data: { settings },
+      };
+    } catch (error) {
+      logger.error("설정 조회 오류:", error);
+      return { type: "error", message: "설정을 조회할 수 없습니다." };
+    }
+  }
+
+  /**
+   * ⏭️ 현재 세션 건너뛰기
+   */
+  async skipCurrent(bot, callbackQuery, subAction, params, moduleManager) {
+    // TODO: 구현
+    return {
+      type: "info",
+      message: "이 기능은 아직 준비 중입니다.",
+    };
+  }
+
+  /**
+   * ▶️ 다음 세션 시작
+   */
+  async nextSession(bot, callbackQuery, subAction, params, moduleManager) {
+    // TODO: 구현
+    return {
+      type: "info",
+      message: "이 기능은 아직 준비 중입니다.",
+    };
+  }
+
+  /**
+   * ⏱️ 집중 시간 설정
+   */
+  async updateFocusDuration(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    // TODO: 구현
+    return {
+      type: "info",
+      message: "이 기능은 아직 준비 중입니다.",
+    };
+  }
+
+  /**
+   * ☕ 휴식 시간 설정
+   */
+  async updateBreakDuration(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    // TODO: 구현
+    return {
+      type: "info",
+      message: "이 기능은 아직 준비 중입니다.",
+    };
+  }
+
+  /**
+   * 🔔 알림 설정 토글
+   */
+  async toggleNotifications(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    // TODO: 구현
+    return {
+      type: "info",
+      message: "이 기능은 아직 준비 중입니다.",
+    };
+  }
+
+  /**
+   * 🌴 휴식 타이머 시작
+   */
+  async startBreakTimer(bot, userId, summary) {
+    // TODO: 구현
+    logger.info("휴식 타이머 시작 기능은 아직 구현되지 않았습니다.");
+  }
+
   // ===== ⏱️ 타이머 관리 =====
 
   /**
@@ -492,11 +633,19 @@ class TimerModule extends BaseModule {
    */
   async recoverActiveTimers() {
     try {
+      // TimerService가 메모리 기반일 때는 복구할 필요 없음
+      if (!this.timerService) {
+        logger.warn("TimerService가 초기화되지 않았습니다.");
+        return;
+      }
+
       const activeSessions = await this.timerService.getActiveSessions();
 
       for (const session of activeSessions) {
         // 남은 시간 계산
-        const elapsedTime = Math.floor((Date.now() - session.startedAt) / 1000);
+        const elapsedTime = Math.floor(
+          (Date.now() - new Date(session.startedAt).getTime()) / 1000
+        );
         const remainingTime = session.duration * 60 - elapsedTime;
 
         if (remainingTime > 0) {
@@ -524,6 +673,7 @@ class TimerModule extends BaseModule {
       logger.info(`🔄 ${activeSessions.length}개의 활성 타이머 복구 완료`);
     } catch (error) {
       logger.error("타이머 복구 실패:", error);
+      // 복구 실패해도 모듈은 계속 작동하도록 함
     }
   }
 

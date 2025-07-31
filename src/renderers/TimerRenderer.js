@@ -290,10 +290,10 @@ class TimerRenderer extends BaseRenderer {
     const emoji = this.emojis[type];
     const minutes = Math.floor(remainingTime / 60);
 
-    let text = `${emoji} *${this.getSessionTypeName(type)} 시작!*\n\n`;
+    let text = `${emoji} *${this.getSessionTypeName(type)} 시작\\!*\n\n`;
     text += `⏱️ 남은 시간: ${minutes}분\n`;
     text += this.renderProgressBar(session.duration * 60, remainingTime);
-    text += "\n\n💪 집중해서 작업하세요!";
+    text += "\n\n💪 집중해서 작업하세요\\!";
 
     return {
       text,
@@ -328,7 +328,7 @@ class TimerRenderer extends BaseRenderer {
 
     let text = `${this.emojis.active} *타이머 재개*\n\n`;
     text += `⏱️ 남은 시간: ${minutes}분\n\n`;
-    text += `다시 집중해봅시다! 💪`;
+    text += `다시 집중해봅시다\\! 💪`;
 
     return {
       text,
@@ -348,11 +348,11 @@ class TimerRenderer extends BaseRenderer {
       text += `진행률: ${summary.completedPercentage}%\n\n`;
 
       if (summary.completedPercentage >= 80) {
-        text += `거의 다 했네요! 다음엔 끝까지 해보세요 👍`;
+        text += `거의 다 했네요\\! 다음엔 끝까지 해보세요 👍`;
       } else if (summary.completedPercentage >= 50) {
-        text += `절반 이상 진행했네요! 수고하셨습니다 😊`;
+        text += `절반 이상 진행했네요\\! 수고하셨습니다 😊`;
       } else {
-        text += `다음엔 더 집중해보세요! 화이팅 💪`;
+        text += `다음엔 더 집중해보세요\\! 화이팅 💪`;
       }
     }
 
@@ -816,10 +816,11 @@ class TimerRenderer extends BaseRenderer {
    * 에러 메시지 렌더링
    */
   renderError(error) {
+    const errorMessage =
+      error?.message || error || "알 수 없는 오류가 발생했습니다.";
+
     return {
-      text: `❌ *오류 발생*\n\n${
-        error.message || "알 수 없는 오류가 발생했습니다."
-      }`,
+      text: `❌ *오류 발생*\n\n${this.escapeMarkdownV2(errorMessage)}`,
       keyboard: this.createBackKeyboard(),
     };
   }

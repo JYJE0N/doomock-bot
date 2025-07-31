@@ -92,6 +92,8 @@ class MongooseManager {
       const models = {
         Todo: require("./models/Todo"),
         Timer: require("./models/Timer"),
+        TimerStats: require("./models/TimerStats"), // 추가
+        TimerSettings: require("./models/TimerSettings"),
         Worktime: require("./models/Worktime"),
         Leave: require("./models/Leave"),
         Reminder: require("./models/Reminder"),
