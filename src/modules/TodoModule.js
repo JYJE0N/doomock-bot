@@ -128,11 +128,12 @@ class TodoModule extends BaseModule {
   }
 
   // ===== 🎯 표준 매개변수를 사용하는 액션 메서드들 =====
+  // 표준: (bot, callbackQuery, subAction, params, moduleManager)
 
   /**
    * 📋 메뉴 표시 (표준 매개변수)
    */
-  async showMenu(bot, callbackQuery, params, moduleManager) {
+  async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery.from);
 
@@ -177,7 +178,7 @@ class TodoModule extends BaseModule {
   /**
    * 📋 할일 목록 표시 (표준 매개변수)
    */
-  async showList(bot, callbackQuery, params, moduleManager) {
+  async showList(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
 
     try {
@@ -240,7 +241,7 @@ class TodoModule extends BaseModule {
   /**
    * ➕ 할일 추가 시작 (표준 매개변수)
    */
-  async startAdd(bot, callbackQuery, params, moduleManager) {
+  async startAdd(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
 
     try {
@@ -295,7 +296,7 @@ class TodoModule extends BaseModule {
   /**
    * ✅ 할일 완료/미완료 토글 (표준 매개변수)
    */
-  async toggleTodo(bot, callbackQuery, params, moduleManager) {
+  async toggleTodo(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
 
     if (!params) {
@@ -345,7 +346,7 @@ class TodoModule extends BaseModule {
   /**
    * 🗑️ 할일 삭제 확인 (표준 매개변수)
    */
-  async confirmDelete(bot, callbackQuery, params, moduleManager) {
+  async confirmDelete(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
 
     if (!params) {
@@ -403,7 +404,7 @@ class TodoModule extends BaseModule {
   /**
    * 🗑️ 할일 삭제 실행 (표준 매개변수)
    */
-  async executeDelete(bot, callbackQuery, params, moduleManager) {
+  async executeDelete(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
 
     if (!params) {
@@ -460,20 +461,309 @@ class TodoModule extends BaseModule {
   /**
    * 📄 페이지 변경 (표준 매개변수)
    */
-  async changePage(bot, callbackQuery, params, moduleManager) {
+  async changePage(bot, callbackQuery, subAction, params, moduleManager) {
     const page = parseInt(params) || 1;
     return await this.showList(
       bot,
       callbackQuery,
+      subAction,
       page.toString(),
       moduleManager
     );
   }
 
   /**
-   * 📊 통계 표시 (표준 매개변수)
+   * ✏️ 할일 수정 시작 (표준 매개변수)
    */
-  async showStats(bot, callbackQuery, params, moduleManager) {
+  async startEdit(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    if (!params) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 ID가 필요합니다.",
+          action: "edit",
+          canRetry: false,
+        },
+      };
+    }
+
+    try {
+      const todoId = params;
+
+      // 할일 정보 조회
+      const todoResult = await this.todoService.getTodoById(userId, todoId);
+
+      if (!todoResult.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: "수정할 할일을 찾을 수 없습니다.",
+            action: "edit",
+            canRetry: false,
+          },
+        };
+      }
+
+      // 사용자 상태 설정
+      this.setUserState(userId, {
+        action: this.constants.INPUT_STATES.WAITING_EDIT_INPUT,
+        todoId: todoId,
+        messageId: callbackQuery.message.message_id,
+        timestamp: Date.now(),
+      });
+
+      return {
+        type: "edit_prompt",
+        module: "todo",
+        data: {
+          todo: todoResult.data,
+          todoId,
+          maxLength: this.config.maxTitleLength,
+        },
+      };
+    } catch (error) {
+      logger.error("TodoModule.startEdit 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 수정을 시작할 수 없습니다.",
+          action: "edit",
+          canRetry: true,
+        },
+      };
+    }
+  }
+
+  /**
+   * ✅ 할일 완료 (표준 매개변수)
+   */
+  async completeTodo(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    if (!params) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 ID가 필요합니다.",
+          action: "complete",
+          canRetry: false,
+        },
+      };
+    }
+
+    try {
+      const todoId = params;
+      const result = await this.todoService.completeTodo(userId, todoId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: result.message || "할일을 완료할 수 없습니다.",
+            action: "complete",
+            canRetry: true,
+          },
+        };
+      }
+
+      return await this.showList(bot, callbackQuery, "1", moduleManager);
+    } catch (error) {
+      logger.error("TodoModule.completeTodo 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일을 완료할 수 없습니다.",
+          action: "complete",
+          canRetry: true,
+        },
+      };
+    }
+  }
+
+  /**
+   * ↩️ 할일 미완료로 되돌리기 (표준 매개변수)
+   */
+  async uncompleteTodo(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    if (!params) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 ID가 필요합니다.",
+          action: "uncomplete",
+          canRetry: false,
+        },
+      };
+    }
+
+    try {
+      const todoId = params;
+      const result = await this.todoService.uncompleteTodo(userId, todoId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: result.message || "할일을 미완료로 되돌릴 수 없습니다.",
+            action: "uncomplete",
+            canRetry: true,
+          },
+        };
+      }
+
+      return await this.showList(bot, callbackQuery, "1", moduleManager);
+    } catch (error) {
+      logger.error("TodoModule.uncompleteTodo 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일을 미완료로 되돌릴 수 없습니다.",
+          action: "uncomplete",
+          canRetry: true,
+        },
+      };
+    }
+  }
+
+  /**
+   * 📦 할일 아카이브 (표준 매개변수)
+   */
+  async archiveTodo(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    if (!params) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 ID가 필요합니다.",
+          action: "archive",
+          canRetry: false,
+        },
+      };
+    }
+
+    try {
+      const todoId = params;
+      const result = await this.todoService.archiveTodo(userId, todoId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: result.message || "할일을 아카이브할 수 없습니다.",
+            action: "archive",
+            canRetry: true,
+          },
+        };
+      }
+
+      return await this.showList(bot, callbackQuery, "1", moduleManager);
+    } catch (error) {
+      logger.error("TodoModule.archiveTodo 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일을 아카이브할 수 없습니다.",
+          action: "archive",
+          canRetry: true,
+        },
+      };
+    }
+  }
+
+  /**
+   * 🔍 검색 시작 (표준 매개변수)
+   */
+  async startSearch(bot, callbackQuery, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    // 사용자 상태 설정
+    this.setUserState(userId, {
+      action: this.constants.INPUT_STATES.WAITING_SEARCH_INPUT,
+      messageId: callbackQuery.message.message_id,
+      timestamp: Date.now(),
+    });
+
+    return {
+      type: "search_prompt",
+      module: "todo",
+      data: {
+        userId,
+      },
+    };
+  }
+
+  /**
+   * 🎛️ 필터 메뉴 표시 (표준 매개변수)
+   */
+  async showFilter(bot, callbackQuery, params, moduleManager) {
+    return {
+      type: "filter_menu",
+      module: "todo",
+      data: {
+        currentFilters: params ? params.split(":") : [],
+        config: this.config,
+      },
+    };
+  }
+
+  /**
+   * 📊 상태별 필터링 (표준 매개변수)
+   */
+  async filterByStatus(bot, callbackQuery, params, moduleManager) {
+    const status = params || "pending";
+    return await this.showList(
+      bot,
+      callbackQuery,
+      `1:${status}`,
+      moduleManager
+    );
+  }
+
+  /**
+   * ⭐ 우선순위별 필터링 (표준 매개변수)
+   */
+  async filterByPriority(bot, callbackQuery, params, moduleManager) {
+    const priority = params || "high";
+    return await this.showList(
+      bot,
+      callbackQuery,
+      `1::${priority}`,
+      moduleManager
+    );
+  }
+
+  /**
+   * 🔄 필터 초기화 (표준 매개변수)
+   */
+  async clearFilter(bot, callbackQuery, params, moduleManager) {
+    return await this.showList(bot, callbackQuery, "1", moduleManager);
+  }
+
+  /**
+   * ⏮️ 첫 페이지로 (표준 매개변수)
+   */
+  async goToFirstPage(bot, callbackQuery, params, moduleManager) {
+    return await this.showList(bot, callbackQuery, "1", moduleManager);
+  }
+
+  /**
+   * 
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery.from);
 
@@ -487,8 +777,8 @@ class TodoModule extends BaseModule {
           data: {
             message: "통계를 불러올 수 없습니다.",
             action: "stats",
-            canRetry: true,
-          },
+            canRetry: true
+          }
         };
       }
 
@@ -498,9 +788,10 @@ class TodoModule extends BaseModule {
         data: {
           ...result.data,
           userName,
-          generatedAt: TimeHelper.getLogTimeString(),
-        },
+          generatedAt: TimeHelper.getLogTimeString()
+        }
       };
+
     } catch (error) {
       logger.error("TodoModule.showStats 오류:", error);
       return {
@@ -509,8 +800,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "통계를 표시할 수 없습니다.",
           action: "stats",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -518,7 +809,7 @@ class TodoModule extends BaseModule {
   /**
    * ❓ 도움말 표시 (표준 매개변수)
    */
-  async showHelp(bot, callbackQuery, params, moduleManager) {
+  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
     return {
       type: "help",
       module: "todo",
