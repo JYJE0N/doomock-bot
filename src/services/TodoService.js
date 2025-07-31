@@ -1,22 +1,23 @@
-// src/services/TodoService.js - 🎯 Mongoose 기반 할일 데이터 서비스
+// src/services/TodoService.js - 완성도 높은 할일 데이터 서비스
+
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🔧 TodoService - Mongoose 기반 할일 데이터 관리
+ * 📋 TodoService - Mongoose 기반 할일 관리 서비스
  *
  * 🎯 핵심 기능:
  * - 할일 CRUD (생성/조회/업데이트/삭제)
+ * - 검색 및 필터링
  * - 완료/미완료 토글
- * - 사용자별 할일 관리
- * - 간단한 통계
+ * - 리마인더 연동
+ * - 통계 및 분석
  *
  * ✅ 표준 준수:
- * - Mongoose 라이브러리 사용 ✨
+ * - Mongoose 라이브러리 사용
  * - 모델 기반 스키마 검증
  * - 메모리 캐싱 시스템
  * - Railway 환경 최적화
- * - 표준 필드 활용
  */
 class TodoService {
   constructor(options = {}) {
@@ -29,6 +30,7 @@ class TodoService {
       cacheTimeout: parseInt(process.env.TODO_CACHE_TIMEOUT) || 300000, // 5분
       maxTodosPerUser: parseInt(process.env.MAX_TODOS_PER_USER) || 50,
       enableValidation: process.env.TODO_VALIDATION_ENABLED !== "false",
+      enableSearch: true,
       ...options.config,
     };
 
@@ -47,9 +49,10 @@ class TodoService {
       cacheHits: 0,
       cacheMisses: 0,
       validationErrors: 0,
+      searchCount: 0,
     };
 
-    logger.info("🔧 TodoService 생성됨 - Mongoose 버전! 🎉");
+    logger.info("📋 TodoService 생성됨 - Mongoose 버전! 🎉");
   }
 
   /**
@@ -76,17 +79,17 @@ class TodoService {
     }
   }
 
-  // ===== 📊 Mongoose 기반 CRUD 메서드들 =====
+  // ===== 📋 Mongoose 기반 CRUD 메서드들 =====
 
   /**
-   * 📋 할일 목록 조회 (Mongoose 메서드 활용)
+   * 📋 할일 목록 조회
    */
   async getTodos(userId, options = {}) {
     this.stats.operationsCount++;
 
     try {
       // 캐시 확인
-      const cacheKey = `todos:${userId}`;
+      const cacheKey = `todos:${userId}:${JSON.stringify(options)}`;
       if (this.config.enableCache && this.isValidCache(cacheKey)) {
         this.stats.cacheHits++;
         return this.cache.get(cacheKey);
@@ -94,49 +97,62 @@ class TodoService {
 
       this.stats.cacheMisses++;
 
-      // 🎯 Mongoose 정적 메서드 사용
-      const todos = await this.Todo.findByUser(userId, {
-        completed: options.completed,
-        category: options.category,
-        priority: options.priority,
-        tags: options.tags,
-        sort: options.sort || { completed: 1, createdAt: -1 }, // 미완료 먼저
-        limit: options.limit || 50,
+      // Mongoose 쿼리 구성
+      const query = {
+        userId: userId.toString(),
+        isActive: true,
+      };
+
+      // 완료 상태 필터
+      if (options.completed !== undefined) {
+        query.completed = options.completed;
+      }
+
+      // 카테고리 필터
+      if (options.category) {
+        query.category = options.category;
+      }
+
+      // 우선순위 필터
+      if (options.priority) {
+        query.priority = options.priority;
+      }
+
+      // 태그 필터
+      if (options.tags && options.tags.length > 0) {
+        query.tags = { $in: options.tags };
+      }
+
+      let mongoQuery = this.Todo.find(query);
+
+      // 정렬 (미완료 → 완료 순, 최신순)
+      mongoQuery = mongoQuery.sort({
+        completed: 1, // 미완료가 먼저
+        createdAt: -1, // 최신순
       });
 
-      // 데이터 정규화 (Mongoose 문서 -> 플레인 객체)
-      const processedTodos = todos.map((todo) => ({
-        id: todo._id.toString(),
-        userId: todo.userId,
-        text: todo.text,
-        description: todo.description,
-        completed: todo.completed,
-        completedAt: todo.completedAt,
-        priority: todo.priority,
-        category: todo.category,
-        tags: todo.tags,
-        dueDate: todo.dueDate,
-        createdAt: todo.createdAt,
-        updatedAt: todo.updatedAt,
-        isActive: todo.isActive,
+      // 페이징
+      if (options.limit) {
+        mongoQuery = mongoQuery.limit(options.limit);
+      }
+      if (options.skip) {
+        mongoQuery = mongoQuery.skip(options.skip);
+      }
 
-        // 가상 속성들
-        daysUntilDue: todo.daysUntilDue,
-        isOverdue: todo.isOverdue,
-      }));
+      const todos = await mongoQuery.lean();
 
       // 캐시에 저장
       if (this.config.enableCache) {
-        this.cache.set(cacheKey, processedTodos);
+        this.cache.set(cacheKey, todos);
         this.cacheTimestamps.set(cacheKey, Date.now());
       }
 
       this.stats.successCount++;
       logger.debug(
-        `📋 할일 ${processedTodos.length}개 조회됨 (사용자: ${userId}) - Mongoose`
+        `📋 할일 ${todos.length}개 조회됨 (사용자: ${userId}) - Mongoose`
       );
 
-      return processedTodos;
+      return todos;
     } catch (error) {
       this.stats.errorCount++;
       logger.error("할일 목록 조회 실패 (Mongoose):", error);
@@ -145,78 +161,55 @@ class TodoService {
   }
 
   /**
-   * ➕ 할일 추가 (Mongoose 모델 활용)
+   * ➕ 새 할일 추가
    */
-  async addTodo(userId, data) {
+  async addTodo(userId, todoData) {
     this.stats.operationsCount++;
 
     try {
-      // 할일 개수 제한 확인
+      // 사용자별 할일 개수 확인
       const existingCount = await this.Todo.countDocuments({
-        userId: String(userId),
+        userId: userId.toString(),
         isActive: true,
       });
 
       if (existingCount >= this.config.maxTodosPerUser) {
         throw new Error(
-          `할일은 최대 ${this.config.maxTodosPerUser}개까지만 등록 가능합니다`
+          `최대 ${this.config.maxTodosPerUser}개까지만 할일을 추가할 수 있습니다`
         );
       }
 
-      // 📝 할일 데이터 구성
-      const todoData = {
-        userId: String(userId),
-        text: (typeof data === "string" ? data : data.text || "").trim(),
-        description: data.description || null,
-        completed: false,
-        priority: data.priority || 3,
-        category: data.category || "일반",
-        tags: Array.isArray(data.tags) ? data.tags.slice(0, 5) : [],
-        dueDate: data.dueDate ? new Date(data.dueDate) : null,
-      };
+      // 할일 데이터 구성
+      const todoDoc = new this.Todo({
+        userId: userId.toString(),
+        text: todoData.text.trim(),
+        category: todoData.category || "일반",
+        priority: todoData.priority || 3,
+        tags: todoData.tags || [],
+        dueDate: todoData.dueDate || null,
+        reminderId: todoData.reminderId || null,
+        description: todoData.description || "",
+      });
 
-      // 빈 텍스트 검증
-      if (!todoData.text) {
-        throw new Error("할일 내용이 비어있습니다");
-      }
-
-      // 🎯 Mongoose 모델 인스턴스 생성 및 저장
-      const todo = new this.Todo(todoData);
-      const savedTodo = await todo.save(); // Mongoose 자동 검증!
+      const savedTodo = await todoDoc.save();
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
       this.stats.successCount++;
       logger.info(
-        `➕ Mongoose 할일 추가: ${savedTodo._id} (사용자: ${userId})`
+        `➕ 할일 추가됨: "${todoData.text}" (사용자: ${userId}) - Mongoose`
       );
 
-      // 응답 데이터 정규화
-      return {
-        id: savedTodo._id.toString(),
-        userId: savedTodo.userId,
-        text: savedTodo.text,
-        description: savedTodo.description,
-        completed: savedTodo.completed,
-        priority: savedTodo.priority,
-        category: savedTodo.category,
-        tags: savedTodo.tags,
-        dueDate: savedTodo.dueDate,
-        createdAt: savedTodo.createdAt,
-        updatedAt: savedTodo.updatedAt,
-        isActive: savedTodo.isActive,
-      };
+      return savedTodo;
     } catch (error) {
       this.stats.errorCount++;
 
-      // Mongoose 검증 오류 처리
+      // Mongoose 검증 에러 처리
       if (error.name === "ValidationError") {
         this.stats.validationErrors++;
-        const validationMessages = Object.values(error.errors).map(
-          (e) => e.message
-        );
-        throw new Error(`데이터 검증 실패: ${validationMessages.join(", ")}`);
+        const firstError = Object.values(error.errors)[0];
+        throw new Error(firstError.message);
       }
 
       logger.error("할일 추가 실패 (Mongoose):", error);
@@ -225,16 +218,15 @@ class TodoService {
   }
 
   /**
-   * ✅ 할일 완료/미완료 토글 (Mongoose 인스턴스 메서드 활용)
+   * ✅ 할일 완료/미완료 토글
    */
   async toggleTodo(userId, todoId) {
     this.stats.operationsCount++;
 
     try {
-      // 🎯 Mongoose findOne으로 문서 조회
       const todo = await this.Todo.findOne({
         _id: todoId,
-        userId: String(userId),
+        userId: userId.toString(),
         isActive: true,
       });
 
@@ -242,36 +234,22 @@ class TodoService {
         throw new Error("할일을 찾을 수 없습니다");
       }
 
-      // 🎯 Mongoose 인스턴스 메서드 사용
-      const updatedTodo = await todo.toggle(); // 모델에 정의된 toggle() 메서드
+      // 완료 상태 토글
+      todo.completed = !todo.completed;
+      todo.completedAt = todo.completed ? new Date() : null;
+
+      const updatedTodo = await todo.save();
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
       this.stats.successCount++;
+      const action = todo.completed ? "완료" : "미완료";
       logger.info(
-        `✅ Mongoose 할일 토글: ${todoId} -> ${updatedTodo.completed} (사용자: ${userId})`
+        `✅ 할일 ${action}: "${todo.text}" (사용자: ${userId}) - Mongoose`
       );
 
-      // 응답 데이터 정규화
-      return {
-        id: updatedTodo._id.toString(),
-        userId: updatedTodo.userId,
-        text: updatedTodo.text,
-        completed: updatedTodo.completed,
-        completedAt: updatedTodo.completedAt,
-        priority: updatedTodo.priority,
-        category: updatedTodo.category,
-        tags: updatedTodo.tags,
-        dueDate: updatedTodo.dueDate,
-        createdAt: updatedTodo.createdAt,
-        updatedAt: updatedTodo.updatedAt,
-        isActive: updatedTodo.isActive,
-
-        // 가상 속성들
-        daysUntilDue: updatedTodo.daysUntilDue,
-        isOverdue: updatedTodo.isOverdue,
-      };
+      return updatedTodo;
     } catch (error) {
       this.stats.errorCount++;
       logger.error("할일 토글 실패 (Mongoose):", error);
@@ -280,33 +258,83 @@ class TodoService {
   }
 
   /**
-   * 🗑️ 할일 삭제 (Mongoose 소프트 삭제)
+   * 📝 할일 업데이트
    */
-  async deleteTodo(userId, todoId) {
+  async updateTodo(userId, todoId, updateData) {
     this.stats.operationsCount++;
 
     try {
-      // 🎯 Mongoose findOne으로 문서 조회
-      const todo = await this.Todo.findOne({
-        _id: todoId,
-        userId: String(userId),
-        isActive: true,
-      });
+      const updatedTodoData = {
+        ...updateData,
+        updatedAt: new Date(),
+      };
 
-      if (!todo) {
+      const updatedTodo = await this.Todo.findOneAndUpdate(
+        {
+          _id: todoId,
+          userId: userId.toString(),
+          isActive: true,
+        },
+        updatedTodoData,
+        {
+          new: true,
+          runValidators: true,
+        }
+      );
+
+      if (!updatedTodo) {
         throw new Error("할일을 찾을 수 없습니다");
       }
-
-      // 🎯 Mongoose 인스턴스 메서드 사용 (소프트 삭제)
-      await todo.softDelete(); // 모델에 정의된 softDelete() 메서드
 
       // 캐시 무효화
       this.invalidateUserCache(userId);
 
       this.stats.successCount++;
-      logger.info(`🗑️ Mongoose 할일 삭제: ${todoId} (사용자: ${userId})`);
+      logger.debug(
+        `📝 할일 업데이트됨: ${todoId} (사용자: ${userId}) - Mongoose`
+      );
 
-      return true;
+      return updatedTodo;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("할일 업데이트 실패 (Mongoose):", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🗑️ 할일 삭제 (소프트 삭제)
+   */
+  async deleteTodo(userId, todoId) {
+    this.stats.operationsCount++;
+
+    try {
+      const deletedTodo = await this.Todo.findOneAndUpdate(
+        {
+          _id: todoId,
+          userId: userId.toString(),
+          isActive: true,
+        },
+        {
+          isActive: false,
+          deletedAt: new Date(),
+        },
+        { new: true }
+      );
+
+      if (!deletedTodo) {
+        throw new Error("할일을 찾을 수 없습니다");
+      }
+
+      // 캐시 무효화
+      this.invalidateUserCache(userId);
+
+      this.stats.successCount++;
+      logger.info(
+        `🗑️ 할일 삭제됨: "${deletedTodo.text}" (사용자: ${userId}) - Mongoose`
+      );
+
+      return deletedTodo;
     } catch (error) {
       this.stats.errorCount++;
       logger.error("할일 삭제 실패 (Mongoose):", error);
@@ -315,108 +343,296 @@ class TodoService {
   }
 
   /**
-   * 📊 간단한 통계 조회 (Mongoose Aggregation)
+   * 🔍 할일 검색
    */
-  async getTodoStats(userId) {
+  async searchTodos(userId, keyword, options = {}) {
+    this.stats.operationsCount++;
+    this.stats.searchCount++;
+
+    try {
+      if (!keyword || keyword.trim().length === 0) {
+        return [];
+      }
+
+      const searchKeyword = keyword.trim();
+
+      // 캐시 확인
+      const cacheKey = `search:${userId}:${searchKeyword}:${JSON.stringify(
+        options
+      )}`;
+      if (this.config.enableCache && this.isValidCache(cacheKey)) {
+        this.stats.cacheHits++;
+        return this.cache.get(cacheKey);
+      }
+
+      this.stats.cacheMisses++;
+
+      // MongoDB 텍스트 검색 쿼리
+      const query = {
+        userId: userId.toString(),
+        isActive: true,
+        $or: [
+          { text: { $regex: searchKeyword, $options: "i" } },
+          { description: { $regex: searchKeyword, $options: "i" } },
+          { category: { $regex: searchKeyword, $options: "i" } },
+          { tags: { $in: [new RegExp(searchKeyword, "i")] } },
+        ],
+      };
+
+      // 완료 상태 필터
+      if (options.completed !== undefined) {
+        query.completed = options.completed;
+      }
+
+      const searchResults = await this.Todo.find(query)
+        .sort({
+          completed: 1, // 미완료 먼저
+          createdAt: -1, // 최신순
+        })
+        .limit(options.limit || 20)
+        .lean();
+
+      // 캐시에 저장
+      if (this.config.enableCache) {
+        this.cache.set(cacheKey, searchResults);
+        this.cacheTimestamps.set(cacheKey, Date.now());
+      }
+
+      this.stats.successCount++;
+      logger.debug(
+        `🔍 검색 완료: "${searchKeyword}" → ${searchResults.length}개 (사용자: ${userId}) - Mongoose`
+      );
+
+      return searchResults;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("할일 검색 실패 (Mongoose):", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 📊 카테고리별 통계
+   */
+  async getCategoryStats(userId) {
     this.stats.operationsCount++;
 
     try {
-      // 🎯 Mongoose 정적 메서드 활용하여 통계 조회
-      const categoryStats = await this.Todo.getCategoryStats(userId);
-
-      // 전체 통계 계산
-      const totalStats = categoryStats.reduce(
-        (acc, cat) => ({
-          total: acc.total + cat.total,
-          completed: acc.completed + cat.completed,
-          pending: acc.pending + cat.pending,
-        }),
-        { total: 0, completed: 0, pending: 0 }
-      );
-
-      const completionRate =
-        totalStats.total > 0
-          ? Math.round((totalStats.completed / totalStats.total) * 100)
-          : 0;
-
-      const stats = {
-        total: totalStats.total,
-        completed: totalStats.completed,
-        pending: totalStats.pending,
-        completionRate,
-
-        // 카테고리별 세부 통계
-        categories: categoryStats,
-      };
+      const stats = await this.Todo.aggregate([
+        {
+          $match: {
+            userId: userId.toString(),
+            isActive: true,
+          },
+        },
+        {
+          $group: {
+            _id: "$category",
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
+            },
+          },
+        },
+        {
+          $project: {
+            category: "$_id",
+            total: 1,
+            completed: 1,
+            pending: { $subtract: ["$total", "$completed"] },
+            completionRate: {
+              $round: [
+                { $multiply: [{ $divide: ["$completed", "$total"] }, 100] },
+                1,
+              ],
+            },
+          },
+        },
+        {
+          $sort: { total: -1 },
+        },
+      ]);
 
       this.stats.successCount++;
       return stats;
     } catch (error) {
       this.stats.errorCount++;
-      logger.error("통계 조회 실패 (Mongoose):", error);
-
-      // 기본 통계로 폴백
-      return {
-        total: 0,
-        completed: 0,
-        pending: 0,
-        completionRate: 0,
-        categories: [],
-      };
+      logger.error("카테고리별 통계 조회 실패 (Mongoose):", error);
+      throw error;
     }
   }
 
   /**
-   * 🔍 오늘 마감인 할일 조회 (Mongoose 정적 메서드)
+   * 📈 월별 통계
    */
-  async getTodosDueToday(userId) {
+  async getMonthlyStats(userId, year = null) {
     this.stats.operationsCount++;
 
     try {
-      const todosDue = await this.Todo.findDueToday(userId);
+      const targetYear = year || new Date().getFullYear();
+
+      const stats = await this.Todo.aggregate([
+        {
+          $match: {
+            userId: userId.toString(),
+            isActive: true,
+            createdAt: {
+              $gte: new Date(`${targetYear}-01-01`),
+              $lt: new Date(`${targetYear + 1}-01-01`),
+            },
+          },
+        },
+        {
+          $group: {
+            _id: { $month: "$createdAt" },
+            added: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
+            },
+          },
+        },
+        {
+          $project: {
+            month: "$_id",
+            added: 1,
+            completed: 1,
+            pending: { $subtract: ["$added", "$completed"] },
+          },
+        },
+        {
+          $sort: { month: 1 },
+        },
+      ]);
 
       this.stats.successCount++;
-      return todosDue.map((todo) => ({
-        id: todo._id.toString(),
-        text: todo.text,
-        dueDate: todo.dueDate,
-        priority: todo.priority,
-        category: todo.category,
-        isOverdue: todo.isOverdue,
-      }));
+      return stats;
     } catch (error) {
       this.stats.errorCount++;
-      logger.error("오늘 마감 할일 조회 실패:", error);
-      return [];
+      logger.error("월별 통계 조회 실패 (Mongoose):", error);
+      throw error;
     }
   }
 
   /**
-   * ⚠️ 지연된 할일 조회 (Mongoose 정적 메서드)
+   * 📅 오늘 마감인 할일 조회
+   */
+  async getTodayDueTodos(userId) {
+    this.stats.operationsCount++;
+
+    try {
+      const today = TimeHelper.now();
+      const startOfDay = TimeHelper.setTime(today, 0, 0, 0);
+      const endOfDay = TimeHelper.setTime(today, 23, 59, 59);
+
+      const dueTodos = await this.Todo.find({
+        userId: userId.toString(),
+        isActive: true,
+        completed: false,
+        dueDate: {
+          $gte: startOfDay,
+          $lte: endOfDay,
+        },
+      })
+        .sort({ dueDate: 1 })
+        .lean();
+
+      this.stats.successCount++;
+      return dueTodos;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("오늘 마감 할일 조회 실패 (Mongoose):", error);
+      throw error;
+    }
+  }
+
+  /**
+   * ⚠️ 연체된 할일 조회
    */
   async getOverdueTodos(userId) {
     this.stats.operationsCount++;
 
     try {
-      const overdueTodos = await this.Todo.findOverdue(userId);
+      const now = TimeHelper.now();
+
+      const overdueTodos = await this.Todo.find({
+        userId: userId.toString(),
+        isActive: true,
+        completed: false,
+        dueDate: {
+          $lt: now,
+        },
+      })
+        .sort({ dueDate: 1 })
+        .lean();
 
       this.stats.successCount++;
-      return overdueTodos.map((todo) => ({
-        id: todo._id.toString(),
-        text: todo.text,
-        dueDate: todo.dueDate,
-        priority: todo.priority,
-        category: todo.category,
-        daysOverdue: Math.abs(todo.daysUntilDue) || 0,
-      }));
+      return overdueTodos;
     } catch (error) {
       this.stats.errorCount++;
-      logger.error("지연된 할일 조회 실패:", error);
-      return [];
+      logger.error("연체 할일 조회 실패 (Mongoose):", error);
+      throw error;
     }
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 =====
+  /**
+   * 🏆 완료율 높은 카테고리 조회
+   */
+  async getTopCategories(userId, limit = 5) {
+    this.stats.operationsCount++;
+
+    try {
+      const topCategories = await this.Todo.aggregate([
+        {
+          $match: {
+            userId: userId.toString(),
+            isActive: true,
+          },
+        },
+        {
+          $group: {
+            _id: "$category",
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: [{ $eq: ["$completed", true] }, 1, 0] },
+            },
+          },
+        },
+        {
+          $match: {
+            total: { $gte: 2 }, // 최소 2개 이상인 카테고리만
+          },
+        },
+        {
+          $project: {
+            category: "$_id",
+            total: 1,
+            completed: 1,
+            completionRate: {
+              $round: [
+                { $multiply: [{ $divide: ["$completed", "$total"] }, 100] },
+                1,
+              ],
+            },
+          },
+        },
+        {
+          $sort: { completionRate: -1, total: -1 },
+        },
+        {
+          $limit: limit,
+        },
+      ]);
+
+      this.stats.successCount++;
+      return topCategories;
+    } catch (error) {
+      this.stats.errorCount++;
+      logger.error("상위 카테고리 조회 실패 (Mongoose):", error);
+      throw error;
+    }
+  }
+
+  // ===== 🛠️ 헬퍼 메서드들 =====
 
   /**
    * 캐시 유효성 검사
@@ -427,69 +643,112 @@ class TodoService {
     }
 
     const timestamp = this.cacheTimestamps.get(key);
-    return Date.now() - timestamp < this.config.cacheTimeout;
+    const now = Date.now();
+    const isValid = now - timestamp < this.config.cacheTimeout;
+
+    if (!isValid) {
+      this.cache.delete(key);
+      this.cacheTimestamps.delete(key);
+    }
+
+    return isValid;
   }
 
   /**
-   * 사용자 캐시 무효화
+   * 사용자별 캐시 무효화
    */
   invalidateUserCache(userId) {
-    const cacheKey = `todos:${userId}`;
-    this.cache.delete(cacheKey);
-    this.cacheTimestamps.delete(cacheKey);
+    const keysToDelete = [];
+
+    for (const key of this.cache.keys()) {
+      if (key.includes(`:${userId}:`)) {
+        keysToDelete.push(key);
+      }
+    }
+
+    keysToDelete.forEach((key) => {
+      this.cache.delete(key);
+      this.cacheTimestamps.delete(key);
+    });
+
+    logger.debug(
+      `🗑️ 사용자 캐시 무효화됨: ${userId} (${keysToDelete.length}개)`
+    );
   }
 
   /**
    * 전체 캐시 정리
    */
   clearCache() {
+    const cacheSize = this.cache.size;
     this.cache.clear();
     this.cacheTimestamps.clear();
-    logger.debug("📝 TodoService 캐시 정리됨 (Mongoose)");
+
+    logger.debug(`🗑️ TodoService 캐시 정리됨 (${cacheSize}개)`);
   }
 
+  // ===== 📊 서비스 상태 및 정리 =====
+
   /**
-   * 서비스 상태 조회 (Mongoose 정보 포함)
+   * 서비스 상태 조회
    */
   getStatus() {
     return {
       serviceName: "TodoService",
-      framework: "Mongoose", // ✨ Mongoose 사용 표시
-      modelName: "Todo",
       isConnected: !!this.Todo,
+      modelName: this.Todo?.modelName || null,
       cacheEnabled: this.config.enableCache,
       cacheSize: this.cache.size,
-      stats: this.stats,
-      environment: this.isRailway ? "railway" : "local",
-
-      // Mongoose 관련 정보
-      mongoose: {
-        validationEnabled: this.config.enableValidation,
-        validationErrors: this.stats.validationErrors,
-        modelMethods: [
-          "findByUser",
-          "findDueToday",
-          "findOverdue",
-          "getCategoryStats",
-        ],
-        instanceMethods: [
-          "toggle",
-          "softDelete",
-          "restore",
-          "setPriority",
-          "addTag",
-          "removeTag",
-        ],
+      stats: { ...this.stats },
+      config: {
+        maxTodosPerUser: this.config.maxTodosPerUser,
+        enableValidation: this.config.enableValidation,
+        enableSearch: this.config.enableSearch,
       },
+      isRailway: this.isRailway,
     };
   }
 
   /**
-   * 정리 작업 (앱 종료 시)
+   * 헬스체크
+   */
+  async healthCheck() {
+    try {
+      // 간단한 쿼리로 DB 연결 확인
+      await this.Todo.findOne().limit(1);
+
+      return {
+        healthy: true,
+        message: "TodoService 정상 작동",
+        timestamp: new Date(),
+      };
+    } catch (error) {
+      return {
+        healthy: false,
+        message: `TodoService 헬스체크 실패: ${error.message}`,
+        timestamp: new Date(),
+      };
+    }
+  }
+
+  /**
+   * 정리 작업
    */
   async cleanup() {
     try {
       this.clearCache();
+
+      // 통계 초기화
+      this.stats = {
+        operationsCount: 0,
+        successCount: 0,
+        errorCount: 0,
+        cacheHits: 0,
+        cacheMisses: 0,
+        validationErrors: 0,
+        searchCount: 0,
+      };
+
       logger.info("✅ TodoService 정리 완료 (Mongoose)");
     } catch (error) {
       logger.error("❌ TodoService 정리 실패:", error);
