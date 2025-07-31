@@ -1,4 +1,4 @@
-// src/renderers/TodoRenderer.js - 완성도 높은 할일 관리 UI 렌더러 (오류 최종 수정 버전)
+// src/renderers/TodoRenderer.js - config 참조 오류 최종 수정 버전
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
@@ -28,59 +28,78 @@ class TodoRenderer extends BaseRenderer {
   async render(result, ctx) {
     const { type, data } = result;
     try {
-      let rendered;
       switch (type) {
         case "list":
-          rendered = this.renderTodoList(data);
-          break;
+          return await this.renderTodoListResponse(data, ctx);
         case "stats":
-          rendered = this.renderStats(data);
-          break;
+          return await this.renderStatsResponse(data, ctx);
         case "input_prompt":
-          rendered = this.renderInputPrompt(data);
-          break;
+          return await this.renderInputPromptResponse(data, ctx);
         case "error":
-          rendered = this.createErrorContent(data);
-          break;
+          return await this.renderErrorResponse(data, ctx);
         default:
           logger.warn(`알 수 없는 할일 렌더링 타입: ${type}`);
-          rendered = this.createErrorContent({
-            message: "지원하지 않는 기능입니다.",
-          });
-      }
-
-      const chatId = ctx?.callbackQuery?.message?.chat?.id || ctx?.chat?.id;
-      const messageId = ctx?.callbackQuery?.message?.message_id;
-
-      if (chatId) {
-        await this.sendMessage(
-          chatId,
-          rendered.text,
-          rendered.keyboard,
-          messageId
-        );
-      } else {
-        logger.error("렌더링할 chat ID를 찾을 수 없습니다.");
+          return await this.renderErrorResponse(
+            { message: "지원하지 않는 기능입니다." },
+            ctx
+          );
       }
     } catch (error) {
       logger.error("TodoRenderer 렌더링 오류:", error);
-      const renderedError = this.createErrorContent({
-        message: "화면을 표시하는 중 오류가 발생했습니다.",
-      });
-      const chatId = ctx?.callbackQuery?.message?.chat?.id || ctx?.chat?.id;
-      const messageId = ctx?.callbackQuery?.message?.message_id;
-      if (chatId)
-        await this.sendMessage(
-          chatId,
-          renderedError.text,
-          renderedError.keyboard,
-          messageId
-        );
+      await this.renderErrorResponse(
+        { message: "화면을 표시하는 중 오류가 발생했습니다." },
+        ctx
+      );
     }
   }
 
-  renderTodoList(data) {
-    const { userName, todos, stats, page = 1 } = data;
+  // --- 렌더링 응답(Response) 메소드들 ---
+
+  async renderTodoListResponse(data, ctx) {
+    const rendered = this.createTodoListContent(data);
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  async renderStatsResponse(data, ctx) {
+    const rendered = this.createStatsContent(data);
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  async renderInputPromptResponse(data, ctx) {
+    const rendered = this.createInputPromptContent(data);
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  async renderErrorResponse(data, ctx) {
+    const rendered = this.createErrorContent(data);
+    await this.sendMessage(
+      ctx.callbackQuery.message.chat.id,
+      rendered.text,
+      rendered.keyboard,
+      ctx.callbackQuery.message.message_id
+    );
+  }
+
+  // --- UI 콘텐츠(Content) 생성 메소드들 ---
+
+  createTodoListContent(data) {
+    // ⭐️ 수정: data 객체에서 maxTodosPerPage를 직접 구조 분해 할당으로 가져옵니다.
+    const { userName, todos, stats, page = 1, maxTodosPerPage = 8 } = data;
     let text = `${this.emojis.todo} *할일 관리*\n\n`;
     text += `안녕하세요, ${this.escapeMarkdownV2(userName)}님\\!\n\n`;
 
@@ -95,7 +114,8 @@ class TodoRenderer extends BaseRenderer {
     if (todos.length === 0) {
       text += `${this.emojis.pending} 아직 할일이 없습니다\\. 새로운 할일을 추가해보세요\\!`;
     } else {
-      const itemsPerPage = this.config.maxTodosPerPage;
+      // ⭐️ 수정: this.config.maxTodosPerPage 대신 지역 변수 maxTodosPerPage를 사용합니다.
+      const itemsPerPage = maxTodosPerPage;
       const totalPages = Math.ceil(todos.length / itemsPerPage);
       const startIndex = (page - 1) * itemsPerPage;
       const pageTodos = todos.slice(startIndex, startIndex + itemsPerPage);
@@ -104,7 +124,6 @@ class TodoRenderer extends BaseRenderer {
       pageTodos.forEach((todo) => {
         const status = todo.completed ? "✅" : "🔘";
         const priorityIcon = this.getPriorityIcon(todo.priority);
-        // ✅ 수정: displayText -> text
         const todoText = todo.completed
           ? `~${this.escapeMarkdownV2(todo.text)}~`
           : this.escapeMarkdownV2(todo.text);
@@ -112,10 +131,14 @@ class TodoRenderer extends BaseRenderer {
       });
     }
 
-    return { text, keyboard: this.createMainKeyboard(todos, page) };
+    // ⭐️ 수정: 키보드 생성 함수에도 maxTodosPerPage를 전달합니다.
+    return {
+      text,
+      keyboard: this.createMainKeyboard(todos, page, maxTodosPerPage),
+    };
   }
 
-  renderStats(data) {
+  createStatsContent(data) {
     const { stats } = data;
     let text = `${this.emojis.stats} *할일 통계*\n\n`;
     text += `📈 *전체 현황*\n`;
@@ -125,7 +148,7 @@ class TodoRenderer extends BaseRenderer {
     return { text, keyboard: this.createBackKeyboard() };
   }
 
-  renderInputPrompt(data) {
+  createInputPromptContent(data) {
     let text = `${this.emojis.add} *새 할일 추가*\n\n`;
     text += `${this.escapeMarkdownV2(data.message)}`;
     return {
@@ -146,16 +169,18 @@ class TodoRenderer extends BaseRenderer {
     };
   }
 
-  createMainKeyboard(todos, currentPage) {
+  // --- 키보드 및 헬퍼 메소드들 ---
+
+  // ⭐️ 수정: maxTodosPerPage를 파라미터로 받도록 변경
+  createMainKeyboard(todos, currentPage, maxTodosPerPage = 8) {
     const keyboard = [];
-    const itemsPerPage = this.config.maxTodosPerPage;
+    const itemsPerPage = maxTodosPerPage;
     const totalPages = Math.ceil(todos.length / itemsPerPage);
     const startIndex = (currentPage - 1) * itemsPerPage;
     const pageTodos = todos.slice(startIndex, startIndex + itemsPerPage);
 
     pageTodos.forEach((todo) => {
       const toggleIcon = todo.completed ? "↩️" : "✅";
-      // ✅ 수정: displayText -> text
       const buttonText = `${toggleIcon} ${this.truncateText(todo.text, 20)}`;
       keyboard.push([
         { text: buttonText, callback_data: `todo:toggle:${todo.id}` },
@@ -182,7 +207,10 @@ class TodoRenderer extends BaseRenderer {
       keyboard.push(paginationRow);
     }
 
-    keyboard.push([{ text: "➕ 추가", callback_data: "todo:add" }]);
+    keyboard.push([
+      { text: "➕ 추가", callback_data: "todo:add" },
+      { text: "📊 통계", callback_data: "todo:stats" },
+    ]);
     keyboard.push([{ text: "🔙 메인 메뉴", callback_data: "system:menu" }]);
 
     return { inline_keyboard: keyboard };
