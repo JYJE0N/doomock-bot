@@ -139,6 +139,13 @@ class BotController {
     try {
       logger.info("🎮 핸들러 및 매니저 초기화 중...");
 
+      // ServiceBuilder 생성 및 초기화
+      const { createServiceBuilder } = require("../core/ServiceBuilder");
+      this.serviceBuilder = createServiceBuilder();
+      this.serviceBuilder.setDatabaseManager(this.dbManager);
+      this.serviceBuilder.setMongooseManager(this.mongooseManager);
+      await this.serviceBuilder.initialize();
+
       // ModuleManager 초기화
       this.moduleManager = new ModuleManager();
       await this.moduleManager.initialize(this.bot, {

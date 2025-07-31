@@ -11,6 +11,7 @@ const TTSRenderer = require("../renderers/TTSRenderer");
 const WeatherRenderer = require("../renderers/WeatherRenderer");
 const TimerRenderer = require("../renderers/TimerRenderer");
 const LeaveRenderer = require("../renderers/LeaveRenderer");
+const WorktimeRenderer = require("../renderers/WorktimeRenderer");
 
 /**
  * 🎯 중앙 네비게이션 핸들러
@@ -57,6 +58,8 @@ class NavigationHandler {
       ["weather", new WeatherRenderer(this.bot, this)],
       ["timer", new TimerRenderer(this.bot, this)],
       ["leave", new LeaveRenderer(this.bot, this)],
+      ["weather", new WeatherRenderer(this.bot, this)],
+      ["worktime", new WorktimeRenderer(this.bot, this)],
     ];
 
     renderers.forEach(([name, renderer]) => {

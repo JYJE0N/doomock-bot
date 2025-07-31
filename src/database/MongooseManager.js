@@ -97,6 +97,7 @@ class MongooseManager {
         TimerSettings: require("./models/TimerSettings"),
         Worktime: require("./models/Worktime"),
         Leave: require("./models/Leave"),
+        Worktime: require("./models/Worktime"), // ✅ 추가 필요
         UserLeaveSetting: require("./models/UserLeaveSetting"),
         Reminder: require("./models/Reminder"),
         UserSetting: require("./models/UserSetting"),
