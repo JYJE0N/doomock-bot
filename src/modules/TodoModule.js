@@ -14,8 +14,8 @@ const TimeHelper = require("../utils/TimeHelper");
  * - onInitialize/onHandleMessage 구현
  * - registerActions 사용
  * - Railway 환경변수 기반
- * - 사용자 친화적 에러 처리
- * - 올바른 반환값 구조
+ * - 순수 데이터만 반환 (UI는 렌더러가 담당!)
+ * - SoC 완전 준수
  */
 class TodoModule extends BaseModule {
   constructor(moduleName, options = {}) {
@@ -600,21 +600,21 @@ class TodoModule extends BaseModule {
 
     // 입력 검증
     if (!text) {
-      await this.sendErrorMessage(
-        bot,
-        msg.chat.id,
-        "할일 제목을 입력해주세요."
-      );
-      return true;
+      return {
+        type: "add_input_error",
+        module: "todo",
+        data: { message: "할일 제목을 입력해주세요." },
+      };
     }
 
     if (text.length > this.config.maxTitleLength) {
-      await this.sendErrorMessage(
-        bot,
-        msg.chat.id,
-        `할일 제목이 너무 깁니다. (최대 ${this.config.maxTitleLength}자)`
-      );
-      return true;
+      return {
+        type: "add_input_error",
+        module: "todo",
+        data: {
+          message: `할일 제목이 너무 깁니다. (최대 ${this.config.maxTitleLength}자)`,
+        },
+      };
     }
 
     try {
@@ -628,72 +628,46 @@ class TodoModule extends BaseModule {
       this.clearUserState(userId);
 
       if (result.success) {
-        await this.sendSuccessMessage(
-          bot,
-          msg.chat.id,
-          `✅ "${text}" 할일이 추가되었습니다!`,
-          "todo:list"
-        );
+        // ✅ 순수 데이터만 반환 - 렌더러가 UI 담당
+        return {
+          type: "add_success",
+          module: "todo",
+          data: {
+            message: `"${text}" 할일이 추가되었습니다!`,
+            todo: result.data,
+            shouldShowList: true,
+          },
+        };
       } else {
-        await this.sendErrorMessage(
-          bot,
-          msg.chat.id,
-          result.message || "할일 추가에 실패했습니다."
-        );
+        return {
+          type: "add_error",
+          module: "todo",
+          data: {
+            message: result.message || "할일 추가에 실패했습니다.",
+            canRetry: true,
+          },
+        };
       }
-
-      return true;
     } catch (error) {
       logger.error("할일 추가 처리 오류:", error);
       this.clearUserState(userId);
-      await this.sendErrorMessage(
-        bot,
-        msg.chat.id,
-        "할일 추가 중 오류가 발생했습니다."
-      );
-      return true;
+
+      return {
+        type: "add_error",
+        module: "todo",
+        data: {
+          message: "할일 추가 중 오류가 발생했습니다.",
+          canRetry: true,
+        },
+      };
     }
   }
 
   // ===== 🛠️ 유틸리티 메서드들 =====
 
-  /**
-   * 성공 메시지 전송
-   */
-  async sendSuccessMessage(bot, chatId, message, callbackData = null) {
-    const keyboard = callbackData
-      ? {
-          inline_keyboard: [
-            [
-              { text: "📋 목록 보기", callback_data: callbackData },
-              { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-            ],
-          ],
-        }
-      : undefined;
-
-    await bot.sendMessage(chatId, message, {
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 에러 메시지 전송
-   */
-  async sendErrorMessage(bot, chatId, message) {
-    const keyboard = {
-      inline_keyboard: [
-        [
-          { text: "📋 할일 메뉴", callback_data: "todo:menu" },
-          { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-        ],
-      ],
-    };
-
-    await bot.sendMessage(chatId, `❌ ${message}`, {
-      reply_markup: keyboard,
-    });
-  }
+  // ===== ❌ UI 관련 메서드 완전 제거 =====
+  // 모든 메시지 전송과 키보드 생성은 렌더러가 담당!
+  // 모듈은 순수하게 데이터만 반환
 
   /**
    * 🧹 정리 작업 (표준 cleanup 패턴)
