@@ -118,41 +118,27 @@ class BaseRenderer {
   escapeMarkdownV2(text) {
     if (typeof text !== "string") text = String(text);
 
-    // 텔레그램 MarkdownV2에서 이스케이프해야 하는 모든 문자
-    const escapeChars = [
-      "_",
-      "*",
-      "[",
-      "]",
-      "(",
-      ")",
-      "~",
-      "`",
-      ">",
-      "#",
-      "+",
-      "-",
-      "=",
-      "|",
-      "{",
-      "}",
-      ".",
-      "!",
-    ];
-
-    let escaped = text;
-
-    // 각 문자를 개별적으로 이스케이프
-    escapeChars.forEach((char) => {
-      // 이미 이스케이프된 문자는 건드리지 않음
-      const regex = new RegExp(
-        `(?<!\\\\)\\${char.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}`,
-        "g"
-      );
-      escaped = escaped.replace(regex, `\\${char}`);
-    });
-
-    return escaped;
+    // ✅ 단순하고 안전한 이스케이프 (Node.js 호환)
+    return text
+      .replace(/\\/g, "\\\\") // 백슬래시 먼저
+      .replace(/_/g, "\\_") // 언더스코어
+      .replace(/\*/g, "\\*") // 별표
+      .replace(/\[/g, "\\[") // 대괄호 열기
+      .replace(/\]/g, "\\]") // 대괄호 닫기
+      .replace(/\(/g, "\\(") // 소괄호 열기
+      .replace(/\)/g, "\\)") // 소괄호 닫기
+      .replace(/~/g, "\\~") // 물결표
+      .replace(/`/g, "\\`") // 백틱
+      .replace(/>/g, "\\>") // 꺽쇠
+      .replace(/#/g, "\\#") // 해시
+      .replace(/\+/g, "\\+") // 플러스
+      .replace(/-/g, "\\-") // 마이너스
+      .replace(/=/g, "\\=") // 등호
+      .replace(/\|/g, "\\|") // 파이프
+      .replace(/\{/g, "\\{") // 중괄호 열기
+      .replace(/\}/g, "\\}") // 중괄호 닫기
+      .replace(/\./g, "\\.") // 점
+      .replace(/!/g, "\\!"); // 느낌표
   }
 
   /**
@@ -196,31 +182,82 @@ class BaseRenderer {
   }
 
   /**
+   * 🔄 MarkdownV2 → HTML 자동 변환
+   */
+  convertMarkdownToHtml(text) {
+    if (typeof text !== "string") text = String(text);
+
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") // **굵게** → <b>굵게</b>
+      .replace(/\*(.*?)\*/g, "<i>$1</i>") // *기울임* → <i>기울임</i>
+      .replace(/__(.*?)__/g, "<u>$1</u>") // __밑줄__ → <u>밑줄</u>
+      .replace(/~~(.*?)~~/g, "<s>$1</s>") // ~~취소선~~ → <s>취소선</s>
+      .replace(/`(.*?)`/g, "<code>$1</code>") // `코드` → <code>코드</code>
+      .replace(/```(.*?)```/gs, "<pre>$1</pre>") // ```블록``` → <pre>블록</pre>
+      .replace(/\\(.)/g, "$1"); // 이스케이프 제거
+  }
+
+  /**
+   * 🧹 모든 마크업 제거 (최종 폴백)
+   */
+  stripAllMarkup(text) {
+    if (typeof text !== "string") text = String(text);
+
+    return text
+      .replace(/\*\*(.*?)\*\*/g, "$1") // **굵게** → 굵게
+      .replace(/\*(.*?)\*/g, "$1") // *기울임* → 기울임
+      .replace(/__(.*?)__/g, "$1") // __밑줄__ → 밑줄
+      .replace(/~~(.*?)~~/g, "$1") // ~~취소선~~ → 취소선
+      .replace(/`(.*?)`/g, "$1") // `코드` → 코드
+      .replace(/```(.*?)```/gs, "$1") // ```블록``` → 블록
+      .replace(/\\(.)/g, "$1") // 이스케이프 제거
+      .replace(/\n\n+/g, "\n\n"); // 과도한 줄바꿈 정리
+  }
+
+  /**
    * 🛡️ 안전한 메시지 전송 (MarkdownV2 + 폴백 시스템)
    */
   async sendSafeMessage(ctx, text, options = {}) {
     this.stats.renderCount++;
-    this.stats.lastActivity = TimeHelper.getLogTimeString();
+    this.stats.lastActivity = new Date();
+
+    // ✅ 기본값을 HTML로 변경 (안전함)
+    const defaultOptions = {
+      parse_mode: "HTML", // ← 이것만 변경!
+      ...options,
+    };
 
     try {
-      // 첫 번째 시도: MarkdownV2
-      const escapedText = this.escapeMarkdownV2(text);
-
-      const messageOptions = {
-        parse_mode: this.config.defaultParseMode,
-        ...options,
-      };
+      // ✅ MarkdownV2 → HTML 자동 변환
+      const htmlText = this.convertMarkdownToHtml(text);
 
       if (ctx.callbackQuery) {
-        return await ctx.editMessageText(escapedText, messageOptions);
+        return await ctx.editMessageText(htmlText, defaultOptions);
       } else {
-        return await ctx.reply(escapedText, messageOptions);
+        return await ctx.reply(htmlText, defaultOptions);
       }
     } catch (error) {
-      logger.warn("🛡️ MarkdownV2 전송 실패, HTML로 폴백:", error.message);
-      this.stats.markdownErrors++;
+      logger.warn("🛡️ HTML 전송 실패, 일반 텍스트로 폴백:", error.message);
+      this.stats.fallbackUsed++;
 
-      return await this.sendFallbackMessage(ctx, text, options);
+      try {
+        const plainText = this.stripAllMarkup(text);
+
+        if (ctx.callbackQuery) {
+          return await ctx.editMessageText(plainText, {
+            ...options,
+            parse_mode: undefined,
+          });
+        } else {
+          return await ctx.reply(plainText, {
+            ...options,
+            parse_mode: undefined,
+          });
+        }
+      } catch (fallbackError) {
+        logger.error("🚨 폴백 전송도 실패:", fallbackError);
+        throw fallbackError;
+      }
     }
   }
 
@@ -259,13 +296,38 @@ class BaseRenderer {
   /**
    * 🔄 HTML 안전 변환
    */
-  convertToSafeHtml(text) {
+  convertToHtml(text) {
+    if (typeof text !== "string") text = String(text);
+
+    return (
+      text
+        // ✅ MarkdownV2 → HTML 변환
+        .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") // **굵게** → <b>굵게</b>
+        .replace(/\*(.*?)\*/g, "<i>$1</i>") // *기울임* → <i>기울임</i>
+        .replace(/__(.*?)__/g, "<u>$1</u>") // __밑줄__ → <u>밑줄</u>
+        .replace(/~~(.*?)~~/g, "<s>$1</s>") // ~~취소선~~ → <s>취소선</s>
+        .replace(/`(.*?)`/g, "<code>$1</code>") // `코드` → <code>코드</code>
+        .replace(/```(.*?)```/gs, "<pre>$1</pre>") // ```코드블록``` → <pre>코드블록</pre>
+        // 이스케이프된 문자들 복원
+        .replace(/\\(.)/g, "$1")
+    );
+  }
+
+  /**
+   * 🧹 마크업 제거 (폴백용)
+   */
+  stripMarkup(text) {
+    if (typeof text !== "string") text = String(text);
+
     return text
-      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") // **굵게** → <b>굵게</b>
-      .replace(/\*(.*?)\*/g, "<i>$1</i>") // *기울임* → <i>기울임</i>
-      .replace(/`(.*?)`/g, "<code>$1</code>") // `코드` → <code>코드</code>
-      .replace(/~~(.*?)~~/g, "<s>$1</s>") // ~~취소선~~ → <s>취소선</s>
-      .replace(/\\(.)/g, "$1"); // 이스케이프 문자 제거
+      .replace(/\*\*(.*?)\*\*/g, "$1") // **굵게** → 굵게
+      .replace(/\*(.*?)\*/g, "$1") // *기울임* → 기울임
+      .replace(/__(.*?)__/g, "$1") // __밑줄__ → 밑줄
+      .replace(/~~(.*?)~~/g, "$1") // ~~취소선~~ → 취소선
+      .replace(/`(.*?)`/g, "$1") // `코드` → 코드
+      .replace(/```(.*?)```/gs, "$1") // ```코드블록``` → 코드블록
+      .replace(/\\(.)/g, "$1") // 이스케이프 제거
+      .replace(/\n\n+/g, "\n\n"); // 과도한 줄바꿈 정리
   }
 
   /**
