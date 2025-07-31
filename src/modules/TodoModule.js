@@ -63,11 +63,11 @@ class TodoModule extends BaseModule {
    */
   async onInitialize() {
     try {
-      // ServiceBuilder에서 TodoService 가져오기
-      this.todoService = this.serviceBuilder.getServiceInstance("todo");
+      // ServiceBuilder에서 TodoService 가져오기 (없으면 생성)
+      this.todoService = await this.serviceBuilder.getOrCreate("todo");
 
       if (!this.todoService) {
-        throw new Error("TodoService를 찾을 수 없습니다");
+        throw new Error("TodoService 생성에 실패했습니다");
       }
 
       // 액션 등록 (표준 패턴)
@@ -807,8 +807,110 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * ❓ 도움말 표시 (표준 매개변수)
+   * ⏮️ 마지막 페이지로 (표준 매개변수)
    */
+  async goToLastPage(bot, callbackQuery, subAction, params, moduleManager) {
+    // 마지막 페이지 계산을 위해 전체 개수 필요
+    const userId = getUserId(callbackQuery.from);
+
+    try {
+      const result = await this.todoService.getTodos(userId, {
+        page: 1,
+        limit: 1,
+      });
+
+      if (result.success && result.data.totalPages > 0) {
+        return await this.showList(
+          bot,
+          callbackQuery,
+          subAction,
+          result.data.totalPages.toString(),
+          moduleManager
+        );
+      } else {
+        return await this.showList(
+          bot,
+          callbackQuery,
+          subAction,
+          "1",
+          moduleManager
+        );
+      }
+    } catch (error) {
+      logger.error("TodoModule.goToLastPage 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "마지막 페이지로 이동할 수 없습니다.",
+          action: "page:last",
+          canRetry: true,
+        },
+      };
+    }
+  }
+
+  /**
+   * ⚙️ 설정 표시 (표준 매개변수)
+   */
+  async showSettings(bot, callbackQuery, subAction, params, moduleManager) {
+    return {
+      type: "settings",
+      module: "todo",
+      data: {
+        config: this.config,
+        availableSettings: [
+          {
+            key: "maxTodosPerUser",
+            name: "최대 할일 개수",
+            value: this.config.maxTodosPerUser,
+          },
+          { key: "pageSize", name: "페이지 크기", value: this.config.pageSize },
+          {
+            key: "enablePriority",
+            name: "우선순위 기능",
+            value: this.config.enablePriority ? "활성화" : "비활성화",
+          },
+          {
+            key: "enableCategories",
+            name: "카테고리 기능",
+            value: this.config.enableCategories ? "활성화" : "비활성화",
+          },
+        ],
+      },
+    };
+  }
+
+  /**
+   * ⚙️ 우선순위 토글 (표준 매개변수)
+   */
+  async togglePriority(bot, callbackQuery, subAction, params, moduleManager) {
+    return {
+      type: "error",
+      module: "todo",
+      data: {
+        message: "우선순위 설정 변경 기능은 아직 구현되지 않았습니다.",
+        action: "settings:priority",
+        canRetry: false,
+      },
+    };
+  }
+
+  /**
+   * ⚙️ 카테고리 토글 (표준 매개변수)
+   */
+  async toggleCategories(bot, callbackQuery, subAction, params, moduleManager) {
+    return {
+      type: "error",
+      module: "todo",
+      data: {
+        message: "카테고리 설정 변경 기능은 아직 구현되지 않았습니다.",
+        action: "settings:categories",
+        canRetry: false,
+      },
+    };
+  }
+
   async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
     return {
       type: "help",
@@ -828,8 +930,10 @@ class TodoModule extends BaseModule {
     };
   }
 
-  // ===== 💬 메시지 처리 (표준 onHandleMessage 패턴) =====
-
+  /**
+   * ❓ 도움말 표시 (표준 매개변수)
+   */
+  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {}
   /**
    * 💬 메시지 처리 - 할일 추가/수정 입력 (표준 패턴)
    */
@@ -883,9 +987,7 @@ class TodoModule extends BaseModule {
     }
   }
 
-  /**
-   * 할일 추가 입력 처리
-   */
+  // ===== 💬 메시지 처리 (표준 onHandleMessage 패턴) =====
   async handleAddInput(bot, msg, text, userState) {
     const userId = getUserId(msg.from);
 
@@ -956,13 +1058,128 @@ class TodoModule extends BaseModule {
 
   // ===== 🛠️ 유틸리티 메서드들 =====
 
-  // ===== ❌ UI 관련 메서드 완전 제거 =====
-  // 모든 메시지 전송과 키보드 생성은 렌더러가 담당!
-  // 모듈은 순수하게 데이터만 반환
+  /**
+   * 할일 추가 입력 처리
+   */
+  async handleAddInput(bot, msg, text, userState) {
+    const userId = getUserId(msg.from);
+
+    try {
+      // 할일 추가
+      const result = await this.todoService.addTodo(userId, {
+        title: text,
+        createdAt: TimeHelper.getLogTimeString(),
+      });
+
+      // 사용자 상태 정리
+      this.clearUserState(userId);
+
+      if (result.success) {
+        // ✅ 순수 데이터만 반환 - 렌더러가 UI 담당
+        return {
+          type: "add_success",
+          module: "todo",
+          data: {
+            message: `"${text}" 할일이 추가되었습니다!`,
+            todo: result.data,
+            shouldShowList: true,
+          },
+        };
+      } else {
+        return {
+          type: "add_error",
+          module: "todo",
+          data: {
+            message: result.message || "할일 추가에 실패했습니다.",
+            canRetry: true,
+          },
+        };
+      }
+    } catch (error) {
+      logger.error("할일 추가 처리 오류:", error);
+      this.clearUserState(userId);
+
+      return {
+        type: "add_error",
+        module: "todo",
+        data: {
+          message: "할일 추가 중 오류가 발생했습니다.",
+          canRetry: true,
+        },
+      };
+    }
+  }
 
   /**
-   * 🧹 정리 작업 (표준 cleanup 패턴)
+   * ✏️ 할일 수정 입력 처리
    */
+  async handleEditInput(bot, msg, text, userState) {
+    const userId = getUserId(msg.from);
+    const { todoId } = userState;
+
+    try {
+      // 할일 수정 (구현 필요)
+      // const result = await this.todoService.updateTodo(userId, todoId, { title: text });
+
+      this.clearUserState(userId);
+
+      return {
+        type: "edit_error",
+        module: "todo",
+        data: {
+          message: "할일 수정 기능은 아직 구현되지 않았습니다.",
+        },
+      };
+    } catch (error) {
+      logger.error("할일 수정 처리 오류:", error);
+      this.clearUserState(userId);
+
+      return {
+        type: "edit_error",
+        module: "todo",
+        data: {
+          message: "할일 수정 중 오류가 발생했습니다.",
+        },
+      };
+    }
+  }
+
+  /**
+   * 🔍 검색 입력 처리
+   */
+  async handleSearchInput(bot, msg, text, userState) {
+    const userId = getUserId(msg.from);
+
+    try {
+      // 검색 기능 (구현 필요)
+      // const result = await this.todoService.searchTodos(userId, text);
+
+      this.clearUserState(userId);
+
+      return {
+        type: "search_error",
+        module: "todo",
+        data: {
+          message: "할일 검색 기능은 아직 구현되지 않았습니다.",
+        },
+      };
+    } catch (error) {
+      logger.error("할일 검색 처리 오류:", error);
+      this.clearUserState(userId);
+
+      return {
+        type: "search_error",
+        module: "todo",
+        data: {
+          message: "할일 검색 중 오류가 발생했습니다.",
+        },
+      };
+    }
+  }
+  // 모듈은 순수하게 데이터만 반환
+
+  // ===== ❌ UI 관련 메서드 완전 제거 =====
+  // 모든 메시지 전송과 키보드 생성은 렌더러가 담당!
   async cleanup() {
     try {
       // 부모 클래스의 정리 작업 실행

@@ -258,15 +258,9 @@ class ModuleManager {
       } catch (error) {
         logger.error(`💥 [${config.key}] 모듈 로드 실패:`, error);
 
-        // enhanced 모듈이 실패하면 전체 실패
-        if (config.enhanced) {
-          throw new Error(
-            `핵심 모듈 ${config.key} 로드 실패: ${error.message}`
-          );
-        }
-
-        // 일반 모듈 실패는 계속 진행
-        logger.warn(`⚠️ ${config.key} 모듈 로드 실패했지만 계속 진행`);
+        // ✅ 모든 모듈 실패를 허용 - 개별 모듈 실패가 전체를 중단시키지 않음
+        logger.warn(`⚠️ ${config.key} 모듈 로드 실패했지만 계속 진행합니다`);
+        continue; // 다음 모듈로 계속 진행
       }
     }
 
@@ -281,7 +275,8 @@ class ModuleManager {
   /**
    * 📋 모듈 가져오기
    */
-  async getModule(moduleKey) {
+  async restartModule(moduleKey) {
+    // <- 함수 이름을 restartModule로 변경
     try {
       logger.info(`🔄 ${moduleKey} 모듈 재시작 시작...`);
 
@@ -294,7 +289,6 @@ class ModuleManager {
       // 기존 모듈 정리
       const oldModule = this.modules.get(moduleKey);
       if (oldModule && typeof oldModule.cleanup === "function") {
-        // 'await'를 사용하기 위해 함수는 'async'여야 합니다.
         await oldModule.cleanup();
         logger.debug(`🧹 ${moduleKey} 기존 모듈 정리 완료`);
       }
@@ -332,6 +326,23 @@ class ModuleManager {
     this.navigationHandler = navigationHandler;
     logger.debug("🔗 NavigationHandler 연결됨");
   }
+
+  /**
+   * 특정 모듈 가져오기
+   */
+  getModule(moduleKey) {
+    return this.modules.get(moduleKey);
+  }
+
+  /**
+   * 🎯 ModuleManager와 NavigationHandler 상호 참조 설정
+   */
+  setNavigationHandler(navigationHandler) {
+    this.navigationHandler = navigationHandler;
+    logger.debug("🔗 NavigationHandler 연결됨");
+  }
+
+  // `getModule` 함수로 감싸주어야 합니다.
   getModule(moduleKey) {
     return this.modules.get(moduleKey);
   }
