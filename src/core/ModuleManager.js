@@ -1,5 +1,4 @@
-// src/core/ModuleManager.js - Mongoose 지원 버전
-const path = require("path");
+// src/core/ModuleManager.js - 매개변수 전달 수정 버전
 const logger = require("../utils/Logger");
 const { getEnabledModules } = require("../config/ModuleRegistry");
 
@@ -27,6 +26,57 @@ class ModuleManager {
     };
 
     logger.info("🎯 ModuleManager 생성됨 - 표준 매개변수 전달 지원");
+  }
+
+  /**
+   * 🎯 ModuleManager 초기화 (BotController 호환)
+   */
+  async initialize(bot, options = {}) {
+    try {
+      logger.info("🎯 ModuleManager 초기화 시작...");
+
+      // bot 인스턴스 설정
+      this.bot = bot;
+
+      // 데이터베이스 매니저들 설정
+      if (options.dbManager) {
+        this.dbManager = options.dbManager;
+      }
+
+      if (options.mongooseManager) {
+        this.mongooseManager = options.mongooseManager;
+      }
+
+      // ServiceBuilder 설정 (BotController에서는 전달 안함)
+      if (!this.serviceBuilder) {
+        const { createServiceBuilder } = require("./ServiceBuilder");
+        this.serviceBuilder = createServiceBuilder();
+        logger.debug("✅ ServiceBuilder 생성됨");
+      }
+
+      // ServiceBuilder에 데이터베이스 매니저들 설정
+      if (this.dbManager) {
+        this.serviceBuilder.setDatabaseManager(this.dbManager);
+        logger.debug("✅ DatabaseManager → ServiceBuilder 연결");
+      }
+
+      if (this.mongooseManager) {
+        this.serviceBuilder.setMongooseManager(this.mongooseManager);
+        logger.debug("✅ MongooseManager → ServiceBuilder 연결");
+      }
+
+      // ServiceBuilder 초기화
+      await this.serviceBuilder.initialize();
+      logger.debug("✅ ServiceBuilder 초기화 완료");
+
+      // 모듈들 로드
+      await this.loadModules(bot);
+
+      logger.success("✅ ModuleManager 초기화 완료");
+    } catch (error) {
+      logger.error("❌ ModuleManager 초기화 실패:", error);
+      throw error;
+    }
   }
 
   /**
@@ -229,9 +279,9 @@ class ModuleManager {
   }
 
   /**
-   * 🔄 모듈 재시작
+   * 📋 모듈 가져오기
    */
-  async restartModule(moduleKey) {
+  async getModule(moduleKey) {
     try {
       logger.info(`🔄 ${moduleKey} 모듈 재시작 시작...`);
 
@@ -244,6 +294,7 @@ class ModuleManager {
       // 기존 모듈 정리
       const oldModule = this.modules.get(moduleKey);
       if (oldModule && typeof oldModule.cleanup === "function") {
+        // 'await'를 사용하기 위해 함수는 'async'여야 합니다.
         await oldModule.cleanup();
         logger.debug(`🧹 ${moduleKey} 기존 모듈 정리 완료`);
       }
@@ -275,8 +326,12 @@ class ModuleManager {
   }
 
   /**
-   * 📋 모듈 가져오기
+   * 🎯 ModuleManager와 NavigationHandler 상호 참조 설정
    */
+  setNavigationHandler(navigationHandler) {
+    this.navigationHandler = navigationHandler;
+    logger.debug("🔗 NavigationHandler 연결됨");
+  }
   getModule(moduleKey) {
     return this.modules.get(moduleKey);
   }
