@@ -1,22 +1,13 @@
-// src/utils/TimeHelper.js - 완전 리팩토링 버전 (SRP 준수)
+// src/utils/TimeHelper.js - getKoreanDate 메서드 추가 버전
+
 const moment = require("moment-timezone");
 
 /**
  * 🕐 TimeHelper - 한국 시간 전용 유틸리티 (완전 Static 클래스)
  *
  * 🎯 한 가지 책임: 한국 시간대 기반 시간 처리
- *
- * ✅ 일관된 Static 메서드 구조:
- * - 모든 메서드가 static으로 통일
- * - instance 생성 없이 바로 사용 가능
- * - 메모리 효율적
- * - 전역적으로 일관된 동작
- *
- * 🔧 표준 매개변수:
- * - date: Date 객체 또는 moment 객체
- * - format: 문자열 형식 키 또는 moment 형식
- * - amount: 숫자 (더하기/빼기 양)
- * - unit: 시간 단위 ('minutes', 'hours', 'days' 등)
+ * ✅ 모든 메서드가 static으로 통일
+ * 🔧 표준 매개변수 구조
  */
 class TimeHelper {
   // 🌏 한국 시간대 상수
@@ -68,6 +59,22 @@ class TimeHelper {
 
     // 아니면 직접 moment 형식으로 사용
     return momentDate.format(formatKey);
+  }
+
+  /**
+   * 📅 현재 한국 날짜 (Date 객체) - ✅ 누락된 메서드 추가!
+   * @returns {Date} 현재 한국 시간의 Date 객체
+   */
+  static getKoreanDate() {
+    return this.now().toDate();
+  }
+
+  /**
+   * 📅 오늘의 한국 날짜 (YYYY-MM-DD 형식) - ✅ 편의 메서드
+   * @returns {string} 오늘 날짜 문자열
+   */
+  static getTodayDateString() {
+    return this.format(null, "date");
   }
 
   // ===== ➕ 시간 연산 메서드 =====
@@ -154,22 +161,47 @@ class TimeHelper {
     return today.isSame(checkDate);
   }
 
-  // ===== 📊 편의 메서드 =====
+  // ===== 🏢 업무 시간 관련 메서드 =====
 
   /**
-   * 🇰🇷 한국 시간 문자열 (호환성)
-   * @returns {string} 전체 형식 한국 시간
+   * 📅 업무일인지 확인 (월~금)
+   * @param {Date|moment|null} date - 확인할 날짜 (null이면 현재)
+   * @returns {boolean} 업무일이면 true
    */
-  static getKoreaTimeString() {
-    return this.format(null, "full");
+  static isWorkday(date = null) {
+    const checkDate = date ? moment.tz(date, this.TIMEZONE) : this.now();
+    const weekday = checkDate.day(); // 0=일요일, 6=토요일
+    return weekday >= 1 && weekday <= 5; // 월~금
   }
 
   /**
-   * 🔥 로그용 시간 문자열 - 핵심 메서드!
-   * @returns {string} 로그 형식 시간 (YYYY-MM-DD HH:mm:ss)
+   * 📅 다음 업무일 가져오기
+   * @param {Date|moment|null} date - 기준 날짜 (null이면 현재)
+   * @returns {moment} 다음 업무일
    */
-  static getLogTimeString() {
-    return this.format(null, "log");
+  static getNextWorkday(date = null) {
+    let checkDate = date ? moment.tz(date, this.TIMEZONE) : this.now();
+
+    do {
+      checkDate = checkDate.add(1, "day");
+    } while (!this.isWorkday(checkDate));
+
+    return checkDate;
+  }
+
+  // ===== 🔧 유틸리티 메서드 =====
+
+  /**
+   * 📊 두 시간 사이의 차이 계산
+   * @param {Date|moment} startTime - 시작 시간
+   * @param {Date|moment} endTime - 종료 시간
+   * @param {string} unit - 단위 ('minutes', 'hours', 'days' 등)
+   * @returns {number} 차이값
+   */
+  static diff(startTime, endTime, unit = "minutes") {
+    const start = moment.tz(startTime, this.TIMEZONE);
+    const end = moment.tz(endTime, this.TIMEZONE);
+    return end.diff(start, unit);
   }
 
   /**
@@ -212,96 +244,56 @@ class TimeHelper {
     return `${seconds}초`;
   }
 
-  // ===== 🏢 업무 시간 관련 메서드 =====
+  // ===== 🔄 호환성 메서드 (기존 코드 지원) =====
 
   /**
-   * 📅 업무일인지 확인 (월~금)
-   * @param {Date|moment|null} date - 확인할 날짜 (null이면 현재)
-   * @returns {boolean} 업무일이면 true
+   * 🇰🇷 한국 시간 문자열 (호환성)
+   * @returns {string} 전체 형식 한국 시간
    */
-  static isWorkday(date = null) {
-    const checkDate = date ? moment.tz(date, this.TIMEZONE) : this.now();
-    const dayOfWeek = checkDate.day();
-    return dayOfWeek >= 1 && dayOfWeek <= 5; // 월요일(1) ~ 금요일(5)
+  static getKoreaTimeString() {
+    return this.format(null, "full");
   }
 
   /**
-   * 📅 주말인지 확인
-   * @param {Date|moment|null} date - 확인할 날짜 (null이면 현재)
-   * @returns {boolean} 주말이면 true
+   * 🔥 로그용 시간 문자열 - 핵심 메서드!
+   * @returns {string} 로그 형식 시간 (YYYY-MM-DD HH:mm:ss)
    */
-  static isWeekend(date = null) {
-    return !this.isWorkday(date);
+  static getLogTimeString() {
+    return this.format(null, "log");
   }
 
   /**
-   * 📅 업무 시간대인지 확인
-   * @param {Date|moment|null} date - 확인할 날짜 (null이면 현재)
-   * @param {number} startHour - 업무 시작 시간 (기본: 9)
-   * @param {number} endHour - 업무 종료 시간 (기본: 18)
-   * @returns {boolean} 업무 시간대면 true
+   * 현재 시간을 다양한 형식으로 반환 (호환성)
+   * @param {string} format - 형식 키
+   * @returns {string} 포맷된 시간 문자열
    */
-  static isWorkTime(date = null, startHour = 9, endHour = 18) {
-    const checkDate = date ? moment.tz(date, this.TIMEZONE) : this.now();
-    const hour = checkDate.hour();
-
-    return this.isWorkday(checkDate) && hour >= startHour && hour < endHour;
-  }
-
-  // ===== 📅 날짜 계산 메서드 =====
-
-  /**
-   * 📅 오늘 시작 시간 (00:00:00)
-   * @returns {moment} 오늘 시작 moment 객체
-   */
-  static today() {
-    return this.now().startOf("day");
+  static getCurrentTime(format = "log") {
+    return this.format(null, format);
   }
 
   /**
-   * 📅 어제 시작 시간
-   * @returns {moment} 어제 시작 moment 객체
+   * 짧은 시간 문자열 (호환성)
+   * @returns {string} 짧은 형식 시간
    */
-  static yesterday() {
-    return this.now().subtract(1, "day").startOf("day");
+  static getShortTimeString() {
+    return this.format(null, "short");
   }
 
   /**
-   * 📅 내일 시작 시간
-   * @returns {moment} 내일 시작 moment 객체
+   * 타임스탬프 반환 (호환성)
+   * @returns {number} 현재 타임스탬프
    */
-  static tomorrow() {
-    return this.now().add(1, "day").startOf("day");
+  static getTimestamp() {
+    return this.now().valueOf();
   }
 
   /**
-   * 📅 다음 업무일 찾기
-   * @param {Date|moment|null} date - 기준 날짜 (null이면 현재)
-   * @returns {moment} 다음 업무일 moment 객체
+   * 상대 시간 표시 (호환성)
+   * @param {Date|moment} date - 기준 날짜
+   * @returns {string} 상대 시간 문자열 ("3분 전", "2시간 후" 등)
    */
-  static nextWorkday(date = null) {
-    let checkDate = date ? moment.tz(date, this.TIMEZONE) : this.now();
-
-    do {
-      checkDate = checkDate.add(1, "day");
-    } while (!this.isWorkday(checkDate));
-
-    return checkDate;
-  }
-
-  // ===== 🔧 유틸리티 메서드 =====
-
-  /**
-   * 📊 두 시간 사이의 차이 계산
-   * @param {Date|moment} startTime - 시작 시간
-   * @param {Date|moment} endTime - 종료 시간
-   * @param {string} unit - 단위 ('minutes', 'hours', 'days' 등)
-   * @returns {number} 차이값
-   */
-  static diff(startTime, endTime, unit = "minutes") {
-    const start = moment.tz(startTime, this.TIMEZONE);
-    const end = moment.tz(endTime, this.TIMEZONE);
-    return end.diff(start, unit);
+  static fromNow(date) {
+    return moment.tz(date, this.TIMEZONE).fromNow();
   }
 
   /**
@@ -351,44 +343,9 @@ class TimeHelper {
       formats: this.FORMATS,
       locale: moment.locale(),
       isStaticClass: true,
-      version: "2.0.0",
+      version: "2.1.0", // getKoreanDate 추가로 버전 업
+      newMethods: ["getKoreanDate", "getTodayDateString"],
     };
-  }
-
-  // ===== 🔄 호환성 메서드 (기존 코드 지원) =====
-
-  /**
-   * 현재 시간을 다양한 형식으로 반환 (호환성)
-   * @param {string} format - 형식 키
-   * @returns {string} 포맷된 시간 문자열
-   */
-  static getCurrentTime(format = "log") {
-    return this.format(null, format);
-  }
-
-  /**
-   * 짧은 시간 문자열 (호환성)
-   * @returns {string} 짧은 형식 시간
-   */
-  static getShortTimeString() {
-    return this.format(null, "short");
-  }
-
-  /**
-   * 타임스탬프 반환 (호환성)
-   * @returns {number} 현재 타임스탬프
-   */
-  static getTimestamp() {
-    return this.now().valueOf();
-  }
-
-  /**
-   * 상대 시간 표시 (호환성)
-   * @param {Date|moment} date - 기준 날짜
-   * @returns {string} 상대 시간 문자열 ("3분 전", "2시간 후" 등)
-   */
-  static fromNow(date) {
-    return moment.tz(date, this.TIMEZONE).fromNow();
   }
 }
 
