@@ -295,17 +295,23 @@ class BaseRenderer {
    * @returns {Object} 인라인 키보드 객체
    */
   createInlineKeyboard(buttons, moduleKey) {
-    const keyboard = buttons.map((row) => {
+    const keyboard = { inline_keyboard: [] };
+
+    buttons.forEach((row) => {
       if (Array.isArray(row)) {
         // 여러 버튼이 한 줄에 있는 경우
-        return row.map((button) => this.createButton(button, moduleKey));
+        const buttonRow = row.map((button) =>
+          this.createButton(button, moduleKey)
+        );
+        keyboard.inline_keyboard.push(buttonRow);
       } else {
         // 한 줄에 버튼 하나
-        return [this.createButton(row, moduleKey)];
+        const buttonRow = [this.createButton(row, moduleKey)];
+        keyboard.inline_keyboard.push(buttonRow);
       }
     });
 
-    return { inline_keyboard: keyboard };
+    return keyboard;
   }
 
   /**
@@ -323,8 +329,28 @@ class BaseRenderer {
       return { text, url };
     }
 
-    // 콜백 버튼인 경우
-    const callback_data = this.buildCallbackData(moduleKey, action, params);
+    // ✅ 수정: moduleKey를 올바르게 전달
+    let targetModuleKey = moduleKey;
+
+    // 특별한 경우들 처리
+    if (action === "menu" && text.includes("메인 메뉴")) {
+      targetModuleKey = "system"; // 메인 메뉴는 항상 system
+    }
+
+    const callback_data = this.buildCallbackData(
+      targetModuleKey,
+      action,
+      params
+    );
+
+    logger.debug(`🔘 버튼 생성:`, {
+      text,
+      action,
+      params,
+      원본모듈: moduleKey,
+      대상모듈: targetModuleKey,
+      콜백데이터: callback_data,
+    });
 
     return { text, callback_data };
   }

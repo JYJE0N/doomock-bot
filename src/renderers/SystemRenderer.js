@@ -1,257 +1,241 @@
-// src/renderers/SystemRenderer.js - logger 오류 수정 버전
 const BaseRenderer = require("./BaseRenderer");
-const logger = require("../utils/Logger"); // ✅ 이 줄 추가!
+const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const { getUserName } = require("../utils/UserHelper");
 
 /**
- * 🖥️ SystemRenderer - 시스템 정보 렌더링 (logger 수정)
+ * 🖥️ SystemRenderer - 시스템 정보 렌더링 (완전 구현)
  */
 class SystemRenderer extends BaseRenderer {
-  constructor() {
-    super("system");
+  constructor(bot, navigationHandler) {
+    super(bot, navigationHandler);
+    this.moduleName = "system";
+    logger.debug("🖥️ SystemRenderer 생성됨");
+  }
 
-    // 시스템 관련 이모지
-    this.emojis = {
-      system: "🖥️",
-      status: "📊",
-      health: "💚",
-      warning: "⚠️",
-      error: "❌",
-      info: "ℹ️",
-      menu: "📋",
-      help: "❓",
-      home: "🏠",
-      refresh: "🔄",
-    };
+  /**
+   * 🎯 메인 렌더링 메서드 (필수 구현)
+   */
+  async render(result, ctx) {
+    const { type, data } = result;
 
-    logger.debug("🖥️ SystemRenderer 생성됨"); // ✅ 이제 작동함
+    logger.debug(`🖥️ SystemRenderer.render: ${type}`, data);
+
+    switch (type) {
+      case "main_menu":
+      case "menu":
+        return await this.renderMainMenu(data, ctx);
+      case "help":
+        return await this.renderHelp(data, ctx);
+      case "status":
+        return await this.renderStatus(data, ctx);
+      case "about":
+        return await this.renderAbout(data, ctx);
+      case "error":
+        return await this.renderError(data, ctx);
+      default:
+        logger.warn(`🖥️ 지원하지 않는 렌더링 타입: ${type}`);
+        return await this.renderError(
+          { message: "지원하지 않는 기능입니다." },
+          ctx
+        );
+    }
   }
 
   /**
    * 🏠 메인 메뉴 렌더링
    */
-  async renderMenu(data, ctx) {
-    const { userName, systemInfo, moduleStats, timestamp } = data;
+  async renderMainMenu(data, ctx) {
+    const { userName, activeModules = [], systemStats = {} } = data;
 
-    let text = `🤖 **두목봇 v4.0.0**\n\n`;
+    let text = `🏠 **메인 메뉴**\n\n`;
     text += `안녕하세요, ${userName}님! 👋\n\n`;
 
-    // 시스템 상태 요약
-    text += `📊 **시스템 상태**\n`;
-    text += `• 가동시간: ${this.formatUptime(systemInfo?.uptime || 0)}\n`;
-    text += `• 활성 모듈: ${moduleStats?.activeModules || 0}개\n`;
-    text += `• 메모리 사용량: ${this.formatMemory(
-      systemInfo?.memory || 0
-    )}\n\n`;
-
-    text += `✨ **원하는 기능을 선택해주세요!**`;
-
-    // 메인 메뉴 버튼들
-    const buttons = [
-      [
-        { text: "📋 할일 관리", action: "module", params: "todo" },
-        { text: "🍅 타이머", action: "module", params: "timer" },
-      ],
-      [
-        { text: "🏢 근무시간", action: "module", params: "worktime" },
-        { text: "🏖️ 연차 관리", action: "module", params: "leave" },
-      ],
-      [
-        { text: "🌤️ 날씨", action: "module", params: "weather" },
-        { text: "🔮 운세", action: "module", params: "fortune" },
-      ],
-      [
-        { text: "🔊 음성변환", action: "module", params: "tts" },
-        { text: "📊 시스템 상태", action: "status" },
-      ],
-      [{ text: "❓ 도움말", action: "help" }],
-    ];
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-
-    await this.sendSafeMessage(ctx, text, {
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 📊 시스템 상태 렌더링
-   */
-  async renderStatus(data, ctx) {
-    const { systemInfo, moduleStats, services, timestamp } = data;
-
-    let text = `📊 **시스템 상태 보고서**\n\n`;
-
-    // 기본 시스템 정보
-    text += `🖥️ **시스템 정보**\n`;
-    text += `• 버전: 두목봇 v4.0.0\n`;
-    text += `• 환경: ${systemInfo?.environment || "development"}\n`;
-    text += `• 가동시간: ${this.formatUptime(systemInfo?.uptime || 0)}\n`;
-    text += `• 메모리: ${this.formatMemory(systemInfo?.memory || 0)}\n\n`;
-
-    // 모듈 상태
-    text += `📦 **모듈 상태**\n`;
-    text += `• 전체: ${moduleStats?.totalModules || 0}개\n`;
-    text += `• 활성화: ${moduleStats?.activeModules || 0}개\n`;
-    text += `• 비활성화: ${moduleStats?.inactiveModules || 0}개\n`;
-    text += `• 오류: ${moduleStats?.errorModules || 0}개\n\n`;
-
-    // 서비스 상태
-    if (services && Object.keys(services).length > 0) {
-      text += `⚙️ **서비스 상태**\n`;
-      Object.entries(services).forEach(([name, status]) => {
-        const statusIcon = status.isReady ? "✅" : "❌";
-        text += `• ${name}: ${statusIcon}\n`;
+    if (activeModules.length > 0) {
+      text += `🎯 **사용 가능한 기능 (${activeModules.length}개)**\n`;
+      activeModules.forEach((module) => {
+        text += `${module.emoji} ${module.name}\n`;
       });
       text += `\n`;
     }
 
-    text += `⏰ **마지막 업데이트**: ${
-      timestamp || TimeHelper.format(TimeHelper.now(), "full")
-    }`;
+    text += `📊 **시스템 정보**\n`;
+    text += `• ⏱️ 가동시간: ${systemStats.uptime || "정보 없음"}\n`;
+    text += `• 🔄 처리된 요청: ${systemStats.totalCallbacks || 0}회\n\n`;
+    text += `원하는 기능을 선택해주세요! ✨`;
 
-    const buttons = [
-      [
-        { text: "🔄 새로고침", action: "status" },
-        { text: "📈 상세 정보", action: "info" },
-      ],
-      [{ text: "🏠 메인 메뉴", action: "menu" }],
-    ];
+    // ✅ 실제 activeModules 데이터로 키보드 생성
+    const buttons = [];
+
+    // 모듈 버튼들 (2열씩)
+    for (let i = 0; i < activeModules.length; i += 2) {
+      const row = [];
+
+      const module1 = activeModules[i];
+      row.push({
+        text: `${module1.emoji} ${module1.name}`,
+        action: "menu",
+        params: "",
+      });
+
+      if (i + 1 < activeModules.length) {
+        const module2 = activeModules[i + 1];
+        row.push({
+          text: `${module2.emoji} ${module2.name}`,
+          action: "menu",
+          params: "",
+        });
+      }
+
+      buttons.push(row);
+    }
+
+    // 시스템 버튼들
+    buttons.push([
+      { text: "📊 시스템 상태", action: "status", params: "" },
+      { text: "❓ 도움말", action: "help", params: "" },
+    ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
-    await this.sendSafeMessage(ctx, text, {
-      reply_markup: keyboard,
-    });
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
   /**
    * ❓ 도움말 렌더링
    */
   async renderHelp(data, ctx) {
-    const { features, commands, tips } = data;
+    const { userName, commands = [], features = [] } = data;
 
-    let text = `❓ **두목봇 도움말**\n\n`;
+    let text = `❓ **도움말**\n\n`;
+    text += `안녕하세요, ${userName}님!\n\n`;
 
-    text += `🎯 **주요 기능**\n`;
-    if (features) {
-      Object.entries(features).forEach(([key, description]) => {
-        text += `• ${description}\n`;
+    if (commands.length > 0) {
+      text += `**⌨️ 사용 가능한 명령어**\n`;
+      commands.forEach((cmd) => {
+        text += `• ${cmd.command} - ${cmd.description}\n`;
       });
-    } else {
-      text += `• 📋 할일 관리\n`;
-      text += `• 🍅 뽀모도로 타이머\n`;
-      text += `• 🏢 근무시간 추적\n`;
-      text += `• 🌤️ 날씨 정보\n`;
-      text += `• 🔮 타로 운세\n`;
-      text += `• 🔊 텍스트 음성변환\n`;
+      text += `\n`;
     }
 
-    text += `\n💡 **사용법**\n`;
-    text += `• 버튼을 눌러 기능을 선택하세요\n`;
-    text += `• 자연어로 명령할 수도 있어요\n`;
-    text += `• 예: "할일", "날씨", "타이머 시작"\n\n`;
+    if (features.length > 0) {
+      text += `**🎯 주요 기능**\n`;
+      features.forEach((feature) => {
+        text += `• ${feature}\n`;
+      });
+      text += `\n`;
+    }
 
-    text += `🚀 **팁**\n`;
-    text += `• /start - 메인 메뉴로 이동\n`;
-    text += `• /help - 이 도움말 보기\n`;
-    text += `• /status - 시스템 상태 확인\n`;
+    text += `더 자세한 정보가 필요하시면 각 모듈의 도움말을 확인해주세요.`;
 
-    const buttons = [
-      [
-        { text: "🏠 메인 메뉴", action: "menu" },
-        { text: "📊 시스템 상태", action: "status" },
-      ],
-    ];
+    const buttons = [[{ text: "🏠 메인 메뉴", action: "menu", params: "" }]];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-
-    await this.sendSafeMessage(ctx, text, {
-      reply_markup: keyboard,
-    });
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
   /**
-   * ℹ️ 시스템 정보 렌더링
+   * 📊 시스템 상태 렌더링
    */
-  async renderInfo(data, ctx) {
-    const { systemInfo, performance, database } = data;
+  async renderStatus(data, ctx) {
+    const {
+      status = "unknown",
+      uptime = "정보 없음",
+      memory = {},
+      moduleCount = 0,
+      lastHealthCheck = null,
+    } = data;
 
-    let text = `ℹ️ **시스템 정보**\n\n`;
+    let text = `📊 **시스템 상태**\n\n`;
 
-    text += `🔧 **기술 스택**\n`;
-    text += `• Node.js ${process.version}\n`;
-    text += `• Telegraf (텔레그램 봇)\n`;
-    text += `• MongoDB + Mongoose\n`;
-    text += `• Railway (배포)\n\n`;
+    // 상태 표시
+    const statusIcon = status === "healthy" ? "💚" : "❌";
+    text += `${statusIcon} **전체 상태**: ${
+      status === "healthy" ? "정상" : "문제 있음"
+    }\n\n`;
 
-    text += `📊 **성능 지표**\n`;
-    text += `• CPU 사용률: ${performance?.cpu || "N/A"}%\n`;
-    text += `• 메모리 사용률: ${performance?.memory || "N/A"}%\n`;
-    text += `• 응답시간: ${performance?.responseTime || "N/A"}ms\n\n`;
+    // 시스템 정보
+    text += `🖥️ **시스템 정보**\n`;
+    text += `• 가동시간: ${uptime}\n`;
+    text += `• 메모리 사용량: ${memory.used || 0}MB / ${memory.total || 0}MB\n`;
+    text += `• 활성 모듈: ${moduleCount}개\n\n`;
 
-    text += `🗄️ **데이터베이스**\n`;
-    text += `• 연결 상태: ${
-      database?.connected ? "✅ 연결됨" : "❌ 연결 안됨"
-    }\n`;
-    text += `• 컬렉션 수: ${database?.collections || "N/A"}개\n`;
-    text += `• 총 문서 수: ${database?.documents || "N/A"}개\n`;
+    if (lastHealthCheck) {
+      text += `🔍 **마지막 체크**: ${TimeHelper.format(
+        new Date(lastHealthCheck),
+        "datetime"
+      )}\n\n`;
+    }
+
+    text += `시스템이 정상적으로 작동 중입니다! ✨`;
 
     const buttons = [
       [
-        { text: "🔄 새로고침", action: "info" },
-        { text: "📊 상태", action: "status" },
+        { text: "🔄 새로고침", action: "status", params: "" },
+        { text: "🏠 메인 메뉴", action: "menu", params: "" },
       ],
-      [{ text: "🏠 메인 메뉴", action: "menu" }],
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
 
-    await this.sendSafeMessage(ctx, text, {
-      reply_markup: keyboard,
-    });
+  /**
+   * ℹ️ 정보 렌더링
+   */
+  async renderAbout(data, ctx) {
+    let text = `ℹ️ **두목봇 정보**\n\n`;
+    text += `**🤖 두목봇 v4.0.0**\n`;
+    text += `통합 업무 관리 시스템\n\n`;
+    text += `**🎯 주요 특징**\n`;
+    text += `• 📝 할일 관리\n`;
+    text += `• ⏰ 타이머 기능\n`;
+    text += `• 🏢 근무시간 추적\n`;
+    text += `• 🏖️ 휴가 관리\n`;
+    text += `• 🌤️ 날씨 정보\n`;
+    text += `• 🔮 운세\n`;
+    text += `• 🔊 음성 변환\n\n`;
+    text += `효율적인 업무 관리를 도와드립니다! 💪`;
+
+    const buttons = [[{ text: "🏠 메인 메뉴", action: "menu", params: "" }]];
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
   /**
    * ❌ 에러 렌더링
    */
   async renderError(data, ctx) {
-    const { message } = data;
+    const { message = "알 수 없는 오류가 발생했습니다." } = data;
 
     let text = `❌ **시스템 오류**\n\n`;
-    text += `${message || "알 수 없는 오류가 발생했습니다"}\n\n`;
-    text += `🔧 **해결 방법**\n`;
-    text += `• 잠시 후 다시 시도해보세요\n`;
-    text += `• 문제가 지속되면 관리자에게 문의하세요\n`;
+    text += `${message}\n\n`;
+    text += `잠시 후 다시 시도해주세요.`;
 
     const buttons = [
       [
-        { text: "🔄 다시 시도", action: "menu" },
-        { text: "📊 시스템 상태", action: "status" },
+        { text: "🔄 재시도", action: "menu", params: "" },
+        { text: "🏠 메인 메뉴", action: "menu", params: "" },
       ],
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-
-    await this.sendSafeMessage(ctx, text, {
-      reply_markup: keyboard,
-    });
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
-  // ===== 🛠️ 유틸리티 메서드들 =====
-
   /**
-   * 가동시간 포맷팅
+   * ⏱️ 가동시간 포맷팅
    */
-  formatUptime(uptime) {
-    const seconds = Math.floor(uptime / 1000);
+  formatUptime(uptimeMs) {
+    if (!uptimeMs || uptimeMs <= 0) return "정보 없음";
+
+    const seconds = Math.floor(uptimeMs / 1000);
     const minutes = Math.floor(seconds / 60);
     const hours = Math.floor(minutes / 60);
     const days = Math.floor(hours / 24);
 
     if (days > 0) {
-      return `${days}일 ${hours % 24}시간`;
+      return `${days}일 ${hours % 24}시간 ${minutes % 60}분`;
     } else if (hours > 0) {
       return `${hours}시간 ${minutes % 60}분`;
     } else {
@@ -260,10 +244,12 @@ class SystemRenderer extends BaseRenderer {
   }
 
   /**
-   * 메모리 포맷팅
+   * 💾 메모리 포맷팅
    */
-  formatMemory(bytes) {
-    const mb = Math.round(bytes / 1024 / 1024);
+  formatMemory(memoryBytes) {
+    if (!memoryBytes || memoryBytes <= 0) return "정보 없음";
+
+    const mb = Math.round(memoryBytes / 1024 / 1024);
     return `${mb}MB`;
   }
 }

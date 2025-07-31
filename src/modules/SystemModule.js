@@ -108,6 +108,22 @@ class SystemModule extends BaseModule {
     logger.info(`✅ SystemModule 액션 등록 완료 (${this.actionMap.size}개)`);
   }
 
+  isModuleMessage(text, keywords) {
+    if (!text || typeof text !== "string") return false;
+    if (!keywords || !Array.isArray(keywords)) return false;
+
+    const lowerText = text.trim().toLowerCase();
+
+    return keywords.some((keyword) => {
+      const lowerKeyword = keyword.toLowerCase();
+      return (
+        lowerText === lowerKeyword ||
+        lowerText.startsWith(lowerKeyword + " ") ||
+        lowerText.includes(lowerKeyword)
+      );
+    });
+  }
+
   /**
    * 🔑 모듈 키워드 정의
    */
@@ -156,7 +172,7 @@ class SystemModule extends BaseModule {
     this.systemStats.totalMessages++;
     this.systemStats.lastActivity = Date.now();
 
-    // 시스템 키워드 확인
+    // ✅ 시스템 키워드 확인 (수정됨)
     const keywords = this.getModuleKeywords();
 
     if (this.isModuleMessage(text, keywords)) {
@@ -226,6 +242,18 @@ class SystemModule extends BaseModule {
         type: "error",
         message: "메뉴를 불러올 수 없습니다.",
       };
+    }
+  }
+
+  /**
+   * 👤 사용자 이름 가져오기 (안전함)
+   */
+  async getUserName(userId) {
+    try {
+      // UserHelper를 사용하거나 기본값 반환
+      return "사용자"; // 임시로 기본값 사용
+    } catch (error) {
+      return "사용자";
     }
   }
 
@@ -423,16 +451,107 @@ class SystemModule extends BaseModule {
   // ===== 🛠️ 헬퍼 메서드들 (순수 로직) =====
 
   /**
+   * 📊 시스템 통계 가져오기
+   */
+  getSystemStats() {
+    return {
+      uptime: this.getUptime(),
+      totalCallbacks: this.systemStats.totalCallbacks,
+      totalMessages: this.systemStats.totalMessages,
+      totalUsers: this.systemStats.totalUsers.size,
+      lastActivity: this.systemStats.lastActivity,
+    };
+  }
+
+  /**
    * 🏠 메인 메뉴 데이터 조회
    */
   async getMainMenuData(userId) {
-    return {
-      botInfo: this.getBotInfo(),
-      userStats: this.getUserStats(userId),
-      systemStatus: this.systemStatus,
-      availableModules: this.getAvailableModules(),
-      quickActions: this.getQuickActions(),
+    try {
+      return {
+        userName: await this.getUserName(userId),
+        activeModules: await this.getActiveModulesList(),
+        systemStats: this.getSystemStats(),
+        botInfo: {
+          name: this.config.botName,
+          version: this.config.botVersion,
+          uptime: this.getUptime(),
+        },
+      };
+    } catch (error) {
+      logger.error("메인 메뉴 데이터 생성 실패:", error);
+      return {
+        userName: "사용자",
+        activeModules: [],
+        systemStats: {},
+        botInfo: { name: "두목봇", version: "4.1.0", uptime: "0분" },
+      };
+    }
+  }
+
+  /**
+   * 📋 활성 모듈 목록 가져오기
+   */
+  async getActiveModulesList() {
+    try {
+      if (!this.moduleManager) {
+        return [];
+      }
+
+      const moduleList = this.moduleManager.getModuleList();
+      return moduleList
+        .map((moduleName) => {
+          const module = this.moduleManager.getModule(moduleName);
+          return {
+            key: moduleName.toLowerCase(),
+            name: this.getModuleDisplayName(moduleName),
+            emoji: this.getModuleEmoji(moduleName),
+            showInMenu: true,
+          };
+        })
+        .filter((module) => module.showInMenu);
+    } catch (error) {
+      logger.error("활성 모듈 목록 조회 실패:", error);
+      return [];
+    }
+  }
+
+  /**
+   * 📝 모듈 표시 이름 가져오기
+   */
+  getModuleDisplayName(moduleName) {
+    const nameMap = {
+      system: "시스템",
+      todo: "할일 관리",
+      timer: "타이머",
+      worktime: "근무시간",
+      leave: "휴가 관리",
+      fortune: "운세",
+      weather: "날씨",
+      tts: "음성 변환",
     };
+
+    const key = moduleName.toLowerCase().replace("module", "");
+    return nameMap[key] || moduleName;
+  }
+
+  /**
+   * 🎨 모듈 이모지 가져오기
+   */
+  getModuleEmoji(moduleName) {
+    const emojiMap = {
+      system: "🖥️",
+      todo: "📋",
+      timer: "⏰",
+      worktime: "🏢",
+      leave: "🏖️",
+      fortune: "🔮",
+      weather: "🌤️",
+      tts: "🔊",
+    };
+
+    const key = moduleName.toLowerCase().replace("module", "");
+    return emojiMap[key] || "📱";
   }
 
   /**
@@ -440,12 +559,18 @@ class SystemModule extends BaseModule {
    */
   async getHelpData(userId) {
     return {
-      botInfo: this.getBotInfo(),
-      features: this.getBotFeatures(),
-      commands: this.getAvailableCommands(),
-      modules: this.getAvailableModules(),
-      tips: this.getUsageTips(),
-      supportInfo: this.getSupportInfo(),
+      userName: await this.getUserName(userId),
+      commands: [
+        { command: "/start", description: "봇 시작 및 메인 메뉴" },
+        { command: "/help", description: "도움말 표시" },
+        { command: "/status", description: "시스템 상태 확인" },
+      ],
+      features: [
+        "📝 할일 관리 - 작업 등록, 수정, 완료 처리",
+        "⏰ 타이머 - 포모도로 타이머와 일반 타이머",
+        "🏢 근무시간 - 출퇴근 시간 관리",
+        "🏖️ 휴가 관리 - 연차, 병가 등 휴가 신청",
+      ],
     };
   }
 
@@ -456,18 +581,16 @@ class SystemModule extends BaseModule {
     const memoryUsage = process.memoryUsage();
 
     return {
+      status: this.systemStatus.isHealthy ? "healthy" : "unhealthy",
       uptime: this.getUptime(),
-      memoryUsage: {
+      memory: {
         used: Math.round(memoryUsage.heapUsed / 1024 / 1024),
         total: Math.round(memoryUsage.heapTotal / 1024 / 1024),
-        system: Math.round(os.totalmem() / 1024 / 1024 / 1024),
-        free: Math.round(os.freemem() / 1024 / 1024 / 1024),
       },
-      cpuUsage: os.loadavg()[0],
-      systemStats: this.systemStats,
-      isHealthy: this.systemStatus.isHealthy,
       lastHealthCheck: this.systemStatus.lastHealthCheck,
-      environment: process.env.NODE_ENV || "development",
+      moduleCount: this.moduleManager
+        ? this.moduleManager.getModuleList().length
+        : 0,
     };
   }
 
@@ -753,19 +876,17 @@ class SystemModule extends BaseModule {
    */
   getUptime() {
     const uptimeMs = Date.now() - this.systemStats.startTime;
-    const days = Math.floor(uptimeMs / (24 * 60 * 60 * 1000));
-    const hours = Math.floor(
-      (uptimeMs % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000)
-    );
-    const minutes = Math.floor((uptimeMs % (60 * 60 * 1000)) / (60 * 1000));
+    const minutes = Math.floor(uptimeMs / (1000 * 60));
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
 
-    return {
-      ms: uptimeMs,
-      formatted: `${days}일 ${hours}시간 ${minutes}분`,
-      days,
-      hours,
-      minutes,
-    };
+    if (days > 0) {
+      return `${days}일 ${hours % 24}시간`;
+    } else if (hours > 0) {
+      return `${hours}시간 ${minutes % 60}분`;
+    } else {
+      return `${minutes}분`;
+    }
   }
 
   /**
