@@ -12,8 +12,11 @@ const TimeHelper = require("../utils/TimeHelper");
  * - 일관된 시간 표시 형식
  */
 class WorktimeRenderer extends BaseRenderer {
-  constructor() {
-    super();
+  constructor(bot, navigationHandler, markdownHelper) {
+    super(bot, navigationHandler, markdownHelper);
+
+    // 렌더러 식별
+    this.moduleName = "worktime";
 
     // 상태별 이모지
     this.statusEmojis = {
@@ -22,6 +25,33 @@ class WorktimeRenderer extends BaseRenderer {
       absent: "❌",
       break: "⏸️",
     };
+
+    // 시간대별 이모지
+    this.timeEmojis = {
+      morning: "🌅",
+      noon: "☀️",
+      afternoon: "🌤️",
+      evening: "🌆",
+      night: "🌙",
+    };
+
+    logger.info(
+      "🏢 WorktimeRenderer 생성됨 - NavigationHandler를 통한 의존성 접근"
+    );
+  }
+
+  /**
+   * 🎯 ErrorHandler 접근 (NavigationHandler를 통해)
+   */
+  get errorHandler() {
+    return this.navigationHandler?.errorHandler;
+  }
+
+  /**
+   * 🎯 MarkdownHelper 접근 (NavigationHandler를 통해)
+   */
+  get markdownHelper() {
+    return this.navigationHandler?.markdownHelper || super.markdownHelper;
   }
 
   /**
@@ -33,6 +63,396 @@ class WorktimeRenderer extends BaseRenderer {
   safeTimeDisplay(timeData, format = "timeOnly") {
     // TimeHelper의 안전한 시간 표시 사용
     return TimeHelper.safeDisplayTime(timeData, format);
+  }
+
+  /**
+   * 🎯 표준 render 메서드 (핵심!)
+   * BaseRenderer의 추상 메서드를 구현
+   */
+  async render(result, ctx) {
+    try {
+      if (!result || typeof result !== "object") {
+        logger.error("WorktimeRenderer: 잘못된 결과 데이터", result);
+        return await this.renderError({ message: "잘못된 데이터입니다." }, ctx);
+      }
+
+      const { type, data } = result;
+
+      if (!type) {
+        logger.error("WorktimeRenderer: 결과 타입이 없습니다", result);
+        return await this.renderError(
+          { message: "결과 타입이 지정되지 않았습니다." },
+          ctx
+        );
+      }
+
+      logger.debug(`🏢 WorktimeRenderer 렌더링: ${type}`, {
+        hasData: !!data,
+        dataKeys: data ? Object.keys(data) : [],
+      });
+
+      // 타입별 렌더링 분기
+      switch (type) {
+        case "menu":
+          return await this.renderMenu(data || {}, ctx);
+        case "today":
+        case "status":
+          return await this.renderToday(data || {}, ctx);
+        case "checkin":
+        case "checkin_success":
+          return await this.renderCheckinSuccess(data || {}, ctx);
+        case "checkout":
+        case "checkout_success":
+          return await this.renderCheckoutSuccess(data || {}, ctx);
+        case "week":
+          return await this.renderWeek(data || {}, ctx);
+        case "month":
+          return await this.renderMonth(data || {}, ctx);
+        case "history":
+          return await this.renderHistory(data || {}, ctx);
+        case "stats":
+          return await this.renderStats(data || {}, ctx);
+        case "error":
+          return await this.renderError(data || {}, ctx);
+        default:
+          logger.warn(`🏢 WorktimeRenderer: 알 수 없는 타입 - ${type}`);
+          return await this.renderError(
+            { message: `지원하지 않는 기능입니다: ${type}` },
+            ctx
+          );
+      }
+    } catch (error) {
+      logger.error("💥 WorktimeRenderer.render 오류:", error);
+
+      // 🎯 ErrorHandler에게 위임
+      return await this.errorHandler.handleUnexpectedError(
+        ctx,
+        error,
+        "WorktimeRenderer.render"
+      );
+    }
+  }
+
+  /**
+   * 🏠 메인 메뉴 렌더링
+   */
+  async renderMenu(data, ctx) {
+    const { userName, todayStatus = {}, config = {} } = data;
+
+    let text = `🏢 **근무시간 관리**
+
+안녕하세요, ${userName || "사용자"}님! ${this.getTimeEmoji()}
+
+`;
+
+    // 오늘 상태 요약
+    if (todayStatus.hasRecord) {
+      const { isWorking, workSummary } = todayStatus;
+
+      if (isWorking) {
+        const progress = this.calculateWorkProgress(
+          workSummary?.workDuration || 0,
+          config.overtimeThreshold || 480
+        );
+        text += `${this.statusEmojis.working} **현재 근무 중**
+⏰ **근무시간**: ${workSummary?.displayTime || "0:00"}
+${this.createProgressBar(progress.percentage, progress.label)}
+
+`;
+      } else {
+        text += `✅ **오늘 근무 완료**
+⏰ **총 근무시간**: ${workSummary?.displayTime || "0:00"}
+${
+  workSummary?.isOvertime
+    ? "🔥 초과근무 " + this.formatDuration(workSummary.overtimeMinutes)
+    : "👍 정상근무"
+}
+
+`;
+      }
+    } else {
+      text += `📝 **오늘 근무 기록 없음**
+출근 버튼을 눌러 근무를 시작하세요!
+
+`;
+    }
+
+    // 이번 주 요약
+    text += `📊 **이번 주 근무**
+• 근무일수: ${todayStatus.weekSummary?.workDays || 0}일
+• 총 시간: ${todayStatus.weekSummary?.totalHours || 0}시간`;
+
+    // 메뉴 버튼
+    const buttons = [
+      [
+        {
+          text:
+            todayStatus.hasRecord && todayStatus.isWorking
+              ? "🏠 퇴근하기"
+              : "💼 출근하기",
+          callback_data: this.buildCallbackData(
+            "worktime",
+            todayStatus.hasRecord && todayStatus.isWorking
+              ? "checkout"
+              : "checkin"
+          ),
+        },
+        {
+          text: "📅 오늘 현황",
+          callback_data: this.buildCallbackData("worktime", "today"),
+        },
+      ],
+      [
+        {
+          text: "📈 주간 통계",
+          callback_data: this.buildCallbackData("worktime", "week"),
+        },
+        {
+          text: "📊 월간 통계",
+          callback_data: this.buildCallbackData("worktime", "month"),
+        },
+      ],
+      [
+        {
+          text: "📋 근무 이력",
+          callback_data: this.buildCallbackData("worktime", "history"),
+        },
+        {
+          text: "🔙 메인 메뉴",
+          callback_data: this.buildCallbackData("system", "menu"),
+        },
+      ],
+    ];
+
+    const keyboard = { inline_keyboard: buttons };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * ✅ 출근 성공 렌더링
+   */
+  async renderCheckinSuccess(data, ctx) {
+    const { record, checkInTime, message } = data;
+
+    const text = `✅ **출근 완료!**
+
+💼 출근시간: ${this.safeTimeDisplay(checkInTime)}
+📍 위치: 회사
+🎯 목표: 8시간 근무
+
+오늘도 좋은 하루 되세요! 💪`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "📅 오늘 현황",
+            callback_data: this.buildCallbackData("worktime", "today"),
+          },
+          {
+            text: "🔙 메뉴",
+            callback_data: this.buildCallbackData("worktime", "menu"),
+          },
+        ],
+      ],
+    };
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * ✅ 퇴근 성공 렌더링
+   */
+  async renderCheckoutSuccess(data, ctx) {
+    const { record, workSummary, message } = data;
+
+    const text = `🏠 **퇴근 완료!**
+
+⏰ 총 근무시간: ${workSummary?.displayTime || "0:00"}
+${workSummary?.isOvertime ? "🔥 초과근무" : "👍 정상근무"}
+
+수고하셨습니다! 푹 쉬세요 😊`;
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "📈 주간 통계",
+            callback_data: this.buildCallbackData("worktime", "week"),
+          },
+          {
+            text: "🔙 메뉴",
+            callback_data: this.buildCallbackData("worktime", "menu"),
+          },
+        ],
+      ],
+    };
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * 📊 월간 통계 렌더링
+   */
+  async renderMonth(data, ctx) {
+    const {
+      month,
+      year,
+      workDays = 0,
+      totalHours = 0,
+      overtimeHours = 0,
+      avgDailyHours = 0,
+      performance = {},
+      trends = {},
+    } = data;
+
+    let text = `📊 **월간 근무 통계**
+
+📅 **${year}년 ${month}월**
+📊 **근무일**: ${workDays}일
+⏰ **총 시간**: ${totalHours}시간`;
+
+    if (overtimeHours > 0) {
+      text += `
+🔥 **초과근무**: ${overtimeHours}시간`;
+    }
+
+    text += `
+📊 **일평균**: ${avgDailyHours}시간`;
+
+    if (performance.emoji && performance.txt) {
+      text += `
+
+${performance.emoji} **평가**: ${performance.txt}`;
+    }
+
+    if (trends.weeklyTrend) {
+      text += `
+
+📈 **트렌드**
+📊 **주간**: ${trends.weeklyTrend}`;
+
+      if (trends.monthlyTrend) {
+        text += `
+📈 **월간**: ${trends.monthlyTrend}`;
+      }
+
+      if (trends.recommendation) {
+        text += `
+💡 **추천**: ${trends.recommendation}`;
+      }
+    }
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "📈 주간 통계",
+            callback_data: this.buildCallbackData("worktime", "week"),
+          },
+          {
+            text: "📋 근무 이력",
+            callback_data: this.buildCallbackData("worktime", "history"),
+          },
+        ],
+        [
+          {
+            text: "🔄 새로고침",
+            callback_data: this.buildCallbackData("worktime", "month"),
+          },
+          {
+            text: "🔙 메뉴",
+            callback_data: this.buildCallbackData("worktime", "menu"),
+          },
+        ],
+      ],
+    };
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: keyboard,
+    });
+  }
+
+  /**
+   * 📊 통계 렌더링
+   */
+  async renderStats(data, ctx) {
+    const {
+      overall = {},
+      thisMonth = {},
+      lastMonth = {},
+      achievements = [],
+    } = data;
+
+    let text = `📊 **근무 통계**
+
+**전체 통계**
+• 총 근무일: ${overall.totalDays || 0}일
+• 총 근무시간: ${overall.totalHours || 0}시간
+• 평균 일일 근무: ${overall.avgDailyHours || 0}시간`;
+
+    if (thisMonth.workDays) {
+      text += `
+
+**이번 달**
+• 근무일: ${thisMonth.workDays}일
+• 총 시간: ${thisMonth.totalHours}시간
+• 초과근무: ${thisMonth.overtimeHours || 0}시간`;
+    }
+
+    if (lastMonth.workDays) {
+      text += `
+
+**지난 달**
+• 근무일: ${lastMonth.workDays}일
+• 총 시간: ${lastMonth.totalHours}시간
+• 초과근무: ${lastMonth.overtimeHours || 0}시간`;
+    }
+
+    if (achievements.length > 0) {
+      text += `
+
+🏆 **달성 기록**`;
+      achievements.forEach((achievement) => {
+        text += `
+${achievement.emoji} ${achievement.txt}`;
+      });
+    }
+
+    const keyboard = {
+      inline_keyboard: [
+        [
+          {
+            text: "📈 주간 통계",
+            callback_data: this.buildCallbackData("worktime", "week"),
+          },
+          {
+            text: "📊 월간 통계",
+            callback_data: this.buildCallbackData("worktime", "month"),
+          },
+        ],
+        [
+          {
+            text: "📋 근무 이력",
+            callback_data: this.buildCallbackData("worktime", "history"),
+          },
+          {
+            text: "🔙 메뉴",
+            callback_data: this.buildCallbackData("worktime", "menu"),
+          },
+        ],
+      ],
+    };
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: keyboard,
+    });
   }
 
   /**

@@ -66,7 +66,7 @@ class NavigationHandler {
   }
 
   /**
-   * 📱 렌더러 등록
+   * 📱 렌더러 등록 (의존성 위임 방식)
    */
   registerRenderers() {
     const renderers = [
@@ -74,7 +74,7 @@ class NavigationHandler {
         "fortune",
         new (require("../renderers/FortuneRenderer"))(
           this.bot,
-          this,
+          this, // NavigationHandler를 통해 ErrorHandler 접근
           this.markdownHelper
         ),
       ],
@@ -130,7 +130,7 @@ class NavigationHandler {
         "worktime",
         new (require("../renderers/WorktimeRenderer"))(
           this.bot,
-          this,
+          this, // ✅ NavigationHandler 전달 (ErrorHandler는 내부에서 접근)
           this.markdownHelper
         ),
       ],
@@ -138,10 +138,12 @@ class NavigationHandler {
 
     renderers.forEach(([name, renderer]) => {
       this.renderers.set(name, renderer);
-      logger.debug(`📱 ${name} 렌더러 등록됨`);
+      logger.debug(`📱 ${name} 렌더러 등록됨 (의존성 위임 방식)`);
     });
 
-    logger.info(`✅ ${this.renderers.size}개 렌더러 등록 완료`);
+    logger.info(
+      `✅ ${this.renderers.size}개 렌더러 등록 완료 - 깔끔한 의존성 구조`
+    );
   }
 
   setModuleManager(moduleManager) {

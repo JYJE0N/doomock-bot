@@ -1,4 +1,4 @@
-// src/renderers/BaseRenderer.js - 파서 규칙 통일 버전
+// src/renderers/BaseRenderer.js - 🎨 최종 리팩토링 버전
 
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
@@ -6,589 +6,163 @@ const TimeHelper = require("../utils/TimeHelper");
 /**
  * 🎨 BaseRenderer - 모든 렌더러의 표준 기반 클래스
  *
- * 🎯 핵심 개선사항:
- * - NavigationHandler와 동일한 파서 규칙 적용
- * - "모듈:액션:파라미터" 형태 표준화
- * - 모든 렌더러가 동일한 콜백 데이터 해석 방식 사용
- * - MarkdownV2 완벽 이스케이프 처리
- * - 표준 매개변수 체계 준수
- *
- * 🔧 비유: 음식점의 통일된 주문 시스템
- * - 모든 점원이 같은 방식으로 주문을 받고 해석
- * - 통일된 포맷으로 주방에 전달
- * - 일관된 서비스 품질 보장
+ * 🎯 핵심 원칙:
+ * - 의존성 위임: NavigationHandler를 통해 다른 헬퍼에 접근합니다.
+ * - 단일 책임 원칙: 각 메서드는 하나의 명확한 역할만 수행합니다.
+ * - 계층화된 폴백: 메시지 전송 실패 시 단계별로 안전하게 처리합니다.
+ * - 표준화된 콜백 처리: 모든 렌더러가 동일한 방식으로 콜백을 생성하고 해석합니다.
  */
 class BaseRenderer {
   constructor(bot, navigationHandler, markdownHelper) {
-    // 괄호를 한 쌍으로 수정
     this.bot = bot;
     this.navigationHandler = navigationHandler;
-    // 직접 생성하는 대신, 주입받은 객체 사용
-    this.markdownHelper = markdownHelper;
+    this.markdownHelper = markdownHelper; // MarkdownHelper 직접 주입
+    this.moduleName = "base"; // 자식 클래스에서 오버라이드 필요
 
-    // 📊 렌더링 통계
     this.stats = {
       renderCount: 0,
+      successCount: 0,
       errorCount: 0,
-      markdownErrors: 0,
       fallbackUsed: 0,
       lastActivity: null,
     };
 
-    // ⚙️ 렌더러 설정
     this.config = {
-      defaultParseMode: "MarkdownV2",
-      fallbackParseMode: "HTML",
-      maxRetries: 3,
       enableFallback: true,
     };
 
-    logger.debug(`🎨 BaseRenderer 생성됨`);
+    logger.debug(`🎨 ${this.constructor.name} 생성됨`);
   }
 
-  // ===== 🔧 콜백 데이터 파서 (NavigationHandler와 동일한 규칙) =====
+  // ===== 🔗 의존성 접근자 =====
 
   /**
-   * 🔧 콜백 데이터 파싱 (NavigationHandler와 100% 동일)
-   * "module:action:param1:param2" 형식을 일관되게 파싱합니다.
-   *
-   * 예시:
-   * - "leave:menu" → { moduleKey: "leave", subAction: "menu", params: "" }
-   * - "leave:use:full" → { moduleKey: "leave", subAction: "use", params: "full" }
-   * - "timer:start:30:workout" → { moduleKey: "timer", subAction: "start", params: "30:workout" }
-   *
-   * @param {string} data - 콜백 데이터
-   * @returns {Object} 파싱된 결과
+   * 🚨 ErrorHandler는 NavigationHandler를 통해 접근합니다.
    */
-  parseCallbackData(data) {
-    if (!data || typeof data !== "string") {
-      // ... (기존 에러 처리)
-      return { moduleKey: "system", subAction: "menu", params: "" };
-    }
-
-    const parts = data.split(":");
-
-    const parsed = {
-      moduleKey: parts[0] || "system", // 첫 번째: 모듈
-      subAction: parts[1] || "menu", // 두 번째: 액션
-      params: parts.slice(2).join(":") || "", // 세 번째 이후 모두: 파라미터
-    };
-
-    return parsed;
+  get errorHandler() {
+    return this.navigationHandler?.errorHandler;
   }
 
-  /**
-   * 🔧 콜백 데이터 생성 (파싱의 역과정)
-   * 표준 형식으로 콜백 데이터를 생성합니다.
-   *
-   * @param {string} moduleKey - 모듈명
-   * @param {string} subAction - 액션명
-   * @param {string|array} params - 파라미터들
-   * @returns {string} 생성된 콜백 데이터
-   */
-  buildCallbackData(moduleKey, subAction, params = "") {
-    let paramsStr = "";
-
-    if (Array.isArray(params)) {
-      paramsStr = params.join(":");
-    } else if (params) {
-      paramsStr = String(params);
-    }
-
-    const callbackData = paramsStr
-      ? `${moduleKey}:${subAction}:${paramsStr}`
-      : `${moduleKey}:${subAction}`;
-
-    logger.debug(`🔧 BaseRenderer 콜백 생성:`, {
-      입력: { moduleKey, subAction, params },
-      결과: callbackData,
-    });
-
-    return callbackData;
-  }
-
-  // ===== 🛡️ MarkdownV2 이스케이프 시스템 =====
+  // ===== 🎯 핵심 추상 메서드 =====
 
   /**
-   * 🛡️ 강화된 MarkdownV2 이스케이프 (완전한 해결책)
-   * 텔레그램 MarkdownV2 400 에러를 완전히 방지합니다.
-   */
-  escapeMarkdownV2(text) {
-    if (typeof text !== "string") text = String(text);
-
-    // ✅ 단순하고 안전한 이스케이프 (Node.js 호환)
-    return text
-      .replace(/\\/g, "\\\\") // 백슬래시 먼저
-      .replace(/_/g, "\\_") // 언더스코어
-      .replace(/\*/g, "\\*") // 별표
-      .replace(/\[/g, "\\[") // 대괄호 열기
-      .replace(/\]/g, "\\]") // 대괄호 닫기
-      .replace(/\(/g, "\\(") // 소괄호 열기
-      .replace(/\)/g, "\\)") // 소괄호 닫기
-      .replace(/~/g, "\\~") // 물결표
-      .replace(/`/g, "\\`") // 백틱
-      .replace(/>/g, "\\>") // 꺽쇠
-      .replace(/#/g, "\\#") // 해시
-      .replace(/\+/g, "\\+") // 플러스
-      .replace(/-/g, "\\-") // 마이너스
-      .replace(/=/g, "\\=") // 등호
-      .replace(/\|/g, "\\|") // 파이프
-      .replace(/\{/g, "\\{") // 중괄호 열기
-      .replace(/\}/g, "\\}") // 중괄호 닫기
-      .replace(/\./g, "\\.") // 점
-      .replace(/!/g, "\\!"); // 느낌표
-  }
-
-  /**
-   * 🔧 일반 마크다운 이스케이프 (폴백용)
-   */
-  escapeMarkdown(text) {
-    if (typeof text !== "string") text = String(text);
-
-    return text
-      .replace(/\*/g, "\\*")
-      .replace(/_/g, "\\_")
-      .replace(/\[/g, "\\[")
-      .replace(/\]/g, "\\]")
-      .replace(/\(/g, "\\(")
-      .replace(/\)/g, "\\)")
-      .replace(/~/g, "\\~")
-      .replace(/`/g, "\\`")
-      .replace(/>/g, "\\>")
-      .replace(/#/g, "\\#")
-      .replace(/\+/g, "\\+")
-      .replace(/-/g, "\\-")
-      .replace(/=/g, "\\=")
-      .replace(/\|/g, "\\|")
-      .replace(/\{/g, "\\{")
-      .replace(/\}/g, "\\}")
-      .replace(/\./g, "\\.")
-      .replace(/!/g, "\\!");
-  }
-
-  // ===== 🎨 표준 렌더링 메서드들 =====
-
-  /**
-   * 🎯 메인 렌더링 메서드 (자식 클래스에서 구현)
-   * 모든 렌더러가 이 패턴을 따라야 합니다.
-   *
-   * @param {Object} result - 모듈에서 전달받은 결과
-   * @param {Object} ctx - 텔레그램 컨텍스트
+   * 🎯 메인 렌더링 메서드 (자식 클래스에서 필수 구현)
    */
   async render(result, ctx) {
-    throw new Error("render() 메서드는 자식 클래스에서 구현해야 합니다");
+    throw new Error(
+      `render() 메서드는 ${this.constructor.name}에서 구현해야 합니다`
+    );
   }
 
+  // ===== 🔧 콜백 데이터 처리 =====
+
   /**
-   * 🔄 MarkdownV2 → HTML 자동 변환
+   * 🔧 콜백 데이터 생성
    */
-  convertMarkdownToHtml(text) {
-    if (typeof text !== "string") text = String(text);
-
-    return text
-      .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") // **굵게** → <b>굵게</b>
-      .replace(/\*(.*?)\*/g, "<i>$1</i>") // *기울임* → <i>기울임</i>
-      .replace(/__(.*?)__/g, "<u>$1</u>") // __밑줄__ → <u>밑줄</u>
-      .replace(/~~(.*?)~~/g, "<s>$1</s>") // ~~취소선~~ → <s>취소선</s>
-      .replace(/`(.*?)`/g, "<code>$1</code>") // `코드` → <code>코드</code>
-      .replace(/```(.*?)```/gs, "<pre>$1</pre>") // ```블록``` → <pre>블록</pre>
-      .replace(/\\(.)/g, "$1"); // 이스케이프 제거
+  buildCallbackData(moduleKey, subAction, params = "") {
+    const paramsStr = Array.isArray(params)
+      ? params.join(":")
+      : String(params || "");
+    return paramsStr
+      ? `${moduleKey}:${subAction}:${paramsStr}`
+      : `${moduleKey}:${subAction}`;
   }
 
-  /**
-   * 🧹 모든 마크업 제거 (최종 폴백)
-   */
-  stripAllMarkup(text) {
-    if (typeof text !== "string") text = String(text);
-
-    return text
-      .replace(/\*\*(.*?)\*\*/g, "$1") // **굵게** → 굵게
-      .replace(/\*(.*?)\*/g, "$1") // *기울임* → 기울임
-      .replace(/__(.*?)__/g, "$1") // __밑줄__ → 밑줄
-      .replace(/~~(.*?)~~/g, "$1") // ~~취소선~~ → 취소선
-      .replace(/`(.*?)`/g, "$1") // `코드` → 코드
-      .replace(/```(.*?)```/gs, "$1") // ```블록``` → 블록
-      .replace(/\\(.)/g, "$1") // 이스케이프 제거
-      .replace(/\n\n+/g, "\n\n"); // 과도한 줄바꿈 정리
-  }
+  // ===== 💬 메시지 전송 시스템 =====
 
   /**
-   * 🛡️ 안전한 메시지 전송 (에러 처리 개선 버전)
+   * 🛡️ 안전한 메시지 전송 (통합된 폴백 시스템)
    */
   async sendSafeMessage(ctx, text, options = {}) {
     this.stats.renderCount++;
     this.stats.lastActivity = new Date();
 
-    const defaultOptions = {
-      parse_mode: "HTML",
-      ...options,
-    };
-
     try {
-      const htmlText = this.markdownHelper.convertToHtml(text);
-
-      if (ctx.callbackQuery) {
-        await ctx.editMessageText(htmlText, defaultOptions);
-      } else {
-        await ctx.reply(htmlText, defaultOptions);
-      }
-      return true; // 성공적으로 메시지를 보냈거나 수정함
+      // 1단계: HTML 모드로 시도 (MarkdownHelper 사용)
+      const htmlText = this.markdownHelper.convertMarkdownToHtml(text);
+      await this.sendMessage(ctx, htmlText, { parse_mode: "HTML", ...options });
+      this.stats.successCount++;
+      return true;
     } catch (error) {
-      // 텔레그램의 "수정된 내용 없음" 오류는 정상적인 상황으로 간주하고 무시합니다.
-      if (error.message.includes("message is not modified")) {
-        logger.debug("🔄 메시지 내용이 동일하여 편집을 건너뜁니다.");
-        // 사용자에게는 로딩이 끝났음을 알려주는 것이 좋습니다.
+      // "message is not modified" 에러는 성공으로 간주하고 조용히 처리
+      if (error.message?.includes("message is not modified")) {
         if (ctx.callbackQuery) await ctx.answerCbQuery();
-        return true; // 오류가 아니므로 성공으로 처리
+        this.stats.successCount++; // 성공으로 카운트
+        return true;
       }
 
-      // 그 외의 다른 오류일 경우, 일반 텍스트로 폴백을 시도합니다.
-      logger.warn("🛡️ HTML 전송 실패, 일반 텍스트로 폴백:", error.message);
-      this.stats.fallbackUsed++;
+      logger.warn(`HTML 전송 실패, 폴백 시도: ${error.message}`);
+    }
 
+    // 2단계: 일반 텍스트로 폴백
+    if (this.config.enableFallback) {
       try {
-        const plainText = this.stripAllMarkup(text);
-        const fallbackOptions = { ...options, parse_mode: undefined };
-
-        if (ctx.callbackQuery) {
-          await ctx.editMessageText(plainText, fallbackOptions);
-        } else {
-          await ctx.reply(plainText, fallbackOptions);
-        }
+        const plainText = this.markdownHelper.stripAllMarkup(text);
+        await this.sendMessage(ctx, plainText, {
+          ...options,
+          parse_mode: undefined,
+        });
+        this.stats.fallbackUsed++;
         return true;
       } catch (fallbackError) {
-        // ✅ catch 블록에 변수를 올바르게 선언합니다.
-        logger.error("🚨 폴백 전송도 실패:", fallbackError);
-        return false; // 최종 실패
+        logger.error(`폴백 전송도 실패: ${fallbackError.message}`);
       }
     }
-  }
 
-  /**
-   * 🔄 폴백 메시지 전송 (HTML 모드)
-   */
-  async sendFallbackMessage(ctx, text, options = {}) {
-    try {
-      this.stats.fallbackUsed++;
-
-      // HTML 태그 제거 및 안전한 텍스트로 변환
-      const safeText = this.convertToSafeHtml(text);
-
-      const messageOptions = {
-        parse_mode: this.config.fallbackParseMode,
-        ...options,
-      };
-
-      if (ctx.callbackQuery) {
-        return await ctx.editMessageText(safeText, messageOptions);
-      } else {
-        return await ctx.reply(safeText, messageOptions);
-      }
-    } catch (fallbackError) {
-      logger.error("🚨 폴백 메시지 전송도 실패:", fallbackError);
-      this.stats.errorCount++;
-
-      // 최종 안전망: 일반 텍스트
-      return await this.sendPlainTextMessage(
+    // 3단계: 최종적으로 ErrorHandler에 위임
+    this.stats.errorCount++;
+    if (this.errorHandler) {
+      await this.errorHandler.handleMessageSendError(
         ctx,
-        "메시지 표시 중 오류가 발생했습니다."
+        "메시지 전송 최종 실패"
       );
     }
+    return false;
   }
 
   /**
-   * 🔄 HTML 안전 변환
+   * 📤 실제 메시지 전송 로직 (수정/전송 분기)
    */
-  convertToHtml(text) {
-    if (typeof text !== "string") text = String(text);
-
-    return (
-      text
-        // ✅ MarkdownV2 → HTML 변환
-        .replace(/\*\*(.*?)\*\*/g, "<b>$1</b>") // **굵게** → <b>굵게</b>
-        .replace(/\*(.*?)\*/g, "<i>$1</i>") // *기울임* → <i>기울임</i>
-        .replace(/__(.*?)__/g, "<u>$1</u>") // __밑줄__ → <u>밑줄</u>
-        .replace(/~~(.*?)~~/g, "<s>$1</s>") // ~~취소선~~ → <s>취소선</s>
-        .replace(/`(.*?)`/g, "<code>$1</code>") // `코드` → <code>코드</code>
-        .replace(/```(.*?)```/gs, "<pre>$1</pre>") // ```코드블록``` → <pre>코드블록</pre>
-        // 이스케이프된 문자들 복원
-        .replace(/\\(.)/g, "$1")
-    );
-  }
-
-  /**
-   * 🧹 마크업 제거 (폴백용)
-   */
-  stripMarkup(text) {
-    if (typeof text !== "string") text = String(text);
-
-    return text
-      .replace(/\*\*(.*?)\*\*/g, "$1") // **굵게** → 굵게
-      .replace(/\*(.*?)\*/g, "$1") // *기울임* → 기울임
-      .replace(/__(.*?)__/g, "$1") // __밑줄__ → 밑줄
-      .replace(/~~(.*?)~~/g, "$1") // ~~취소선~~ → 취소선
-      .replace(/`(.*?)`/g, "$1") // `코드` → 코드
-      .replace(/```(.*?)```/gs, "$1") // ```코드블록``` → 코드블록
-      .replace(/\\(.)/g, "$1") // 이스케이프 제거
-      .replace(/\n\n+/g, "\n\n"); // 과도한 줄바꿈 정리
-  }
-
-  /**
-   * 🔚 최종 안전망: 일반 텍스트 메시지
-   */
-  async sendPlainTextMessage(ctx, text) {
-    try {
-      if (ctx.callbackQuery) {
-        return await ctx.editMessageText(text);
-      } else {
-        return await ctx.reply(text);
-      }
-    } catch (error) {
-      logger.error("🚨 일반 텍스트 메시지마저 실패:", error);
-      // 이 시점에서는 더 이상 할 수 있는 것이 없음
+  async sendMessage(ctx, text, options) {
+    if (ctx.callbackQuery) {
+      await ctx.editMessageText(text, options);
+    } else {
+      await ctx.reply(text, options);
     }
   }
 
-  // ===== 🎹 표준 키보드 생성 메서드들 =====
+  // ===== 🎹 키보드 생성 시스템 =====
 
   /**
-   * 🎹 표준 인라인 키보드 생성
-   * 파서 규칙을 준수하는 콜백 데이터로 키보드를 만듭니다.
-   *
-   * @param {Array} buttons - 버튼 배열
-   * @param {string} moduleKey - 현재 모듈명
-   * @returns {Object} 인라인 키보드 객체
+   * 🎹 인라인 키보드 생성
    */
-  createInlineKeyboard(buttons, moduleKey) {
-    const keyboard = { inline_keyboard: [] };
-
-    buttons.forEach((row) => {
-      if (Array.isArray(row)) {
-        // 여러 버튼이 한 줄에 있는 경우
-        const buttonRow = row.map((button) =>
-          this.createButton(button, moduleKey)
-        );
-        keyboard.inline_keyboard.push(buttonRow);
-      } else {
-        // 한 줄에 버튼 하나
-        const buttonRow = [this.createButton(row, moduleKey)];
-        keyboard.inline_keyboard.push(buttonRow);
-      }
-    });
-
-    return keyboard;
+  createInlineKeyboard(buttons, moduleKey = this.moduleName) {
+    return {
+      inline_keyboard: buttons.map((row) =>
+        Array.isArray(row)
+          ? row.map((btn) => this.createButton(btn, moduleKey))
+          : [this.createButton(row, moduleKey)]
+      ),
+    };
   }
 
   /**
    * 🔘 개별 버튼 생성
-   *
-   * @param {Object} buttonConfig - 버튼 설정
-   * @param {string} moduleKey - 모듈명
-   * @returns {Object} 버튼 객체
    */
-  createButton(buttonConfig, moduleKey) {
-    const { text, action, params = "", url } = buttonConfig;
+  createButton(config, defaultModule) {
+    const { text, action, params, url, module } = config;
+    if (url) return { text, url };
 
-    // URL 버튼인 경우
-    if (url) {
-      return { text, url };
-    }
-
-    // ✅ 수정: moduleKey를 올바르게 전달
-    let targetModuleKey = moduleKey;
-
-    // 특별한 경우들 처리
+    let targetModule = module || defaultModule;
     if (action === "menu" && text.includes("메인 메뉴")) {
-      targetModuleKey = "system"; // 메인 메뉴는 항상 system
+      targetModule = "system";
     }
 
-    const callback_data = this.buildCallbackData(
-      targetModuleKey,
-      action,
-      params
-    );
-
-    logger.debug(`🔘 버튼 생성:`, {
-      text,
-      action,
-      params,
-      원본모듈: moduleKey,
-      대상모듈: targetModuleKey,
-      콜백데이터: callback_data,
-    });
-
+    const callback_data = this.buildCallbackData(targetModule, action, params);
     return { text, callback_data };
   }
 
-  /**
-   * 🏠 홈 버튼 생성 (표준)
-   */
-  createHomeButton() {
-    return {
-      text: "🏠 메인 메뉴",
-      callback_data: "system:menu",
-    };
-  }
-
-  /**
-   * ◀️ 뒤로가기 버튼 생성 (표준)
-   */
-  createBackButton(moduleKey) {
-    return {
-      text: "◀️ 뒤로가기",
-      callback_data: this.buildCallbackData(moduleKey, "menu"),
-    };
-  }
-
-  // ===== 📊 페이지네이션 헬퍼 =====
-
-  /**
-   * 📄 페이지네이션 키보드 생성
-   *
-   * @param {number} currentPage - 현재 페이지
-   * @param {number} totalPages - 전체 페이지
-   * @param {string} moduleKey - 모듈명
-   * @param {string} action - 페이지 액션명
-   * @returns {Array} 페이지네이션 버튼들
-   */
-  createPaginationButtons(currentPage, totalPages, moduleKey, action = "page") {
-    const buttons = [];
-
-    if (totalPages <= 1) return buttons;
-
-    const row = [];
-
-    // 이전 페이지
-    if (currentPage > 1) {
-      row.push({
-        text: "◀️",
-        callback_data: this.buildCallbackData(
-          moduleKey,
-          action,
-          currentPage - 1
-        ),
-      });
-    }
-
-    // 페이지 정보
-    row.push({
-      text: `${currentPage}/${totalPages}`,
-      callback_data: "noop", // 클릭해도 아무것도 안 함
-    });
-
-    // 다음 페이지
-    if (currentPage < totalPages) {
-      row.push({
-        text: "▶️",
-        callback_data: this.buildCallbackData(
-          moduleKey,
-          action,
-          currentPage + 1
-        ),
-      });
-    }
-
-    buttons.push(row);
-    return buttons;
-  }
-
-  // ===== 📊 통계 및 상태 관리 =====
-
-  /**
-   * 📊 렌더러 통계 조회
-   */
-  getStats() {
-    return {
-      ...this.stats,
-      성공률:
-        this.stats.renderCount > 0
-          ? (
-              ((this.stats.renderCount - this.stats.errorCount) /
-                this.stats.renderCount) *
-              100
-            ).toFixed(2) + "%"
-          : "0%",
-      마크다운오류율:
-        this.stats.renderCount > 0
-          ? (
-              (this.stats.markdownErrors / this.stats.renderCount) *
-              100
-            ).toFixed(2) + "%"
-          : "0%",
-    };
-  }
-
-  /**
-   * 📊 통계 리셋
-   */
-  resetStats() {
-    this.stats = {
-      renderCount: 0,
-      errorCount: 0,
-      markdownErrors: 0,
-      fallbackUsed: 0,
-      lastActivity: null,
-    };
-    logger.info(`🔄 ${this.constructor.name} 통계 리셋됨`);
-  }
-
-  // ===== 🧪 표준 에러 처리 =====
-
-  /**
-   * ❌ 표준 에러 메시지 렌더링
-   */
-  async renderError(message, ctx) {
-    const errorText = `❌ **오류**\n\n${this.escapeMarkdownV2(message)}`;
-
-    const keyboard = this.createInlineKeyboard(
-      [{ text: "🏠 메인 메뉴", action: "menu", params: "" }],
-      "system"
-    );
-
-    await this.sendSafeMessage(ctx, errorText, {
-      reply_markup: keyboard,
-    });
-  }
-
-  /**
-   * 💡 표준 정보 메시지 렌더링
-   */
-  async renderInfo(message, ctx, moduleKey = "system") {
-    const infoText = `💡 **안내**\n\n${this.escapeMarkdownV2(message)}`;
-
-    const keyboard = this.createInlineKeyboard(
-      [this.createBackButton(moduleKey)],
-      moduleKey
-    );
-
-    await this.sendSafeMessage(ctx, infoText, {
-      reply_markup: keyboard,
-    });
-  }
-
-  // ===== 🔧 디버깅 및 개발 도구 =====
-
-  /**
-   * 🔍 디버그 정보 출력
-   */
-  debug(message, data = null) {
-    logger.debug(`🎨 ${this.constructor.name}: ${message}`, data);
-  }
-
-  /**
-   * ⚠️ 경고 출력
-   */
-  warn(message, data = null) {
-    logger.warn(`🎨 ${this.constructor.name}: ${message}`, data);
-  }
-
-  /**
-   * ❌ 에러 출력
-   */
-  error(message, error = null) {
-    this.stats.errorCount++;
-    logger.error(`🎨 ${this.constructor.name}: ${message}`, error);
-  }
+  // ... (createHomeButton, createBackButton, createPaginationButtons 등 유틸성 키보드 메서드)
 }
 
 module.exports = BaseRenderer;
