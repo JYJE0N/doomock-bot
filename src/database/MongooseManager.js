@@ -100,14 +100,25 @@ class MongooseManager {
         Reminder: require("./models/Reminder"),
         UserSetting: require("./models/UserSetting"),
         TTSHistory: require("./models/TTSHistory"),
+        // 🔮 Fortune 모델 추가! (핵심 수정)
+        Fortune: require("./models/Fortune").FortuneUser, // FortuneUser를 Fortune으로 등록
       };
 
       for (const [name, model] of Object.entries(models)) {
+        // 모델이 존재하는지 확인
+        if (!model) {
+          logger.warn(`⚠️ 모델이 존재하지 않음: ${name}`);
+          continue;
+        }
+
         this.models.set(name, model);
         logger.debug(`📋 모델 등록됨: ${name}`);
       }
 
       logger.success(`✅ ${this.models.size}개 모델 등록 완료`);
+
+      // 등록된 모델 목록 확인용 로그 (중요!)
+      logger.debug("📋 등록된 모델 목록:", Array.from(this.models.keys()));
     } catch (error) {
       logger.error("❌ 모델 등록 실패:", error);
       throw error;
