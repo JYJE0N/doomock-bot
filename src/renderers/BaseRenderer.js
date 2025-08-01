@@ -19,9 +19,12 @@ const TimeHelper = require("../utils/TimeHelper");
  * - 일관된 서비스 품질 보장
  */
 class BaseRenderer {
-  constructor(bot, navigationHandler) {
+  constructor(bot, navigationHandler, markdownHelper) {
+    // 괄호를 한 쌍으로 수정
     this.bot = bot;
     this.navigationHandler = navigationHandler;
+    // 직접 생성하는 대신, 주입받은 객체 사용
+    this.markdownHelper = markdownHelper;
 
     // 📊 렌더링 통계
     this.stats = {
@@ -59,22 +62,17 @@ class BaseRenderer {
    */
   parseCallbackData(data) {
     if (!data || typeof data !== "string") {
-      logger.warn("⚠️ BaseRenderer: 잘못된 콜백 데이터:", data);
+      // ... (기존 에러 처리)
       return { moduleKey: "system", subAction: "menu", params: "" };
     }
 
     const parts = data.split(":");
 
     const parsed = {
-      moduleKey: parts[0] || "system", // 첫 번째 부분: 모듈명
-      subAction: parts[1] || "menu", // 두 번째 부분: 액션명
-      params: parts.length > 2 ? parts.slice(2).join(":") : "", // 나머지: 파라미터들
+      moduleKey: parts[0] || "system", // 첫 번째: 모듈
+      subAction: parts[1] || "menu", // 두 번째: 액션
+      params: parts.slice(2).join(":") || "", // 세 번째 이후 모두: 파라미터
     };
-
-    logger.debug(`🔧 BaseRenderer 콜백 파싱:`, {
-      원본: data,
-      결과: parsed,
-    });
 
     return parsed;
   }

@@ -9,6 +9,10 @@ const { createServiceBuilder } = require("../core/ServiceBuilder");
 const ModuleManager = require("../core/ModuleManager");
 const NavigationHandler = require("../handlers/NavigationHandler");
 
+// 🎯 관심사 분리 - 전문 컴포넌트 import
+const ErrorHandler = require("../handlers/ErrorHandler");
+const MarkdownHelper = require("../utils/MarkdownHelper");
+
 /**
  * 🤖 BotController - 텔레그램 봇 중앙 제어 시스템 (Mongoose 전용)
  *
@@ -26,6 +30,8 @@ class BotController {
     this.serviceBuilder = null;
     this.isInitialized = false;
     this.cleanupInProgress = false;
+    this.errorHandler = null;
+    this.markdownHelper = null;
 
     // 통계
     this.stats = {
@@ -113,6 +119,12 @@ class BotController {
     try {
       logger.info("🎮 핸들러 및 매니저 초기화 중...");
 
+      // 헬퍼 컴포넌트 중앙 생성
+      this.errorHandler = new ErrorHandler();
+      this.markdownHelper = new MarkdownHelper();
+      await this.errorHandler.initialize(this.bot);
+      await this.markdownHelper.initialize();
+
       // 1. ServiceBuilder 생성 (Mongoose 전용)
       this.serviceBuilder = createServiceBuilder(this.bot);
       this.serviceBuilder.setMongooseManager(this.mongooseManager);
@@ -156,7 +168,9 @@ class BotController {
       // 5. NavigationHandler 초기화
       this.navigationHandler = new NavigationHandler(
         this.bot,
-        this.moduleManager
+        this.moduleManager,
+        this.errorHandler, // 주입!
+        this.markdownHelper // 주입!
       );
       await this.navigationHandler.initialize();
       logger.success("✅ NavigationHandler 초기화 완료");

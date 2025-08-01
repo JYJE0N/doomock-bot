@@ -4,10 +4,6 @@ const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const { getEnabledModules } = require("../config/ModuleRegistry");
 
-// 🎯 관심사 분리 - 전문 컴포넌트 import
-const ErrorHandler = require("../handlers/ErrorHandler");
-const MarkdownHelper = require("../utils/MarkdownHelper");
-
 /**
  * 🎹 NavigationHandler - SoC 원칙 적용 버전
  *
@@ -22,14 +18,14 @@ const MarkdownHelper = require("../utils/MarkdownHelper");
  * - 약사(MarkdownHelper): 처방전 안전 관리
  */
 class NavigationHandler {
-  constructor() {
+  constructor(bot, moduleManager, errorHandler, markdownHelper) {
     this.bot = null;
     this.moduleManager = null;
     this.renderers = new Map();
 
-    // 🎯 전문 컴포넌트 초기화
-    this.errorHandler = new ErrorHandler();
-    this.markdownHelper = new MarkdownHelper();
+    // 직접 생성하는 대신, 주입받은 객체 사용
+    this.errorHandler = errorHandler;
+    this.markdownHelper = markdownHelper;
 
     // 📊 통계
     this.stats = {
@@ -76,20 +72,67 @@ class NavigationHandler {
     const renderers = [
       [
         "fortune",
-        new (require("../renderers/FortuneRenderer"))(this.bot, this),
+        new (require("../renderers/FortuneRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
       ],
-      ["todo", new (require("../renderers/TodoRenderer"))(this.bot, this)],
-      ["system", new (require("../renderers/SystemRenderer"))(this.bot, this)],
-      ["tts", new (require("../renderers/TTSRenderer"))(this.bot, this)],
+      [
+        "todo",
+        new (require("../renderers/TodoRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
+      ],
+      [
+        "system",
+        new (require("../renderers/SystemRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
+      ],
+      [
+        "tts",
+        new (require("../renderers/TTSRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
+      ],
       [
         "weather",
-        new (require("../renderers/WeatherRenderer"))(this.bot, this),
+        new (require("../renderers/WeatherRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
       ],
-      ["timer", new (require("../renderers/TimerRenderer"))(this.bot, this)],
-      ["leave", new (require("../renderers/LeaveRenderer"))(this.bot, this)],
+      [
+        "timer",
+        new (require("../renderers/TimerRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
+      ],
+      [
+        "leave",
+        new (require("../renderers/LeaveRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
+      ],
       [
         "worktime",
-        new (require("../renderers/WorktimeRenderer"))(this.bot, this),
+        new (require("../renderers/WorktimeRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        ),
       ],
     ];
 
@@ -177,50 +220,20 @@ class NavigationHandler {
    * 🔧 표준 콜백 데이터 파서 (핵심!)
    */
   parseCallbackData(data) {
-    try {
-      // 1. 입력 검증
-      if (!data || typeof data !== "string") {
-        logger.warn(
-          "⚠️ NavigationHandler: 잘못된 콜백 데이터 타입:",
-          typeof data,
-          data
-        );
-        this.stats.parseErrors++;
-        return this.getFallbackParsed();
-      }
-
-      // 2. 빈 문자열 체크
-      if (data.trim() === "") {
-        logger.warn("⚠️ NavigationHandler: 빈 콜백 데이터");
-        this.stats.parseErrors++;
-        return this.getFallbackParsed();
-      }
-
-      // 3. 표준 파싱 실행
-      const parts = data.split(this.parserConfig.separator);
-
-      const parsed = {
-        moduleKey: parts[0] || this.parserConfig.fallbackModule,
-        subAction: parts[1] || this.parserConfig.fallbackAction,
-        params:
-          parts.length > 2
-            ? parts.slice(2).join(this.parserConfig.separator)
-            : "",
-      };
-
-      // 4. 파싱 결과 검증
-      if (!parsed.moduleKey || !parsed.subAction) {
-        logger.warn("⚠️ NavigationHandler: 필수 요소 누락:", parsed);
-        this.stats.parseErrors++;
-        return this.getFallbackParsed();
-      }
-
-      return parsed;
-    } catch (error) {
-      logger.error("💥 NavigationHandler 파싱 오류:", error, { data });
-      this.stats.parseErrors++;
-      return this.getFallbackParsed();
+    if (!data || typeof data !== "string") {
+      // ... (기존 에러 처리)
+      return { moduleKey: "system", subAction: "menu", params: "" };
     }
+
+    const parts = data.split(":");
+
+    const parsed = {
+      moduleKey: parts[0] || "system", // 첫 번째: 모듈
+      subAction: parts[1] || "menu", // 두 번째: 액션
+      params: parts.slice(2).join(":") || "", // 세 번째 이후 모두: 파라미터
+    };
+
+    return parsed;
   }
 
   /**
