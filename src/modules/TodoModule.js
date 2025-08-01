@@ -928,6 +928,9 @@ class TodoModule extends BaseModule {
     };
   }
 
+  /**
+   * ❓ 도움말 표시 (표준 매개변수) - 올바른 버전 하나만 남깁니다.
+   */
   async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
     return {
       type: "help",
@@ -947,10 +950,6 @@ class TodoModule extends BaseModule {
     };
   }
 
-  /**
-   * ❓ 도움말 표시 (표준 매개변수)
-   */
-  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {}
   /**
    * 💬 메시지 처리 - 할일 추가/수정 입력 (표준 패턴)
    */

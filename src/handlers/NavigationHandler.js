@@ -284,14 +284,15 @@ class NavigationHandler {
         params
       );
 
-      if (!result) {
+      // 👇 이 부분을 수정합니다.
+      // result가 없거나, result.success가 false인 경우 ErrorHandler에 위임합니다.
+      if (!result || result.success === false) {
         logger.warn(`💫 모듈 처리 실패: ${moduleKey}.${subAction}`);
-        // 🎯 ErrorHandler 위임
         return await this.errorHandler.handleModuleProcessingError(
           ctx,
           moduleKey,
           subAction,
-          "모듈 처리 실패"
+          result?.message || "모듈 처리 중 오류가 발생했습니다."
         );
       }
 
