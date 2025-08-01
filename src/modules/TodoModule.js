@@ -86,18 +86,18 @@ class TodoModule extends BaseModule {
    * 🎯 액션 등록 (표준 setupActions 패턴)
    */
   setupActions() {
-    // registerActions 메서드 사용 (표준)
-    tthis.registerActions({
-      // ... (기존 list, add 등)
-      delete: this.confirmDelete,
-      executeDelete: this.executeDelete,
+    // ✅ 수정: menu 액션 추가!
+    this.registerActions({
+      // ✅ 기본 액션 (menu 추가!)
+      menu: this.showMenu,
+      help: this.showHelp,
 
       // CRUD 작업
       list: this.showList,
       add: this.startAdd,
       edit: this.startEdit,
       delete: this.confirmDelete,
-      "delete:confirm": this.executeDelete,
+      executeDelete: this.executeDelete, // ✅ 수정: "delete:confirm" → "executeDelete"
 
       // 상태 변경
       toggle: this.toggleTodo,
@@ -105,28 +105,22 @@ class TodoModule extends BaseModule {
       uncomplete: this.uncompleteTodo,
       archive: this.archiveTodo,
 
-      // 검색 및 필터링
+      // 조회 및 필터링
       search: this.startSearch,
-      filter: this.showFilter,
-      "filter:status": this.filterByStatus,
-      "filter:priority": this.filterByPriority,
-      "filter:clear": this.clearFilter,
-
-      // 페이지네이션
-      page: this.changePage,
-      "page:first": this.goToFirstPage,
-      "page:last": this.goToLastPage,
-
-      // 통계
-      stats: this.showStats,
+      filter: this.filterTodos,
+      "filter:completed": this.filterCompleted,
+      "filter:pending": this.filterPending,
 
       // 설정
       settings: this.showSettings,
       "settings:priority": this.togglePriority,
       "settings:categories": this.toggleCategories,
+
+      // 통계
+      stats: this.showStats,
     });
 
-    logger.info(`📋 TodoModule: ${this.actionMap.size}개 액션 등록 완료`);
+    logger.info(`📋 TodoModule 액션 등록 완료 (${this.actionMap.size}개)`);
   }
 
   // ===== 🎯 표준 매개변수를 사용하는 액션 메서드들 =====

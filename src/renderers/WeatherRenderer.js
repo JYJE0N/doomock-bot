@@ -1,21 +1,16 @@
-// src/renderers/WeatherRenderer.js - 🌤️ 날씨 렌더러 (이쁜 UI)
+// src/renderers/WeatherRenderer.js - render 메서드 구현
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🌤️ WeatherRenderer - 날씨 정보 렌더링
- *
- * ✅ 특징:
- * - 아름다운 날씨 카드 UI
- * - 이모지와 아이콘으로 직관적 표현
- * - 8개 도시 버튼 그리드
- * - 미세먼지 정보 포함
- * - 실시간 업데이트 시간 표시
+ * 🌤️ WeatherRenderer - 날씨 정보 렌더링 (표준 render 메서드 구현)
  */
 class WeatherRenderer extends BaseRenderer {
-  constructor() {
-    super("weather");
+  constructor(bot, navigationHandler) {
+    super(bot, navigationHandler);
+
+    this.moduleName = "weather";
 
     // 날씨 이모지 매핑
     this.weatherEmojis = {
@@ -39,7 +34,7 @@ class WeatherRenderer extends BaseRenderer {
       매우나쁨: "🔴",
     };
 
-    // 도시별 이모지 (모듈과 동일)
+    // 도시별 이모지
     this.cityEmojis = {
       서울: "🏛️",
       수원: "🏰",
@@ -52,6 +47,50 @@ class WeatherRenderer extends BaseRenderer {
     };
 
     logger.info("🌤️ WeatherRenderer 생성됨");
+  }
+
+  /**
+   * 🎯 표준 render 메서드 (필수 구현!)
+   */
+  async render(result, ctx) {
+    try {
+      if (!result || typeof result !== "object") {
+        logger.error("WeatherRenderer: 잘못된 결과 데이터", result);
+        return await this.renderError({ message: "잘못된 데이터입니다." }, ctx);
+      }
+
+      const { type, data } = result;
+
+      logger.debug(`🌤️ WeatherRenderer.render: ${type}`, data);
+
+      switch (type) {
+        case "menu":
+          return await this.renderMenu(data, ctx);
+        case "current":
+        case "weather":
+          return await this.renderWeather(data, ctx);
+        case "cities":
+          return await this.renderCities(data, ctx);
+        case "forecast":
+          return await this.renderForecast(data, ctx);
+        case "settings":
+          return await this.renderSettings(data, ctx);
+        case "error":
+          return await this.renderError(data, ctx);
+        default:
+          logger.warn(`🌤️ 지원하지 않는 렌더링 타입: ${type}`);
+          return await this.renderError(
+            { message: "지원하지 않는 기능입니다." },
+            ctx
+          );
+      }
+    } catch (error) {
+      logger.error("WeatherRenderer.render 오류:", error);
+      return await this.renderError(
+        { message: "렌더링 중 오류가 발생했습니다." },
+        ctx
+      );
+    }
   }
 
   /**
@@ -84,13 +123,10 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
               { text: "⚙️ 설정", action: "settings" },
             ]
           : [{ text: "⚙️ 설정", action: "settings" }],
-        // 세 번째 행: 도움말 + 메인메뉴
-        [
-          { text: "❓ 도움말", action: "help" },
-          { text: "🔙 메인메뉴", action: "menu" },
-        ],
-      ].filter((row) => row.length > 0),
-      this.moduleName
+        // 세 번째 행: 메인 메뉴
+        [{ text: "🔙 메인 메뉴", action: "menu" }],
+      ],
+      "system" // 메인 메뉴는 system으로
     );
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -100,38 +136,35 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
    * 🏙️ 도시 목록 렌더링
    */
   async renderCities(data, ctx) {
-    const { cities } = data;
+    const { cities, defaultCity } = data;
 
-    const text = `🏙️ **도시 선택**
+    let text = `🏙️ **도시 선택**\n\n현재 기본 도시: **${defaultCity}** ${
+      this.cityEmojis[defaultCity] || "🏙️"
+    }\n\n날씨를 확인할 도시를 선택해주세요:`;
 
-원하는 도시를 선택하세요:`;
-
-    // 4x2 그리드로 도시 버튼 배치
+    // 도시 버튼을 2x4 그리드로 배치
     const cityButtons = [];
     for (let i = 0; i < cities.length; i += 2) {
       const row = [];
-
-      // 첫 번째 도시
-      const city1 = cities[i];
-      row.push({
-        text: `${city1.emoji} ${city1.name}`,
-        action: `city:${city1.id}`,
-      });
-
-      // 두 번째 도시 (있으면)
-      if (i + 1 < cities.length) {
-        const city2 = cities[i + 1];
+      if (cities[i]) {
         row.push({
-          text: `${city2.emoji} ${city2.name}`,
-          action: `city:${city2.id}`,
+          text: `${this.cityEmojis[cities[i].name] || "🏙️"} ${cities[i].name}`,
+          action: `city:${cities[i].id}`,
         });
       }
-
+      if (cities[i + 1]) {
+        row.push({
+          text: `${this.cityEmojis[cities[i + 1].name] || "🏙️"} ${
+            cities[i + 1].name
+          }`,
+          action: `city:${cities[i + 1].id}`,
+        });
+      }
       cityButtons.push(row);
     }
 
-    // 하단 네비게이션
-    cityButtons.push([{ text: "🔙 뒤로", action: "menu" }]);
+    // 하단 버튼들
+    cityButtons.push([{ text: "🔙 날씨 메뉴", action: "menu" }]);
 
     const keyboard = this.createInlineKeyboard(cityButtons, this.moduleName);
 
@@ -139,7 +172,7 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
   }
 
   /**
-   * 🌡️ 날씨 정보 렌더링 (핵심!)
+   * 🌡️ 날씨 정보 렌더링
    */
   async renderWeather(data, ctx) {
     const { city, weather, dust, timestamp, hasError, errorMessage } = data;
@@ -149,9 +182,9 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
     }
 
     // 메인 날씨 카드
-    let text = `${city.emoji} **${city.name} 날씨** ${
-      this.weatherEmojis[weather.description] || "🌤️"
-    }
+    let text = `${city.emoji || this.cityEmojis[city.name] || "🏙️"} **${
+      city.name
+    } 날씨** ${this.weatherEmojis[weather.description] || "🌤️"}
 
 🌡️ **온도**: ${weather.temperature}°C (체감 ${weather.feelsLike}°C)
 📝 **날씨**: ${weather.description}
@@ -208,26 +241,32 @@ ${this.dustEmojis[dust.grade] || "🟡"} **등급**: ${dust.grade}
   async renderForecast(data, ctx) {
     const { city, forecast, timestamp } = data;
 
-    let text = `📊 **${city.name} 날씨 예보** ${city.emoji}
+    let text = `📊 **${city.name} 날씨 예보** ${
+      city.emoji || this.cityEmojis[city.name] || "🏙️"
+    }
 
 `;
 
     // 5일 예보 표시
-    forecast.forecasts.forEach((day, index) => {
-      const dayEmoji = index === 0 ? "📅" : "📆";
-      const weatherEmoji = this.weatherEmojis[day.description] || "🌤️";
+    if (forecast && forecast.forecasts) {
+      forecast.forecasts.forEach((day, index) => {
+        const dayEmoji = index === 0 ? "📅" : "📆";
+        const weatherEmoji = this.weatherEmojis[day.description] || "🌤️";
 
-      text += `${dayEmoji} **${day.dayOfWeek}** (${day.date})
+        text += `${dayEmoji} **${day.dayOfWeek}** (${day.date})
 ${weatherEmoji} ${day.description}
 🌡️ ${day.temperature.min}°C ~ ${day.temperature.max}°C
 💧 ${day.humidity}% | ☔ ${day.rainProbability}%
 
 `;
-    });
+      });
+    } else {
+      text += "예보 데이터를 불러올 수 없습니다.";
+    }
 
     text += `⏰ **업데이트**: ${timestamp}`;
 
-    if (forecast.isOffline) {
+    if (forecast && forecast.isOffline) {
       text += `\n⚠️ **오프라인 모드** (기본 예보)`;
     }
 
@@ -246,169 +285,17 @@ ${weatherEmoji} ${day.description}
   }
 
   /**
-   * 🌡️ 현재 날씨 렌더링 (기본 도시)
+   * ⚙️ 설정 렌더링
    */
-  async renderCurrentWeather(data, ctx) {
-    // 일반 날씨 렌더링과 동일하지만 메시지만 다름
-    await this.renderWeather(data, ctx);
-  }
+  async renderSettings(data, ctx) {
+    const { userName, defaultCity, config } = data;
 
-  /**
-   * ⚠️ 날씨 오류 렌더링
-   */
-  async renderWeatherError(data, ctx) {
-    const { city, errorMessage } = data;
+    const text = `⚙️ **날씨 설정**
 
-    const text = `⚠️ **날씨 조회 실패**
+안녕하세요, ${userName}님!
 
-${city ? `📍 도시: ${city.name}` : ""}
-❌ **오류**: ${errorMessage || "날씨 정보를 가져올 수 없습니다"}
-
-잠시 후 다시 시도해주세요 🔄`;
-
-    const keyboard = this.createInlineKeyboard(
-      [
-        [
-          {
-            text: "🔄 다시 시도",
-            action: city ? `city:${city.id}` : "current",
-          },
-          { text: "🏙️ 다른 도시", action: "cities" },
-        ],
-        [{ text: "🔙 메뉴", action: "menu" }],
-      ],
-      this.moduleName
-    );
-
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  /**
-   * ⚙️ 설정 성공 렌더링
-   */
-  async renderSettingSuccess(data, ctx) {
-    const { city, message } = data;
-
-    const text = `✅ **설정 완료**
-
-${city.emoji} **${city.name}**이(가) 기본 도시로 설정되었습니다!
-
-이제 "날씨" 또는 "현재 날씨"라고 말하시면 
-${city.name} 날씨가 자동으로 표시됩니다 🎯`;
-
-    const keyboard = this.createInlineKeyboard(
-      [
-        [
-          { text: "🌡️ 현재 날씨", action: "current" },
-          { text: "🏙️ 도시 변경", action: "cities" },
-        ],
-        [{ text: "🔙 메뉴", action: "menu" }],
-      ],
-      this.moduleName
-    );
-
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  /**
-   * 💬 직접 메시지 응답 렌더링 (자연어 처리 결과)
-   */
-  async renderCityWeatherDirect(data, ctx) {
-    // 자연어로 요청한 경우의 응답
-    let prefix = `💬 **요청하신 날씨 정보입니다**\n\n`;
-
-    const { city, weather, dust, timestamp, hasError, errorMessage } = data;
-
-    if (hasError) {
-      const errorText = `${prefix}⚠️ **날씨 조회 실패**
-
-${city ? `📍 도시: ${city.name}` : ""}
-❌ **오류**: ${errorMessage || "날씨 정보를 가져올 수 없습니다"}
-
-"날씨 메뉴"라고 말하시면 더 많은 옵션을 볼 수 있습니다 🌤️`;
-
-      const keyboard = this.createInlineKeyboard(
-        [
-          [
-            { text: "🌤️ 날씨 메뉴", action: "menu" },
-            {
-              text: "🔄 다시 시도",
-              action: city ? `city:${city.id}` : "current",
-            },
-          ],
-        ],
-        this.moduleName
-      );
-
-      return await this.sendSafeMessage(ctx, errorText, {
-        reply_markup: keyboard,
-      });
-    }
-
-    // 성공적인 날씨 정보
-    let text = `${prefix}${city.emoji} **${city.name} 날씨** ${
-      this.weatherEmojis[weather.description] || "🌤️"
-    }
-
-🌡️ **${weather.temperature}°C** (체감 ${weather.feelsLike}°C)
-📝 **${weather.description}**
-💧 **습도**: ${weather.humidity}%
-🌬️ **바람**: ${weather.windSpeed}m/s`;
-
-    // 미세먼지 정보 (있으면)
-    if (dust) {
-      text += `\n🌬️ **미세먼지**: ${this.dustEmojis[dust.grade] || "🟡"} ${
-        dust.grade
-      } (PM10: ${dust.pm10}㎍/m³)`;
-    }
-
-    text += `\n\n💡 더 자세한 정보는 아래 버튼을 눌러보세요!`;
-
-    const keyboard = this.createInlineKeyboard(
-      [
-        [
-          { text: "🌤️ 날씨 메뉴", action: "menu" },
-          { text: "📊 예보 보기", action: `forecast:${city.id}` },
-        ],
-        [{ text: "🏙️ 다른 도시", action: "cities" }],
-      ],
-      this.moduleName
-    );
-
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  /**
-   * 🏠 기본 날씨 직접 응답
-   */
-  async renderDefaultWeatherDirect(data, ctx) {
-    // 기본 도시 날씨를 자연어로 요청한 경우
-    await this.renderCityWeatherDirect(data, ctx);
-  }
-
-  /**
-   * ❓ 도움말 렌더링
-   */
-  async renderHelp(data, ctx) {
-    const { config, majorCities, features } = data;
-
-    const text = `❓ **날씨 도움말**
-
-🌤️ **주요 기능**:
-${Object.entries(features)
-  .map(([key, desc]) => `• ${desc}`)
-  .join("\n")}
-
-🗣️ **음성 명령어**:
-• "날씨" / "오늘 날씨" → 기본 도시 날씨
-• "서울 날씨" / "부산 날씨" → 특정 도시 날씨
-• "날씨 메뉴" → 전체 메뉴 보기
-
-📍 **지원 도시**: ${majorCities.length}개
-${majorCities.map((city) => `${city.emoji} ${city.name}`).join(", ")}
-
-⚙️ **설정**:
-• 기본 도시 설정 가능
+📍 **현재 설정**
+• 기본 도시: ${defaultCity} ${this.cityEmojis[defaultCity] || "🏙️"}
 • 미세먼지 정보: ${config.enableDustInfo ? "✅ 활성화" : "❌ 비활성화"}
 • 날씨 예보: ${config.enableForecast ? "✅ 활성화" : "❌ 비활성화"}
 
@@ -453,10 +340,69 @@ ${message || "알 수 없는 오류가 발생했습니다"}
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
+  /**
+   * ⚠️ 날씨 오류 렌더링
+   */
+  async renderWeatherError(data, ctx) {
+    const { city, errorMessage } = data;
+
+    const text = `⚠️ **날씨 조회 실패**
+
+${city ? `📍 도시: ${city.name}` : ""}
+❌ **오류**: ${errorMessage || "날씨 정보를 가져올 수 없습니다"}
+
+잠시 후 다시 시도해주세요 🔄`;
+
+    const keyboard = this.createInlineKeyboard(
+      [
+        [
+          {
+            text: "🔄 다시 시도",
+            action: city ? `city:${city.id}` : "current",
+          },
+          { text: "🏙️ 다른 도시", action: "cities" },
+        ],
+        [{ text: "🔙 메뉴", action: "menu" }],
+      ],
+      this.moduleName
+    );
+
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * ✅ 설정 성공 렌더링
+   */
+  async renderSettingSuccess(data, ctx) {
+    const { city, message } = data;
+
+    const text = `✅ **설정 완료**
+
+${city.emoji || this.cityEmojis[city.name] || "🏙️"} **${
+      city.name
+    }**이(가) 기본 도시로 설정되었습니다!
+
+이제 "날씨" 또는 "현재 날씨"라고 말하시면 
+${city.name} 날씨가 자동으로 표시됩니다 🎯`;
+
+    const keyboard = this.createInlineKeyboard(
+      [
+        [
+          { text: "🌡️ 현재 날씨", action: "current" },
+          { text: "🏙️ 도시 변경", action: "cities" },
+        ],
+        [{ text: "🔙 메뉴", action: "menu" }],
+      ],
+      this.moduleName
+    );
+
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
   // ===== 🛠️ 유틸리티 메서드들 =====
 
   /**
-   * 🌡️ 온도 색상 표현 (미래 확장용)
+   * 🌡️ 온도 색상 표현
    */
   getTemperatureColor(temperature) {
     if (temperature >= 30) return "🔴"; // 매우 더움
