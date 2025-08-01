@@ -144,19 +144,9 @@ class NavigationHandler {
       const safeUserName = this.markdownHelper.escapeForDisplay(userName);
       const text = `🏠 *메인 메뉴*\n안녕하세요, ${safeUserName}님\\!`;
 
-      // 표준 형식으로 콜백 데이터 생성
-      const keyboard = {
-        inline_keyboard: enabledModules
-          .filter((module) => module.showInMenu !== false)
-          .map((module) => [
-            {
-              text: `${module.icon} ${
-                module.displayName || module.description
-              }`,
-              callback_data: `${module.key}:menu`,
-            },
-          ]),
-      };
+      // 🎹 2열 배치 키보드 생성 (ModuleRegistry 함수 활용)
+      const { buildNavigationKeyboard } = require("../config/ModuleRegistry");
+      const keyboard = buildNavigationKeyboard();
 
       // 🎯 MarkdownHelper 위임 - 안전한 메시지 전송
       const success = await this.markdownHelper.sendSafeMessage(ctx, text, {

@@ -1,8 +1,10 @@
+// src/renderers/FortuneRenderer.js - 2열 배치 수정
+
 const BaseRenderer = require("./BaseRenderer");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 (심플 버전)
+ * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 (2열 배치 개선)
  */
 class FortuneRenderer extends BaseRenderer {
   constructor(bot, navigationHandler) {
@@ -45,7 +47,7 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 🔮 메뉴 렌더링
+   * 🔮 메뉴 렌더링 (2열 배치 개선!)
    */
   async renderMenu(data, ctx) {
     const { userName, todayCount, maxDraws, canDraw, fortuneTypes } = data;
@@ -67,25 +69,44 @@ class FortuneRenderer extends BaseRenderer {
     const buttons = [];
 
     if (canDraw) {
-      // 운세 타입 버튼들
-      Object.entries(fortuneTypes).forEach(([key, config]) => {
-        buttons.push([
-          {
-            text: `${config.emoji} ${config.label}`,
-            action: "draw",
-            params: key,
-          },
-        ]);
-      });
+      // 🎯 운세 타입 버튼들을 2열로 배치
+      const fortuneTypeEntries = Object.entries(fortuneTypes);
 
+      for (let i = 0; i < fortuneTypeEntries.length; i += 2) {
+        const row = [];
+
+        // 첫 번째 운세 타입
+        const [key1, config1] = fortuneTypeEntries[i];
+        row.push({
+          text: `${config1.emoji} ${config1.label}`,
+          action: "draw",
+          params: key1,
+        });
+
+        // 두 번째 운세 타입 (있으면)
+        if (i + 1 < fortuneTypeEntries.length) {
+          const [key2, config2] = fortuneTypeEntries[i + 1];
+          row.push({
+            text: `${config2.emoji} ${config2.label}`,
+            action: "draw",
+            params: key2,
+          });
+        }
+
+        buttons.push(row);
+      }
+
+      // 카드 셔플 버튼 (1열)
       buttons.push([{ text: "🔄 카드 셔플", action: "shuffle" }]);
     }
 
+    // 통계/기록 버튼 (2열)
     buttons.push([
       { text: "📊 통계", action: "stats" },
       { text: "📋 기록", action: "history" },
     ]);
 
+    // 메인 메뉴 버튼 (1열)
     buttons.push([{ text: "🔙 메인 메뉴", action: "menu" }]);
 
     const keyboard = this.createInlineKeyboard(
@@ -97,7 +118,7 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 🃏 운세 타입 선택 렌더링
+   * 🃏 운세 타입 선택 렌더링 (2열 배치)
    */
   async renderDrawSelect(data, ctx) {
     const { fortuneTypes, remaining } = data;
@@ -108,15 +129,32 @@ class FortuneRenderer extends BaseRenderer {
 
     const buttons = [];
 
-    Object.entries(fortuneTypes).forEach(([key, config]) => {
-      buttons.push([
-        {
-          text: `${config.emoji} ${config.label}`,
+    // 🎯 운세 타입 버튼들을 2열로 배치
+    const fortuneTypeEntries = Object.entries(fortuneTypes);
+
+    for (let i = 0; i < fortuneTypeEntries.length; i += 2) {
+      const row = [];
+
+      // 첫 번째 운세 타입
+      const [key1, config1] = fortuneTypeEntries[i];
+      row.push({
+        text: `${config1.emoji} ${config1.label}`,
+        action: "draw",
+        params: key1,
+      });
+
+      // 두 번째 운세 타입 (있으면)
+      if (i + 1 < fortuneTypeEntries.length) {
+        const [key2, config2] = fortuneTypeEntries[i + 1];
+        row.push({
+          text: `${config2.emoji} ${config2.label}`,
           action: "draw",
-          params: key,
-        },
-      ]);
-    });
+          params: key2,
+        });
+      }
+
+      buttons.push(row);
+    }
 
     buttons.push([{ text: "🔙 메뉴", action: "menu" }]);
 
@@ -418,7 +456,7 @@ ${data.message}
       triple: "삼카드",
       love: "연애운",
       work: "사업운",
-      custom: "질문운",
+      custom: "질문",
     };
 
     return typeNames[type] || type;
