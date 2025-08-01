@@ -41,10 +41,21 @@ class TodoService extends BaseService {
 
   async addTodo(userId, todoData) {
     try {
+      // ✅ 안전한 텍스트 추출 (title 또는 text 모두 지원)
+      const todoText = todoData.text || todoData.title;
+
+      // ✅ undefined 체크 추가
+      if (!todoText) {
+        return this.createErrorResponse(
+          new Error("MISSING_TEXT"),
+          "할일 내용이 필요합니다."
+        );
+      }
+
       const newTodo = new this.models.Todo({
         userId: userId.toString(),
-        text: todoData.text.trim(), // 'title'을 모델 스키마에 맞는 'text'로 변경
-        description: todoData.description?.trim(),
+        text: todoText.trim(), // ✅ 안전하게 trim 적용
+        description: todoData.description?.trim() || null,
         priority: todoData.priority || 3,
       });
 

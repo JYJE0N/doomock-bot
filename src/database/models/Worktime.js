@@ -4,11 +4,9 @@ const mongoose = require("mongoose");
 const TimeHelper = require("../../utils/TimeHelper");
 
 const WorktimeSchema = new mongoose.Schema({
-  // ✅ userId 필드 추가
   userId: {
     type: String,
     required: true,
-    // index: true 제거 (복합인덱스에서 처리)
   },
 
   date: {
@@ -44,7 +42,7 @@ const WorktimeSchema = new mongoose.Schema({
 
   workType: {
     type: String,
-    enum: ["normal", "overtime", "holiday"],
+    enum: ["normal", "overtime", "holiday", "night"], // ✅ "night" 추가!
     default: "normal",
   },
 
@@ -54,15 +52,14 @@ const WorktimeSchema = new mongoose.Schema({
     default: "working",
   },
 
-  // ✅ 표준 필드들 수정
   createdAt: {
     type: Date,
-    default: Date.now, // ✅ Date.now 사용
+    default: Date.now,
   },
 
   updatedAt: {
     type: Date,
-    default: Date.now, // ✅ Date.now 사용
+    default: Date.now,
   },
 
   version: {
@@ -76,9 +73,9 @@ const WorktimeSchema = new mongoose.Schema({
   },
 });
 
-// 🔥 일반 인덱스로 변경
-WorktimeSchema.index({ userId: 1, date: 1 }); // unique 옵션 제거!
+// 복합 인덱스
+WorktimeSchema.index({ userId: 1, date: 1 }, { unique: true });
 WorktimeSchema.index({ userId: 1, createdAt: -1 });
-WorktimeSchema.index({ status: 1, userId: 1 }); // 상태별 조회용
+WorktimeSchema.index({ date: 1, isActive: 1 });
 
 module.exports = mongoose.model("Worktime", WorktimeSchema);

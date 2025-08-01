@@ -1001,9 +1001,9 @@ class TodoModule extends BaseModule {
     }
 
     try {
-      // 할일 추가
+      // ✅ 수정: 'title' 대신 'text' 사용 (스키마와 일치)
       const result = await this.todoService.addTodo(userId, {
-        title: text,
+        text: text, // ✅ 'text'로 통일
         createdAt: TimeHelper.getLogTimeString(),
       });
 
@@ -1011,7 +1011,6 @@ class TodoModule extends BaseModule {
       this.clearUserState(userId);
 
       if (result.success) {
-        // ✅ 순수 데이터만 반환 - 렌더러가 UI 담당
         return {
           type: "add_success",
           module: "todo",
