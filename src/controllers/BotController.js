@@ -129,6 +129,7 @@ class BotController {
         "leave",
         "weather",
         "tts",
+        "fortune",
       ];
 
       for (const serviceName of requiredServices) {
