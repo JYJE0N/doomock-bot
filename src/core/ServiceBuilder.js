@@ -25,8 +25,13 @@ class ServiceBuilder {
   }
 
   async initialize() {
-    await this.autoRegisterServices();
-    logger.success(`✅ ${this.services.size}개 서비스 등록 완료`);
+    if (this.isInitialized) {
+      logger.debug("ServiceBuilder 이미 초기화됨 - 스킵");
+      return;
+    }
+
+    // 초기화 로직...
+    this.isInitialized = true;
   }
 
   async autoRegisterServices() {

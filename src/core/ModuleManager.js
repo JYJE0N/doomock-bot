@@ -34,19 +34,17 @@ class ModuleManager {
         this.mongooseManager = options.mongooseManager;
       }
 
-      // ServiceBuilder 초기화
+      // ✅ 중요: ServiceBuilder가 없으면 에러 발생
       if (!this.serviceBuilder) {
-        const { createServiceBuilder } = require("./ServiceBuilder");
-        this.serviceBuilder = createServiceBuilder(this.bot);
-        logger.debug("✅ ServiceBuilder 생성됨");
+        throw new Error(
+          "ServiceBuilder가 설정되지 않았습니다. ModuleManager 생성 시 전달해주세요."
+        );
       }
 
-      // Mongoose Manager 연결
-      if (this.mongooseManager) {
-        this.serviceBuilder.setMongooseManager(this.mongooseManager);
-      }
+      // ❌ 삭제: ServiceBuilder 초기화는 BotController에서 이미 완료됨
+      // await this.serviceBuilder.initialize();
 
-      await this.serviceBuilder.initialize();
+      // 모듈 로드
       await this.loadModules(bot);
 
       logger.success("✅ ModuleManager 초기화 완료");

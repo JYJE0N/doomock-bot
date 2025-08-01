@@ -56,9 +56,12 @@ class BaseModule {
    */
   async initialize() {
     if (this.isInitialized) {
-      logger.warn(`${this.moduleName} 이미 초기화됨`);
+      logger.warn(`${this.name} 모듈이 이미 초기화됨`);
       return;
     }
+
+    // 초기화 로직...
+    this.isInitialized = true;
 
     try {
       logger.info(`🎯 ${this.moduleName} 초기화 시작...`);
