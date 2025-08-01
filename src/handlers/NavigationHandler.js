@@ -2,6 +2,7 @@
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const { getEnabledModules } = require("../config/ModuleRegistry");
+const MarkdownHelper = require("../utils/MarkdownHelper");
 
 /**
  * 🎯 NavigationHandler - 완전 표준화된 콜백 파서
@@ -258,67 +259,27 @@ class NavigationHandler {
   /**
    * 🏠 메인 메뉴 표시
    */
-  async showMainMenu(ctx) {
+  async showMainMenu(bot, chatId) {
     try {
-      // ctx에서 사용자 정보 안전하게 가져오기
-      const from = ctx.from || ctx.callbackQuery?.from || ctx.message?.from;
-      if (!from) {
-        throw new Error("사용자 정보를 찾을 수 없습니다");
-      }
+      let welcomeMessage =
+        `🎮 *두목 봇에 오신 것을 환영합니다!*\n\n` +
+        `여기서 할 수 있는 일들:\n` +
+        `• 유저 정보 조회 및 관리\n` +
+        `• 아이템 사용 및 거래\n` +
+        `• 퀘스트 진행`;
 
-      const userName = getUserName(from);
-      const enabledModules = getEnabledModules();
+      // MarkdownV2 사용 시 이스케이프 처리
+      welcomeMessage = MarkdownHelper.escapeMarkdownV2(welcomeMessage);
 
-      const text = `🏠 **메인 메뉴**\n안녕하세요, ${userName}님!`;
+      const keyboard = this.mainMenuRenderer.renderMainMenu();
 
-      // 표준 형식으로 콜백 데이터 생성
-      const keyboard = {
-        inline_keyboard: enabledModules
-          .filter((module) => module.showInMenu !== false)
-          .map((module) => [
-            {
-              text: `${module.icon} ${
-                module.displayName || module.description
-              }`,
-              callback_data: `${module.key}:menu`,
-            },
-          ]),
-      };
-
-      // 메시지 전송 방식 결정
-      if (ctx.callbackQuery) {
-        // 콜백 쿼리에서 호출된 경우 - 메시지 수정
-        await ctx.editMessageText(text, {
-          reply_markup: keyboard,
-          parse_mode: "MarkdownV2",
-        });
-      } else {
-        // 명령어에서 호출된 경우 - 새 메시지 전송
-        await ctx.reply(text, {
-          reply_markup: keyboard,
-          parse_mode: "MarkdownV2",
-        });
-      }
-
-      logger.debug("🏠 메인 메뉴 표시 완료");
-      return true;
+      await bot.telegram.sendMessage(chatId, welcomeMessage, {
+        parse_mode: "MarkdownV2",
+        reply_markup: keyboard,
+      });
     } catch (error) {
-      logger.error("💥 메인 메뉴 표시 오류:", error);
-
-      // 에러 메시지 전송 방식도 ctx 타입에 따라 분기
-      const errorMessage = "메인 메뉴를 표시할 수 없습니다.";
-
-      try {
-        if (ctx.callbackQuery) {
-          await ctx.answerCbQuery(errorMessage, { show_alert: true });
-        } else {
-          await ctx.reply(`❌ ${errorMessage}`);
-        }
-      } catch (e) {
-        logger.error("에러 메시지 전송 실패:", e);
-      }
-
-      return false;
+      this.logger.error("💥 메인 메뉴 표시 오류:", error);
+      throw error;
     }
   }
 

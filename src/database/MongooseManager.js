@@ -62,7 +62,10 @@ class MongooseManager {
       throw error;
     }
   }
-
+  // 누락된 메서드 추가
+  isConnected() {
+    return this.connected && this.mongoose?.connection?.readyState === 1;
+  }
   /**
    * 이벤트 리스너 설정
    */
@@ -142,10 +145,9 @@ class MongooseManager {
    * 연결 종료
    */
   async disconnect() {
-    if (mongoose.connection.readyState === 1) {
-      await mongoose.disconnect();
-      this.isConnected = false;
-      logger.info("✅ Mongoose 연결 종료됨");
+    if (this.mongoose) {
+      await this.mongoose.disconnect();
+      this.connected = false;
     }
   }
 
