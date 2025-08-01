@@ -1,4 +1,5 @@
 const BaseService = require("./BaseService");
+const logger = require("../utils/Logger");
 
 /**
  * 🔮 FortuneService - 타로 카드 서비스 (심플 버전)
@@ -131,6 +132,11 @@ class FortuneService extends BaseService {
         arcana: "major",
       },
     ];
+    logger.info("🔮 FortuneService 생성됨");
+  }
+
+  async onInitialize() {
+    logger.success("✅ FortuneService 초기화 완료");
   }
 
   /**

@@ -1,8 +1,7 @@
-const { getInstance } = require("../database/DatabaseManager");
-const dbManager = getInstance();
+// src/utils/TTSHelper.js - Mongoose 버전
 const logger = require("./Logger");
-// TTS 관련 기능을 제공하는 클래스
 
+// TTS 관련 기능을 제공하는 클래스
 class TTSService {
   constructor() {
     this.modes = new Map(); // 예시 상태 저장소
@@ -32,9 +31,6 @@ class TTSService {
   }
 
   async handleTTSCallback(bot, callbackQuery, params) {
-    // await bot.answerCallbackQuery(callbackQuery.id, {
-    //   text: "🔊 TTS 설정 완료",
-    // });
     logger.debug("TTS 콜백 처리 (응답은 BotController에서 이미 처리됨)");
   }
 

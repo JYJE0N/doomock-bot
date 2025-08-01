@@ -1,27 +1,23 @@
+// src/core/ServiceBuilder.js - Mongoose 전용 서비스 빌더
+
 const path = require("path");
 const fs = require("fs");
 const logger = require("../utils/Logger");
 
 /**
- * 🏭 ServiceBuilder - 서비스 팩토리 (수정된 버전)
+ * 🏭 ServiceBuilder - 서비스 팩토리 (Mongoose 전용)
  *
- * 🎯 핵심 기능:
- * - 서비스 자동 등록
- * - 인스턴스 생성 및 캐싱
- * - Mongoose/Native 이중 지원
+ * ✅ 주요 변경사항:
+ * - MongoDB Native Driver 지원 제거
+ * - 모든 서비스가 Mongoose 사용
+ * - 코드 단순화
  */
 class ServiceBuilder {
-  constructor(bot, menuManager) {
+  constructor(bot) {
     this.bot = bot;
-    this.menuManager = menuManager;
     this.services = new Map();
-    this.serviceInstances = new Map(); // ⭐ 이것이 누락되어 있었음!
-    this.dbManager = null;
+    this.serviceInstances = new Map();
     this.mongooseManager = null;
-  }
-
-  setDatabaseManager(dbManager) {
-    this.dbManager = dbManager;
   }
 
   setMongooseManager(mongooseManager) {
@@ -46,6 +42,7 @@ class ServiceBuilder {
         const serviceName = file.replace("Service.js", "").toLowerCase();
         const ServiceClass = require(path.join(servicesDir, file));
         this.services.set(serviceName, ServiceClass);
+        logger.debug(`📦 ${serviceName} 서비스 클래스 등록됨`);
       } catch (error) {
         logger.error(`❌ ${file} 등록 실패:`, error);
       }
@@ -53,7 +50,6 @@ class ServiceBuilder {
   }
 
   async getOrCreate(serviceName) {
-    // serviceInstances가 이제 제대로 정의되어 있으므로 에러가 발생하지 않음
     if (this.serviceInstances.has(serviceName)) {
       return this.serviceInstances.get(serviceName);
     }
@@ -63,28 +59,28 @@ class ServiceBuilder {
   async create(serviceName) {
     const ServiceClass = this.services.get(serviceName);
     if (!ServiceClass) {
-      throw new Error(`서비스 없음: ${serviceName}`);
+      throw new Error(`서비스를 찾을 수 없음: ${serviceName}`);
     }
 
-    // Mongoose 서비스들
-    const mongooseServices = ["todo", "timer", "leave", "tts"];
-
-    let instance;
-    if (mongooseServices.includes(serviceName)) {
-      instance = new ServiceClass();
-    } else {
-      instance = new ServiceClass({
-        db: this.dbManager?.getDb(),
-        dbManager: this.dbManager,
+    try {
+      // 모든 서비스가 Mongoose 사용
+      const instance = new ServiceClass({
+        mongooseManager: this.mongooseManager,
       });
-    }
 
-    if (instance.initialize) {
-      await instance.initialize();
-    }
+      // 서비스 초기화
+      if (instance.initialize) {
+        await instance.initialize();
+      }
 
-    this.serviceInstances.set(serviceName, instance);
-    return instance;
+      this.serviceInstances.set(serviceName, instance);
+      logger.success(`✅ ${serviceName} 서비스 인스턴스 생성됨`);
+
+      return instance;
+    } catch (error) {
+      logger.error(`❌ ${serviceName} 서비스 생성 실패:`, error);
+      throw error;
+    }
   }
 
   getServiceInstance(serviceName) {
@@ -92,17 +88,36 @@ class ServiceBuilder {
   }
 
   async cleanup() {
+    logger.info("🧹 ServiceBuilder 정리 시작...");
+
     for (const [name, instance] of this.serviceInstances) {
       if (instance.cleanup) {
-        await instance.cleanup();
+        try {
+          await instance.cleanup();
+          logger.debug(`✅ ${name} 서비스 정리 완료`);
+        } catch (error) {
+          logger.warn(`⚠️ ${name} 서비스 정리 실패:`, error.message);
+        }
       }
     }
+
     this.serviceInstances.clear();
+    this.services.clear();
+
+    logger.success("✅ ServiceBuilder 정리 완료");
+  }
+
+  getStatus() {
+    return {
+      registeredServices: Array.from(this.services.keys()),
+      activeInstances: Array.from(this.serviceInstances.keys()),
+      mongooseConnected: this.mongooseManager?.isConnected() || false,
+    };
   }
 }
 
-function createServiceBuilder(bot, menuManager) {
-  return new ServiceBuilder(bot, menuManager);
+function createServiceBuilder(bot) {
+  return new ServiceBuilder(bot);
 }
 
 module.exports = { ServiceBuilder, createServiceBuilder };

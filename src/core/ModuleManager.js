@@ -21,7 +21,7 @@ class ModuleManager {
   }
 
   /**
-   * 🎯 ModuleManager 초기화
+   * 🎯 ModuleManager 초기화 (Mongoose 전용)
    */
   async initialize(bot, options = {}) {
     try {
@@ -29,24 +29,19 @@ class ModuleManager {
 
       this.bot = bot;
 
-      if (options.dbManager) {
-        this.dbManager = options.dbManager;
-      }
-
+      // Mongoose Manager만 설정
       if (options.mongooseManager) {
         this.mongooseManager = options.mongooseManager;
       }
 
+      // ServiceBuilder 초기화
       if (!this.serviceBuilder) {
         const { createServiceBuilder } = require("./ServiceBuilder");
-        this.serviceBuilder = createServiceBuilder();
+        this.serviceBuilder = createServiceBuilder(this.bot);
         logger.debug("✅ ServiceBuilder 생성됨");
       }
 
-      if (this.dbManager) {
-        this.serviceBuilder.setDatabaseManager(this.dbManager);
-      }
-
+      // Mongoose Manager 연결
       if (this.mongooseManager) {
         this.serviceBuilder.setMongooseManager(this.mongooseManager);
       }

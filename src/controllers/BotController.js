@@ -1,67 +1,47 @@
-// src/controllers/BotController.js - 🤖 텔레그램 봇 컨트롤러 (무한재귀 해결)
-const { Telegraf, session } = require("telegraf");
-const logger = require("../utils/Logger");
-const { getUserName, getUserId } = require("../utils/UserHelper");
+// src/controllers/BotController.js - 🤖 Mongoose 전용 봇 컨트롤러
 
-// 핵심 매니저들
-// ✅ 수정: DatabaseManager를 getInstance로 가져오도록 변경
-const { getInstance: getDbManager } = require("../database/DatabaseManager");
+const { Telegraf } = require("telegraf");
+const logger = require("../utils/Logger");
 const {
   getInstance: getMongooseManager,
 } = require("../database/MongooseManager");
+const { createServiceBuilder } = require("../core/ServiceBuilder");
 const ModuleManager = require("../core/ModuleManager");
 const NavigationHandler = require("../handlers/NavigationHandler");
 
 /**
- * 🤖 BotController - 텔레그램 봇 핵심 컨트롤러
+ * 🤖 BotController - 텔레그램 봇 중앙 제어 시스템 (Mongoose 전용)
  *
- * 🔧 수정 사항:
- * - 무한재귀 cleanup() 문제 해결
- * - 안전한 종료 로직
- * - 중복 초기화 방지
- * - Promise 거부 처리 개선
+ * ✅ 주요 변경사항:
+ * - MongoDB Native Driver 완전 제거
+ * - Mongoose만 사용하여 단순화
+ * - 데이터베이스 연결 로직 간소화
  */
 class BotController {
   constructor() {
-    // 초기화 상태 관리
-    this.isInitialized = false;
-    this.isShuttingDown = false;
-    this.cleanupInProgress = false;
-
-    // 텔레그램 봇 인스턴스
     this.bot = null;
-
-    // 핵심 매니저들
-    this.dbManager = null;
-    this.mongooseManager = null;
     this.moduleManager = null;
     this.navigationHandler = null;
+    this.mongooseManager = null;
+    this.serviceBuilder = null;
+    this.isInitialized = false;
+    this.cleanupInProgress = false;
 
     // 통계
     this.stats = {
       messagesProcessed: 0,
       callbacksProcessed: 0,
-      errorsOccurred: 0,
-      startTime: Date.now(),
+      errorsCount: 0,
+      startTime: new Date(),
     };
 
-    logger.info("🤖 BotController 인스턴스 생성됨");
+    logger.info("🤖 BotController 인스턴스 생성됨 (Mongoose 전용)");
   }
 
   /**
-   * 🎯 봇 초기화
+   * 🎯 초기화
    */
   async initialize() {
-    if (this.isInitialized) {
-      logger.warn("⚠️ BotController가 이미 초기화됨");
-      return;
-    }
-
-    if (this.isShuttingDown) {
-      logger.warn("⚠️ BotController가 종료 중입니다");
-      return;
-    }
-
     try {
       logger.info("🤖 BotController 초기화 시작...");
 
@@ -69,11 +49,11 @@ class BotController {
       this.validateEnvironment();
 
       // 2. 텔레그램 봇 생성
-      this.bot = new Telegraf(process.env.BOT_TOKEN); // ✅ 수정: BOT_TOKEN 사용
+      this.bot = new Telegraf(process.env.BOT_TOKEN);
       logger.info("✅ 텔레그램 봇 인스턴스 생성됨");
 
-      // 3. 데이터베이스 초기화
-      await this.initializeDatabases();
+      // 3. Mongoose 초기화 (단일 데이터베이스 연결)
+      await this.initializeDatabase();
 
       // 4. 핸들러와 매니저 초기화
       await this.initializeHandlers();
@@ -93,10 +73,7 @@ class BotController {
    * 🔧 환경변수 검증
    */
   validateEnvironment() {
-    const requiredEnvVars = [
-      "BOT_TOKEN", // ✅ 수정: TELEGRAM_BOT_TOKEN → BOT_TOKEN
-      "MONGO_URL",
-    ];
+    const requiredEnvVars = ["BOT_TOKEN", "MONGO_URL"];
 
     const missingVars = requiredEnvVars.filter(
       (varName) => !process.env[varName]
@@ -110,22 +87,19 @@ class BotController {
   }
 
   /**
-   * 🗄️ 데이터베이스 초기화
+   * 🗄️ 데이터베이스 초기화 (Mongoose만 사용)
    */
-  async initializeDatabases() {
+  async initializeDatabase() {
     try {
-      logger.info("🗄️ 데이터베이스 초기화 중...");
+      logger.info("🗄️ Mongoose 데이터베이스 초기화 중...");
 
-      // MongoDB Native Driver 초기화
-      // ✅ 수정: new DatabaseManager() 대신 getInstance() 사용
-      this.dbManager = getDbManager();
-      await this.dbManager.connect();
-      logger.success("✅ MongoDB Native 연결 완료");
-
-      // Mongoose 초기화
+      // Mongoose Manager 가져오기
       this.mongooseManager = getMongooseManager();
+
+      // Mongoose 연결
       await this.mongooseManager.connect();
-      logger.success("✅ Mongoose 연결 완료");
+
+      logger.success("✅ Mongoose 데이터베이스 연결 완료");
     } catch (error) {
       logger.error("❌ 데이터베이스 초기화 실패:", error);
       throw error;
@@ -133,36 +107,64 @@ class BotController {
   }
 
   /**
-   * 🎮 핸들러와 매니저 초기화
+   * 🎮 핸들러 및 매니저 초기화
    */
   async initializeHandlers() {
     try {
       logger.info("🎮 핸들러 및 매니저 초기화 중...");
 
-      // ServiceBuilder 생성 및 초기화
-      const { createServiceBuilder } = require("../core/ServiceBuilder");
-      this.serviceBuilder = createServiceBuilder();
-      this.serviceBuilder.setDatabaseManager(this.dbManager);
+      // 1. ServiceBuilder 생성 (Mongoose 전용)
+      this.serviceBuilder = createServiceBuilder(this.bot);
       this.serviceBuilder.setMongooseManager(this.mongooseManager);
+
+      // 2. ServiceBuilder 초기화
       await this.serviceBuilder.initialize();
 
-      // ModuleManager 초기화
-      this.moduleManager = new ModuleManager();
+      // 3. 필수 서비스들 미리 생성
+      logger.info("📦 필수 서비스 초기화 중...");
+      const requiredServices = [
+        "todo",
+        "timer",
+        "worktime",
+        "leave",
+        "weather",
+        "tts",
+      ];
+
+      for (const serviceName of requiredServices) {
+        try {
+          await this.serviceBuilder.getOrCreate(serviceName);
+          logger.success(`✅ ${serviceName} 서비스 초기화 완료`);
+        } catch (error) {
+          logger.warn(`⚠️ ${serviceName} 서비스 초기화 실패:`, error.message);
+        }
+      }
+
+      // 4. ModuleManager 초기화
+      this.moduleManager = new ModuleManager({
+        bot: this.bot,
+        serviceBuilder: this.serviceBuilder,
+      });
+
       await this.moduleManager.initialize(this.bot, {
-        dbManager: this.dbManager,
         mongooseManager: this.mongooseManager,
       });
+
       logger.success("✅ ModuleManager 초기화 완료");
 
-      // NavigationHandler 초기화
-      this.navigationHandler = new NavigationHandler(this.bot);
-      this.navigationHandler.initialize(this.bot);
+      // 5. NavigationHandler 초기화
+      this.navigationHandler = new NavigationHandler(
+        this.bot,
+        this.moduleManager
+      );
+      await this.navigationHandler.initialize();
       logger.success("✅ NavigationHandler 초기화 완료");
 
-      // 상호 참조 설정
+      // 6. 상호 참조 설정
       this.navigationHandler.setModuleManager(this.moduleManager);
       this.moduleManager.setNavigationHandler(this.navigationHandler);
-      logger.success("✅ 핸들러 간 상호 참조 설정 완료");
+
+      logger.success("✅ 핸들러 및 매니저 초기화 완료");
     } catch (error) {
       logger.error("❌ 핸들러 초기화 실패:", error);
       throw error;
@@ -170,198 +172,34 @@ class BotController {
   }
 
   /**
-   * 🔗 미들웨어 설정
+   * 🔌 미들웨어 설정
    */
   setupMiddlewares() {
-    logger.info("🔗 미들웨어 설정 중...");
+    // 에러 핸들링
+    this.bot.catch((error, ctx) => {
+      logger.error("봇 에러:", error);
+      this.stats.errorsCount++;
 
-    // 세션 미들웨어
-    this.bot.use(session());
-
-    // 성능 로깅 미들웨어
-    this.bot.use(async (ctx, next) => {
-      const startTime = Date.now();
       try {
-        await next();
-        const duration = Date.now() - startTime;
-        logger.debug(
-          `✅ [${
-            ctx.updateType
-          }] 처리 완료 (${duration}ms) | 사용자: ${getUserName(ctx.from)}`
-        );
-      } catch (error) {
-        const duration = Date.now() - startTime;
-        logger.error(
-          `❌ [${
-            ctx.updateType
-          }] 처리 실패 (${duration}ms) | 사용자: ${getUserName(ctx.from)}`,
-          error
-        );
-        throw error;
-      }
-    });
-
-    // 에러 핸들러 (중요: 무한재귀 방지)
-    this.bot.catch((err, ctx) => {
-      this.stats.errorsOccurred++;
-
-      logger.error(`💥 처리되지 않은 오류 발생 (컨텍스트: ${ctx.updateType})`, {
-        error: err.message,
-        stack: err.stack,
-        userId: ctx.from?.id,
-        userName: getUserName(ctx.from),
-      });
-
-      // 🔥 중요: 여기서 cleanup()이나 shutdown()을 호출하지 않음!
-      // 무한재귀의 원인이었음
-
-      // 단순히 사용자에게 오류 메시지만 전송
-      if (ctx.chat?.id) {
-        ctx
-          .reply(
-            "죄송합니다. 예상치 못한 오류가 발생했습니다. 잠시 후 다시 시도해 주세요."
-          )
-          .catch((sendError) => {
-            logger.error("오류 메시지 전송도 실패:", sendError);
-          });
+        ctx.reply("처리 중 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+      } catch (replyError) {
+        logger.error("에러 응답 전송 실패:", replyError);
       }
     });
 
     // 명령어 핸들러
-    this.bot.command("start", (ctx) => this.handleStartCommand(ctx));
-    this.bot.command("help", (ctx) => this.handleHelpCommand(ctx));
-    this.bot.command("status", (ctx) => this.handleStatusCommand(ctx));
+    this.bot.command("start", this.handleStartCommand.bind(this));
+    this.bot.command("help", this.handleHelpCommand.bind(this));
+    this.bot.command("menu", this.handleMenuCommand.bind(this));
+    this.bot.command("status", this.handleStatusCommand.bind(this));
 
     // 콜백 쿼리 핸들러
-    this.bot.on("callback_query", (ctx) => this.handleCallbackQuery(ctx));
+    this.bot.on("callback_query", this.handleCallbackQuery.bind(this));
 
-    // 메시지 핸들러
-    this.bot.on("message", (ctx) => this.handleMessage(ctx));
+    // 텍스트 메시지 핸들러
+    this.bot.on("text", this.handleTextMessage.bind(this));
 
-    logger.success("✅ 모든 미들웨어 설정 완료");
-  }
-
-  /**
-   * 🚀 봇 시작
-   */
-  async start() {
-    if (!this.isInitialized) {
-      throw new Error("BotController가 초기화되지 않음");
-    }
-
-    try {
-      await this.bot.launch();
-      logger.celebration("🎉 텔레그램 봇이 성공적으로 시작되었습니다!");
-
-      // Graceful stop 설정
-      process.once("SIGINT", () => this.stop("SIGINT"));
-      process.once("SIGTERM", () => this.stop("SIGTERM"));
-    } catch (error) {
-      logger.error("❌ 봇 시작 실패:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 🛑 봇 정지 (안전한 종료)
-   */
-  async stop(signal) {
-    if (this.isShuttingDown) {
-      logger.warn("⚠️ 이미 종료 중입니다");
-      return;
-    }
-
-    this.isShuttingDown = true;
-
-    logger.info(`🛑 ${signal} 신호 수신, 봇 종료 중...`);
-
-    try {
-      // 봇 정지
-      if (this.bot) {
-        this.bot.stop(signal);
-        logger.info("✅ 텔레그램 봇 정지됨");
-      }
-
-      // 정리 작업
-      await this.cleanup();
-
-      logger.success("✅ 봇이 정상적으로 종료되었습니다.");
-    } catch (error) {
-      logger.error("❌ 봇 종료 중 오류:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * 🧹 정리 작업 (무한재귀 방지)
-   */
-  async cleanup() {
-    if (this.cleanupInProgress) {
-      logger.warn("⚠️ 정리 작업이 이미 진행 중입니다");
-      return;
-    }
-
-    this.cleanupInProgress = true;
-
-    try {
-      logger.info("🧹 BotController 정리 작업 시작...");
-
-      // ModuleManager 정리
-      if (this.moduleManager) {
-        try {
-          await this.moduleManager.cleanup();
-          logger.debug("✅ ModuleManager 정리 완료");
-        } catch (error) {
-          logger.warn("⚠️ ModuleManager 정리 실패:", error.message);
-        }
-      }
-
-      // NavigationHandler 정리
-      if (this.navigationHandler) {
-        try {
-          if (typeof this.navigationHandler.cleanup === "function") {
-            await this.navigationHandler.cleanup();
-          }
-          logger.debug("✅ NavigationHandler 정리 완료");
-        } catch (error) {
-          logger.warn("⚠️ NavigationHandler 정리 실패:", error.message);
-        }
-      }
-
-      // 데이터베이스 연결 종료
-      if (this.mongooseManager) {
-        try {
-          await this.mongooseManager.disconnect();
-          logger.debug("✅ Mongoose 연결 종료됨");
-        } catch (error) {
-          logger.warn("⚠️ Mongoose 연결 종료 실패:", error.message);
-        }
-      }
-
-      if (this.dbManager) {
-        try {
-          await this.dbManager.disconnect();
-          logger.debug("✅ MongoDB Native 연결 종료됨");
-        } catch (error) {
-          logger.warn("⚠️ MongoDB Native 연결 종료 실패:", error.message);
-        }
-      }
-
-      // 상태 초기화
-      this.isInitialized = false;
-      this.bot = null;
-      this.moduleManager = null;
-      this.navigationHandler = null;
-      this.dbManager = null;
-      this.mongooseManager = null;
-
-      logger.success("✅ BotController 정리 작업 완료");
-    } catch (error) {
-      logger.error("❌ BotController 정리 작업 실패:", error);
-      throw error;
-    } finally {
-      this.cleanupInProgress = false;
-    }
+    logger.info("✅ 미들웨어 설정 완료");
   }
 
   // ===== 🎯 명령어 핸들러들 =====
@@ -386,27 +224,41 @@ class BotController {
     try {
       this.stats.messagesProcessed++;
 
-      const helpText =
-        `🤖 **두목봇 도움말**\n\n` +
-        `**기본 명령어:**\n` +
-        `/start - 메인 메뉴 표시\n` +
-        `/help - 도움말 표시\n` +
-        `/status - 시스템 상태 확인\n\n` +
-        `**주요 기능:**\n` +
-        `📝 **할일 관리** - 할일 추가, 완료, 삭제\n` +
-        `⏰ **타이머** - 포모도로 타이머\n` +
-        `🏢 **근무시간** - 출퇴근 기록\n` +
-        `🏖️ **휴가관리** - 연차 사용 기록\n` +
-        `🔔 **리마인더** - 알림 설정\n` +
-        `🔮 **운세** - 오늘의 운세\n` +
-        `🌤️ **날씨** - 날씨 정보\n` +
-        `🔊 **TTS** - 텍스트 음성 변환\n\n` +
-        `각 기능은 메인 메뉴에서 선택하실 수 있습니다.`;
+      const helpText = `📌 **DooMock Bot 도움말**
+
+🤖 **주요 명령어**:
+• /start - 메인 메뉴 보기
+• /menu - 메인 메뉴 보기
+• /help - 도움말 보기
+• /status - 봇 상태 확인
+
+📋 **주요 기능**:
+• 📋 할일 관리 - 할일 추가/완료/삭제
+• 🍅 타이머 - 뽀모도로 타이머
+• 🏢 근무시간 - 출퇴근 기록 관리
+• 🏖️ 연차 관리 - 연차 사용 현황
+• 🌤️ 날씨 - 현재 날씨 정보
+• 🔊 TTS - 텍스트 음성 변환
+
+💡 **팁**: 메뉴 버튼을 클릭하거나 텍스트 입력으로도 기능을 사용할 수 있습니다!`;
 
       await ctx.replyWithMarkdown(helpText);
     } catch (error) {
       logger.error("help 명령 처리 오류:", error);
       await ctx.reply("도움말 표시 중 오류가 발생했습니다.");
+    }
+  }
+
+  /**
+   * /menu 명령어 처리
+   */
+  async handleMenuCommand(ctx) {
+    try {
+      this.stats.messagesProcessed++;
+      await this.navigationHandler.showMainMenu(ctx);
+    } catch (error) {
+      logger.error("menu 명령 처리 오류:", error);
+      await ctx.reply("메뉴 표시 중 오류가 발생했습니다.");
     }
   }
 
@@ -417,120 +269,196 @@ class BotController {
     try {
       this.stats.messagesProcessed++;
 
-      // 시스템 상태 수집
-      const dbStatus = this.dbManager?.getStatus() || { connected: false };
-      const mongooseStatus = this.mongooseManager?.getStatus() || {
-        connected: false,
-      };
-      const moduleStatus = this.moduleManager?.getStatus() || {
-        loadedModules: 0,
-        activeModules: 0,
-      };
+      const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
+      const hours = Math.floor(uptime / 3600);
+      const minutes = Math.floor((uptime % 3600) / 60);
+      const seconds = uptime % 60;
 
-      const uptime = Math.round(
-        (Date.now() - this.stats.startTime) / 1000 / 60
-      );
-      const memoryUsage = Math.round(
-        process.memoryUsage().heapUsed / 1024 / 1024
-      );
-      const totalMemory = Math.round(
-        process.memoryUsage().heapTotal / 1024 / 1024
-      );
+      const statusText = `🤖 **봇 상태**
 
-      const statusText =
-        `🔍 **시스템 상태**\n\n` +
-        `**데이터베이스 (Native):**\n` +
-        `▸ 연결: ${dbStatus.connected ? "✅" : "❌"}\n` +
-        `▸ DB: ${dbStatus.database || "N/A"}\n\n` +
-        `**데이터베이스 (Mongoose):**\n` +
-        `▸ 연결: ${mongooseStatus.connected ? "✅" : "❌"}\n` +
-        `▸ 상태: ${mongooseStatus.readyState || "N/A"}\n` +
-        `▸ 모델: ${mongooseStatus.models?.length || 0}개\n\n` +
-        `**모듈:**\n` +
-        `▸ 로드됨: ${moduleStatus.loadedModules}개\n` +
-        `▸ 활성: ${moduleStatus.activeModules}개\n\n` +
-        `**성능:**\n` +
-        `▸ 메모리: ${memoryUsage}MB / ${totalMemory}MB\n` +
-        `▸ 업타임: ${uptime}분\n` +
-        `▸ 처리된 메시지: ${this.stats.messagesProcessed}개\n` +
-        `▸ 처리된 콜백: ${this.stats.callbacksProcessed}개\n` +
-        `▸ 오류 발생: ${this.stats.errorsOccurred}개`;
+⏱️ **가동 시간**: ${hours}시간 ${minutes}분 ${seconds}초
+📊 **처리 통계**:
+• 메시지: ${this.stats.messagesProcessed}개
+• 콜백: ${this.stats.callbacksProcessed}개
+• 오류: ${this.stats.errorsCount}개
+
+📦 **모듈**: ${this.moduleManager?.modules?.size || 0}개 로드됨
+🗄️ **DB**: ${this.mongooseManager?.isConnected() ? "연결됨 ✅" : "연결 안됨 ❌"}
+
+✅ 모든 시스템 정상 작동 중`;
 
       await ctx.replyWithMarkdown(statusText);
     } catch (error) {
       logger.error("status 명령 처리 오류:", error);
-      await ctx.reply("상태 정보를 가져오는 중 오류가 발생했습니다.");
+      await ctx.reply("상태 확인 중 오류가 발생했습니다.");
     }
   }
 
   /**
-   * 콜백 쿼리 처리 (중복 응답 방지)
+   * 🔘 콜백 쿼리 처리
    */
   async handleCallbackQuery(ctx) {
     try {
       this.stats.callbacksProcessed++;
-
-      // 즉시 응답 (중복 방지)
-      await ctx.answerCbQuery();
-
-      // NavigationHandler로 위임
       await this.navigationHandler.handleCallback(ctx);
+      await ctx.answerCbQuery();
     } catch (error) {
       logger.error("콜백 쿼리 처리 오류:", error);
-
-      // 안전한 오류 응답
-      try {
-        await ctx.answerCbQuery("처리 중 오류가 발생했습니다.", {
-          show_alert: true,
-        });
-      } catch (answerError) {
-        logger.error("콜백 쿼리 오류 응답 실패:", answerError);
-      }
+      await ctx.answerCbQuery("처리 중 오류가 발생했습니다.", {
+        show_alert: true,
+      });
     }
   }
 
   /**
-   * 메시지 처리
+   * 💬 텍스트 메시지 처리
    */
-  async handleMessage(ctx) {
+  async handleTextMessage(ctx) {
     try {
       this.stats.messagesProcessed++;
 
-      // ModuleManager로 위임
-      const handled = await this.moduleManager.handleMessage(
-        this.bot,
-        ctx.message
-      );
-
-      // 모듈에서 처리하지 않은 메시지
-      if (!handled && ctx.message.text && !ctx.message.text.startsWith("/")) {
-        await ctx.reply(
-          "명령을 이해하지 못했습니다. /help를 입력하여 도움말을 확인하세요."
-        );
+      if (!ctx.message?.text || ctx.message.text.startsWith("/")) {
+        return;
       }
+
+      // NavigationHandler가 메시지도 처리
+      await this.navigationHandler.handleMessage(ctx);
     } catch (error) {
-      logger.error("메시지 처리 오류:", error);
+      logger.error("텍스트 메시지 처리 오류:", error);
       await ctx.reply("메시지 처리 중 오류가 발생했습니다.");
     }
   }
 
+  // ===== 🚀 봇 시작/종료 =====
+
   /**
-   * 📊 상태 정보 반환
+   * 🚀 봇 시작
+   */
+  async start() {
+    try {
+      if (!this.isInitialized) {
+        throw new Error("BotController가 초기화되지 않았습니다");
+      }
+
+      logger.info("🚀 텔레그램 봇 시작 중...");
+
+      await this.bot.launch();
+
+      logger.success("✅ 텔레그램 봇이 성공적으로 시작되었습니다!");
+      logger.info(
+        `🤖 봇 사용자명: @${this.bot.botInfo?.username || "unknown"}`
+      );
+
+      // Graceful 종료 설정
+      process.once("SIGINT", () => this.stop("SIGINT"));
+      process.once("SIGTERM", () => this.stop("SIGTERM"));
+    } catch (error) {
+      logger.error("❌ 봇 시작 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🛑 봇 종료
+   */
+  async stop(signal = "SIGTERM") {
+    try {
+      logger.info(`🛑 봇 종료 중... (${signal})`);
+
+      if (this.bot) {
+        await this.bot.stop(signal);
+      }
+
+      logger.success("✅ 봇이 안전하게 종료되었습니다");
+    } catch (error) {
+      logger.error("❌ 봇 종료 중 오류:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🧹 정리 작업
+   */
+  async cleanup() {
+    if (this.cleanupInProgress) {
+      logger.warn("⚠️ 정리 작업이 이미 진행 중입니다");
+      return;
+    }
+
+    this.cleanupInProgress = true;
+
+    try {
+      logger.info("🧹 BotController 정리 작업 시작...");
+
+      // ServiceBuilder 정리
+      if (this.serviceBuilder) {
+        try {
+          await this.serviceBuilder.cleanup();
+          logger.debug("✅ ServiceBuilder 정리 완료");
+        } catch (error) {
+          logger.warn("⚠️ ServiceBuilder 정리 실패:", error.message);
+        }
+      }
+
+      // ModuleManager 정리
+      if (this.moduleManager) {
+        try {
+          await this.moduleManager.cleanup();
+          logger.debug("✅ ModuleManager 정리 완료");
+        } catch (error) {
+          logger.warn("⚠️ ModuleManager 정리 실패:", error.message);
+        }
+      }
+
+      // NavigationHandler 정리
+      if (
+        this.navigationHandler &&
+        typeof this.navigationHandler.cleanup === "function"
+      ) {
+        try {
+          await this.navigationHandler.cleanup();
+          logger.debug("✅ NavigationHandler 정리 완료");
+        } catch (error) {
+          logger.warn("⚠️ NavigationHandler 정리 실패:", error.message);
+        }
+      }
+
+      // Mongoose 연결 종료
+      if (this.mongooseManager) {
+        try {
+          await this.mongooseManager.disconnect();
+          logger.debug("✅ Mongoose 연결 종료됨");
+        } catch (error) {
+          logger.warn("⚠️ Mongoose 연결 종료 실패:", error.message);
+        }
+      }
+
+      // 상태 초기화
+      this.isInitialized = false;
+      this.bot = null;
+      this.moduleManager = null;
+      this.navigationHandler = null;
+      this.mongooseManager = null;
+      this.serviceBuilder = null;
+
+      logger.success("✅ BotController 정리 작업 완료");
+    } catch (error) {
+      logger.error("❌ BotController 정리 작업 실패:", error);
+      throw error;
+    } finally {
+      this.cleanupInProgress = false;
+    }
+  }
+
+  /**
+   * 📊 상태 조회
    */
   getStatus() {
     return {
       initialized: this.isInitialized,
-      shuttingDown: this.isShuttingDown,
-      cleanupInProgress: this.cleanupInProgress,
       stats: this.stats,
-      uptime: Date.now() - this.stats.startTime,
-      components: {
-        bot: !!this.bot,
-        dbManager: !!this.dbManager,
-        mongooseManager: !!this.mongooseManager,
-        moduleManager: !!this.moduleManager,
-        navigationHandler: !!this.navigationHandler,
-      },
+      modules: this.moduleManager?.modules?.size || 0,
+      mongooseConnected: this.mongooseManager?.isConnected() || false,
     };
   }
 }

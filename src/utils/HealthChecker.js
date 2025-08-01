@@ -127,6 +127,53 @@ class HealthChecker {
       return null;
     }
   }
+  /**
+   * 🗄️ Mongoose 상태 체크
+   */
+  async checkMongoose() {
+    try {
+      const mongooseManager = this.getComponent("mongoose");
+
+      if (!mongooseManager) {
+        return this.createHealthResult(
+          "warning",
+          "MongooseManager가 등록되지 않음"
+        );
+      }
+
+      const issues = [];
+      let severity = "healthy";
+
+      // 연결 상태 확인
+      if (!mongooseManager.isConnected()) {
+        issues.push("Mongoose 연결 끊김");
+        severity = "critical";
+      }
+
+      // 상태 정보 가져오기
+      const status = mongooseManager.getStatus();
+
+      // readyState 확인 (0: disconnected, 1: connected, 2: connecting, 3: disconnecting)
+      if (status.readyState !== 1) {
+        issues.push(`비정상 연결 상태: ${status.readyState}`);
+        severity = "critical";
+      }
+
+      // 모델 등록 확인
+      if (!status.models || status.models.length === 0) {
+        issues.push("등록된 모델이 없음");
+        severity = "warning";
+      }
+
+      return this.createHealthResult(severity, issues.join(", ") || "정상", {
+        ...status,
+        issues: issues.length,
+      });
+    } catch (error) {
+      logger.error("❌ Mongoose 상태 체크 실패:", error);
+      return this.createHealthResult("error", `체크 실패: ${error.message}`);
+    }
+  }
 
   /**
    * 🎯 헬스체커 시작
@@ -480,6 +527,58 @@ class HealthChecker {
       logger.error("❌ TodoService 상태 체크 실패:", error);
       return this.createHealthResult("error", `체크 실패: ${error.message}`);
     }
+  }
+
+  /**
+   * 🏥 전체 시스템 체크 (수정됨 - DatabaseManager 제거)
+   */
+  async checkSystem() {
+    const results = {
+      timestamp: new Date().toISOString(),
+      overallHealth: "healthy",
+      components: {},
+    };
+
+    // 각 컴포넌트 체크
+    const checks = [
+      { name: "bot", method: this.checkBot },
+      { name: "mongoose", method: this.checkMongoose },
+      { name: "moduleManager", method: this.checkModuleManager },
+    ];
+
+    for (const check of checks) {
+      try {
+        results.components[check.name] = await check.method.call(this);
+
+        // 전체 상태 업데이트
+        const componentSeverity = results.components[check.name].severity;
+        if (componentSeverity === "critical") {
+          results.overallHealth = "critical";
+        } else if (
+          componentSeverity === "warning" &&
+          results.overallHealth !== "critical"
+        ) {
+          results.overallHealth = "warning";
+        }
+      } catch (error) {
+        logger.error(`❌ ${check.name} 체크 실패:`, error);
+        results.components[check.name] = this.createHealthResult(
+          "error",
+          `체크 실패: ${error.message}`
+        );
+        results.overallHealth = "critical";
+      }
+    }
+
+    // 추가 정보
+    results.runtime = {
+      nodeVersion: process.version,
+      platform: process.platform,
+      uptime: process.uptime(),
+      memoryUsage: process.memoryUsage(),
+    };
+
+    return results;
   }
 
   /**

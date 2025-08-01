@@ -17,7 +17,7 @@ class WeatherService extends BaseService {
   constructor(options = {}) {
     super("WeatherService", options);
 
-    // API 설정
+    // API 설정 (변경 없음)
     this.config = {
       apiKey: process.env.WEATHER_API_KEY,
       baseUrl: "https://api.openweathermap.org/data/2.5",

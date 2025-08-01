@@ -260,12 +260,18 @@ class NavigationHandler {
    */
   async showMainMenu(ctx) {
     try {
-      const userName = getUserName(ctx.callbackQuery.from);
+      // ctx에서 사용자 정보 안전하게 가져오기
+      const from = ctx.from || ctx.callbackQuery?.from || ctx.message?.from;
+      if (!from) {
+        throw new Error("사용자 정보를 찾을 수 없습니다");
+      }
+
+      const userName = getUserName(from);
       const enabledModules = getEnabledModules();
 
       const text = `🏠 **메인 메뉴**\n안녕하세요, ${userName}님!`;
 
-      // ✅ 표준 형식으로 콜백 데이터 생성
+      // 표준 형식으로 콜백 데이터 생성
       const keyboard = {
         inline_keyboard: enabledModules
           .filter((module) => module.showInMenu !== false)
@@ -274,21 +280,44 @@ class NavigationHandler {
               text: `${module.icon} ${
                 module.displayName || module.description
               }`,
-              callback_data: `${module.key}:menu`, // 표준 형식!
+              callback_data: `${module.key}:menu`,
             },
           ]),
       };
 
-      await ctx.editMessageText(text, {
-        reply_markup: keyboard,
-        parse_mode: "MarkdownV2",
-      });
+      // 메시지 전송 방식 결정
+      if (ctx.callbackQuery) {
+        // 콜백 쿼리에서 호출된 경우 - 메시지 수정
+        await ctx.editMessageText(text, {
+          reply_markup: keyboard,
+          parse_mode: "MarkdownV2",
+        });
+      } else {
+        // 명령어에서 호출된 경우 - 새 메시지 전송
+        await ctx.reply(text, {
+          reply_markup: keyboard,
+          parse_mode: "MarkdownV2",
+        });
+      }
 
       logger.debug("🏠 메인 메뉴 표시 완료");
       return true;
     } catch (error) {
       logger.error("💥 메인 메뉴 표시 오류:", error);
-      await this.sendSafeErrorMessage(ctx, "메인 메뉴를 표시할 수 없습니다.");
+
+      // 에러 메시지 전송 방식도 ctx 타입에 따라 분기
+      const errorMessage = "메인 메뉴를 표시할 수 없습니다.";
+
+      try {
+        if (ctx.callbackQuery) {
+          await ctx.answerCbQuery(errorMessage, { show_alert: true });
+        } else {
+          await ctx.reply(`❌ ${errorMessage}`);
+        }
+      } catch (e) {
+        logger.error("에러 메시지 전송 실패:", e);
+      }
+
       return false;
     }
   }
@@ -354,15 +383,21 @@ class NavigationHandler {
    */
   async sendSafeErrorMessage(ctx, message) {
     try {
-      // 메시지 수정 시도
-      await ctx.editMessageText(`❌ ${message}`);
-    } catch (editError) {
-      try {
-        // 수정 실패시 콜백 응답
-        await ctx.answerCbQuery(message, { show_alert: true });
-      } catch (answerError) {
-        logger.error("💥 완전한 에러 응답 실패:", answerError);
+      // 콜백 쿼리인 경우
+      if (ctx.callbackQuery) {
+        try {
+          // 먼저 메시지 수정 시도
+          await ctx.editMessageText(`❌ ${message}`);
+        } catch (editError) {
+          // 수정 실패시 콜백 응답
+          await ctx.answerCbQuery(message, { show_alert: true });
+        }
+      } else {
+        // 일반 메시지인 경우
+        await ctx.reply(`❌ ${message}`);
       }
+    } catch (error) {
+      logger.error("💥 에러 응답 전송 실패:", error);
     }
   }
 
