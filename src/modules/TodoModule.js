@@ -1075,58 +1075,6 @@ class TodoModule extends BaseModule {
   // ===== 🛠️ 유틸리티 메서드들 =====
 
   /**
-   * 할일 추가 입력 처리
-   */
-  async handleAddInput(bot, msg, text, userState) {
-    const userId = getUserId(msg.from);
-
-    try {
-      // 할일 추가
-      const result = await this.todoService.addTodo(userId, {
-        title: text,
-        createdAt: TimeHelper.getLogTimeString(),
-      });
-
-      // 사용자 상태 정리
-      this.clearUserState(userId);
-
-      if (result.success) {
-        // ✅ 순수 데이터만 반환 - 렌더러가 UI 담당
-        return {
-          type: "add_success",
-          module: "todo",
-          data: {
-            message: `"${text}" 할일이 추가되었습니다!`,
-            todo: result.data,
-            shouldShowList: true,
-          },
-        };
-      } else {
-        return {
-          type: "add_error",
-          module: "todo",
-          data: {
-            message: result.message || "할일 추가에 실패했습니다.",
-            canRetry: true,
-          },
-        };
-      }
-    } catch (error) {
-      logger.error("할일 추가 처리 오류:", error);
-      this.clearUserState(userId);
-
-      return {
-        type: "add_error",
-        module: "todo",
-        data: {
-          message: "할일 추가 중 오류가 발생했습니다.",
-          canRetry: true,
-        },
-      };
-    }
-  }
-
-  /**
    * ✏️ 할일 수정 입력 처리
    */
   async handleEditInput(bot, msg, text, userState) {
