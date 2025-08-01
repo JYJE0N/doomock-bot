@@ -407,53 +407,206 @@ class WorktimeModule extends BaseModule {
   }
 
   async processCheckOut(userId) {
-    // 실제 퇴근 처리 로직
-    return {
-      success: true,
-      checkoutTime: new Date(),
-      totalWorkTime: 480, // 8시간(분)
-      message: "퇴근이 기록되었습니다.",
-    };
+    try {
+      if (this.worktimeService) {
+        const result = await this.worktimeService.checkOut(userId);
+        return {
+          success: true,
+          checkOutTime: result.checkOutTime,
+          totalWorkTime: result.workDuration,
+          message: "퇴근이 기록되었습니다.",
+          workSummary: {
+            workDuration: result.workDuration,
+            displayTime: this.formatDuration(result.workDuration),
+            isOvertime: result.workDuration > this.config.overtimeThreshold,
+            overtimeMinutes: result.overtimeMinutes || 0,
+          },
+        };
+      }
+
+      // 🔥 더미 데이터 (아직 고정값 480분 = 8시간)
+      return {
+        success: true,
+        checkOutTime: new Date(),
+        totalWorkTime: 480, // 이게 문제!
+        message: "퇴근이 기록되었습니다.",
+      };
+    } catch (error) {
+      logger.error("퇴근 처리 실패:", error);
+      let message = "퇴근 처리 중 오류가 발생했습니다.";
+      if (error.message.includes("출근 기록이 없")) {
+        message = "출근 기록이 없습니다. 먼저 출근을 해주세요!";
+      }
+
+      return {
+        type: "error",
+        message: message,
+      };
+    }
   }
 
   async getWeekStats(userId) {
-    // 주간 통계 로직
-    return {
-      totalHours: 40,
-      workDays: 5,
-      averageHours: 8,
-      overtimeHours: 0,
-    };
+    try {
+      // Service가 있으면 실제 DB 조회
+      if (this.worktimeService) {
+        const weekStats = await this.worktimeService.getWeekStats(userId);
+        return weekStats;
+      }
+
+      // 🔥 이미 import된 TimeHelper 직접 사용!
+      return {
+        weekStart: TimeHelper.format(TimeHelper.getWeekStart(), "date"),
+        weekEnd: TimeHelper.format(TimeHelper.getWeekEnd(), "date"),
+        totalHours: 40,
+        workDays: 5,
+        avgDailyHours: 8,
+        overtimeHours: 0,
+        records: [],
+      };
+    } catch (error) {
+      logger.error("주간 통계 조회 실패:", error);
+
+      // 에러 시에도 기본값
+      return {
+        weekStart: TimeHelper.format(TimeHelper.getWeekStart(), "date"),
+        weekEnd: TimeHelper.format(TimeHelper.getWeekEnd(), "date"),
+        totalHours: 0,
+        workDays: 0,
+        avgDailyHours: 0,
+        overtimeHours: 0,
+        records: [],
+      };
+    }
   }
 
   async getMonthStats(userId) {
-    // 월간 통계 로직
-    return {
-      totalHours: 160,
-      workDays: 20,
-      averageHours: 8,
-      overtimeHours: 0,
-    };
+    try {
+      // Service가 있으면 실제 DB 조회
+      if (this.worktimeService) {
+        const monthStats = await this.worktimeService.getMonthStats(userId);
+        return monthStats;
+      }
+
+      // 🔥 더미 데이터에 필요한 필드 추가!
+      return {
+        monthStart: TimeHelper.format(TimeHelper.getMonthStart(), "date"),
+        monthEnd: TimeHelper.format(TimeHelper.getMonthEnd(), "date"),
+        workDays: 20,
+        totalHours: 160,
+        averageHours: 8,
+        avgDailyHours: 8,
+        overtimeHours: 0,
+        achievements: [],
+        lastMonth: {
+          workDays: 22,
+          totalHours: 176,
+          overtimeHours: 5,
+        },
+      };
+    } catch (error) {
+      logger.error("월간 통계 조회 실패:", error);
+
+      return {
+        monthStart: TimeHelper.format(TimeHelper.getMonthStart(), "date"),
+        monthEnd: TimeHelper.format(TimeHelper.getMonthEnd(), "date"),
+        workDays: 0,
+        totalHours: 0,
+        avgDailyHours: 0,
+        overtimeHours: 0,
+        achievements: [],
+      };
+    }
   }
 
   async getComprehensiveStats(userId) {
-    // 전체 통계 로직
-    return {
-      totalWorkDays: 100,
-      totalHours: 800,
-      averageHours: 8,
-      longestDay: 10,
-      shortestDay: 6,
-    };
+    try {
+      // Service가 있으면 실제 DB 조회
+      if (this.worktimeService) {
+        const stats = await this.worktimeService.getComprehensiveStats(userId);
+        return stats;
+      }
+
+      // 🔥 전체 통계 더미 데이터
+      return {
+        totalWorkDays: 100,
+        totalHours: 800,
+        averageHours: 8,
+        longestDay: 10,
+        shortestDay: 6,
+        // 추가 통계 정보
+        firstWorkDate: TimeHelper.format(new Date(2024, 0, 1), "date"),
+        lastWorkDate: TimeHelper.format(new Date(), "date"),
+        currentStreak: 5,
+        longestStreak: 15,
+        monthlyAverage: 160,
+      };
+    } catch (error) {
+      logger.error("전체 통계 조회 실패:", error);
+
+      return {
+        totalWorkDays: 0,
+        totalHours: 0,
+        averageHours: 0,
+        longestDay: 0,
+        shortestDay: 0,
+      };
+    }
   }
 
   async getWorkHistory(userId, days) {
-    // 근무 이력 로직
-    return {
-      days: days,
-      records: [],
-      totalHours: 0,
-    };
+    try {
+      // Service가 있으면 실제 DB 조회
+      if (this.worktimeService) {
+        const history = await this.worktimeService.getWorkHistory(userId, days);
+        return history;
+      }
+
+      // 🔥 근무 이력 더미 데이터
+      const records = [];
+      const today = new Date();
+
+      // 최근 7일 더미 데이터 생성
+      for (let i = 0; i < Math.min(days, 7); i++) {
+        const date = new Date(today);
+        date.setDate(date.getDate() - i);
+
+        if (TimeHelper.isWorkday(date)) {
+          records.push({
+            date: TimeHelper.format(date, "date"),
+            checkInTime: new Date(date.setHours(9, 0, 0)),
+            checkOutTime: new Date(date.setHours(18, 0, 0)),
+            workDuration: 480,
+            status: "completed",
+          });
+        }
+      }
+
+      return {
+        days: days,
+        records: records,
+        totalHours: records.length * 8,
+        summary: {
+          totalDays: days,
+          workDays: records.length,
+          totalHours: records.length * 8,
+          avgHours: 8,
+        },
+      };
+    } catch (error) {
+      logger.error("근무 이력 조회 실패:", error);
+
+      return {
+        days: days,
+        records: [],
+        totalHours: 0,
+        summary: {
+          totalDays: days,
+          workDays: 0,
+          totalHours: 0,
+          avgHours: 0,
+        },
+      };
+    }
   }
 
   getStatus() {

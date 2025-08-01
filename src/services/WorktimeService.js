@@ -94,31 +94,110 @@ class WorktimeService extends BaseService {
     try {
       const today = TimeHelper.getTodayDateString();
 
-      // 기존 기록 확인
-      const existing = await this.models.Worktime.findOne({
+      const existingRecord = await this.models.Worktime.findOne({
         userId: userId,
         date: today,
         isActive: true,
       });
 
-      if (existing && existing.checkInTime) {
-        throw new Error("이미 출근 기록이 있습니다.");
+      // 🔥 이미 출근했고 아직 퇴근 안한 경우만 에러
+      if (
+        existingRecord &&
+        existingRecord.checkInTime &&
+        !existingRecord.checkOutTime
+      ) {
+        throw new Error("이미 출근 중입니다.");
       }
 
-      // 새 출근 기록 생성
       const checkInTime = new Date();
-      const record = await this.models.Worktime.create({
-        userId: userId,
-        date: today,
-        checkInTime: checkInTime,
-        status: "working",
-        isActive: true,
-      });
+      let record;
 
-      logger.info(`✅ 출근 기록 생성: ${userId}`);
+      if (existingRecord && existingRecord.checkOutTime) {
+        // 🔥 오늘 이미 퇴근한 기록이 있으면 새로 만들기
+        record = await this.models.Worktime.create({
+          userId: userId,
+          date: today,
+          checkInTime: checkInTime,
+          status: "working",
+          isActive: true,
+        });
+      } else if (existingRecord) {
+        // 기존 레코드 업데이트
+        existingRecord.checkInTime = checkInTime;
+        existingRecord.status = "working";
+        record = await existingRecord.save();
+      } else {
+        // 새 레코드 생성
+        record = await this.models.Worktime.create({
+          userId: userId,
+          date: today,
+          checkInTime: checkInTime,
+          status: "working",
+          isActive: true,
+        });
+      }
+
+      logger.info(`✅ 출근 기록: ${userId} at ${checkInTime}`);
       return this.safeTransformRecord(record);
     } catch (error) {
       logger.error("출근 처리 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🏠 퇴근 처리
+   */
+  async checkOut(userId) {
+    try {
+      const today = TimeHelper.getTodayDateString();
+
+      // 🔥 쿼리 수정: checkOutTime이 null이거나 없는 경우
+      const record = await this.models.Worktime.findOne({
+        userId: userId,
+        date: today,
+        checkInTime: { $ne: null }, // null이 아닌 경우
+        checkOutTime: null, // null인 경우 (아직 퇴근 안함)
+        isActive: true,
+      });
+
+      if (!record) {
+        throw new Error("출근 기록이 없습니다.");
+      }
+
+      // 퇴근 시간 업데이트
+      const checkOutTime = new Date();
+      const workDuration = TimeHelper.diffMinutes(
+        record.checkInTime,
+        checkOutTime
+      );
+
+      record.checkOutTime = checkOutTime;
+      record.workDuration = workDuration;
+      record.status = "completed";
+
+      // 초과근무 계산
+      const regularHours = Math.min(workDuration, 480); // 8시간
+      const overtimeMinutes = Math.max(0, workDuration - 480);
+
+      record.regularHours = Math.floor(regularHours / 60);
+      record.overtimeHours = Math.floor(overtimeMinutes / 60);
+
+      if (overtimeMinutes > 0) {
+        record.workType = "overtime";
+      }
+
+      await record.save();
+
+      logger.info(`✅ 퇴근 기록: ${userId} - ${workDuration}분 근무`);
+
+      // 안전하게 변환해서 반환
+      const transformed = this.safeTransformRecord(record);
+      transformed.overtimeMinutes = overtimeMinutes;
+
+      return transformed;
+    } catch (error) {
+      logger.error("퇴근 처리 실패:", error);
       throw error;
     }
   }
@@ -130,20 +209,20 @@ class WorktimeService extends BaseService {
     try {
       const today = TimeHelper.getTodayDateString();
 
+      // 🔥 오늘의 가장 최근 기록 하나만 가져오기
       const record = await this.models.Worktime.findOne({
         userId: userId,
         date: today,
         isActive: true,
-      });
+      }).sort({ createdAt: -1 }); // 최신순 정렬
 
       if (!record) {
         return null;
       }
 
-      // 안전한 변환 적용
       const transformed = this.safeTransformRecord(record);
 
-      // 현재 근무 중이면 실시간 계산
+      // 현재 근무 중인지 확인
       if (transformed.checkInTime && !transformed.checkOutTime) {
         const currentDuration = this.calculateCurrentWorkDuration(
           transformed.checkInTime,

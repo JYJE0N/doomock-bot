@@ -273,10 +273,21 @@ ${
   async renderCheckoutSuccess(data, ctx) {
     const { record, workSummary, message } = data;
 
+    let workStatus = "";
+    if (workSummary?.workDuration < 60) {
+      workStatus = "😅 짧은 근무";
+    } else if (workSummary?.workDuration < 240) {
+      workStatus = "⏱️ 반일 근무";
+    } else if (workSummary?.isOvertime) {
+      workStatus = "🔥 초과근무";
+    } else {
+      workStatus = "👍 정상근무";
+    }
+
     const text = `🏠 **퇴근 완료!**
 
 ⏰ 총 근무시간: ${workSummary?.displayTime || "0:00"}
-${workSummary?.isOvertime ? "🔥 초과근무" : "👍 정상근무"}
+${workStatus}
 
 수고하셨습니다! 푹 쉬세요 😊`;
 
@@ -284,8 +295,8 @@ ${workSummary?.isOvertime ? "🔥 초과근무" : "👍 정상근무"}
       inline_keyboard: [
         [
           {
-            text: "📈 주간 통계",
-            callback_data: this.buildCallbackData("worktime", "week"),
+            text: "📅 오늘 현황",
+            callback_data: this.buildCallbackData("worktime", "today"),
           },
           {
             text: "🔙 메뉴",
