@@ -66,6 +66,12 @@ class BaseModule {
       // 자식 클래스의 초기화 로직 호출
       await this.onInitialize();
 
+      // 액션 설정 호출
+      this.setupActions();
+
+      // 액션 핸들러 매개변수 검증
+      this.validateActionHandlers();
+
       this.isInitialized = true;
       logger.success(`✅ ${this.moduleName} 초기화 완료`);
     } catch (error) {
@@ -76,19 +82,32 @@ class BaseModule {
 
   /**
    * 🎯 자식 클래스에서 구현할 초기화 메서드
-   * 서비스 연결, DB 초기화, 액션 등록 등을 수행
+   * 서비스 연결, DB 초기화 등을 수행
    */
   async onInitialize() {
     // 자식 클래스에서 구현
-    // 예: 서비스 연결, setupActions() 호출 등
+    // 예: 서비스 연결 등
   }
 
   /**
-   * 🎯 액션 등록 (자식 클래스에서 구현)
+   * 🎯 액션 등록 (자식 클래스에서 필수 구현)
    */
   setupActions() {
     // 자식 클래스에서 구현
-    // 예: this.registerActions({ menu: this.showMenu, ... });
+    throw new Error(`${this.moduleName}: setupActions() must be implemented`);
+  }
+
+  /**
+   * 🔍 액션 핸들러 매개변수 검증
+   */
+  validateActionHandlers() {
+    for (const [actionName, handler] of this.actionMap.entries()) {
+      if (handler.length !== 5) {
+        logger.warn(
+          `⚠️ ${this.moduleName}.${actionName} 핸들러가 표준 매개변수 5개를 받지 않습니다 (현재: ${handler.length}개)`
+        );
+      }
+    }
   }
 
   /**

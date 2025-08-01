@@ -2,21 +2,13 @@
 const logger = require("../utils/Logger");
 const { getEnabledModules } = require("../config/ModuleRegistry");
 
-/**
- * 🎯 ModuleManager - 중앙 모듈 관리자 (매개변수 전달 수정)
- *
- * ✅ 핵심 수정사항:
- * - NavigationHandler 파서 표준에 맞는 매개변수 전달
- * - 표준: (bot, callbackQuery, subAction, params, moduleManager)
- * - 모든 모듈이 동일한 매개변수 순서로 호출받음
- */
 class ModuleManager {
   constructor(options = {}) {
     this.bot = options.bot;
     this.serviceBuilder = options.serviceBuilder;
     this.modules = new Map();
+    this.navigationHandler = null; // 중복 제거를 위해 하나만
 
-    // 📊 통계
     this.stats = {
       modulesLoaded: 0,
       callbacksProcessed: 0,
@@ -29,16 +21,14 @@ class ModuleManager {
   }
 
   /**
-   * 🎯 ModuleManager 초기화 (BotController 호환)
+   * 🎯 ModuleManager 초기화
    */
   async initialize(bot, options = {}) {
     try {
       logger.info("🎯 ModuleManager 초기화 시작...");
 
-      // bot 인스턴스 설정
       this.bot = bot;
 
-      // 데이터베이스 매니저들 설정
       if (options.dbManager) {
         this.dbManager = options.dbManager;
       }
@@ -47,29 +37,21 @@ class ModuleManager {
         this.mongooseManager = options.mongooseManager;
       }
 
-      // ServiceBuilder 설정 (BotController에서는 전달 안함)
       if (!this.serviceBuilder) {
         const { createServiceBuilder } = require("./ServiceBuilder");
         this.serviceBuilder = createServiceBuilder();
         logger.debug("✅ ServiceBuilder 생성됨");
       }
 
-      // ServiceBuilder에 데이터베이스 매니저들 설정
       if (this.dbManager) {
         this.serviceBuilder.setDatabaseManager(this.dbManager);
-        logger.debug("✅ DatabaseManager → ServiceBuilder 연결");
       }
 
       if (this.mongooseManager) {
         this.serviceBuilder.setMongooseManager(this.mongooseManager);
-        logger.debug("✅ MongooseManager → ServiceBuilder 연결");
       }
 
-      // ServiceBuilder 초기화
       await this.serviceBuilder.initialize();
-      logger.debug("✅ ServiceBuilder 초기화 완료");
-
-      // 모듈들 로드
       await this.loadModules(bot);
 
       logger.success("✅ ModuleManager 초기화 완료");
@@ -80,12 +62,7 @@ class ModuleManager {
   }
 
   /**
-   * 🎯 콜백 처리 (수정된 매개변수 전달)
-   *
-   * NavigationHandler에서 오는 표준 형식:
-   * - moduleKey: 모듈 식별자
-   * - subAction: 실행할 액션
-   * - params: 매개변수들
+   * 🎯 콜백 처리 (표준 매개변수 전달)
    */
   async handleCallback(bot, callbackQuery, moduleKey, subAction, params) {
     try {
@@ -130,9 +107,9 @@ class ModuleManager {
       const result = await moduleInstance.handleCallback(
         bot, // 1번째: bot 인스턴스
         callbackQuery, // 2번째: 텔레그램 콜백쿼리
-        subAction, // 3번째: 실행할 액션 ✅ 수정됨!
-        params, // 4번째: 매개변수들 ✅ 수정됨!
-        this // 5번째: ModuleManager 인스턴스 ✅ 수정됨!
+        subAction, // 3번째: 실행할 액션
+        params, // 4번째: 매개변수들
+        this // 5번째: ModuleManager 인스턴스
       );
 
       // 4. 결과 검증 및 표준화
@@ -153,10 +130,10 @@ class ModuleManager {
         hasData: !!result.data,
       });
 
-      // 6. 결과에 모듈 정보 추가 (렌더러가 사용)
+      // 6. 결과에 모듈 정보 추가
       return {
         ...result,
-        module: result.module || moduleKey, // 모듈명 보장
+        module: result.module || moduleKey,
         processedBy: "ModuleManager",
         timestamp: new Date(),
       };
@@ -181,146 +158,41 @@ class ModuleManager {
   }
 
   /**
-   * 💬 메시지 처리 (표준 매개변수)
-   */
-  async handleMessage(bot, msg) {
-    try {
-      this.stats.messagesProcessed++;
-      this.stats.lastActivity = new Date();
-
-      logger.debug(`💬 ModuleManager 메시지 처리:`, {
-        userId: msg.from.id,
-        text: msg.text?.substring(0, 50) + (msg.text?.length > 50 ? "..." : ""),
-        type: msg.type,
-      });
-
-      // 모든 모듈에서 메시지 처리 시도
-      for (const [moduleKey, moduleInstance] of this.modules.entries()) {
-        if (!moduleInstance.isInitialized) {
-          continue; // 초기화되지 않은 모듈은 건너뛰기
-        }
-
-        if (typeof moduleInstance.onHandleMessage === "function") {
-          try {
-            // ✅ 표준 매개변수로 메시지 처리 호출
-            const handled = await moduleInstance.onHandleMessage(bot, msg);
-
-            if (handled) {
-              logger.debug(`✅ ${moduleKey} 모듈에서 메시지 처리됨`);
-              return true;
-            }
-          } catch (error) {
-            logger.error(`❌ ${moduleKey} 모듈 메시지 처리 오류:`, error);
-            // 한 모듈 실패해도 다른 모듈 계속 시도
-          }
-        }
-      }
-
-      logger.debug(`💫 어떤 모듈도 메시지를 처리하지 않음`);
-      return false;
-    } catch (error) {
-      logger.error(`💥 ModuleManager 메시지 처리 오류:`, error);
-      this.stats.errorsCount++;
-      return false;
-    }
-  }
-
-  /**
-   * 🏗️ 모듈 로드 (표준 생성자 매개변수)
+   * 🎯 모듈 로드
    */
   async loadModules(bot) {
-    const moduleConfigs = getEnabledModules();
+    const enabledModules = getEnabledModules();
 
-    logger.info(`📦 ${moduleConfigs.length}개의 모듈을 로드합니다...`);
-
-    for (const config of moduleConfigs) {
+    for (const config of enabledModules) {
       try {
-        logger.debug(`📁 모듈 로드 시작: ${config.key}`);
+        logger.info(`📦 [${config.key}] 모듈 로드 시작...`);
 
-        // 모듈 클래스 로드
         const ModuleClass = require(config.path);
 
-        // ✅ BaseModule 표준 생성자 매개변수로 인스턴스 생성
         const moduleInstance = new ModuleClass(config.key, {
-          bot: bot, // BaseModule이 기대하는 구조
-          moduleManager: this, // ModuleManager 인스턴스
-          serviceBuilder: this.serviceBuilder, // 서비스 빌더
-          config: config.config || {}, // 모듈별 설정
+          bot: bot,
+          moduleManager: this,
+          serviceBuilder: this.serviceBuilder,
+          config: config.config || {},
         });
 
-        // 모듈 초기화
         await moduleInstance.initialize();
-
-        // 모듈 등록
         this.modules.set(config.key, moduleInstance);
 
         logger.success(`✅ [${config.key}] 모듈 로드 완료`);
       } catch (error) {
         logger.error(`💥 [${config.key}] 모듈 로드 실패:`, error);
-
-        // ✅ 모든 모듈 실패를 허용 - 개별 모듈 실패가 전체를 중단시키지 않음
         logger.warn(`⚠️ ${config.key} 모듈 로드 실패했지만 계속 진행합니다`);
-        continue; // 다음 모듈로 계속 진행
+        continue;
       }
     }
 
     this.stats.modulesLoaded = this.modules.size;
     logger.success(`✅ ${this.modules.size}개 모듈 로드 완료`);
-
-    // 로드된 모듈 목록 로그
-    const loadedModules = Array.from(this.modules.keys());
-    logger.info(`📋 로드된 모듈: ${loadedModules.join(", ")}`);
   }
 
   /**
-   * 📋 모듈 가져오기
-   */
-  async restartModule(moduleKey) {
-    // <- 함수 이름을 restartModule로 변경
-    try {
-      logger.info(`🔄 ${moduleKey} 모듈 재시작 시작...`);
-
-      // 모듈 설정 찾기
-      const config = getEnabledModules().find((m) => m.key === moduleKey);
-      if (!config) {
-        throw new Error(`모듈 설정을 찾을 수 없습니다: ${moduleKey}`);
-      }
-
-      // 기존 모듈 정리
-      const oldModule = this.modules.get(moduleKey);
-      if (oldModule && typeof oldModule.cleanup === "function") {
-        await oldModule.cleanup();
-        logger.debug(`🧹 ${moduleKey} 기존 모듈 정리 완료`);
-      }
-
-      // 모듈 캐시에서 제거 (재로드 위해)
-      delete require.cache[require.resolve(config.path)];
-
-      // 새 모듈 인스턴스 생성
-      const ModuleClass = require(config.path);
-
-      // ✅ 표준 생성자 매개변수 사용
-      const moduleInstance = new ModuleClass(moduleKey, {
-        bot: this.bot,
-        moduleManager: this,
-        serviceBuilder: this.serviceBuilder,
-        config: config.config || {},
-      });
-
-      // 초기화 및 등록
-      await moduleInstance.initialize();
-      this.modules.set(moduleKey, moduleInstance);
-
-      logger.success(`✅ ${moduleKey} 모듈 재시작 완료`);
-      return true;
-    } catch (error) {
-      logger.error(`❌ ${moduleKey} 모듈 재시작 실패:`, error);
-      throw error;
-    }
-  }
-
-  /**
-   * 🎯 ModuleManager와 NavigationHandler 상호 참조 설정
+   * 🎯 NavigationHandler 연결 (중복 제거)
    */
   setNavigationHandler(navigationHandler) {
     this.navigationHandler = navigationHandler;
@@ -335,114 +207,40 @@ class ModuleManager {
   }
 
   /**
-   * 🎯 ModuleManager와 NavigationHandler 상호 참조 설정
+   * 모듈 재시작
    */
-  setNavigationHandler(navigationHandler) {
-    this.navigationHandler = navigationHandler;
-    logger.debug("🔗 NavigationHandler 연결됨");
-  }
-
-  // `getModule` 함수로 감싸주어야 합니다.
-  getModule(moduleKey) {
-    return this.modules.get(moduleKey);
-  }
-
-  /**
-   * 📋 모든 모듈 목록
-   */
-  getModuleList() {
-    return Array.from(this.modules.keys());
-  }
-
-  /**
-   * 📊 상태 조회
-   */
-  getStatus() {
-    const moduleStatus = {};
-
-    // 각 모듈 상태 수집
-    for (const [key, module] of this.modules.entries()) {
-      moduleStatus[key] = {
-        initialized: module.isInitialized || false,
-        stats: module.stats || {},
-        hasService: !!module.serviceInstance,
-        lastActivity: module.stats?.lastActivity || null,
-        errorCount: module.stats?.errorsCount || 0,
-      };
-    }
-
-    return {
-      serviceName: "ModuleManager",
-      stats: {
-        ...this.stats,
-        successRate:
-          this.stats.callbacksProcessed > 0
-            ? Math.round(
-                ((this.stats.callbacksProcessed - this.stats.errorsCount) /
-                  this.stats.callbacksProcessed) *
-                  100
-              )
-            : 100,
-      },
-      modules: {
-        total: this.modules.size,
-        loaded: this.stats.modulesLoaded,
-        active: Array.from(this.modules.values()).filter((m) => m.isInitialized)
-          .length,
-        details: moduleStatus,
-      },
-      lastActivity: this.stats.lastActivity,
-    };
-  }
-
-  /**
-   * 🧹 모든 모듈 정리
-   */
-  async cleanup() {
+  async restartModule(moduleKey) {
     try {
-      logger.info("🧹 ModuleManager 정리 시작...");
+      logger.info(`🔄 ${moduleKey} 모듈 재시작 시작...`);
 
-      // 모든 모듈 정리
-      const cleanupPromises = [];
-
-      for (const [key, module] of this.modules.entries()) {
-        if (typeof module.cleanup === "function") {
-          cleanupPromises.push(
-            module
-              .cleanup()
-              .then(() => logger.debug(`✅ ${key} 모듈 정리 완료`))
-              .catch((error) =>
-                logger.error(`❌ ${key} 모듈 정리 실패:`, error)
-              )
-          );
-        }
+      const config = getEnabledModules().find((m) => m.key === moduleKey);
+      if (!config) {
+        throw new Error(`모듈 설정을 찾을 수 없습니다: ${moduleKey}`);
       }
 
-      // 모든 모듈 정리 대기
-      await Promise.allSettled(cleanupPromises);
-
-      // 서비스 빌더 정리
-      if (
-        this.serviceBuilder &&
-        typeof this.serviceBuilder.cleanup === "function"
-      ) {
-        await this.serviceBuilder.cleanup();
-        logger.debug("✅ ServiceBuilder 정리 완료");
+      const oldModule = this.modules.get(moduleKey);
+      if (oldModule && typeof oldModule.cleanup === "function") {
+        await oldModule.cleanup();
+        logger.debug(`🧹 ${moduleKey} 기존 모듈 정리 완료`);
       }
 
-      // 상태 초기화
-      this.modules.clear();
-      this.stats = {
-        modulesLoaded: 0,
-        callbacksProcessed: 0,
-        messagesProcessed: 0,
-        errorsCount: 0,
-        lastActivity: null,
-      };
+      delete require.cache[require.resolve(config.path)];
 
-      logger.success("✅ ModuleManager 정리 완료");
+      const ModuleClass = require(config.path);
+      const moduleInstance = new ModuleClass(moduleKey, {
+        bot: this.bot,
+        moduleManager: this,
+        serviceBuilder: this.serviceBuilder,
+        config: config.config || {},
+      });
+
+      await moduleInstance.initialize();
+      this.modules.set(moduleKey, moduleInstance);
+
+      logger.success(`✅ ${moduleKey} 모듈 재시작 완료`);
+      return true;
     } catch (error) {
-      logger.error("❌ ModuleManager 정리 실패:", error);
+      logger.error(`❌ ${moduleKey} 모듈 재시작 실패:`, error);
       throw error;
     }
   }

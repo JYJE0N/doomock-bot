@@ -54,7 +54,7 @@ class LeaveRenderer extends BaseRenderer {
       text += `• 사용률: ${status.usageRate}%\n\n`;
 
       // 진행률 바
-      const progress = this.createProgressBar(status.used, status.annual);
+      const progress = data.progressBar;
       text += `${progress}\n\n`;
     }
 
