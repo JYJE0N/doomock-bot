@@ -24,7 +24,21 @@ class TodoRenderer extends BaseRenderer {
       case "add_success":
         return await this.renderAddSuccess(data, ctx);
       case "add_error":
-        return await this.renderAddError(data, ctx);
+        return await this.renderAddError(data, ctx); // 렌더링 함수 추가
+      // 👇 누락된 case들 추가
+      case "delete_confirm":
+        return await this.renderDeleteConfirm(data, ctx);
+      case "delete_success":
+        await ctx.answerCbQuery("✅ 삭제되었습니다.");
+        // 삭제 성공 후 목록을 다시 보여주기 위해 showList를 직접 호출
+        return await this.showList(bot, ctx.callbackQuery, "1", moduleManager);
+      // 👆 여기까지 추가
+      case "delete_confirm":
+        return await this.renderDeleteConfirm(data, ctx); // 렌더링 함수 추가
+      case "delete_success":
+        // 성공 시 간단한 메시지를 보내거나 목록을 새로고침 할 수 있습니다.
+        await ctx.answerCbQuery("✅ 삭제되었습니다.");
+        return await this.renderList(data.updatedList, ctx);
       case "error":
         return await this.renderError(data, ctx);
       default:
@@ -53,7 +67,7 @@ class TodoRenderer extends BaseRenderer {
         ],
         [{ text: "🔙 메인 메뉴", action: "menu" }],
       ],
-      "system"
+      this.moduleName
     ); // 메인 메뉴는 system으로
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -73,7 +87,7 @@ class TodoRenderer extends BaseRenderer {
       todos.forEach((todo, index) => {
         const status = todo.completed ? "✅" : "⬜";
         const number = (currentPage - 1) * 8 + index + 1;
-        text += `${status} **${number}.** ${todo.title}\n`;
+        text += `${status} **${number}.** ${todo.text}\n`;
 
         if (todo.description) {
           text += `   _${todo.description}_\n`;
@@ -223,9 +237,47 @@ ${data.message}
           { text: "🔙 메인 메뉴", action: "menu" },
         ],
       ],
-      "system"
+      this.moduleName // "system" 대신 this.moduleName 사용
     );
 
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * ➕ 추가 오류 렌더링 (누락된 메서드 추가)
+   */
+  async renderAddError(data, ctx) {
+    const text = `❌ **할일 추가 실패**\n\n${data.message}`;
+    const keyboard = this.createInlineKeyboard(
+      [
+        [{ text: "🔄 다시 시도", action: "add" }],
+        [{ text: "🔙 메뉴로", action: "menu" }],
+      ],
+      this.moduleName
+    );
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * 🗑️ 삭제 확인 렌더링 (누락된 메서드 추가)
+   */
+  async renderDeleteConfirm(data, ctx) {
+    const { todo } = data;
+    const text = `🗑️ **삭제 확인**\n\n정말로 아래 할일을 삭제하시겠습니까?\n\n- "${todo.text}"`; // 👈 여기도 .title을 .text로 변경
+    const keyboard = this.createInlineKeyboard(
+      [
+        [
+          // 👇 action을 'executeDelete'로 수정
+          {
+            text: "✅ 예, 삭제합니다.",
+            action: "executeDelete",
+            params: todo._id.toString(),
+          },
+          { text: "❌ 아니요", action: "list", params: "1" },
+        ],
+      ],
+      this.moduleName
+    );
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 }

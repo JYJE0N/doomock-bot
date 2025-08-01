@@ -330,8 +330,39 @@ class NavigationHandler {
     try {
       logger.debug("📨 텍스트 메시지 수신:", ctx.message?.text);
 
-      // 여기에 텍스트 메시지 처리 로직 추가
-      // 예: 모듈별 키워드 매칭, 자연어 처리 등
+      // 등록된 모든 모듈을 순회합니다.
+      for (const module of this.moduleManager.modules.values()) {
+        // 각 모듈에 메시지를 처리할 기능(onHandleMessage)이 있는지 확인합니다.
+        if (typeof module.onHandleMessage === "function") {
+          const result = await module.onHandleMessage(this.bot, ctx.message);
+
+          // 모듈이 메시지를 성공적으로 처리했다면(null이나 false가 아닌 값을 반환했다면)
+          if (result) {
+            logger.debug(`✅ ${module.moduleName} 모듈이 메시지 처리함`, {
+              resultType: result.type,
+            });
+
+            // 해당 모듈의 렌더러를 찾아 결과를 화면에 표시합니다.
+            const renderer = this.renderers.get(
+              result.module || module.moduleName
+            );
+            if (renderer) {
+              await renderer.render(result, ctx);
+            } else {
+              logger.warn(
+                `📱 렌더러 없음: ${result.module || module.moduleName}`
+              );
+              await this.errorHandler.handleMissingRenderer(
+                ctx,
+                result.module || module.moduleName,
+                result
+              );
+            }
+            // 메시지 처리를 완료했으므로 루프를 중단합니다.
+            return;
+          }
+        }
+      }
     } catch (error) {
       // 🎯 ErrorHandler 위임
       await this.errorHandler.handleUnexpectedError(

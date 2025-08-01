@@ -54,6 +54,8 @@ class TodoModule extends BaseModule {
         WAITING_SEARCH_INPUT: "waiting_search_input",
       },
     };
+    // ===== 🎯 1. userStates Map 추가 =====
+    this.userStates = new Map();
 
     logger.info("📋 TodoModule 생성됨 (표준화 완료)");
   }
@@ -71,7 +73,7 @@ class TodoModule extends BaseModule {
       }
 
       // 액션 등록 (표준 패턴)
-      // this.setupActions();
+      this.setupActions();
 
       logger.success("📋 TodoModule 초기화 완료 - 표준 준수");
     } catch (error) {
@@ -85,10 +87,10 @@ class TodoModule extends BaseModule {
    */
   setupActions() {
     // registerActions 메서드 사용 (표준)
-    this.registerActions({
-      // 메인 메뉴 및 네비게이션
-      menu: this.showMenu,
-      help: this.showHelp,
+    tthis.registerActions({
+      // ... (기존 list, add 등)
+      delete: this.confirmDelete,
+      executeDelete: this.executeDelete,
 
       // CRUD 작업
       list: this.showList,
@@ -406,8 +408,9 @@ class TodoModule extends BaseModule {
    */
   async executeDelete(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
+    const todoId = params; // params는 이제 순수한 ID입니다.
 
-    if (!params) {
+    if (!todoId) {
       return {
         type: "error",
         module: "todo",
@@ -420,8 +423,9 @@ class TodoModule extends BaseModule {
     }
 
     try {
-      const todoId = params;
       const result = await this.todoService.deleteTodo(userId, todoId);
+
+      return await this.showList(bot, callbackQuery, "1", moduleManager);
 
       if (!result.success) {
         return {
@@ -635,6 +639,19 @@ class TodoModule extends BaseModule {
         },
       };
     }
+  }
+
+  // ===== 🎯 2. 상태 관리 헬퍼 메서드 추가 =====
+  setUserState(userId, state) {
+    this.userStates.set(userId.toString(), state);
+  }
+
+  getUserState(userId) {
+    return this.userStates.get(userId.toString());
+  }
+
+  clearUserState(userId) {
+    return this.userStates.delete(userId.toString());
   }
 
   /**

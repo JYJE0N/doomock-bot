@@ -31,7 +31,8 @@ class SystemRenderer extends BaseRenderer {
       case "about":
         return await this.renderAbout(data, ctx);
       case "error":
-        return await this.renderError(data, ctx);
+        // data가 아닌 result 객체 전체를 전달합니다.
+        return await this.renderError(result, ctx);
       default:
         logger.warn(`🖥️ 지원하지 않는 렌더링 타입: ${type}`);
         return await this.renderError(
