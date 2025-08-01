@@ -51,7 +51,7 @@ class FortuneModule extends BaseModule {
    * 🎯 모듈 초기화
    */
   async onInitialize() {
-    this.fortuneService = this.serviceBuilder.getServiceInstance("fortune");
+    this.fortuneService = this.serviceBuilder.getOrCreate("fortune");
 
     if (!this.fortuneService) {
       logger.warn("FortuneService 없음 - 더미 모드로 동작");

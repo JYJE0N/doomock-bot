@@ -26,7 +26,7 @@ class LeaveModule extends BaseModule {
    * 🎯 모듈 초기화
    */
   async onInitialize() {
-    this.leaveService = this.serviceBuilder.getServiceInstance("leave");
+    this.leaveService = this.serviceBuilder.getOrCreate("leave");
 
     if (!this.leaveService) {
       throw new Error("LeaveService를 찾을 수 없습니다");

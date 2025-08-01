@@ -71,7 +71,7 @@ class TodoModule extends BaseModule {
       }
 
       // 액션 등록 (표준 패턴)
-      this.setupActions();
+      // this.setupActions();
 
       logger.success("📋 TodoModule 초기화 완료 - 표준 준수");
     } catch (error) {

@@ -1,6 +1,6 @@
 // src/core/ModuleManager.js - 매개변수 전달 수정 버전
 const logger = require("../utils/Logger");
-const { getEnabledModules } = require("../config/ModuleRegistry");
+const { getAllEnabledModules } = require("../config/ModuleRegistry");
 
 class ModuleManager {
   constructor(options = {}) {
@@ -154,7 +154,7 @@ class ModuleManager {
    * 🎯 모듈 로드
    */
   async loadModules(bot) {
-    const enabledModules = getEnabledModules();
+    const enabledModules = getAllEnabledModules();
 
     for (const config of enabledModules) {
       try {
@@ -206,7 +206,7 @@ class ModuleManager {
     try {
       logger.info(`🔄 ${moduleKey} 모듈 재시작 시작...`);
 
-      const config = getEnabledModules().find((m) => m.key === moduleKey);
+      const config = getAllEnabledModules().find((m) => m.key === moduleKey);
       if (!config) {
         throw new Error(`모듈 설정을 찾을 수 없습니다: ${moduleKey}`);
       }

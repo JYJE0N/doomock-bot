@@ -18,6 +18,7 @@ class ServiceBuilder {
     this.services = new Map();
     this.serviceInstances = new Map();
     this.mongooseManager = null;
+    this.isInitialized = false; // 추가: 초기화 상태 플래그
   }
 
   setMongooseManager(mongooseManager) {
@@ -30,8 +31,18 @@ class ServiceBuilder {
       return;
     }
 
-    // 초기화 로직...
-    this.isInitialized = true;
+    try {
+      logger.info("🏭 ServiceBuilder 초기화 시작...");
+
+      // ✅ 핵심: 서비스 자동 등록 호출!
+      await this.autoRegisterServices();
+
+      this.isInitialized = true;
+      logger.success("✅ ServiceBuilder 초기화 완료");
+    } catch (error) {
+      logger.error("❌ ServiceBuilder 초기화 실패:", error);
+      throw error;
+    }
   }
 
   async autoRegisterServices() {
