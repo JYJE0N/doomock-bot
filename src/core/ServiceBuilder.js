@@ -36,22 +36,47 @@ class ServiceBuilder {
 
   async autoRegisterServices() {
     const servicesDir = path.join(__dirname, "..", "services");
+
+    // 디렉토리 존재 확인
+    if (!fs.existsSync(servicesDir)) {
+      logger.error(`❌ 서비스 디렉토리가 없습니다: ${servicesDir}`);
+      return;
+    }
+
+    logger.debug(`📂 서비스 디렉토리 스캔 중: ${servicesDir}`);
+
     const serviceFiles = fs
       .readdirSync(servicesDir)
       .filter(
         (file) => file.endsWith("Service.js") && file !== "BaseService.js"
       );
 
+    logger.info(
+      `📄 발견된 서비스 파일: ${serviceFiles.length}개`,
+      serviceFiles
+    );
+
     for (const file of serviceFiles) {
       try {
+        // 서비스 이름 추출 (TodoService.js -> todo)
         const serviceName = file.replace("Service.js", "").toLowerCase();
         const ServiceClass = require(path.join(servicesDir, file));
+
+        // 클래스인지 확인
+        if (typeof ServiceClass !== "function") {
+          logger.warn(`⚠️ ${file}이 올바른 클래스가 아닙니다`);
+          continue;
+        }
+
         this.services.set(serviceName, ServiceClass);
-        logger.debug(`📦 ${serviceName} 서비스 클래스 등록됨`);
+        logger.success(`✅ ${serviceName} 서비스 클래스 등록됨 (${file})`);
       } catch (error) {
         logger.error(`❌ ${file} 등록 실패:`, error);
       }
     }
+
+    // 등록된 서비스 목록 출력
+    logger.info(`📦 등록된 서비스 목록:`, Array.from(this.services.keys()));
   }
 
   async getOrCreate(serviceName) {
@@ -62,12 +87,18 @@ class ServiceBuilder {
   }
 
   async create(serviceName) {
+    logger.debug(`🔍 서비스 생성 시도: ${serviceName}`);
+    logger.debug(`📦 사용 가능한 서비스:`, Array.from(this.services.keys()));
+
     const ServiceClass = this.services.get(serviceName);
     if (!ServiceClass) {
+      logger.error(`❌ 등록된 서비스 목록:`, Array.from(this.services.keys()));
       throw new Error(`서비스를 찾을 수 없음: ${serviceName}`);
     }
 
     try {
+      logger.debug(`🏗️ ${serviceName} 인스턴스 생성 중...`);
+
       // 모든 서비스가 Mongoose 사용
       const instance = new ServiceClass({
         mongooseManager: this.mongooseManager,
@@ -75,6 +106,7 @@ class ServiceBuilder {
 
       // 서비스 초기화
       if (instance.initialize) {
+        logger.debug(`🔧 ${serviceName} 초기화 중...`);
         await instance.initialize();
       }
 

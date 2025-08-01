@@ -20,6 +20,10 @@ class TTSService extends BaseService {
     logger.info("🔊 TTSService 생성됨"); // ✅ 이제 작동함
   }
 
+  getRequiredModels() {
+    return ["TTSHistory"];
+  }
+
   /**
    * 🎯 서비스 초기화
    */

@@ -19,6 +19,10 @@ class LeaveService extends BaseService {
     logger.info("🏖️ LeaveService 생성됨");
   }
 
+  getRequiredModels() {
+    return ["Leave"]; // 나중에 ["TimerSession"] 추가
+  }
+
   /**
    * 🎯 서비스 초기화
    */

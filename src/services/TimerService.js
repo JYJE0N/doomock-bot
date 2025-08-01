@@ -1,4 +1,5 @@
 const BaseService = require("./BaseService");
+const logger = require("../utils/Logger");
 
 /**
  * 🍅 TimerService - 타이머 데이터 서비스 (심플 버전)
@@ -12,7 +13,7 @@ class TimerService extends BaseService {
   }
 
   getRequiredModels() {
-    return []; // 나중에 ["TimerSession"] 추가
+    return ["Timer"]; // 나중에 ["TimerSession"] 추가
   }
 
   async startSession(userId, sessionData) {

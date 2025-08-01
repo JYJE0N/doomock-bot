@@ -65,6 +65,10 @@ class WeatherService extends BaseService {
     logger.info("🌤️ WeatherService 생성됨");
   }
 
+  getRequiredModels() {
+    return ["Weather"]; // 나중에 ["TimerSession"] 추가
+  }
+
   /**
    * 🎯 서비스 초기화
    */
