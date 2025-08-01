@@ -304,18 +304,35 @@ class WorktimeService extends BaseService {
    */
   async getMonthStats(userId) {
     try {
-      const monthStart = TimeHelper.getMonthStart(); // 이제 정상 동작합니다.
-      const monthEnd = TimeHelper.getMonthEnd(); // 이제 정상 동작합니다.
+      const monthStart = TimeHelper.getMonthStart();
+      const monthEnd = TimeHelper.getMonthEnd();
 
+      // 👇 데이터베이스 조회 로직을 추가합니다.
       const records = await this.models.Worktime.find({
-        // ... (DB 조회 로직은 getWeekStats와 유사)
+        userId: userId,
+        date: {
+          $gte: TimeHelper.format(monthStart, "YYYY-MM-DD"),
+          $lte: TimeHelper.format(monthEnd, "YYYY-MM-DD"),
+        },
+        isActive: true,
+        checkOutTime: { $exists: true },
       }).sort({ date: 1 });
 
-      const stats = this.calculateMonthlyStats(records); // 👈 계산 함수 호출
+      const stats = this.calculateMonthlyStats(records);
 
+      // 👇 반환할 데이터 객체를 완성합니다.
       return {
-        // 👈 `createSuccessResponse` 대신 직접 객체 반환
-        // ... (getWeekStats와 동일한 구조로 데이터 반환)
+        monthStart: TimeHelper.format(monthStart, "YYYY-MM-DD"),
+        monthEnd: TimeHelper.format(monthEnd, "YYYY-MM-DD"),
+        workDays: records.length,
+        totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
+        overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
+        avgDailyHours:
+          records.length > 0
+            ? Math.round((stats.totalMinutes / records.length / 60) * 10) / 10
+            : 0,
+        records: records,
+        analysis: this.analyzeMonthlyPattern(records), // 월간 분석 함수 호출
       };
     } catch (error) {
       logger.error("월간 통계 조회 실패:", error);
@@ -393,30 +410,6 @@ class WorktimeService extends BaseService {
       hours: Math.round((minutes / 60) * 10) / 10,
       isOvertime: minutes > this.config.overtimeThreshold,
     };
-  }
-
-  /**
-   * 📊 주간 통계 계산
-   */
-  calculateWeeklyStats(records) {
-    return records.reduce(
-      (stats, record) => {
-        const duration = record.workDuration || 0;
-        const overtime = Math.max(0, duration - this.config.overtimeThreshold);
-
-        return {
-          totalMinutes: stats.totalMinutes + duration,
-          overtimeMinutes: stats.overtimeMinutes + overtime,
-        };
-      },
-      { totalMinutes: 0, overtimeMinutes: 0 }
-    );
-  }
-  /**
-   * 📈 월간 통계 계산
-   */
-  calculateMonthlyStats(records) {
-    return this.calculateWeeklyStats(records); // 주간 통계와 계산 방식이 동일합니다.
   }
 
   /**

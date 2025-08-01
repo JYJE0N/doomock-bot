@@ -213,48 +213,53 @@ class BaseRenderer {
   }
 
   /**
-   * 🛡️ 안전한 메시지 전송 (MarkdownV2 + 폴백 시스템)
+   * 🛡️ 안전한 메시지 전송 (에러 처리 개선 버전)
    */
   async sendSafeMessage(ctx, text, options = {}) {
     this.stats.renderCount++;
     this.stats.lastActivity = new Date();
 
-    // ✅ 기본값을 HTML로 변경 (안전함)
     const defaultOptions = {
-      parse_mode: "HTML", // ← 이것만 변경!
+      parse_mode: "HTML",
       ...options,
     };
 
     try {
-      // ✅ MarkdownV2 → HTML 자동 변환
-      const htmlText = this.convertMarkdownToHtml(text);
+      const htmlText = this.markdownHelper.convertToHtml(text);
 
       if (ctx.callbackQuery) {
-        return await ctx.editMessageText(htmlText, defaultOptions);
+        await ctx.editMessageText(htmlText, defaultOptions);
       } else {
-        return await ctx.reply(htmlText, defaultOptions);
+        await ctx.reply(htmlText, defaultOptions);
       }
+      return true; // 성공적으로 메시지를 보냈거나 수정함
     } catch (error) {
+      // 텔레그램의 "수정된 내용 없음" 오류는 정상적인 상황으로 간주하고 무시합니다.
+      if (error.message.includes("message is not modified")) {
+        logger.debug("🔄 메시지 내용이 동일하여 편집을 건너뜁니다.");
+        // 사용자에게는 로딩이 끝났음을 알려주는 것이 좋습니다.
+        if (ctx.callbackQuery) await ctx.answerCbQuery();
+        return true; // 오류가 아니므로 성공으로 처리
+      }
+
+      // 그 외의 다른 오류일 경우, 일반 텍스트로 폴백을 시도합니다.
       logger.warn("🛡️ HTML 전송 실패, 일반 텍스트로 폴백:", error.message);
       this.stats.fallbackUsed++;
 
       try {
         const plainText = this.stripAllMarkup(text);
+        const fallbackOptions = { ...options, parse_mode: undefined };
 
         if (ctx.callbackQuery) {
-          return await ctx.editMessageText(plainText, {
-            ...options,
-            parse_mode: undefined,
-          });
+          await ctx.editMessageText(plainText, fallbackOptions);
         } else {
-          return await ctx.reply(plainText, {
-            ...options,
-            parse_mode: undefined,
-          });
+          await ctx.reply(plainText, fallbackOptions);
         }
+        return true;
       } catch (fallbackError) {
+        // ✅ catch 블록에 변수를 올바르게 선언합니다.
         logger.error("🚨 폴백 전송도 실패:", fallbackError);
-        throw fallbackError;
+        return false; // 최종 실패
       }
     }
   }

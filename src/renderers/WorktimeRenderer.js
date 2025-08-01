@@ -233,7 +233,7 @@ ${
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
-    // safeEditMessage 대신 표준 sendSafeMessage 사용
+    // sendSafeMessage 대신 표준 sendSafeMessage 사용
     await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "Markdown", // MarkdownV2 대신 Markdown 사용 권장 (더 안정적)
@@ -283,7 +283,7 @@ ${this.getTimeEmoji()} 좋은 아침입니다!
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -329,7 +329,7 @@ ${this.getTimeEmoji()} 수고하셨습니다!
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -368,7 +368,7 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -415,7 +415,7 @@ ${message || "오늘 하루도 수고하셨습니다! 🌙"}`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -456,7 +456,7 @@ ${message || "오늘 하루도 수고하셨습니다! 🌙"}`;
         ],
       };
 
-      return await this.safeEditMessage(ctx, text, {
+      return await this.sendSafeMessage(ctx, text, {
         reply_markup: keyboard,
         // parse_mode: "MarkdownV2",
       });
@@ -556,7 +556,7 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
     ]);
 
     const keyboard = { inline_keyboard: buttons };
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -649,7 +649,7 @@ ${statusIcon} **${record.date}**: ${duration}`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -732,7 +732,7 @@ ${performance.emoji} **평가**: ${performance.txt}`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -809,7 +809,7 @@ ${achievement.emoji} ${achievement.txt}`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -886,7 +886,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -956,7 +956,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -1036,7 +1036,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -1078,7 +1078,7 @@ ${message || "처리 중 문제가 발생했습니다."}`;
 
     const keyboard = { inline_keyboard: buttons };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -1123,7 +1123,7 @@ ${message || "처리 중 문제가 발생했습니다."}`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -1171,7 +1171,7 @@ ${message || "처리 중 문제가 발생했습니다."}`;
       ],
     };
 
-    await this.safeEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
       // parse_mode: "MarkdownV2",
     });
@@ -1247,40 +1247,6 @@ ${message || "처리 중 문제가 발생했습니다."}`;
     if (hour >= 12 && hour < 18) return this.timeEmojis.afternoon;
     if (hour >= 18 && hour < 22) return this.timeEmojis.evening;
     return this.timeEmojis.night;
-  }
-
-  /**
-   * 🛡️ 안전한 메시지 편집
-   */
-  async safeEditMessage(ctx, text, options = {}) {
-    try {
-      // MarkdownV2 이스케이프 처리
-      const escapedText = this.escapeMarkdownV2(text);
-
-      await ctx.editMessageText(escapedText, {
-        // parse_mode: "MarkdownV2",
-        ...options,
-      });
-    } catch (error) {
-      logger.error("WorktimeRenderer 메시지 편집 실패:", error);
-
-      // 폴백: HTML 모드로 재시도
-      try {
-        await ctx.editMessageText(text, {
-          parse_mode: "HTML",
-          ...options,
-        });
-      } catch (fallbackError) {
-        logger.error("WorktimeRenderer HTML 폴백도 실패:", fallbackError);
-
-        // 최후 수단: 일반 텍스트
-        try {
-          await ctx.editMessageText(text.replace(/[\*_`\[\]]/g, ""), options);
-        } catch (finalError) {
-          logger.error("WorktimeRenderer 최종 폴백 실패:", finalError);
-        }
-      }
-    }
   }
 
   /**
