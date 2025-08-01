@@ -79,7 +79,7 @@ class DooMockBot {
    * 🚀 애플리케이션 시작
    */
   async start() {
-    // 화려한 배너 표시
+    // 화려한 배너 표시 ㅋㅋ
     await showDoomockBanner();
 
     if (this.isInitialized) {
