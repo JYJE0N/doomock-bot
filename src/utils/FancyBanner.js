@@ -58,8 +58,8 @@ class FancyBanner {
     console.log(""); // 여백
 
     // 메인 타이틀 - 더 크고 선명하게
-    await this.printFigletText("DooMock", {
-      font: "Big", // Big 폰트가 더 선명함
+    await this.printFigletText("DOOMOCK", {
+      font: "Larry 3D", // Big 폰트가 더 선명함
       style: "neonRainbow", // 새로운 네온 레인보우 스타일
     });
 

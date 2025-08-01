@@ -80,10 +80,7 @@ class DooMockBot {
    */
   async start() {
     // 화려한 배너 표시
-    await FancyBanner.showDoomockBanner("DOOMOCK", {
-      font: "Standard", // 다른 폰트 시도
-      style: "rainbow", // 또는 'gradient', 'neon', 'neonRainbow'
-    });
+    await showDoomockBanner();
 
     if (this.isInitialized) {
       logger.warn("⚠️ 이미 초기화된 애플리케이션");
