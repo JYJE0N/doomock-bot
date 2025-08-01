@@ -684,10 +684,10 @@ ${statusIcon} **${record.date}**: ${duration}`;
     text += `
 📊 **일평균**: ${avgDailyHours}시간`;
 
-    if (performance.emoji && performance.title) {
+    if (performance.emoji && performance.txt) {
       text += `
 
-${performance.emoji} **평가**: ${performance.title}`;
+${performance.emoji} **평가**: ${performance.txt}`;
     }
 
     if (trends.weeklyTrend) {
@@ -780,7 +780,7 @@ ${performance.emoji} **평가**: ${performance.title}`;
 🏆 **달성 기록**`;
       achievements.forEach((achievement) => {
         text += `
-${achievement.emoji} ${achievement.title}`;
+${achievement.emoji} ${achievement.txt}`;
       });
     }
 

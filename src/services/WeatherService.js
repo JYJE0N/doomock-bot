@@ -10,8 +10,7 @@ const TimeHelper = require("../utils/TimeHelper");
  * - 실제 날씨 API 연동 (OpenWeatherMap)
  * - 8개 주요 도시 지원
  * - 캐싱 시스템으로 API 호출 최적화
- * - 미세먼지 정보 포함
- * - 에러 상황에서도 기본 데이터 제공
+ * - 미세먼지 정보 포함 * - 에러 상황에서도 기본 데이터 제공
  */
 class WeatherService extends BaseService {
   constructor(options = {}) {
