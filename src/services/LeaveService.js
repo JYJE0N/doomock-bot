@@ -134,6 +134,32 @@ class LeaveService extends BaseService {
   }
 
   /**
+   * 📊 연차 현황 조회 (메서드 추가)
+   */
+  async getLeaveStatus(userId) {
+    try {
+      // Mock 데이터 (실제로는 DB 조회 로직 구현 필요)
+      const mockStatus = {
+        totalLeave: this.config.defaultAnnualLeave,
+        usedLeave: Math.floor(Math.random() * 10),
+        remainingLeave: 0,
+        scheduledLeave: Math.floor(Math.random() * 3),
+        year: new Date().getFullYear(),
+      };
+
+      mockStatus.remainingLeave =
+        mockStatus.totalLeave -
+        mockStatus.usedLeave -
+        mockStatus.scheduledLeave;
+
+      return this.createSuccessResponse(mockStatus, "연차 현황 조회 완료");
+    } catch (error) {
+      logger.error("연차 현황 조회 실패:", error);
+      return this.createErrorResponse(error, "연차 현황 조회 중 오류 발생");
+    }
+  }
+
+  /**
    * ⚙️ 연차 설정 조회
    */
   async getUserSettings(userId) {

@@ -194,6 +194,24 @@ class FortuneService extends BaseService {
   }
 
   /**
+   * 오늘 뽑은 횟수 조회 (메서드 추가)
+   */
+  async getTodayDrawCount(userId) {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const userDraws = this.dailyDraws.get(userId.toString()) || {};
+      const count = userDraws[today] || 0;
+
+      return this.createSuccessResponse({ count });
+    } catch (error) {
+      return this.createErrorResponse(
+        error,
+        "오늘 뽑은 횟수 조회에 실패했습니다."
+      );
+    }
+  }
+
+  /**
    * 랜덤 카드 선택
    */
   getRandomCard() {

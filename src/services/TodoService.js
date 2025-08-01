@@ -111,6 +111,81 @@ class TodoService extends BaseService {
       return this.createErrorResponse(error, "할일 삭제 실패");
     }
   }
+  // ===== 🎯 누락된 메서드 추가 =====
+
+  /**
+   * 📊 할일 통계 조회
+   */
+  async getStats(userId) {
+    try {
+      const stats = await this.models.Todo.aggregate([
+        { $match: { userId: userId.toString(), isActive: true } },
+        {
+          $group: {
+            _id: "$completed",
+            count: { $sum: 1 },
+          },
+        },
+      ]);
+
+      const result = {
+        total: 0,
+        completed: 0,
+        pending: 0,
+      };
+
+      stats.forEach((stat) => {
+        if (stat._id === true) {
+          result.completed = stat.count;
+        } else {
+          result.pending = stat.count;
+        }
+        result.total += stat.count;
+      });
+
+      return this.createSuccessResponse(result);
+    } catch (error) {
+      return this.createErrorResponse(error, "통계 조회 실패");
+    }
+  }
+
+  /**
+   * 🔢 사용자의 할일 개수 조회
+   */
+  async getTodoCount(userId) {
+    try {
+      const count = await this.models.Todo.countDocuments({
+        userId: userId.toString(),
+        isActive: true,
+      });
+      return this.createSuccessResponse(count);
+    } catch (error) {
+      return this.createErrorResponse(error, "할일 개수 조회 실패");
+    }
+  }
+
+  /**
+   * 🆔 ID로 특정 할일 조회
+   */
+  async getTodoById(userId, todoId) {
+    try {
+      const todo = await this.models.Todo.findOne({
+        _id: todoId,
+        userId: userId.toString(),
+        isActive: true,
+      }).lean();
+
+      if (!todo) {
+        return this.createErrorResponse(
+          new Error("NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
+      }
+      return this.createSuccessResponse(todo);
+    } catch (error) {
+      return this.createErrorResponse(error, "할일 조회 실패");
+    }
+  }
 }
 
 module.exports = TodoService;
