@@ -3,9 +3,9 @@ const fs = require("fs");
 const logger = require("../utils/Logger");
 
 /**
- * 🏭 ServiceBuilder - 서비스 팩토리 (심플 버전)
+ * 🏭 ServiceBuilder - 서비스 팩토리 (수정된 버전)
  *
- * 🎯 핵심 기능만:
+ * 🎯 핵심 기능:
  * - 서비스 자동 등록
  * - 인스턴스 생성 및 캐싱
  * - Mongoose/Native 이중 지원
@@ -15,6 +15,9 @@ class ServiceBuilder {
     this.bot = bot;
     this.menuManager = menuManager;
     this.services = new Map();
+    this.serviceInstances = new Map(); // ⭐ 이것이 누락되어 있었음!
+    this.dbManager = null;
+    this.mongooseManager = null;
   }
 
   setDatabaseManager(dbManager) {
@@ -50,6 +53,7 @@ class ServiceBuilder {
   }
 
   async getOrCreate(serviceName) {
+    // serviceInstances가 이제 제대로 정의되어 있으므로 에러가 발생하지 않음
     if (this.serviceInstances.has(serviceName)) {
       return this.serviceInstances.get(serviceName);
     }
@@ -97,8 +101,8 @@ class ServiceBuilder {
   }
 }
 
-function createServiceBuilder() {
-  return new ServiceBuilder();
+function createServiceBuilder(bot, menuManager) {
+  return new ServiceBuilder(bot, menuManager);
 }
 
 module.exports = { ServiceBuilder, createServiceBuilder };

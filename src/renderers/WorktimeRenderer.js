@@ -39,38 +39,44 @@ class WorktimeRenderer extends BaseRenderer {
       night: "🌙",
     };
 
-    // 렌더링 타입 매핑
-    this.renderTypeMap = new Map([
-      // 메뉴 관련
-      ["menu", this.renderMenu.bind(this)],
-      ["help", this.renderHelp.bind(this)],
+    // renderTypeMap은 setupRenderTypeMap 메서드에서 초기화
+    this.renderTypeMap = new Map();
 
-      // 출퇴근 관련
-      ["checkin", this.renderCheckin.bind(this)],
-      ["checkout", this.renderCheckout.bind(this)],
-      ["checkin_success", this.renderCheckinSuccess.bind(this)],
-      ["checkout_success", this.renderCheckoutSuccess.bind(this)],
-
-      // 상태 조회
-      ["today", this.renderToday.bind(this)],
-      ["status", this.renderToday.bind(this)], // 별칭
-
-      // 통계 관련
-      ["week", this.renderWeek.bind(this)],
-      ["month", this.renderMonth.bind(this)],
-      ["stats", this.renderStats.bind(this)],
-      ["history", this.renderHistory.bind(this)],
-
-      // 설정
-      ["settings", this.renderSettings.bind(this)],
-
-      // 에러 처리
-      ["error", this.renderError.bind(this)],
-      ["checkin_error", this.renderCheckinError.bind(this)],
-      ["checkout_error", this.renderCheckoutError.bind(this)],
-    ]);
+    // 초기화 완료 후 renderTypeMap 설정
+    this.setupRenderTypeMap();
 
     logger.info("🏢 WorktimeRenderer 생성됨 - 표준 render 메서드 지원");
+  }
+
+  /**
+   * 렌더 타입 맵 설정 (메서드들이 모두 정의된 후에 실행)
+   */
+  setupRenderTypeMap() {
+    this.renderTypeMap.set("menu", this.renderMenu.bind(this));
+    this.renderTypeMap.set("help", this.renderHelp.bind(this));
+    this.renderTypeMap.set("checkin", this.renderCheckin.bind(this));
+    this.renderTypeMap.set("checkout", this.renderCheckout.bind(this));
+    this.renderTypeMap.set(
+      "checkin_success",
+      this.renderCheckinSuccess.bind(this)
+    );
+    this.renderTypeMap.set(
+      "checkout_success",
+      this.renderCheckoutSuccess.bind(this)
+    );
+    this.renderTypeMap.set("today", this.renderToday.bind(this));
+    this.renderTypeMap.set("status", this.renderToday.bind(this));
+    this.renderTypeMap.set("week", this.renderWeek.bind(this));
+    this.renderTypeMap.set("month", this.renderMonth.bind(this));
+    this.renderTypeMap.set("stats", this.renderStats.bind(this));
+    this.renderTypeMap.set("history", this.renderHistory.bind(this));
+    this.renderTypeMap.set("settings", this.renderSettings.bind(this));
+    this.renderTypeMap.set("error", this.renderError.bind(this));
+    this.renderTypeMap.set("checkin_error", this.renderCheckinError.bind(this));
+    this.renderTypeMap.set(
+      "checkout_error",
+      this.renderCheckoutError.bind(this)
+    );
   }
 
   /**
@@ -83,7 +89,6 @@ class WorktimeRenderer extends BaseRenderer {
    */
   async render(result, ctx) {
     try {
-      // 결과 데이터 검증
       if (!result || typeof result !== "object") {
         logger.error("WorktimeRenderer: 잘못된 결과 데이터", result);
         return await this.renderError({ message: "잘못된 데이터입니다." }, ctx);
@@ -104,7 +109,6 @@ class WorktimeRenderer extends BaseRenderer {
         dataKeys: data ? Object.keys(data) : [],
       });
 
-      // 타입별 렌더링 함수 찾기
       const renderFunction = this.renderTypeMap.get(type);
 
       if (!renderFunction) {
@@ -117,14 +121,12 @@ class WorktimeRenderer extends BaseRenderer {
         );
       }
 
-      // 해당 타입의 렌더링 함수 실행
       await renderFunction(data || {}, ctx);
 
       logger.debug(`✅ WorktimeRenderer 렌더링 완료: ${type}`);
     } catch (error) {
       logger.error("💥 WorktimeRenderer.render 오류:", error);
 
-      // 안전한 에러 렌더링
       try {
         await this.renderError(
           {
@@ -136,7 +138,6 @@ class WorktimeRenderer extends BaseRenderer {
       } catch (fallbackError) {
         logger.error("💥 WorktimeRenderer 폴백 에러:", fallbackError);
 
-        // 최후의 수단: 간단한 텍스트 응답
         try {
           await ctx.editMessageText("❌ 근무시간 처리 중 오류가 발생했습니다.");
         } catch (finalError) {

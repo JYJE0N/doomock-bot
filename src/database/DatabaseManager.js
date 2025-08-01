@@ -1,14 +1,17 @@
-// ===== 3. src/database/DatabaseManager.js - 간결한 연결 관리자 =====
+// src/database/DatabaseManager.js
 const logger = require("../utils/Logger");
 const { MongoClient } = require("mongodb");
-const { SchemaManager } = require("./schemas/StandardSchema");
 
 // 🌍 싱글톤 인스턴스
 let globalInstance = null;
 
+/**
+ * 🗄️ DatabaseManager - MongoDB Native Driver 관리자
+ *
+ * StandardSchema 의존성을 제거하고 순수한 MongoDB 연결 관리만 담당
+ */
 class DatabaseManager {
   constructor(mongoUrl = null, bypassSingleton = false) {
-    // ✅ 수정: 싱글톤 우회 옵션 추가
     if (globalInstance && !bypassSingleton) {
       logger.debug("🔄 기존 DatabaseManager 인스턴스 반환");
       return globalInstance;
@@ -29,7 +32,6 @@ class DatabaseManager {
     this.reconnectDelay = 5000;
     this.connectionAttempts = 0;
 
-    // ✅ 수정: 싱글톤 우회가 아닌 경우에만 전역 인스턴스로 저장
     if (!bypassSingleton) {
       globalInstance = this;
     }
@@ -52,7 +54,6 @@ class DatabaseManager {
       return this.isConnected;
     }
 
-    // ✅ URL 확인 추가
     if (!this.mongoUrl) {
       logger.warn("⚠️ MongoDB URL이 없어 연결 건너뜀");
       return false;
@@ -66,7 +67,7 @@ class DatabaseManager {
         `🔌 MongoDB 연결 시도 중... (시도 ${this.connectionAttempts}/${this.maxReconnectAttempts})`
       );
 
-      // URL에서 데이터베이스 이름 추출 (Railway 환경)
+      // URL에서 데이터베이스 이름 추출
       const urlMatch = this.mongoUrl.match(/\/([^/?]+)(\?|$)/);
       this.databaseName = urlMatch ? urlMatch[1] : "doomock_bot";
 
@@ -86,7 +87,7 @@ class DatabaseManager {
 
       this.db = this.client.db(this.databaseName);
       this.isConnected = true;
-      this.connectionAttempts = 0; // 성공 시 초기화
+      this.connectionAttempts = 0;
 
       // 연결 이벤트 설정
       this.setupEventListeners();
@@ -113,75 +114,66 @@ class DatabaseManager {
   }
 
   /**
+   * 연결 대기
+   */
+  async waitForConnection() {
+    const maxWaitTime = 30000;
+    const checkInterval = 100;
+    const startTime = Date.now();
+
+    while (this.isConnecting && Date.now() - startTime < maxWaitTime) {
+      await new Promise((resolve) => setTimeout(resolve, checkInterval));
+    }
+
+    if (!this.isConnected) {
+      throw new Error("연결 대기 시간 초과");
+    }
+  }
+
+  /**
    * 이벤트 리스너 설정
    */
   setupEventListeners() {
-    if (!this.client) return;
+    this.client.on("serverHeartbeatFailed", () => {
+      logger.warn("⚠️ MongoDB 하트비트 실패");
+    });
+
+    this.client.on("error", (error) => {
+      logger.error("❌ MongoDB 클라이언트 오류:", error);
+    });
 
     this.client.on("close", () => {
       logger.warn("⚠️ MongoDB 연결 종료됨");
       this.isConnected = false;
     });
-
-    this.client.on("error", (error) => {
-      logger.error("❌ MongoDB 오류:", error.message);
-    });
-
-    this.client.on("serverOpening", () => {
-      logger.debug("MongoDB 서버 연결 중...");
-    });
-
-    this.client.on("serverClosed", () => {
-      logger.debug("MongoDB 서버 연결 종료");
-    });
   }
 
   /**
-   * 연결 대기
+   * 데이터베이스 가져오기
    */
-  async waitForConnection(timeout = 10000) {
-    const startTime = Date.now();
-
-    while (!this.isConnected && Date.now() - startTime < timeout) {
-      await new Promise((resolve) => setTimeout(resolve, 100));
+  getDb() {
+    if (!this.isConnected || !this.db) {
+      throw new Error("데이터베이스가 연결되지 않음");
     }
-
-    return this.isConnected;
-  }
-
-  /**
-   * 연결 보장
-   */
-  async ensureConnection() {
-    if (!this.isConnected) {
-      await this.connect();
-    }
-    return this.isConnected;
+    return this.db;
   }
 
   /**
    * 컬렉션 가져오기
    */
-  getCollection(name) {
-    if (!this.isConnected || !this.db) {
-      throw new Error("데이터베이스에 연결되지 않음");
-    }
-    return this.db.collection(name);
+  getCollection(collectionName) {
+    return this.getDb().collection(collectionName);
   }
 
   /**
    * 트랜잭션 실행
    */
   async withTransaction(callback) {
-    if (!this.client) {
-      throw new Error("MongoDB 클라이언트가 없음");
-    }
-
     const session = this.client.startSession();
     try {
       await session.withTransaction(callback);
     } finally {
-      await session.endSession();
+      session.endSession();
     }
   }
 
@@ -197,19 +189,6 @@ class DatabaseManager {
   }
 
   /**
-   * 연결 상태 확인
-   */
-  async checkConnection() {
-    try {
-      if (!this.db) return false;
-      await this.db.admin().ping();
-      return true;
-    } catch (error) {
-      return false;
-    }
-  }
-
-  /**
    * 상태 정보
    */
   getStatus() {
@@ -218,40 +197,12 @@ class DatabaseManager {
       connecting: this.isConnecting,
       database: this.databaseName,
       railway: this.isRailway,
-      connectionAttempts: this.connectionAttempts,
-      mongoUrl: this.mongoUrl ? "SET" : "NOT_SET",
+      attempts: this.connectionAttempts,
     };
   }
+}
 
-  // ⭐️ 여기에 추가! (getStatus 메서드 다음)
-  /**
-   * DB 인스턴스 가져오기 (호환성을 위한 메서드)
-   */
-  getDb() {
-    if (!this.db) {
-      throw new Error("데이터베이스가 연결되지 않았습니다");
-    }
-    return this.db;
-  }
-
-  /**
-   * DB 인스턴스 가져오기 (별칭)
-   */
-  getDatabase() {
-    return this.getDb();
-  }
-
-  /**
-   * 연결 상태 확인 (메서드 형태)
-   */
-  isConnected() {
-    return this.isConnected;
-  }
-} // 클래스 끝
-
-/**
- * 싱글톤 인스턴스 가져오기
- */
+// 싱글톤 인스턴스 반환
 function getInstance() {
   if (!globalInstance) {
     globalInstance = new DatabaseManager();
@@ -259,16 +210,7 @@ function getInstance() {
   return globalInstance;
 }
 
-/**
- * ✅ 수정: 새 인스턴스 생성 (싱글톤 완전 우회)
- */
-function createInstance(mongoUrl) {
-  // 싱글톤을 우회하여 새 인스턴스 생성
-  return new DatabaseManager(mongoUrl, true); // bypassSingleton = true
-}
-
 module.exports = {
   DatabaseManager,
   getInstance,
-  createInstance,
 };
