@@ -13,7 +13,10 @@
     "railway:start": "NODE_ENV=production node --max-old-space-size=450 doomock_bot.js",
     "railway:build": "echo 'Build complete'",
     "cleanup": "pkill -f 'node doomock_bot.js' || true",
-    "restart": "npm run cleanup && sleep 5 && npm start"
+    "restart": "npm run cleanup && sleep 5 && npm start",
+    "cleanup:indexes": "node scripts/cleanup-indexes.js",
+    "db:check": "node scripts/cleanup-indexes.js --check-only",
+    "db:reset": "node scripts/cleanup-indexes.js --full-reset"
   },
   "keywords": [
     "telegram",

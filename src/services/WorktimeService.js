@@ -68,8 +68,8 @@ class WorktimeService extends BaseService {
    */
   async checkIn(userId, checkInTime = null) {
     try {
-      const now = checkInTime || TimeHelper.now();
-      const today = TimeHelper.format(now, "YYYY-MM-DD");
+      const now = checkInTime || new Date();
+      const today = TimeHelper.format(null, "YYYY-MM-DD");
 
       // 이미 출근했는지 확인
       const existingRecord = await this.models.Worktime.findOne({
@@ -147,8 +147,8 @@ class WorktimeService extends BaseService {
    */
   async checkOut(userId, checkOutTime = null) {
     try {
-      const now = checkOutTime || TimeHelper.now();
-      const today = TimeHelper.format(now, "YYYY-MM-DD");
+      const now = checkOutTime || new Date();
+      const today = TimeHelper.format(null, "YYYY-MM-DD");
 
       // 출근 기록 확인
       const worktimeRecord = await this.models.Worktime.findOne({
@@ -223,7 +223,7 @@ class WorktimeService extends BaseService {
    */
   async getTodayRecord(userId) {
     try {
-      const today = TimeHelper.format(TimeHelper.now(), "YYYY-MM-DD");
+      const today = TimeHelper.format(null, "YYYY-MM-DD");
 
       const record = await this.models.Worktime.findOne({
         userId: userId,
@@ -239,7 +239,7 @@ class WorktimeService extends BaseService {
       if (record.checkInTime && !record.checkOutTime) {
         const currentDuration = this.calculateCurrentWorkDuration(
           record.checkInTime,
-          TimeHelper.now()
+          new Date() // ✅ Date 객체 사용
         );
 
         return {
@@ -506,7 +506,7 @@ class WorktimeService extends BaseService {
    */
   async recoverActiveSessions() {
     try {
-      const today = TimeHelper.format(TimeHelper.now(), "YYYY-MM-DD");
+      const today = TimeHelper.format(null, "YYYY-MM-DD");
 
       const activeRecords = await this.models.Worktime.find({
         date: today,
@@ -534,7 +534,7 @@ class WorktimeService extends BaseService {
    */
   async updateTodayStats() {
     try {
-      const now = TimeHelper.now();
+      const now = new Date();
 
       // 5분마다만 업데이트
       if (
@@ -544,7 +544,7 @@ class WorktimeService extends BaseService {
         return;
       }
 
-      const today = TimeHelper.format(now, "YYYY-MM-DD");
+      const today = TimeHelper.format(null, "YYYY-MM-DD");
 
       const todayRecords = await this.models.Worktime.find({
         date: today,

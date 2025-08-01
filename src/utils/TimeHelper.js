@@ -180,6 +180,12 @@ class TimeHelper {
     return new Date(date).getDay();
   }
 
+  static diffMinutes(startTime, endTime) {
+    const start = new Date(startTime);
+    const end = new Date(endTime);
+    return Math.floor((end - start) / (1000 * 60));
+  }
+
   /**
    * 📅 오늘인지 확인
    * @param {Date|moment} date - 확인할 날짜
