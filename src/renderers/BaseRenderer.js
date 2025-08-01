@@ -1,8 +1,4 @@
 // src/renderers/BaseRenderer.js - 🎨 최종 리팩토링 버전
-
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
-
 /**
  * 🎨 BaseRenderer - 모든 렌더러의 표준 기반 클래스
  *
@@ -12,12 +8,18 @@ const TimeHelper = require("../utils/TimeHelper");
  * - 계층화된 폴백: 메시지 전송 실패 시 단계별로 안전하게 처리합니다.
  * - 표준화된 콜백 처리: 모든 렌더러가 동일한 방식으로 콜백을 생성하고 해석합니다.
  */
+const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
+
 class BaseRenderer {
   constructor(bot, navigationHandler, markdownHelper) {
     this.bot = bot;
     this.navigationHandler = navigationHandler;
-    this.markdownHelper = markdownHelper; // MarkdownHelper 직접 주입
-    this.moduleName = "base"; // 자식 클래스에서 오버라이드 필요
+
+    // 👇 실제 값을 내부 속성(_markdownHelper)에 저장합니다.
+    this._markdownHelper = markdownHelper;
+
+    this.moduleName = "base";
 
     this.stats = {
       renderCount: 0,
@@ -41,6 +43,14 @@ class BaseRenderer {
    */
   get errorHandler() {
     return this.navigationHandler?.errorHandler;
+  }
+
+  /**
+   * 📝 MarkdownHelper 접근 (수정된 버전)
+   */
+  get markdownHelper() {
+    // 👇 내부 속성(_markdownHelper)을 반환하여 무한 반복을 방지합니다.
+    return this._markdownHelper || this.navigationHandler?.markdownHelper;
   }
 
   // ===== 🎯 핵심 추상 메서드 =====
