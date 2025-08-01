@@ -113,18 +113,24 @@ class WorktimeRenderer extends BaseRenderer {
         case "stats":
           return await this.renderStats(data || {}, ctx);
         case "error":
-          return await this.renderError(data || {}, ctx);
+          // 🔥 renderError를 만들지 말고, ErrorHandler에 위임!
+          return await this.errorHandler.handleModuleProcessingError(
+            ctx,
+            "worktime",
+            result.subAction || "unknown",
+            data?.message || "처리 중 오류가 발생했습니다."
+          );
+
         default:
           logger.warn(`🏢 WorktimeRenderer: 알 수 없는 타입 - ${type}`);
-          return await this.renderError(
-            { message: `지원하지 않는 기능입니다: ${type}` },
-            ctx
+          return await this.errorHandler.handleUnexpectedError(
+            ctx,
+            new Error(`지원하지 않는 타입: ${type}`),
+            "WorktimeRenderer.render"
           );
       }
     } catch (error) {
       logger.error("💥 WorktimeRenderer.render 오류:", error);
-
-      // 🎯 ErrorHandler에게 위임
       return await this.errorHandler.handleUnexpectedError(
         ctx,
         error,

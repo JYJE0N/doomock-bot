@@ -13,9 +13,14 @@ const logger = require("../utils/Logger");
  * - 일관된 데이터 형식으로 변환
  */
 class WorktimeService extends BaseService {
-  constructor() {
-    super();
-    this.activeSessions = new Map(); // 현재 활성 세션 관리
+  constructor(options = {}) {
+    super("WorktimeService", options); // 🔥 서비스 이름 추가!
+    this.activeSessions = new Map();
+  }
+
+  // 🔥 이 메서드 추가!
+  getRequiredModels() {
+    return ["Worktime"];
   }
 
   /**
@@ -83,6 +88,39 @@ class WorktimeService extends BaseService {
     }
 
     return transformed;
+  }
+
+  async checkIn(userId) {
+    try {
+      const today = TimeHelper.getTodayDateString();
+
+      // 기존 기록 확인
+      const existing = await this.models.Worktime.findOne({
+        userId: userId,
+        date: today,
+        isActive: true,
+      });
+
+      if (existing && existing.checkInTime) {
+        throw new Error("이미 출근 기록이 있습니다.");
+      }
+
+      // 새 출근 기록 생성
+      const checkInTime = new Date();
+      const record = await this.models.Worktime.create({
+        userId: userId,
+        date: today,
+        checkInTime: checkInTime,
+        status: "working",
+        isActive: true,
+      });
+
+      logger.info(`✅ 출근 기록 생성: ${userId}`);
+      return this.safeTransformRecord(record);
+    } catch (error) {
+      logger.error("출근 처리 실패:", error);
+      throw error;
+    }
   }
 
   /**
