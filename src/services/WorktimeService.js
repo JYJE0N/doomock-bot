@@ -260,13 +260,14 @@ class WorktimeService extends BaseService {
   }
 
   /**
-   * 📊 주간 통계 조회
+   * 📊 주간 통계 조회 (완성된 버전)
    */
   async getWeekStats(userId) {
     try {
-      const weekStart = TimeHelper.getWeekStart(); // 이제 정상 동작합니다.
-      const weekEnd = TimeHelper.getWeekEnd(); // 이제 정상 동작합니다.
+      const weekStart = TimeHelper.getWeekStart();
+      const weekEnd = TimeHelper.getWeekEnd();
 
+      // 👇 누락되었던 데이터베이스 조회 로직
       const records = await this.models.Worktime.find({
         userId: userId,
         date: {
@@ -277,10 +278,9 @@ class WorktimeService extends BaseService {
         checkOutTime: { $exists: true },
       }).sort({ date: 1 });
 
-      const stats = this.calculateWeeklyStats(records); // 👈 계산 함수 호출
+      const stats = this.calculateWeeklyStats(records);
 
       return {
-        // 👈 `createSuccessResponse` 대신 직접 객체 반환 (모듈에서 처리)
         weekStart: TimeHelper.format(weekStart, "YYYY-MM-DD"),
         weekEnd: TimeHelper.format(weekEnd, "YYYY-MM-DD"),
         workDays: records.length,
@@ -300,14 +300,14 @@ class WorktimeService extends BaseService {
   }
 
   /**
-   * 📈 월간 통계 조회
+   * 📈 월간 통계 조회 (완성된 버전)
    */
   async getMonthStats(userId) {
     try {
       const monthStart = TimeHelper.getMonthStart();
       const monthEnd = TimeHelper.getMonthEnd();
 
-      // 👇 데이터베이스 조회 로직을 추가합니다.
+      // 👇 누락되었던 데이터베이스 조회 로직
       const records = await this.models.Worktime.find({
         userId: userId,
         date: {
@@ -320,10 +320,9 @@ class WorktimeService extends BaseService {
 
       const stats = this.calculateMonthlyStats(records);
 
-      // 👇 반환할 데이터 객체를 완성합니다.
       return {
-        monthStart: TimeHelper.format(monthStart, "YYYY-MM-DD"),
-        monthEnd: TimeHelper.format(monthEnd, "YYYY-MM-DD"),
+        month: TimeHelper.format(monthStart, "MM"),
+        year: TimeHelper.format(monthStart, "YYYY"),
         workDays: records.length,
         totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
@@ -332,12 +331,19 @@ class WorktimeService extends BaseService {
             ? Math.round((stats.totalMinutes / records.length / 60) * 10) / 10
             : 0,
         records: records,
-        analysis: this.analyzeMonthlyPattern(records), // 월간 분석 함수 호출
+        analysis: this.analyzeMonthlyPattern(records),
       };
     } catch (error) {
       logger.error("월간 통계 조회 실패:", error);
       throw error;
     }
+  }
+
+  /**
+   * 📈 월간 패턴 분석 (누락된 메서드 추가)
+   */
+  analyzeMonthlyPattern(records) {
+    return this.analyzeWeeklyPattern(records);
   }
 
   /**
@@ -437,13 +443,6 @@ class WorktimeService extends BaseService {
     }
 
     return { trend, recommendation, avgHours: Math.round(avgHours * 10) / 10 };
-  }
-
-  /**
-   * 📈 월간 패턴 분석
-   */
-  analyzeMonthlyPattern(records) {
-    return this.analyzeWeeklyPattern(records); // 동일한 로직
   }
 
   // ===== 💡 추천사항 생성 =====
