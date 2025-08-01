@@ -76,8 +76,9 @@ const WorktimeSchema = new mongoose.Schema({
   },
 });
 
-// 🔥 수정: 유니크 제약 제거!
-WorktimeSchema.index({ userId: 1, date: 1 }); // unique 옵션 제거
+// 🔥 일반 인덱스로 변경
+WorktimeSchema.index({ userId: 1, date: 1 }); // unique 옵션 제거!
 WorktimeSchema.index({ userId: 1, createdAt: -1 });
+WorktimeSchema.index({ status: 1, userId: 1 }); // 상태별 조회용
 
 module.exports = mongoose.model("Worktime", WorktimeSchema);
