@@ -1,4 +1,6 @@
 // src/renderers/BaseRenderer.js - 🎨 최종 리팩토링 버전
+const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 /**
  * 🎨 BaseRenderer - 모든 렌더러의 표준 기반 클래스
  *
@@ -8,8 +10,6 @@
  * - 계층화된 폴백: 메시지 전송 실패 시 단계별로 안전하게 처리합니다.
  * - 표준화된 콜백 처리: 모든 렌더러가 동일한 방식으로 콜백을 생성하고 해석합니다.
  */
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
 
 class BaseRenderer {
   constructor(bot, navigationHandler, markdownHelper) {
@@ -89,7 +89,7 @@ class BaseRenderer {
 
     try {
       // 1단계: HTML 모드로 시도 (MarkdownHelper 사용)
-      const htmlText = this.markdownHelper.convertMarkdownToHtml(text);
+      const htmlText = this.markdownHelper.convertToHtml(text);
       await this.sendMessage(ctx, htmlText, { parse_mode: "HTML", ...options });
       this.stats.successCount++;
       return true;

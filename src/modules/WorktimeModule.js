@@ -142,13 +142,19 @@ class WorktimeModule extends BaseModule {
       return {
         type: "today",
         module: "worktime",
-        data: todayStatus,
+        data: {
+          isWorking: todayStatus.isWorking,
+          record: todayStatus.record,
+          workSummary: todayStatus.workSummary,
+          recommendations: [], // 빈 배열로 초기화
+          timestamp: new Date(),
+        },
       };
     } catch (error) {
-      logger.error("오늘 근무시간 조회 실패:", error); // ✅ 수정됨
+      logger.error("오늘 현황 조회 실패:", error);
       return {
         type: "error",
-        message: "오늘 근무시간을 불러올 수 없습니다.",
+        message: "오늘 현황을 불러올 수 없습니다.",
       };
     }
   }
@@ -311,12 +317,20 @@ class WorktimeModule extends BaseModule {
   // 모두 logger 대신 require로 가져온 logger 사용
   async getTodayStatus(userId) {
     // 실제 구현에서는 worktimeService를 사용
+    const checkinTime = new Date(); // 임시 데이터
+    const isWorking = true; // 현재 근무 중으로 설정
+
     return {
-      isWorking: false,
-      checkinTime: null,
-      workDuration: 0,
-      expectedCheckout: null,
-      status: "not_started",
+      hasRecord: true,
+      isWorking: isWorking,
+      record: {
+        checkInTime: checkinTime,
+        checkOutTime: null,
+      },
+      workSummary: {
+        workDuration: 120, // 2시간 (분)
+        displayTime: "2:00",
+      },
     };
   }
 

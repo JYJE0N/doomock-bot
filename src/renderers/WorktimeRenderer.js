@@ -1,5 +1,5 @@
 // src/renderers/WorktimeRenderer.js - 시간 표시 개선 버전
-
+const logger = require("../utils/Logger");
 const BaseRenderer = require("./BaseRenderer");
 const TimeHelper = require("../utils/TimeHelper");
 
@@ -186,10 +186,7 @@ ${
     const buttons = [
       [
         {
-          text:
-            todayStatus.hasRecord && todayStatus.isWorking
-              ? "🏠 퇴근하기"
-              : "💼 출근하기",
+          text: todayStatus.isWorking ? "🏃 퇴근하기" : "🏃 출근하기",
           callback_data: this.buildCallbackData(
             "worktime",
             todayStatus.hasRecord && todayStatus.isWorking
@@ -459,13 +456,17 @@ ${achievement.emoji} ${achievement.txt}`;
    * 📅 오늘 근무 현황 렌더링 (개선됨)
    */
   async renderToday(data, ctx) {
-    const {
-      record = {},
-      workSummary = {},
-      recommendations = [],
-      timestamp,
-      isWorking = false,
-    } = data;
+    // 데이터 구조 정규화
+    const record = data.record || {
+      checkInTime: data.checkinTime,
+      checkOutTime: data.checkoutTime,
+    };
+
+    const isWorking = data.isWorking ?? false;
+    const workSummary = data.workSummary || {
+      workDuration: data.workDuration,
+      displayTime: data.displayTime,
+    };
 
     // 🔍 디버깅용 (개발 중에만 사용)
     console.log("🔍 오늘 근무 데이터 디버깅:", {
@@ -575,6 +576,19 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
     await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
     });
+  }
+
+  /**
+   * ⏰ 시간대별 이모지 반환
+   * @returns {string} 현재 시간에 맞는 이모지
+   */
+  getTimeEmoji() {
+    const hour = new Date().getHours();
+    if (hour < 6) return this.timeEmojis.night; // 🌙
+    if (hour < 12) return this.timeEmojis.morning; // 🌅
+    if (hour < 14) return this.timeEmojis.noon; // ☀️
+    if (hour < 18) return this.timeEmojis.afternoon; // 🌤️
+    return this.timeEmojis.evening; // 🌆
   }
 
   /**

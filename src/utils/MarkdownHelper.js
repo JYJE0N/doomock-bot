@@ -209,7 +209,8 @@ class MarkdownHelper {
 
     // 2️⃣ HTML 폴백
     try {
-      const htmlText = this.convertToHtml(text);
+      const htmlText = this.markdownHelper.convertToHtml(text);
+
       const messageOptions = {
         parse_mode: "HTML",
         ...options,
