@@ -260,13 +260,17 @@ class WorktimeService extends BaseService {
           $lte: TimeHelper.format(weekEnd, "date"),
         },
         isActive: true,
-        checkOutTime: { $exists: true, $ne: null }, // null 체크 추가
+        // ✅ 수정: checkOutTime 필터 완화 (출근만 있어도 표시)
+        $or: [
+          { checkOutTime: { $exists: true, $ne: null } }, // 퇴근 완료
+          { checkInTime: { $exists: true, $ne: null } }, // 출근만 있어도 표시
+        ],
       }).sort({ date: 1 });
 
-      // 레코드들을 안전하게 변환
+      // ✅ 수정: 필터링 조건 완화 - 출근 기록만 있어도 표시
       const safeRecords = records
         .map((record) => this.safeTransformRecord(record))
-        .filter((record) => record && record.workDuration > 0); // 유효한 레코드만
+        .filter((record) => record && record.checkInTime); // workDuration > 0 조건 제거
 
       const stats = this.calculateWeeklyStats(safeRecords);
 
@@ -305,13 +309,17 @@ class WorktimeService extends BaseService {
           $lte: TimeHelper.format(monthEnd, "date"),
         },
         isActive: true,
-        checkOutTime: { $exists: true, $ne: null }, // null 체크 추가
+        // ✅ 수정: 필터링 완화
+        $or: [
+          { checkOutTime: { $exists: true, $ne: null } },
+          { checkInTime: { $exists: true, $ne: null } },
+        ],
       }).sort({ date: 1 });
 
-      // 레코드들을 안전하게 변환
+      // ✅ 수정: 출근 기록만 있어도 표시
       const safeRecords = records
         .map((record) => this.safeTransformRecord(record))
-        .filter((record) => record && record.workDuration > 0);
+        .filter((record) => record && record.checkInTime);
 
       const stats = this.calculateMonthlyStats(safeRecords);
 
@@ -363,8 +371,10 @@ class WorktimeService extends BaseService {
     let overtimeMinutes = 0;
 
     records.forEach((record) => {
-      if (record.workDuration > 0) {
-        totalMinutes += record.workDuration;
+      // ✅ 수정: workDuration이 0이어도 처리 (출근만 있는 경우)
+      if (record.workDuration >= 0) {
+        // > 0 에서 >= 0 으로 변경
+        totalMinutes += record.workDuration || 0;
 
         // 8시간(480분) 초과시 초과근무
         if (record.workDuration > 480) {

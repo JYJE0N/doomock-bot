@@ -553,62 +553,81 @@ class WorktimeModule extends BaseModule {
     }
   }
 
-  async getWorkHistory(userId, days) {
+  async getWorkHistory(userId, days = 7) {
     try {
-      // Service가 있으면 실제 DB 조회
-      if (this.worktimeService) {
-        const history = await this.worktimeService.getWorkHistory(userId, days);
-        return history;
+      // ✅ WorktimeService를 통해 실제 데이터 조회
+      if (!this.worktimeService) {
+        logger.warn("WorktimeService가 없어서 빈 이력 반환");
+        return {
+          days: days,
+          records: [],
+          totalHours: 0,
+          summary: { workDays: 0, totalDays: days },
+        };
       }
 
-      // 🔥 근무 이력 더미 데이터
-      const records = [];
-      const today = new Date();
+      // 날짜 범위 계산
+      const endDate = TimeHelper.getTodayDateString();
+      const startDate = TimeHelper.format(
+        TimeHelper.now().subtract(days - 1, "days"),
+        "date"
+      );
 
-      // 최근 7일 더미 데이터 생성
-      for (let i = 0; i < Math.min(days, 7); i++) {
-        const date = new Date(today);
-        date.setDate(date.getDate() - i);
+      // 실제 데이터베이스에서 조회
+      const records = await this.worktimeService.models.Worktime.find({
+        userId: userId.toString(),
+        date: {
+          $gte: startDate,
+          $lte: endDate,
+        },
+        isActive: true,
+        // ✅ 출근 기록만 있어도 표시 (퇴근 안 했어도)
+      })
+        .sort({ date: -1 })
+        .limit(days);
 
-        if (TimeHelper.isWorkday(date)) {
-          records.push({
-            date: TimeHelper.format(date, "date"),
-            checkInTime: new Date(date.setHours(9, 0, 0)),
-            checkOutTime: new Date(date.setHours(18, 0, 0)),
-            workDuration: 480,
-            status: "completed",
-          });
-        }
-      }
+      // 안전하게 변환
+      const safeRecords = records
+        .map((record) => this.worktimeService.safeTransformRecord(record))
+        .filter((record) => record && record.checkInTime); // 출근 기록이 있는 것만
+
+      // 요약 계산
+      const totalHours =
+        safeRecords.reduce((sum, record) => {
+          return sum + (record.workDuration || 0);
+        }, 0) / 60; // 분을 시간으로 변환
+
+      const summary = {
+        totalDays: days,
+        workDays: safeRecords.length,
+        totalHours: Math.round(totalHours * 10) / 10,
+        avgHours:
+          safeRecords.length > 0
+            ? Math.round((totalHours / safeRecords.length) * 10) / 10
+            : 0,
+      };
+
+      logger.debug(`📋 근무 이력 조회 완료: ${safeRecords.length}개 기록`);
 
       return {
         days: days,
-        records: records,
-        totalHours: records.length * 8,
-        summary: {
-          totalDays: days,
-          workDays: records.length,
-          totalHours: records.length * 8,
-          avgHours: 8,
-        },
+        records: safeRecords,
+        totalHours: summary.totalHours,
+        summary: summary,
       };
     } catch (error) {
       logger.error("근무 이력 조회 실패:", error);
 
+      // 에러 시 빈 데이터 반환 (앱이 크래시되지 않도록)
       return {
         days: days,
         records: [],
         totalHours: 0,
-        summary: {
-          totalDays: days,
-          workDays: 0,
-          totalHours: 0,
-          avgHours: 0,
-        },
+        summary: { workDays: 0, totalDays: days },
+        error: true,
       };
     }
   }
-
   getStatus() {
     return {
       ...super.getStatus(),
