@@ -92,52 +92,31 @@ class WorktimeService extends BaseService {
 
   async checkIn(userId) {
     try {
+      const now = new Date();
       const today = TimeHelper.getTodayDateString();
 
-      const existingRecord = await this.models.Worktime.findOne({
+      // 🔥 현재 근무 중인 기록이 있는지만 확인
+      const workingRecord = await this.models.Worktime.findOne({
         userId: userId,
-        date: today,
+        status: "working",
+        checkOutTime: null,
         isActive: true,
       });
 
-      // 🔥 이미 출근했고 아직 퇴근 안한 경우만 에러
-      if (
-        existingRecord &&
-        existingRecord.checkInTime &&
-        !existingRecord.checkOutTime
-      ) {
-        throw new Error("이미 출근 중입니다.");
+      if (workingRecord) {
+        throw new Error("이미 출근 중입니다. 먼저 퇴근을 해주세요!");
       }
 
-      const checkInTime = new Date();
-      let record;
+      // 🔥 새 출근 기록 생성 (하루에 여러 개 가능)
+      const record = await this.models.Worktime.create({
+        userId: userId,
+        date: today, // 출근 시점의 날짜
+        checkInTime: now,
+        status: "working",
+        isActive: true,
+      });
 
-      if (existingRecord && existingRecord.checkOutTime) {
-        // 🔥 오늘 이미 퇴근한 기록이 있으면 새로 만들기
-        record = await this.models.Worktime.create({
-          userId: userId,
-          date: today,
-          checkInTime: checkInTime,
-          status: "working",
-          isActive: true,
-        });
-      } else if (existingRecord) {
-        // 기존 레코드 업데이트
-        existingRecord.checkInTime = checkInTime;
-        existingRecord.status = "working";
-        record = await existingRecord.save();
-      } else {
-        // 새 레코드 생성
-        record = await this.models.Worktime.create({
-          userId: userId,
-          date: today,
-          checkInTime: checkInTime,
-          status: "working",
-          isActive: true,
-        });
-      }
-
-      logger.info(`✅ 출근 기록: ${userId} at ${checkInTime}`);
+      logger.info(`✅ 출근 기록: ${userId} at ${now}`);
       return this.safeTransformRecord(record);
     } catch (error) {
       logger.error("출근 처리 실패:", error);
@@ -150,48 +129,50 @@ class WorktimeService extends BaseService {
    */
   async checkOut(userId) {
     try {
-      const today = TimeHelper.getTodayDateString();
+      const now = new Date();
 
-      // 🔥 쿼리 수정: checkOutTime이 null이거나 없는 경우
+      // 🔥 현재 근무 중인 기록 찾기 (날짜 상관없이)
       const record = await this.models.Worktime.findOne({
         userId: userId,
-        date: today,
-        checkInTime: { $ne: null }, // null이 아닌 경우
-        checkOutTime: null, // null인 경우 (아직 퇴근 안함)
+        status: "working",
+        checkOutTime: null,
         isActive: true,
-      });
+      }).sort({ checkInTime: -1 }); // 가장 최근 출근 기록
 
       if (!record) {
         throw new Error("출근 기록이 없습니다.");
       }
 
-      // 퇴근 시간 업데이트
-      const checkOutTime = new Date();
-      const workDuration = TimeHelper.diffMinutes(
-        record.checkInTime,
-        checkOutTime
-      );
-
-      record.checkOutTime = checkOutTime;
-      record.workDuration = workDuration;
+      // 퇴근 처리
+      record.checkOutTime = now;
       record.status = "completed";
 
-      // 초과근무 계산
-      const regularHours = Math.min(workDuration, 480); // 8시간
-      const overtimeMinutes = Math.max(0, workDuration - 480);
+      // 🔥 근무시간 계산 (자정 넘어도 정확히 계산)
+      const workDuration = TimeHelper.diffMinutes(record.checkInTime, now);
+      record.workDuration = workDuration;
 
-      record.regularHours = Math.floor(regularHours / 60);
-      record.overtimeHours = Math.floor(overtimeMinutes / 60);
+      // 🔥 야간근무 체크 (22시~06시)
+      const checkInHour = record.checkInTime.getHours();
+      const checkOutHour = now.getHours();
 
-      if (overtimeMinutes > 0) {
-        record.workType = "overtime";
+      if (
+        checkOutHour < 6 ||
+        checkOutHour >= 22 ||
+        checkInHour < 6 ||
+        checkInHour >= 22
+      ) {
+        record.workType = "night"; // 야간근무
       }
+
+      // 초과근무 계산
+      const overtimeMinutes = Math.max(0, workDuration - 480);
+      record.regularHours = Math.floor(Math.min(workDuration, 480) / 60);
+      record.overtimeHours = Math.floor(overtimeMinutes / 60);
 
       await record.save();
 
       logger.info(`✅ 퇴근 기록: ${userId} - ${workDuration}분 근무`);
 
-      // 안전하게 변환해서 반환
       const transformed = this.safeTransformRecord(record);
       transformed.overtimeMinutes = overtimeMinutes;
 
@@ -209,21 +190,16 @@ class WorktimeService extends BaseService {
     try {
       const today = TimeHelper.getTodayDateString();
 
-      // 🔥 오늘의 가장 최근 기록 하나만 가져오기
-      const record = await this.models.Worktime.findOne({
+      // 🔥 먼저 현재 근무 중인지 확인 (날짜 무관)
+      const workingRecord = await this.models.Worktime.findOne({
         userId: userId,
-        date: today,
+        status: "working",
+        checkOutTime: null,
         isActive: true,
-      }).sort({ createdAt: -1 }); // 최신순 정렬
+      }).sort({ checkInTime: -1 });
 
-      if (!record) {
-        return null;
-      }
-
-      const transformed = this.safeTransformRecord(record);
-
-      // 현재 근무 중인지 확인
-      if (transformed.checkInTime && !transformed.checkOutTime) {
+      if (workingRecord) {
+        const transformed = this.safeTransformRecord(workingRecord);
         const currentDuration = this.calculateCurrentWorkDuration(
           transformed.checkInTime,
           new Date()
@@ -236,9 +212,32 @@ class WorktimeService extends BaseService {
         };
       }
 
+      // 🔥 오늘 완료된 기록들의 합계 계산
+      const todayRecords = await this.models.Worktime.find({
+        userId: userId,
+        date: today,
+        status: "completed",
+        isActive: true,
+      });
+
+      if (todayRecords.length === 0) {
+        return null;
+      }
+
+      // 🔥 오늘 총 근무시간 합산
+      const totalWorkDuration = todayRecords.reduce((sum, record) => {
+        return sum + (record.workDuration || 0);
+      }, 0);
+
+      // 가장 최근 기록 반환
+      const lastRecord = todayRecords[todayRecords.length - 1];
+      const transformed = this.safeTransformRecord(lastRecord);
+
       return {
         ...transformed,
+        workDuration: totalWorkDuration, // 합산된 시간
         isWorking: false,
+        todayRecordCount: todayRecords.length, // 오늘 출퇴근 횟수
       };
     } catch (error) {
       logger.error("오늘 기록 조회 실패:", error);

@@ -76,9 +76,8 @@ const WorktimeSchema = new mongoose.Schema({
   },
 });
 
-// ✅ 복합 인덱스 (userId 포함)
-WorktimeSchema.index({ userId: 1, date: 1 }, { unique: true });
+// 🔥 수정: 유니크 제약 제거!
+WorktimeSchema.index({ userId: 1, date: 1 }); // unique 옵션 제거
 WorktimeSchema.index({ userId: 1, createdAt: -1 });
-WorktimeSchema.index({ date: 1, isActive: 1 });
 
 module.exports = mongoose.model("Worktime", WorktimeSchema);
