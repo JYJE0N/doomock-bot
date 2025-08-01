@@ -294,8 +294,9 @@ class TodoModule extends BaseModule {
    */
   async toggleTodo(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
+    const todoId = params;
 
-    if (!params) {
+    if (!todoId) {
       return {
         type: "error",
         module: "todo",
@@ -308,7 +309,6 @@ class TodoModule extends BaseModule {
     }
 
     try {
-      const todoId = params;
       const result = await this.todoService.toggleTodo(userId, todoId);
 
       if (!result.success) {
@@ -324,7 +324,13 @@ class TodoModule extends BaseModule {
       }
 
       // 토글 후 목록으로 돌아가기
-      return await this.showList(bot, callbackQuery, "1", moduleManager);
+      return await this.showList(
+        bot,
+        callbackQuery,
+        "list",
+        "1",
+        moduleManager
+      );
     } catch (error) {
       logger.error("TodoModule.toggleTodo 오류:", error);
       return {
@@ -402,46 +408,20 @@ class TodoModule extends BaseModule {
    */
   async executeDelete(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
-    const todoId = params; // params는 이제 순수한 ID입니다.
-
-    if (!todoId) {
-      return {
-        type: "error",
-        module: "todo",
-        data: {
-          message: "할일 ID가 필요합니다.",
-          action: "delete:confirm",
-          canRetry: false,
-        },
-      };
-    }
+    const todoId = params;
 
     try {
-      const result = await this.todoService.deleteTodo(userId, todoId);
+      await this.todoService.deleteTodo(userId, todoId);
 
-      return await this.showList(bot, callbackQuery, "1", moduleManager);
-
-      if (!result.success) {
-        return {
-          type: "error",
-          module: "todo",
-          data: {
-            message: result.message || "할일을 삭제할 수 없습니다.",
-            action: "delete:confirm",
-            canRetry: true,
-          },
-        };
-      }
-
-      // 성공 메시지와 함께 목록으로 돌아가기
-      return {
-        type: "delete_success",
-        module: "todo",
-        data: {
-          message: "할일이 삭제되었습니다.",
-          deletedTodo: result.data,
-        },
-      };
+      // ✅ 수정된 호출 방식
+      // subAction에는 'list'를, params에는 '1'을 정확히 전달합니다.
+      return await this.showList(
+        bot,
+        callbackQuery,
+        "list",
+        "1",
+        moduleManager
+      );
     } catch (error) {
       logger.error("TodoModule.executeDelete 오류:", error);
       return {

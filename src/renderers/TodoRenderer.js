@@ -259,15 +259,15 @@ ${data.message}
   }
 
   /**
-   * 🗑️ 삭제 확인 렌더링 (누락된 메서드 추가)
+   * 🗑️ 삭제 확인 렌더링
    */
   async renderDeleteConfirm(data, ctx) {
     const { todo } = data;
-    const text = `🗑️ **삭제 확인**\n\n정말로 아래 할일을 삭제하시겠습니까?\n\n- "${todo.text}"`; // 👈 여기도 .title을 .text로 변경
+    const text = `🗑️ **삭제 확인**\n\n정말로 아래 할일을 삭제하시겠습니까?\n\n- "${todo.text}"`;
     const keyboard = this.createInlineKeyboard(
       [
         [
-          // 👇 action을 'executeDelete'로 수정
+          // 👇 action을 'delete:confirm' 대신 'executeDelete'로 수정
           {
             text: "✅ 예, 삭제합니다.",
             action: "executeDelete",
