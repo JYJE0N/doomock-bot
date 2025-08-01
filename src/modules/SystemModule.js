@@ -43,15 +43,15 @@ class SystemModule extends BaseModule {
     this.registerActions({
       menu: this.showMainMenu,
       help: this.showHelp,
-      about: this.showAbout,
+      // about: this.showAbout,
       status: this.showSystemStatus,
-      info: this.showSystemInfo,
-      health: this.showHealthStatus,
+      // info: this.showSystemInfo,
+      // health: this.showHealthStatus,
       modules: this.showModuleStatus,
-      stats: this.showSystemStats,
-      logs: this.showRecentLogs,
+      // stats: this.showSystemStats,
+      // logs: this.showRecentLogs,
       ping: this.handlePing,
-      version: this.showVersion,
+      // version: this.showVersion,
     });
   }
 

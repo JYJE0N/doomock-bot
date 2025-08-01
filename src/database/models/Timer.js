@@ -5,8 +5,8 @@ const mongoose = require("mongoose");
 const timerSchema = new mongoose.Schema(
   {
     // 사용자 정보
-    userId: { type: String, required: true, index: true },
-    userName: { type: String, required: true },
+    // userId: { type: String, required: true },
+    // userName: { type: String, required: true },
 
     // 세션 정보
     type: {
@@ -57,8 +57,6 @@ const timerSchema = new mongoose.Schema(
 // ===== 인덱스 =====
 timerSchema.index({ userId: 1, startedAt: -1 });
 timerSchema.index({ status: 1, startedAt: -1 });
-timerSchema.index({ userId: 1, type: 1, completedAt: -1 });
-timerSchema.index({ userId: 1, status: 1 });
 
 // ===== 인스턴스 메서드 =====
 

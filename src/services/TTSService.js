@@ -28,8 +28,7 @@ class TTSService extends BaseService {
    * 🎯 서비스 초기화
    */
   async onInitialize() {
-    // logger 사용 가능
-    logger.success("✅ TTSService 초기화 완료");
+    // logger.success("✅ TTSService 초기화 완료");
   }
 
   /**

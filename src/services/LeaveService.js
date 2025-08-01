@@ -27,7 +27,7 @@ class LeaveService extends BaseService {
    * 🎯 서비스 초기화
    */
   async onInitialize() {
-    logger.success("✅ LeaveService 초기화 완료");
+    // logger.success("✅ LeaveService 초기화 완료");
   }
 
   /**

@@ -7,12 +7,12 @@ const mongoose = require("mongoose");
  */
 const userLocationSchema = new mongoose.Schema(
   {
-    userId: {
-      type: Number,
-      required: true,
-      unique: true,
-      index: true,
-    },
+    // userId: {
+    //   type: Number,
+    //   required: true,
+    //   unique: true,
+    //   // index: true,
+    // },
 
     username: {
       type: String,

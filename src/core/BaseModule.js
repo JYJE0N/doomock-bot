@@ -1,85 +1,141 @@
-// src/services/BaseService.js
+// src/core/BaseModule.js
 const logger = require("../utils/Logger");
 
 /**
- * 🏗️ BaseService - 모든 서비스의 부모 (심플 버전)
+ * 🏗️ BaseModule - 모든 모듈의 부모 클래스
  */
-class BaseService {
-  constructor(serviceName, options = {}) {
-    this.serviceName = serviceName;
-    this.models = {};
-    this.cache = new Map();
+class BaseModule {
+  constructor(moduleName, options = {}) {
+    this.moduleName = moduleName;
+    this.bot = options.bot;
+    this.moduleManager = options.moduleManager;
+    this.serviceBuilder = options.serviceBuilder;
+    this.actionMap = new Map();
     this.isInitialized = false;
+    this.config = options.config || {};
 
-    // ✅ 중요: options에서 mongooseManager 받기!
-    this.mongooseManager = options.mongooseManager;
+    logger.info(`📦 ${moduleName} 모듈 생성됨`);
   }
 
+  /**
+   * 모듈 초기화
+   */
   async initialize() {
     if (this.isInitialized) return;
 
-    await this.initializeModels();
-    await this.onInitialize();
+    try {
+      // 하위 클래스의 초기화 메서드 호출
+      await this.onInitialize();
 
-    this.isInitialized = true;
-    logger.success(`✅ ${this.serviceName} 초기화 완료`);
-  }
-
-  async initializeModels() {
-    // ✅ 수정: getInstance() 대신 전달받은 mongooseManager 사용!
-    if (!this.mongooseManager) {
-      // 만약 mongooseManager가 없으면 getInstance() 사용 (폴백)
-      const { getInstance } = require("../database/MongooseManager");
-      this.mongooseManager = getInstance();
-      logger.warn(
-        `⚠️ ${this.serviceName}: mongooseManager가 전달되지 않아 getInstance() 사용`
-      );
-    }
-
-    const modelNames = this.getRequiredModels();
-    for (const modelName of modelNames) {
-      try {
-        this.models[modelName] = this.mongooseManager.getModel(modelName);
-        logger.debug(`✅ ${this.serviceName}: ${modelName} 모델 로드됨`);
-      } catch (error) {
-        logger.error(
-          `❌ ${this.serviceName}: ${modelName} 모델 로드 실패:`,
-          error
-        );
-        throw error;
+      // 액션 등록
+      if (this.setupActions) {
+        this.setupActions();
       }
+
+      this.isInitialized = true;
+      logger.success(`✅ ${this.moduleName} 초기화 완료`);
+    } catch (error) {
+      logger.error(`❌ ${this.moduleName} 초기화 실패:`, error);
+      throw error;
     }
   }
 
-  getRequiredModels() {
-    return []; // 자식 클래스에서 구현
-  }
-
+  /**
+   * 하위 클래스에서 구현해야 할 초기화 메서드
+   */
   async onInitialize() {
-    // 자식 클래스에서 구현
+    // 하위 클래스에서 구현
   }
 
-  createSuccessResponse(data, message = "완료") {
-    return { success: true, data, message };
+  /**
+   * 콜백 처리
+   */
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const handler = this.actionMap.get(subAction);
+
+      if (!handler) {
+        logger.warn(`❓ ${this.moduleName}: 알 수 없는 액션 - ${subAction}`);
+        return {
+          type: "error",
+          message: `알 수 없는 액션입니다: ${subAction}`,
+          module: this.moduleName,
+        };
+      }
+
+      // 핸들러 실행
+      const result = await handler.call(
+        this,
+        bot,
+        callbackQuery,
+        subAction,
+        params,
+        moduleManager
+      );
+
+      return result;
+    } catch (error) {
+      logger.error(`💥 ${this.moduleName} 콜백 처리 오류:`, error);
+      return {
+        type: "error",
+        message: "처리 중 오류가 발생했습니다.",
+        module: this.moduleName,
+        error: error.message,
+      };
+    }
   }
 
-  createErrorResponse(error, message = "오류 발생") {
-    logger.error(`${this.serviceName} 오류:`, error);
-    return { success: false, error: error.message, message };
+  /**
+   * 메시지 처리
+   */
+  async handleMessage(bot, msg) {
+    if (this.onHandleMessage) {
+      return await this.onHandleMessage(bot, msg);
+    }
+    return false;
   }
 
+  /**
+   * 액션 등록 헬퍼
+   */
+  registerActions(actions) {
+    for (const [action, handler] of Object.entries(actions)) {
+      if (typeof handler !== "function") {
+        logger.warn(
+          `⚠️ ${this.moduleName}: ${action} 액션의 핸들러가 함수가 아닙니다`
+        );
+        continue;
+      }
+      this.actionMap.set(action, handler.bind(this));
+    }
+  }
+
+  /**
+   * 모듈 정리
+   */
+  async cleanup() {
+    try {
+      if (this.onCleanup) {
+        await this.onCleanup();
+      }
+      this.actionMap.clear();
+      logger.debug(`🧹 ${this.moduleName} 모듈 정리됨`);
+    } catch (error) {
+      logger.error(`❌ ${this.moduleName} 정리 실패:`, error);
+    }
+  }
+
+  /**
+   * 모듈 상태 조회
+   */
   getStatus() {
     return {
-      serviceName: this.serviceName,
+      moduleName: this.moduleName,
       isInitialized: this.isInitialized,
-      modelCount: Object.keys(this.models).length,
-      mongooseConnected: this.mongooseManager?.isConnected() || false,
+      actionCount: this.actionMap.size,
+      actions: Array.from(this.actionMap.keys()),
     };
-  }
-
-  async cleanup() {
-    this.cache.clear();
   }
 }
 
-module.exports = BaseService;
+module.exports = BaseModule;

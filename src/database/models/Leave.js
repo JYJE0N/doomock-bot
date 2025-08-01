@@ -14,10 +14,10 @@ const mongoose = require("mongoose");
 const leaveSchema = new mongoose.Schema(
   {
     // 👤 사용자 ID
-    userId: {
-      type: String,
-      required: [true, "사용자 ID는 필수입니다"],
-    },
+    // userId: {
+    //   type: String,
+    //   required: [true, "사용자 ID는 필수입니다"],
+    // },
 
     // 📅 연도
     year: {

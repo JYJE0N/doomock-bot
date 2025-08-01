@@ -58,7 +58,7 @@ class WorktimeService extends BaseService {
     // 오늘 통계 초기화
     await this.updateTodayStats();
 
-    logger.success("✅ WorktimeService 초기화 완료");
+    // logger.success("✅ WorktimeService 초기화 완료");
   }
 
   // ===== 🎯 핵심 비즈니스 메서드들 =====

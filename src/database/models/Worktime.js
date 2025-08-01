@@ -2,11 +2,6 @@ const mongoose = require("mongoose");
 const TimeHelper = require("../../utils/TimeHelper");
 
 const WorktimeSchema = new mongoose.Schema({
-  userId: {
-    type: String,
-    required: true,
-    index: true,
-  },
   date: {
     type: String, // YYYY-MM-DD 형식
     required: true,

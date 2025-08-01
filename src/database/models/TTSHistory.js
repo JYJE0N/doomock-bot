@@ -3,11 +3,11 @@ const mongoose = require("mongoose");
 
 const TTSHistorySchema = new mongoose.Schema(
   {
-    userId: {
-      type: String,
-      required: true,
-      index: true,
-    },
+    // userId: {
+    //   type: String,
+    //   required: true,
+    // index: true,
+    // },
     text: {
       type: String,
       required: true,

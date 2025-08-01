@@ -21,11 +21,11 @@ const logger = require("../../utils/Logger");
 const reminderSchema = new mongoose.Schema(
   {
     // 👤 사용자 정보
-    userId: {
-      type: String,
-      required: [true, "사용자 ID는 필수입니다"],
-      index: true,
-    },
+    // userId: {
+    //   type: String,
+    //   required: [true, "사용자 ID는 필수입니다"],
+    //   // index: true,
+    // },
 
     // 📝 리마인더 내용
     text: {

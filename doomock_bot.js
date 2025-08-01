@@ -103,7 +103,7 @@ class DooMockBot {
       await this.botController.initialize();
 
       // 🚀 봇 시작
-      logger.info("🚀 텔레그램 봇 시작 중...");
+      // logger.info("🚀 텔레그램 봇 시작 중...");
       await this.botController.start();
 
       // 초기화 완료

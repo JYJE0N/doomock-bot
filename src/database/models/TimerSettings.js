@@ -5,7 +5,7 @@ const mongoose = require("mongoose");
 const timerSettingsSchema = new mongoose.Schema(
   {
     // 사용자 식별자
-    userId: { type: String, required: true, unique: true },
+    // userId: { type: String, required: true, unique: true },
 
     // 시간 설정 (분 단위)
     focusDuration: { type: Number, default: 25, min: 1, max: 120 },

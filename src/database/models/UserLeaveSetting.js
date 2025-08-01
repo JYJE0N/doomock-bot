@@ -18,11 +18,11 @@ const mongoose = require("mongoose");
 const userLeaveSettingSchema = new mongoose.Schema(
   {
     // 👤 사용자 ID (고유)
-    userId: {
-      type: String,
-      required: [true, "사용자 ID는 필수입니다"],
-      index: true,
-    },
+    // userId: {
+    //   type: String,
+    //   required: [true, "사용자 ID는 필수입니다"],
+    //   index: true,
+    // },
 
     // 📊 연간 연차 일수
     annualLeave: {

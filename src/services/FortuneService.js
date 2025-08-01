@@ -136,7 +136,7 @@ class FortuneService extends BaseService {
   }
 
   async onInitialize() {
-    logger.success("✅ FortuneService 초기화 완료");
+    // logger.success("✅ FortuneService 초기화 완료");
   }
 
   /**

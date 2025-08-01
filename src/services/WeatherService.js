@@ -82,7 +82,7 @@ class WeatherService extends BaseService {
     // 캐시 정리 스케줄링
     this.setupCacheCleaning();
 
-    logger.success("✅ WeatherService 초기화 완료");
+    // logger.success("✅ WeatherService 초기화 완료");
   }
 
   /**
