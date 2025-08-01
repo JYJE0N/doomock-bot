@@ -468,11 +468,15 @@ ${achievement.emoji} ${achievement.txt}`;
       displayTime: data.displayTime,
     };
 
-    // 🔍 디버깅용 (개발 중에만 사용)
-    console.log("🔍 오늘 근무 데이터 디버깅:", {
-      checkInTime: TimeHelper.debugTime(record.checkInTime),
-      checkOutTime: TimeHelper.debugTime(record.checkOutTime),
-    });
+    // 🔥 추가: recommendations와 timestamp 변수 정의
+    const recommendations = data.recommendations || [];
+    const timestamp = data.timestamp || new Date();
+
+    // 🔍 디버깅용 (개발 중에만 사용) - 실제로는 주석 처리하거나 제거
+    // console.log("🔍 오늘 근무 데이터 디버깅:", {
+    //   checkInTime: TimeHelper.debugTime(record.checkInTime),
+    //   checkOutTime: TimeHelper.debugTime(record.checkOutTime),
+    // });
 
     const statusEmoji = isWorking
       ? this.statusEmojis.working

@@ -316,22 +316,49 @@ class WorktimeModule extends BaseModule {
   // 나머지 비즈니스 로직 메서드들 (getTodayStatus, processCheckIn 등)은
   // 모두 logger 대신 require로 가져온 logger 사용
   async getTodayStatus(userId) {
-    // 실제 구현에서는 worktimeService를 사용
-    const checkinTime = new Date(); // 임시 데이터
-    const isWorking = true; // 현재 근무 중으로 설정
+    try {
+      // Service를 통해 DB 조회
+      const todayRecord = await this.worktimeService.getTodayRecord(userId);
 
-    return {
-      hasRecord: true,
-      isWorking: isWorking,
-      record: {
-        checkInTime: checkinTime,
-        checkOutTime: null,
-      },
-      workSummary: {
-        workDuration: 120, // 2시간 (분)
-        displayTime: "2:00",
-      },
-    };
+      if (!todayRecord) {
+        return {
+          hasRecord: false,
+          isWorking: false,
+          record: null,
+          workSummary: null,
+        };
+      }
+
+      // 실제 데이터 기반으로 상태 계산
+      const isWorking = todayRecord.checkInTime && !todayRecord.checkOutTime;
+      const workDuration =
+        todayRecord.currentWorkDuration || todayRecord.workDuration || 0;
+
+      return {
+        hasRecord: true,
+        isWorking: isWorking,
+        record: todayRecord,
+        workSummary: {
+          workDuration: workDuration,
+          displayTime: this.formatDuration(workDuration),
+          isOvertime: workDuration > this.config.overtimeThreshold,
+          overtimeMinutes: Math.max(
+            0,
+            workDuration - this.config.overtimeThreshold
+          ),
+        },
+      };
+    } catch (error) {
+      logger.error("오늘 상태 조회 실패:", error);
+      throw error;
+    }
+  }
+
+  formatDuration(minutes) {
+    if (!minutes || minutes === 0) return "0:00";
+    const hours = Math.floor(minutes / 60);
+    const mins = minutes % 60;
+    return `${hours}:${mins.toString().padStart(2, "0")}`;
   }
 
   async processCheckIn(userId) {
