@@ -11,11 +11,10 @@ const logger = require("../utils/Logger");
  * - Mongoose/Native 이중 지원
  */
 class ServiceBuilder {
-  constructor() {
+  constructor(bot, menuManager) {
+    this.bot = bot;
+    this.menuManager = menuManager;
     this.services = new Map();
-    this.serviceInstances = new Map();
-    this.dbManager = null;
-    this.mongooseManager = null;
   }
 
   setDatabaseManager(dbManager) {
@@ -64,7 +63,7 @@ class ServiceBuilder {
     }
 
     // Mongoose 서비스들
-    const mongooseServices = ["todo", "timer", "leave"];
+    const mongooseServices = ["todo", "timer", "leave", "tts"];
 
     let instance;
     if (mongooseServices.includes(serviceName)) {

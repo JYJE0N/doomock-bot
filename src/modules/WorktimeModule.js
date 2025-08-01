@@ -178,6 +178,17 @@ class WorktimeModule extends BaseModule {
     }
   }
 
+  async handleCallback(bot, callbackQuery, subAction, params, menuManager) {
+    const handler = this.actionMap[subAction];
+    if (handler) {
+      // 5개 매개변수 모두 전달
+      return await handler(bot, callbackQuery, subAction, params, menuManager);
+    }
+
+    this.logger.warn(`처리되지 않은 subAction: ${subAction}`);
+    await bot.answerCallbackQuery(callbackQuery.id);
+  }
+
   /**
    * 💼 출근 처리
    */
@@ -404,26 +415,30 @@ class WorktimeModule extends BaseModule {
   /**
    * ❓ 도움말 표시
    */
-  async showHelp(bot, callbackQuery, params, moduleManager) {
-    return {
-      type: "help",
-      module: "worktime",
-      data: {
-        config: this.config,
-        features: {
-          checkin: "출근 시간 기록",
-          checkout: "퇴근 시간 기록",
-          tracking: "실시간 근무시간 추적",
-          stats: "일/주/월 통계",
-          overtime: "초과근무 계산",
-          reminders: "퇴근 알림 (선택)",
-        },
-        commands: {
-          text: ["출근", "퇴근", "근무시간", "오늘"],
-          buttons: ["출근하기", "퇴근하기", "오늘 현황", "통계"],
-        },
-      },
-    };
+  async showHelp(bot, callbackQuery, subAction, params, menuManager) {
+    try {
+      const chatId = callbackQuery.message.chat.id;
+      const messageId = callbackQuery.message.message_id;
+
+      // WorktimeRenderer를 사용하여 도움말 UI 생성
+      const helpMessage = this.renderer.renderHelp();
+
+      // 메시지 편집
+      await bot.editMessageText(helpMessage.text, {
+        chat_id: chatId,
+        message_id: messageId,
+        parse_mode: "HTML",
+        reply_markup: helpMessage.reply_markup,
+      });
+
+      await bot.answerCallbackQuery(callbackQuery.id);
+    } catch (error) {
+      this.logger.error("도움말 표시 실패:", error);
+      await bot.answerCallbackQuery(callbackQuery.id, {
+        text: "도움말을 표시하는 중 오류가 발생했습니다.",
+        show_alert: true,
+      });
+    }
   }
 
   // ===== 🛠️ 핵심 비즈니스 로직 메서드들 =====
