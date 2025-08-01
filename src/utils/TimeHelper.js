@@ -34,6 +34,36 @@ class TimeHelper {
     moment.tz.setDefault(this.TIMEZONE);
   }
 
+  // ===== 📅 날짜 범위 헬퍼 (누락된 기능 추가) =====
+
+  /**
+   * 📅 이번 주의 시작일 (일요일)
+   */
+  static getWeekStart() {
+    return this.now().startOf("week").toDate();
+  }
+
+  /**
+   * 📅 이번 주의 마지막일 (토요일)
+   */
+  static getWeekEnd() {
+    return this.now().endOf("week").toDate();
+  }
+
+  /**
+   * 📅 이번 달의 시작일
+   */
+  static getMonthStart() {
+    return this.now().startOf("month").toDate();
+  }
+
+  /**
+   * 📅 이번 달의 마지막일
+   */
+  static getMonthEnd() {
+    return this.now().endOf("month").toDate();
+  }
+
   // ===== 🕐 핵심 시간 메서드 =====
 
   /**
