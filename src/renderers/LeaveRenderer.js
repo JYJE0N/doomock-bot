@@ -72,10 +72,7 @@ class LeaveRenderer extends BaseRenderer {
       [{ text: "🔙 메인 메뉴", action: "menu" }],
     ];
 
-    const keyboard = this.createInlineKeyboard(
-      buttons,
-      data.status ? this.moduleName : "system"
-    );
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
@@ -259,7 +256,7 @@ ${data.message}
       ],
     ];
 
-    const keyboard = this.createInlineKeyboard(buttons, "system");
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }

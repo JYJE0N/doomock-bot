@@ -43,7 +43,7 @@ class TodoService extends BaseService {
     try {
       const newTodo = new this.models.Todo({
         userId: userId.toString(),
-        text: todoData.title.trim(), // 'title'을 모델 스키마에 맞는 'text'로 변경
+        text: todoData.text.trim(), // 'title'을 모델 스키마에 맞는 'text'로 변경
         description: todoData.description?.trim(),
         priority: todoData.priority || 3,
       });

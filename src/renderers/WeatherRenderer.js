@@ -126,7 +126,7 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
         // 세 번째 행: 메인 메뉴
         [{ text: "🔙 메인 메뉴", action: "menu" }],
       ],
-      "system" // 메인 메뉴는 system으로
+      this.moduleName
     );
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -309,7 +309,7 @@ ${weatherEmoji} ${day.description}
         ],
         [{ text: "🔙 메인메뉴", action: "menu" }],
       ],
-      "system"
+      this.moduleName
     );
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -334,7 +334,7 @@ ${message || "알 수 없는 오류가 발생했습니다"}
           { text: "🔙 메인메뉴", action: "menu" },
         ],
       ],
-      "system"
+      this.moduleName
     );
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });

@@ -202,64 +202,41 @@ ${
 • 총 시간: ${todayStatus.weekSummary?.totalHours || 0}시간`;
 
     // 메뉴 버튼
-    const keyboard = {
-      inline_keyboard: [
-        [
-          {
-            text:
-              todayStatus.hasRecord && todayStatus.isWorking
-                ? "🏠 퇴근하기"
-                : "💼 출근하기",
-            callback_data: this.buildCallbackData(
-              "worktime",
-              todayStatus.hasRecord && todayStatus.isWorking
-                ? "checkout"
-                : "checkin"
-            ),
-          },
-        ],
-        [
-          {
-            text: "📅 오늘 현황",
-            callback_data: this.buildCallbackData("worktime", "today"),
-          },
-          {
-            text: "📈 주간 통계",
-            callback_data: this.buildCallbackData("worktime", "week"),
-          },
-        ],
-        [
-          {
-            text: "📊 월간 통계",
-            callback_data: this.buildCallbackData("worktime", "month"),
-          },
-          {
-            text: "📋 근무 이력",
-            callback_data: this.buildCallbackData("worktime", "history"),
-          },
-        ],
-        [
-          {
-            text: "⚙️ 설정",
-            callback_data: this.buildCallbackData("worktime", "settings"),
-          },
-          {
-            text: "❓ 도움말",
-            callback_data: this.buildCallbackData("worktime", "help"),
-          },
-        ],
-        [
-          {
-            text: "🔙 메인 메뉴",
-            callback_data: this.buildCallbackData("main", "menu"),
-          },
-        ],
+    const buttons = [
+      [
+        {
+          text:
+            todayStatus.hasRecord && todayStatus.isWorking
+              ? "🏠 퇴근하기"
+              : "💼 출근하기",
+          action:
+            todayStatus.hasRecord && todayStatus.isWorking
+              ? "checkout"
+              : "checkin",
+        },
       ],
-    };
+      [
+        { text: "📅 오늘 현황", action: "today" },
+        { text: "📈 주간 통계", action: "week" },
+      ],
+      [
+        { text: "📊 월간 통계", action: "month" },
+        { text: "📋 근무 이력", action: "history" },
+      ],
+      [
+        { text: "⚙️ 설정", action: "settings" },
+        { text: "❓ 도움말", action: "help" },
+      ],
+      // '메인 메뉴' 버튼은 action: 'menu'만 지정하면 BaseRenderer가 알아서 'system:menu'로 만들어줍니다.
+      [{ text: "🔙 메인 메뉴", action: "menu" }],
+    ];
 
-    await this.safeEditMessage(ctx, text, {
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+
+    // safeEditMessage 대신 표준 sendSafeMessage 사용
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "Markdown", // MarkdownV2 대신 Markdown 사용 권장 (더 안정적)
     });
   }
 
@@ -308,7 +285,7 @@ ${this.getTimeEmoji()} 좋은 아침입니다!
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -354,7 +331,7 @@ ${this.getTimeEmoji()} 수고하셨습니다!
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -393,7 +370,7 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -440,7 +417,7 @@ ${message || "오늘 하루도 수고하셨습니다! 🌙"}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -481,7 +458,7 @@ ${message || "오늘 하루도 수고하셨습니다! 🌙"}`;
 
       return await this.safeEditMessage(ctx, text, {
         reply_markup: keyboard,
-        parse_mode: "MarkdownV2",
+        // parse_mode: "MarkdownV2",
       });
     }
 
@@ -581,7 +558,7 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
     const keyboard = { inline_keyboard: buttons };
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -674,7 +651,7 @@ ${statusIcon} **${record.date}**: ${duration}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -757,7 +734,7 @@ ${performance.emoji} **평가**: ${performance.title}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -834,7 +811,7 @@ ${achievement.emoji} ${achievement.title}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -911,7 +888,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -981,7 +958,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -1061,7 +1038,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -1103,7 +1080,7 @@ ${message || "처리 중 문제가 발생했습니다."}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -1148,7 +1125,7 @@ ${message || "처리 중 문제가 발생했습니다."}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -1196,7 +1173,7 @@ ${message || "처리 중 문제가 발생했습니다."}`;
 
     await this.safeEditMessage(ctx, text, {
       reply_markup: keyboard,
-      parse_mode: "MarkdownV2",
+      // parse_mode: "MarkdownV2",
     });
   }
 
@@ -1281,7 +1258,7 @@ ${message || "처리 중 문제가 발생했습니다."}`;
       const escapedText = this.escapeMarkdownV2(text);
 
       await ctx.editMessageText(escapedText, {
-        parse_mode: "MarkdownV2",
+        // parse_mode: "MarkdownV2",
         ...options,
       });
     } catch (error) {

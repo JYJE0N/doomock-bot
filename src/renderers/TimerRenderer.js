@@ -82,12 +82,11 @@ class TimerRenderer extends BaseRenderer {
       ]);
     }
 
+    // '메인 메뉴' 버튼은 BaseRenderer에서 알아서 'system:menu'로 만들어주므로 걱정할 필요 없습니다.
     buttons.push([{ text: "🔙 메인 메뉴", action: "menu" }]);
 
-    const keyboard = this.createInlineKeyboard(
-      buttons,
-      data.activeTimer ? this.moduleName : "system"
-    );
+    // ✅ 수정된 부분: 항상 this.moduleName을 사용하도록 변경
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
@@ -189,7 +188,7 @@ class TimerRenderer extends BaseRenderer {
           { text: "🔙 메인 메뉴", action: "menu" },
         ],
       ],
-      "system"
+      this.moduleName
     );
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -270,7 +269,7 @@ ${data.message}
           { text: "🔙 메인 메뉴", action: "menu" },
         ],
       ],
-      "system"
+      this.moduleName
     );
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
