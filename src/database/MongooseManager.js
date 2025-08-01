@@ -1,7 +1,6 @@
-// src/database/MongooseManager.js
+// src/database/MongooseManager.js - isConnected() 메서드 추가 수정
 const mongoose = require("mongoose");
 const logger = require("../utils/Logger");
-const UserLeaveSetting = require("./models/UserLeaveSetting");
 
 let instance = null;
 
@@ -62,10 +61,7 @@ class MongooseManager {
       throw error;
     }
   }
-  // 누락된 메서드 추가
-  isConnected() {
-    return this.connected && this.mongoose?.connection?.readyState === 1;
-  }
+
   /**
    * 이벤트 리스너 설정
    */
@@ -96,11 +92,10 @@ class MongooseManager {
       const models = {
         Todo: require("./models/Todo"),
         Timer: require("./models/Timer"),
-        TimerStats: require("./models/TimerStats"), // 추가
+        TimerStats: require("./models/TimerStats"),
         TimerSettings: require("./models/TimerSettings"),
         Worktime: require("./models/Worktime"),
         Leave: require("./models/Leave"),
-        Worktime: require("./models/Worktime"), // ✅ 추가 필요
         UserLeaveSetting: require("./models/UserLeaveSetting"),
         Reminder: require("./models/Reminder"),
         UserSetting: require("./models/UserSetting"),
@@ -130,6 +125,13 @@ class MongooseManager {
   }
 
   /**
+   * 🔍 연결 상태 확인 (메서드로 추가!) - 핵심 수정!
+   */
+  isConnected() {
+    return this.isConnected && mongoose.connection.readyState === 1;
+  }
+
+  /**
    * 트랜잭션 실행
    */
   async withTransaction(callback) {
@@ -145,9 +147,10 @@ class MongooseManager {
    * 연결 종료
    */
   async disconnect() {
-    if (this.mongoose) {
-      await this.mongoose.disconnect();
-      this.connected = false;
+    if (mongoose.connection.readyState === 1) {
+      await mongoose.disconnect();
+      this.isConnected = false;
+      logger.info("✅ Mongoose 연결 종료됨");
     }
   }
 
