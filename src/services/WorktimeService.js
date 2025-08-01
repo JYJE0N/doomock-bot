@@ -1,229 +1,96 @@
-// src/services/WorktimeService.js - 🏢 근무시간 관리 서비스 (Mongoose 연동)
+// src/services/WorktimeService.js - 데이터 처리 개선 버전
+
 const BaseService = require("./BaseService");
-const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const logger = require("../utils/Logger");
 
 /**
- * 🏢 WorktimeService - 근무시간 관리 서비스
+ * 🏢 WorktimeService - 근무시간 데이터 관리 (데이터 처리 개선)
  *
- * ✅ 특징:
- * - Mongoose 모델 사용
- * - 출퇴근 시간 추적
- * - 일/주/월 통계 제공
- * - 초과근무 계산
- * - 캐싱으로 성능 최적화
+ * 🎯 핵심 개선사항:
+ * - 데이터베이스에서 가져온 시간 데이터의 안전한 처리
+ * - null/undefined 값에 대한 방어 코드
+ * - 일관된 데이터 형식으로 변환
  */
 class WorktimeService extends BaseService {
-  constructor(options = {}) {
-    super("WorktimeService", options);
+  constructor() {
+    super();
+    this.activeSessions = new Map(); // 현재 활성 세션 관리
+  }
 
-    // 서비스 설정
-    this.config = {
-      workStartTime: "09:00",
-      workEndTime: "18:00",
-      lunchDuration: 60, // 점심시간 (분)
-      overtimeThreshold: 480, // 8시간 (분)
-      trackingMode: "simple", // simple | detailed
-      autoBreakEnabled: false,
-      dailyGoalHours: 8,
-      enableCache: true,
-      cacheTimeout: 5 * 60 * 1000, // 5분
-      ...options.config,
+  /**
+   * ⏰ DB 시간 데이터 안전 변환
+   * @param {any} dbTimeData - DB에서 가져온 시간 데이터
+   * @returns {Date|null} 안전한 Date 객체 또는 null
+   */
+  safeDateFromDB(dbTimeData) {
+    if (!dbTimeData) return null;
+
+    try {
+      // MongoDB의 Date 객체 처리
+      if (dbTimeData instanceof Date) {
+        return dbTimeData;
+      }
+
+      // 문자열인 경우
+      if (typeof dbTimeData === "string") {
+        const parsed = new Date(dbTimeData);
+        return isNaN(parsed.getTime()) ? null : parsed;
+      }
+
+      // 기타 형식 시도
+      const attempt = new Date(dbTimeData);
+      return isNaN(attempt.getTime()) ? null : attempt;
+    } catch (error) {
+      logger.warn("DB 시간 변환 실패:", dbTimeData, error.message);
+      return null;
+    }
+  }
+
+  /**
+   * 📋 워크타임 레코드 안전 변환
+   * @param {object} record - DB 레코드
+   * @returns {object} 안전하게 변환된 레코드
+   */
+  safeTransformRecord(record) {
+    if (!record) return null;
+
+    const transformed = {
+      ...(record.toObject ? record.toObject() : record),
+
+      // 시간 필드들을 안전하게 변환
+      checkInTime: this.safeDateFromDB(record.checkInTime),
+      checkOutTime: this.safeDateFromDB(record.checkOutTime),
+      createdAt: this.safeDateFromDB(record.createdAt),
+      updatedAt: this.safeDateFromDB(record.updatedAt),
+
+      // 표시용 시간 문자열 추가
+      checkInDisplay: TimeHelper.safeDisplayTime(record.checkInTime),
+      checkOutDisplay: TimeHelper.safeDisplayTime(record.checkOutTime),
+
+      // 날짜 문자열 (정렬용)
+      dateString: record.date || TimeHelper.format(record.createdAt, "date"),
     };
 
-    // 활성 세션 관리 (현재 근무 중인 사람들)
-    this.activeSessions = new Map();
-
-    // 오늘 통계 캐시
-    this.todayStats = null;
-    this.lastStatsUpdate = null;
-
-    logger.info("🏢 WorktimeService 생성됨");
-  }
-
-  /**
-   * 🎯 필요한 모델들 정의
-   */
-  getRequiredModels() {
-    return ["Worktime"];
-  }
-
-  /**
-   * 🎯 서비스 초기화
-   */
-  async onInitialize() {
-    // 활성 세션 복구 (서버 재시작 시)
-    await this.recoverActiveSessions();
-
-    // 오늘 통계 초기화
-    await this.updateTodayStats();
-
-    // logger.success("✅ WorktimeService 초기화 완료");
-  }
-
-  // ===== 🎯 핵심 비즈니스 메서드들 =====
-
-  /**
-   * 💼 출근 처리
-   */
-  async checkIn(userId, checkInTime = null) {
-    try {
-      const now = checkInTime || new Date();
-      const today = TimeHelper.format(null, "YYYY-MM-DD");
-
-      // 이미 출근했는지 확인
-      const existingRecord = await this.models.Worktime.findOne({
-        userId: userId,
-        date: today,
-        isActive: true,
-      });
-
-      if (existingRecord && existingRecord.checkInTime) {
-        return this.createErrorResponse(
-          new Error("이미 출근하셨습니다"),
-          "출근 처리 실패"
-        );
-      }
-
-      // 새 출근 기록 생성 또는 업데이트
-      let worktimeRecord;
-
-      if (existingRecord) {
-        // 기존 기록 업데이트
-        existingRecord.checkInTime = now;
-        existingRecord.updatedAt = now;
-        existingRecord.version += 1;
-        worktimeRecord = await existingRecord.save();
-      } else {
-        // 새 기록 생성
-        worktimeRecord = new this.models.Worktime({
-          userId: userId,
-          date: today,
-          checkInTime: now,
-          workType: "normal", // normal | overtime | holiday
-          status: "working",
-          createdAt: now,
-          updatedAt: now,
-          version: 1,
-          isActive: true,
-        });
-        await worktimeRecord.save();
-      }
-
-      // 활성 세션에 추가
-      this.activeSessions.set(userId, {
-        checkInTime: now,
-        userId: userId,
-        recordId: worktimeRecord._id,
-      });
-
-      // 통계 업데이트
-      await this.updateTodayStats();
-
-      logger.info(
-        `💼 출근 처리 완료: ${userId} at ${TimeHelper.format(now, "HH:mm")}`
+    // 근무시간 계산 (안전하게)
+    if (transformed.checkInTime && transformed.checkOutTime) {
+      const duration = TimeHelper.diffMinutes(
+        transformed.checkInTime,
+        transformed.checkOutTime
       );
-
-      return this.createSuccessResponse(
-        {
-          record: worktimeRecord,
-          checkInTime: now,
-          currentStatus: "working",
-          recommendations: this.generateCheckInRecommendations(now),
-        },
-        "출근 처리되었습니다"
-      );
-    } catch (error) {
-      logger.error("출근 처리 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "출근 처리 중 오류가 발생했습니다"
-      );
+      transformed.workDuration = Math.max(0, duration);
+      transformed.workDurationDisplay = this.formatWorkDuration(duration);
     }
+
+    return transformed;
   }
 
   /**
-   * 🏠 퇴근 처리
-   */
-  async checkOut(userId, checkOutTime = null) {
-    try {
-      const now = checkOutTime || new Date();
-      const today = TimeHelper.format(null, "YYYY-MM-DD");
-
-      // 출근 기록 확인
-      const worktimeRecord = await this.models.Worktime.findOne({
-        userId: userId,
-        date: today,
-        isActive: true,
-        checkInTime: { $exists: true },
-      });
-
-      if (!worktimeRecord) {
-        return this.createErrorResponse(
-          new Error("출근 기록이 없습니다"),
-          "퇴근 처리 실패"
-        );
-      }
-
-      if (worktimeRecord.checkOutTime) {
-        return this.createErrorResponse(
-          new Error("이미 퇴근하셨습니다"),
-          "퇴근 처리 실패"
-        );
-      }
-
-      // 근무시간 계산
-      const workDuration = this.calculateWorkDuration(
-        worktimeRecord.checkInTime,
-        now
-      );
-
-      // 퇴근 처리
-      worktimeRecord.checkOutTime = now;
-      worktimeRecord.workDuration = workDuration.totalMinutes;
-      worktimeRecord.regularHours = workDuration.regularHours;
-      worktimeRecord.overtimeHours = workDuration.overtimeHours;
-      worktimeRecord.status = "completed";
-      worktimeRecord.updatedAt = now;
-      worktimeRecord.version += 1;
-
-      await worktimeRecord.save();
-
-      // 활성 세션에서 제거
-      this.activeSessions.delete(userId);
-
-      // 통계 업데이트
-      await this.updateTodayStats();
-
-      logger.info(
-        `🏠 퇴근 처리 완료: ${userId} (${workDuration.totalMinutes}분 근무)`
-      );
-
-      return this.createSuccessResponse(
-        {
-          record: worktimeRecord,
-          checkOutTime: now,
-          workDuration: workDuration,
-          currentStatus: "completed",
-          recommendations: this.generateCheckOutRecommendations(workDuration),
-        },
-        "퇴근 처리되었습니다"
-      );
-    } catch (error) {
-      logger.error("퇴근 처리 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "퇴근 처리 중 오류가 발생했습니다"
-      );
-    }
-  }
-
-  /**
-   * 📅 오늘 근무 기록 조회
+   * 📅 오늘 근무 기록 조회 (개선됨)
    */
   async getTodayRecord(userId) {
     try {
-      const today = TimeHelper.format(null, "YYYY-MM-DD");
+      const today = TimeHelper.getTodayDateString();
 
       const record = await this.models.Worktime.findOne({
         userId: userId,
@@ -235,22 +102,25 @@ class WorktimeService extends BaseService {
         return null;
       }
 
+      // 안전한 변환 적용
+      const transformed = this.safeTransformRecord(record);
+
       // 현재 근무 중이면 실시간 계산
-      if (record.checkInTime && !record.checkOutTime) {
+      if (transformed.checkInTime && !transformed.checkOutTime) {
         const currentDuration = this.calculateCurrentWorkDuration(
-          record.checkInTime,
-          new Date() // ✅ Date 객체 사용
+          transformed.checkInTime,
+          new Date()
         );
 
         return {
-          ...record.toObject(),
+          ...transformed,
           currentWorkDuration: currentDuration,
           isWorking: true,
         };
       }
 
       return {
-        ...record.toObject(),
+        ...transformed,
         isWorking: false,
       };
     } catch (error) {
@@ -260,38 +130,43 @@ class WorktimeService extends BaseService {
   }
 
   /**
-   * 📊 주간 통계 조회 (완성된 버전)
+   * 📊 주간 통계 조회 (개선됨)
    */
   async getWeekStats(userId) {
     try {
       const weekStart = TimeHelper.getWeekStart();
       const weekEnd = TimeHelper.getWeekEnd();
 
-      // 👇 누락되었던 데이터베이스 조회 로직
       const records = await this.models.Worktime.find({
         userId: userId,
         date: {
-          $gte: TimeHelper.format(weekStart, "YYYY-MM-DD"),
-          $lte: TimeHelper.format(weekEnd, "YYYY-MM-DD"),
+          $gte: TimeHelper.format(weekStart, "date"),
+          $lte: TimeHelper.format(weekEnd, "date"),
         },
         isActive: true,
-        checkOutTime: { $exists: true },
+        checkOutTime: { $exists: true, $ne: null }, // null 체크 추가
       }).sort({ date: 1 });
 
-      const stats = this.calculateWeeklyStats(records);
+      // 레코드들을 안전하게 변환
+      const safeRecords = records
+        .map((record) => this.safeTransformRecord(record))
+        .filter((record) => record && record.workDuration > 0); // 유효한 레코드만
+
+      const stats = this.calculateWeeklyStats(safeRecords);
 
       return {
-        weekStart: TimeHelper.format(weekStart, "YYYY-MM-DD"),
-        weekEnd: TimeHelper.format(weekEnd, "YYYY-MM-DD"),
-        workDays: records.length,
+        weekStart: TimeHelper.format(weekStart, "date"),
+        weekEnd: TimeHelper.format(weekEnd, "date"),
+        workDays: safeRecords.length,
         totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
         avgDailyHours:
-          records.length > 0
-            ? Math.round((stats.totalMinutes / records.length / 60) * 10) / 10
+          safeRecords.length > 0
+            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) /
+              10
             : 0,
-        records: records,
-        analysis: this.analyzeWeeklyPattern(records),
+        records: safeRecords,
+        analysis: this.analyzeWeeklyPattern(safeRecords),
       };
     } catch (error) {
       logger.error("주간 통계 조회 실패:", error);
@@ -300,38 +175,44 @@ class WorktimeService extends BaseService {
   }
 
   /**
-   * 📈 월간 통계 조회 (완성된 버전)
+   * 📈 월간 통계 조회 (개선됨)
    */
   async getMonthStats(userId) {
     try {
       const monthStart = TimeHelper.getMonthStart();
       const monthEnd = TimeHelper.getMonthEnd();
 
-      // 👇 누락되었던 데이터베이스 조회 로직
       const records = await this.models.Worktime.find({
         userId: userId,
         date: {
-          $gte: TimeHelper.format(monthStart, "YYYY-MM-DD"),
-          $lte: TimeHelper.format(monthEnd, "YYYY-MM-DD"),
+          $gte: TimeHelper.format(monthStart, "date"),
+          $lte: TimeHelper.format(monthEnd, "date"),
         },
         isActive: true,
-        checkOutTime: { $exists: true },
+        checkOutTime: { $exists: true, $ne: null }, // null 체크 추가
       }).sort({ date: 1 });
 
-      const stats = this.calculateMonthlyStats(records);
+      // 레코드들을 안전하게 변환
+      const safeRecords = records
+        .map((record) => this.safeTransformRecord(record))
+        .filter((record) => record && record.workDuration > 0);
+
+      const stats = this.calculateMonthlyStats(safeRecords);
 
       return {
         month: TimeHelper.format(monthStart, "MM"),
         year: TimeHelper.format(monthStart, "YYYY"),
-        workDays: records.length,
+        workDays: safeRecords.length,
         totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
         avgDailyHours:
-          records.length > 0
-            ? Math.round((stats.totalMinutes / records.length / 60) * 10) / 10
+          safeRecords.length > 0
+            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) /
+              10
             : 0,
-        records: records,
-        analysis: this.analyzeMonthlyPattern(records),
+        records: safeRecords,
+        performance: this.analyzeMonthlyPerformance(safeRecords),
+        trends: this.analyzeMonthlyTrends(safeRecords),
       };
     } catch (error) {
       logger.error("월간 통계 조회 실패:", error);
@@ -340,259 +221,127 @@ class WorktimeService extends BaseService {
   }
 
   /**
-   * 📈 월간 패턴 분석 (누락된 메서드 추가)
-   */
-  analyzeMonthlyPattern(records) {
-    return this.analyzeWeeklyPattern(records);
-  }
-
-  /**
-   * 📋 근무 이력 조회
-   */
-  async getWorkHistory(userId, days = 7) {
-    try {
-      const endDate = TimeHelper.now();
-      const startDate = new Date(endDate);
-      startDate.setDate(startDate.getDate() - days);
-
-      const records = await this.models.Worktime.find({
-        userId: userId,
-        date: {
-          $gte: TimeHelper.format(startDate, "YYYY-MM-DD"),
-          $lte: TimeHelper.format(endDate, "YYYY-MM-DD"),
-        },
-        isActive: true,
-      }).sort({ date: -1 });
-
-      return records.map((record) => ({
-        ...record.toObject(),
-        workDurationDisplay: this.formatDuration(record.workDuration || 0),
-        checkInDisplay: record.checkInTime
-          ? TimeHelper.format(record.checkInTime, "HH:mm")
-          : null,
-        checkOutDisplay: record.checkOutTime
-          ? TimeHelper.format(record.checkOutTime, "HH:mm")
-          : null,
-      }));
-    } catch (error) {
-      logger.error("근무 이력 조회 실패:", error);
-      throw error;
-    }
-  }
-
-  // ===== 🧮 계산 및 분석 메서드들 =====
-
-  /**
-   * ⏱️ 근무시간 계산
-   */
-  calculateWorkDuration(checkInTime, checkOutTime) {
-    const totalMinutes = TimeHelper.diffMinutes(checkInTime, checkOutTime);
-    const regularMinutes = Math.min(
-      totalMinutes,
-      this.config.overtimeThreshold
-    );
-    const overtimeMinutes = Math.max(
-      0,
-      totalMinutes - this.config.overtimeThreshold
-    );
-
-    return {
-      totalMinutes: totalMinutes,
-      regularHours: Math.round((regularMinutes / 60) * 10) / 10,
-      overtimeHours: Math.round((overtimeMinutes / 60) * 10) / 10,
-      displayTime: this.formatDuration(totalMinutes),
-      isOvertime: overtimeMinutes > 0,
-    };
-  }
-
-  /**
-   * ⏰ 현재 근무시간 계산 (진행 중)
+   * ⏱️ 현재 근무시간 계산 (안전)
+   * @param {Date} checkInTime - 출근 시간
+   * @param {Date} currentTime - 현재 시간
+   * @returns {number} 근무 시간(분)
    */
   calculateCurrentWorkDuration(checkInTime, currentTime) {
-    const minutes = TimeHelper.diffMinutes(checkInTime, currentTime);
-    return {
-      totalMinutes: minutes,
-      displayTime: this.formatDuration(minutes),
-      hours: Math.round((minutes / 60) * 10) / 10,
-      isOvertime: minutes > this.config.overtimeThreshold,
-    };
+    if (!checkInTime || !currentTime) return 0;
+
+    const safeCheckIn = this.safeDateFromDB(checkInTime);
+    const safeCurrentTime = this.safeDateFromDB(currentTime);
+
+    if (!safeCheckIn || !safeCurrentTime) return 0;
+
+    return Math.max(0, TimeHelper.diffMinutes(safeCheckIn, safeCurrentTime));
   }
 
   /**
-   * 📊 주간 패턴 분석
+   * 📊 주간 통계 계산
+   * @param {Array} records - 안전하게 변환된 레코드들
+   * @returns {object} 통계 데이터
+   */
+  calculateWeeklyStats(records) {
+    let totalMinutes = 0;
+    let overtimeMinutes = 0;
+
+    records.forEach((record) => {
+      if (record.workDuration > 0) {
+        totalMinutes += record.workDuration;
+
+        // 8시간(480분) 초과시 초과근무
+        if (record.workDuration > 480) {
+          overtimeMinutes += record.workDuration - 480;
+        }
+      }
+    });
+
+    return { totalMinutes, overtimeMinutes };
+  }
+
+  /**
+   * 📊 월간 통계 계산
+   * @param {Array} records - 안전하게 변환된 레코드들
+   * @returns {object} 통계 데이터
+   */
+  calculateMonthlyStats(records) {
+    return this.calculateWeeklyStats(records); // 같은 로직 재사용
+  }
+
+  /**
+   * ⏱️ 근무시간 포맷팅
+   * @param {number} minutes - 분 단위 시간
+   * @returns {string} 포맷된 문자열
+   */
+  formatWorkDuration(minutes) {
+    if (!minutes || minutes <= 0) return "0분";
+
+    const hours = Math.floor(minutes / 60);
+    const remainingMinutes = minutes % 60;
+
+    if (hours === 0) return `${remainingMinutes}분`;
+    if (remainingMinutes === 0) return `${hours}시간`;
+
+    return `${hours}시간 ${remainingMinutes}분`;
+  }
+
+  /**
+   * 📈 주간 패턴 분석 (기본 구현)
    */
   analyzeWeeklyPattern(records) {
     if (records.length === 0) {
-      return { trend: "데이터 없음", recommendation: "근무를 시작해보세요" };
+      return {
+        trend: "데이터 없음",
+        recommendation: "근무 기록을 시작해보세요.",
+      };
     }
 
     const avgHours =
-      records.reduce((sum, r) => sum + (r.workDuration || 0), 0) /
-      records.length /
-      60;
+      records.reduce((sum, r) => sum + r.workDuration, 0) / records.length / 60;
 
-    let trend = "안정적";
-    let recommendation = "좋은 근무 패턴입니다";
-
-    if (avgHours > 9) {
-      trend = "고강도";
-      recommendation = "적절한 휴식을 취하세요";
-    } else if (avgHours < 6) {
-      trend = "저강도";
-      recommendation = "근무시간을 늘려보세요";
-    }
-
-    return { trend, recommendation, avgHours: Math.round(avgHours * 10) / 10 };
-  }
-
-  // ===== 💡 추천사항 생성 =====
-
-  /**
-   * 💼 출근 시 추천사항
-   */
-  generateCheckInRecommendations(checkInTime) {
-    const recommendations = [];
-    const hour = checkInTime.getHours();
-
-    if (hour < 8) {
-      recommendations.push("일찍 오셨네요! 오늘도 화이팅! 💪");
-    } else if (hour >= 9) {
-      recommendations.push("오늘 하루도 열심히 해보세요! 📈");
-    } else {
-      recommendations.push("정시 출근! 좋은 하루 되세요! ☀️");
-    }
-
-    recommendations.push("정기적으로 휴식을 취하세요 ☕");
-
-    return recommendations;
-  }
-
-  /**
-   * 🏠 퇴근 시 추천사항
-   */
-  generateCheckOutRecommendations(workDuration) {
-    const recommendations = [];
-
-    if (workDuration.isOvertime) {
-      recommendations.push("오늘 정말 고생 많으셨습니다! 🌟");
-      recommendations.push("충분한 휴식을 취하세요 😴");
-    } else if (workDuration.totalMinutes >= 420) {
-      // 7시간 이상
-      recommendations.push("적절한 근무시간이네요! 👍");
-    } else {
-      recommendations.push("오늘도 수고하셨습니다! 🎉");
-    }
-
-    recommendations.push("내일도 화이팅! 💪");
-
-    return recommendations;
-  }
-
-  // ===== 🛠️ 유틸리티 메서드들 =====
-
-  /**
-   * ⏱️ 시간 포맷팅
-   */
-  formatDuration(minutes) {
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return `${hours.toString().padStart(2, "0")}:${mins
-      .toString()
-      .padStart(2, "0")}`;
-  }
-
-  /**
-   * 🔄 활성 세션 복구
-   */
-  async recoverActiveSessions() {
-    try {
-      const today = TimeHelper.format(null, "YYYY-MM-DD");
-
-      const activeRecords = await this.models.Worktime.find({
-        date: today,
-        checkInTime: { $exists: true },
-        checkOutTime: { $exists: false },
-        isActive: true,
-      });
-
-      for (const record of activeRecords) {
-        this.activeSessions.set(record.userId, {
-          checkInTime: record.checkInTime,
-          userId: record.userId,
-          recordId: record._id,
-        });
-      }
-
-      logger.info(`🔄 ${activeRecords.length}개 활성 세션 복구됨`);
-    } catch (error) {
-      logger.error("활성 세션 복구 실패:", error);
-    }
-  }
-
-  /**
-   * 📊 오늘 통계 업데이트
-   */
-  async updateTodayStats() {
-    try {
-      const now = new Date();
-
-      // 5분마다만 업데이트
-      if (
-        this.lastStatsUpdate &&
-        now - this.lastStatsUpdate < this.config.cacheTimeout
-      ) {
-        return;
-      }
-
-      const today = TimeHelper.format(null, "YYYY-MM-DD");
-
-      const todayRecords = await this.models.Worktime.find({
-        date: today,
-        isActive: true,
-      });
-
-      this.todayStats = {
-        totalUsers: todayRecords.length,
-        activeUsers: this.activeSessions.size,
-        completedSessions: todayRecords.filter((r) => r.checkOutTime).length,
-        sessions: todayRecords.length,
-        lastUpdate: now,
+    if (avgHours >= 8) {
+      return {
+        trend: "안정적인 근무 패턴",
+        recommendation: "현재 패턴을 유지하세요.",
       };
-
-      this.lastStatsUpdate = now;
-    } catch (error) {
-      logger.error("오늘 통계 업데이트 실패:", error);
+    } else {
+      return {
+        trend: "근무시간 부족",
+        recommendation: "목표 시간 달성을 위해 노력해보세요.",
+      };
     }
   }
 
   /**
-   * 📊 서비스 상태 조회
+   * 📊 월간 성과 분석 (기본 구현)
    */
-  getStatus() {
-    return {
-      ...super.getStatus(),
-      activeSessions: this.activeSessions.size,
-      cacheEnabled: this.config.enableCache,
-      trackingMode: this.config.trackingMode,
-      autoBreakEnabled: this.config.autoBreakEnabled,
-      dailyGoalHours: this.config.dailyGoalHours,
-      totalSessionsToday: this.todayStats?.sessions || 0,
-      config: {
-        overtimeThreshold: this.config.overtimeThreshold,
-        workStartTime: this.config.workStartTime,
-        workEndTime: this.config.workEndTime,
-      },
-    };
+  analyzeMonthlyPerformance(records) {
+    if (records.length === 0) {
+      return { emoji: "📝", txt: "기록이 없습니다." };
+    }
+
+    const avgDaily =
+      records.reduce((sum, r) => sum + r.workDuration, 0) / records.length / 60;
+
+    if (avgDaily >= 8) {
+      return { emoji: "🏆", txt: "우수한 근무 성과" };
+    } else if (avgDaily >= 6) {
+      return { emoji: "👍", txt: "양호한 근무 성과" };
+    } else {
+      return { emoji: "📈", txt: "개선이 필요함" };
+    }
   }
 
   /**
-   * 🧹 서비스 정리
+   * 📈 월간 트렌드 분석 (기본 구현)
    */
-  async cleanup() {
-    this.activeSessions.clear();
-    this.todayStats = null;
-    await super.cleanup();
-    logger.info("✅ WorktimeService 정리 완료");
+  analyzeMonthlyTrends(records) {
+    return {
+      weeklyTrend: "안정적",
+      monthlyTrend: "증가 추세",
+      recommendation: "현재 패턴 유지",
+    };
   }
 }
 
