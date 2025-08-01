@@ -4,6 +4,7 @@ const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
 const { getRegistryStats } = require("./src/config/ModuleRegistry");
 const TimeHelper = require("./src/utils/TimeHelper");
+const { showDoomockBanner } = require("./src/utils/FancyBanner");
 
 /**
  * 🚀 DooMockBot v3.0.1 - 안정화 버전
@@ -78,6 +79,12 @@ class DooMockBot {
    * 🚀 애플리케이션 시작
    */
   async start() {
+    // 화려한 배너 표시
+    await FancyBanner.showDoomockBanner("DOOMOCK", {
+      font: "Standard", // 다른 폰트 시도
+      style: "rainbow", // 또는 'gradient', 'neon', 'neonRainbow'
+    });
+
     if (this.isInitialized) {
       logger.warn("⚠️ 이미 초기화된 애플리케이션");
       return;
