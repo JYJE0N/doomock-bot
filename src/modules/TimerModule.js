@@ -26,7 +26,7 @@ class TimerModule extends BaseModule {
    * 🎯 모듈 초기화
    */
   async onInitialize() {
-    this.timerService = this.serviceBuilder.getOrCreate("timer");
+    this.timerService = await this.serviceBuilder.getOrCreate("timer");
 
     if (!this.timerService) {
       throw new Error("TimerService를 찾을 수 없습니다");

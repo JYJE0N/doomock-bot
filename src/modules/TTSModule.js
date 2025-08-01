@@ -38,7 +38,7 @@ class TTSModule extends BaseModule {
    * 🎯 모듈 초기화
    */
   async onInitialize() {
-    this.ttsService = this.serviceBuilder.getOrCreate("tts");
+    this.ttsService = await this.serviceBuilder.getOrCreate("tts");
 
     if (!this.ttsService) {
       throw new Error("TTSService를 찾을 수 없습니다");
