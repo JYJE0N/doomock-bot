@@ -562,19 +562,41 @@ class LeaveModule extends BaseModule {
       }
 
       if (renderer) {
-        // ctx 객체 생성 (일반 메시지용)
+        // ctx 객체 생성 (일반 메시지용) - 수정된 부분
         const ctx = {
           chat: msg.chat,
           message: msg,
-          bot: bot,
-          reply: (text, options) => bot.sendMessage(msg.chat.id, text, options),
-          replyWithMarkdown: (text, options) =>
-            bot.sendMessage(msg.chat.id, text, {
-              ...options,
-              parse_mode: "Markdown",
-            }),
-          editMessageText: (text, options) => {
-            return bot.sendMessage(msg.chat.id, text, options);
+          from: msg.from,
+          telegram: bot.telegram || bot, // Telegraf 호환성
+          reply: async (text, options) => {
+            // bot.sendMessage 대신 telegram API 사용
+            if (bot.telegram) {
+              return bot.telegram.sendMessage(msg.chat.id, text, options);
+            } else if (bot.sendMessage) {
+              return bot.sendMessage(msg.chat.id, text, options);
+            } else {
+              throw new Error("Bot API not found");
+            }
+          },
+          replyWithMarkdown: async (text, options) => {
+            const opts = { ...options, parse_mode: "Markdown" };
+            if (bot.telegram) {
+              return bot.telegram.sendMessage(msg.chat.id, text, opts);
+            } else if (bot.sendMessage) {
+              return bot.sendMessage(msg.chat.id, text, opts);
+            }
+          },
+          replyWithHTML: async (text, options) => {
+            const opts = { ...options, parse_mode: "HTML" };
+            if (bot.telegram) {
+              return bot.telegram.sendMessage(msg.chat.id, text, opts);
+            } else if (bot.sendMessage) {
+              return bot.sendMessage(msg.chat.id, text, opts);
+            }
+          },
+          editMessageText: async (text, options) => {
+            // 일반 메시지는 수정할 수 없으므로 새 메시지 전송
+            return ctx.reply(text, options);
           },
         };
 
@@ -594,6 +616,47 @@ class LeaveModule extends BaseModule {
     } catch (renderError) {
       logger.error("❌ LeaveModule: 렌더러 전달 실패:", renderError);
       await this.sendFallbackMessage(result, bot, msg);
+    }
+  }
+
+  /**
+   * 📨 직접 메시지 전송 (렌더러 없을 때)
+   */
+  async sendDirectMessage(result, bot, msg) {
+    try {
+      const message = result.data?.message || "처리가 완료되었습니다.";
+
+      // Telegraf 호환 API 사용
+      if (bot.telegram) {
+        await bot.telegram.sendMessage(msg.chat.id, message, {
+          parse_mode: "Markdown",
+        });
+      } else if (bot.sendMessage) {
+        await bot.sendMessage(msg.chat.id, message);
+      } else {
+        logger.error("❌ Bot API를 찾을 수 없습니다");
+      }
+    } catch (error) {
+      logger.error("❌ 직접 메시지 전송 실패:", error);
+    }
+  }
+
+  /**
+   * 🚨 폴백 메시지 전송 (최후의 수단)
+   */
+  async sendFallbackMessage(result, bot, msg) {
+    try {
+      const fallbackText = "요청이 처리되었습니다. 다시 시도해주세요.";
+
+      if (bot.telegram) {
+        await bot.telegram.sendMessage(msg.chat.id, fallbackText);
+      } else if (bot.sendMessage) {
+        await bot.sendMessage(msg.chat.id, fallbackText);
+      } else {
+        logger.error("❌ Fallback: Bot API를 찾을 수 없습니다");
+      }
+    } catch (error) {
+      logger.error("❌ 폴백 메시지도 전송 실패:", error);
     }
   }
 
@@ -723,15 +786,6 @@ class LeaveModule extends BaseModule {
       logger.error("⚙️ LeaveModule.handleSettingsAction 실패:", error);
       return this.createErrorResult("설정 처리 중 오류가 발생했습니다.");
     }
-  }
-
-  /**
-   * 📝 일반 메시지 처리 (표준 onHandleMessage 패턴)
-   */
-  async onHandleMessage(bot, msg) {
-    // 향후 입사일 설정 등 텍스트 입력 처리용
-    // 현재는 처리하지 않음
-    return false;
   }
 
   /**

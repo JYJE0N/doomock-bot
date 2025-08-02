@@ -8,8 +8,8 @@ const mongoose = require("mongoose");
  * - userId: 사용자 ID
  * - year: 연도 (2025)
  * - date: 사용 날짜 (2025-07-15)
- * - amount: 사용량 (1, 0.5, 0.25)
- * - type: 타입 (연차, 반차, 반반차)
+ * - amount: 사용량 (0.25 ~ 10일, 0.25 단위)
+ * - type: 타입 (반반차, 반차, 연차, 연차 X일)
  * - reason: 사유 (선택)
  */
 const leaveSchema = new mongoose.Schema(
@@ -38,24 +38,27 @@ const leaveSchema = new mongoose.Schema(
       default: Date.now,
     },
 
-    // 📊 사용량 (1, 0.5, 0.25)
+    // 📊 사용량 - 유연하게 변경
     amount: {
       type: Number,
       required: [true, "사용량은 필수입니다"],
-      enum: {
-        values: [0.25, 0.5, 1],
-        message: "0.25일, 0.5일, 1일만 가능합니다",
+      min: [0.25, "최소 0.25일입니다"],
+      max: [10, "최대 10일까지 가능합니다"],
+      validate: {
+        validator: function (v) {
+          // 0.25 단위로만 허용
+          return (v * 4) % 1 === 0;
+        },
+        message: "연차는 0.25일 단위로만 사용 가능합니다",
       },
     },
 
-    // 🏷️ 연차 타입
+    // 🏷️ 연차 타입 - 유연하게 변경
     type: {
       type: String,
-      enum: {
-        values: ["반반차", "반차", "연차"],
-        message: "반반차, 반차, 연차만 가능합니다",
-      },
       required: [true, "연차 타입은 필수입니다"],
+      maxlength: [20, "타입은 20자 이내여야 합니다"],
+      // enum 제거 - 자유로운 값 허용
     },
 
     // 📝 사유 (선택사항)
@@ -93,117 +96,49 @@ leaveSchema.virtual("formattedDate").get(function () {
   return this.date ? this.date.toISOString().split("T")[0] : null;
 });
 
-// ===== 🎯 미들웨어 =====
+// ===== 🎯 Hooks =====
 leaveSchema.pre("save", function (next) {
-  // 연차 타입 자동 설정
-  if (this.amount === 0.25) {
-    this.type = "반반차";
-  } else if (this.amount === 0.5) {
-    this.type = "반차";
-  } else if (this.amount === 1) {
-    this.type = "연차";
-  }
-
-  // 연도 자동 설정
-  if (this.date) {
+  // 날짜에서 연도 자동 추출
+  if (this.date && !this.year) {
     this.year = this.date.getFullYear();
   }
-
   next();
 });
 
-// ===== 🎯 정적 메서드 =====
+// ===== 🎯 Static 메서드 =====
 
 /**
- * 📊 사용자의 연간 연차 사용량 조회
+ * 📊 사용자의 연간 연차 사용 현황 조회
  */
-leaveSchema.statics.getUserYearlyUsage = async function (userId, year = null) {
+leaveSchema.statics.getYearlyUsage = async function (userId, year) {
   const targetYear = year || new Date().getFullYear();
 
-  const result = await this.aggregate([
-    {
-      $match: {
-        userId: String(userId),
-        year: targetYear,
-        isActive: true,
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        totalUsed: { $sum: "$amount" },
-        totalCount: { $sum: 1 },
-      },
-    },
-  ]);
+  const leaves = await this.find({
+    userId: String(userId),
+    year: targetYear,
+    isActive: true,
+  }).sort({ date: -1 });
 
-  return result[0] || { totalUsed: 0, totalCount: 0 };
-};
+  // 총 사용량 계산
+  const totalUsed = leaves.reduce((sum, leave) => sum + leave.amount, 0);
 
-/**
- * 📈 월별 사용량 조회
- */
-leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
-  const targetYear = year || new Date().getFullYear();
-
-  const result = await this.aggregate([
-    {
-      $match: {
-        userId: String(userId),
-        year: targetYear,
-        isActive: true,
-      },
-    },
-    {
-      $group: {
-        _id: { $month: "$date" },
-        days: { $sum: "$amount" },
-        count: { $sum: 1 },
-        details: {
-          $push: {
-            date: { $dateToString: { format: "%Y-%m-%d", date: "$date" } },
-            type: "$type",
-            amount: "$amount",
-            reason: "$reason",
-          },
-        },
-      },
-    },
-    {
-      $sort: { _id: 1 },
-    },
-  ]);
-
-  // 12개월 데이터로 정규화
-  const monthlyData = [];
-  for (let month = 1; month <= 12; month++) {
-    const data = result.find((r) => r._id === month);
-    monthlyData.push({
-      month,
-      days: data ? data.days : 0,
-      count: data ? data.count : 0,
-      details: data ? data.details : [],
-    });
+  // 월별 사용량 계산
+  const monthlyUsage = {};
+  for (let i = 1; i <= 12; i++) {
+    monthlyUsage[i] = 0;
   }
 
-  return monthlyData;
-};
+  leaves.forEach((leave) => {
+    const month = leave.date.getMonth() + 1;
+    monthlyUsage[month] += leave.amount;
+  });
 
-/**
- * 📅 특정 날짜 사용량 조회
- */
-leaveSchema.statics.getDateUsage = async function (userId, date) {
-  const startOfDay = new Date(date);
-  startOfDay.setHours(0, 0, 0, 0);
-
-  const endOfDay = new Date(date);
-  endOfDay.setHours(23, 59, 59, 999);
-
-  return await this.find({
-    userId: String(userId),
-    date: { $gte: startOfDay, $lte: endOfDay },
-    isActive: true,
-  }).lean();
+  return {
+    year: targetYear,
+    totalUsed,
+    monthlyUsage,
+    details: leaves,
+  };
 };
 
 /**
@@ -212,9 +147,9 @@ leaveSchema.statics.getDateUsage = async function (userId, date) {
 leaveSchema.statics.addUsage = async function (
   userId,
   amount,
-  date = null,
-  reason = "",
-  type = null // ✅ 추가: type 매개변수
+  date,
+  reason,
+  type
 ) {
   const useDate = date ? new Date(date) : new Date();
 
@@ -228,7 +163,7 @@ leaveSchema.statics.addUsage = async function (
     } else if (amount === 1) {
       leaveType = "연차";
     } else {
-      throw new Error(`잘못된 연차 사용량: ${amount}일`);
+      leaveType = `연차 ${amount}일`;
     }
   }
 
@@ -236,7 +171,7 @@ leaveSchema.statics.addUsage = async function (
     userId: String(userId),
     date: useDate,
     amount: amount,
-    type: leaveType, // ✅ 수정: type 필드 명시적 설정
+    type: leaveType,
     reason: reason,
   });
 
