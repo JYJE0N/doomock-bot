@@ -105,14 +105,31 @@ class TTSModule extends BaseModule {
 
   async shareAudio(bot, callbackQuery, subAction, params, moduleManager) {
     const shareUrl = params;
-    const fullUrl = `${process.env.BASE_URL}${shareUrl}`;
+    const baseUrl = process.env.BASE_URL || process.env.RAILWAY_PUBLIC_DOMAIN;
+
+    if (!baseUrl) {
+      logger.warn(
+        "BASE_URL 또는 RAILWAY_PUBLIC_DOMAIN 환경변수가 설정되지 않음"
+      );
+      return {
+        type: "error",
+        module: "tts",
+        data: {
+          message: "공유 기능을 사용할 수 없습니다. 관리자에게 문의하세요.",
+        },
+      };
+    }
+
+    // Railway 도메인인 경우 https:// 추가
+    const protocol = baseUrl.startsWith("http") ? "" : "https://";
+    const fullUrl = `${protocol}${baseUrl}${shareUrl}`;
 
     return {
       type: "share_ready",
       module: "tts",
       data: {
         shareUrl: fullUrl,
-        message: "링크가 복사되었습니다! 공유해보세요.",
+        message: "링크가 준비되었습니다! 복사해서 공유하세요.",
       },
     };
   }

@@ -1,6 +1,8 @@
 // src/controllers/BotController.js - 🤖 Mongoose 전용 봇 컨트롤러
 
 const { Telegraf } = require("telegraf");
+const express = require("express");
+const path = require("path");
 const logger = require("../utils/Logger");
 const {
   getInstance: getMongooseManager,
@@ -32,6 +34,10 @@ class BotController {
     this.cleanupInProgress = false;
     this.errorHandler = null;
     this.markdownHelper = null;
+
+    // Express 서버 추가
+    this.app = null;
+    this.server = null;
 
     // 통계
     this.stats = {
@@ -71,6 +77,141 @@ class BotController {
       logger.success("✅ BotController 초기화 완료");
     } catch (error) {
       logger.error("❌ BotController 초기화 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * 🌐 Express 서버 초기화
+   */
+  async initializeExpressServer() {
+    try {
+      logger.info("🌐 Express 서버 초기화 중...");
+
+      this.app = express();
+
+      // 기본 미들웨어
+      this.app.use(express.json());
+      this.app.use(express.urlencoded({ extended: true }));
+
+      // CORS 설정 (필요한 경우)
+      this.app.use((req, res, next) => {
+        res.header("Access-Control-Allow-Origin", "*");
+        res.header("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.header("Access-Control-Allow-Headers", "Content-Type");
+        next();
+      });
+
+      // Static 파일 제공 설정
+      const publicPath = path.join(process.cwd(), "public");
+
+      // public 디렉토리가 없으면 생성
+      const fs = require("fs");
+      if (!fs.existsSync(publicPath)) {
+        fs.mkdirSync(publicPath, { recursive: true });
+        logger.info(`📁 public 디렉토리 생성: ${publicPath}`);
+      }
+
+      // TTS 디렉토리 생성
+      const ttsPath = path.join(publicPath, "tts");
+      if (!fs.existsSync(ttsPath)) {
+        fs.mkdirSync(ttsPath, { recursive: true });
+        logger.info(`📁 TTS 디렉토리 생성: ${ttsPath}`);
+      }
+
+      // Static 미들웨어 설정
+      this.app.use(express.static(publicPath));
+      this.app.use("/tts", express.static(ttsPath));
+
+      logger.info(`📁 Static 파일 제공: ${publicPath}`);
+      logger.info(`🎵 TTS 파일 제공: ${ttsPath}`);
+
+      // 루트 엔드포인트
+      this.app.get("/", (req, res) => {
+        res.json({
+          name: "DoomockBot API",
+          version: "3.0.1",
+          status: "running",
+          timestamp: new Date().toISOString(),
+        });
+      });
+
+      // 헬스체크 엔드포인트
+      this.app.get("/health", (req, res) => {
+        res.json({
+          status: "ok",
+          timestamp: new Date().toISOString(),
+          uptime: process.uptime(),
+          bot: {
+            initialized: this.isInitialized,
+            mongooseConnected: this.mongooseManager?.isConnected() || false,
+            modules: this.moduleManager?.modules?.size || 0,
+          },
+          memory: {
+            used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+            total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
+          },
+        });
+      });
+
+      // TTS 파일 목록 (디버깅용)
+      this.app.get("/tts", (req, res) => {
+        try {
+          const files = fs
+            .readdirSync(ttsPath)
+            .filter((f) => f.endsWith(".mp3"));
+          res.json({
+            count: files.length,
+            files: files,
+            path: ttsPath,
+          });
+        } catch (error) {
+          res.status(500).json({ error: "Failed to list TTS files" });
+        }
+      });
+
+      // 404 핸들러
+      this.app.use((req, res) => {
+        logger.warn(`404 Not Found: ${req.method} ${req.url}`);
+        res.status(404).json({
+          error: "Not Found",
+          path: req.url,
+          method: req.method,
+        });
+      });
+
+      // 에러 핸들러
+      this.app.use((err, req, res, next) => {
+        logger.error("Express 에러:", err);
+        res.status(500).json({
+          error: "Internal Server Error",
+          message:
+            process.env.NODE_ENV === "development" ? err.message : undefined,
+        });
+      });
+
+      // 서버 시작
+      const port = process.env.PORT || 3000;
+      this.server = this.app.listen(port, () => {
+        logger.success(`✅ Express 서버가 포트 ${port}에서 실행 중`);
+
+        // Railway 환경
+        if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+          const publicUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}`;
+          logger.info(`🌐 Public URL: ${publicUrl}`);
+          logger.info(`🎵 TTS 파일 접근: ${publicUrl}/tts/`);
+
+          // BASE_URL 환경변수 자동 설정
+          if (!process.env.BASE_URL) {
+            process.env.BASE_URL = publicUrl;
+            logger.info(`📝 BASE_URL 자동 설정: ${publicUrl}`);
+          }
+        } else {
+          logger.info(`🔗 로컬 서버: http://localhost:${port}`);
+        }
+      });
+    } catch (error) {
+      logger.error("❌ Express 서버 초기화 실패:", error);
       throw error;
     }
   }
@@ -405,6 +546,21 @@ class BotController {
     try {
       logger.info("🧹 BotController 정리 작업 시작...");
 
+      // Express 서버 종료
+      if (this.server) {
+        try {
+          await new Promise((resolve, reject) => {
+            this.server.close((err) => {
+              if (err) reject(err);
+              else resolve();
+            });
+          });
+          logger.debug("✅ Express 서버 종료됨");
+        } catch (error) {
+          logger.warn("⚠️ Express 서버 종료 실패:", error.message);
+        }
+      }
+
       // ServiceBuilder 정리
       if (this.serviceBuilder) {
         try {
@@ -455,6 +611,8 @@ class BotController {
       this.navigationHandler = null;
       this.mongooseManager = null;
       this.serviceBuilder = null;
+      this.app = null;
+      this.server = null;
 
       logger.success("✅ BotController 정리 작업 완료");
     } catch (error) {
