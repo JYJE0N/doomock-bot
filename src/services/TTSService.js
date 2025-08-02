@@ -9,31 +9,64 @@ class TTSService extends BaseService {
   constructor(options = {}) {
     super("TTSService", options);
 
-    this.client = new textToSpeech.TextToSpeechClient();
+    this.client = null;
     this.fileHelper = new TTSFileHelper();
     this.voiceConfig = new TTSVoiceConfig();
 
-    this.userVoices = new Map(); // 사용자별 음성 설정
+    this.userVoices = new Map();
+  }
+
+  getRequiredModels() {
+    return ["TTSHistory"];
   }
 
   async onInitialize() {
-    await this.fileHelper.initialize();
+    try {
+      // 환경변수에서 필수 정보 가져오기
+      const projectId = process.env.GOOGLE_PROJECT_ID;
+      const clientEmail = process.env.GOOGLE_CLIENT_EMAIL;
+      const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
-    // 주기적으로 오래된 파일 정리
-    setInterval(() => {
-      this.fileHelper
-        .cleanupOldFiles()
-        .catch((err) => logger.error("파일 정리 실패:", err));
-    }, 60 * 60 * 1000); // 1시간마다
+      if (!projectId || !clientEmail || !privateKey) {
+        throw new Error("Google Cloud TTS 인증 정보가 부족합니다.");
+      }
 
-    logger.success("✅ TTSService 초기화 완료");
+      // 최소한의 credentials 객체 생성
+      const credentials = {
+        type: "service_account",
+        project_id: projectId,
+        private_key: privateKey,
+        client_email: clientEmail,
+      };
+
+      // TTS 클라이언트 생성
+      this.client = new textToSpeech.TextToSpeechClient({
+        credentials: credentials,
+        projectId: projectId,
+      });
+
+      logger.info("✅ Google TTS 클라이언트 초기화 완료");
+
+      await this.fileHelper.initialize();
+
+      // 주기적으로 오래된 파일 정리
+      setInterval(() => {
+        this.fileHelper
+          .cleanupOldFiles()
+          .catch((err) => logger.error("파일 정리 실패:", err));
+      }, 60 * 60 * 1000); // 1시간마다
+
+      logger.success("✅ TTSService 초기화 완료");
+    } catch (error) {
+      logger.error("TTSService 초기화 실패:", error);
+      throw error;
+    }
   }
 
   async convertTextToSpeech(userId, options) {
     const { text, language = "ko-KR" } = options;
 
     try {
-      // 사용자 음성 설정 가져오기
       const voiceCode =
         this.getUserVoice(userId) || this.voiceConfig.getDefaultVoice(language);
 
@@ -51,8 +84,15 @@ class TTSService extends BaseService {
           audioEncoding: "MP3",
           speakingRate: 1.0,
           pitch: 0.0,
+          volumeGainDb: 0.0,
         },
       };
+
+      logger.debug("🎤 TTS 변환 요청:", {
+        text: text.substring(0, 50) + "...",
+        voice: voiceCode,
+        language,
+      });
 
       const [response] = await this.client.synthesizeSpeech(request);
 
@@ -64,24 +104,28 @@ class TTSService extends BaseService {
       );
 
       // 히스토리 저장
-      await this.saveHistory(userId, {
-        text,
-        language,
-        voice: voice.name,
-        voiceCode,
-        fileName,
-        shareUrl: filePaths.shareUrl,
-      });
+      if (this.models.TTSHistory) {
+        await this.saveHistory(userId, {
+          text,
+          language,
+          voice: voice.name,
+          voiceCode,
+          fileName,
+          shareUrl: filePaths.shareUrl,
+        });
+      }
+
+      logger.info(`✅ TTS 변환 성공: ${fileName}`);
 
       return this.createSuccessResponse({
         audioFile: filePaths.tempPath,
         shareUrl: filePaths.shareUrl,
         voice: voice.name,
-        duration: Math.ceil(text.length / 5), // 대략적인 계산
+        duration: Math.ceil(text.length / 5),
       });
     } catch (error) {
       logger.error("TTS 변환 실패:", error);
-      return this.createErrorResponse(error);
+      return this.createErrorResponse(error, "TTS 변환 중 오류가 발생했습니다");
     }
   }
 
@@ -91,33 +135,48 @@ class TTSService extends BaseService {
 
   async setUserVoice(userId, voiceCode) {
     this.userVoices.set(userId, voiceCode);
+    logger.info(`🎤 사용자 ${userId} 음성 변경: ${voiceCode}`);
     return this.createSuccessResponse({ voiceCode });
-  }
-
-  async saveHistory(userId, data) {
-    try {
-      const TTSHistory = this.models.TTSHistory;
-      await TTSHistory.create({
-        userId,
-        ...data,
-        createdAt: new Date(),
-      });
-    } catch (error) {
-      logger.error("히스토리 저장 실패:", error);
-    }
   }
 
   async getUserStats(userId) {
     try {
-      const TTSHistory = this.models.TTSHistory;
-      const count = await TTSHistory.countDocuments({ userId });
+      if (!this.models.TTSHistory) {
+        return this.createSuccessResponse({
+          totalConversions: 0,
+          currentVoice: this.getUserVoice(userId),
+        });
+      }
+
+      const count = await this.models.TTSHistory.countDocuments({ userId });
 
       return this.createSuccessResponse({
         totalConversions: count,
         currentVoice: this.getUserVoice(userId),
       });
     } catch (error) {
-      return this.createErrorResponse(error);
+      logger.error("통계 조회 실패:", error);
+      return this.createSuccessResponse({
+        totalConversions: 0,
+        currentVoice: this.getUserVoice(userId),
+      });
+    }
+  }
+
+  async saveHistory(userId, data) {
+    try {
+      if (!this.models.TTSHistory) {
+        logger.warn("TTSHistory 모델 없음 - 히스토리 저장 스킵");
+        return;
+      }
+
+      await this.models.TTSHistory.create({
+        userId,
+        ...data,
+        createdAt: new Date(),
+      });
+    } catch (error) {
+      logger.error("히스토리 저장 실패:", error);
     }
   }
 }

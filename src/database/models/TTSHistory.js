@@ -24,7 +24,7 @@ const TTSHistorySchema = new mongoose.Schema({
   createdAt: {
     type: Date,
     default: Date.now,
-    index: true,
+    // index: true,
   },
 });
 

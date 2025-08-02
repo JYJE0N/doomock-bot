@@ -38,8 +38,20 @@ class TTSFileHelper {
     const tempPath = path.join(this.tempDir, fileName);
     const sharePath = path.join(this.shareDir, fileName);
 
+    // 디렉토리가 있는지 다시 확인
+    await this.ensureDirectories();
+
     await fs.writeFile(tempPath, audioBuffer);
     await fs.copyFile(tempPath, sharePath);
+
+    logger.debug("오디오 파일 저장 완료:", {
+      tempPath,
+      sharePath,
+      exists: await fs
+        .access(tempPath)
+        .then(() => true)
+        .catch(() => false),
+    });
 
     return {
       tempPath,
