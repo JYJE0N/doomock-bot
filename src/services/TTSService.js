@@ -1,7 +1,7 @@
 // src/services/TTSService.js
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
-const textToSpeech = require("@google-cloud/text-to-speech");
+const { TextToSpeechClient } = require("@google-cloud/text-to-speech");
 const TTSFileHelper = require("../utils/TTSFileHelper");
 const TTSVoiceConfig = require("../config/TTSVoiceConfig");
 
@@ -40,7 +40,7 @@ class TTSService extends BaseService {
       };
 
       // TTS 클라이언트 생성
-      this.client = new textToSpeech.TextToSpeechClient({
+      this.client = new TextToSpeechClient({
         credentials: credentials,
         projectId: projectId,
       });

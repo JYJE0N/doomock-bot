@@ -296,7 +296,7 @@ class TimerModule extends BaseModule {
 
       // 타이머 일시정지
       this.stopTimerInterval(userId);
-      this.stopLiveUpdateInterval(userId);
+      this.stopLiveUpdateInterval(userId); // 실시간 업데이트 중지
       timer.isPaused = true;
       timer.pausedAt = Date.now();
 
@@ -343,7 +343,12 @@ class TimerModule extends BaseModule {
       // 타이머 재개
       timer.isPaused = false;
       timer.pausedAt = null;
-      this.startTimerInterval(userId);
+      this.startTimerInterval(userId); // 타이머 재시작
+
+      // 실시간 상태 확인에 필요한 로직
+      if (timer.liveUpdate && this.config.enableLiveUpdates) {
+        this.startLiveUpdateInterval(userId, bot);
+      }
 
       // 서비스에 상태 업데이트
       await this.timerService.resumeSession(timer.sessionId);
@@ -1013,8 +1018,21 @@ class TimerModule extends BaseModule {
         const timerData = this.generateTimerDisplayData(timer);
         const motivationData = this.generateMotivationData(timer);
 
-        // 🎨 렌더러는 여기서 실시간 메시지를 생성할 것임
-        // 모듈은 데이터만 제공! (SoC 준수)
+        // ✅ 실제 메시지 업데이트 코드 추가!
+        if (timer.chatId && timer.lastMessageId) {
+          // 렌더러에서 메시지 생성
+          const renderer = require("../renderers/TimerRenderer");
+          const messageText = renderer.renderStatus(timerData, motivationData);
+          const keyboard = renderer.buildActiveTimerButtons(timer);
+
+          // 텔레그램 메시지 업데이트
+          await bot.editMessageText(messageText, {
+            chat_id: timer.chatId,
+            message_id: timer.lastMessageId,
+            parse_mode: "MarkdownV2",
+            reply_markup: { inline_keyboard: keyboard },
+          });
+        }
       } catch (error) {
         logger.warn(`실시간 업데이트 실패 (${userId}):`, error.message);
         timer.liveUpdate = false;
