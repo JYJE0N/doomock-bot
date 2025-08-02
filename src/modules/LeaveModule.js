@@ -388,7 +388,6 @@ class LeaveModule extends BaseModule {
       const userId = getUserId(msg.from);
       const inputText = msg.text?.trim();
 
-      // ✅ 추가: 디버깅 로그
       logger.debug(`📝 LeaveModule.onHandleMessage 호출됨:`, {
         userId,
         inputText,
@@ -399,21 +398,12 @@ class LeaveModule extends BaseModule {
       const inputState = this.userInputStates.get(userId);
 
       // 입력 대기 상태가 아니면 무시
-      if (
-        !inputState ||
-        inputState.state !== this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT
-      ) {
-        logger.debug(`📝 LeaveModule: 입력 대기 상태 아님`, {
-          hasState: !!inputState,
-          currentState: inputState?.state,
-          expectedState: this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
-        });
+      if (!inputState) {
+        logger.debug(`📝 LeaveModule: 입력 대기 상태 아님`);
         return false;
       }
 
-      logger.info(`📝 LeaveModule: 연차 입력 처리 시작 - "${inputText}"`);
-
-      // 취소 명령 처리
+      // 취소 명령 처리 (공통)
       if (inputText === "/cancel" || inputText === "취소") {
         logger.info(`📝 LeaveModule: 입력 취소 처리`);
         this.userInputStates.delete(userId);
@@ -422,7 +412,11 @@ class LeaveModule extends BaseModule {
           type: "input_cancelled",
           module: "leave",
           data: {
-            message: "연차 입력이 취소되었습니다.",
+            message:
+              inputState.state ===
+              this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT
+                ? "입사일 입력이 취소되었습니다."
+                : "연차 입력이 취소되었습니다.",
             userId,
           },
         };
@@ -432,83 +426,32 @@ class LeaveModule extends BaseModule {
         return true;
       }
 
-      // 입력값 검증 및 처리
-      logger.debug(`📝 LeaveModule: 입력값 검증 시작 - "${inputText}"`);
-      const result = await this.processCustomLeaveInput(
-        userId,
-        inputText,
-        inputState
-      );
+      // 상태별 처리 분기
+      switch (inputState.state) {
+        case this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT:
+          return await this.handleCustomAmountInput(
+            bot,
+            msg,
+            userId,
+            inputText,
+            inputState
+          );
 
-      logger.debug(`📝 LeaveModule: 검증 결과:`, {
-        success: result.success,
-        amount: result.amount,
-        message: result.message,
-      });
+        case this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT:
+          return await this.handleJoinDateInput(
+            bot,
+            msg,
+            userId,
+            inputText,
+            inputState
+          );
 
-      if (result.success) {
-        logger.info(`📝 LeaveModule: 연차 사용 처리 시작 - ${result.amount}일`);
-
-        // 연차 사용 처리
-        const useResult = await this.leaveService.useLeave(
-          userId,
-          result.amount,
-          `직접 입력: ${result.amount}일 연차`
-        );
-
-        this.userInputStates.delete(userId);
-        logger.debug(`📝 LeaveModule: 입력 상태 정리됨`);
-
-        if (useResult.success) {
-          logger.info(`✅ LeaveModule: 연차 사용 성공 - ${result.amount}일`);
-
-          const successResult = {
-            type: "use_success",
-            module: "leave",
-            data: {
-              ...useResult.data,
-              amount: result.amount,
-              leaveType: `직접 입력 ${result.amount}일`,
-              message: `${result.amount}일 연차가 사용되었습니다.`,
-            },
-          };
-
-          await this.sendResultToRenderer(successResult, bot, msg);
-          logger.info(`✅ LeaveModule: 성공 메시지 전송 완료`);
-        } else {
-          logger.error(`❌ LeaveModule: 연차 사용 실패 - ${useResult.message}`);
-
-          const errorResult = {
-            type: "use_error",
-            module: "leave",
-            data: {
-              message: useResult.message,
-              canRetry: true,
-            },
-          };
-
-          await this.sendResultToRenderer(errorResult, bot, msg);
-          logger.info(`✅ LeaveModule: 에러 메시지 전송 완료`);
-        }
-      } else {
-        logger.warn(`⚠️ LeaveModule: 입력값 검증 실패 - ${result.message}`);
-
-        const inputErrorResult = {
-          type: "input_error",
-          module: "leave",
-          data: {
-            message: result.message,
-            remainingLeave: inputState.remainingLeave,
-            canRetry: true,
-          },
-        };
-
-        await this.sendResultToRenderer(inputErrorResult, bot, msg);
-        logger.info(`✅ LeaveModule: 검증 실패 메시지 전송 완료`);
+        default:
+          logger.debug(`📝 LeaveModule: 알 수 없는 입력 상태`, {
+            state: inputState.state,
+          });
+          return false;
       }
-
-      logger.info(`✅ LeaveModule: 메시지 처리 완료 - true 반환`);
-      return true;
     } catch (error) {
       logger.error("❌ LeaveModule.onHandleMessage 실패:", error);
 
@@ -533,7 +476,239 @@ class LeaveModule extends BaseModule {
         logger.error("❌ LeaveModule: 에러 메시지 전송도 실패:", renderError);
       }
 
-      return true; // ✅ 에러가 발생해도 true 반환 (처리했음을 표시)
+      return true;
+    }
+  }
+
+  /**
+   * 📝 월차소진 커스텀 입력 처리 (기존 로직 분리)
+   */
+  async handleCustomAmountInput(bot, msg, userId, inputText, inputState) {
+    logger.info(`📝 LeaveModule: 연차 입력 처리 시작 - "${inputText}"`);
+
+    // 입력값 검증 및 처리
+    logger.debug(`📝 LeaveModule: 입력값 검증 시작 - "${inputText}"`);
+    const result = await this.processCustomLeaveInput(
+      userId,
+      inputText,
+      inputState
+    );
+
+    logger.debug(`📝 LeaveModule: 검증 결과:`, {
+      success: result.success,
+      amount: result.amount,
+      message: result.message,
+    });
+
+    if (result.success) {
+      logger.info(`📝 LeaveModule: 연차 사용 처리 시작 - ${result.amount}일`);
+
+      // 연차 사용 처리
+      const useResult = await this.leaveService.useLeave(
+        userId,
+        result.amount,
+        `직접 입력: ${result.amount}일 연차`
+      );
+
+      this.userInputStates.delete(userId);
+      logger.debug(`📝 LeaveModule: 입력 상태 정리됨`);
+
+      if (useResult.success) {
+        logger.info(`✅ LeaveModule: 연차 사용 성공 - ${result.amount}일`);
+
+        const successResult = {
+          type: "use_success",
+          module: "leave",
+          data: {
+            ...useResult.data,
+            amount: result.amount,
+            leaveType: `직접 입력 ${result.amount}일`,
+            message: `${result.amount}일 연차가 사용되었습니다.`,
+          },
+        };
+
+        await this.sendResultToRenderer(successResult, bot, msg);
+        logger.info(`✅ LeaveModule: 성공 메시지 전송 완료`);
+      } else {
+        logger.error(`❌ LeaveModule: 연차 사용 실패 - ${useResult.message}`);
+
+        const errorResult = {
+          type: "use_error",
+          module: "leave",
+          data: {
+            message: useResult.message,
+            canRetry: true,
+          },
+        };
+
+        await this.sendResultToRenderer(errorResult, bot, msg);
+        logger.info(`✅ LeaveModule: 에러 메시지 전송 완료`);
+      }
+    } else {
+      logger.warn(`⚠️ LeaveModule: 입력값 검증 실패 - ${result.message}`);
+
+      const inputErrorResult = {
+        type: "input_error",
+        module: "leave",
+        data: {
+          message: result.message,
+          remainingLeave: inputState.remainingLeave,
+          canRetry: true,
+        },
+      };
+
+      await this.sendResultToRenderer(inputErrorResult, bot, msg);
+      logger.info(`✅ LeaveModule: 검증 실패 메시지 전송 완료`);
+    }
+
+    logger.info(`✅ LeaveModule: 메시지 처리 완료 - true 반환`);
+    return true;
+  }
+
+  /**
+   * 📅 입사일 입력 처리 (새로 추가)
+   */
+  async handleJoinDateInput(bot, msg, userId, inputText, inputState) {
+    logger.info(`📅 LeaveModule: 입사일 입력 처리 시작 - "${inputText}"`);
+
+    // 입사일 형식 검증
+    const result = await this.processJoinDateInput(userId, inputText);
+
+    logger.debug(`📅 LeaveModule: 입사일 검증 결과:`, {
+      success: result.success,
+      joinDate: result.joinDate,
+      message: result.message,
+    });
+
+    if (result.success) {
+      logger.info(`📅 LeaveModule: 입사일 설정 처리 시작 - ${result.joinDate}`);
+
+      // 입사일 설정 처리
+      const setResult = await this.leaveService.setJoinDate(
+        userId,
+        result.joinDate
+      );
+
+      this.userInputStates.delete(userId);
+      logger.debug(`📅 LeaveModule: 입력 상태 정리됨`);
+
+      if (setResult.success) {
+        logger.info(`✅ LeaveModule: 입사일 설정 성공 - ${result.joinDate}`);
+
+        const successResult = {
+          type: "settings_success",
+          module: "leave",
+          data: {
+            ...setResult.data,
+            action: "joindate",
+            message: `입사일이 ${result.joinDate}로 설정되었습니다.`,
+          },
+        };
+
+        await this.sendResultToRenderer(successResult, bot, msg);
+        logger.info(`✅ LeaveModule: 성공 메시지 전송 완료`);
+      } else {
+        logger.error(`❌ LeaveModule: 입사일 설정 실패 - ${setResult.message}`);
+
+        const errorResult = {
+          type: "error",
+          module: "leave",
+          data: {
+            message: setResult.message,
+            canRetry: true,
+          },
+        };
+
+        await this.sendResultToRenderer(errorResult, bot, msg);
+        logger.info(`✅ LeaveModule: 에러 메시지 전송 완료`);
+      }
+    } else {
+      logger.warn(`⚠️ LeaveModule: 입사일 검증 실패 - ${result.message}`);
+
+      const inputErrorResult = {
+        type: "input_error",
+        module: "leave",
+        data: {
+          message: result.message,
+          canRetry: true,
+        },
+      };
+
+      await this.sendResultToRenderer(inputErrorResult, bot, msg);
+      logger.info(`✅ LeaveModule: 검증 실패 메시지 전송 완료`);
+    }
+
+    logger.info(`✅ LeaveModule: 입사일 처리 완료 - true 반환`);
+    return true;
+  }
+
+  /**
+   * 📅 입사일 입력값 검증 및 처리
+   */
+  async processJoinDateInput(userId, inputText) {
+    try {
+      // 기본 형식 검증 (YYYY-MM-DD)
+      const datePattern = /^(\d{4})-(\d{2})-(\d{2})$/;
+      const match = inputText.match(datePattern);
+
+      if (!match) {
+        return {
+          success: false,
+          message: "올바른 날짜 형식이 아닙니다.\n예: 2020-03-15",
+        };
+      }
+
+      const year = parseInt(match[1]);
+      const month = parseInt(match[2]);
+      const day = parseInt(match[3]);
+
+      // 날짜 유효성 검증
+      const date = new Date(year, month - 1, day);
+
+      if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day
+      ) {
+        return {
+          success: false,
+          message: "유효하지 않은 날짜입니다.",
+        };
+      }
+
+      // 미래 날짜 체크
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      if (date > today) {
+        return {
+          success: false,
+          message: "미래의 날짜는 입력할 수 없습니다.",
+        };
+      }
+
+      // 너무 오래된 날짜 체크 (50년 이상)
+      const maxYearsAgo = new Date();
+      maxYearsAgo.setFullYear(maxYearsAgo.getFullYear() - 50);
+
+      if (date < maxYearsAgo) {
+        return {
+          success: false,
+          message: "50년 이상 전의 날짜는 입력할 수 없습니다.",
+        };
+      }
+
+      return {
+        success: true,
+        joinDate: inputText,
+        message: `입사일: ${inputText}`,
+      };
+    } catch (error) {
+      logger.error("📅 processJoinDateInput 실패:", error);
+      return {
+        success: false,
+        message: "날짜 처리 중 오류가 발생했습니다.",
+      };
     }
   }
 
