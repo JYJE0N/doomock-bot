@@ -56,7 +56,7 @@ class TTSRenderer extends BaseRenderer {
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    await this.sendSafeMessageForAudio(ctx, text, { reply_markup: keyboard });
   }
 
   // TTSRenderer.js - 이 렌더러에서만 특별 처리
@@ -184,7 +184,7 @@ ${voice.description}
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    await this.sendSafeMessageForAudio(ctx, text, { reply_markup: keyboard });
   }
 
   async renderConversionComplete(data, ctx) {
