@@ -59,6 +59,22 @@ class TTSRenderer extends BaseRenderer {
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
+  // TTSRenderer.js - 이 렌더러에서만 특별 처리
+  async sendSafeMessageForAudio(ctx, text, options = {}) {
+    // 오디오 메시지 콜백인지 확인
+    if (ctx.callbackQuery?.message && !ctx.callbackQuery.message.text) {
+      // 새 메시지로 전송
+      await ctx.reply(text, {
+        parse_mode: "Markdown",
+        ...options,
+      });
+      await ctx.answerCbQuery();
+    } else {
+      // 일반적인 경우는 기존 MarkdownHelper 사용
+      await this.markdownHelper.sendSafeMessage(ctx, text, options);
+    }
+  }
+
   // 변환시킬 텍스트 입력 프롬프트
   async renderWaitingInput(data, ctx) {
     const { language, maxLength } = data;
@@ -84,7 +100,7 @@ class TTSRenderer extends BaseRenderer {
       });
     } else {
       // 일반적인 경우 기존 방식 사용
-      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      await this.sendSafeMessageForAudio(ctx, text, { reply_markup: keyboard });
     }
   }
 
@@ -146,7 +162,7 @@ class TTSRenderer extends BaseRenderer {
     const buttons = [[{ text: "🔙 메뉴", action: "menu" }]];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    await this.sendSafeMessageForAudio(ctx, text, { reply_markup: keyboard });
   }
 
   async renderVoiceChanged(data, ctx) {
