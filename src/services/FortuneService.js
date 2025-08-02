@@ -1,31 +1,30 @@
-// src/services/FortuneService.js - 🔮 Mongoose 연동 완성판
+// src/services/FortuneService.js - 🔮 캘틱 크로스 & 마이너 아르카나 완성판
 
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🔮 FortuneService - 타로 카드 서비스 (DB 연동 버전)
+ * 🔮 FortuneService - 전문 타로 시스템 (캘틱 크로스 & 풀덱)
  *
- * ✅ 주요 변경사항:
- * - Map 기반 임시 저장소 완전 제거
- * - Fortune 모델(this.models.Fortune)을 사용한 모든 데이터 처리
- * - Mongoose의 find, findOne, findOneAndUpdate 등 활용
- * - 날짜 기반 일일 제한 체크 구현
- * - 사용자별 통계 및 히스토리 관리
+ * ✨ 새로운 기능:
+ * - 캘틱 크로스 10카드 스프레드
+ * - 메이저 아르카나 22장 (정방향/역방향)
+ * - 마이너 아르카나 56장 (정방향만)
+ * - 전문적인 타로 해석 시스템
  */
 class FortuneService extends BaseService {
   constructor(options = {}) {
     super("FortuneService", options);
 
-    // 🎴 타로 카드 덱 (변경 없음)
-    this.tarotDeck = this.initializeTarotDeck();
+    // 🎴 완전한 타로 덱 초기화
+    this.tarotDeck = this.initializeFullTarotDeck();
 
-    // ⚙️ 설정 (하루 제한 등)
+    // ⚙️ 설정
     this.config = {
-      maxDrawsPerDay: 5,
+      maxDrawsPerDay: 3, // 캘틱 크로스는 하루 3번으로 제한
       maxHistoryRecords: 100,
-      shuffleCooldown: 60000, // 1분
+      shuffleCooldown: 60000,
       ...options.config,
     };
 
@@ -37,14 +36,14 @@ class FortuneService extends BaseService {
       lastUpdate: null,
     };
 
-    logger.info("🔮 FortuneService 생성됨 (DB 연동 버전)");
+    logger.info("🔮 FortuneService 생성됨 (캘틱 크로스 & 풀덱 버전)");
   }
 
   /**
    * 🗃️ 필수 DB 모델 지정
    */
   getRequiredModels() {
-    return ["Fortune"]; // Fortune 모델만 필요
+    return ["Fortune"];
   }
 
   /**
@@ -52,18 +51,14 @@ class FortuneService extends BaseService {
    */
   async onInitialize() {
     try {
-      // DB 연결 확인
       if (!this.models || !this.models.Fortune) {
         throw new Error("Fortune 모델이 연결되지 않았습니다");
       }
 
-      // 인덱스 확인 및 생성 (필요시)
       await this.ensureIndexes();
-
-      // 통계 초기화
       await this.updateStats();
 
-      logger.success("🔮 FortuneService 초기화 완료 (DB 연동)");
+      logger.success("🔮 FortuneService 초기화 완료 (캘틱 크로스 & 풀덱)");
     } catch (error) {
       logger.error("❌ FortuneService 초기화 실패:", error);
       throw error;
@@ -77,8 +72,6 @@ class FortuneService extends BaseService {
     try {
       const Fortune = this.models.Fortune;
 
-      // userId 복합 인덱스 확인 (이미 unique 인덱스가 있음)
-      // lastDrawDate 인덱스 확인
       await Fortune.collection.createIndex(
         {
           lastDrawDate: 1,
@@ -91,7 +84,6 @@ class FortuneService extends BaseService {
 
       logger.debug("📊 Fortune 인덱스 확인 완료");
     } catch (error) {
-      // 인덱스 생성 실패는 치명적이지 않음
       logger.warn("⚠️ Fortune 인덱스 생성 중 경고:", error.message);
     }
   }
@@ -102,17 +94,13 @@ class FortuneService extends BaseService {
   async updateStats() {
     try {
       const Fortune = this.models.Fortune;
-      const today = TimeHelper.format(new Date(), "date"); // YYYY-MM-DD
+      const today = TimeHelper.format(new Date(), "date");
 
-      // 전체 사용자 수
       const totalUsers = await Fortune.countDocuments({});
-
-      // 오늘 뽑기한 사용자 수
       const todayUsers = await Fortune.countDocuments({
         lastDrawDate: today,
       });
 
-      // 전체 뽑기 횟수 집계
       const totalDrawsResult = await Fortune.aggregate([
         {
           $group: {
@@ -208,10 +196,9 @@ class FortuneService extends BaseService {
       let userRecord = await Fortune.findOne({ userId });
 
       if (!userRecord) {
-        // 새 사용자 생성
         userRecord = new Fortune({
           userId,
-          userName: `User${userId}`, // 기본 이름
+          userName: `User${userId}`,
           totalDraws: 0,
           drawHistory: [],
           lastDrawDate: null,
@@ -235,7 +222,6 @@ class FortuneService extends BaseService {
    */
   async checkDailyLimit(userRecord, today) {
     try {
-      // 오늘 첫 뽑기인 경우
       if (userRecord.lastDrawDate !== today) {
         return {
           allowed: true,
@@ -244,7 +230,6 @@ class FortuneService extends BaseService {
         };
       }
 
-      // 오늘 이미 뽑은 경우
       const todayDrawCount = userRecord.todayDrawCount || 0;
       const remainingDraws = this.config.maxDrawsPerDay - todayDrawCount;
 
@@ -252,7 +237,7 @@ class FortuneService extends BaseService {
         return {
           allowed: false,
           remainingDraws: 0,
-          message: `오늘은 이미 ${this.config.maxDrawsPerDay}번 뽑으셨습니다. 내일 다시 시도해주세요!`,
+          message: `오늘은 이미 ${this.config.maxDrawsPerDay}번 뽑으셨습니다. 캘틱 크로스는 신중하게 하루에 몇 번만 뽑는 것이 좋습니다.`,
         };
       }
 
@@ -263,7 +248,6 @@ class FortuneService extends BaseService {
       };
     } catch (error) {
       logger.error("❌ 일일 제한 체크 실패:", error);
-      // 안전한 기본값 반환
       return {
         allowed: true,
         remainingDraws: 1,
@@ -296,10 +280,8 @@ class FortuneService extends BaseService {
           ];
           break;
 
-        case "love":
-        case "work":
-        case "custom":
-          result.cards = [this.drawSingleCard()];
+        case "celtic":
+          result.cards = this.drawCelticCross();
           break;
 
         default:
@@ -320,11 +302,81 @@ class FortuneService extends BaseService {
     const randomIndex = Math.floor(Math.random() * this.tarotDeck.length);
     const card = { ...this.tarotDeck[randomIndex] };
 
-    // 50% 확률로 역방향
-    card.isReversed = Math.random() < 0.5;
+    // 메이저 아르카나는 역방향 가능, 마이너는 정방향만
+    if (card.arcana === "major") {
+      card.isReversed = Math.random() < 0.3; // 30% 확률로 역방향
+    } else {
+      card.isReversed = false; // 마이너 아르카나는 항상 정방향
+    }
+
     card.drawnAt = new Date();
 
     return card;
+  }
+
+  /**
+   * 🔮 캘틱 크로스 10카드 뽑기
+   */
+  drawCelticCross() {
+    const positions = [
+      {
+        key: "present",
+        name: "현재 상황",
+        description: "지금 당신이 처한 상황",
+      },
+      {
+        key: "challenge",
+        name: "도전/장애물",
+        description: "극복해야 할 문제나 도전",
+      },
+      { key: "past", name: "원인/과거", description: "현재 상황의 근본 원인" },
+      {
+        key: "future",
+        name: "가능한 미래",
+        description: "현재 방향으로 갈 때의 미래",
+      },
+      {
+        key: "conscious",
+        name: "의식적 접근",
+        description: "당신이 의식적으로 취하는 접근법",
+      },
+      {
+        key: "unconscious",
+        name: "무의식적 영향",
+        description: "무의식적으로 작용하는 요소들",
+      },
+      {
+        key: "approach",
+        name: "당신의 접근법",
+        description: "취해야 할 행동 방향",
+      },
+      {
+        key: "environment",
+        name: "외부 환경",
+        description: "주변 환경과 타인의 영향",
+      },
+      {
+        key: "hopes_fears",
+        name: "희망과 두려움",
+        description: "내면의 기대와 걱정",
+      },
+      {
+        key: "outcome",
+        name: "최종 결과",
+        description: "모든 요소를 고려한 최종 결과",
+      },
+    ];
+
+    return positions.map((position, index) => {
+      const card = this.drawSingleCard();
+      return {
+        ...card,
+        position: position.key,
+        positionName: position.name,
+        positionDescription: position.description,
+        order: index + 1,
+      };
+    });
   }
 
   /**
@@ -335,13 +387,14 @@ class FortuneService extends BaseService {
       const Fortune = this.models.Fortune;
       const { type, question, date } = options;
 
-      // 히스토리 레코드 생성
+      // 히스토리 레코드 생성 (첫 번째 카드 기준)
+      const mainCard = drawResult.cards[0];
       const historyRecord = {
         date,
-        cardId: drawResult.cards[0].id,
-        cardName: drawResult.cards[0].name,
-        koreanName: drawResult.cards[0].korean,
-        isReversed: drawResult.cards[0].isReversed,
+        cardId: mainCard.id,
+        cardName: mainCard.name,
+        koreanName: mainCard.korean,
+        isReversed: mainCard.isReversed,
         drawType: type,
         timestamp: new Date(),
         doomockComment: this.generateDoomockComment(
@@ -349,20 +402,17 @@ class FortuneService extends BaseService {
           userRecord.userName,
           drawResult
         ),
+        question: type === "celtic" ? question : null,
+        cardCount: drawResult.cards.length,
       };
 
-      // 3장 뽑기의 경우 첫 번째 카드만 메인으로 저장
-      if (type === "triple" && drawResult.cards.length > 1) {
-        historyRecord.position = "present"; // 현재 카드를 메인으로
-      }
-
-      // 사용자 레코드 업데이트 (원자적 업데이트)
+      // 사용자 레코드 업데이트
       const updateData = {
         $inc: { totalDraws: 1 },
         $push: {
           drawHistory: {
             $each: [historyRecord],
-            $slice: -this.config.maxHistoryRecords, // 최신 N개만 유지
+            $slice: -this.config.maxHistoryRecords,
           },
         },
         $set: {
@@ -371,7 +421,6 @@ class FortuneService extends BaseService {
         },
       };
 
-      // 날짜가 바뀐 경우 오늘 카운트 리셋
       if (userRecord.lastDrawDate !== date) {
         updateData.$set.todayDrawCount = 1;
       } else {
@@ -398,14 +447,44 @@ class FortuneService extends BaseService {
   }
 
   /**
+   * 📅 오늘 뽑기 횟수 조회
+   */
+  async getTodayDrawCount(userId) {
+    try {
+      const Fortune = this.models.Fortune;
+      const today = TimeHelper.format(new Date(), "date");
+
+      const userRecord = await Fortune.findOne({ userId });
+
+      if (!userRecord || userRecord.lastDrawDate !== today) {
+        return {
+          success: true,
+          data: { count: 0, date: today },
+        };
+      }
+
+      return {
+        success: true,
+        data: {
+          count: userRecord.todayDrawCount || 0,
+          date: today,
+        },
+      };
+    } catch (error) {
+      logger.error("❌ 오늘 뽑기 횟수 조회 실패:", error);
+      return {
+        success: false,
+        message: error.message,
+        data: { count: 0 },
+      };
+    }
+  }
+
+  /**
    * 🔄 카드 덱 셔플
    */
   async shuffleDeck(userId) {
     try {
-      // 쿨다운 체크 (필요시)
-      // ... 쿨다운 로직 구현
-
-      // 실제로는 랜덤이라 의미 없지만 사용자 경험용
       return {
         success: true,
         message: this.generateDoomockComment("shuffle", `User${userId}`),
@@ -436,7 +515,6 @@ class FortuneService extends BaseService {
         };
       }
 
-      // 최근 7일 활동 계산
       const recentDays = await this.calculateRecentActivity(userRecord, 7);
 
       const stats = {
@@ -454,7 +532,7 @@ class FortuneService extends BaseService {
             : this.config.maxDrawsPerDay,
         streak: recentDays.streak,
         favoriteType: recentDays.favoriteType,
-        accuracy: Math.floor(Math.random() * 20) + 80, // 임시 더미 데이터
+        accuracy: Math.floor(Math.random() * 20) + 80,
         lastDrawDate: userRecord.lastDrawDate,
         joinDate: userRecord.createdAt,
       };
@@ -489,7 +567,6 @@ class FortuneService extends BaseService {
         };
       }
 
-      // 최신 기록부터 정렬하여 제한된 개수만 반환
       const history = userRecord.drawHistory
         .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))
         .slice(0, limit)
@@ -501,6 +578,8 @@ class FortuneService extends BaseService {
           type: record.drawType,
           comment: record.doomockComment,
           timestamp: record.timestamp,
+          cardCount: record.cardCount || 1,
+          question: record.question,
         }));
 
       return {
@@ -522,7 +601,7 @@ class FortuneService extends BaseService {
   }
 
   /**
-   * 📊 최근 활동 분석 (연속 기록, 선호 타입 등)
+   * 📊 최근 활동 분석
    */
   async calculateRecentActivity(userRecord, days = 7) {
     try {
@@ -535,7 +614,6 @@ class FortuneService extends BaseService {
         return diffDays <= days;
       });
 
-      // 연속 기록 계산
       let streak = 0;
       const dateMap = new Map();
 
@@ -547,7 +625,6 @@ class FortuneService extends BaseService {
         dateMap.set(date, dateMap.get(date) + 1);
       });
 
-      // 선호 타입 계산
       const typeCount = {};
       recentRecords.forEach((record) => {
         typeCount[record.drawType] = (typeCount[record.drawType] || 0) + 1;
@@ -581,33 +658,41 @@ class FortuneService extends BaseService {
 
     const messages = {
       draw: [
-        `👔 두목: '${name}, 오늘의 카드가 나왔네요!'`,
-        `💼 두목: '${name}, 이 카드가 답을 줄 거예요!'`,
-        `☕ 두목: '${name}, 커피 마시며 해석해보세요!'`,
-        `📊 두목: '${name}, 데이터처럼 정확한 카드네요!'`,
-        `🎯 두목: '${name}, 직감을 믿어보세요!'`,
+        `👔 두목: '${name}, 타로가 답을 주었네요!'`,
+        `💼 두목: '${name}, 카드의 메시지를 잘 새겨들으세요!'`,
+        `☕두목: '${name}, 심호흡하고 카드를 해석해보세요!'`,
+        `📊 두목: '${name}, 데이터만큼 정확한 타로의 지혜입니다!'`,
+        `🎯 두목: '${name}, 직감을 믿고 받아들이세요!'`,
       ],
       shuffle: [
-        `👔 두목: '${name}, 카드를 새로 섞었습니다!'`,
-        `💼 두목: '${name}, 새로운 기운이 들어왔어요!'`,
-        `🔄 두목: '${name}, 운명의 수레바퀴가 돌아갑니다!'`,
-      ],
-      limit: [
-        `👔 두목: '${name}, 오늘은 여기까지입니다!'`,
-        `💼 두목: '${name}, 내일 또 뵙겠습니다!'`,
-        `☕ 두목: '${name}, 퇴근하고 쉬세요!'`,
+        `👔 두목: '${name}, 우주의 에너지로 카드를 정화했습니다!'`,
+        `💼 두목: '${name}, 새로운 기운이 카드에 깃들었어요!'`,
+        `🔄 두목: '${name}, 이제 진정한 메시지를 받을 준비가 되었습니다!'`,
       ],
     };
+
+    // 캘틱 크로스 특별 멘트
+    if (cardData && cardData.type === "celtic") {
+      const celticMessages = [
+        `👔 두목: '${name}, 캘틱 크로스가 완성되었습니다. 깊이 성찰해보세요!'`,
+        `💼 두목: '${name}, 10장의 카드가 당신의 길을 비춰줍니다!'`,
+        `🔮 두목: '${name}, 고대 켈트의 지혜가 담긴 신성한 배치입니다!'`,
+      ];
+      return celticMessages[Math.floor(Math.random() * celticMessages.length)];
+    }
 
     const typeMessages = messages[type] || messages.draw;
     return typeMessages[Math.floor(Math.random() * typeMessages.length)];
   }
 
   /**
-   * 🎴 타로 카드 덱 초기화 (변경 없음)
+   * 🎴 완전한 타로 덱 초기화 (메이저 22장 + 마이너 56장)
    */
-  initializeTarotDeck() {
-    return [
+  initializeFullTarotDeck() {
+    const deck = [];
+
+    // 🌟 메이저 아르카나 (22장) - 정방향/역방향 가능
+    const majorArcana = [
       { id: 0, name: "The Fool", korean: "바보", emoji: "🤡", arcana: "major" },
       {
         id: 1,
@@ -704,7 +789,7 @@ class FortuneService extends BaseService {
         id: 20,
         name: "Judgement",
         korean: "심판",
-        emoji: "⚖️",
+        emoji: "📯",
         arcana: "major",
       },
       {
@@ -715,6 +800,65 @@ class FortuneService extends BaseService {
         arcana: "major",
       },
     ];
+
+    deck.push(...majorArcana);
+
+    // ⚔️ 마이너 아르카나 (56장) - 정방향만
+    const suits = [
+      { name: "Cups", korean: "컵", emoji: "🏆", element: "물" },
+      { name: "Wands", korean: "완드", emoji: "🔥", element: "불" },
+      { name: "Swords", korean: "검", emoji: "⚔️", element: "공기" },
+      { name: "Pentacles", korean: "펜타클", emoji: "🪙", element: "땅" },
+    ];
+
+    suits.forEach((suit, suitIndex) => {
+      // 숫자 카드 (Ace + 2-10)
+      for (let i = 1; i <= 10; i++) {
+        const cardName = i === 1 ? "Ace" : i.toString();
+        deck.push({
+          id: 100 + suitIndex * 14 + i,
+          name: `${cardName} of ${suit.name}`,
+          korean: `${suit.korean} ${i === 1 ? "에이스" : i}`,
+          emoji: suit.emoji,
+          arcana: "minor",
+          suit: suit.name,
+          suitKorean: suit.korean,
+          element: suit.element,
+          number: i,
+        });
+      }
+
+      // 궁정 카드 (Page, Knight, Queen, King)
+      const courtCards = [
+        { name: "Page", korean: "페이지", emoji: "👤" },
+        { name: "Knight", korean: "기사", emoji: "🐎" },
+        { name: "Queen", korean: "여왕", emoji: "👑" },
+        { name: "King", korean: "왕", emoji: "🤴" },
+      ];
+
+      courtCards.forEach((court, courtIndex) => {
+        deck.push({
+          id: 100 + suitIndex * 14 + 11 + courtIndex,
+          name: `${court.name} of ${suit.name}`,
+          korean: `${suit.korean} ${court.korean}`,
+          emoji: court.emoji,
+          arcana: "minor",
+          suit: suit.name,
+          suitKorean: suit.korean,
+          element: suit.element,
+          court: court.name,
+          courtKorean: court.korean,
+        });
+      });
+    });
+
+    logger.info(
+      `🎴 완전한 타로 덱 초기화: ${deck.length}장 (메이저 ${
+        majorArcana.length
+      }장 + 마이너 ${deck.length - majorArcana.length}장)`
+    );
+
+    return deck;
   }
 
   /**
@@ -722,7 +866,6 @@ class FortuneService extends BaseService {
    */
   async cleanup() {
     try {
-      // 캐시 정리 등 필요시 구현
       logger.debug("🔮 FortuneService 정리 완료");
     } catch (error) {
       logger.error("❌ FortuneService 정리 실패:", error);
@@ -737,6 +880,7 @@ class FortuneService extends BaseService {
       serviceName: "FortuneService",
       status: "active",
       dbConnected: !!this.models?.Fortune,
+      deckSize: this.tarotDeck.length,
       stats: this.stats,
       config: {
         maxDrawsPerDay: this.config.maxDrawsPerDay,
