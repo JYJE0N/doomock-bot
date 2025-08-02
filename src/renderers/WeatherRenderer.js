@@ -393,23 +393,35 @@ ${this.dustEmojis[dust.grade] || "🟡"} **등급**: ${dust.grade}
 
 `;
 
-    // 5일 예보 표시 - 데이터 구조 수정
-    if (forecast && forecast.forecast) {
-      // forecasts → forecast로 변경
+    // 5일 예보 표시 - 실제 API 데이터 구조에 맞춤
+    if (forecast && forecast.forecast && Array.isArray(forecast.forecast)) {
       forecast.forecast.forEach((day, index) => {
         const dayEmoji = index === 0 ? "📅" : "📆";
         const weatherEmoji =
           day.icon || this.weatherEmojis[day.description] || "🌤️";
 
-        text += `${dayEmoji} **${day.date}**
+        text += `${dayEmoji} **${day.dayOfWeek}** (${day.date})
 ${weatherEmoji} ${day.description}
-🌡️ ${day.tempMin}°C ~ ${day.tempMax}°C
+🌡️ ${day.tempMin}°C ~ ${day.tempMax}°C`;
 
-`;
+        // 습도와 강수확률 표시 (있을 때만)
+        if (day.humidity || day.rainProbability > 0) {
+          text += `\n💧 ${day.humidity}%`;
+          if (day.rainProbability > 0) {
+            text += ` | ☔ ${day.rainProbability}%`;
+          }
+        }
+
+        text += `\n\n`;
       });
     } else {
-      text += "예보 데이터를 불러올 수 없습니다.";
-      logger.warn("예보 데이터 구조 문제:", { forecast });
+      text += "❌ 예보 데이터를 불러올 수 없습니다.\n\n";
+      logger.warn("예보 데이터 구조 문제:", {
+        hasData: !!forecast,
+        hasForecast: !!forecast?.forecast,
+        isArray: Array.isArray(forecast?.forecast),
+        structure: forecast,
+      });
     }
 
     text += `⏰ **업데이트**: ${timestamp}`;

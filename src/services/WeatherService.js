@@ -242,7 +242,7 @@ class WeatherService extends BaseService {
         location: originalLocation,
         cityName: city?.name || originalLocation,
         country: city?.country || "KR",
-        forecast: dailyForecasts,
+        forecast: dailyForecasts, // ← 여기가 중요! forecast 키로 통일
         timestamp: TimeHelper.format(TimeHelper.now(), "full"),
         isOffline: false,
         source: "OpenWeatherMap 5-day forecast",
@@ -258,9 +258,6 @@ class WeatherService extends BaseService {
     }
   }
 
-  /**
-   * 📅 3시간 간격 데이터를 하루별로 그룹핑
-   */
   groupForecastByDay(forecastList) {
     const dailyData = new Map();
     const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
@@ -355,27 +352,27 @@ class WeatherService extends BaseService {
   }
 
   /**
-   * 🎭 Mock 데이터 (개발용 - 명확히 표시)
+   * 🎭 Mock 데이터 (개발용 - 데이터 구조 통일)
    */
   createMockForecastData(location) {
     logger.warn(`🎭 Mock 예보 데이터 생성: ${location}`);
 
     const days = [];
+    const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
+
     for (let i = 0; i < 5; i++) {
       const date = new Date(Date.now() + i * 86400000);
+      const dayOfWeek = i === 0 ? "오늘" : weekdays[date.getDay()] + "요일";
+
       days.push({
         date: TimeHelper.format(date, "MM/DD"),
-        dayOfWeek:
-          i === 0
-            ? "오늘"
-            : ["월", "화", "수", "목", "금", "토", "일"][date.getDay()] +
-              "요일",
+        dayOfWeek: dayOfWeek,
         tempMin: Math.round(15 + Math.random() * 5),
         tempMax: Math.round(25 + Math.random() * 8),
-        description: ["맑음", "구름", "비", "흐림"][
+        description: ["맑음", "구름조금", "흐림", "비"][
           Math.floor(Math.random() * 4)
         ],
-        icon: ["☀️", "⛅", "🌧️", "☁️"][Math.floor(Math.random() * 4)],
+        icon: ["☀️", "⛅", "☁️", "🌧️"][Math.floor(Math.random() * 4)],
         humidity: Math.round(50 + Math.random() * 30),
         rainProbability: Math.round(Math.random() * 50),
       });
@@ -383,7 +380,7 @@ class WeatherService extends BaseService {
 
     return {
       location,
-      forecast: days,
+      forecast: days, // ← 여기가 중요! forecast 키로 통일
       timestamp: TimeHelper.format(TimeHelper.now(), "full"),
       isOffline: true,
       source: "Mock 데이터 (개발용)",
