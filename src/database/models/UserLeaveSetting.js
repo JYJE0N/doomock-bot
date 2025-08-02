@@ -1,169 +1,66 @@
-// src/database/models/UserLeaveSetting.js - 🏖️ DB 연결 완료 버전
+// src/database/models/UserLeaveSetting.js - 개인 연차 설정 모델
 const mongoose = require("mongoose");
 
 /**
- * 👤 UserLeaveSetting - 사용자별 연차 설정 모델
+ * 👤 UserLeaveSetting - 개인 연차 설정 모델
  *
- * 🎯 용도:
- * - 사용자별 연간 연차 일수 설정
- * - 연차 관련 개인 설정 관리
- * - 회사별/부서별 연차 정책 적용
- *
- * ✅ 특징:
- * - 사용자당 하나의 설정 레코드
- * - 연도별 설정 가능
- * - 기본값 fallback 지원
- * - SoC 준수: 순수 데이터 스키마만
+ * 🎯 핵심 필드:
+ * - userId: 사용자 ID
+ * - totalLeave: 총 연차 일수 (기본 15일 + 보너스)
+ * - joinDate: 입사일 (근속 보너스 계산용)
+ * - customLeave: 수동 추가/삭제된 연차
+ * - year: 해당 연도
  */
-
 const userLeaveSettingSchema = new mongoose.Schema(
   {
-    // 👤 사용자 ID (고유) - ✅ 활성화!
+    // 👤 사용자 ID
     userId: {
       type: String,
       required: [true, "사용자 ID는 필수입니다"],
       trim: true,
-      // 🎯 SoC: 인덱스는 별도로 정의 (중복 방지)
     },
 
-    // 📊 연간 연차 일수
-    annualLeave: {
+    // 📅 해당 연도
+    year: {
       type: Number,
-      required: [true, "연간 연차 일수는 필수입니다"],
-      min: [1, "최소 1일 이상이어야 합니다"],
-      max: [50, "최대 50일까지 설정 가능합니다"],
-      default: function () {
-        return parseInt(process.env.DEFAULT_ANNUAL_LEAVE) || 15; // ✅ 환경변수 우선
-      },
+      required: [true, "연도는 필수입니다"],
+      default: () => new Date().getFullYear(),
     },
 
-    // 📅 적용 연도 (옵션 - 미래 확장용)
-    applicableYear: {
+    // 📊 총 연차 일수
+    totalLeave: {
       type: Number,
-      default: function () {
-        return new Date().getFullYear(); // ✅ 수정: 올바른 년도 설정
-      },
-      min: [2020, "2020년 이후만 설정 가능합니다"],
-      max: [2035, "2035년 이전까지만 설정 가능합니다"],
+      required: [true, "총 연차 일수는 필수입니다"],
+      min: [0, "연차는 0일 이상이어야 합니다"],
+      max: [50, "연차는 50일 이하여야 합니다"],
+      default: 15,
     },
 
-    // 🏢 회사/부서 정보 (옵션 - 미래 확장용)
-    company: {
-      type: String,
-      trim: true,
-      maxlength: [100, "회사명은 100자를 초과할 수 없습니다"],
-      default: "",
+    // 💼 입사일
+    joinDate: {
+      type: Date,
+      default: null,
     },
 
-    department: {
-      type: String,
-      trim: true,
-      maxlength: [100, "부서명은 100자를 초과할 수 없습니다"],
-      default: "",
-    },
-
-    // 👔 직급/경력 (연차 일수 자동 계산용 - 미래 확장)
-    position: {
-      type: String,
-      enum: {
-        values: [
-          "intern",
-          "junior",
-          "senior",
-          "lead",
-          "manager",
-          "director",
-          "executive",
-        ],
-        message: "유효하지 않은 직급입니다",
-      },
-      default: "junior",
-    },
-
-    yearsOfService: {
+    // 🎁 수동 조정 연차 (관리자나 사용자가 추가/삭제)
+    customLeave: {
       type: Number,
-      min: [0, "경력은 0년 이상이어야 합니다"],
-      max: [50, "경력은 50년 이하여야 합니다"],
       default: 0,
+      min: [-20, "최대 20일까지 차감 가능합니다"],
+      max: [20, "최대 20일까지 추가 가능합니다"],
     },
 
-    // ⚙️ 연차 정책 설정
-    policy: {
-      // 반차 사용 허용
-      allowHalfDay: {
-        type: Boolean,
-        default: true,
+    // 📝 설정 변경 이력
+    changeHistory: [
+      {
+        date: { type: Date, default: Date.now },
+        action: { type: String, enum: ["add", "remove", "reset", "join_date"] },
+        amount: { type: Number, default: 0 },
+        reason: { type: String, default: "" },
+        oldValue: { type: Number },
+        newValue: { type: Number },
       },
-
-      // 반반차 사용 허용
-      allowQuarterDay: {
-        type: Boolean,
-        default: true,
-      },
-
-      // 연차 이월 허용 (미래 기능)
-      allowCarryOver: {
-        type: Boolean,
-        default: false,
-      },
-
-      // 최대 이월 일수
-      maxCarryOverDays: {
-        type: Number,
-        min: [0, "이월 일수는 0일 이상이어야 합니다"],
-        max: [10, "최대 10일까지 이월 가능합니다"],
-        default: 0,
-      },
-
-      // 승인 필요 여부
-      requireApproval: {
-        type: Boolean,
-        default: false,
-      },
-    },
-
-    // 📅 특별 휴가 설정 (미래 확장)
-    specialLeave: {
-      // 생일 휴가
-      birthdayLeave: {
-        enabled: { type: Boolean, default: false },
-        days: { type: Number, default: 0.5 },
-      },
-
-      // 리프레시 휴가
-      refreshLeave: {
-        enabled: { type: Boolean, default: false },
-        days: { type: Number, default: 5 },
-      },
-    },
-
-    // 🎯 메타데이터
-    metadata: {
-      // 설정 변경 이력
-      lastModified: {
-        type: Date,
-        default: Date.now,
-      },
-
-      modifiedBy: {
-        type: String,
-        default: "user",
-      },
-
-      // 설정 소스
-      source: {
-        type: String,
-        enum: ["user", "admin", "policy", "system"],
-        default: "user",
-      },
-
-      // 노트
-      notes: {
-        type: String,
-        maxlength: [500, "노트는 500자를 초과할 수 없습니다"],
-        default: "",
-      },
-    },
+    ],
 
     // 🔄 활성 상태
     isActive: {
@@ -172,174 +69,217 @@ const userLeaveSettingSchema = new mongoose.Schema(
     },
   },
   {
-    timestamps: true, // createdAt, updatedAt 자동 생성
+    timestamps: true,
     versionKey: false,
     collection: "user_leave_settings",
   }
 );
 
-// ===== 🎯 인덱스 정의 (성능 최적화) =====
+// ===== 🎯 인덱스 설정 =====
+userLeaveSettingSchema.index({ userId: 1, year: 1 }, { unique: true }); // 사용자당 연도별 고유
+userLeaveSettingSchema.index({ userId: 1 }); // 사용자별 조회
 
-// 🔥 핵심: 사용자별 고유 설정 (복합 고유 인덱스)
-userLeaveSettingSchema.index(
-  { userId: 1, applicableYear: 1 },
-  {
-    unique: true,
-    name: "idx_user_year_unique",
-  }
-);
+// ===== 🎯 가상 속성 =====
+userLeaveSettingSchema.virtual("workYears").get(function () {
+  if (!this.joinDate) return 0;
 
-// 조회 최적화 인덱스
-userLeaveSettingSchema.index({ userId: 1 }); // 사용자별 설정 조회
-userLeaveSettingSchema.index({ applicableYear: 1 }); // 연도별 설정 조회
-userLeaveSettingSchema.index({ company: 1, department: 1 }); // 조직별 조회
-userLeaveSettingSchema.index({ updatedAt: -1 }); // 최근 수정순 조회
-userLeaveSettingSchema.index({ isActive: 1 }); // 활성 상태별 조회
+  const now = new Date();
+  const join = new Date(this.joinDate);
+  const diffTime = Math.abs(now - join);
+  const years = Math.floor(diffTime / (1000 * 60 * 60 * 24 * 365));
 
-// ===== 🎯 가상 속성 (Virtual) - 단순 데이터 변환만 =====
-
-// 연도 문자열 변환
-userLeaveSettingSchema.virtual("yearString").get(function () {
-  return this.applicableYear ? this.applicableYear.toString() : "";
+  return years;
 });
 
-// 설정 ID 문자열 변환
-userLeaveSettingSchema.virtual("id").get(function () {
-  return this._id.toHexString();
+userLeaveSettingSchema.virtual("yearlyBonus").get(function () {
+  const workYears = this.workYears;
+  return workYears >= 2 ? Math.floor(workYears / 2) : 0;
 });
 
-// ===== 🎯 인스턴스 메서드 - 기본 CRUD만 =====
+userLeaveSettingSchema.virtual("finalTotalLeave").get(function () {
+  return 15 + this.yearlyBonus + this.customLeave;
+});
 
-// 활성 상태 토글
-userLeaveSettingSchema.methods.toggleActive = function () {
-  this.isActive = !this.isActive;
-  return this.save();
-};
-
-// 기본 정보 업데이트
-userLeaveSettingSchema.methods.updateBasicInfo = function (updateData) {
-  Object.assign(this, updateData);
-  this.metadata.lastModified = new Date();
-  return this.save();
-};
-
-// ===== 🚀 정적 메서드 - 순수 CRUD 및 조회만 =====
+// ===== 🎯 정적 메서드 =====
 
 /**
- * 🎯 사용자 설정 조회 또는 생성 (핵심!)
+ * 📊 사용자 연차 설정 조회 또는 생성
  */
 userLeaveSettingSchema.statics.getOrCreate = async function (
   userId,
   year = null
 ) {
-  const currentYear = year || new Date().getFullYear();
+  const targetYear = year || new Date().getFullYear();
 
-  try {
-    let setting = await this.findOne({
-      userId: userId.toString(),
-      applicableYear: currentYear,
-      isActive: true,
-    });
-
-    if (!setting) {
-      // 기본 설정으로 새 레코드 생성
-      setting = new this({
-        userId: userId.toString(),
-        applicableYear: currentYear,
-        annualLeave: parseInt(process.env.DEFAULT_ANNUAL_LEAVE) || 15,
-        metadata: {
-          source: "system",
-          notes: "시스템에 의해 자동 생성됨",
-        },
-      });
-
-      await setting.save();
-    }
-
-    return setting;
-  } catch (error) {
-    console.error("사용자 설정 조회/생성 실패:", error);
-    throw error;
-  }
-};
-
-/**
- * 🔍 사용자별 설정 조회
- */
-userLeaveSettingSchema.statics.findByUserId = async function (
-  userId,
-  year = null
-) {
-  const query = {
-    userId: userId.toString(),
+  let setting = await this.findOne({
+    userId: String(userId),
+    year: targetYear,
     isActive: true,
-  };
+  });
 
-  if (year) {
-    query.applicableYear = year;
+  if (!setting) {
+    setting = new this({
+      userId: String(userId),
+      year: targetYear,
+      totalLeave: 15,
+    });
+    await setting.save();
   }
 
-  return await this.find(query).sort({ applicableYear: -1 });
+  return setting;
 };
 
 /**
- * 📊 기본 통계 조회
+ * ➕ 연차 추가
  */
-userLeaveSettingSchema.statics.getBasicStats = async function (year = null) {
-  const currentYear = year || new Date().getFullYear();
+userLeaveSettingSchema.statics.addLeave = async function (
+  userId,
+  amount,
+  reason = "수동 추가"
+) {
+  const currentYear = new Date().getFullYear();
+  const setting = await this.getOrCreate(userId, currentYear);
 
-  return await this.aggregate([
-    {
-      $match: {
-        applicableYear: currentYear,
-        isActive: true,
-      },
-    },
-    {
-      $group: {
-        _id: null,
-        totalUsers: { $sum: 1 },
-        avgAnnualLeave: { $avg: "$annualLeave" },
-        minAnnualLeave: { $min: "$annualLeave" },
-        maxAnnualLeave: { $max: "$annualLeave" },
-      },
-    },
-  ]);
+  const oldValue = setting.customLeave;
+  setting.customLeave += amount;
+
+  // 변경 이력 추가
+  setting.changeHistory.push({
+    action: "add",
+    amount: amount,
+    reason: reason,
+    oldValue: oldValue,
+    newValue: setting.customLeave,
+  });
+
+  return await setting.save();
 };
 
-// ===== 🎯 미들웨어 - 기본 데이터 처리만 =====
+/**
+ * ➖ 연차 삭제
+ */
+userLeaveSettingSchema.statics.removeLeave = async function (
+  userId,
+  amount,
+  reason = "수동 삭제"
+) {
+  const currentYear = new Date().getFullYear();
+  const setting = await this.getOrCreate(userId, currentYear);
 
-// 저장 전 데이터 정규화
-userLeaveSettingSchema.pre("save", function (next) {
-  // userId 정규화
-  if (this.userId) {
-    this.userId = this.userId.toString().trim();
+  const oldValue = setting.customLeave;
+  setting.customLeave -= amount;
+
+  // 최소값 체크
+  if (setting.customLeave < -20) {
+    setting.customLeave = -20;
   }
 
-  // 메타데이터 업데이트
-  if (this.isModified() && !this.isNew) {
-    this.metadata.lastModified = new Date();
-  }
+  // 변경 이력 추가
+  setting.changeHistory.push({
+    action: "remove",
+    amount: amount,
+    reason: reason,
+    oldValue: oldValue,
+    newValue: setting.customLeave,
+  });
 
-  next();
-});
+  return await setting.save();
+};
+
+/**
+ * 💼 입사일 설정
+ */
+userLeaveSettingSchema.statics.setJoinDate = async function (userId, joinDate) {
+  const currentYear = new Date().getFullYear();
+  const setting = await this.getOrCreate(userId, currentYear);
+
+  const oldDate = setting.joinDate;
+  setting.joinDate = new Date(joinDate);
+
+  // 변경 이력 추가
+  setting.changeHistory.push({
+    action: "join_date",
+    reason: `입사일 변경: ${
+      oldDate ? oldDate.toISOString().split("T")[0] : "없음"
+    } → ${joinDate}`,
+    oldValue: oldDate ? oldDate.getTime() : null,
+    newValue: setting.joinDate.getTime(),
+  });
+
+  return await setting.save();
+};
+
+/**
+ * 🔄 연차 초기화 (신년)
+ */
+userLeaveSettingSchema.statics.resetForNewYear = async function (
+  userId,
+  newYear
+) {
+  // 기존 설정에서 입사일만 가져오기
+  const lastYearSetting = await this.findOne({
+    userId: String(userId),
+    year: newYear - 1,
+    isActive: true,
+  });
+
+  const newSetting = new this({
+    userId: String(userId),
+    year: newYear,
+    totalLeave: 15,
+    joinDate: lastYearSetting ? lastYearSetting.joinDate : null,
+    customLeave: 0, // 신년에는 수동 조정 초기화
+    changeHistory: [
+      {
+        action: "reset",
+        reason: `${newYear}년 신규 연차 생성`,
+        oldValue: 0,
+        newValue: 15,
+      },
+    ],
+  });
+
+  return await newSetting.save();
+};
+
+// ===== 🎯 인스턴스 메서드 =====
+
+/**
+ * 📊 현재 총 연차 계산
+ */
+userLeaveSettingSchema.methods.calculateTotalLeave = function () {
+  const baseLeave = 15;
+  const bonus = this.yearlyBonus;
+  const custom = this.customLeave;
+
+  return baseLeave + bonus + custom;
+};
+
+/**
+ * 📋 변경 이력 요약
+ */
+userLeaveSettingSchema.methods.getChangesSummary = function () {
+  return this.changeHistory.map((change) => ({
+    date: change.date.toISOString().split("T")[0],
+    action: change.action,
+    amount: change.amount,
+    reason: change.reason,
+  }));
+};
 
 // ===== 🎯 JSON 변환 설정 =====
-
 userLeaveSettingSchema.set("toJSON", {
   virtuals: true,
   transform: function (doc, ret) {
+    ret.id = ret._id;
     delete ret._id;
     delete ret.__v;
     return ret;
   },
 });
 
-// ===== 🎯 모델 생성 및 내보내기 =====
-
 const UserLeaveSetting = mongoose.model(
   "UserLeaveSetting",
   userLeaveSettingSchema
 );
-
 module.exports = UserLeaveSetting;
