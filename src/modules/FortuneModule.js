@@ -117,28 +117,21 @@ class FortuneModule extends BaseModule {
         `🎴 drawCard 시작: ${userName}, subAction: ${subAction}, params: ${params}`
       );
 
-      // 일일 제한 확인 (새 FortuneService 호환)
+      // 일일 제한 확인
       const todayCount = await this.getTodayDrawCount(userId, userName);
-      logger.debug(
-        `📅 오늘 뽑기 횟수: ${todayCount}/${this.config.maxDrawsPerDay}`
-      );
 
       if (todayCount >= this.config.maxDrawsPerDay) {
         logger.warn(`⛔ 일일 제한 도달: ${userName}`);
         return {
           type: "daily_limit",
           module: "fortune",
-          data: {
-            used: todayCount,
-            max: this.config.maxDrawsPerDay,
-          },
+          data: { used: todayCount, max: this.config.maxDrawsPerDay },
         };
       }
 
-      // 🎯 운세 타입이 지정된 경우 (params에 실제 타입이 들어있음!)
+      // 운세 타입이 지정된 경우
       if (params) {
-        const fortuneType = params; // "single", "triple", "celtic"
-        logger.debug(`🎯 운세 타입 선택됨: ${fortuneType}`);
+        const fortuneType = params;
 
         if (!this.config.fortuneTypes[fortuneType]) {
           logger.error(`❌ 잘못된 운세 타입: ${fortuneType}`);
@@ -151,7 +144,6 @@ class FortuneModule extends BaseModule {
 
         // 캘틱 크로스 질문인 경우
         if (fortuneType === "celtic") {
-          logger.debug("🔮 캘틱 크로스 질문 모드 시작");
           this.userStates.set(userId, {
             action: "waiting_question",
             messageId: callbackQuery.message.message_id,
@@ -170,19 +162,24 @@ class FortuneModule extends BaseModule {
 
         // 🎬 카드 뽑기 애니메이션 시작
         logger.debug("🎬 카드 뽑기 애니메이션 시작");
-        logger.debug("🔍 Bot 객체 디버깅:", {
-          hasBot: !!bot,
-          botType: typeof bot,
-          hasTelegram: !!(bot && bot.telegram),
-          botKeys: bot ? Object.keys(bot) : [],
-        });
 
+        // ✅ 수정: bot 객체 null 체크 및 전달
+        if (!bot) {
+          logger.error("❌ AnimationHelper: bot 객체가 null/undefined");
+          return {
+            type: "error",
+            module: "fortune",
+            data: { message: "봇 연결 오류가 발생했습니다." },
+          };
+        }
+
+        // ✅ 수정: bot 객체를 AnimationHelper에 전달
         const animationMessage = await AnimationHelper.performShuffle(
           bot,
           chatId
         );
 
-        // 일반 운세 뽑기 (새 FortuneService 사용)
+        // 일반 운세 뽑기
         logger.debug(`🎴 performDraw 호출 시작: ${userName}, ${fortuneType}`);
         const result = await this.performDraw(
           userId,
@@ -191,16 +188,21 @@ class FortuneModule extends BaseModule {
           userName
         );
 
-        logger.debug("🎴 performDraw 결과:", {
-          success: result?.success,
-          hasData: !!result?.data,
-          message: result?.message,
-          dataKeys: result?.data ? Object.keys(result.data) : [],
-        });
-
-        // 🔍 디버깅: 결과 상세 분석
+        // 결과 검증
         if (!result) {
           logger.error("❌ performDraw가 null/undefined 반환");
+
+          // 실패 애니메이션 표시
+          if (animationMessage) {
+            await bot.telegram.editMessageText(
+              chatId,
+              animationMessage,
+              undefined,
+              "❌ 카드 뽑기에 실패했습니다\\. 다시 시도해주세요\\.",
+              { parse_mode: "MarkdownV2" }
+            );
+          }
+
           return {
             type: "error",
             module: "fortune",
@@ -211,7 +213,7 @@ class FortuneModule extends BaseModule {
         if (!result.success) {
           logger.error("❌ performDraw 실패:", result);
 
-          // 🎭 실패 애니메이션 표시 (AnimationHelper 활용)
+          // 실패 애니메이션 표시
           if (animationMessage) {
             await bot.telegram.editMessageText(
               chatId,
@@ -256,7 +258,6 @@ class FortuneModule extends BaseModule {
       }
 
       // 운세 타입 선택 화면
-      logger.debug("🎯 운세 타입 선택 화면 표시");
       return {
         type: "draw_select",
         module: "fortune",
