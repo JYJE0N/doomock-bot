@@ -159,7 +159,7 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
       return await this.renderWeatherError(data, ctx);
     }
 
-    // ✅ 안전성 체크
+    // 안전성 체크
     if (!city || !weather) {
       logger.error("날씨 렌더링 - 필수 데이터 누락:", {
         city: !!city,
@@ -191,13 +191,45 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
       text += `\n👁️ **가시거리**: ${weather.visibility}km`;
     }
 
-    // 미세먼지 정보 추가
-    if (dust && dust.grade) {
-      text += `\n\n🌬️ **미세먼지 정보**
-${this.dustEmojis[dust.grade] || "🟡"} **등급**: ${dust.grade}`;
+    // ✅ 미세먼지 정보 추가 (수정된 버전!)
+    if (dust && (dust.pm10 || dust.pm25 || dust.overall)) {
+      text += `\n\n🌬️ **미세먼지 정보**\n`;
 
-      if (dust.pm10) text += `\n🔸 **PM10**: ${dust.pm10}㎍/m³`;
-      if (dust.pm25) text += `\n🔹 **PM2.5**: ${dust.pm25}㎍/m³`;
+      // 전체 등급 표시
+      if (dust.overall && dust.overall.grade) {
+        const gradeEmoji = this.dustEmojis[dust.overall.grade] || "🟡";
+        text += `${gradeEmoji} **등급**: ${dust.overall.grade}`;
+      }
+
+      // PM10 정보
+      if (dust.pm10) {
+        const pm10Value = dust.pm10.value || dust.pm10;
+        const pm10Grade = dust.pm10.grade || "";
+        text += `\n🔸 **PM10**: ${pm10Value}㎍/m³`;
+        if (pm10Grade && pm10Grade !== dust.overall?.grade) {
+          text += ` (${pm10Grade})`;
+        }
+      }
+
+      // PM2.5 정보
+      if (dust.pm25) {
+        const pm25Value = dust.pm25.value || dust.pm25;
+        const pm25Grade = dust.pm25.grade || "";
+        text += `\n🔹 **PM2.5**: ${pm25Value}㎍/m³`;
+        if (pm25Grade && pm25Grade !== dust.overall?.grade) {
+          text += ` (${pm25Grade})`;
+        }
+      }
+
+      // 측정소 정보 (있으면)
+      if (dust.stationName) {
+        text += `\n📍 **측정소**: ${dust.stationName}`;
+      }
+
+      // 행동요령 (있으면)
+      if (dust.advice) {
+        text += `\n💡 **행동요령**: ${dust.advice}`;
+      }
     }
 
     // 하단 정보
@@ -361,21 +393,23 @@ ${this.dustEmojis[dust.grade] || "🟡"} **등급**: ${dust.grade}
 
 `;
 
-    // 5일 예보 표시
-    if (forecast && forecast.forecasts) {
-      forecast.forecasts.forEach((day, index) => {
+    // 5일 예보 표시 - 데이터 구조 수정
+    if (forecast && forecast.forecast) {
+      // forecasts → forecast로 변경
+      forecast.forecast.forEach((day, index) => {
         const dayEmoji = index === 0 ? "📅" : "📆";
-        const weatherEmoji = this.weatherEmojis[day.description] || "🌤️";
+        const weatherEmoji =
+          day.icon || this.weatherEmojis[day.description] || "🌤️";
 
-        text += `${dayEmoji} **${day.dayOfWeek}** (${day.date})
+        text += `${dayEmoji} **${day.date}**
 ${weatherEmoji} ${day.description}
-🌡️ ${day.temperature.min}°C ~ ${day.temperature.max}°C
-💧 ${day.humidity}% | ☔ ${day.rainProbability}%
+🌡️ ${day.tempMin}°C ~ ${day.tempMax}°C
 
 `;
       });
     } else {
       text += "예보 데이터를 불러올 수 없습니다.";
+      logger.warn("예보 데이터 구조 문제:", { forecast });
     }
 
     text += `⏰ **업데이트**: ${timestamp}`;
