@@ -133,18 +133,7 @@ class LeaveRenderer extends BaseRenderer {
       }
 
       // 🎨 MarkdownHelper로 안전한 렌더링
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
-      const keyboard = this.createStatusKeyboard(status);
-
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       await ctx.bot.answerCallbackQuery(ctx.callbackQuery.id, {
         text: `잔여 연차: ${remainingLeave}일`,
@@ -162,16 +151,20 @@ class LeaveRenderer extends BaseRenderer {
    */
   buildStatusContent(status) {
     const {
-      totalLeave,
-      usedLeave,
-      remainingLeave,
-      usageRate,
-      year,
-      canUseHalfDay,
-      canUseQuarterDay,
-    } = status;
+      totalLeave = 0,
+      usedLeave = 0,
+      remainingLeave = 0,
+      usageRate = 0,
+      year = new Date().getFullYear(),
+      canUseHalfDay = true,
+      canUseQuarterDay = false,
+    } = status || {};
 
-    const progressBar = this.createProgressBar(usageRate, 20);
+    // 🛡️ 안전한 usageRate 처리
+    const safeUsageRate =
+      typeof usageRate === "number" && !isNaN(usageRate) ? usageRate : 0;
+
+    const progressBar = this.createProgressBar(safeUsageRate, 20);
     const statusIcon =
       remainingLeave > 5 ? "🟢" : remainingLeave > 2 ? "🟡" : "🔴";
 
@@ -183,7 +176,7 @@ ${statusIcon} **잔여 연차: ${remainingLeave}일**
 ├ 총 연차: ${totalLeave}일
 ├ 사용 연차: ${usedLeave}일
 ├ 잔여 연차: ${remainingLeave}일
-└ 사용률: ${usageRate.toFixed(1)}%
+└ 사용률: ${safeUsageRate.toFixed(1)}%
 
 📊 **사용률 시각화**
 ${progressBar}
@@ -209,24 +202,12 @@ ${canUseQuarterDay ? this.icons.quarter : "🚫"} 반반차 (0.25일) - ${
       const year = ctx.year || new Date().getFullYear();
 
       const content = this.buildHistoryContent(items, year, pagination);
-
-      // 🎨 MarkdownHelper로 안전한 렌더링
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
       const keyboard = this.createHistoryKeyboard(
         historyData,
         year,
         pagination.page
       );
-
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       return { success: true, type: "history_rendered" };
     } catch (error) {
@@ -272,19 +253,9 @@ ${canUseQuarterDay ? this.icons.quarter : "🚫"} 반반차 (0.25일) - ${
   async renderRequestForm(status, ctx) {
     try {
       const content = this.buildRequestFormContent(status);
-
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
       const keyboard = this.createRequestFormKeyboard(status);
 
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       return { success: true, type: "request_form_rendered" };
     } catch (error) {
@@ -328,19 +299,9 @@ ${canUseQuarterDay ? "" : "• ❌ 사용 불가"}
   async renderRequestSuccess(leaveData, ctx) {
     try {
       const content = this.buildSuccessContent(leaveData);
-
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
       const keyboard = this.createSuccessKeyboard();
 
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       return { success: true, type: "success_rendered" };
     } catch (error) {
@@ -381,19 +342,9 @@ ${
     try {
       const year = ctx.year || new Date().getFullYear();
       const content = this.buildMonthlyStatsContent(monthlyData, year);
-
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
       const keyboard = this.createStatsKeyboard(year);
 
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       return { success: true, type: "stats_rendered" };
     } catch (error) {
@@ -454,19 +405,9 @@ ${
   async renderTodayUsage(todayData, ctx) {
     try {
       const content = this.buildTodayUsageContent(todayData);
-
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
       const keyboard = this.createTodayKeyboard();
 
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       return { success: true, type: "today_rendered" };
     } catch (error) {
@@ -512,25 +453,190 @@ ${
    */
   async renderMainMenu(status, ctx) {
     try {
-      const content = this.buildMainMenuContent(status);
+      const {
+        remainingLeave = 15,
+        usedLeave = 0,
+        totalLeave = 15,
+      } = status || {};
 
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
+      const text = `🏖️ **내 연차 현황**
 
-      const keyboard = this.createMainMenuKeyboard();
+📊 **2025년 연차 정보**
+• 전체 연차: ${totalLeave}일
+• 사용한 연차: ${usedLeave}일  
+• 남은 연차: ${remainingLeave}일
 
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+${
+  remainingLeave > 10
+    ? "😊 충분해요!"
+    : remainingLeave > 5
+    ? "😐 적당해요"
+    : "😰 부족해요!"
+}`;
 
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📋 사용 내역", callback_data: "leave:history" },
+            { text: "➕ 연차 쓰기", callback_data: "leave:use" },
+          ],
+          [{ text: "🔙 메인으로", callback_data: "main:show" }],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
       return { success: true, type: "main_menu_rendered" };
     } catch (error) {
       logger.error("LeaveRenderer.renderMainMenu 실패:", error);
       return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * 📋 사용 내역 (심플 버전)
+   */
+  async renderHistory(historyData, ctx) {
+    try {
+      const { items = [] } = historyData || {};
+
+      let text = `📋 **연차 사용 내역**\n\n`;
+
+      if (items.length === 0) {
+        text += `아직 사용한 연차가 없어요! 🎉`;
+      } else {
+        items.slice(0, 5).forEach((item, index) => {
+          text += `${index + 1}. ${item.date} - ${item.type}\n`;
+          if (item.reason) text += `   💭 ${item.reason}\n`;
+          text += `\n`;
+        });
+
+        if (items.length > 5) {
+          text += `... 외 ${items.length - 5}건 더`;
+        }
+      }
+
+      const keyboard = {
+        inline_keyboard: [[{ text: "🔙 뒤로", callback_data: "leave:menu" }]],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "history_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderHistory 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * ➕ 연차 사용 기록 (심플 버전)
+   */
+  async renderUseForm(ctx) {
+    try {
+      const text = `➕ **연차 사용하기**
+
+어떤 연차를 사용하셨나요?`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🌅 반차 (0.5일)", callback_data: "leave:add:half" },
+            { text: "🏖️ 연차 (1일)", callback_data: "leave:add:full" },
+          ],
+          [{ text: "❌ 취소", callback_data: "leave:menu" }],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "use_form_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderUseForm 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * ✅ 연차 사용 완료 (심플 버전)
+   */
+  async renderUseSuccess(data, ctx) {
+    try {
+      const { type, amount, remainingLeave } = data;
+
+      const text = `✅ **연차 사용 완료!**
+
+🏖️ ${type} (${amount}일) 사용했어요
+📊 남은 연차: ${remainingLeave}일
+
+즐거운 휴가 되세요! 🌴`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "📊 현황 보기", callback_data: "leave:menu" },
+            { text: "➕ 더 쓰기", callback_data: "leave:use" },
+          ],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "use_success_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderUseSuccess 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * 📊 render 메서드 (심플 버전)
+   */
+  async render(result, ctx) {
+    try {
+      const { type, data } = result;
+
+      switch (type) {
+        case "main_menu":
+        case "menu":
+          return await this.renderMainMenu(data, ctx);
+        case "history":
+          return await this.renderHistory(data, ctx);
+        case "use_form":
+          return await this.renderUseForm(ctx);
+        case "use_success":
+          return await this.renderUseSuccess(data, ctx);
+        case "error":
+          return await this.renderError(data, ctx);
+        default:
+          return await this.renderError(
+            { message: `지원하지 않는 기능: ${type}` },
+            ctx
+          );
+      }
+    } catch (error) {
+      logger.error("LeaveRenderer.render 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * ❌ 에러 렌더링 (심플 버전)
+   */
+  async renderError(data, ctx) {
+    try {
+      const text = `❌ **오류 발생**
+
+${data.message || "알 수 없는 오류가 발생했습니다."}`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "🔙 메인으로", callback_data: "leave:menu" }],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "error_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderError 실패:", error);
+      // 최종 폴백
+      return { success: false, error: error.message };
     }
   }
 
@@ -541,14 +647,25 @@ ${
     let message = `${this.icons.leave} **연차 관리**\n\n`;
 
     if (status) {
+      // 🛡️ 안전한 데이터 접근 (undefined 방지)
+      const remainingLeave = status.remainingLeave || 0;
+      const usageRate = status.usageRate || 0; // ✅ undefined 방지!
+
       const statusIcon =
-        status.remainingLeave > 5
-          ? "🟢"
-          : status.remainingLeave > 2
-          ? "🟡"
-          : "🔴";
-      message += `${statusIcon} **현재 잔여 연차: ${status.remainingLeave}일**\n`;
-      message += `📊 사용률: ${status.usageRate.toFixed(1)}%\n\n`;
+        remainingLeave > 5 ? "🟢" : remainingLeave > 2 ? "🟡" : "🔴";
+
+      message += `${statusIcon} **현재 잔여 연차: ${remainingLeave}일**\n`;
+
+      // 🛡️ toFixed() 호출 전 숫자 타입 확인
+      const safeUsageRate =
+        typeof usageRate === "number" && !isNaN(usageRate)
+          ? usageRate.toFixed(1)
+          : "0.0";
+
+      message += `📊 사용률: ${safeUsageRate}%\n\n`;
+    } else {
+      // 🛡️ status가 없을 때 기본 메시지
+      message += `📊 **연차 정보를 불러오는 중...**\n\n`;
     }
 
     message += `📋 **메뉴를 선택하세요:**\n\n`;
@@ -569,19 +686,9 @@ ${
   async renderSettings(data, ctx) {
     try {
       const content = this.buildSettingsContent(data);
-
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
       const keyboard = this.createSettingsKeyboard();
 
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       return { success: true, type: "settings_rendered" };
     } catch (error) {
@@ -617,10 +724,6 @@ ${data.message || "알 수 없는 오류가 발생했습니다."}
 
 다시 시도해주세요.`;
 
-      const safeMessage = this.markdownHelper
-        ? await this.markdownHelper.processText(content)
-        : { text: content, parseMode: "HTML" };
-
       const keyboard = {
         inline_keyboard: [
           [
@@ -630,12 +733,7 @@ ${data.message || "알 수 없는 오류가 발생했습니다."}
         ],
       };
 
-      await ctx.bot.editMessageText(safeMessage.text, {
-        chat_id: ctx.callbackQuery.message.chat.id,
-        message_id: ctx.callbackQuery.message.message_id,
-        reply_markup: keyboard,
-        parse_mode: safeMessage.parseMode || "HTML",
-      });
+      await this.sendSafeMessage(ctx, content, { reply_markup: keyboard });
 
       return { success: true, type: "error_rendered" };
     } catch (error) {
@@ -980,10 +1078,16 @@ ${data.message || "알 수 없는 오류가 발생했습니다."}
    * 진행률 바 생성
    */
   createProgressBar(percentage, length = 20) {
-    const filled = Math.round((percentage / 100) * length);
+    // 🛡️ 안전한 percentage 처리
+    const safePercentage =
+      typeof percentage === "number" && !isNaN(percentage)
+        ? Math.max(0, Math.min(100, percentage))
+        : 0;
+
+    const filled = Math.round((safePercentage / 100) * length);
     const empty = length - filled;
     return (
-      "█".repeat(filled) + "░".repeat(empty) + ` ${percentage.toFixed(1)}%`
+      "█".repeat(filled) + "░".repeat(empty) + ` ${safePercentage.toFixed(1)}%`
     );
   }
 

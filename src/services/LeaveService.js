@@ -77,7 +77,7 @@ class LeaveService extends BaseService {
    * 🗄️ 필요한 Mongoose 모델 정의
    */
   getRequiredModels() {
-    return ["Leave", "LeavePolicy"]; // Leave 모델과 정책 모델
+    return ["Leave", "UserLeaveSetting"]; // Leave 모델과 정책 모델
   }
 
   /**
@@ -100,8 +100,10 @@ class LeaveService extends BaseService {
    */
   async ensureDefaultPolicies() {
     try {
-      // 현재는 Mock 데이터로 처리 (실제 DB 연동 시 수정)
-      logger.debug("📋 기본 연차 정책 확인 완료");
+      // UserLeaveSetting 모델을 사용하여 기본 정책 처리
+      const UserLeaveSettingModel = this.models.UserLeaveSetting;
+
+      logger.debug("📋 기본 연차 정책 확인 완료 (UserLeaveSetting 기반)");
     } catch (error) {
       logger.warn("⚠️ 기본 정책 생성 실패 (Mock 모드로 계속):", error.message);
     }

@@ -177,6 +177,66 @@ class ErrorHandler {
   }
 
   /**
+   * 🎨 렌더링 에러 처리 (LeaveRenderer 등에서 사용)
+   */
+  async handleRenderError(bot, callbackQuery, error, options = {}) {
+    this.stats.totalErrors++;
+    this.stats.rendererErrors++;
+    this.stats.lastError = new Date();
+
+    const {
+      module = "unknown",
+      renderer = "unknown",
+      fallbackMessage,
+    } = options;
+
+    logger.error(`🎨 렌더링 오류 [${module}/${renderer}]:`, error);
+
+    try {
+      // 사용자에게 에러 알림
+      const errorMessage =
+        fallbackMessage || this.config.fallbackMessages.renderer;
+
+      // 🛡️ callbackQuery가 있을 때만 답변
+      if (callbackQuery && callbackQuery.id) {
+        await bot.answerCallbackQuery(callbackQuery.id, {
+          text: errorMessage,
+          show_alert: true,
+        });
+      }
+
+      // 기본 에러 화면 표시 시도
+      try {
+        const fallbackKeyboard = {
+          inline_keyboard: [
+            [{ text: "🔄 다시 시도", callback_data: `${module}:menu` }],
+            [{ text: "🏠 메인으로", callback_data: "main:show" }],
+          ],
+        };
+
+        await bot.editMessageText(
+          `❌ **화면 표시 오류**\n\n${errorMessage}\n\n다시 시도하거나 메인 메뉴로 돌아가세요.`,
+          {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            reply_markup: fallbackKeyboard,
+            parse_mode: "Markdown",
+          }
+        );
+
+        this.stats.handledErrors++;
+        return { success: false, handled: true, error: error.message };
+      } catch (fallbackError) {
+        logger.error("폴백 메시지 표시 실패:", fallbackError);
+        return await this.handleCriticalError({ callbackQuery }, error);
+      }
+    } catch (criticalError) {
+      logger.error("🔥 렌더링 에러 처리 중 치명적 오류:", criticalError);
+      return { success: false, handled: false, error: criticalError.message };
+    }
+  }
+
+  /**
    * 🎨 렌더러 없음 처리
    */
   async handleMissingRenderer(ctx, moduleKey, result) {
