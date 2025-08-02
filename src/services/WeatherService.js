@@ -1,23 +1,14 @@
-// src/services/WeatherService.js - 🌤️ 날씨 API 서비스 (완성판)
+// ✅ src/services/WeatherService.js - 미세먼지 메서드 완전 구현
+
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const axios = require("axios");
 
-/**
- * 🌤️ WeatherService - 날씨 정보 API 서비스
- *
- * ✅ 특징:
- * - 실제 날씨 API 연동 (OpenWeatherMap)
- * - 8개 주요 도시 지원
- * - 캐싱 시스템으로 API 호출 최적화
- * - 미세먼지 정보 포함 * - 에러 상황에서도 기본 데이터 제공
- */
 class WeatherService extends BaseService {
   constructor(options = {}) {
     super("WeatherService", options);
 
-    // API 설정 (변경 없음)
     this.config = {
       apiKey: process.env.WEATHER_API_KEY,
       baseUrl: "https://api.openweathermap.org/data/2.5",
@@ -29,7 +20,6 @@ class WeatherService extends BaseService {
       ...options.config,
     };
 
-    // 도시 매핑 (한글 → 영문)
     this.cityMapping = {
       서울: "Seoul,KR",
       수원: "Suwon,KR",
@@ -49,12 +39,30 @@ class WeatherService extends BaseService {
       제주시: "Jeju,KR",
     };
 
-    // 캐싱 시스템
+    // 🌬️ 미세먼지 측정소 매핑 (한국 환경공단)
+    this.dustStationMapping = {
+      서울: "종로구",
+      서울시: "종로구",
+      수원: "수원",
+      수원시: "수원",
+      인천: "인천",
+      인천시: "인천",
+      대전: "대전",
+      대전시: "대전",
+      대구: "대구",
+      대구시: "대구",
+      부산: "부산",
+      부산시: "부산",
+      광주: "광주",
+      광주시: "광주",
+      제주: "제주",
+      제주시: "제주",
+    };
+
     this.weatherCache = new Map();
     this.dustCache = new Map();
     this.forecastCache = new Map();
 
-    // 통계
     this.stats = {
       apiCalls: 0,
       cacheHits: 0,
@@ -66,27 +74,34 @@ class WeatherService extends BaseService {
   }
 
   getRequiredModels() {
-    // ✅ 중요: WeatherService는 외부 API 서비스라 DB 모델이 필요 없음!
     return [];
   }
 
-  /**
-   * 🎯 서비스 초기화
-   */
   async onInitialize() {
-    // API 키 검증
     if (!this.config.apiKey) {
       logger.warn("⚠️ OpenWeatherMap API 키가 설정되지 않음");
+    } else {
+      logger.success(
+        `✅ 날씨 API 키 확인됨: ${this.config.apiKey.substring(0, 8)}...`
+      );
     }
 
-    // 캐시 정리 스케줄링
-    this.setupCacheCleaning();
+    if (!this.config.dustApiKey) {
+      logger.warn("⚠️ 미세먼지 API 키가 설정되지 않음 - 추정 데이터 사용");
+    } else {
+      logger.success(
+        `✅ 미세먼지 API 키 확인됨: ${this.config.dustApiKey.substring(
+          0,
+          8
+        )}...`
+      );
+    }
 
-    // logger.success("✅ WeatherService 초기화 완료");
+    this.setupCacheCleaning();
   }
 
   /**
-   * 🌡️ 현재 날씨 조회 (핵심 메서드)
+   * 🌡️ 현재 날씨 조회
    */
   async getCurrentWeather(location) {
     try {
@@ -98,16 +113,12 @@ class WeatherService extends BaseService {
         return this.createSuccessResponse(cached, "캐시된 날씨 정보");
       }
 
-      // ✅ API 키가 있으면 실제 API 호출!
       if (this.config.apiKey) {
-        logger.info(`🌐 실제 API 호출: ${location}`);
+        logger.info(`🌐 현재 날씨 API 호출: ${location}`);
 
         try {
-          // 도시명 매핑
           const mappedCity = this.cityMapping[location] || `${location},KR`;
 
-          // OpenWeatherMap API 호출
-          const axios = require("axios");
           const response = await axios.get(`${this.config.baseUrl}/weather`, {
             params: {
               q: mappedCity,
@@ -118,36 +129,32 @@ class WeatherService extends BaseService {
             timeout: 10000,
           });
 
-          // Weather 모델로 데이터 변환
           const Weather = require("../database/models/Weather");
           const weatherData = Weather.createFromApiResponse(
             response.data,
             location
           );
 
-          // 캐시 저장
           this.setCached(this.weatherCache, cacheKey, weatherData);
           this.stats.apiCalls++;
           this.stats.lastUpdate = new Date();
 
           logger.success(
-            `✅ 실제 날씨 API 성공: ${location} (${weatherData.temperature}°C)`
+            `✅ 현재 날씨 API 성공: ${location} (${weatherData.temperature}°C)`
           );
           return this.createSuccessResponse(weatherData, "실제 날씨 정보");
         } catch (apiError) {
           logger.error(
-            `❌ 날씨 API 호출 실패 (${location}):`,
+            `❌ 현재 날씨 API 호출 실패 (${location}):`,
             apiError.message
           );
 
-          // API 실패 시 Mock 데이터로 폴백
           const mockData = this.createMockWeatherData(location);
           return this.createSuccessResponse(mockData, "API 실패 - Mock 데이터");
         }
       }
 
-      // API 키 없으면 Mock 데이터 반환
-      logger.warn("⚠️ API 키 없음 - Mock 데이터 사용");
+      logger.warn(`⚠️ API 키 없음 - ${location} Mock 데이터 사용`);
       const mockData = this.createMockWeatherData(location);
       return this.createSuccessResponse(mockData, "Mock 날씨 정보");
     } catch (error) {
@@ -157,10 +164,276 @@ class WeatherService extends BaseService {
   }
 
   /**
-   * 🌤️ 실제 날씨 예보 조회 (OpenWeatherMap 5일 예보)
+   * 🌬️ 미세먼지 정보 조회 (완전 구현!)
    */
+  async getDustInfo(location) {
+    try {
+      const cacheKey = `dust_${location}`;
+      const cached = this.getCached(this.dustCache, cacheKey);
+
+      if (cached) {
+        this.stats.cacheHits++;
+        logger.info(`📦 캐시에서 미세먼지 반환: ${location}`);
+        return this.createSuccessResponse(cached, "캐시된 미세먼지 정보");
+      }
+
+      // ✅ 미세먼지 API 키가 있으면 실제 API 호출!
+      if (this.config.dustApiKey) {
+        logger.info(`🌬️ 실제 미세먼지 API 호출: ${location}`);
+
+        try {
+          // 측정소명 매핑
+          const stationName =
+            this.dustStationMapping[location] ||
+            this.dustStationMapping[location.replace(/시$/, "")] ||
+            "종로구";
+
+          logger.info(`🏢 측정소 매핑: ${location} → ${stationName}`);
+
+          // 한국 환경공단 API 호출
+          const response = await axios.get(
+            `${this.config.dustApiUrl}/getMsrstnAcctoRltmMesureDnsty`,
+            {
+              params: {
+                serviceKey: this.config.dustApiKey,
+                stationName: stationName,
+                dataTerm: "DAILY",
+                ver: "1.0",
+                returnType: "json",
+                numOfRows: 1,
+                pageNo: 1,
+              },
+              timeout: 10000,
+            }
+          );
+
+          logger.info(`📡 미세먼지 API 응답:`, {
+            status: response.status,
+            hasData: !!response.data,
+            dataKeys: response.data ? Object.keys(response.data) : [],
+          });
+
+          if (
+            response.data &&
+            response.data.response &&
+            response.data.response.body &&
+            response.data.response.body.items
+          ) {
+            const items = response.data.response.body.items;
+
+            if (Array.isArray(items) && items.length > 0) {
+              const dustData = this.parseKoreanDustData(
+                items[0],
+                location,
+                stationName
+              );
+
+              // 캐시 저장
+              this.setCached(this.dustCache, cacheKey, dustData);
+              this.stats.apiCalls++;
+
+              logger.success(
+                `✅ 실제 미세먼지 API 성공: ${location} (PM2.5: ${dustData.pm25}㎍/m³)`
+              );
+              return this.createSuccessResponse(dustData, "실제 미세먼지 정보");
+            } else {
+              logger.warn(`⚠️ 미세먼지 API 응답에 데이터 없음: ${stationName}`);
+            }
+          } else {
+            logger.warn(`⚠️ 미세먼지 API 응답 구조 이상:`, response.data);
+          }
+        } catch (dustError) {
+          logger.error(`❌ 미세먼지 API 호출 실패 (${location}):`, {
+            error: dustError.message,
+            code: dustError.code,
+            response: dustError.response
+              ? {
+                  status: dustError.response.status,
+                  data: dustError.response.data,
+                }
+              : null,
+          });
+        }
+      } else {
+        logger.info(`ℹ️ 미세먼지 API 키 없음 - ${location} 추정 데이터 사용`);
+      }
+
+      // API 실패 또는 키 없음 → 추정 데이터 생성
+      const estimatedData = this.createMockDustData(location);
+
+      // 캐시에 저장 (단기간)
+      this.setCached(this.dustCache, cacheKey, estimatedData);
+
+      logger.warn(`🎭 추정 미세먼지 데이터 생성: ${location}`);
+      return this.createSuccessResponse(estimatedData, "추정 미세먼지 정보");
+    } catch (error) {
+      this.stats.errors++;
+      logger.error(`❌ 미세먼지 정보 조회 실패 (${location}):`, error);
+
+      // 최종 폴백
+      const fallbackData = this.createMockDustData(location);
+      return this.createSuccessResponse(fallbackData, "폴백 미세먼지 정보");
+    }
+  }
+
   /**
-   * 🌤️ 실제 날씨 예보 조회 (진짜 구현!)
+   * 🔄 한국 환경공단 API 응답 → 내부 포맷 변환
+   */
+  parseKoreanDustData(apiData, location, stationName) {
+    try {
+      // API 응답 필드들
+      const pm25Value = parseInt(apiData.pm25Value) || 0;
+      const pm10Value = parseInt(apiData.pm10Value) || 0;
+      const pm25Grade = parseInt(apiData.pm25Grade) || 1;
+      const pm10Grade = parseInt(apiData.pm10Grade) || 1;
+      const dataTime =
+        apiData.dataTime || TimeHelper.format(TimeHelper.now(), "full");
+
+      // 등급 변환
+      const pm25GradeText = this.convertDustGrade(pm25Grade);
+      const pm10GradeText = this.convertDustGrade(pm10Grade);
+      const overallGrade = this.convertDustGrade(
+        Math.max(pm25Grade, pm10Grade)
+      );
+
+      return {
+        pm25: pm25Value,
+        pm10: pm10Value,
+        grade: overallGrade,
+        pm25Grade: pm25GradeText,
+        pm10Grade: pm10GradeText,
+        location: location,
+        stationName: stationName,
+        dataTime: dataTime,
+        timestamp: TimeHelper.format(TimeHelper.now(), "time"),
+        source: "한국환경공단",
+        isReal: true,
+        advice: this.getDustAdvice(overallGrade),
+      };
+    } catch (error) {
+      logger.error("미세먼지 데이터 파싱 실패:", error);
+      return this.createMockDustData(location);
+    }
+  }
+
+  /**
+   * 🏷️ 미세먼지 등급 변환 (숫자 → 한글)
+   */
+  convertDustGrade(gradeNumber) {
+    const gradeMap = {
+      1: "좋음",
+      2: "보통",
+      3: "나쁨",
+      4: "매우나쁨",
+    };
+    return gradeMap[gradeNumber] || "알수없음";
+  }
+
+  /**
+   * 💡 미세먼지 행동요령
+   */
+  getDustAdvice(grade) {
+    const adviceMap = {
+      좋음: "외출하기 좋은 날씨입니다! 야외활동을 즐기세요.",
+      보통: "일반적인 야외활동에 지장이 없습니다.",
+      나쁨: "장시간 야외활동을 자제하고, 외출 시 마스크를 착용하세요.",
+      매우나쁨:
+        "외출을 자제하고, 꼭 외출해야 할 경우 KF94 마스크를 착용하세요.",
+    };
+    return adviceMap[grade] || "미세먼지 농도를 확인하세요.";
+  }
+
+  /**
+   * 🎭 Mock 미세먼지 데이터 생성 (실제와 유사하게)
+   */
+  createMockDustData(location) {
+    const hour = new Date().getHours();
+
+    // 시간대별 미세먼지 추정 (서울 기준)
+    let pm25Base, pm10Base, gradeText;
+
+    if (hour >= 7 && hour <= 9) {
+      // 출근 시간 - 나쁨
+      pm25Base = 35;
+      pm10Base = 65;
+      gradeText = "나쁨";
+    } else if (hour >= 18 && hour <= 20) {
+      // 퇴근 시간 - 나쁨
+      pm25Base = 40;
+      pm10Base = 70;
+      gradeText = "나쁨";
+    } else if (hour >= 0 && hour <= 6) {
+      // 새벽 - 좋음
+      pm25Base = 15;
+      pm10Base = 30;
+      gradeText = "좋음";
+    } else {
+      // 평시 - 보통
+      pm25Base = 25;
+      pm10Base = 45;
+      gradeText = "보통";
+    }
+
+    // 약간의 변동 추가
+    const variation = Math.random() * 10 - 5;
+    const pm25Value = Math.max(5, Math.round(pm25Base + variation));
+    const pm10Value = Math.max(10, Math.round(pm10Base + variation * 1.5));
+
+    // 실제 수치에 따른 등급 재계산
+    const actualGrade = this.calculateDustGrade(pm25Value, pm10Value);
+
+    return {
+      pm25: pm25Value,
+      pm10: pm10Value,
+      grade: actualGrade,
+      pm25Grade: this.getDustGradeFromValue(pm25Value, "pm25"),
+      pm10Grade: this.getDustGradeFromValue(pm10Value, "pm10"),
+      location: location,
+      stationName: "추정값",
+      dataTime: TimeHelper.format(TimeHelper.now(), "full"),
+      timestamp: TimeHelper.format(TimeHelper.now(), "time"),
+      source: "추정 데이터",
+      isReal: false,
+      advice: this.getDustAdvice(actualGrade),
+      notice: "실제 미세먼지 API 연결 시 정확한 정보를 제공합니다.",
+    };
+  }
+
+  /**
+   * 📊 수치로부터 미세먼지 등급 계산
+   */
+  calculateDustGrade(pm25, pm10) {
+    const pm25Grade = this.getDustGradeFromValue(pm25, "pm25");
+    const pm10Grade = this.getDustGradeFromValue(pm10, "pm10");
+
+    // 더 나쁜 등급을 선택
+    const grades = ["좋음", "보통", "나쁨", "매우나쁨"];
+    const pm25Index = grades.indexOf(pm25Grade);
+    const pm10Index = grades.indexOf(pm10Grade);
+
+    return grades[Math.max(pm25Index, pm10Index)];
+  }
+
+  /**
+   * 🎯 수치별 미세먼지 등급 판정
+   */
+  getDustGradeFromValue(value, type) {
+    if (type === "pm25") {
+      if (value <= 15) return "좋음";
+      if (value <= 35) return "보통";
+      if (value <= 75) return "나쁨";
+      return "매우나쁨";
+    } else {
+      // pm10
+      if (value <= 30) return "좋음";
+      if (value <= 80) return "보통";
+      if (value <= 150) return "나쁨";
+      return "매우나쁨";
+    }
+  }
+
+  /**
+   * 🌤️ 날씨 예보 조회 (기존과 동일)
    */
   async getForecast(location) {
     try {
@@ -172,47 +445,41 @@ class WeatherService extends BaseService {
         return this.createSuccessResponse(cached, "캐시된 예보 정보");
       }
 
-      // API 키 없으면 Mock 데이터 (명확히 표시)
       if (!this.config.apiKey) {
-        logger.warn("⚠️ API 키 없음 - Mock 예보 데이터 사용");
+        logger.warn(`⚠️ API 키 없음 - ${location} 예보 Mock 데이터 사용`);
         const mockForecast = this.createMockForecastData(location);
         mockForecast.isOffline = true;
         mockForecast.source = "Mock (API 키 없음)";
         return this.createSuccessResponse(mockForecast, "Mock 예보 정보");
       }
 
-      // 도시명 매핑
       const mappedCity = this.cityMapping[location] || `${location},KR`;
 
       logger.info(`🌐 실제 예보 API 호출: ${location} → ${mappedCity}`);
 
-      // axios 임포트 (WeatherService 상단에 추가 필요)
-      const axios = require("axios");
-
-      // OpenWeatherMap 5일 예보 API 호출
       const response = await axios.get(`${this.config.baseUrl}/forecast`, {
         params: {
           q: mappedCity,
           appid: this.config.apiKey,
           units: "metric",
           lang: "kr",
-          cnt: 40, // 5일 * 8회 (3시간 간격)
+          cnt: 40,
         },
-        timeout: 10000,
+        timeout: 15000,
       });
 
       if (response.data && response.data.list) {
-        // API 응답을 내부 포맷으로 변환
         const forecastData = this.parseOpenWeatherForecast(
           response.data,
           location
         );
 
-        // 캐시에 저장
         this.setCached(this.forecastCache, cacheKey, forecastData);
         this.stats.apiCalls++;
 
-        logger.success(`✅ 실제 예보 API 성공: ${location}`);
+        logger.success(
+          `✅ 실제 예보 API 성공: ${location} (${response.data.list.length}개 데이터)`
+        );
         return this.createSuccessResponse(
           forecastData,
           "실제 예보 정보 조회 성공"
@@ -224,7 +491,6 @@ class WeatherService extends BaseService {
       this.stats.errors++;
       logger.error(`❌ 예보 API 실패 (${location}):`, error.message);
 
-      // 실패시 Mock 데이터로 폴백 (에러임을 명시)
       const mockForecast = this.createMockForecastData(location);
       mockForecast.isOffline = true;
       mockForecast.error = error.message;
@@ -234,21 +500,18 @@ class WeatherService extends BaseService {
     }
   }
 
-  /**
-   * 🔄 OpenWeatherMap 예보 응답 → 내부 포맷 변환
-   */
+  // ... 기존 메서드들 (parseOpenWeatherForecast, groupForecastByDay 등)은 동일하게 유지
+
   parseOpenWeatherForecast(apiResponse, originalLocation) {
     try {
       const { list, city } = apiResponse;
-
-      // 5일 예보를 하루별로 그룹핑
       const dailyForecasts = this.groupForecastByDay(list);
 
       return {
         location: originalLocation,
         cityName: city?.name || originalLocation,
         country: city?.country || "KR",
-        forecast: dailyForecasts, // ← 핵심! forecast 키 사용
+        forecast: dailyForecasts,
         timestamp: TimeHelper.format(TimeHelper.now(), "full"),
         isOffline: false,
         source: "OpenWeatherMap 5-day forecast",
@@ -264,9 +527,6 @@ class WeatherService extends BaseService {
     }
   }
 
-  /**
-   * 📅 3시간 간격 데이터를 하루별로 그룹핑
-   */
   groupForecastByDay(forecastList) {
     const dailyData = new Map();
     const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
@@ -296,7 +556,6 @@ class WeatherService extends BaseService {
       dayData.icons.push(item.weather[0].icon);
       dayData.humidity.push(item.main.humidity);
 
-      // 강수확률 계산
       if (
         item.weather[0].main.includes("Rain") ||
         item.weather[0].main.includes("Snow") ||
@@ -309,7 +568,6 @@ class WeatherService extends BaseService {
       }
     });
 
-    // 하루별 데이터 정리 (최대 5일)
     return Array.from(dailyData.values())
       .slice(0, 5)
       .map((day) => ({
@@ -326,9 +584,6 @@ class WeatherService extends BaseService {
       }));
   }
 
-  /**
-   * 🎯 가장 빈번한 날씨 상태 선택
-   */
   getMostFrequentCondition(conditions) {
     const counts = {};
     conditions.forEach((condition) => {
@@ -340,9 +595,6 @@ class WeatherService extends BaseService {
     );
   }
 
-  /**
-   * 🎨 가장 빈번한 아이콘 선택 + Weather 모델 연동
-   */
   getMostFrequentIcon(icons) {
     const counts = {};
     icons.forEach((icon) => {
@@ -353,14 +605,10 @@ class WeatherService extends BaseService {
       counts[a] > counts[b] ? a : b
     );
 
-    // Weather 모델의 아이콘 매핑 사용
     const Weather = require("../database/models/Weather");
     return Weather.getWeatherIcon(mostFrequentIcon);
   }
 
-  /**
-   * 🎭 Mock 데이터 (개발용 - 데이터 구조 통일)
-   */
   createMockForecastData(location) {
     logger.warn(`🎭 Mock 예보 데이터 생성: ${location}`);
 
@@ -387,107 +635,19 @@ class WeatherService extends BaseService {
 
     return {
       location,
-      forecast: days, // ← 여기가 중요! forecast 키로 통일
+      forecast: days,
       timestamp: TimeHelper.format(TimeHelper.now(), "full"),
       isOffline: true,
       source: "Mock 데이터 (개발용)",
     };
   }
 
-  /**
-   * 🌬️ 미세먼지 정보 조회 (실제 API 호출 로직 추가!)
-   */
-  async getDustInfo(location) {
-    try {
-      const cacheKey = `dust_${location}`;
-      const cached = this.getCached(this.dustCache, cacheKey);
-
-      if (cached) {
-        this.stats.cacheHits++;
-        return this.createSuccessResponse(cached, "캐시된 미세먼지 정보");
-      }
-
-      // ✅ 미세먼지 API 키가 있으면 실제 API 호출!
-      if (this.config.dustApiKey) {
-        logger.info(`🌬️ 실제 미세먼지 API 호출: ${location}`);
-
-        try {
-          const AirQualityHelper = require("../utils/AirQualityHelper");
-          const airHelper = new AirQualityHelper();
-          const result = await airHelper.getCurrentAirQuality(location);
-
-          if (result.success && result.data) {
-            // 캐시 저장
-            this.setCached(this.dustCache, cacheKey, result.data);
-            logger.success(`✅ 실제 미세먼지 API 성공: ${location}`);
-            return this.createSuccessResponse(
-              result.data,
-              "실제 미세먼지 정보"
-            );
-          }
-        } catch (dustError) {
-          logger.error(
-            `❌ 미세먼지 API 호출 실패 (${location}):`,
-            dustError.message
-          );
-        }
-      }
-
-      // API 실패 또는 키 없음
-      logger.warn("⚠️ 미세먼지 API 키 없거나 실패 - 추정 데이터 사용");
-      const estimatedData = this.createMockDustData(location);
-      return this.createSuccessResponse(estimatedData, "추정 미세먼지 정보");
-    } catch (error) {
-      this.stats.errors++;
-      return this.createErrorResponse(error, "미세먼지 정보 조회 실패");
-    }
+  createMockWeatherData(location) {
+    const Weather = require("../database/models/Weather");
+    return Weather.createFallbackWeather(location);
   }
 
-  /**
-   * 🌬️ Mock 미세먼지 데이터 생성
-   */
-  createMockDustData(location) {
-    const hour = new Date().getHours();
-
-    // 시간대별 미세먼지 추정
-    let pm25, pm10, grade;
-    if (hour >= 7 && hour <= 9) {
-      pm25 = Math.floor(Math.random() * 20) + 25; // 25-45
-      pm10 = Math.floor(Math.random() * 30) + 45; // 45-75
-      grade = "나쁨";
-    } else if (hour >= 18 && hour <= 20) {
-      pm25 = Math.floor(Math.random() * 15) + 20; // 20-35
-      pm10 = Math.floor(Math.random() * 25) + 40; // 40-65
-      grade = "보통";
-    } else {
-      pm25 = Math.floor(Math.random() * 15) + 10; // 10-25
-      pm10 = Math.floor(Math.random() * 20) + 20; // 20-40
-      grade = "좋음";
-    }
-
-    return {
-      pm25: { value: pm25, grade },
-      pm10: { value: pm10, grade },
-      overall: { grade },
-      location,
-      timestamp: new Date().toISOString(),
-      source: "estimated",
-    };
-  }
-
-  /**
-   * 🗺️ 지원 도시 목록
-   */
-  async getSupportedCities() {
-    const cities = Object.keys(this.cityMapping).filter(
-      (city) => !city.includes("시")
-    );
-    return this.createSuccessResponse(cities, "지원 도시 목록");
-  }
-
-  /**
-   * 📦 캐시 관리 메서드들
-   */
+  // 캐시 및 유틸리티 메서드들
   getCached(cache, key) {
     const item = cache.get(key);
     if (item && Date.now() - item.timestamp < this.config.cacheTimeout) {
@@ -504,70 +664,37 @@ class WeatherService extends BaseService {
     });
   }
 
-  /**
-   * 🧹 캐시 정리 스케줄링
-   */
   setupCacheCleaning() {
     setInterval(() => {
-      this.cleanExpiredCache(this.weatherCache);
-      this.cleanExpiredCache(this.dustCache);
-      this.cleanExpiredCache(this.forecastCache);
+      [this.weatherCache, this.dustCache, this.forecastCache].forEach(
+        (cache) => {
+          for (const [key, item] of cache.entries()) {
+            if (Date.now() - item.timestamp >= this.config.cacheTimeout) {
+              cache.delete(key);
+            }
+          }
+        }
+      );
     }, this.config.cacheTimeout);
   }
 
-  /**
-   * 🗑️ 만료된 캐시 정리
-   */
-  cleanExpiredCache(cache) {
-    const now = Date.now();
-    for (const [key, value] of cache.entries()) {
-      if (now - value.timestamp > this.config.cacheTimeout) {
-        cache.delete(key);
-      }
-    }
+  createSuccessResponse(data, message) {
+    return { success: true, data, message };
   }
 
-  /**
-   * 🎭 Mock 데이터 생성
-   */
-  createMockWeatherData(location) {
-    return {
-      location,
-      temperature: Math.round(15 + Math.random() * 15),
-      description: ["맑음", "구름 조금", "흐림", "비"][
-        Math.floor(Math.random() * 4)
-      ],
-      humidity: Math.round(40 + Math.random() * 40),
-      windSpeed: Math.round(Math.random() * 10),
-      feelsLike: Math.round(15 + Math.random() * 15),
-      icon: "☀️",
-      timestamp: TimeHelper.format(TimeHelper.now(), "full"),
-    };
+  createErrorResponse(error, message) {
+    return { success: false, error: error.message, message };
   }
 
-  createMockForecastData(location) {
-    const days = [];
-    for (let i = 0; i < 5; i++) {
-      days.push({
-        date: TimeHelper.format(new Date(Date.now() + i * 86400000), "MM/DD"),
-        tempMin: Math.round(10 + Math.random() * 10),
-        tempMax: Math.round(20 + Math.random() * 10),
-        description: ["맑음", "구름", "비", "흐림"][
-          Math.floor(Math.random() * 4)
-        ],
-        icon: ["☀️", "⛅", "🌧️", "☁️"][Math.floor(Math.random() * 4)],
-      });
-    }
-    return { location, forecast: days };
-  }
-
-  /**
-   * 📊 서비스 상태 조회
-   */
   getStatus() {
     return {
-      ...super.getStatus(),
-      apiKey: !!this.config.apiKey,
+      isHealthy: true,
+      hasApiKey: !!this.config.apiKey,
+      hasdustApiKey: !!this.config.dustApiKey,
+      apiKeyStatus: this.config.apiKey ? "설정됨" : "없음",
+      dustApiKeyStatus: this.config.dustApiKey ? "설정됨" : "없음",
+      mockMode: !this.config.apiKey,
+      dustMockMode: !this.config.dustApiKey,
       cacheSize: {
         weather: this.weatherCache.size,
         dust: this.dustCache.size,
@@ -578,9 +705,6 @@ class WeatherService extends BaseService {
     };
   }
 
-  /**
-   * 🧹 서비스 정리
-   */
   async cleanup() {
     this.weatherCache.clear();
     this.dustCache.clear();
