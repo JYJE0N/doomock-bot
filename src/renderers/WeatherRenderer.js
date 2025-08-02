@@ -469,8 +469,10 @@ ${city.name} 날씨가 자동으로 표시됩니다 🎯`;
   /**
    * ❌ 에러 렌더링
    */
+  // ✅ 이렇게 변경
   async renderError(data, ctx) {
-    const { message } = data;
+    const safeData = data || {};
+    const { message } = safeData;
 
     const text = `❌ **날씨 서비스 오류**
 

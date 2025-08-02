@@ -78,7 +78,6 @@ class WeatherModule extends BaseModule {
       // 기본 액션
       menu: this.showMenu,
       main: this.showMenu,
-
       // 날씨 조회
       city: this.showCityWeather,
       cities: this.showCityList,
@@ -150,7 +149,7 @@ class WeatherModule extends BaseModule {
   /**
    * 🏠 메인 메뉴 데이터 반환
    */
-  async showMenu(bot, callbackQuery, params, moduleManager) {
+  async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
     const userName = getUserName(from);
@@ -183,7 +182,7 @@ class WeatherModule extends BaseModule {
   /**
    * 🏙️ 도시 목록 표시
    */
-  async showCityList(bot, callbackQuery, params, moduleManager) {
+  async showCityList(bot, callbackQuery, subAction, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
@@ -259,7 +258,13 @@ class WeatherModule extends BaseModule {
   /**
    * 🌤️ 현재 날씨 표시 (기본 도시)
    */
-  async showCurrentWeather(bot, callbackQuery, params, moduleManager) {
+  async showCurrentWeather(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
 
@@ -400,7 +405,7 @@ class WeatherModule extends BaseModule {
   /**
    * ❓ 도움말 표시
    */
-  async showHelp(bot, callbackQuery, params, moduleManager) {
+  async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
     return {
       type: "help",
       module: "weather",
