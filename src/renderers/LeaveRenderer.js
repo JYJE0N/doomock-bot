@@ -61,6 +61,8 @@ class LeaveRenderer extends BaseRenderer {
           return await this.renderUseSuccess(data, ctx);
         case "use_error": // ✅ 추가
           return await this.renderUseError(data, ctx);
+        case "joindate_prompt": // 👇 이 케이스를 추가합니다.
+          return await this.renderJoinDatePrompt(data, ctx);
         case "input_cancelled": // ✅ 추가
           return await this.renderInputCancelled(data, ctx);
         case "input_error": // ✅ 추가
@@ -579,6 +581,31 @@ ${
       return { success: true, type: "settings_success_rendered" };
     } catch (error) {
       logger.error("LeaveRenderer.renderSettingsSuccess 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * 💼 입사일 입력 프롬프트 렌더링
+   */
+  async renderJoinDatePrompt(data, ctx) {
+    try {
+      const text = `💼 **입사일 설정**
+
+${data.message}
+
+취소하려면 /cancel 을 입력해주세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [{ text: "❌ 취소", callback_data: "leave:settings" }],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "joindate_prompt_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderJoinDatePrompt 실패:", error);
       return await this.handleRenderError(ctx, error);
     }
   }

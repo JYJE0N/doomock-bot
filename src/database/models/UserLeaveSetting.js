@@ -91,9 +91,21 @@ userLeaveSettingSchema.virtual("workYears").get(function () {
   return years;
 });
 
+// 👇 이 부분을 수정합니다.
 userLeaveSettingSchema.virtual("yearlyBonus").get(function () {
   const workYears = this.workYears;
-  return workYears >= 2 ? Math.floor(workYears / 2) : 0;
+
+  // 3년차부터 2년마다 1일 가산 (최대 25일 한도)
+  // 예: 3년차(만 2년) -> 1일 추가, 5년차(만 4년) -> 2일 추가
+  if (workYears < 2) {
+    return 0;
+  }
+
+  // 2년마다 1일씩 가산되는 연차 수를 계산합니다.
+  const bonusDays = Math.floor((workYears - 1) / 2);
+
+  // 기본 연차(15일)와 합쳐 총 25일을 넘을 수 없습니다.
+  return Math.min(bonusDays, 10); // 기본 15일에 더해지므로 보너스는 최대 10일
 });
 
 userLeaveSettingSchema.virtual("finalTotalLeave").get(function () {

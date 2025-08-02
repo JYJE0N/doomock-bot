@@ -155,16 +155,13 @@ leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
           userId: userId.toString(),
           year: targetYear,
           isActive: true,
-          status: "approved",
         },
       },
       {
-        // 2. 월별 그룹을 만들면서, 'days'와 'amount' 필드를 모두 고려하여 합산합니다.
+        // 2. 월별 그룹을 만들면서, 'amount' 필드를 합산합니다.
         $group: {
-          _id: { $month: "$usedDate" },
-          // 👇 *** 바로 이 부분이 수정되었습니다! ***
-          // days 필드가 없으면 amount 필드를 사용하도록 하여 이전 데이터도 집계합니다.
-          totalDays: { $sum: { $ifNull: ["$days", "$amount"] } },
+          _id: { $month: "$date" }, // 👈 'usedDate' -> 'date'로 수정
+          totalDays: { $sum: "$amount" }, // 👈 '$days' -> '$amount'로 수정
           count: { $sum: 1 },
         },
       },

@@ -54,8 +54,10 @@ class LeaveModule extends BaseModule {
         half: 0.5,
         full: 1.0,
       },
+      // 👇 'WAITING_JOIN_DATE_INPUT' 상태를 추가합니다.
       INPUT_STATES: {
         WAITING_CUSTOM_AMOUNT: "waiting_custom_amount",
+        WAITING_JOIN_DATE_INPUT: "waiting_join_date_input",
       },
       SETTINGS_ACTIONS: {
         ADD: "add",
@@ -379,7 +381,7 @@ class LeaveModule extends BaseModule {
   // ===== 🎯 4. 텍스트 메시지 처리 =====
 
   /**
-   * 📝 일반 메시지 처리 (직접 입력 처리)
+   * 📝 일반 메시지 처리 (직접 상태에 따라 분기)
    */
   async onHandleMessage(bot, msg) {
     try {
@@ -754,14 +756,27 @@ class LeaveModule extends BaseModule {
           break;
 
         case this.constants.SETTINGS_ACTIONS.JOIN_DATE:
-          // 입사일 설정 안내 (실제 설정은 텍스트 입력 필요)
+          // 👇 입사일 입력을 기다리는 상태로 설정합니다.
+          this.userInputStates.set(userId, {
+            state: this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT,
+            timestamp: Date.now(),
+          });
+
+          // 1분 후 자동 정리
+          setTimeout(() => {
+            if (this.userInputStates.has(userId)) {
+              this.userInputStates.delete(userId);
+              logger.info(
+                `⏰ LeaveModule: 사용자 ${userId} 입사일 입력 대기 시간 초과`
+              );
+            }
+          }, this.config.inputTimeout);
+
           return {
-            type: "settings_info",
+            type: "joindate_prompt", // 렌더러가 프롬프트를 표시하도록 함
             module: "leave",
             data: {
-              action: "joindate_info",
-              message: "입사일 설정 기능은 추후 업데이트될 예정입니다.",
-              canModify: true,
+              message: "입사일을 'YYYY-MM-DD' 형식으로 입력해주세요.",
             },
           };
 
