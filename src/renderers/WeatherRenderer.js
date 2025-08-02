@@ -150,25 +150,13 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
   }
 
   /**
-   * 🌡️ 날씨 정보 렌더링 (에러 처리 강화)
+   * 🌡️ 날씨 정보 렌더링 (미세먼지 수정)
    */
   async renderWeather(data, ctx) {
     const { city, weather, dust, timestamp, hasError, errorMessage } = data;
 
     if (hasError) {
       return await this.renderWeatherError(data, ctx);
-    }
-
-    // 안전성 체크
-    if (!city || !weather) {
-      logger.error("날씨 렌더링 - 필수 데이터 누락:", {
-        city: !!city,
-        weather: !!weather,
-      });
-      return await this.renderError(
-        { message: "날씨 데이터가 올바르지 않습니다." },
-        ctx
-      );
     }
 
     // 메인 날씨 카드
@@ -191,50 +179,23 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
       text += `\n👁️ **가시거리**: ${weather.visibility}km`;
     }
 
-    // ✅ 미세먼지 정보 추가 (수정된 버전!)
-    if (dust && (dust.pm10 || dust.pm25 || dust.overall)) {
-      text += `\n\n🌬️ **미세먼지 정보**\n`;
-
-      // 전체 등급 표시
-      if (dust.overall && dust.overall.grade) {
-        const gradeEmoji = this.dustEmojis[dust.overall.grade] || "🟡";
-        text += `${gradeEmoji} **등급**: ${dust.overall.grade}`;
+    // 미세먼지 정보 추가 (수정됨!)
+    if (dust && dust.pm25 && dust.pm10) {
+      text += `\n\n🌬️ **미세먼지 정보**
+${this.dustEmojis[dust.overall?.grade] || "🟡"} **등급**: ${
+        dust.overall?.grade || "보통"
       }
-
-      // PM10 정보
-      if (dust.pm10) {
-        const pm10Value = dust.pm10.value || dust.pm10;
-        const pm10Grade = dust.pm10.grade || "";
-        text += `\n🔸 **PM10**: ${pm10Value}㎍/m³`;
-        if (pm10Grade && pm10Grade !== dust.overall?.grade) {
-          text += ` (${pm10Grade})`;
-        }
-      }
-
-      // PM2.5 정보
-      if (dust.pm25) {
-        const pm25Value = dust.pm25.value || dust.pm25;
-        const pm25Grade = dust.pm25.grade || "";
-        text += `\n🔹 **PM2.5**: ${pm25Value}㎍/m³`;
-        if (pm25Grade && pm25Grade !== dust.overall?.grade) {
-          text += ` (${pm25Grade})`;
-        }
-      }
-
-      // 측정소 정보 (있으면)
-      if (dust.stationName) {
-        text += `\n📍 **측정소**: ${dust.stationName}`;
-      }
-
-      // 행동요령 (있으면)
-      if (dust.advice) {
-        text += `\n💡 **행동요령**: ${dust.advice}`;
-      }
+🔸 **PM10**: ${dust.pm10.value || "-"}㎍/m³ (${dust.pm10.grade || "-"})
+🔹 **PM2.5**: ${dust.pm25.value || "-"}㎍/m³ (${dust.pm25.grade || "-"})`;
+    } else if (dust) {
+      // 미세먼지 데이터는 있지만 구조가 다른 경우
+      text += `\n\n🌬️ **미세먼지 정보**
+🟡 **등급**: ${dust.grade || "정보 없음"}`;
     }
 
     // 하단 정보
     text += `\n\n📍 **위치**: ${city.fullName || city.name}
-⏰ **업데이트**: ${timestamp || "알수없음"}`;
+⏰ **업데이트**: ${timestamp}`;
 
     if (weather.isOffline) {
       text += `\n⚠️ **오프라인 모드** (기본 데이터)`;

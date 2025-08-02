@@ -2,6 +2,7 @@
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const axios = require("axios");
 
 /**
  * 🌤️ WeatherService - 날씨 정보 API 서비스
@@ -158,6 +159,9 @@ class WeatherService extends BaseService {
   /**
    * 🌤️ 실제 날씨 예보 조회 (OpenWeatherMap 5일 예보)
    */
+  /**
+   * 🌤️ 실제 날씨 예보 조회 (진짜 구현!)
+   */
   async getForecast(location) {
     try {
       const cacheKey = `forecast_${location}`;
@@ -172,18 +176,20 @@ class WeatherService extends BaseService {
       if (!this.config.apiKey) {
         logger.warn("⚠️ API 키 없음 - Mock 예보 데이터 사용");
         const mockForecast = this.createMockForecastData(location);
-        mockForecast.isOffline = true; // Mock임을 명시
+        mockForecast.isOffline = true;
         mockForecast.source = "Mock (API 키 없음)";
         return this.createSuccessResponse(mockForecast, "Mock 예보 정보");
       }
 
       // 도시명 매핑
-      const mappedCity = this.cityMapping[location] || location;
+      const mappedCity = this.cityMapping[location] || `${location},KR`;
 
       logger.info(`🌐 실제 예보 API 호출: ${location} → ${mappedCity}`);
 
-      // OpenWeatherMap 5일 예보 API 호출
+      // axios 임포트 (WeatherService 상단에 추가 필요)
       const axios = require("axios");
+
+      // OpenWeatherMap 5일 예보 API 호출
       const response = await axios.get(`${this.config.baseUrl}/forecast`, {
         params: {
           q: mappedCity,
@@ -235,14 +241,14 @@ class WeatherService extends BaseService {
     try {
       const { list, city } = apiResponse;
 
-      // 5일 예보를 하루별로 그룹핑 (3시간 간격 데이터를 하루로 합치기)
+      // 5일 예보를 하루별로 그룹핑
       const dailyForecasts = this.groupForecastByDay(list);
 
       return {
         location: originalLocation,
         cityName: city?.name || originalLocation,
         country: city?.country || "KR",
-        forecast: dailyForecasts, // ← 여기가 중요! forecast 키로 통일
+        forecast: dailyForecasts, // ← 핵심! forecast 키 사용
         timestamp: TimeHelper.format(TimeHelper.now(), "full"),
         isOffline: false,
         source: "OpenWeatherMap 5-day forecast",
@@ -258,6 +264,9 @@ class WeatherService extends BaseService {
     }
   }
 
+  /**
+   * 📅 3시간 간격 데이터를 하루별로 그룹핑
+   */
   groupForecastByDay(forecastList) {
     const dailyData = new Map();
     const weekdays = ["일", "월", "화", "수", "목", "금", "토"];
@@ -278,7 +287,6 @@ class WeatherService extends BaseService {
           icons: [],
           humidity: [],
           rainProbability: 0,
-          rawData: [],
         });
       }
 
@@ -287,9 +295,8 @@ class WeatherService extends BaseService {
       dayData.conditions.push(item.weather[0].description);
       dayData.icons.push(item.weather[0].icon);
       dayData.humidity.push(item.main.humidity);
-      dayData.rawData.push(item);
 
-      // 강수확률 계산 (비/눈 관련 날씨 코드 확인)
+      // 강수확률 계산
       if (
         item.weather[0].main.includes("Rain") ||
         item.weather[0].main.includes("Snow") ||
@@ -334,7 +341,7 @@ class WeatherService extends BaseService {
   }
 
   /**
-   * 🎨 가장 빈번한 아이콘 선택
+   * 🎨 가장 빈번한 아이콘 선택 + Weather 모델 연동
    */
   getMostFrequentIcon(icons) {
     const counts = {};
