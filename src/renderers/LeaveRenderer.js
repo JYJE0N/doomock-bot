@@ -55,8 +55,16 @@ class LeaveRenderer extends BaseRenderer {
           return await this.renderMonthlyView(data, ctx);
         case "use_form":
           return await this.renderUseForm(data, ctx);
+        case "custom_input_prompt":
+          return await this.renderCustomInputPrompt(data, ctx);
         case "use_success":
           return await this.renderUseSuccess(data, ctx);
+        case "use_error": // ✅ 추가
+          return await this.renderUseError(data, ctx);
+        case "input_cancelled": // ✅ 추가
+          return await this.renderInputCancelled(data, ctx);
+        case "input_error": // ✅ 추가
+          return await this.renderInputError(data, ctx);
         case "settings":
           return await this.renderSettings(data, ctx);
         case "settings_success":
@@ -125,7 +133,8 @@ ${joinDate ? `💼 입사일: ${joinDate} (${workYears}년차)` : ""}
           ],
           [
             { text: "⚙️ 설정", callback_data: "leave:settings" },
-            { text: "🔙 메인으로", callback_data: "main:show" },
+            // ✅ 수정: "main:show" → "system:menu" (표준 준수!)
+            { text: "🔙 메인으로", callback_data: "system:menu" },
           ],
         ],
       };
@@ -135,6 +144,37 @@ ${joinDate ? `💼 입사일: ${joinDate} (${workYears}년차)` : ""}
     } catch (error) {
       logger.error("LeaveRenderer.renderMainMenu 실패:", error);
       return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * ❌ 에러 렌더링 (수정된 버전)
+   */
+  async renderError(data, ctx) {
+    try {
+      const { message = "알 수 없는 오류가 발생했습니다." } = data || {}; // ✅ data 검증 추가
+
+      const text = `❌ **오류 발생**
+
+${message}
+
+다시 시도해주세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 다시 시도", callback_data: "leave:menu" },
+            // ✅ 수정: "system:menu" → "system:menu" (표준 준수!)
+            { text: "🔙 메인으로", callback_data: "system:menu" },
+          ],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "error_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderError 실패:", error);
+      return { success: false, error: error.message };
     }
   }
 
@@ -227,13 +267,15 @@ ${joinDate ? `💼 입사일: ${joinDate} (${workYears}년차)` : ""}
    */
   async renderUseForm(data, ctx) {
     try {
-      const { remainingLeave = 0 } = data || {};
+      const { remainingLeave = 0, maxContinuousDays = 10 } = data || {};
 
       const text = `➕ **연차 사용하기**
 
 💰 **남은 연차: ${remainingLeave}일**
 
-어떤 연차를 사용하셨나요?`;
+어떤 방식으로 연차를 사용하시겠어요?
+
+📝 **직접 입력**: 최대 ${maxContinuousDays}일까지, 0.25일 단위로 입력 가능`;
 
       const keyboard = {
         inline_keyboard: [
@@ -241,7 +283,10 @@ ${joinDate ? `💼 입사일: ${joinDate} (${workYears}년차)` : ""}
             { text: "🕐 반반차 (0.25일)", callback_data: "leave:add:quarter" },
             { text: "🕒 반차 (0.5일)", callback_data: "leave:add:half" },
           ],
-          [{ text: "🕘 연차 (1일)", callback_data: "leave:add:full" }],
+          [
+            { text: "🕘 연차 (1일)", callback_data: "leave:add:full" },
+            { text: "✏️ 직접 입력", callback_data: "leave:custom" }, // ✅ 추가
+          ],
           [{ text: "❌ 취소", callback_data: "leave:menu" }],
         ],
       };
@@ -264,23 +309,33 @@ ${joinDate ? `💼 입사일: ${joinDate} (${workYears}년차)` : ""}
         amount = 1,
         remainingLeave = 0,
         date = TimeHelper.format(new Date(), "YYYY-MM-DD"),
+        leaveType = null, // ✅ 추가: 표시용 타입
       } = data;
 
       const typeIcon = this.getLeaveTypeIcon(type);
+      const displayType = leaveType || type;
+
+      // ✅ 메시지 개선: 양에 따라 다른 메시지
+      let congratsMessage;
+      if (amount >= 3) {
+        congratsMessage = "🌴 긴 휴가 즐겁게 보내세요!";
+      } else if (amount >= 1.5) {
+        congratsMessage = "🏖️ 여유로운 휴식 되세요!";
+      } else if (amount === 1) {
+        congratsMessage = "🌴 즐거운 휴가 되세요!";
+      } else if (amount === 0.5) {
+        congratsMessage = "☀️ 반나절 휴식 되세요!";
+      } else {
+        congratsMessage = "☕ 짧은 휴식 되세요!";
+      }
 
       const text = `✅ **연차 사용 완료!**
 
-${typeIcon} **${type} (${amount}일)** 사용했어요
+${typeIcon} **${displayType} (${amount}일)** 사용했어요
 📅 날짜: ${date}
 📊 남은 연차: ${remainingLeave}일
 
-${
-  amount === 1
-    ? "🌴 즐거운 휴가 되세요!"
-    : amount === 0.5
-    ? "☀️ 반나절 휴식 되세요!"
-    : "☕ 짧은 휴식 되세요!"
-}`;
+${congratsMessage}`;
 
       const keyboard = {
         inline_keyboard: [
@@ -296,6 +351,134 @@ ${
       return { success: true, type: "use_success_rendered" };
     } catch (error) {
       logger.error("LeaveRenderer.renderUseSuccess 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * ✏️ 직접 입력 프롬프트 렌더링 (새로 추가)
+   */
+  async renderCustomInputPrompt(data, ctx) {
+    try {
+      const {
+        remainingLeave = 0,
+        maxDays = 10,
+        examples = ["1.5", "2", "3", "2.5"],
+      } = data || {};
+
+      const text = `✏️ **연차 직접 입력**
+
+💰 **남은 연차: ${remainingLeave}일**
+
+📝 **사용할 연차량을 입력해주세요**
+
+**입력 규칙:**
+• 0.25일 단위로 입력 (0.25, 0.5, 0.75, 1, 1.25, ...)
+• 최대 ${maxDays}일까지 가능
+• 남은 연차를 초과할 수 없음
+
+**입력 예시:**
+${examples.map((ex) => `• \`${ex}\``).join("\n")}
+
+**취소하려면:** \`/cancel\` 또는 \`취소\` 입력`;
+
+      const keyboard = {
+        inline_keyboard: [[{ text: "❌ 취소", callback_data: "leave:use" }]],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "custom_input_prompt_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderCustomInputPrompt 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * ❌ 연차 사용 실패 렌더링
+   */
+  async renderUseError(data, ctx) {
+    try {
+      const { message = "연차 사용에 실패했습니다." } = data || {};
+
+      const text = `❌ **연차 사용 실패**
+
+${message}
+
+다시 시도해주세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🔄 다시 시도", callback_data: "leave:use" },
+            { text: "📊 현황 보기", callback_data: "leave:menu" },
+          ],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "use_error_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderUseError 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * 🚫 입력 취소 렌더링
+   */
+  async renderInputCancelled(data, ctx) {
+    try {
+      const { message = "연차 입력이 취소되었습니다." } = data || {};
+
+      const text = `🚫 **입력 취소**
+
+${message}
+
+다른 방법으로 연차를 사용하거나 메뉴로 돌아가세요.`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "➕ 연차 사용", callback_data: "leave:use" },
+            { text: "📊 현황 보기", callback_data: "leave:menu" },
+          ],
+        ],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "input_cancelled_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderInputCancelled 실패:", error);
+      return await this.handleRenderError(ctx, error);
+    }
+  }
+
+  /**
+   * ⚠️ 입력 오류 렌더링
+   */
+  async renderInputError(data, ctx) {
+    try {
+      const { message = "입력에 오류가 있습니다.", remainingLeave = 0 } =
+        data || {};
+
+      const text = `⚠️ **입력 오류**
+
+${message}
+
+💰 **남은 연차: ${remainingLeave}일**
+
+올바른 형식으로 다시 입력해주세요.
+**취소하려면:** \`/cancel\` 또는 \`취소\` 입력`;
+
+      const keyboard = {
+        inline_keyboard: [[{ text: "❌ 취소", callback_data: "leave:use" }]],
+      };
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      return { success: true, type: "input_error_rendered" };
+    } catch (error) {
+      logger.error("LeaveRenderer.renderInputError 실패:", error);
       return await this.handleRenderError(ctx, error);
     }
   }
@@ -417,7 +600,7 @@ ${message}
         inline_keyboard: [
           [
             { text: "🔄 다시 시도", callback_data: "leave:menu" },
-            { text: "🔙 메인으로", callback_data: "main:show" },
+            { text: "🔙 메인으로", callback_data: "system:menu" },
           ],
         ],
       };
@@ -437,6 +620,7 @@ ${message}
    */
   getLeaveTypeIcon(type) {
     const icons = {
+      // 기존 타입들
       연차: this.icons.full,
       반차: this.icons.half,
       반반차: this.icons.quarter,
@@ -446,7 +630,11 @@ ${message}
       1: this.icons.full,
       0.5: this.icons.half,
       0.25: this.icons.quarter,
+
+      // ✅ 추가: 직접 입력용 (양에 따라 다른 아이콘)
+      "직접 입력": "📝",
     };
+
     return icons[type] || this.icons.full;
   }
 

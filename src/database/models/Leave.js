@@ -213,14 +213,30 @@ leaveSchema.statics.addUsage = async function (
   userId,
   amount,
   date = null,
-  reason = ""
+  reason = "",
+  type = null // ✅ 추가: type 매개변수
 ) {
   const useDate = date ? new Date(date) : new Date();
+
+  // ✅ type이 전달되지 않으면 자동 계산
+  let leaveType = type;
+  if (!leaveType) {
+    if (amount === 0.25) {
+      leaveType = "반반차";
+    } else if (amount === 0.5) {
+      leaveType = "반차";
+    } else if (amount === 1) {
+      leaveType = "연차";
+    } else {
+      throw new Error(`잘못된 연차 사용량: ${amount}일`);
+    }
+  }
 
   const leave = new this({
     userId: String(userId),
     date: useDate,
     amount: amount,
+    type: leaveType, // ✅ 수정: type 필드 명시적 설정
     reason: reason,
   });
 

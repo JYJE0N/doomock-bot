@@ -1,10 +1,19 @@
-// src/modules/LeaveModule.js - 개인용 연차 관리 모듈
+// src/modules/LeaveModule.js - 완전히 표준화된 연차 관리 모듈
 const BaseModule = require("../core/BaseModule");
 const { getUserId, getUserName } = require("../utils/UserHelper");
 const logger = require("../utils/Logger");
 
 /**
- * 🏖️ LeaveModule - 개인용 연차 관리 모듈
+ * 🏖️ LeaveModule - 개인용 연차 관리 모듈 (완전 표준화)
+ *
+ * ✅ 표준 준수 사항:
+ * - BaseModule 상속 ✅
+ * - 표준 constructor: (moduleName, options = {}) ✅
+ * - 표준 매개변수: (bot, callbackQuery, subAction, params, moduleManager) ✅
+ * - registerActions 방식 (직접 actionMap 할당 금지) ✅
+ * - onInitialize/onHandleMessage 구현 ✅
+ * - 순수 데이터만 반환 (UI는 렌더러가 담당!) ✅
+ * - SoC 완전 준수 ✅
  *
  * 🎯 핵심 액션:
  * - menu: 메인 현황
@@ -12,44 +21,111 @@ const logger = require("../utils/Logger");
  * - use: 연차 사용 폼
  * - add: 연차 사용 처리 (quarter/half/full)
  * - settings: 설정 메뉴
- * - settings:add/remove: 연차 추가/삭제
- * - settings:joindate: 입사일 설정
  */
 class LeaveModule extends BaseModule {
-  constructor() {
-    super("leave");
+  constructor(moduleName, options = {}) {
+    super(moduleName, options);
+
+    // ✅ 추가: 사용자 입력 상태 관리
+    this.userInputStates = new Map();
+
+    // 서비스 인스턴스
+    this.leaveService = null;
+
+    // 모듈 설정 (환경변수 기반)
+    this.config = {
+      maxLeavePerDay: 1, // 하루 최대 연차
+      maxContinuousDays: parseInt(process.env.LEAVE_MAX_CONTINUOUS_DAYS) || 10, // 연속 휴가 최대일
+      allowedIncrements: [0.25, 0.5, 0.75, 1], // 허용되는 단위
+      inputTimeout: 60000, // 입력 대기 시간 (1분)
+      ...options.config,
+    };
+
+    // 모듈 상수
+    this.constants = {
+      LEAVE_TYPES: {
+        QUARTER: "quarter",
+        HALF: "half",
+        FULL: "full",
+        CUSTOM: "custom", // ✅ 추가
+      },
+      LEAVE_AMOUNTS: {
+        quarter: 0.25,
+        half: 0.5,
+        full: 1.0,
+      },
+      INPUT_STATES: {
+        WAITING_CUSTOM_AMOUNT: "waiting_custom_amount",
+      },
+      SETTINGS_ACTIONS: {
+        ADD: "add",
+        REMOVE: "remove",
+        JOIN_DATE: "joindate",
+      },
+    };
+    // ✅ 디버깅: 상수 확인
+    logger.debug(`🏖️ LeaveModule 생성됨 - 상수 확인:`, {
+      waitingState: this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
+      inputTimeout: this.config.inputTimeout,
+      maxDays: this.config.maxContinuousDays,
+    });
+
+    logger.info("🏖️ LeaveModule 생성됨 (직접 입력 기능 포함)");
   }
 
   /**
-   * 🎯 서비스 초기화
+   * 🎯 모듈 초기화 (표준 onInitialize 패턴)
    */
   async onInitialize() {
-    this.leaveService = await this.serviceBuilder.getOrCreate("leave");
-    logger.debug("🏖️ LeaveModule 초기화 완료");
+    try {
+      // ✅ ServiceBuilder 검증
+      if (!this.serviceBuilder) {
+        throw new Error("ServiceBuilder가 설정되지 않았습니다");
+      }
+
+      if (!this.serviceBuilder.isInitialized) {
+        throw new Error("ServiceBuilder가 초기화되지 않았습니다");
+      }
+
+      // ✅ LeaveService 가져오기
+      this.leaveService = await this.serviceBuilder.getOrCreate("leave");
+
+      if (!this.leaveService) {
+        throw new Error("LeaveService 생성에 실패했습니다");
+      }
+
+      logger.success("🏖️ LeaveModule 초기화 완료 - 표준 준수");
+    } catch (error) {
+      logger.error("❌ LeaveModule 초기화 실패:", error);
+      throw error;
+    }
   }
 
   /**
-   * 🎯 액션 매핑 설정
+   * 🎯 액션 등록 (표준 setupActions 패턴)
    */
   setupActions() {
-    this.actionMap = {
+    // ✅ registerActions 사용 (직접 actionMap 할당 금지!)
+    this.registerActions({
       // 기본 메뉴
-      menu: this.showMenu.bind(this),
-      monthly: this.showMonthlyView.bind(this),
+      menu: this.showMenu,
+      main: this.showMenu, // ✅ 추가: main 액션도 menu로 처리 (호환성)
+      monthly: this.showMonthlyView,
 
       // 연차 사용
-      use: this.showUseForm.bind(this),
-      add: this.handleUseLeave.bind(this),
+      use: this.showUseForm,
+      add: this.handleUseLeave,
+      custom: this.startCustomInput, // ✅ 추가: 직접 입력 시작
 
       // 설정
-      settings: this.showSettings.bind(this),
+      settings: this.showSettings,
+    });
 
-      // 설정 액션들 - settings:action:value 형태
-    };
+    logger.debug(`🏖️ LeaveModule 액션 등록 완료 (${this.actionMap.size}개)`);
   }
 
   /**
-   * 🏠 메인 메뉴 표시
+   * 🏠 메인 메뉴 표시 (표준 매개변수 5개)
    */
   async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     try {
@@ -79,7 +155,7 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * 📈 월별 현황 표시
+   * 📈 월별 현황 표시 (표준 매개변수 5개)
    */
   async showMonthlyView(bot, callbackQuery, subAction, params, moduleManager) {
     try {
@@ -104,7 +180,7 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * ➕ 연차 사용 폼 표시
+   * ➕ 연차 사용 폼 표시 (표준 매개변수 5개)
    */
   async showUseForm(bot, callbackQuery, subAction, params, moduleManager) {
     try {
@@ -122,6 +198,9 @@ class LeaveModule extends BaseModule {
         module: "leave",
         data: {
           remainingLeave: statusResult.data.remainingLeave,
+          availableTypes: Object.keys(this.constants.LEAVE_TYPES),
+          leaveAmounts: this.constants.LEAVE_AMOUNTS,
+          maxContinuousDays: this.config.maxContinuousDays, // ✅ 추가
         },
       };
     } catch (error) {
@@ -131,30 +210,33 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * 🎯 연차 사용 처리
+   * 🎯 연차 사용 처리 (표준 매개변수 5개)
    */
   async handleUseLeave(bot, callbackQuery, subAction, params, moduleManager) {
     try {
       const userId = getUserId(callbackQuery.from);
       const leaveType = params; // quarter, half, full
 
-      // 연차 타입별 사용량 매핑
-      const leaveAmounts = {
-        quarter: 0.25,
-        half: 0.5,
-        full: 1,
+      // ✅ 수정: 연차 타입별 정보 매핑 (type 포함)
+      const leaveInfo = {
+        quarter: { amount: 0.25, type: "반반차", displayName: "반반차" },
+        half: { amount: 0.5, type: "반차", displayName: "반차" },
+        full: { amount: 1, type: "연차", displayName: "연차" },
       };
 
-      const amount = leaveAmounts[leaveType];
-      if (!amount) {
-        return this.createErrorResult("잘못된 연차 타입입니다.");
+      const info = leaveInfo[leaveType];
+      if (!info) {
+        return this.createErrorResult(`잘못된 연차 타입입니다: ${leaveType}`);
       }
+
+      // ✅ 수정: reason에 타입 정보 포함
+      const reason = `${info.displayName} 사용`;
 
       // 연차 사용 처리
       const useResult = await this.leaveService.useLeave(
         userId,
-        amount,
-        "개인 사용"
+        info.amount,
+        reason
       );
 
       if (!useResult.success) {
@@ -164,7 +246,11 @@ class LeaveModule extends BaseModule {
       return {
         type: "use_success",
         module: "leave",
-        data: useResult.data,
+        data: {
+          ...useResult.data,
+          leaveType: info.displayName,
+          message: `${info.displayName}(${info.amount}일)이 사용되었습니다.`,
+        },
       };
     } catch (error) {
       logger.error("🎯 LeaveModule.handleUseLeave 실패:", error);
@@ -173,13 +259,23 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * ⚙️ 설정 메뉴 표시
+   * ⚙️ 설정 메뉴 표시 (표준 매개변수 5개)
    */
   async showSettings(bot, callbackQuery, subAction, params, moduleManager) {
     try {
       const userId = getUserId(callbackQuery.from);
 
-      // 사용자 설정 조회
+      // 설정 관련 액션 처리 (settings:action:value 형태)
+      if (params) {
+        return await this.handleSettingsAction(
+          bot,
+          callbackQuery,
+          params,
+          moduleManager
+        );
+      }
+
+      // 기본 설정 메뉴 조회
       const settingsResult = await this.leaveService.getUserSettings(userId);
 
       if (!settingsResult.success) {
@@ -189,7 +285,10 @@ class LeaveModule extends BaseModule {
       return {
         type: "settings",
         module: "leave",
-        data: settingsResult.data,
+        data: {
+          ...settingsResult.data,
+          availableActions: Object.values(this.constants.SETTINGS_ACTIONS),
+        },
       };
     } catch (error) {
       logger.error("⚙️ LeaveModule.showSettings 실패:", error);
@@ -197,38 +296,366 @@ class LeaveModule extends BaseModule {
     }
   }
 
+  // ===== 🎯 3. 직접 입력 시작 메서드 =====
+
   /**
-   * 🎯 콜백 처리 (설정 액션들)
+   * ✏️ 직접 입력 시작
    */
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+  async startCustomInput(bot, callbackQuery, subAction, params, moduleManager) {
     try {
-      // 기본 액션들 먼저 처리
-      if (this.actionMap[subAction]) {
-        return await this.actionMap[subAction](
-          bot,
-          callbackQuery,
-          subAction,
-          params,
-          moduleManager
+      const userId = getUserId(callbackQuery.from);
+
+      logger.info(`✏️ LeaveModule: 직접 입력 시작 - 사용자 ${userId}`);
+
+      // 현재 연차 현황 확인
+      const statusResult = await this.leaveService.getLeaveStatus(userId);
+      if (!statusResult.success) {
+        logger.error(
+          `❌ LeaveModule: 연차 현황 조회 실패 - ${statusResult.message}`
         );
+        return this.createErrorResult("연차 현황을 확인할 수 없습니다.");
       }
 
-      // 설정 관련 액션들 (settings:action:value 형태)
-      if (subAction === "settings") {
-        return await this.handleSettingsAction(
-          bot,
-          callbackQuery,
-          params,
-          moduleManager
-        );
-      }
+      const { remainingLeave } = statusResult.data;
+      logger.debug(
+        `✏️ LeaveModule: 연차 현황 확인 완료 - 잔여: ${remainingLeave}일`
+      );
 
-      // 매핑되지 않은 액션
-      logger.warn(`🏖️ 지원하지 않는 액션: ${subAction}`);
-      return this.createErrorResult(`지원하지 않는 기능입니다: ${subAction}`);
+      // ✅ 사용자 입력 상태 설정 (디버깅 로그 추가)
+      const inputState = {
+        state: this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
+        remainingLeave,
+        timestamp: Date.now(),
+      };
+
+      logger.info(`✏️ LeaveModule: 사용자 입력 상태 설정`, {
+        userId,
+        state: inputState.state,
+        remainingLeave: inputState.remainingLeave,
+        constantsCheck: this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
+      });
+
+      this.userInputStates.set(userId, inputState);
+
+      // ✅ 설정 확인 로그
+      const verifyState = this.userInputStates.get(userId);
+      logger.debug(`✏️ LeaveModule: 상태 설정 검증`, {
+        hasState: !!verifyState,
+        stateMatches:
+          verifyState?.state ===
+          this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
+        totalStates: this.userInputStates.size,
+        allUserIds: Array.from(this.userInputStates.keys()),
+      });
+
+      // 1분 후 자동 정리
+      setTimeout(() => {
+        if (this.userInputStates.has(userId)) {
+          this.userInputStates.delete(userId);
+          logger.info(
+            `⏰ LeaveModule: 사용자 ${userId} 입력 대기 시간 초과로 정리됨`
+          );
+        }
+      }, this.config.inputTimeout);
+
+      logger.info(`✅ LeaveModule: 직접 입력 준비 완료 - 사용자 ${userId}`);
+
+      return {
+        type: "custom_input_prompt",
+        module: "leave",
+        data: {
+          remainingLeave,
+          maxDays: this.config.maxContinuousDays,
+          allowedIncrements: this.config.allowedIncrements,
+          examples: ["1.5", "2", "3", "2.5"],
+        },
+      };
     } catch (error) {
-      logger.error("🎯 LeaveModule.handleCallback 실패:", error);
-      return this.createErrorResult("처리 중 오류가 발생했습니다.");
+      logger.error("❌ LeaveModule.startCustomInput 실패:", error);
+      return this.createErrorResult("직접 입력을 시작할 수 없습니다.");
+    }
+  }
+
+  // ===== 🎯 4. 텍스트 메시지 처리 =====
+
+  /**
+   * 📝 일반 메시지 처리 (직접 입력 처리)
+   */
+  async onHandleMessage(bot, msg) {
+    try {
+      const userId = getUserId(msg.from);
+      const inputText = msg.text?.trim();
+
+      // ✅ 추가: 디버깅 로그
+      logger.debug(`📝 LeaveModule.onHandleMessage 호출됨:`, {
+        userId,
+        inputText,
+        hasInputState: this.userInputStates.has(userId),
+        inputStatesSize: this.userInputStates.size,
+      });
+
+      const inputState = this.userInputStates.get(userId);
+
+      // 입력 대기 상태가 아니면 무시
+      if (
+        !inputState ||
+        inputState.state !== this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT
+      ) {
+        logger.debug(`📝 LeaveModule: 입력 대기 상태 아님`, {
+          hasState: !!inputState,
+          currentState: inputState?.state,
+          expectedState: this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
+        });
+        return false;
+      }
+
+      logger.info(`📝 LeaveModule: 연차 입력 처리 시작 - "${inputText}"`);
+
+      // 취소 명령 처리
+      if (inputText === "/cancel" || inputText === "취소") {
+        logger.info(`📝 LeaveModule: 입력 취소 처리`);
+        this.userInputStates.delete(userId);
+
+        const cancelResult = {
+          type: "input_cancelled",
+          module: "leave",
+          data: {
+            message: "연차 입력이 취소되었습니다.",
+            userId,
+          },
+        };
+
+        await this.sendResultToRenderer(cancelResult, bot, msg);
+        logger.info(`✅ LeaveModule: 취소 처리 완료`);
+        return true;
+      }
+
+      // 입력값 검증 및 처리
+      logger.debug(`📝 LeaveModule: 입력값 검증 시작 - "${inputText}"`);
+      const result = await this.processCustomLeaveInput(
+        userId,
+        inputText,
+        inputState
+      );
+
+      logger.debug(`📝 LeaveModule: 검증 결과:`, {
+        success: result.success,
+        amount: result.amount,
+        message: result.message,
+      });
+
+      if (result.success) {
+        logger.info(`📝 LeaveModule: 연차 사용 처리 시작 - ${result.amount}일`);
+
+        // 연차 사용 처리
+        const useResult = await this.leaveService.useLeave(
+          userId,
+          result.amount,
+          `직접 입력: ${result.amount}일 연차`
+        );
+
+        this.userInputStates.delete(userId);
+        logger.debug(`📝 LeaveModule: 입력 상태 정리됨`);
+
+        if (useResult.success) {
+          logger.info(`✅ LeaveModule: 연차 사용 성공 - ${result.amount}일`);
+
+          const successResult = {
+            type: "use_success",
+            module: "leave",
+            data: {
+              ...useResult.data,
+              amount: result.amount,
+              leaveType: `직접 입력 ${result.amount}일`,
+              message: `${result.amount}일 연차가 사용되었습니다.`,
+            },
+          };
+
+          await this.sendResultToRenderer(successResult, bot, msg);
+          logger.info(`✅ LeaveModule: 성공 메시지 전송 완료`);
+        } else {
+          logger.error(`❌ LeaveModule: 연차 사용 실패 - ${useResult.message}`);
+
+          const errorResult = {
+            type: "use_error",
+            module: "leave",
+            data: {
+              message: useResult.message,
+              canRetry: true,
+            },
+          };
+
+          await this.sendResultToRenderer(errorResult, bot, msg);
+          logger.info(`✅ LeaveModule: 에러 메시지 전송 완료`);
+        }
+      } else {
+        logger.warn(`⚠️ LeaveModule: 입력값 검증 실패 - ${result.message}`);
+
+        const inputErrorResult = {
+          type: "input_error",
+          module: "leave",
+          data: {
+            message: result.message,
+            remainingLeave: inputState.remainingLeave,
+            canRetry: true,
+          },
+        };
+
+        await this.sendResultToRenderer(inputErrorResult, bot, msg);
+        logger.info(`✅ LeaveModule: 검증 실패 메시지 전송 완료`);
+      }
+
+      logger.info(`✅ LeaveModule: 메시지 처리 완료 - true 반환`);
+      return true;
+    } catch (error) {
+      logger.error("❌ LeaveModule.onHandleMessage 실패:", error);
+
+      // 에러 시 입력 상태 정리
+      const userId = getUserId(msg.from);
+      this.userInputStates.delete(userId);
+      logger.debug(`🧹 LeaveModule: 에러로 인한 입력 상태 정리`);
+
+      const criticalErrorResult = {
+        type: "error",
+        module: "leave",
+        data: {
+          message: "처리 중 오류가 발생했습니다.",
+          canRetry: true,
+        },
+      };
+
+      try {
+        await this.sendResultToRenderer(criticalErrorResult, bot, msg);
+        logger.info(`✅ LeaveModule: 에러 메시지 전송 완료`);
+      } catch (renderError) {
+        logger.error("❌ LeaveModule: 에러 메시지 전송도 실패:", renderError);
+      }
+
+      return true; // ✅ 에러가 발생해도 true 반환 (처리했음을 표시)
+    }
+  }
+
+  /**
+   * 🎨 결과를 렌더러로 전달하는 헬퍼 메서드 (새로 추가)
+   */
+  async sendResultToRenderer(result, bot, msg) {
+    try {
+      logger.debug(`🎨 LeaveModule: sendResultToRenderer 시작`, {
+        resultType: result.type,
+        hasModuleManager: !!this.moduleManager,
+        hasNavigationHandler: !!this.moduleManager?.navigationHandler,
+        hasRenderers: !!this.moduleManager?.navigationHandler?.renderers,
+      });
+
+      // 1. NavigationHandler를 통해 렌더러 접근 시도
+      let renderer = null;
+
+      if (this.moduleManager?.navigationHandler?.renderers) {
+        renderer = this.moduleManager.navigationHandler.renderers.get("leave");
+        logger.debug(`🎨 LeaveModule: 렌더러 찾기 결과`, {
+          hasRenderer: !!renderer,
+          rendererCount: this.moduleManager.navigationHandler.renderers.size,
+          availableRenderers: Array.from(
+            this.moduleManager.navigationHandler.renderers.keys()
+          ),
+        });
+      }
+
+      if (renderer) {
+        // ctx 객체 생성 (일반 메시지용)
+        const ctx = {
+          chat: msg.chat,
+          message: msg,
+          bot: bot,
+          reply: (text, options) => bot.sendMessage(msg.chat.id, text, options),
+          replyWithMarkdown: (text, options) =>
+            bot.sendMessage(msg.chat.id, text, {
+              ...options,
+              parse_mode: "Markdown",
+            }),
+          editMessageText: (text, options) => {
+            return bot.sendMessage(msg.chat.id, text, options);
+          },
+        };
+
+        logger.info(
+          `🎨 LeaveModule: 렌더러를 통해 결과 전송 중 - ${result.type}`
+        );
+        await renderer.render(result, ctx);
+        logger.info(`✅ LeaveModule: 렌더러 전송 완료`);
+        return;
+      }
+
+      // 2. 렌더러가 없으면 직접 메시지 생성
+      logger.warn(
+        "⚠️ LeaveModule: LeaveRenderer를 찾을 수 없어서 직접 메시지 생성"
+      );
+      await this.sendDirectMessage(result, bot, msg);
+    } catch (renderError) {
+      logger.error("❌ LeaveModule: 렌더러 전달 실패:", renderError);
+      await this.sendFallbackMessage(result, bot, msg);
+    }
+  }
+
+  // ===== 🎯 5. 입력값 검증 및 처리 =====
+
+  /**
+   * 📊 사용자 입력 연차량 처리
+   */
+  async processCustomLeaveInput(userId, inputText, inputState) {
+    try {
+      // 숫자 추출 및 검증
+      const cleanInput = inputText.replace(/[^0-9.]/g, "");
+      const amount = parseFloat(cleanInput);
+
+      // 기본 검증
+      if (isNaN(amount) || amount <= 0) {
+        return {
+          success: false,
+          message: "올바른 숫자를 입력해주세요.\n예: 1, 1.5, 2, 2.5",
+        };
+      }
+
+      // 최대 연차량 체크
+      if (amount > this.config.maxContinuousDays) {
+        return {
+          success: false,
+          message: `최대 ${this.config.maxContinuousDays}일까지만 사용 가능합니다.`,
+        };
+      }
+
+      // 잔여 연차 체크
+      if (amount > inputState.remainingLeave) {
+        return {
+          success: false,
+          message: `잔여 연차가 부족합니다.\n요청: ${amount}일, 잔여: ${inputState.remainingLeave}일`,
+        };
+      }
+
+      // 0.25 단위 체크
+      const remainder = (amount * 4) % 1;
+      if (remainder !== 0) {
+        return {
+          success: false,
+          message:
+            "0.25일 단위로만 입력 가능합니다.\n예: 0.25, 0.5, 0.75, 1, 1.25, 1.5, ...",
+        };
+      }
+
+      // 소수점 둘째자리까지만 허용
+      const roundedAmount = Math.round(amount * 100) / 100;
+
+      return {
+        success: true,
+        amount: roundedAmount,
+        message: `${roundedAmount}일 연차 사용`,
+      };
+    } catch (error) {
+      logger.error("📊 processCustomLeaveInput 실패:", error);
+      return {
+        success: false,
+        message: "입력 처리 중 오류가 발생했습니다.",
+      };
     }
   }
 
@@ -243,24 +670,33 @@ class LeaveModule extends BaseModule {
       let result;
 
       switch (action) {
-        case "add":
+        case this.constants.SETTINGS_ACTIONS.ADD:
           // 연차 추가 (settings:add:1)
           const addAmount = parseInt(value) || 1;
-          result = await this.leaveService.addLeave(userId, addAmount);
+          result = await this.leaveService.addLeave(
+            userId,
+            addAmount,
+            "수동 추가"
+          );
           break;
 
-        case "remove":
+        case this.constants.SETTINGS_ACTIONS.REMOVE:
           // 연차 삭제 (settings:remove:1)
           const removeAmount = parseInt(value) || 1;
-          result = await this.leaveService.removeLeave(userId, removeAmount);
+          result = await this.leaveService.removeLeave(
+            userId,
+            removeAmount,
+            "수동 삭제"
+          );
           break;
 
-        case "joindate":
+        case this.constants.SETTINGS_ACTIONS.JOIN_DATE:
           // 입사일 설정 안내 (실제 설정은 텍스트 입력 필요)
           return {
-            type: "settings",
+            type: "settings_info",
             module: "leave",
             data: {
+              action: "joindate_info",
               message: "입사일 설정 기능은 추후 업데이트될 예정입니다.",
               canModify: true,
             },
@@ -270,14 +706,18 @@ class LeaveModule extends BaseModule {
           return this.createErrorResult(`지원하지 않는 설정 액션: ${action}`);
       }
 
-      if (!result.success) {
-        return this.createErrorResult(result.message);
+      if (!result || !result.success) {
+        return this.createErrorResult(result?.message || "설정 처리 실패");
       }
 
       return {
         type: "settings_success",
         module: "leave",
-        data: result.data,
+        data: {
+          ...result.data,
+          action,
+          value,
+        },
       };
     } catch (error) {
       logger.error("⚙️ LeaveModule.handleSettingsAction 실패:", error);
@@ -286,27 +726,73 @@ class LeaveModule extends BaseModule {
   }
 
   /**
-   * 📝 일반 메시지 처리 (입사일 설정 등)
+   * 📝 일반 메시지 처리 (표준 onHandleMessage 패턴)
    */
   async onHandleMessage(bot, msg) {
     // 향후 입사일 설정 등 텍스트 입력 처리용
-    return false; // 현재는 처리하지 않음
+    // 현재는 처리하지 않음
+    return false;
   }
 
   /**
-   * 📊 모듈 상태 조회
+   * 🛠️ 헬퍼 메서드들
+   */
+
+  /**
+   * 🛠️ 에러 결과 생성 (수정된 버전)
+   */
+  createErrorResult(message) {
+    return {
+      type: "error",
+      message,
+      module: "leave",
+      data: { message }, // ✅ 추가: data 객체에도 message 포함 (렌더러 에러 방지)
+    };
+  }
+  createErrorResult(message) {
+    return {
+      type: "error",
+      message,
+      module: "leave",
+    };
+  }
+
+  /**
+   * 📊 모듈 상태 조회 (표준 패턴)
    */
   getStatus() {
     return {
       ...super.getStatus(),
-      actions: Object.keys(this.actionMap),
       features: [
         "개인 연차 현황",
         "월별 사용량",
-        "연차 사용 기록",
+        "연차 사용 기록 (고정 + 직접 입력)", // ✅ 업데이트
         "연차 설정 관리",
+        "입사일 기반 보너스",
       ],
+      inputStates: {
+        activeUsers: this.userInputStates.size,
+        waitingInputs: Array.from(this.userInputStates.keys()),
+      },
+      constants: this.constants,
+      version: "2.1.0-custom-input",
     };
+  }
+
+  /**
+   * 🧹 모듈 정리 (표준 패턴)
+   */
+  async cleanup() {
+    try {
+      // 모든 사용자 입력 상태 정리
+      this.userInputStates.clear();
+
+      await super.cleanup();
+      this.leaveService = null;
+      logger.debug("🧹 LeaveModule 정리 완료 (입력 상태 포함)");
+    } catch (error) {
+      logger.error("❌ LeaveModule 정리 실패:", error);
+    }
   }
 }
 

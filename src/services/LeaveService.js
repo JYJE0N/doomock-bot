@@ -150,9 +150,30 @@ class LeaveService extends BaseService {
         );
       }
 
-      // 연차 사용 기록
+      // ✅ 수정: type 필드 미리 계산해서 전달
+      let leaveType;
+      if (amount === 0.25) {
+        leaveType = "반반차";
+      } else if (amount === 0.5) {
+        leaveType = "반차";
+      } else if (amount === 1) {
+        leaveType = "연차";
+      } else {
+        return this.createErrorResponse(
+          new Error("INVALID_AMOUNT"),
+          `잘못된 연차 사용량입니다: ${amount}일`
+        );
+      }
+
+      // 연차 사용 기록 (type 포함)
       const useDate = date ? new Date(date) : new Date();
-      const leave = await LeaveModel.addUsage(userId, amount, useDate, reason);
+      const leave = await LeaveModel.addUsage(
+        userId,
+        amount,
+        useDate,
+        reason,
+        leaveType
+      );
 
       // 업데이트된 현황 조회
       const updatedStatus = await this.getLeaveStatus(userId);
