@@ -453,8 +453,18 @@ class NavigationHandler {
               isUndefined: result === undefined,
             });
 
-            // 모듈이 메시지를 성공적으로 처리했다면(null이나 false가 아닌 값을 반환했다면)
-            if (result) {
+            // 모듈이 메시지를 성공적으로 처리했다면
+            if (result === true) {
+              // ✅ 수정: boolean true는 단순히 "처리됨"을 의미하므로 렌더링하지 않음
+              logger.info(
+                `✅ ${moduleName} 모듈이 메시지 처리함 (렌더링 불필요)`
+              );
+              logger.info(
+                `🏁 NavigationHandler: 메시지 처리 완료 (${moduleName}이 처리함)`
+              );
+              return;
+            } else if (result && typeof result === "object") {
+              // ✅ 수정: 객체 형태의 결과만 렌더링
               logger.info(`✅ ${moduleName} 모듈이 메시지 처리함`, {
                 resultType: result.type,
                 hasData: !!result.data,

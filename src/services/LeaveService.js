@@ -37,6 +37,9 @@ class LeaveService extends BaseService {
   /**
    * 📊 사용자 연차 현황 조회
    */
+  /**
+   * 📊 사용자 연차 현황 조회
+   */
   async getLeaveStatus(userId, year = null) {
     try {
       const currentYear = year || new Date().getFullYear();
@@ -49,10 +52,9 @@ class LeaveService extends BaseService {
         userId,
         currentYear
       );
-      const yearlyUsage = await LeaveModel.getUserYearlyUsage(
-        userId,
-        currentYear
-      );
+
+      // ✅ 수정: getUserYearlyUsage → getYearlyUsage
+      const yearlyUsage = await LeaveModel.getYearlyUsage(userId, currentYear);
 
       // 총 연차 계산 (기본 15 + 근속 보너스 + 수동 조정)
       const totalLeave = userSetting.calculateTotalLeave();
