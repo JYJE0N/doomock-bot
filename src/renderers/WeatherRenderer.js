@@ -307,7 +307,7 @@ ${weatherEmoji} ${day.description}
         if (day.humidity || day.rainProbability > 0) {
           text += `\n💧 ${day.humidity}%`;
           if (day.rainProbability > 0) {
-            text += ` | ☔ ${day.rainProbability}%`;
+            text += ` · ☔ ${day.rainProbability}%`;
           }
         }
 

@@ -77,6 +77,7 @@ class WeatherModule extends BaseModule {
     this.registerActions({
       // 기본 액션
       menu: this.showMenu,
+      main: this.showMenu,
 
       // 날씨 조회
       city: this.showCityWeather,
