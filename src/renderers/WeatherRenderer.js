@@ -1,18 +1,15 @@
-// src/renderers/WeatherRenderer.js - render 메서드 구현
+// ✅ src/renderers/WeatherRenderer.js (최종 수정본)
+
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
-/**
- * 🌤️ WeatherRenderer - 날씨 정보 렌더링 (표준 render 메서드 구현)
- */
 class WeatherRenderer extends BaseRenderer {
-  constructor(bot, navigationHandler) {
-    super(bot, navigationHandler);
-
+  constructor(bot, navigationHandler, markdownHelper) {
+    // ⛔️ super() 호출에 인자를 전달해야 합니다.
+    super(bot, navigationHandler, markdownHelper);
     this.moduleName = "weather";
 
-    // 날씨 이모지 매핑
     this.weatherEmojis = {
       맑음: "☀️",
       "구름 조금": "🌤️",
@@ -25,16 +22,7 @@ class WeatherRenderer extends BaseRenderer {
       안개: "🌫️",
       보통: "🌤️",
     };
-
-    // 미세먼지 등급 이모지
-    this.dustEmojis = {
-      좋음: "🟢",
-      보통: "🟡",
-      나쁨: "🟠",
-      매우나쁨: "🔴",
-    };
-
-    // 도시별 이모지
+    this.dustEmojis = { 좋음: "🟢", 보통: "🟡", 나쁨: "🟠", 매우나쁨: "🔴" };
     this.cityEmojis = {
       서울: "🏛️",
       수원: "🏰",
@@ -45,54 +33,39 @@ class WeatherRenderer extends BaseRenderer {
       광주: "🌻",
       제주: "🏝️",
     };
-
     logger.info("🌤️ WeatherRenderer 생성됨");
   }
 
   /**
-   * 🎯 표준 render 메서드 (current_weather 타입 추가)
+   * 🎯 메인 렌더링 메서드 (필수 구현)
    */
   async render(result, ctx) {
-    try {
-      if (!result || typeof result !== "object") {
-        logger.error("WeatherRenderer: 잘못된 결과 데이터", result);
-        return await this.renderError({ message: "잘못된 데이터입니다." }, ctx);
-      }
+    const { type, data } = result;
 
-      const { type, data } = result;
-
-      logger.debug(`🌤️ WeatherRenderer.render: ${type}`, data);
-
-      switch (type) {
-        case "menu":
-          return await this.renderMenu(data, ctx);
-        case "current":
-        case "current_weather": // ✅ 추가!
-        case "weather":
-          return await this.renderWeather(data, ctx);
-        case "cities":
-          return await this.renderCities(data, ctx);
-        case "forecast":
-          return await this.renderForecast(data, ctx);
-        case "settings":
-          return await this.renderSettings(data, ctx);
-        case "error":
-          return await this.renderError(data, ctx);
-        case "default_set": // ✅ 기본 도시 설정 성공
-          return await this.renderSettingSuccess(data, ctx);
-        default:
-          logger.warn(`🌤️ 지원하지 않는 렌더링 타입: ${type}`);
-          return await this.renderError(
-            { message: "지원하지 않는 기능입니다." },
-            ctx
-          );
-      }
-    } catch (error) {
-      logger.error("WeatherRenderer.render 오류:", error);
-      return await this.renderError(
-        { message: "렌더링 중 오류가 발생했습니다." },
-        ctx
-      );
+    switch (type) {
+      case "menu":
+        return await this.renderMenu(data, ctx);
+      case "cities":
+        return await this.renderCities(data, ctx);
+      case "weather":
+      case "current_weather":
+        return await this.renderWeather(data, ctx);
+      case "forecast":
+        return await this.renderForecast(data, ctx);
+      case "default_set":
+        return await this.renderSettingSuccess(data, ctx);
+      case "city_weather_direct":
+      case "default_weather_direct":
+        return await this.renderCityWeatherDirect(data, ctx);
+      case "help":
+        return await this.renderHelp(data, ctx);
+      case "error":
+        return await this.renderError(data, ctx);
+      default:
+        return await this.renderError(
+          { message: `지원하지 않는 기능 타입: ${type}` },
+          ctx
+        );
     }
   }
 
@@ -362,8 +335,8 @@ ${this.dustEmojis[dust.grade] || "🟡"} **등급**: ${dust.grade}
           day.icon || this.weatherEmojis[day.description] || "🌤️";
 
         text += `${dayEmoji} **${day.dayOfWeek}** (${day.date})
-${weatherEmoji} ${day.description}
-🌡️ ${day.tempMin}°C ~ ${day.tempMax}°C`;
+          ${weatherEmoji} ${day.description}
+          🌡️ ${day.tempMin}°C ~ ${day.tempMax}°C`;
 
         // 습도와 강수확률 표시 (있을 때만)
         if (day.humidity || day.rainProbability > 0) {
