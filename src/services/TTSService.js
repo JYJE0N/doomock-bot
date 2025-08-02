@@ -1,124 +1,124 @@
-// src/services/TTSService.js - logger 오류 수정
-const BaseService = require("./BaseService");
-const logger = require("../utils/Logger"); // ✅ 이 줄 추가!
-const TimeHelper = require("../utils/TimeHelper");
+// src/services/TTSService.js
+const BaseService = require("../core/BaseService");
+const logger = require("../utils/Logger");
+const textToSpeech = require("@google-cloud/text-to-speech");
+const TTSFileHelper = require("../utils/TTSFileHelper");
+const TTSVoiceConfig = require("../utils/TTSVoiceConfig");
 
-/**
- * 🔊 TTSService - 텍스트 음성 변환 서비스 (logger 수정)
- */
 class TTSService extends BaseService {
   constructor(options = {}) {
     super("TTSService", options);
 
-    this.config = {
-      provider: process.env.TTS_PROVIDER || "mock", // mock, google, openai
-      maxTextLength: 1000,
-      defaultLanguage: "ko-KR",
-      ...options.config,
-    };
+    this.client = new textToSpeech.TextToSpeechClient();
+    this.fileHelper = new TTSFileHelper();
+    this.voiceConfig = new TTSVoiceConfig();
 
-    logger.info("🔊 TTSService 생성됨"); // ✅ 이제 작동함
+    this.userVoices = new Map(); // 사용자별 음성 설정
   }
 
-  getRequiredModels() {
-    return ["TTSHistory"];
-  }
-
-  /**
-   * 🎯 서비스 초기화
-   */
   async onInitialize() {
-    // logger.success("✅ TTSService 초기화 완료");
+    await this.fileHelper.initialize();
+
+    // 주기적으로 오래된 파일 정리
+    setInterval(() => {
+      this.fileHelper
+        .cleanupOldFiles()
+        .catch((err) => logger.error("파일 정리 실패:", err));
+    }, 60 * 60 * 1000); // 1시간마다
+
+    logger.success("✅ TTSService 초기화 완료");
   }
 
-  /**
-   * 🎤 텍스트를 음성으로 변환
-   */
   async convertTextToSpeech(userId, options) {
-    const { text, language = "ko-KR", voice = "default" } = options;
+    const { text, language = "ko-KR" } = options;
 
     try {
-      logger.info(`🎤 TTS 변환 요청: ${userId} (${text.length}자)`);
+      // 사용자 음성 설정 가져오기
+      const voiceCode =
+        this.getUserVoice(userId) || this.voiceConfig.getDefaultVoice(language);
 
-      // Mock 구현 (실제로는 Google TTS API 등 사용)
-      const mockResult = {
-        audioFile: `/tmp/tts_${userId}_${Date.now()}.mp3`,
-        duration: Math.ceil(text.length / 10), // 대략적인 계산
-        fileSize: text.length * 50, // Mock 파일 크기
-        text: text,
-        voice: voice,
-        language: language,
+      const voice = this.voiceConfig.getVoiceByCode(voiceCode);
+
+      // Google TTS 요청
+      const request = {
+        input: { text },
+        voice: {
+          languageCode: language,
+          name: voiceCode,
+          ssmlGender: voice.gender === "male" ? "MALE" : "FEMALE",
+        },
+        audioConfig: {
+          audioEncoding: "MP3",
+          speakingRate: 1.0,
+          pitch: 0.0,
+        },
       };
 
-      return this.createSuccessResponse(mockResult, "TTS 변환 완료");
-    } catch (error) {
-      logger.error("TTS 변환 실패:", error);
-      return this.createErrorResponse(error, "TTS 변환 중 오류 발생");
-    }
-  }
+      const [response] = await this.client.synthesizeSpeech(request);
 
-  /**
-   * 📊 사용자 통계 조회
-   */
-  async getUserStats(userId) {
-    try {
-      // Mock 통계
-      const mockStats = {
-        totalConversions: Math.floor(Math.random() * 100),
-        totalDuration: Math.floor(Math.random() * 3600),
-        favoriteLanguage: "ko-KR",
-        lastUsed: TimeHelper.now(),
-      };
-
-      return this.createSuccessResponse(mockStats, "통계 조회 완료");
-    } catch (error) {
-      logger.error("통계 조회 실패:", error);
-      return this.createErrorResponse(error, "통계 조회 중 오류 발생");
-    }
-  }
-
-  /**
-   * 📋 사용자 히스토리 조회
-   */
-  async getUserHistory(userId, limit = 10) {
-    try {
-      // Mock 히스토리
-      const mockHistory = Array.from(
-        { length: Math.min(limit, 5) },
-        (_, i) => ({
-          id: `tts_${userId}_${i}`,
-          text: `변환된 텍스트 ${i + 1}`,
-          voice: "ko-KR-Wavenet-A",
-          duration: 30 + i * 10,
-          createdAt: new Date(Date.now() - i * 3600000),
-        })
+      // 파일 저장
+      const fileName = this.fileHelper.generateFileName(userId, text);
+      const filePaths = await this.fileHelper.saveAudioFile(
+        response.audioContent,
+        fileName
       );
 
-      return this.createSuccessResponse(mockHistory, "히스토리 조회 완료");
+      // 히스토리 저장
+      await this.saveHistory(userId, {
+        text,
+        language,
+        voice: voice.name,
+        voiceCode,
+        fileName,
+        shareUrl: filePaths.shareUrl,
+      });
+
+      return this.createSuccessResponse({
+        audioFile: filePaths.tempPath,
+        shareUrl: filePaths.shareUrl,
+        voice: voice.name,
+        duration: Math.ceil(text.length / 5), // 대략적인 계산
+      });
     } catch (error) {
-      logger.error("히스토리 조회 실패:", error);
-      return this.createErrorResponse(error, "히스토리 조회 중 오류 발생");
+      logger.error("TTS 변환 실패:", error);
+      return this.createErrorResponse(error);
     }
   }
 
-  /**
-   * 📊 서비스 상태 조회
-   */
-  getStatus() {
-    return {
-      ...super.getStatus(),
-      provider: this.config.provider,
-      maxTextLength: this.config.maxTextLength,
-      defaultLanguage: this.config.defaultLanguage,
-    };
+  getUserVoice(userId) {
+    return this.userVoices.get(userId);
   }
 
-  /**
-   * 🧹 서비스 정리
-   */
-  async cleanup() {
-    await super.cleanup();
-    logger.info("✅ TTSService 정리 완료");
+  async setUserVoice(userId, voiceCode) {
+    this.userVoices.set(userId, voiceCode);
+    return this.createSuccessResponse({ voiceCode });
+  }
+
+  async saveHistory(userId, data) {
+    try {
+      const TTSHistory = this.models.TTSHistory;
+      await TTSHistory.create({
+        userId,
+        ...data,
+        createdAt: new Date(),
+      });
+    } catch (error) {
+      logger.error("히스토리 저장 실패:", error);
+    }
+  }
+
+  async getUserStats(userId) {
+    try {
+      const TTSHistory = this.models.TTSHistory;
+      const count = await TTSHistory.countDocuments({ userId });
+
+      return this.createSuccessResponse({
+        totalConversions: count,
+        currentVoice: this.getUserVoice(userId),
+      });
+    } catch (error) {
+      return this.createErrorResponse(error);
+    }
   }
 }
 
