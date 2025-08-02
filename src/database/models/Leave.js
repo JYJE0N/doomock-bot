@@ -142,6 +142,64 @@ leaveSchema.statics.getYearlyUsage = async function (userId, year) {
 };
 
 /**
+ * 📊 월별 사용량 조회 (수정된 버전)
+ */
+leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
+  const targetYear = year || new Date().getFullYear();
+
+  try {
+    const monthlyStats = await this.aggregate([
+      {
+        // 1. 특정 사용자와 연도에 해당하는 데이터만 필터링합니다.
+        $match: {
+          userId: userId.toString(),
+          year: targetYear,
+          isActive: true,
+          status: "approved",
+        },
+      },
+      {
+        // 2. 월별 그룹을 만들면서, 'days'와 'amount' 필드를 모두 고려하여 합산합니다.
+        $group: {
+          _id: { $month: "$usedDate" },
+          // 👇 *** 바로 이 부분이 수정되었습니다! ***
+          // days 필드가 없으면 amount 필드를 사용하도록 하여 이전 데이터도 집계합니다.
+          totalDays: { $sum: { $ifNull: ["$days", "$amount"] } },
+          count: { $sum: 1 },
+        },
+      },
+      {
+        // 3. 월(1-12) 기준으로 오름차순 정렬합니다.
+        $sort: { _id: 1 },
+      },
+    ]);
+
+    // 4. 최종 결과를 1월부터 12월까지의 배열 형식으로 가공합니다.
+    const result = Array.from({ length: 12 }, (_, index) => ({
+      month: index + 1,
+      days: 0,
+      count: 0,
+    }));
+
+    monthlyStats.forEach((stat) => {
+      const monthIndex = stat._id - 1;
+      if (monthIndex >= 0 && monthIndex < 12) {
+        result[monthIndex] = {
+          month: stat._id,
+          days: stat.totalDays,
+          count: stat.count,
+        };
+      }
+    });
+
+    return result;
+  } catch (error) {
+    console.error("월별 사용량 조회 실패:", error);
+    throw error;
+  }
+};
+
+/**
  * ➕ 연차 사용 기록 추가
  */
 leaveSchema.statics.addUsage = async function (

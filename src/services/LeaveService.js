@@ -45,16 +45,16 @@ class LeaveService extends BaseService {
       const currentYear = year || new Date().getFullYear();
 
       // 사용자 설정 조회/생성
-      const LeaveModel = this.models.Leave;
-      const UserLeaveSettingModel = this.models.UserLeaveSetting;
+      const Leave = this.models.Leave;
+      const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const userSetting = await UserLeaveSettingModel.getOrCreate(
+      const userSetting = await UserLeaveSetting.getOrCreate(
         userId,
         currentYear
       );
 
       // ✅ 수정: getUserYearlyUsage → getYearlyUsage
-      const yearlyUsage = await LeaveModel.getYearlyUsage(userId, currentYear);
+      const yearlyUsage = await Leave.getYearlyUsage(userId, currentYear);
 
       // 총 연차 계산 (기본 15 + 근속 보너스 + 수동 조정)
       const totalLeave = userSetting.calculateTotalLeave();
@@ -96,10 +96,10 @@ class LeaveService extends BaseService {
   async getMonthlyUsage(userId, year = null) {
     try {
       const currentYear = year || new Date().getFullYear();
-      const LeaveModel = this.models.Leave;
+      const Leave = this.models.Leave;
 
       // ✅ 수정: Leave 모델에 getMonthlyUsage가 정적 메서드로 존재함
-      const monthlyData = await LeaveModel.getMonthlyUsage(userId, currentYear);
+      const monthlyData = await Leave.getMonthlyUsage(userId, currentYear);
       const currentMonth = new Date().getMonth() + 1;
 
       // 현재 연차 현황도 함께 반환
@@ -135,7 +135,7 @@ class LeaveService extends BaseService {
    */
   async useLeave(userId, amount, reason = "", date = null) {
     try {
-      const LeaveModel = this.models.Leave;
+      const Leave = this.models.Leave;
 
       // 잔여 연차 확인
       const statusResult = await this.getLeaveStatus(userId);
@@ -173,7 +173,7 @@ class LeaveService extends BaseService {
 
       // 연차 사용 기록
       const useDate = date ? new Date(date) : new Date();
-      const leave = await LeaveModel.addUsage(
+      const leave = await Leave.addUsage(
         userId,
         amount,
         useDate,
@@ -213,10 +213,10 @@ class LeaveService extends BaseService {
    */
   async getUserSettings(userId) {
     try {
-      const UserLeaveSettingModel = this.models.UserLeaveSetting;
+      const UserLeaveSetting = this.models.UserLeaveSetting;
       const currentYear = new Date().getFullYear();
 
-      const userSetting = await UserLeaveSettingModel.getOrCreate(
+      const userSetting = await UserLeaveSetting.getOrCreate(
         userId,
         currentYear
       );
@@ -252,9 +252,9 @@ class LeaveService extends BaseService {
    */
   async addLeave(userId, amount, reason = "수동 추가") {
     try {
-      const UserLeaveSettingModel = this.models.UserLeaveSetting;
+      const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const updatedSetting = await UserLeaveSettingModel.addLeave(
+      const updatedSetting = await UserLeaveSetting.addLeave(
         userId,
         amount,
         reason
@@ -285,9 +285,9 @@ class LeaveService extends BaseService {
    */
   async removeLeave(userId, amount, reason = "수동 삭제") {
     try {
-      const UserLeaveSettingModel = this.models.UserLeaveSetting;
+      const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const updatedSetting = await UserLeaveSettingModel.removeLeave(
+      const updatedSetting = await UserLeaveSetting.removeLeave(
         userId,
         amount,
         reason
@@ -318,9 +318,9 @@ class LeaveService extends BaseService {
    */
   async setJoinDate(userId, joinDate) {
     try {
-      const UserLeaveSettingModel = this.models.UserLeaveSetting;
+      const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const updatedSetting = await UserLeaveSettingModel.setJoinDate(
+      const updatedSetting = await UserLeaveSetting.setJoinDate(
         userId,
         joinDate
       );
@@ -353,10 +353,10 @@ class LeaveService extends BaseService {
    */
   async resetForNewYear(userId, newYear = null) {
     try {
-      const UserLeaveSettingModel = this.models.UserLeaveSetting;
+      const UserLeaveSetting = this.models.UserLeaveSetting;
       const targetYear = newYear || new Date().getFullYear();
 
-      const newSetting = await UserLeaveSettingModel.resetForNewYear(
+      const newSetting = await UserLeaveSetting.resetForNewYear(
         userId,
         targetYear
       );
