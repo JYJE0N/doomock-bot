@@ -19,8 +19,8 @@ const { getEnabledModules } = require("../config/ModuleRegistry");
  */
 class NavigationHandler {
   constructor(bot, moduleManager, errorHandler, markdownHelper) {
-    this.bot = null;
-    this.moduleManager = null;
+    this.bot = bot; // 👈 null로 덮어쓰는 대신, 전달받은 bot 객체를 바로 할당합니다.
+    this.moduleManager = moduleManager;
     this.renderers = new Map();
 
     // 직접 생성하는 대신, 주입받은 객체 사용
@@ -48,11 +48,11 @@ class NavigationHandler {
   /**
    * 🎯 초기화
    */
-  async initialize(bot) {
-    this.bot = bot;
+  async initialize() {
+    // this.bot = bot;
 
     // 전문 컴포넌트들 초기화
-    await this.errorHandler.initialize(bot);
+    await this.errorHandler.initialize(this.bot);
     await this.markdownHelper.initialize();
 
     this.registerRenderers();

@@ -1,20 +1,13 @@
-// src/utils/AnimationHelper.js - Bot 객체 호환성 수정 버전
+// 🔧 AnimationHelper.js - Bot 객체 검증 로직 수정
 
 const logger = require("./Logger");
 
 /**
  * 🎬 AnimationHelper - 애니메이션 효과 전용 유틸리티 (Bot 호환성 수정)
- *
- * ✅ 담당 기능:
- * - 셔플 애니메이션
- * - 로딩 애니메이션
- * - 진행률 표시
- * - 텍스트 애니메이션
- * - 카운트다운
  */
 class AnimationHelper {
   /**
-   * 🔧 Bot 객체 검증 및 정규화
+   * 🔧 Bot 객체 검증 및 정규화 (수정된 버전)
    */
   static validateAndNormalizeBot(bot) {
     try {
@@ -24,19 +17,29 @@ class AnimationHelper {
         return null;
       }
 
-      // 2. Telegraf bot 인스턴스 체크
+      logger.debug("AnimationHelper: Bot 객체 분석 시작", {
+        type: typeof bot,
+        hasBot: !!bot,
+        hasTelegram: !!bot.telegram,
+        botKeys: Object.keys(bot),
+        telegrafMethods: bot.telegram
+          ? Object.keys(bot.telegram).slice(0, 5)
+          : [],
+      });
+
+      // 2. Telegraf bot 인스턴스 체크 (일반적인 경우)
       if (bot.telegram && typeof bot.telegram.sendMessage === "function") {
-        logger.debug("AnimationHelper: Telegraf bot 감지됨");
+        logger.debug("AnimationHelper: ✅ 표준 Telegraf bot 감지됨");
         return bot;
       }
 
-      // 3. bot.bot 형태로 중첩된 경우 (ModuleManager에서 전달될 때)
+      // 3. bot.bot 형태로 중첩된 경우 체크
       if (
         bot.bot &&
         bot.bot.telegram &&
         typeof bot.bot.telegram.sendMessage === "function"
       ) {
-        logger.debug("AnimationHelper: 중첩된 bot 객체 감지됨");
+        logger.debug("AnimationHelper: ✅ 중첩된 bot 객체 감지됨");
         return bot.bot;
       }
 
@@ -45,15 +48,49 @@ class AnimationHelper {
         typeof bot.sendMessage === "function" &&
         typeof bot.editMessageText === "function"
       ) {
-        logger.debug("AnimationHelper: 직접 telegram 객체 감지됨");
+        logger.debug("AnimationHelper: ✅ 직접 telegram API 객체 감지됨");
         return { telegram: bot };
       }
 
-      logger.error("AnimationHelper: 지원하지 않는 bot 객체 구조:", {
+      // 5. ✅ 추가: BotController에서 전달되는 경우 체크
+      if (bot.bot && bot.bot.bot && bot.bot.bot.telegram) {
+        logger.debug("AnimationHelper: ✅ BotController 래핑된 bot 감지됨");
+        return bot.bot.bot;
+      }
+
+      // 6. ✅ 추가: ModuleManager를 통해 전달되는 경우
+      if (
+        bot.moduleManager &&
+        bot.moduleManager.bot &&
+        bot.moduleManager.bot.telegram
+      ) {
+        logger.debug("AnimationHelper: ✅ ModuleManager를 통한 bot 감지됨");
+        return bot.moduleManager.bot;
+      }
+
+      // 7. ✅ 추가: context 객체에서 bot 추출 시도
+      if (bot.botInfo && typeof bot.reply === "function") {
+        logger.debug(
+          "AnimationHelper: ✅ Telegraf context 객체에서 bot 추출 시도"
+        );
+        // context 객체인 경우, telegram API 직접 접근
+        return { telegram: bot.telegram };
+      }
+
+      // 8. ✅ 마지막 시도: 객체를 깊이 탐색해서 telegram API 찾기
+      const telegramApi = this.findTelegramApi(bot);
+      if (telegramApi) {
+        logger.debug("AnimationHelper: ✅ 깊이 탐색으로 telegram API 발견");
+        return { telegram: telegramApi };
+      }
+
+      // 모든 시도 실패
+      logger.error("AnimationHelper: ❌ 지원하지 않는 bot 객체 구조:", {
         hasBot: !!bot,
         hasTelegram: !!bot.telegram,
         type: typeof bot,
-        keys: bot ? Object.keys(bot) : [],
+        keys: bot ? Object.keys(bot).slice(0, 10) : [], // 처음 10개만
+        constructor: bot ? bot.constructor.name : null,
       });
 
       return null;
@@ -64,16 +101,56 @@ class AnimationHelper {
   }
 
   /**
-   * 🔀 셔플 애니메이션 (타로 카드용) - 안전한 버전
+   * 🔍 객체에서 Telegram API 깊이 탐색
+   */
+  static findTelegramApi(obj, depth = 0, maxDepth = 3) {
+    if (depth > maxDepth || !obj || typeof obj !== "object") {
+      return null;
+    }
+
+    // 현재 객체가 telegram API인지 확인
+    if (
+      typeof obj.sendMessage === "function" &&
+      typeof obj.editMessageText === "function"
+    ) {
+      return obj;
+    }
+
+    // 하위 프로퍼티들을 재귀적으로 탐색
+    for (const [key, value] of Object.entries(obj)) {
+      if (key === "telegram" && value && typeof value === "object") {
+        const found = this.findTelegramApi(value, depth + 1, maxDepth);
+        if (found) return found;
+      }
+
+      if (key === "bot" && value && typeof value === "object") {
+        const found = this.findTelegramApi(value, depth + 1, maxDepth);
+        if (found) return found;
+      }
+    }
+
+    return null;
+  }
+
+  /**
+   * 🔀 셔플 애니메이션 (타로 카드용) - 강화된 안전 버전
    */
   static async performShuffle(bot, chatId, messageId = null) {
     try {
+      logger.debug("🎬 performShuffle 시작", {
+        hasBotParam: !!bot,
+        chatId,
+        messageId,
+      });
+
       const validBot = this.validateAndNormalizeBot(bot);
       if (!validBot) {
         logger.warn(
           "AnimationHelper.performShuffle: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
         );
-        return null;
+
+        // ✅ 수정: null 대신 더미 메시지 ID 반환으로 오류 방지
+        return "animation_skipped";
       }
 
       const shuffleFrames = [
@@ -84,6 +161,8 @@ class AnimationHelper {
         "✨ 카드 셔플 완료\\! 결과를 확인하세요\\.",
       ];
 
+      logger.debug("🎬 프레임 애니메이션 시작");
+
       return await this.playFrameAnimation(validBot, chatId, shuffleFrames, {
         messageId,
         frameDelay: 600,
@@ -91,12 +170,107 @@ class AnimationHelper {
       });
     } catch (error) {
       logger.error("AnimationHelper.performShuffle 오류:", error);
+
+      // ✅ 오류 시에도 더미 값 반환
+      return "animation_error";
+    }
+  }
+
+  /**
+   * 🎬 프레임 애니메이션 재생 (안전한 버전)
+   */
+  static async playFrameAnimation(bot, chatId, frames, options = {}) {
+    try {
+      const {
+        messageId = null,
+        frameDelay = 500,
+        parseMode = "MarkdownV2",
+        finalFrame = null,
+      } = options;
+
+      let currentMessageId = messageId;
+
+      for (let i = 0; i < frames.length; i++) {
+        const frame = frames[i];
+        const isLastFrame = i === frames.length - 1;
+
+        try {
+          if (currentMessageId) {
+            // 기존 메시지 수정
+            await bot.telegram.editMessageText(
+              chatId,
+              currentMessageId,
+              undefined,
+              frame,
+              { parse_mode: parseMode }
+            );
+          } else {
+            // 새 메시지 전송
+            const sentMessage = await bot.telegram.sendMessage(chatId, frame, {
+              parse_mode: parseMode,
+            });
+            currentMessageId = sentMessage.message_id;
+          }
+
+          // 마지막 프레임이 아니면 지연
+          if (!isLastFrame) {
+            await this.delay(frameDelay);
+          }
+        } catch (frameError) {
+          logger.warn(`프레임 ${i + 1} 처리 중 오류:`, frameError.message);
+
+          // 메시지 수정 실패 시 새 메시지로 전송 시도
+          if (frameError.message.includes("message is not modified")) {
+            continue; // 같은 내용이면 스킵
+          }
+
+          // 그 외 오류는 새 메시지로 전송 시도
+          try {
+            const sentMessage = await bot.telegram.sendMessage(chatId, frame, {
+              parse_mode: parseMode,
+            });
+            currentMessageId = sentMessage.message_id;
+          } catch (sendError) {
+            logger.error(
+              `프레임 ${i + 1} 새 메시지 전송도 실패:`,
+              sendError.message
+            );
+          }
+        }
+      }
+
+      // 최종 프레임이 있으면 표시
+      if (finalFrame && currentMessageId) {
+        await this.delay(frameDelay);
+        try {
+          await bot.telegram.editMessageText(
+            chatId,
+            currentMessageId,
+            undefined,
+            finalFrame,
+            { parse_mode: parseMode }
+          );
+        } catch (finalError) {
+          logger.warn("최종 프레임 표시 실패:", finalError.message);
+        }
+      }
+
+      return currentMessageId;
+    } catch (error) {
+      logger.error("AnimationHelper.playFrameAnimation 오류:", error);
       return null;
     }
   }
 
   /**
-   * ⏳ 로딩 애니메이션 (일반용) - 안전한 버전
+   * ⏱️ 지연 헬퍼
+   */
+  static delay(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  /**
+   * ⏳ 로딩 애니메이션 (안전한 버전)
    */
   static async performLoading(
     bot,
@@ -110,7 +284,7 @@ class AnimationHelper {
         logger.warn(
           "AnimationHelper.performLoading: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
         );
-        return null;
+        return "loading_skipped";
       }
 
       const loadingFrames = [
@@ -128,12 +302,12 @@ class AnimationHelper {
       });
     } catch (error) {
       logger.error("AnimationHelper.performLoading 오류:", error);
-      return null;
+      return "loading_error";
     }
   }
 
   /**
-   * 📊 진행률 애니메이션 - 안전한 버전
+   * 📊 진행률 애니메이션 (안전한 버전)
    */
   static async performProgress(
     bot,
@@ -148,7 +322,7 @@ class AnimationHelper {
         logger.warn(
           "AnimationHelper.performProgress: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
         );
-        return null;
+        return "progress_skipped";
       }
 
       const frames = [];
@@ -172,337 +346,9 @@ class AnimationHelper {
       });
     } catch (error) {
       logger.error("AnimationHelper.performProgress 오류:", error);
-      return null;
+      return "progress_error";
     }
-  }
-
-  /**
-   * ⏰ 카운트다운 애니메이션 - 안전한 버전
-   */
-  static async performCountdown(bot, chatId, seconds = 5, messageId = null) {
-    try {
-      const validBot = this.validateAndNormalizeBot(bot);
-      if (!validBot) {
-        logger.warn(
-          "AnimationHelper.performCountdown: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
-        );
-        return null;
-      }
-
-      const frames = [];
-
-      for (let i = seconds; i >= 0; i--) {
-        if (i > 0) {
-          frames.push(`⏰ *카운트다운*\n\n🔢 ${i}`);
-        } else {
-          frames.push(`🎉 *시작\\!*\n\n✨ 준비 완료`);
-        }
-      }
-
-      return await this.playFrameAnimation(validBot, chatId, frames, {
-        messageId,
-        frameDelay: 1000,
-        parseMode: "MarkdownV2",
-      });
-    } catch (error) {
-      logger.error("AnimationHelper.performCountdown 오류:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 💬 타이핑 애니메이션 (텍스트 순차 표시) - 안전한 버전
-   */
-  static async performTyping(bot, chatId, text, messageId = null) {
-    try {
-      const validBot = this.validateAndNormalizeBot(bot);
-      if (!validBot) {
-        logger.warn(
-          "AnimationHelper.performTyping: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
-        );
-        return null;
-      }
-
-      const words = text.split(" ");
-      const frames = [];
-
-      let currentText = "";
-      for (let i = 0; i < words.length; i++) {
-        currentText += (i > 0 ? " " : "") + words[i];
-        frames.push(currentText + (i < words.length - 1 ? "\\.\\.\\." : ""));
-      }
-
-      return await this.playFrameAnimation(validBot, chatId, frames, {
-        messageId,
-        frameDelay: 300,
-        parseMode: "MarkdownV2",
-      });
-    } catch (error) {
-      logger.error("AnimationHelper.performTyping 오류:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 🎲 주사위 굴리기 애니메이션 - 안전한 버전
-   */
-  static async performDiceRoll(bot, chatId, messageId = null) {
-    try {
-      const validBot = this.validateAndNormalizeBot(bot);
-      if (!validBot) {
-        logger.warn(
-          "AnimationHelper.performDiceRoll: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
-        );
-        return null;
-      }
-
-      const diceFrames = [
-        "🎲 주사위를 굴리는 중\\.\\.\\.",
-        "🎲 굴리는 중\\.\\.\\. ⚪",
-        "🎲 굴리는 중\\.\\.\\. ⚫",
-        "🎲 굴리는 중\\.\\.\\. ⚪",
-        "🎲 굴리는 중\\.\\.\\. ⚫",
-      ];
-
-      // 1-6 랜덤 결과
-      const result = Math.floor(Math.random() * 6) + 1;
-      const diceEmoji = ["1️⃣", "2️⃣", "3️⃣", "4️⃣", "5️⃣", "6️⃣"][result - 1];
-
-      diceFrames.push(`🎲 *결과*: ${diceEmoji} \\(${result}\\)`);
-
-      return await this.playFrameAnimation(validBot, chatId, diceFrames, {
-        messageId,
-        frameDelay: 400,
-        parseMode: "MarkdownV2",
-      });
-    } catch (error) {
-      logger.error("AnimationHelper.performDiceRoll 오류:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 🔄 재시도 애니메이션 - 안전한 버전
-   */
-  static async performRetry(bot, chatId, retryCount = 3, messageId = null) {
-    try {
-      const validBot = this.validateAndNormalizeBot(bot);
-      if (!validBot) {
-        logger.warn(
-          "AnimationHelper.performRetry: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
-        );
-        return null;
-      }
-
-      const frames = [];
-
-      for (let i = 1; i <= retryCount; i++) {
-        frames.push(`🔄 *재시도 중*\\.\\.\\.\n\n시도 횟수: ${i}/${retryCount}`);
-      }
-
-      frames.push("✅ *재시도 완료*\\!\n\n연결되었습니다\\.");
-
-      return await this.playFrameAnimation(validBot, chatId, frames, {
-        messageId,
-        frameDelay: 1000,
-        parseMode: "MarkdownV2",
-      });
-    } catch (error) {
-      logger.error("AnimationHelper.performRetry 오류:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 🎨 커스텀 애니메이션 (사용자 정의 프레임) - 안전한 버전
-   */
-  static async performCustomAnimation(bot, chatId, frames, options = {}) {
-    try {
-      const validBot = this.validateAndNormalizeBot(bot);
-      if (!validBot) {
-        logger.warn(
-          "AnimationHelper.performCustomAnimation: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
-        );
-        return null;
-      }
-
-      return await this.playFrameAnimation(validBot, chatId, frames, {
-        messageId: options.messageId || null,
-        frameDelay: options.frameDelay || 500,
-        parseMode: options.parseMode || "MarkdownV2",
-        ...options,
-      });
-    } catch (error) {
-      logger.error("AnimationHelper.performCustomAnimation 오류:", error);
-      return null;
-    }
-  }
-
-  /**
-   * 🎬 프레임 애니메이션 재생 (핵심 메서드) - 안전한 버전
-   */
-  static async playFrameAnimation(bot, chatId, frames, options = {}) {
-    const {
-      messageId = null,
-      frameDelay = 500,
-      parseMode = "MarkdownV2",
-      finalFrameDelay = null,
-    } = options;
-
-    let currentMessageId = messageId;
-
-    try {
-      // Bot 객체 재검증
-      if (!bot || !bot.telegram) {
-        throw new Error("유효하지 않은 bot 객체");
-      }
-
-      logger.debug(
-        `🎬 애니메이션 시작: ${frames.length}프레임, 채팅ID: ${chatId}`
-      );
-
-      for (let i = 0; i < frames.length; i++) {
-        const frame = frames[i];
-        const isLastFrame = i === frames.length - 1;
-
-        if (currentMessageId) {
-          // 기존 메시지 업데이트
-          await bot.telegram.editMessageText(
-            chatId,
-            currentMessageId,
-            undefined,
-            frame,
-            { parse_mode: parseMode }
-          );
-        } else {
-          // 새 메시지 전송 (첫 번째 프레임만)
-          if (i === 0) {
-            const message = await bot.telegram.sendMessage(chatId, frame, {
-              parse_mode: parseMode,
-            });
-            currentMessageId = message.message_id;
-          }
-        }
-
-        // 마지막 프레임이 아닌 경우에만 딜레이
-        if (!isLastFrame) {
-          const delay =
-            finalFrameDelay && isLastFrame ? finalFrameDelay : frameDelay;
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
-      }
-
-      logger.debug(`✅ 애니메이션 완료: 메시지ID ${currentMessageId}`);
-      return currentMessageId;
-    } catch (error) {
-      logger.error("애니메이션 재생 오류:", error);
-
-      // 오류 발생 시 최종 프레임만 표시 (안전한 폴백)
-      try {
-        const finalFrame = frames[frames.length - 1];
-        if (currentMessageId && bot && bot.telegram) {
-          await bot.telegram.editMessageText(
-            chatId,
-            currentMessageId,
-            undefined,
-            finalFrame,
-            { parse_mode: parseMode }
-          );
-        } else if (bot && bot.telegram) {
-          const message = await bot.telegram.sendMessage(chatId, finalFrame, {
-            parse_mode: parseMode,
-          });
-          currentMessageId = message.message_id;
-        }
-      } catch (fallbackError) {
-        logger.error("애니메이션 폴백 오류:", fallbackError);
-        // 완전 실패 시 null 반환
-        return null;
-      }
-
-      return currentMessageId;
-    }
-  }
-
-  /**
-   * ⏸️ 애니메이션 일시정지
-   */
-  static async pause(milliseconds) {
-    return new Promise((resolve) => setTimeout(resolve, milliseconds));
-  }
-
-  /**
-   * 🎯 애니메이션 프리셋
-   */
-  static getPresets() {
-    return {
-      // 빠른 애니메이션
-      fast: { frameDelay: 200 },
-
-      // 보통 속도
-      normal: { frameDelay: 500 },
-
-      // 느린 애니메이션
-      slow: { frameDelay: 1000 },
-
-      // 매우 느린 애니메이션
-      verySlow: { frameDelay: 2000 },
-
-      // 즉시 (애니메이션 없음)
-      instant: { frameDelay: 0 },
-    };
-  }
-
-  /**
-   * 🎭 테마별 애니메이션
-   */
-  static getThemes() {
-    return {
-      // 게임 테마
-      gaming: {
-        loading: ["🎮", "🕹️", "🎯", "🏆"],
-        success: ["🎉", "🏆", "✨", "🎊"],
-        error: ["💥", "😵", "🚫", "❌"],
-      },
-
-      // 업무 테마
-      business: {
-        loading: ["💼", "📊", "📈", "⚡"],
-        success: ["✅", "📋", "💯", "🎯"],
-        error: ["⚠️", "📛", "🚨", "❌"],
-      },
-
-      // 마법 테마
-      magic: {
-        loading: ["🔮", "✨", "🌟", "💫"],
-        success: ["🎭", "🌈", "⭐", "🎪"],
-        error: ["💀", "🌙", "⚡", "❌"],
-      },
-    };
-  }
-
-  /**
-   * 📊 애니메이션 통계
-   */
-  static getStats() {
-    return {
-      totalAnimations: this.animationCount || 0,
-      averageFrameDelay: 500,
-      supportedTypes: [
-        "shuffle",
-        "loading",
-        "progress",
-        "countdown",
-        "typing",
-        "dice",
-        "retry",
-        "custom",
-      ],
-    };
   }
 }
-
-// 애니메이션 카운터 (선택사항)
-AnimationHelper.animationCount = 0;
 
 module.exports = AnimationHelper;

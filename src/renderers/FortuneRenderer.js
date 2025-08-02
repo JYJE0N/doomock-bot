@@ -24,6 +24,8 @@ class FortuneRenderer extends BaseRenderer {
         return await this.renderDrawResult(data, ctx);
       case "celtic_result":
         return await this.renderCelticResult(data, ctx);
+      case "celtic_detail": // ✅ 추가
+        return await this.renderCelticDetail(data, ctx);
       case "question_prompt":
         return await this.renderQuestionPrompt(data, ctx);
       case "question_error":
@@ -535,25 +537,42 @@ ${data.message}
   }
 
   /**
-   * ❌ 에러 렌더링
+   * ❌ 에러 렌더링 (안전성 수정)
    */
   async renderError(data, ctx) {
-    const text = `❌ **오류 발생**
+    try {
+      // ✅ 수정: 안전한 데이터 접근
+      const errorMessage =
+        data && data.message ? data.message : "알 수 없는 오류가 발생했습니다.";
 
-${data.message}
+      const text = `❌ **오류 발생**
+
+${errorMessage}
 
 다시 시도해주세요.`;
 
-    const buttons = [
-      [
-        { text: "🔄 다시 시도", action: "menu" },
-        { text: "🔙 메인 메뉴", action: "menu" },
-      ],
-    ];
+      const buttons = [
+        [
+          { text: "🔄 다시 시도", action: "menu" },
+          { text: "🔙 메인 메뉴", action: "menu" },
+        ],
+      ];
 
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+      const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    } catch (error) {
+      // 에러 렌더링 중에도 오류가 발생할 경우를 대비한 최후 방어
+      logger.error("FortuneRenderer.renderError 중 오류:", error);
+
+      try {
+        await ctx.reply(
+          "❌ 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        );
+      } catch (replyError) {
+        logger.error("최후 에러 메시지 전송도 실패:", replyError);
+      }
+    }
   }
 
   // ===== 🛠️ 헬퍼 메서드들 =====
@@ -613,6 +632,114 @@ ${data.message}
 
     const cardKey = card.korean || card.name;
     return advice[cardKey] || "직감을 믿고 현명한 선택을 하세요.";
+  }
+
+  /**
+   * 🔮 캘틱 크로스 상세 해석 렌더링 (추가)
+   */
+  async renderCelticDetail(data, ctx) {
+    try {
+      const {
+        userName,
+        question,
+        cards,
+        detailedInterpretation,
+        overallMessage,
+        isDemo,
+        timestamp,
+      } = data;
+
+      let text = `📖 **캘틱 크로스 상세 해석**\n\n`;
+
+      if (isDemo) {
+        text += `🎭 **데모 모드**\n\n`;
+      }
+
+      text += `**질문**: "${question}"\n`;
+
+      if (timestamp) {
+        text += `**뽑은 시간**: ${new Date(timestamp).toLocaleString(
+          "ko-KR"
+        )}\n`;
+      }
+
+      text += `\n`;
+
+      // 10장 카드 상세 설명
+      if (cards && cards.length === 10) {
+        text += `🎴 **10장 카드 상세 분석**\n\n`;
+
+        // 첫 5장
+        text += `**🔵 핵심 스프레드 (1-5번)**\n`;
+        for (let i = 0; i < 5 && i < cards.length; i++) {
+          const card = cards[i];
+          const reversed = card.isReversed ? " 🔄" : "";
+          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${
+            card.korean
+          }${reversed}\n`;
+          text += `   ${card.positionDescription}\n`;
+
+          // 카드별 간단 해석
+          if (card.isReversed) {
+            text += `   💭 역방향으로 평상시와 다른 관점에서 접근해보세요.\n`;
+          } else {
+            text += `   💭 긍정적인 에너지와 변화의 신호입니다.\n`;
+          }
+          text += `\n`;
+        }
+
+        // 나머지 5장
+        text += `**🟡 주변 환경 스프레드 (6-10번)**\n`;
+        for (let i = 5; i < 10 && i < cards.length; i++) {
+          const card = cards[i];
+          const reversed = card.isReversed ? " 🔄" : "";
+          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${
+            card.korean
+          }${reversed}\n`;
+          text += `   ${card.positionDescription}\n\n`;
+        }
+      }
+
+      // 상세 해석
+      if (detailedInterpretation) {
+        text += `📋 **단계별 상세 해석**\n\n`;
+
+        Object.values(detailedInterpretation).forEach((section, index) => {
+          text += `**${index + 1}. ${section.title}**\n`;
+          text += `${section.content}\n\n`;
+        });
+      }
+
+      // 종합 메시지
+      if (overallMessage) {
+        text += `💫 **종합 메시지**\n`;
+        text += `${overallMessage}\n\n`;
+      }
+
+      text += `🎯 **조언**: 카드가 제시하는 방향을 참고하여 현명한 판단을 내리세요.`;
+
+      const buttons = [
+        [
+          { text: "🔮 새로운 질문", action: "draw", params: "celtic" },
+          { text: "🎴 간단 운세", action: "draw" },
+        ],
+        [
+          { text: "📊 통계", action: "stats" },
+          { text: "📋 기록", action: "history" },
+        ],
+        [{ text: "🔙 메뉴", action: "menu" }],
+      ];
+
+      const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    } catch (error) {
+      logger.error("FortuneRenderer.renderCelticDetail 오류:", error);
+      await this.renderError(
+        { message: "상세 해석 표시 중 오류가 발생했습니다." },
+        ctx
+      );
+    }
   }
 
   /**

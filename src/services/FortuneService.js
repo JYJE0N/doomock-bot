@@ -257,7 +257,7 @@ class FortuneService extends BaseService {
   }
 
   /**
-   * 🎴 실제 카드 뽑기 로직
+   * 🎴 실제 카드 뽑기 로직 (중복 방지)
    */
   performCardDraw(type) {
     try {
@@ -267,25 +267,28 @@ class FortuneService extends BaseService {
         cards: [],
       };
 
+      // ✅ 수정: 중복 방지를 위한 덱 복사 및 관리
+      const availableDeck = [...this.tarotDeck]; // 원본 덱 복사
+
       switch (type) {
         case "single":
-          result.cards = [this.drawSingleCard()];
+          result.cards = [this.drawSingleCardFromDeck(availableDeck)];
           break;
 
         case "triple":
-          result.cards = [
-            { ...this.drawSingleCard(), position: "past" },
-            { ...this.drawSingleCard(), position: "present" },
-            { ...this.drawSingleCard(), position: "future" },
-          ];
+          result.cards = this.drawMultipleCards(availableDeck, 3, [
+            "past",
+            "present",
+            "future",
+          ]);
           break;
 
         case "celtic":
-          result.cards = this.drawCelticCross();
+          result.cards = this.drawCelticCrossFromDeck(availableDeck);
           break;
 
         default:
-          result.cards = [this.drawSingleCard()];
+          result.cards = [this.drawSingleCardFromDeck(availableDeck)];
       }
 
       return result;
@@ -296,11 +299,23 @@ class FortuneService extends BaseService {
   }
 
   /**
-   * 🃏 단일 카드 뽑기
+   * 🃏 덱에서 단일 카드 뽑기 (중복 방지)
+   * @param {Array} deck - 사용 가능한 카드 덱 (이 배열에서 카드가 제거됨)
+   * @returns {Object} 뽑힌 카드
    */
-  drawSingleCard() {
-    const randomIndex = Math.floor(Math.random() * this.tarotDeck.length);
-    const card = { ...this.tarotDeck[randomIndex] };
+  drawSingleCardFromDeck(deck) {
+    if (deck.length === 0) {
+      throw new Error("덱에 카드가 남아있지 않습니다");
+    }
+
+    // 랜덤 인덱스 선택
+    const randomIndex = Math.floor(Math.random() * deck.length);
+
+    // 카드 추출 (원본 덱에서 제거)
+    const [selectedCard] = deck.splice(randomIndex, 1);
+
+    // 카드 복사 및 속성 추가
+    const card = { ...selectedCard };
 
     // 메이저 아르카나는 역방향 가능, 마이너는 정방향만
     if (card.arcana === "major") {
@@ -311,13 +326,57 @@ class FortuneService extends BaseService {
 
     card.drawnAt = new Date();
 
+    logger.debug(
+      `🎴 카드 뽑음: ${card.korean} (${card.name}), 덱 남은 개수: ${deck.length}`
+    );
+
     return card;
   }
 
   /**
-   * 🔮 캘틱 크로스 10카드 뽑기
+   * 🎴 여러 카드 뽑기 (중복 방지)
+   * @param {Array} deck - 사용 가능한 카드 덱
+   * @param {number} count - 뽑을 카드 수
+   * @param {Array} positions - 포지션 배열 (옵션)
+   * @returns {Array} 뽑힌 카드들
    */
-  drawCelticCross() {
+  drawMultipleCards(deck, count, positions = []) {
+    if (deck.length < count) {
+      throw new Error(
+        `덱에 카드가 부족합니다. 필요: ${count}장, 남은: ${deck.length}장`
+      );
+    }
+
+    const cards = [];
+
+    for (let i = 0; i < count; i++) {
+      const card = this.drawSingleCardFromDeck(deck);
+
+      // 포지션 정보 추가
+      if (positions[i]) {
+        card.position = positions[i];
+      }
+
+      cards.push(card);
+    }
+
+    logger.debug(`🎴 ${count}장 카드 뽑기 완료, 덱 남은 개수: ${deck.length}`);
+
+    return cards;
+  }
+
+  /**
+   * 🔮 캘틱 크로스 10카드 뽑기 (중복 방지)
+   * @param {Array} deck - 사용 가능한 카드 덱
+   * @returns {Array} 10장의 캘틱 크로스 카드
+   */
+  drawCelticCrossFromDeck(deck) {
+    if (deck.length < 10) {
+      throw new Error(
+        `캘틱 크로스에는 10장이 필요합니다. 덱 남은: ${deck.length}장`
+      );
+    }
+
     const positions = [
       {
         key: "present",
@@ -329,7 +388,11 @@ class FortuneService extends BaseService {
         name: "도전/장애물",
         description: "극복해야 할 문제나 도전",
       },
-      { key: "past", name: "원인/과거", description: "현재 상황의 근본 원인" },
+      {
+        key: "past",
+        name: "원인/과거",
+        description: "현재 상황의 근본 원인",
+      },
       {
         key: "future",
         name: "가능한 미래",
@@ -367,16 +430,79 @@ class FortuneService extends BaseService {
       },
     ];
 
-    return positions.map((position, index) => {
-      const card = this.drawSingleCard();
+    // 10장의 카드를 중복 없이 뽑기
+    const cards = [];
+
+    for (let i = 0; i < 10; i++) {
+      const card = this.drawSingleCardFromDeck(deck);
+      const position = positions[i];
+
+      // 포지션 정보 추가
+      card.position = position.key;
+      card.positionName = position.name;
+      card.positionDescription = position.description;
+      card.order = i + 1;
+
+      cards.push(card);
+    }
+
+    logger.info(
+      `🔮 캘틱 크로스 10카드 뽑기 완료 (모두 다른 카드), 덱 남은: ${deck.length}장`
+    );
+
+    // ✅ 중복 검증 로그
+    const cardIds = cards.map((card) => card.id);
+    const uniqueIds = new Set(cardIds);
+
+    if (cardIds.length !== uniqueIds.size) {
+      logger.error("❌ 캘틱 크로스에 중복 카드 발견!", {
+        총카드수: cardIds.length,
+        고유카드수: uniqueIds.size,
+        카드ID들: cardIds,
+      });
+    } else {
+      logger.success("✅ 캘틱 크로스 중복 없음 확인", {
+        카드ID들: cardIds,
+      });
+    }
+
+    return cards;
+  }
+
+  /**
+   * ✅ 추가: 덱 셔플 기능
+   * @returns {Object} 셔플 결과
+   */
+  async shuffleDeck(userId) {
+    try {
+      logger.info(`🔄 ${userId} 사용자의 덱 셔플 요청`);
+
+      // 실제로는 매번 새로운 덱을 생성하므로 항상 셔플된 상태
+      // 여기서는 사용자에게 피드백만 제공
+
+      const messages = [
+        "카드들이 우주의 에너지로 새롭게 섞였습니다! ✨",
+        "타로 덱이 완전히 리셋되어 새로운 기운을 담았습니다! 🔮",
+        "모든 카드가 원래 자리로 돌아가 새로운 메시지를 준비했습니다! 🎴",
+        "덱이 초기화되어 순수한 에너지로 가득 찼습니다! 💫",
+      ];
+
+      const randomMessage =
+        messages[Math.floor(Math.random() * messages.length)];
+
       return {
-        ...card,
-        position: position.key,
-        positionName: position.name,
-        positionDescription: position.description,
-        order: index + 1,
+        success: true,
+        message: randomMessage,
+        timestamp: new Date(),
       };
-    });
+    } catch (error) {
+      logger.error("❌ 덱 셔플 실패:", error);
+      return {
+        success: false,
+        message: "덱 셔플 중 오류가 발생했습니다.",
+        error: error.message,
+      };
+    }
   }
 
   /**
