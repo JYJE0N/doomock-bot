@@ -798,16 +798,10 @@ class LeaveModule extends BaseModule {
   createErrorResult(message) {
     return {
       type: "error",
-      message,
       module: "leave",
-      data: { message }, // ✅ 추가: data 객체에도 message 포함 (렌더러 에러 방지)
-    };
-  }
-  createErrorResult(message) {
-    return {
-      type: "error",
-      message,
-      module: "leave",
+      data: {
+        message: message || "알 수 없는 오류가 발생했습니다.",
+      }, // ✅ data 객체에 message 포함
     };
   }
 

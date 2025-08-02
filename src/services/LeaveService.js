@@ -98,6 +98,7 @@ class LeaveService extends BaseService {
       const currentYear = year || new Date().getFullYear();
       const LeaveModel = this.models.Leave;
 
+      // ✅ 수정: Leave 모델에 getMonthlyUsage가 정적 메서드로 존재함
       const monthlyData = await LeaveModel.getMonthlyUsage(userId, currentYear);
       const currentMonth = new Date().getMonth() + 1;
 
