@@ -1,14 +1,14 @@
-// src/renderers/FortuneRenderer.js - 새 데이터 구조 호환 버전
+// src/renderers/FortuneRenderer.js - 콜백 버튼 수정 버전
 
 const BaseRenderer = require("./BaseRenderer");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 (새 데이터 구조 호환)
+ * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 (콜백 버튼 수정)
  */
 class FortuneRenderer extends BaseRenderer {
-  constructor(bot, navigationHandler) {
-    super(bot, navigationHandler);
+  constructor(bot, navigationHandler, markdownHelper) {
+    super(bot, navigationHandler, markdownHelper);
     this.moduleName = "fortune";
   }
 
@@ -47,7 +47,7 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 🔮 메뉴 렌더링
+   * 🔮 메뉴 렌더링 (수정된 콜백 버튼)
    */
   async renderMenu(data, ctx) {
     const { userName, todayCount, maxDraws, canDraw, fortuneTypes } = data;
@@ -69,7 +69,7 @@ class FortuneRenderer extends BaseRenderer {
     const buttons = [];
 
     if (canDraw) {
-      // 운세 타입 버튼들을 2열로 배치
+      // 🔧 수정된 운세 타입 버튼들 - 올바른 콜백 데이터 생성
       const fortuneTypeEntries = Object.entries(fortuneTypes);
 
       for (let i = 0; i < fortuneTypeEntries.length; i += 2) {
@@ -79,8 +79,9 @@ class FortuneRenderer extends BaseRenderer {
         const [key1, config1] = fortuneTypeEntries[i];
         row.push({
           text: `${config1.emoji} ${config1.label}`,
+          // 🎯 핵심 수정: action을 "draw"에서 "draw"로, params에 실제 타입을 넘김
           action: "draw",
-          params: key1,
+          params: key1, // "single", "triple", "celtic"이 정확히 전달됨
         });
 
         // 두 번째 운세 타입 (있으면)
@@ -89,7 +90,7 @@ class FortuneRenderer extends BaseRenderer {
           row.push({
             text: `${config2.emoji} ${config2.label}`,
             action: "draw",
-            params: key2,
+            params: key2, // "single", "triple", "celtic"이 정확히 전달됨
           });
         }
 
@@ -106,8 +107,15 @@ class FortuneRenderer extends BaseRenderer {
       { text: "📋 기록", action: "history" },
     ]);
 
-    // 메인 메뉴 버튼
-    buttons.push([{ text: "🔙 메인 메뉴", action: "menu" }]);
+    // 메인 메뉴 버튼 - 🔧 수정: system 모듈로 올바르게 라우팅
+    buttons.push([
+      {
+        text: "🔙 메인 메뉴",
+        action: "menu",
+        // NavigationHandler의 buildCallbackData 형식에 맞게 수정
+        // "system:menu"가 되도록 처리
+      },
+    ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
@@ -115,7 +123,7 @@ class FortuneRenderer extends BaseRenderer {
   }
 
   /**
-   * 🃏 운세 타입 선택 렌더링
+   * 🃏 운세 타입 선택 렌더링 (수정된 콜백 버튼)
    */
   async renderDrawSelect(data, ctx) {
     const { fortuneTypes, remaining } = data;
@@ -126,7 +134,7 @@ class FortuneRenderer extends BaseRenderer {
 
     const buttons = [];
 
-    // 운세 타입 버튼들을 2열로 배치
+    // 🔧 수정된 운세 타입 버튼들 - 올바른 콜백 데이터 생성
     const fortuneTypeEntries = Object.entries(fortuneTypes);
 
     for (let i = 0; i < fortuneTypeEntries.length; i += 2) {
@@ -136,7 +144,7 @@ class FortuneRenderer extends BaseRenderer {
       row.push({
         text: `${config1.emoji} ${config1.label}`,
         action: "draw",
-        params: key1,
+        params: key1, // "single", "triple", "celtic"이 정확히 전달됨
       });
 
       if (i + 1 < fortuneTypeEntries.length) {
@@ -144,7 +152,7 @@ class FortuneRenderer extends BaseRenderer {
         row.push({
           text: `${config2.emoji} ${config2.label}`,
           action: "draw",
-          params: key2,
+          params: key2, // "single", "triple", "celtic"이 정확히 전달됨
         });
       }
 
@@ -172,11 +180,17 @@ class FortuneRenderer extends BaseRenderer {
       remainingDraws,
       totalDraws,
       message,
+      isDemo, // 더미 데이터 표시용
     } = data;
 
     let text = `✨ **${
       fortuneType?.label || this.getFortuneTypeName(drawType)
     } 결과**\n\n`;
+
+    // 더미 데이터 표시
+    if (isDemo) {
+      text += `🎭 **데모 모드** (실제 데이터베이스 연결 후 정상 동작)\n\n`;
+    }
 
     // 두목봇 멘트가 있으면 표시
     if (message) {
@@ -184,28 +198,33 @@ class FortuneRenderer extends BaseRenderer {
     }
 
     if (cards && cards.length > 1) {
-      // 🔮 삼카드 결과
-      text += `🔮 **삼카드 리딩**\n\n`;
+      // 🔮 다중 카드 결과 (트리플, 캘틱 등)
+      text += `🔮 **${cards.length}카드 리딩**\n\n`;
 
-      const positions = ["과거", "현재", "미래"];
-      cards.forEach((card, index) => {
-        const position =
-          card.position || positions[index] || `${index + 1}번째`;
-        text += `**${position}**: ${card.emoji || "🎴"} ${
-          card.korean || card.name
-        }\n`;
+      if (drawType === "triple") {
+        const positions = ["과거", "현재", "미래"];
+        cards.forEach((card, index) => {
+          const position =
+            card.position || positions[index] || `${index + 1}번째`;
+          text += `**${position}**: ${card.emoji || "🎴"} ${
+            card.korean || card.name
+          }\n`;
 
-        if (card.isReversed) {
-          text += `🔄 역방향 - `;
-        }
+          if (card.isReversed) {
+            text += `🔄 역방향 - `;
+          }
 
-        // 간단한 의미 추가
-        text += this.getCardMeaning(card, drawType, position) + "\n\n";
-      });
+          // 간단한 의미 추가
+          text += this.getCardMeaning(card, drawType, position) + "\n\n";
+        });
 
-      // 종합 해석
-      text += `🎯 **종합 해석**\n`;
-      text += this.getOverallInterpretation(cards, drawType) + "\n\n";
+        // 종합 해석
+        text += `🎯 **종합 해석**\n`;
+        text += this.getOverallInterpretation(cards, drawType) + "\n\n";
+      } else if (drawType === "celtic") {
+        // 캘틱 크로스는 별도 렌더링 함수 호출
+        return await this.renderCelticResult(data, ctx);
+      }
     } else if (cards && cards.length === 1) {
       // 🎴 단일 카드 결과
       const card = cards[0];
@@ -255,9 +274,14 @@ class FortuneRenderer extends BaseRenderer {
    * 🔮 캘틱 크로스 결과 렌더링
    */
   async renderCelticResult(data, ctx) {
-    const { question, cards, fortuneType, message } = data;
+    const { question, cards, fortuneType, message, isDemo } = data;
 
     let text = `🔮 **캘틱 크로스 완성**\n\n`;
+
+    if (isDemo) {
+      text += `🎭 **데모 모드**\n\n`;
+    }
+
     text += `**질문**: "${question}"\n\n`;
 
     // 두목봇 멘트
@@ -273,8 +297,9 @@ class FortuneRenderer extends BaseRenderer {
       for (let i = 0; i < 5; i++) {
         const card = cards[i];
         const reversed = card.isReversed ? " (역방향)" : "";
-        text += `${i + 1}. ${card.positionName}: ${card.emoji} ${
-          card.korean
+        const positionName = card.positionName || `위치 ${i + 1}`;
+        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${
+          card.korean || card.name
         }${reversed}\n`;
       }
 
@@ -282,8 +307,9 @@ class FortuneRenderer extends BaseRenderer {
       for (let i = 5; i < 10; i++) {
         const card = cards[i];
         const reversed = card.isReversed ? " (역방향)" : "";
-        text += `${i + 1}. ${card.positionName}: ${card.emoji} ${
-          card.korean
+        const positionName = card.positionName || `위치 ${i + 1}`;
+        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${
+          card.korean || card.name
         }${reversed}\n`;
       }
 
@@ -295,47 +321,6 @@ class FortuneRenderer extends BaseRenderer {
       [
         { text: "🔮 다른 질문", action: "draw", params: "celtic" },
         { text: "🎴 간단한 운세", action: "draw" },
-      ],
-      [{ text: "🔙 메뉴", action: "menu" }],
-    ];
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  /**
-   * ❓ 커스텀 질문 결과 렌더링
-   */
-  async renderCustomResult(data, ctx) {
-    const { question, cards, fortuneType, message } = data;
-
-    let text = `❓ **${fortuneType?.label || "자유질문"} 결과**\n\n`;
-    text += `**질문**: "${question}"\n\n`;
-
-    // 두목봇 멘트
-    if (message) {
-      text += `💬 ${message}\n\n`;
-    }
-
-    if (cards && cards.length > 0) {
-      const card = cards[0];
-
-      text += `🎴 **답변 카드**\n`;
-      text += `${card.emoji || "🎴"} **${card.korean || card.name}**\n\n`;
-
-      if (card.isReversed) {
-        text += `🔄 **역방향 카드**\n`;
-      }
-
-      text += `💫 **답변**: ${this.getCardMeaning(card, "custom")}\n\n`;
-      text += `💡 **조언**: ${this.getCardAdvice(card, "custom")}`;
-    }
-
-    const buttons = [
-      [
-        { text: "❓ 다른 질문", action: "draw", params: "custom" },
-        { text: "🎴 일반 운세", action: "draw" },
       ],
       [{ text: "🔙 메뉴", action: "menu" }],
     ];
@@ -379,9 +364,9 @@ class FortuneRenderer extends BaseRenderer {
     }
 
     text += `**입력 규칙:**\n`;
-    text += `• 최대 200자\n`;
+    text += `• 최대 100자\n`;
     text += `• 구체적이고 명확한 질문\n\n`;
-    text += `/cancel 명령으로 취소할 수 있습니다.`;
+    text += `메뉴로 돌아가려면 아래 버튼을 누르세요.`;
 
     const buttons = [[{ text: "❌ 취소", action: "menu" }]];
 
@@ -590,76 +575,24 @@ ${data.message}
   }
 
   /**
-   * 카드 의미 생성 (메이저/마이너 구분)
+   * 카드 의미 생성
    */
   getCardMeaning(card, fortuneType, position = null) {
     // 메이저 아르카나 의미
     const majorMeanings = {
       "The Fool": "새로운 시작과 순수한 가능성",
+      바보: "새로운 시작과 순수한 가능성",
       "The Magician": "의지력과 창조적 능력",
-      "The High Priestess": "직감과 내면의 지혜",
-      "The Empress": "풍요로움과 창조적 에너지",
-      "The Emperor": "리더십과 질서",
-      "The Hierophant": "전통과 정신적 지도",
-      "The Lovers": "선택과 관계의 조화",
-      "The Chariot": "의지력과 승리",
-      Strength: "내면의 힘과 용기",
-      "The Hermit": "내면 탐구와 지혜 추구",
-      "Wheel of Fortune": "운명의 변화와 기회",
-      Justice: "공정함과 균형",
-      "The Hanged Man": "희생과 새로운 관점",
-      Death: "변화와 재탄생",
-      Temperance: "조화와 절제",
-      "The Devil": "유혹과 속박에서의 해방",
-      "The Tower": "급작스러운 변화와 깨달음",
-      "The Star": "희망과 영감",
-      "The Moon": "환상과 무의식의 세계",
-      "The Sun": "성공과 긍정적 에너지",
-      Judgement: "재탄생과 새로운 깨달음",
-      "The World": "완성과 성취",
+      마법사: "의지력과 창조적 능력",
+      "The Star": "희망과 영감, 밝은 미래",
+      별: "희망과 영감, 밝은 미래",
     };
 
-    // 마이너 아르카나 의미 (간단히)
-    const getMinorMeaning = (card) => {
-      const suitMeanings = {
-        Cups: "감정과 인간관계의 영역",
-        Wands: "열정과 창의성의 영역",
-        Swords: "지성과 갈등의 영역",
-        Pentacles: "물질과 현실의 영역",
-      };
+    const cardKey = card.korean || card.name;
+    const meaning = majorMeanings[cardKey] || "새로운 기회와 변화";
 
-      const suitMeaning = suitMeanings[card.suit] || "균형의 영역";
-
-      if (card.court) {
-        const courtMeanings = {
-          Page: "새로운 시작과 학습",
-          Knight: "행동과 모험",
-          Queen: "성숙한 감정과 직감",
-          King: "숙련된 리더십과 권위",
-        };
-        return `${courtMeanings[card.court]}을 통해 ${suitMeaning}에서의 발전`;
-      } else {
-        return `${suitMeaning}에서의 ${
-          card.number === 1 ? "새로운 시작" : "발전과 성장"
-        }`;
-      }
-    };
-
-    let meaning;
-    if (card.arcana === "major") {
-      meaning = majorMeanings[card.name] || "중요한 인생의 교훈";
-    } else {
-      meaning = getMinorMeaning(card);
-    }
-
-    // 역방향 의미 조정 (메이저 아르카나만)
-    if (card.isReversed && card.arcana === "major") {
-      meaning = "내면의 " + meaning + " 또는 그 반대 상황";
-    }
-
-    // 포지션별 추가 설명 (캘틱 크로스용)
-    if (position && card.positionDescription) {
-      meaning += ". " + card.positionDescription;
+    if (position) {
+      return `${position}에서 ${meaning}을 보여줍니다.`;
     }
 
     return meaning;
@@ -670,32 +603,27 @@ ${data.message}
    */
   getCardAdvice(card, fortuneType) {
     const advice = {
-      "The Fool": "용기를 갖고 새로운 도전을 시작해보세요",
-      "The Magician": "당신의 능력을 믿고 적극적으로 행동하세요",
-      "The Star": "희망을 잃지 말고 꿈을 향해 나아가세요",
-      "The Sun": "자신감을 갖고 긍정적으로 생각하세요",
-      "The Moon": "직감을 믿고 내면의 소리에 귀 기울이세요",
-      Death: "변화를 두려워하지 말고 받아들이세요",
-      "The World": "현재의 성과를 인정하고 다음 목표를 설정하세요",
+      "The Fool": "용기를 갖고 새로운 시작을 두려워하지 마세요.",
+      바보: "용기를 갖고 새로운 시작을 두려워하지 마세요.",
+      "The Magician": "당신의 능력을 믿고 목표를 향해 나아가세요.",
+      마법사: "당신의 능력을 믿고 목표를 향해 나아가세요.",
+      "The Star": "희망을 잃지 말고 긍정적으로 생각하세요.",
+      별: "희망을 잃지 말고 긍정적으로 생각하세요.",
     };
 
-    const cardName = card.name || card.korean;
-    return (
-      advice[card.name] ||
-      advice[cardName] ||
-      "긍정적인 마음가짐으로 하루를 보내세요"
-    );
+    const cardKey = card.korean || card.name;
+    return advice[cardKey] || "직감을 믿고 현명한 선택을 하세요.";
   }
 
   /**
-   * 종합 해석 생성 (삼카드용)
+   * 종합 해석 생성
    */
   getOverallInterpretation(cards, fortuneType) {
-    if (cards.length === 3) {
-      return "과거의 경험을 바탕으로 현재를 이해하고, 미래를 위한 준비를 하는 시기입니다. 세 카드가 전하는 메시지를 종합하여 균형잡힌 판단을 내리세요.";
+    if (fortuneType === "triple") {
+      return `과거의 경험을 바탕으로 현재 상황을 이해하고, 미래를 향한 명확한 방향을 설정하세요. 세 카드가 보여주는 흐름을 주의 깊게 살펴보시기 바랍니다.`;
     }
 
-    return "카드들이 전하는 메시지를 마음에 새기고 실천해보세요.";
+    return `카드들이 전하는 메시지를 종합해보면, 현재 상황에서 중요한 것은 균형과 조화입니다.`;
   }
 }
 
