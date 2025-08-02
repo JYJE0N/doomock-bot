@@ -1,4 +1,4 @@
-// doomock_bot.js - v3.0.1 안정화 버전
+// doomock_bot.js - v4.0.1 안정화 버전
 require("dotenv").config();
 const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
@@ -97,7 +97,7 @@ class DooMockBot {
     this.stats.startAttempts++;
 
     try {
-      logger.celebration("🎊 DooMockBot v3.0.1 시작!");
+      logger.celebration("🎊 DooMockBot v4.0.1 시작!");
       logger.info(`🌍 환경: ${process.env.NODE_ENV || "development"}`);
       logger.info(
         `🚀 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No"}`

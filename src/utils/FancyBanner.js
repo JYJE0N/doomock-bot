@@ -47,7 +47,7 @@ class FancyBanner {
   /**
    * 🎨 메인 배너 표시
    */
-  async showMainBanner(version = "3.0.1") {
+  async showMainBanner(version = "4.0.1") {
     console.clear(); // 화면 클리어 (선택사항)
 
     console.log("\n"); // 상단 여백

@@ -130,7 +130,7 @@ class BotController {
       this.app.get("/", (req, res) => {
         res.json({
           name: "DoomockBot API",
-          version: "3.0.1",
+          version: "4.0.1",
           status: "running",
           timestamp: new Date().toISOString(),
         });

@@ -1,6 +1,6 @@
 {
   "name": "doomock-bot",
-  "version": "3.0.1",
+  "version": "4.0.1",
   "description": "두목봇 - 직장인을 위한 텔레그램 어시스턴트",
   "main": "doomock_bot.js",
   "scripts": {

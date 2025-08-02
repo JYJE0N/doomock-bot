@@ -1,10 +1,10 @@
-// src/utils/ValidationHelper.js - v3.0.1 수정된 중앙 검증 시스템
+// src/utils/ValidationHelper.js - v4.0.1 수정된 중앙 검증 시스템
 const logger = require("./Logger");
 
 const TimeHelper = require("./TimeHelper");
 
 /**
- * 🛡️ 중앙 검증 시스템 v3.0.1 (callbackData 스키마 추가)
+ * 🛡️ 중앙 검증 시스템 v4.0.1 (callbackData 스키마 추가)
  *
  * 🎯 핵심 개념:
  * - 모든 검증을 한곳에서 중앙 집중식 관리
@@ -58,7 +58,7 @@ class ValidationHelper {
     this.registerDefaultSchemas();
 
     logger.info(
-      "🛡️ ValidationHelper v3.0.1 초기화됨 (callbackData 스키마 포함)"
+      "🛡️ ValidationHelper v4.0.1 초기화됨 (callbackData 스키마 포함)"
     );
   }
 

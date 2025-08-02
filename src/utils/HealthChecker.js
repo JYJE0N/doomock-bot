@@ -1,9 +1,9 @@
-// src/utils/HealthChecker.js - v3.0.1 수정된 버전
+// src/utils/HealthChecker.js - v4.0.1 수정된 버전
 const TimeHelper = require("./TimeHelper");
 const logger = require("./Logger");
 
 /**
- * 🏥 HealthChecker v3.0.1 - 수정된 컴포넌트 등록 시스템
+ * 🏥 HealthChecker v4.0.1 - 수정된 컴포넌트 등록 시스템
  *
  * 🔧 주요 수정사항:
  * - 컴포넌트 등록을 function이 아닌 직접 참조로 변경
@@ -68,7 +68,7 @@ class HealthChecker {
     this.alertHistory = new Map();
     this.recoveryAttempts = new Map();
 
-    logger.info("🏥 HealthChecker v3.0.1 초기화됨 (수정된 등록 시스템)");
+    logger.info("🏥 HealthChecker v4.0.1 초기화됨 (수정된 등록 시스템)");
   }
 
   /**
@@ -185,7 +185,7 @@ class HealthChecker {
     }
 
     try {
-      logger.info("🏥 HealthChecker v3.0.1 시작...");
+      logger.info("🏥 HealthChecker v4.0.1 시작...");
 
       // 초기 상태 체크
       await this.performFullHealthCheck();
@@ -199,7 +199,7 @@ class HealthChecker {
       }
 
       this.isRunning = true;
-      logger.success("✅ HealthChecker v3.0.1 실행됨");
+      logger.success("✅ HealthChecker v4.0.1 실행됨");
     } catch (error) {
       logger.error("❌ HealthChecker 시작 실패:", error);
       throw error;

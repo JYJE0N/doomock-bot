@@ -4,8 +4,12 @@ const mongoose = require("mongoose");
 // TimerStats 스키마 생성
 const timerStatsSchema = new mongoose.Schema(
   {
-    // 식별자
-    // userId: { type: String, required: true },
+    // ✅ 수정: userId 필드 주석 해제!
+    userId: {
+      type: String,
+      required: true,
+      index: true,
+    },
     date: { type: String, required: true }, // YYYY-MM-DD 형식
 
     // 세션별 카운트
@@ -40,9 +44,8 @@ const timerStatsSchema = new mongoose.Schema(
   }
 );
 
-// ===== 인덱스 =====
-// 유니크 복합 인덱스
-// timerStatsSchema.index({ userId: 1, date: -1 }, { unique: true });
+// ✅ 수정: 유니크 복합 인덱스 주석 해제!
+timerStatsSchema.index({ userId: 1, date: -1 }, { unique: true });
 timerStatsSchema.index({ date: -1 });
 
 // ===== 정적 메서드 =====

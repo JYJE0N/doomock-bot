@@ -1,4 +1,4 @@
-// src/utils/CallbackResponseManager.js - 중앙 콜백 응답 관리자 v3.0.1
+// src/utils/CallbackResponseManager.js - 중앙 콜백 응답 관리자 v4.0.1
 const logger = require("./Logger");
 
 /**

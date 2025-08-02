@@ -1,8 +1,8 @@
-// src/utils/UserHelper.js - 새로운 간단명확한 사용자 헬퍼 v3.0.1
+// src/utils/UserHelper.js - 새로운 간단명확한 사용자 헬퍼 v4.0.1
 const logger = require("./Logger");
 
 /**
- * 👤 UserHelper v3.0.1 - 간단하고 명확한 사용자 정보 헬퍼
+ * 👤 UserHelper v4.0.1 - 간단하고 명확한 사용자 정보 헬퍼
  *
  * 🎯 핵심 원칙:
  * - 간단함이 최고 (Keep It Simple)
@@ -527,4 +527,4 @@ module.exports = {
 };
 
 // 로깅
-logger.info("👤 UserHelper v3.0.1 로드됨 (새로운 간단명확 구조)");
+logger.info("👤 UserHelper v4.0.1 로드됨 (새로운 간단명확 구조)");

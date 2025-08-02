@@ -1,5 +1,5 @@
 // ========================================
-// 🔧 src/config/ConfigManager.js v3.0.1
+// 🔧 src/config/ConfigManager.js v4.0.1
 // ========================================
 // LoggerEnhancer 알록달록 + Railway 환경변수 중앙 관리
 // ========================================
@@ -8,7 +8,7 @@ const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🔧 ConfigManager v3.0.1 - 알록달록 설정 관리자
+ * 🔧 ConfigManager v4.0.1 - 알록달록 설정 관리자
  *
  * ✨ 새로운 기능들:
  * - 🌈 LoggerEnhancer 알록달록 설정 표시
@@ -34,7 +34,7 @@ class ConfigManager {
 
     // 🌈 초기화 시작 로그
     console.log(
-      this.messageSystem.rainbow("🔧 ═══ ConfigManager v3.0.1 초기화 ═══")
+      this.messageSystem.rainbow("🔧 ═══ ConfigManager v4.0.1 초기화 ═══")
     );
     console.log(
       this.messageSystem.gradient(
@@ -105,7 +105,7 @@ class ConfigManager {
         timezone: "Asia/Seoul",
         rainbow: true, // 🌈 알록달록 모드!
         enhanced: true,
-        version: "3.0.1",
+        version: "4.0.1",
       },
 
       // 🤖 봇 설정
@@ -267,7 +267,7 @@ class ConfigManager {
   showConfigSummary() {
     console.log();
     console.log(
-      this.messageSystem.rainbow("🎯 ═══ DooMockBot v3.0.1 설정 요약 ═══")
+      this.messageSystem.rainbow("🎯 ═══ DooMockBot v4.0.1 설정 요약 ═══")
     );
 
     // 환경 정보 (알록달록!)
@@ -644,7 +644,7 @@ class ConfigManager {
       ...this.config,
       validation: this.validationResult,
       timestamp: TimeHelper.getLogTimeString(),
-      version: "3.0.1",
+      version: "4.0.1",
     };
   }
 

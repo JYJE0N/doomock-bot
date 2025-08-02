@@ -7,7 +7,7 @@
 const chalk = require("chalk");
 
 /**
- * 🎨 통합 메시지 시스템 v3.0.1
+ * 🎨 통합 메시지 시스템 v4.0.1
  *
  * 🌟 특징:
  * - 텔레그램 + 콘솔 동시 처리
@@ -18,7 +18,7 @@ const chalk = require("chalk");
  */
 class UnifiedMessageSystem {
   constructor() {
-    this.version = "3.0.1";
+    this.version = "4.0.1";
 
     // 🎨 MarkdownV2 이스케이프 문자들
     this.escapeChars = [
@@ -69,7 +69,7 @@ class UnifiedMessageSystem {
     };
 
     // ✅ 수정: this.rainbow 사용 (chalk.rainbow 대신)
-    console.log(this.rainbow("🎨 UnifiedMessageSystem v3.0.1 초기화 완료!"));
+    console.log(this.rainbow("🎨 UnifiedMessageSystem v4.0.1 초기화 완료!"));
   }
 
   // ===== 🌈 커스텀 rainbow 메서드 구현 =====
