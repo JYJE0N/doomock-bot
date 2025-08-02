@@ -406,42 +406,112 @@ class NavigationHandler {
    */
   async handleMessage(ctx) {
     try {
-      logger.debug("📨 텍스트 메시지 수신:", ctx.message?.text);
+      const messageText = ctx.message?.text;
+      logger.debug("📨 텍스트 메시지 수신:", messageText);
+
+      // ✅ 추가: ModuleManager와 모듈 상태 확인
+      if (!this.moduleManager) {
+        logger.error("❌ NavigationHandler: ModuleManager가 없습니다");
+        return;
+      }
+
+      const modules = this.moduleManager.modules;
+      if (!modules || modules.size === 0) {
+        logger.error("❌ NavigationHandler: 로드된 모듈이 없습니다");
+        return;
+      }
+
+      logger.debug("🔍 NavigationHandler: 모듈 순회 시작", {
+        totalModules: modules.size,
+        moduleNames: Array.from(modules.keys()),
+        messageText,
+      });
 
       // 등록된 모든 모듈을 순회합니다.
-      for (const module of this.moduleManager.modules.values()) {
+      for (const [moduleName, module] of modules.entries()) {
+        logger.debug(`🔄 NavigationHandler: ${moduleName} 모듈 확인 중`, {
+          hasOnHandleMessage: typeof module.onHandleMessage === "function",
+          moduleName: module.moduleName,
+          isInitialized: module.isInitialized,
+        });
+
         // 각 모듈에 메시지를 처리할 기능(onHandleMessage)이 있는지 확인합니다.
         if (typeof module.onHandleMessage === "function") {
-          const result = await module.onHandleMessage(this.bot, ctx.message);
+          logger.info(
+            `📞 NavigationHandler: ${moduleName} 모듈의 onHandleMessage 호출 중`
+          );
 
-          // 모듈이 메시지를 성공적으로 처리했다면(null이나 false가 아닌 값을 반환했다면)
-          if (result) {
-            logger.debug(`✅ ${module.moduleName} 모듈이 메시지 처리함`, {
-              resultType: result.type,
+          try {
+            const result = await module.onHandleMessage(this.bot, ctx.message);
+
+            logger.debug(`📞 NavigationHandler: ${moduleName} 모듈 응답`, {
+              result,
+              resultType: typeof result,
+              isTrue: result === true,
+              isFalse: result === false,
+              isNull: result === null,
+              isUndefined: result === undefined,
             });
 
-            // 해당 모듈의 렌더러를 찾아 결과를 화면에 표시합니다.
-            const renderer = this.renderers.get(
-              result.module || module.moduleName
-            );
-            if (renderer) {
-              await renderer.render(result, ctx);
-            } else {
-              logger.warn(
-                `📱 렌더러 없음: ${result.module || module.moduleName}`
+            // 모듈이 메시지를 성공적으로 처리했다면(null이나 false가 아닌 값을 반환했다면)
+            if (result) {
+              logger.info(`✅ ${moduleName} 모듈이 메시지 처리함`, {
+                resultType: result.type,
+                hasData: !!result.data,
+              });
+
+              // 해당 모듈의 렌더러를 찾아 결과를 화면에 표시합니다.
+              const renderer = this.renderers.get(
+                result.module || module.moduleName
               );
-              await this.errorHandler.handleMissingRenderer(
-                ctx,
-                result.module || module.moduleName,
-                result
+
+              if (renderer) {
+                logger.debug(
+                  `🎨 NavigationHandler: ${moduleName} 렌더러로 결과 전송`
+                );
+                await renderer.render(result, ctx);
+                logger.info(`✅ NavigationHandler: ${moduleName} 렌더링 완료`);
+              } else {
+                logger.warn(
+                  `📱 렌더러 없음: ${result.module || module.moduleName}`
+                );
+                await this.errorHandler.handleMissingRenderer(
+                  ctx,
+                  result.module || module.moduleName,
+                  result
+                );
+              }
+
+              // 메시지 처리를 완료했으므로 루프를 중단합니다.
+              logger.info(
+                `🏁 NavigationHandler: 메시지 처리 완료 (${moduleName}이 처리함)`
+              );
+              return;
+            } else {
+              logger.debug(
+                `⏭️ NavigationHandler: ${moduleName} 모듈이 메시지를 처리하지 않음 (${result})`
               );
             }
-            // 메시지 처리를 완료했으므로 루프를 중단합니다.
-            return;
+          } catch (moduleError) {
+            logger.error(
+              `❌ NavigationHandler: ${moduleName} 모듈에서 오류 발생:`,
+              moduleError
+            );
+            // 한 모듈에서 오류가 발생해도 다른 모듈들은 계속 시도
+            continue;
           }
+        } else {
+          logger.debug(
+            `⏭️ NavigationHandler: ${moduleName} 모듈에 onHandleMessage 없음`
+          );
         }
       }
+
+      logger.debug(
+        "🏁 NavigationHandler: 모든 모듈 순회 완료 - 아무도 메시지를 처리하지 않음"
+      );
     } catch (error) {
+      logger.error("❌ NavigationHandler: handleMessage 전체 오류:", error);
       // 🎯 ErrorHandler 위임
       await this.errorHandler.handleUnexpectedError(
         ctx,
