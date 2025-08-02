@@ -3,7 +3,7 @@ const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserId, getUserName } = require("../utils/UserHelper");
 const TTSStateHelper = require("../utils/TTSStateHelper");
-const TTSVoiceConfig = require("../utils/TTSVoiceConfig");
+const TTSVoiceConfig = require("../config/TTSVoiceConfig");
 
 class TTSModule extends BaseModule {
   constructor(moduleName, options = {}) {

@@ -1,9 +1,9 @@
 // src/services/TTSService.js
-const BaseService = require("../core/BaseService");
+const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const textToSpeech = require("@google-cloud/text-to-speech");
 const TTSFileHelper = require("../utils/TTSFileHelper");
-const TTSVoiceConfig = require("../utils/TTSVoiceConfig");
+const TTSVoiceConfig = require("../config/TTSVoiceConfig");
 
 class TTSService extends BaseService {
   constructor(options = {}) {
