@@ -157,12 +157,15 @@ class WeatherModule extends BaseModule {
     try {
       const defaultCity = this.getUserPreferredCity(userId);
 
+      // ✅ 로그 추가로 확인
+      logger.info(`🏠 날씨 메뉴 - 사용자: ${userId}, 기본도시: ${defaultCity}`);
+
       return {
         type: "menu",
         module: "weather",
         data: {
           userName,
-          defaultCity,
+          defaultCity, // ✅ 이미 있음
           majorCities: this.majorCities,
           config: this.config,
         },
@@ -180,21 +183,53 @@ class WeatherModule extends BaseModule {
    * 🏙️ 도시 목록 표시
    */
   async showCityList(bot, callbackQuery, params, moduleManager) {
+    const { from } = callbackQuery;
+    const userId = getUserId(from);
+
+    // ✅ 수정: 현재 사용자의 기본 도시 정보 추가
+    const defaultCity = this.getUserPreferredCity(userId); // ✅ 추가!
+
     return {
       type: "cities",
       module: "weather",
       data: {
         cities: this.majorCities,
         config: this.config,
+        defaultCity: defaultCity, // ✅ 추가된 부분!
       },
     };
   }
 
   /**
-   * 🌡️ 특정 도시 날씨 표시
+   * 🛠️ WeatherModule 전용 파라미터 파서
    */
-  async showCityWeather(bot, callbackQuery, params, moduleManager) {
-    const cityId = params[0];
+  parseParams(params) {
+    if (!params) return [];
+
+    if (typeof params === "string") {
+      // "suwon" 또는 "suwon:extra:data" → ["suwon", "extra", "data"]
+      return params.split(":").filter((p) => p.length > 0);
+    } else if (Array.isArray(params)) {
+      return params;
+    } else {
+      return [String(params)];
+    }
+  }
+
+  /**
+   * 🌡️ 특정 도시 날씨 표시 (안전한 파라미터 처리)
+   */
+  async showCityWeather(bot, callbackQuery, subAction, params, moduleManager) {
+    // ✅ WeatherModule 전용 파싱
+    const parsedParams = this.parseParams(params);
+    const cityId = parsedParams[0];
+
+    // ✅ 로그 추가
+    logger.info(
+      `🌡️ 도시 날씨 요청 - 원본 params: "${params}", 파싱된 params: [${parsedParams.join(
+        ","
+      )}], cityId: ${cityId}`
+    );
 
     if (!cityId) {
       return {
@@ -248,14 +283,25 @@ class WeatherModule extends BaseModule {
   /**
    * ⭐ 기본 도시 설정
    */
-  async setDefaultCity(bot, callbackQuery, params, moduleManager) {
+  async setDefaultCity(bot, callbackQuery, subAction, params, moduleManager) {
     const { from } = callbackQuery;
     const userId = getUserId(from);
-    const cityId = params[0];
+
+    // ✅ WeatherModule 전용 파싱
+    const parsedParams = this.parseParams(params);
+    const cityId = parsedParams[0];
+
+    // ✅ 로그 추가
+    logger.info(
+      `⭐ 기본 도시 설정 요청 - 사용자: ${userId}, 원본 params: "${params}", 파싱된 params: [${parsedParams.join(
+        ","
+      )}], cityId: ${cityId}`
+    );
 
     const city = this.majorCities.find((c) => c.id === cityId);
 
     if (!city) {
+      logger.warn(`❌ 알 수 없는 도시 ID: ${cityId}`);
       return {
         type: "error",
         message: "알 수 없는 도시입니다.",
@@ -266,7 +312,14 @@ class WeatherModule extends BaseModule {
       // 사용자 선호 도시 설정
       this.userPreferredCity.set(userId, city.name);
 
-      logger.info(`⭐ 기본 도시 설정`, { userId, city: city.name });
+      // ✅ 설정 후 확인 로그
+      const verifyCity = this.userPreferredCity.get(userId);
+      logger.info(`✅ 기본 도시 설정 완료`, {
+        userId,
+        cityId,
+        cityName: city.name,
+        verified: verifyCity,
+      });
 
       return {
         type: "default_set",
@@ -288,9 +341,18 @@ class WeatherModule extends BaseModule {
   /**
    * 📅 날씨 예보 표시
    */
-  async showForecast(bot, callbackQuery, params, moduleManager) {
+  async showForecast(bot, callbackQuery, subAction, params, moduleManager) {
+    // ✅ WeatherModule 전용 파싱
+    const parsedParams = this.parseParams(params);
     const cityId =
-      params[0] || this.getDefaultCityId(getUserId(callbackQuery.from));
+      parsedParams[0] || this.getDefaultCityId(getUserId(callbackQuery.from));
+
+    // ✅ 로그 추가
+    logger.info(
+      `📊 날씨 예보 요청 - 원본 params: "${params}", 파싱된 params: [${parsedParams.join(
+        ","
+      )}], cityId: ${cityId}`
+    );
 
     if (!this.config.enableForecast) {
       return {
@@ -334,7 +396,6 @@ class WeatherModule extends BaseModule {
       };
     }
   }
-
   /**
    * ❓ 도움말 표시
    */
@@ -418,7 +479,15 @@ class WeatherModule extends BaseModule {
    * 👤 사용자 선호 도시 가져오기
    */
   getUserPreferredCity(userId) {
-    return this.userPreferredCity.get(userId) || this.config.defaultCity;
+    const preferredCity = this.userPreferredCity.get(userId);
+    const defaultCity = preferredCity || this.config.defaultCity;
+
+    // ✅ 디버그 로그 추가
+    logger.debug(
+      `👤 getUserPreferredCity - 사용자: ${userId}, 저장된: ${preferredCity}, 기본: ${this.config.defaultCity}, 결과: ${defaultCity}`
+    );
+
+    return defaultCity;
   }
 
   /**

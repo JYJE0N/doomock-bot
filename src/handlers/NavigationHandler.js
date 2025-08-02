@@ -223,7 +223,8 @@ class NavigationHandler {
    */
   parseCallbackData(data) {
     if (!data || typeof data !== "string") {
-      // ... (기존 에러 처리)
+      logger.warn("⚠️ 잘못된 콜백 데이터:", data);
+      this.stats.parseErrors++;
       return { moduleKey: "system", subAction: "menu", params: "" };
     }
 
@@ -232,10 +233,88 @@ class NavigationHandler {
     const parsed = {
       moduleKey: parts[0] || "system", // 첫 번째: 모듈
       subAction: parts[1] || "menu", // 두 번째: 액션
-      params: parts.slice(2).join(":") || "", // 세 번째 이후 모두: 파라미터
+      params: parts.slice(2).join(":") || "", // ✅ 문자열로 유지 (각 모듈이 알아서 파싱)
     };
 
+    // ✅ 파싱 로그 개선
+    logger.debug(`🎯 콜백 파싱:`, {
+      원본: data,
+      모듈: parsed.moduleKey,
+      액션: parsed.subAction,
+      파라미터: parsed.params,
+      파라미터길이: parsed.params.length,
+    });
+
     return parsed;
+  }
+
+  /**
+   * 🎯 메인 콜백 처리 (기존 방식 유지)
+   */
+  async handleCallback(ctx) {
+    try {
+      this.stats.callbacksProcessed++;
+      this.stats.lastActivity = new Date();
+
+      const callbackQuery = ctx.callbackQuery;
+      const data = callbackQuery.data;
+
+      logger.debug(`🎯 콜백 수신: ${data}`);
+
+      // 시스템 메뉴 직접 처리 (최적화)
+      if (data === "system:menu") {
+        return await this.showMainMenu(ctx);
+      }
+
+      // ✅ 표준 파서 사용 (params는 문자열로 전달)
+      const { moduleKey, subAction, params } = this.parseCallbackData(data);
+
+      logger.debug(`🎯 파싱 완료: ${moduleKey}.${subAction}(${params})`);
+
+      // 1️⃣ 모듈에서 비즈니스 로직 처리
+      const result = await this.moduleManager.handleCallback(
+        this.bot,
+        callbackQuery,
+        moduleKey,
+        subAction,
+        params // ✅ 문자열로 전달 (각 모듈이 알아서 파싱)
+      );
+
+      // result가 없거나, result.success가 false인 경우 ErrorHandler에 위임
+      if (!result || result.success === false) {
+        logger.warn(`💫 모듈 처리 실패: ${moduleKey}.${subAction}`);
+        return await this.errorHandler.handleModuleProcessingError(
+          ctx,
+          moduleKey,
+          subAction,
+          result?.message || "모듈 처리 중 오류가 발생했습니다."
+        );
+      }
+
+      // 2️⃣ 렌더러로 UI 생성
+      const renderer = this.renderers.get(result.module || moduleKey);
+
+      if (renderer) {
+        await renderer.render(result, ctx);
+        logger.debug(`✅ 렌더링 완료: ${moduleKey}.${subAction}`);
+      } else {
+        logger.warn(`📱 렌더러 없음: ${result.module || moduleKey}`);
+        return await this.errorHandler.handleMissingRenderer(
+          ctx,
+          result.module || moduleKey,
+          result
+        );
+      }
+    } catch (error) {
+      logger.error("💥 NavigationHandler 콜백 처리 오류:", error);
+      this.stats.errorsCount++;
+
+      return await this.errorHandler.handleUnexpectedError(
+        ctx,
+        error,
+        "handleCallback"
+      );
+    }
   }
 
   /**

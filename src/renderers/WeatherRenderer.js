@@ -50,7 +50,7 @@ class WeatherRenderer extends BaseRenderer {
   }
 
   /**
-   * 🎯 표준 render 메서드 (필수 구현!)
+   * 🎯 표준 render 메서드 (current_weather 타입 추가)
    */
   async render(result, ctx) {
     try {
@@ -67,6 +67,7 @@ class WeatherRenderer extends BaseRenderer {
         case "menu":
           return await this.renderMenu(data, ctx);
         case "current":
+        case "current_weather": // ✅ 추가!
         case "weather":
           return await this.renderWeather(data, ctx);
         case "cities":
@@ -77,6 +78,8 @@ class WeatherRenderer extends BaseRenderer {
           return await this.renderSettings(data, ctx);
         case "error":
           return await this.renderError(data, ctx);
+        case "default_set": // ✅ 기본 도시 설정 성공
+          return await this.renderSettingSuccess(data, ctx);
         default:
           logger.warn(`🌤️ 지원하지 않는 렌더링 타입: ${type}`);
           return await this.renderError(
@@ -99,15 +102,29 @@ class WeatherRenderer extends BaseRenderer {
   async renderMenu(data, ctx) {
     const { userName, defaultCity, majorCities, config } = data;
 
+    // ✅ 안전성 체크
+    const safeUserName = userName || "사용자";
+    const safeDefaultCity = defaultCity || "서울";
+    const safeCitiesCount = majorCities?.length || 8;
+
+    // ✅ 디버그 로그
+    logger.debug(`🏠 renderMenu - 데이터:`, {
+      userName: safeUserName,
+      defaultCity: safeDefaultCity,
+      citiesCount: safeCitiesCount,
+    });
+
     const text = `🌤️ **날씨 정보** 
 
-안녕하세요, ${userName}님! 
-현재 기본 도시: **${defaultCity}** ${this.cityEmojis[defaultCity] || "🏙️"}
+안녕하세요, ${safeUserName}님! 
+현재 기본 도시: **${safeDefaultCity}** ${
+      this.cityEmojis[safeDefaultCity] || "🏙️"
+    }
 
 실시간 날씨 정보를 확인하세요! 📡
-${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️" : ""}
+${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️" : ""}
 
-📍 **지원 도시**: ${majorCities.length}개 도시`;
+📍 **지원 도시**: ${safeCitiesCount}개 도시`;
 
     const keyboard = this.createInlineKeyboard(
       [
@@ -117,7 +134,7 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
           { text: "🏙️ 도시 선택", action: "cities" },
         ],
         // 두 번째 행: 예보 + 설정
-        config.enableForecast
+        config?.enableForecast
           ? [
               { text: "📊 날씨 예보", action: "forecast" },
               { text: "⚙️ 설정", action: "settings" },
@@ -133,13 +150,100 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
   }
 
   /**
+   * 🌡️ 날씨 정보 렌더링 (에러 처리 강화)
+   */
+  async renderWeather(data, ctx) {
+    const { city, weather, dust, timestamp, hasError, errorMessage } = data;
+
+    if (hasError) {
+      return await this.renderWeatherError(data, ctx);
+    }
+
+    // ✅ 안전성 체크
+    if (!city || !weather) {
+      logger.error("날씨 렌더링 - 필수 데이터 누락:", {
+        city: !!city,
+        weather: !!weather,
+      });
+      return await this.renderError(
+        { message: "날씨 데이터가 올바르지 않습니다." },
+        ctx
+      );
+    }
+
+    // 메인 날씨 카드
+    let text = `${city.emoji || this.cityEmojis[city.name] || "🏙️"} **${
+      city.name
+    } 날씨** ${this.weatherEmojis[weather.description] || "🌤️"}
+
+🌡️ **온도**: ${weather.temperature}°C (체감 ${weather.feelsLike}°C)
+📝 **날씨**: ${weather.description}
+💧 **습도**: ${weather.humidity}%
+🌬️ **바람**: ${weather.windSpeed}m/s`;
+
+    // 기압 정보 (있으면)
+    if (weather.pressure) {
+      text += `\n📊 **기압**: ${weather.pressure}hPa`;
+    }
+
+    // 가시거리 (있으면)
+    if (weather.visibility) {
+      text += `\n👁️ **가시거리**: ${weather.visibility}km`;
+    }
+
+    // 미세먼지 정보 추가
+    if (dust && dust.grade) {
+      text += `\n\n🌬️ **미세먼지 정보**
+${this.dustEmojis[dust.grade] || "🟡"} **등급**: ${dust.grade}`;
+
+      if (dust.pm10) text += `\n🔸 **PM10**: ${dust.pm10}㎍/m³`;
+      if (dust.pm25) text += `\n🔹 **PM2.5**: ${dust.pm25}㎍/m³`;
+    }
+
+    // 하단 정보
+    text += `\n\n📍 **위치**: ${city.fullName || city.name}
+⏰ **업데이트**: ${timestamp || "알수없음"}`;
+
+    if (weather.isOffline) {
+      text += `\n⚠️ **오프라인 모드** (기본 데이터)`;
+    }
+
+    const keyboard = this.createInlineKeyboard(
+      [
+        [
+          { text: "🔄 새로고침", action: `city:${city.id}` },
+          { text: "🏙️ 다른 도시", action: "cities" },
+        ],
+        [
+          { text: "📊 예보", action: `forecast:${city.id}` },
+          { text: "⭐ 기본 설정", action: `setdefault:${city.id}` },
+        ],
+        [{ text: "🔙 메뉴", action: "menu" }],
+      ],
+      this.moduleName
+    );
+
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
    * 🏙️ 도시 목록 렌더링
    */
   async renderCities(data, ctx) {
-    const { cities, defaultCity } = data;
+    const { cities, defaultCity, config } = data;
 
-    let text = `🏙️ **도시 선택**\n\n현재 기본 도시: **${defaultCity}** ${
-      this.cityEmojis[defaultCity] || "🏙️"
+    // ✅ defaultCity가 undefined인 경우 처리
+    const currentDefaultCity = defaultCity || "서울";
+
+    // ✅ 디버그 로그 추가
+    logger.debug(`🏙️ renderCities - 받은 데이터:`, {
+      cities: cities?.length,
+      defaultCity,
+      currentDefaultCity,
+    });
+
+    let text = `🏙️ **도시 선택**\n\n현재 기본 도시: **${currentDefaultCity}** ${
+      this.cityEmojis[currentDefaultCity] || "🏙️"
     }\n\n날씨를 확인할 도시를 선택해주세요:`;
 
     // 도시 버튼을 2x4 그리드로 배치
@@ -147,14 +251,24 @@ ${config.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️
     for (let i = 0; i < cities.length; i += 2) {
       const row = [];
       if (cities[i]) {
+        // ✅ 현재 기본 도시는 ⭐ 표시
+        const isDefault = cities[i].name === currentDefaultCity;
+        const prefix = isDefault ? "⭐ " : "";
+
         row.push({
-          text: `${this.cityEmojis[cities[i].name] || "🏙️"} ${cities[i].name}`,
+          text: `${prefix}${this.cityEmojis[cities[i].name] || "🏙️"} ${
+            cities[i].name
+          }`,
           action: `city:${cities[i].id}`,
         });
       }
       if (cities[i + 1]) {
+        // ✅ 현재 기본 도시는 ⭐ 표시
+        const isDefault = cities[i + 1].name === currentDefaultCity;
+        const prefix = isDefault ? "⭐ " : "";
+
         row.push({
-          text: `${this.cityEmojis[cities[i + 1].name] || "🏙️"} ${
+          text: `${prefix}${this.cityEmojis[cities[i + 1].name] || "🏙️"} ${
             cities[i + 1].name
           }`,
           action: `city:${cities[i + 1].id}`,
