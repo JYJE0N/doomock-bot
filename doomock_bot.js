@@ -9,7 +9,7 @@ const express = require("express");
 const path = require("path");
 
 /**
- * 🚀 DooMockBot v3.0.1 - 안정화 버전
+ * 🚀 DooMockBot v4.0.1 - 안정화 버전
  *
  * ✨ 주요 기능:
  * - 텔레그램 봇 서비스
