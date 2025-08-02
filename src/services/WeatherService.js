@@ -100,6 +100,63 @@ class WeatherService extends BaseService {
     this.setupCacheCleaning();
   }
 
+  // 🔄 Weather 모델에서 이동한 메서드들
+  transformApiResponse(apiResponse, originalLocation) {
+    const main = apiResponse.main || {};
+    const weather = apiResponse.weather?.[0] || {};
+    const wind = apiResponse.wind || {};
+
+    return {
+      location: originalLocation,
+      temperature: main.temp
+        ? Math.round(main.temp)
+        : this.estimateTemperature(),
+      feelsLike: main.feels_like ? Math.round(main.feels_like) : null,
+      humidity: main.humidity || 50,
+      description: weather.description || "맑음",
+      icon: this.getWeatherIcon(weather.icon || "01d"),
+      windSpeed: wind.speed || 0,
+      timestamp: new Date().toISOString(),
+      meta: { source: "API", hasApiData: true },
+    };
+  }
+
+  createFallbackWeather(location) {
+    return new Weather({
+      location,
+      temperature: this.estimateTemperature(),
+      description: "맑음 (추정)",
+      icon: "☀️",
+      meta: { source: "폴백", estimated: true },
+    });
+  }
+
+  // 🧠 유틸리티 메서드들 (Weather 모델에서 이동)
+  estimateTemperature() {
+    const hour = new Date().getHours();
+    const month = new Date().getMonth() + 1;
+
+    let baseTemp = month >= 6 && month <= 8 ? 25 : 15; // 간단화
+    let hourOffset = hour >= 13 && hour <= 18 ? 5 : 0;
+
+    return baseTemp + hourOffset + Math.floor(Math.random() * 4 - 2);
+  }
+
+  getWeatherIcon(iconCode) {
+    const icons = {
+      "01d": "☀️",
+      "01n": "🌙",
+      "02d": "⛅",
+      "02n": "☁️",
+      "09d": "🌧️",
+      "10d": "🌦️",
+      "11d": "⛈️",
+      "13d": "❄️",
+      "50d": "🌫️",
+    };
+    return icons[iconCode] || "🌤️";
+  }
+
   /**
    * 🌡️ 현재 날씨 조회
    */

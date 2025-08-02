@@ -159,7 +159,6 @@ class NavigationHandler {
       // ctx에서 사용자 정보 안전하게 가져오기
       const from = ctx.from || ctx.callbackQuery?.from || ctx.message?.from;
       if (!from) {
-        // 🎯 ErrorHandler 위임
         return await this.errorHandler.handleMissingUserInfo(ctx);
       }
 
@@ -178,28 +177,26 @@ class NavigationHandler {
         enabledModules = getEnabledModules();
       } catch (modulesError) {
         logger.error("getEnabledModules 실패:", modulesError.message);
-        // 🎯 ErrorHandler 위임
         return await this.errorHandler.handleModulesLoadError(
           ctx,
           modulesError
         );
       }
 
-      // 🎯 MarkdownHelper 위임 - 안전한 텍스트 생성
-      const safeUserName = this.markdownHelper.escapeForDisplay(userName);
-      const text = `🏠 *메인 메뉴*\n안녕하세요, ${safeUserName}님\\!`;
+      // 🎯 수정: MarkdownHelper 메서드를 실제 존재하는 메서드로 변경
+      const safeUserName = this.markdownHelper.escapeMarkdownV2(userName); // ✅ 실제 존재하는 메서드
+      const text = `🏠 *메인 메뉴*\n\n안녕하세요, ${safeUserName}님\\!`; // ✅ MarkdownV2 형식
 
       // 🎹 2열 배치 키보드 생성 (ModuleRegistry 함수 활용)
       const { buildNavigationKeyboard } = require("../config/ModuleRegistry");
       const keyboard = buildNavigationKeyboard();
 
-      // 🎯 MarkdownHelper 위임 - 안전한 메시지 전송
+      // 🎯 수정: MarkdownHelper의 실제 메서드 사용
       const success = await this.markdownHelper.sendSafeMessage(ctx, text, {
         reply_markup: keyboard,
       });
 
       if (!success) {
-        // 🎯 ErrorHandler 위임
         return await this.errorHandler.handleMessageSendError(
           ctx,
           "메인 메뉴 전송 실패"
@@ -209,7 +206,6 @@ class NavigationHandler {
       logger.debug("🏠 메인 메뉴 표시 완료");
       return true;
     } catch (error) {
-      // 🎯 ErrorHandler 위임 - 모든 예외 처리
       return await this.errorHandler.handleUnexpectedError(
         ctx,
         error,

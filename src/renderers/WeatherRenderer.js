@@ -107,7 +107,7 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
               { text: "❓ 도움말", action: "help" },
             ]
           : [{ text: "❓ 도움말", action: "help" }],
-        [{ text: "🔙 메인메뉴", action: "main" }],
+        [{ text: "🔙 메인 메뉴", action: "menu" }],
       ],
       this.moduleName
     );

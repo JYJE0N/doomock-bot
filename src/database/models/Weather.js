@@ -1,404 +1,491 @@
-// src/models/Weather.js - 날씨 데이터 모델
+// src/database/models/Weather.js - 🌤️ 표준 스키마 리팩토링
 
+const mongoose = require("mongoose");
 const logger = require("../../utils/Logger");
 const TimeHelper = require("../../utils/TimeHelper");
 
 /**
- * 🌤️ Weather 모델 - 날씨 데이터 구조 및 변환 담당
+ * 🌤️ Weather Mongoose 스키마 - 표준 규칙 준수
  *
- * 🎯 책임:
- * - 날씨 데이터 스키마 정의
- * - API 응답 → 내부 포맷 변환
- * - 폴백 데이터 생성
- * - 데이터 검증 및 기본값
- * - 매핑 데이터 관리 (아이콘, 도시명)
+ * 🎯 핵심 원칙:
+ * - 순수한 데이터 스키마만 정의
+ * - 비즈니스 로직은 Service로 분리
+ * - 표준 인덱스 및 미들웨어 적용
+ * - 가상 속성으로 계산된 값 제공
  */
-class Weather {
-  /**
-   * 🏗️ 표준 날씨 데이터 생성 (API 응답 → 내부 포맷)
-   */
-  static createFromApiResponse(apiResponse, originalLocation) {
-    try {
-      const main = apiResponse.main || {};
-      const weather = apiResponse.weather?.[0] || {};
-      const wind = apiResponse.wind || {};
-      const clouds = apiResponse.clouds || {};
-      const sys = apiResponse.sys || {};
 
-      // 🌡️ 온도 데이터 안전 추출
-      const temperature =
-        main.temp !== undefined ? Math.round(main.temp) : null;
-      const feelsLike =
-        main.feels_like !== undefined ? Math.round(main.feels_like) : null;
-      const tempMin =
-        main.temp_min !== undefined ? Math.round(main.temp_min) : null;
-      const tempMax =
-        main.temp_max !== undefined ? Math.round(main.temp_max) : null;
+const weatherSchema = new mongoose.Schema(
+  {
+    // 👤 사용자 정보 (표준)
+    userId: {
+      type: String,
+      required: [true, "사용자 ID는 필수입니다"],
+      // index는 복합 인덱스에서 처리
+    },
 
-      // 🌡️ 온도가 null인 경우 추정값 사용
-      const estimatedTemp = temperature ?? this.estimateTemperature();
+    // 📍 위치 정보
+    location: {
+      type: String,
+      required: [true, "위치 정보는 필수입니다"],
+      trim: true,
+      maxlength: [100, "위치명은 100자를 초과할 수 없습니다"],
+    },
 
-      return {
-        // 📍 위치 정보
-        location: originalLocation,
-        cityName: apiResponse.name || originalLocation,
-        country: sys.country || "KR",
-        coordinates: {
-          lat: apiResponse.coord?.lat || 0,
-          lon: apiResponse.coord?.lon || 0,
-        },
+    cityName: {
+      type: String,
+      required: true,
+      trim: true,
+    },
 
-        // 🌡️ 온도 데이터 (핵심!)
-        temperature: estimatedTemp,
-        feelsLike: feelsLike ?? estimatedTemp,
-        tempMin: tempMin ?? estimatedTemp - 3,
-        tempMax: tempMax ?? estimatedTemp + 5,
+    country: {
+      type: String,
+      default: "KR",
+      uppercase: true,
+      minlength: 2,
+      maxlength: 2,
+    },
 
-        // 🌤️ 날씨 상태
-        condition: weather.main || "Clear",
-        description: weather.description || "맑음",
-        iconCode: weather.icon || "01d",
-        icon: this.getWeatherIcon(weather.icon || "01d"),
-
-        // 💨 환경 데이터
-        humidity: main.humidity || 50,
-        pressure: main.pressure || 1013,
-        windSpeed: wind.speed ? Math.round(wind.speed * 10) / 10 : 0,
-        windDeg: wind.deg || 0,
-        windDirection: this.getWindDirection(wind.deg || 0),
-        cloudiness: clouds.all || 0,
-        visibility: apiResponse.visibility
-          ? Math.round(apiResponse.visibility / 1000)
-          : 10,
-
-        // 🌅 태양 데이터
-        sunrise: sys.sunrise
-          ? TimeHelper.format(new Date(sys.sunrise * 1000), "time")
-          : "06:00",
-        sunset: sys.sunset
-          ? TimeHelper.format(new Date(sys.sunset * 1000), "time")
-          : "18:00",
-
-        // 📅 시간 정보
-        timestamp: TimeHelper.format(TimeHelper.now(), "full"),
-        lastUpdate: TimeHelper.format(TimeHelper.now(), "time"),
-
-        // 🎯 추가 정보
-        summary: this.createWeatherSummary(
-          estimatedTemp,
-          weather.description,
-          wind.speed
-        ),
-        advice: this.generateWeatherAdvice(
-          estimatedTemp,
-          weather.main,
-          wind.speed
-        ),
-
-        // 📡 메타 정보
-        meta: {
-          source: "OpenWeatherMap",
-          apiResponse: true,
-          hasApiData: true,
-          cacheExpiry: TimeHelper.format(
-            TimeHelper.addMinutes(TimeHelper.now(), 10),
-            "time"
-          ),
-        },
-      };
-    } catch (error) {
-      logger.error("API 응답 변환 실패:", error);
-      return this.createFallbackWeather(originalLocation);
-    }
-  }
-
-  /**
-   * 🔄 폴백 날씨 데이터 생성 (API 실패시)
-   */
-  static createFallbackWeather(location) {
-    const estimatedTemp = this.estimateTemperature();
-
-    return {
-      // 📍 위치 정보
-      location: location || "화성시",
-      cityName: location || "화성시",
-      country: "KR",
-      coordinates: { lat: 37.1989, lon: 127.0056 },
-
-      // 🌡️ 추정 온도 데이터
-      temperature: estimatedTemp,
-      feelsLike: estimatedTemp + Math.floor(Math.random() * 4 - 2),
-      tempMin: estimatedTemp - 3,
-      tempMax: estimatedTemp + 5,
-
-      // 🌤️ 기본 날씨 상태
-      condition: "Clear",
-      description: "맑음 (추정)",
-      iconCode: "01d",
-      icon: this.getWeatherIcon("01d"),
-
-      // 💨 추정 환경 데이터
-      humidity: Math.floor(Math.random() * 30) + 50, // 50-80%
-      pressure: Math.floor(Math.random() * 40) + 1000, // 1000-1040
-      windSpeed: Math.random() * 3 + 1, // 1-4 m/s
-      windDeg: Math.floor(Math.random() * 360),
-      windDirection: this.getWindDirection(Math.floor(Math.random() * 360)),
-      cloudiness: Math.floor(Math.random() * 50),
-      visibility: Math.floor(Math.random() * 10) + 10, // 10-20km
-
-      // 🌅 기본 태양 데이터
-      sunrise: "06:30",
-      sunset: "18:30",
-
-      // 📅 시간 정보
-      timestamp: TimeHelper.format(TimeHelper.now(), "full"),
-      lastUpdate: TimeHelper.format(TimeHelper.now(), "time"),
-
-      // 🎯 추정 정보
-      summary: `추정 기온 ${estimatedTemp}°C, 맑음`,
-      advice: "정확한 날씨 확인을 위해 API 키를 설정해주세요.",
-
-      // 📡 메타 정보
-      meta: {
-        source: "폴백 데이터",
-        apiResponse: false,
-        hasApiData: false,
-        estimated: true,
-        notice: "실제 API 연결 시 정확한 정보를 제공합니다",
+    coordinates: {
+      lat: {
+        type: Number,
+        min: [-90, "위도는 -90도 이상이어야 합니다"],
+        max: [90, "위도는 90도 이하여야 합니다"],
       },
-    };
+      lon: {
+        type: Number,
+        min: [-180, "경도는 -180도 이상이어야 합니다"],
+        max: [180, "경도는 180도 이하여야 합니다"],
+      },
+    },
+
+    // 🌡️ 온도 데이터
+    temperature: {
+      type: Number,
+      required: [true, "온도 정보는 필수입니다"],
+      min: [-50, "온도는 -50도 이상이어야 합니다"],
+      max: [60, "온도는 60도 이하여야 합니다"],
+    },
+
+    feelsLike: {
+      type: Number,
+      min: -50,
+      max: 60,
+    },
+
+    tempMin: {
+      type: Number,
+      min: -50,
+      max: 60,
+    },
+
+    tempMax: {
+      type: Number,
+      min: -50,
+      max: 60,
+    },
+
+    // 🌤️ 날씨 상태
+    condition: {
+      type: String,
+      required: true,
+      enum: {
+        values: [
+          "Clear",
+          "Clouds",
+          "Rain",
+          "Drizzle",
+          "Snow",
+          "Thunderstorm",
+          "Mist",
+          "Fog",
+        ],
+        message: "지원하지 않는 날씨 상태입니다",
+      },
+    },
+
+    description: {
+      type: String,
+      required: true,
+      trim: true,
+      maxlength: [100, "날씨 설명은 100자를 초과할 수 없습니다"],
+    },
+
+    iconCode: {
+      type: String,
+      required: true,
+      match: [/^[0-9]{2}[dn]$/, "올바른 아이콘 코드 형식이 아닙니다"],
+    },
+
+    // 💨 환경 데이터
+    humidity: {
+      type: Number,
+      required: true,
+      min: [0, "습도는 0% 이상이어야 합니다"],
+      max: [100, "습도는 100% 이하여야 합니다"],
+    },
+
+    pressure: {
+      type: Number,
+      min: [800, "기압은 800hPa 이상이어야 합니다"],
+      max: [1200, "기압은 1200hPa 이하여야 합니다"],
+    },
+
+    windSpeed: {
+      type: Number,
+      default: 0,
+      min: [0, "풍속은 0 이상이어야 합니다"],
+      max: [200, "풍속은 200m/s 이하여야 합니다"],
+    },
+
+    windDeg: {
+      type: Number,
+      min: [0, "풍향은 0도 이상이어야 합니다"],
+      max: [360, "풍향은 360도 이하여야 합니다"],
+    },
+
+    cloudiness: {
+      type: Number,
+      default: 0,
+      min: [0, "구름량은 0% 이상이어야 합니다"],
+      max: [100, "구름량은 100% 이하여야 합니다"],
+    },
+
+    visibility: {
+      type: Number,
+      min: [0, "가시거리는 0km 이상이어야 합니다"],
+    },
+
+    // 🌅 태양 데이터
+    sunrise: {
+      type: String,
+      match: [
+        /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/,
+        "올바른 시간 형식이 아닙니다 (HH:MM)",
+      ],
+    },
+
+    sunset: {
+      type: String,
+      match: [
+        /^([01]?[0-9]|2[0-3]):[0-5][0-9]$/,
+        "올바른 시간 형식이 아닙니다 (HH:MM)",
+      ],
+    },
+
+    // 📡 메타 정보
+    meta: {
+      source: {
+        type: String,
+        required: true,
+        enum: ["OpenWeatherMap", "폴백 데이터", "캐시"],
+        default: "OpenWeatherMap",
+      },
+      hasApiData: {
+        type: Boolean,
+        default: false,
+      },
+      estimated: {
+        type: Boolean,
+        default: false,
+      },
+      cacheExpiry: {
+        type: Date,
+      },
+    },
+
+    // 📊 상태 관리
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true,
+    },
+
+    // 📅 시간 정보 (자동 관리)
+    lastUpdate: {
+      type: Date,
+      default: Date.now,
+    },
+  },
+  {
+    // Mongoose 표준 옵션
+    timestamps: true, // createdAt, updatedAt 자동 생성
+    versionKey: false,
+    collection: "weather_data",
+
+    // JSON 변환 옵션
+    toJSON: {
+      virtuals: true,
+      transform: function (doc, ret) {
+        ret.id = ret._id;
+        delete ret._id;
+        return ret;
+      },
+    },
+    toObject: {
+      virtuals: true,
+    },
+  }
+);
+
+// ===== 🔍 인덱스 설정 (표준 규칙) =====
+
+// 사용자별 최신 날씨 조회용 복합 인덱스
+weatherSchema.index({ userId: 1, createdAt: -1 });
+
+// 위치별 날씨 조회용 복합 인덱스
+weatherSchema.index({ location: 1, createdAt: -1 });
+
+// 활성 상태별 조회용
+weatherSchema.index({ isActive: 1 });
+
+// 캐시 만료 관리용
+weatherSchema.index({ "meta.cacheExpiry": 1 }, { sparse: true });
+
+// 지리적 위치 검색용 (2dsphere 인덱스)
+weatherSchema.index({ coordinates: "2dsphere" });
+
+// ===== 🎨 가상 속성 (Virtual Properties) =====
+
+/**
+ * 날씨 아이콘 이모지
+ */
+weatherSchema.virtual("icon").get(function () {
+  const iconMapping = {
+    "01d": "☀️",
+    "01n": "🌙",
+    "02d": "⛅",
+    "02n": "☁️",
+    "03d": "☁️",
+    "03n": "☁️",
+    "04d": "☁️",
+    "04n": "☁️",
+    "09d": "🌧️",
+    "09n": "🌧️",
+    "10d": "🌦️",
+    "10n": "🌧️",
+    "11d": "⛈️",
+    "11n": "⛈️",
+    "13d": "❄️",
+    "13n": "❄️",
+    "50d": "🌫️",
+    "50n": "🌫️",
+  };
+  return iconMapping[this.iconCode] || "🌤️";
+});
+
+/**
+ * 바람 방향 문자열
+ */
+weatherSchema.virtual("windDirection").get(function () {
+  if (!this.windDeg) return "무풍";
+
+  const directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
+  const index = Math.round(this.windDeg / 45) % 8;
+  return directions[index];
+});
+
+/**
+ * 날씨 요약
+ */
+weatherSchema.virtual("summary").get(function () {
+  let summary = `현재 기온 ${this.temperature}°C`;
+
+  if (this.temperature >= 30) summary += " (매우 더움)";
+  else if (this.temperature >= 25) summary += " (더움)";
+  else if (this.temperature >= 20) summary += " (따뜻함)";
+  else if (this.temperature >= 10) summary += " (쌀쌀함)";
+  else if (this.temperature >= 0) summary += " (추움)";
+  else summary += " (매우 추움)";
+
+  summary += `, ${this.description}`;
+
+  if (this.windSpeed > 3) {
+    summary += `, 바람 ${this.windSpeed}m/s`;
   }
 
-  /**
-   * 🧠 스마트 온도 추정 (시간/계절 고려)
-   */
-  static estimateTemperature() {
-    const now = new Date();
-    const hour = now.getHours();
-    const month = now.getMonth() + 1; // 1-12월
+  return summary;
+});
 
-    // 계절별 기본 온도
-    let baseTemp;
-    if (month >= 3 && month <= 5) baseTemp = 15; // 봄
-    else if (month >= 6 && month <= 8) baseTemp = 25; // 여름
-    else if (month >= 9 && month <= 11) baseTemp = 18; // 가을
-    else baseTemp = 5; // 겨울
+/**
+ * 캐시 유효성 확인
+ */
+weatherSchema.virtual("isCacheValid").get(function () {
+  if (!this.meta.cacheExpiry) return false;
+  return new Date() < this.meta.cacheExpiry;
+});
 
-    // 시간대별 보정
-    let hourOffset = 0;
-    if (hour >= 6 && hour <= 12) hourOffset = 2; // 오전
-    else if (hour >= 13 && hour <= 18) hourOffset = 5; // 오후
-    else if (hour >= 19 && hour <= 21) hourOffset = 1; // 저녁
-    else hourOffset = -3; // 새벽/밤
+/**
+ * 데이터 신뢰도
+ */
+weatherSchema.virtual("reliability").get(function () {
+  if (this.meta.hasApiData && !this.meta.estimated) return "높음";
+  if (this.meta.hasApiData && this.meta.estimated) return "보통";
+  return "낮음";
+});
 
-    // ±2도 자연스러운 변화
-    const randomVariation = Math.random() * 4 - 2;
+// ===== 🔧 미들웨어 (Middleware) =====
 
-    return Math.round(baseTemp + hourOffset + randomVariation);
+/**
+ * 저장 전 처리
+ */
+weatherSchema.pre("save", function (next) {
+  // lastUpdate 갱신
+  this.lastUpdate = new Date();
+
+  // 캐시 만료 시간 설정 (10분 후)
+  if (!this.meta.cacheExpiry) {
+    this.meta.cacheExpiry = new Date(Date.now() + 10 * 60 * 1000);
   }
 
-  /**
-   * 🎨 날씨 아이콘 매핑
-   */
-  static getWeatherIcon(iconCode) {
-    const iconMapping = {
-      "01d": "☀️",
-      "01n": "🌙", // 맑음
-      "02d": "⛅",
-      "02n": "☁️", // 구름 조금
-      "03d": "☁️",
-      "03n": "☁️", // 구름
-      "04d": "☁️",
-      "04n": "☁️", // 구름 많음
-      "09d": "🌧️",
-      "09n": "🌧️", // 소나기
-      "10d": "🌦️",
-      "10n": "🌧️", // 비
-      "11d": "⛈️",
-      "11n": "⛈️", // 천둥번개
-      "13d": "❄️",
-      "13n": "❄️", // 눈
-      "50d": "🌫️",
-      "50n": "🌫️", // 안개
-    };
+  next();
+});
 
-    return iconMapping[iconCode] || "🌤️";
-  }
+/**
+ * 업데이트 전 처리
+ */
+weatherSchema.pre(["updateOne", "findOneAndUpdate"], function (next) {
+  this.set({
+    lastUpdate: new Date(),
+  });
 
-  /**
-   * 🗺️ 도시명 매핑
-   */
-  static getCityMapping(koreanCity) {
-    const cityMapping = {
-      서울: "Seoul,KR",
-      서울시: "Seoul,KR",
-      부산: "Busan,KR",
-      부산시: "Busan,KR",
-      대구: "Daegu,KR",
-      대구시: "Daegu,KR",
-      인천: "Incheon,KR",
-      인천시: "Incheon,KR",
-      광주: "Gwangju,KR",
-      광주시: "Gwangju,KR",
-      대전: "Daejeon,KR",
-      대전시: "Daejeon,KR",
-      울산: "Ulsan,KR",
-      울산시: "Ulsan,KR",
-      화성: "Hwaseong,KR",
-      화성시: "Hwaseong,KR",
-      수원: "Suwon,KR",
-      수원시: "Suwon,KR",
-      용인: "Yongin,KR",
-      용인시: "Yongin,KR",
-      안산: "Ansan,KR",
-      안산시: "Ansan,KR",
-      부천: "Bucheon,KR",
-      부천시: "Bucheon,KR",
-    };
+  next();
+});
 
-    const normalized = koreanCity.trim();
-    return (
-      cityMapping[normalized] ||
-      cityMapping[normalized + "시"] ||
-      `${normalized},KR`
+/**
+ * 저장 후 로깅
+ */
+weatherSchema.post("save", function (doc) {
+  if (doc.isNew) {
+    logger.debug(
+      `🌤️ 새 날씨 데이터 저장: ${doc.location} (${doc.temperature}°C)`
     );
   }
+});
 
-  /**
-   * 🧭 바람 방향 계산
-   */
-  static getWindDirection(degrees) {
-    const directions = ["북", "북동", "동", "남동", "남", "남서", "서", "북서"];
-    const index = Math.round(degrees / 45) % 8;
-    return directions[index];
+// ===== 🛠️ 인스턴스 메서드 (Instance Methods) =====
+
+/**
+ * 데이터 유효성 검사
+ */
+weatherSchema.methods.validateData = function () {
+  const errors = [];
+
+  if (!this.location) errors.push("위치 정보가 없습니다");
+  if (this.temperature === null || this.temperature === undefined) {
+    errors.push("온도 정보가 없습니다");
   }
 
-  /**
-   * 📝 날씨 요약 생성
-   */
-  static createWeatherSummary(temperature, description, windSpeed) {
-    let summary = "";
+  return {
+    isValid: errors.length === 0,
+    errors,
+  };
+};
 
-    if (temperature !== null) {
-      summary += `현재 기온 ${temperature}°C`;
+/**
+ * 캐시 만료 처리
+ */
+weatherSchema.methods.expireCache = function () {
+  this.meta.cacheExpiry = new Date();
+  return this.save();
+};
 
-      if (temperature >= 30) summary += " (매우 더움)";
-      else if (temperature >= 25) summary += " (더움)";
-      else if (temperature >= 20) summary += " (따뜻함)";
-      else if (temperature >= 10) summary += " (쌀쌀함)";
-      else if (temperature >= 0) summary += " (추움)";
-      else summary += " (매우 추움)";
-    }
+/**
+ * 소프트 삭제
+ */
+weatherSchema.methods.softDelete = function () {
+  this.isActive = false;
+  return this.save();
+};
 
-    if (description) {
-      summary += `, ${description}`;
-    }
+// ===== 📊 정적 메서드 (Static Methods) =====
 
-    if (windSpeed && windSpeed > 3) {
-      summary += `, 바람 ${windSpeed}m/s`;
-    }
+/**
+ * 사용자의 최신 날씨 데이터 조회
+ */
+weatherSchema.statics.findLatestByUser = function (userId, location = null) {
+  const query = {
+    userId: String(userId),
+    isActive: true,
+  };
 
-    return summary || "날씨 정보 확인 중";
+  if (location) {
+    query.location = location;
   }
 
-  /**
-   * 💡 날씨 조언 생성
-   */
-  static generateWeatherAdvice(temperature, condition, windSpeed) {
-    const advice = [];
+  return this.findOne(query).sort({ createdAt: -1 });
+};
 
-    // 온도 기반 조언
-    if (temperature !== null) {
-      if (temperature >= 30) {
-        advice.push("매우 더우니 충분한 수분 섭취하세요");
-      } else if (temperature >= 25) {
-        advice.push("더운 날씨, 시원한 곳에서 휴식하세요");
-      } else if (temperature <= 0) {
-        advice.push("매우 추우니 따뜻하게 입으세요");
-      } else if (temperature <= 10) {
-        advice.push("쌀쌀하니 겉옷을 준비하세요");
-      }
+/**
+ * 유효한 캐시 데이터 조회
+ */
+weatherSchema.statics.findValidCache = function (userId, location) {
+  return this.findOne({
+    userId: String(userId),
+    location,
+    isActive: true,
+    "meta.cacheExpiry": { $gt: new Date() },
+  }).sort({ createdAt: -1 });
+};
+
+/**
+ * 만료된 캐시 정리
+ */
+weatherSchema.statics.cleanExpiredCache = async function () {
+  const result = await this.updateMany(
+    {
+      "meta.cacheExpiry": { $lt: new Date() },
+      isActive: true,
+    },
+    {
+      $set: { isActive: false },
     }
+  );
 
-    // 날씨 상태 기반 조언
-    if (condition) {
-      switch (condition.toLowerCase()) {
-        case "rain":
-        case "drizzle":
-          advice.push("비가 오니 우산을 챙기세요");
-          break;
-        case "snow":
-          advice.push("눈이 오니 미끄럼 주의하세요");
-          break;
-        case "thunderstorm":
-          advice.push("천둥번개가 있으니 실내에 있으세요");
-          break;
-        case "mist":
-        case "fog":
-          advice.push("안개가 있으니 운전 시 주의하세요");
-          break;
-      }
-    }
-
-    // 바람 기반 조언
-    if (windSpeed && windSpeed > 7) {
-      advice.push("바람이 강하니 외출 시 주의하세요");
-    }
-
-    return advice.length > 0 ? advice.join(". ") + "." : "날씨가 양호합니다.";
+  if (result.modifiedCount > 0) {
+    logger.info(`🧹 만료된 날씨 캐시 ${result.modifiedCount}개 정리 완료`);
   }
 
-  /**
-   * ✅ 데이터 검증
-   */
-  static validateWeatherData(data) {
-    const errors = [];
+  return result;
+};
 
-    // 필수 필드 체크
-    if (!data.location) errors.push("위치 정보가 없습니다");
-    if (data.temperature === null || data.temperature === undefined) {
-      errors.push("온도 정보가 없습니다");
+/**
+ * 사용자별 날씨 기록 통계
+ */
+weatherSchema.statics.getUserStats = async function (userId) {
+  const stats = await this.aggregate([
+    {
+      $match: {
+        userId: String(userId),
+        isActive: true,
+      },
+    },
+    {
+      $group: {
+        _id: null,
+        totalRecords: { $sum: 1 },
+        avgTemperature: { $avg: "$temperature" },
+        maxTemperature: { $max: "$temperature" },
+        minTemperature: { $min: "$temperature" },
+        locations: { $addToSet: "$location" },
+        lastUpdate: { $max: "$createdAt" },
+      },
+    },
+  ]);
+
+  return (
+    stats[0] || {
+      totalRecords: 0,
+      avgTemperature: 0,
+      maxTemperature: 0,
+      minTemperature: 0,
+      locations: [],
+      lastUpdate: null,
     }
+  );
+};
 
-    // 온도 범위 체크 (-50°C ~ 60°C)
-    if (
-      data.temperature !== null &&
-      (data.temperature < -50 || data.temperature > 60)
-    ) {
-      errors.push("온도가 정상 범위를 벗어났습니다");
-    }
+// ===== 🏭 모델 생성 및 내보내기 =====
 
-    // 습도 범위 체크 (0% ~ 100%)
-    if (data.humidity !== null && (data.humidity < 0 || data.humidity > 100)) {
-      errors.push("습도가 정상 범위를 벗어났습니다");
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  }
-
-  /**
-   * 🔄 데이터 정규화 (안전한 기본값 적용)
-   */
-  static normalizeWeatherData(data) {
-    return {
-      ...data,
-      location: data.location || "알수없음",
-      temperature:
-        data.temperature !== null
-          ? data.temperature
-          : this.estimateTemperature(),
-      humidity: data.humidity !== null ? data.humidity : 50,
-      pressure: data.pressure !== null ? data.pressure : 1013,
-      windSpeed: data.windSpeed !== null ? data.windSpeed : 0,
-      cloudiness: data.cloudiness !== null ? data.cloudiness : 0,
-      visibility: data.visibility !== null ? data.visibility : 10,
-      icon: data.icon || this.getWeatherIcon(data.iconCode || "01d"),
-      timestamp: data.timestamp || TimeHelper.format(TimeHelper.now(), "full"),
-    };
-  }
-}
+const Weather = mongoose.model("Weather", weatherSchema);
 
 module.exports = Weather;
