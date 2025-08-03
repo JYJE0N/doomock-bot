@@ -83,50 +83,21 @@ class BaseRenderer {
    * 🛡️ 안전한 메시지 전송 (통합된 폴백 시스템)
    */
   async sendSafeMessage(ctx, text, options = {}) {
-    this.stats.renderCount++;
-    this.stats.lastActivity = new Date();
-
     try {
-      // 1단계: HTML 모드로 시도 (MarkdownHelper 사용)
-      const htmlText = this.markdownHelper.convertToHtml(text);
-      await this.sendMessage(ctx, htmlText, { parse_mode: "HTML", ...options });
-      this.stats.successCount++;
-      return true;
+      // 콜백 쿼리인 경우 editMessageText 사용
+      if (ctx.callbackQuery) {
+        return await ctx.editMessageText(text, options);
+      } else {
+        return await ctx.reply(text, options);
+      }
     } catch (error) {
-      // "message is not modified" 에러는 성공으로 간주하고 조용히 처리
+      // "Bad Request: message is not modified" 에러는 무시
       if (error.message?.includes("message is not modified")) {
-        if (ctx.callbackQuery) await ctx.answerCbQuery();
-        this.stats.successCount++; // 성공으로 카운트
-        return true;
+        logger.debug("메시지가 변경되지 않음 - 무시");
+        return null;
       }
-
-      logger.warn(`HTML 전송 실패, 폴백 시도: ${error.message}`);
+      throw error;
     }
-
-    // 2단계: 일반 텍스트로 폴백
-    if (this.config.enableFallback) {
-      try {
-        const plainText = this.markdownHelper.stripAllMarkup(text);
-        await this.sendMessage(ctx, plainText, {
-          ...options,
-          parse_mode: undefined
-        });
-        this.stats.fallbackUsed++;
-        return true;
-      } catch (fallbackError) {
-        logger.error(`폴백 전송도 실패: ${fallbackError.message}`);
-      }
-    }
-
-    // 3단계: 최종적으로 ErrorHandler에 위임
-    this.stats.errorCount++;
-    if (this.errorHandler) {
-      await this.errorHandler.handleMessageSendError(
-        ctx,
-        "메시지 전송 최종 실패"
-      );
-    }
-    return false;
   }
 
   /**

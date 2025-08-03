@@ -461,15 +461,31 @@ class BotController {
    * 🔘 콜백 쿼리 처리
    */
   async handleCallbackQuery(ctx) {
+    let answered = false;
+
     try {
       this.stats.callbacksProcessed++;
       await this.navigationHandler.handleCallback(ctx);
-      await ctx.answerCbQuery();
+
+      // 응답하지 않았다면 응답
+      if (!answered) {
+        await ctx.answerCbQuery();
+        answered = true;
+      }
     } catch (error) {
       logger.error("콜백 쿼리 처리 오류:", error);
-      await ctx.answerCbQuery("처리 중 오류가 발생했습니다.", {
-        show_alert: true
-      });
+
+      // 에러가 "query is too old"가 아닌 경우에만 응답
+      if (!error.message?.includes("query is too old") && !answered) {
+        try {
+          await ctx.answerCbQuery("처리 중 오류가 발생했습니다.", {
+            show_alert: true
+          });
+        } catch (answerError) {
+          // 응답 실패는 무시
+          logger.debug("콜백 응답 실패 (이미 응답됨):", answerError.message);
+        }
+      }
     }
   }
 
