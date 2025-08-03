@@ -43,8 +43,9 @@ class TimeParseHelper {
       for (const strategy of strategies) {
         const result = strategy.call(this, cleanText, now);
         if (result.success) {
+          // ✅ 수정: formattedTime 사용 (이미 포맷된 문자열)
           logger.info(
-            `✅ 시간 파싱 성공: "${cleanText}" → ${result.datetime.format()}`
+            `✅ 시간 파싱 성공: "${cleanText}" → ${result.formattedTime}`
           );
           return result;
         }
@@ -64,11 +65,11 @@ class TimeParseHelper {
    */
   static parseRelativeTime(text, now) {
     const patterns = [
-      { regex: /(\d+)분\s*후/g, unit: "minutes" },
-      { regex: /(\d+)시간\s*후/g, unit: "hours" },
-      { regex: /(\d+)일\s*후/g, unit: "days" },
-      { regex: /(\d+)주\s*후/g, unit: "weeks" },
-      { regex: /(\d+)개월\s*후/g, unit: "months" }
+      { regex: /(\d+)분\s*후/, unit: "minutes" }, // g 플래그 제거
+      { regex: /(\d+)시간\s*후/, unit: "hours" },
+      { regex: /(\d+)일\s*후/, unit: "days" },
+      { regex: /(\d+)주\s*후/, unit: "weeks" },
+      { regex: /(\d+)개월\s*후/, unit: "months" }
     ];
 
     for (const pattern of patterns) {

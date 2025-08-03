@@ -2,7 +2,6 @@
 
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
 
 /**
  * 🔔 ReminderService - 리마인더 서비스 (Mongoose 버전)
@@ -152,6 +151,27 @@ class ReminderService extends BaseService {
         error,
         "리마인더 완료 처리에 실패했습니다."
       );
+    }
+  }
+
+  async getPendingReminders(currentTime = new Date(), limit = 10) {
+    try {
+      const ReminderModel = this.models.Reminder;
+
+      // 현재 시간보다 이전이지만 아직 발송되지 않은 리마인더 조회
+      const reminders = await ReminderModel.find({
+        isActive: true,
+        completed: false,
+        reminderTime: { $lte: currentTime },
+        sentAt: { $exists: false } // 아직 발송되지 않은 것만
+      })
+        .limit(limit)
+        .lean();
+
+      return reminders;
+    } catch (error) {
+      logger.error("발송 대상 리마인더 조회 실패:", error);
+      return [];
     }
   }
 

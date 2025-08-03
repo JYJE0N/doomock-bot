@@ -1,7 +1,6 @@
 // src/utils/ReminderScheduler.js - 🔔 리마인더 스케줄링 시스템
 const cron = require("node-cron");
 const logger = require("./Logger");
-const TimeHelper = require("./TimeHelper");
 
 /**
  * 🔔 ReminderScheduler - 리마인더 자동 발송 시스템
@@ -186,6 +185,18 @@ class ReminderScheduler {
     }
   }
 
+  async markReminderSent(reminder) {
+    try {
+      await this.reminderService.updateReminder(reminder._id, {
+        sentAt: new Date(),
+        completed: true
+      });
+      logger.debug(`✅ 리마인더 발송 완료 표시: ${reminder._id}`);
+    } catch (error) {
+      logger.error(`리마인더 발송 완료 표시 실패: ${reminder._id}`, error);
+    }
+  }
+
   /**
    * 🔍 발송 대상 리마인더 조회
    */
@@ -252,19 +263,6 @@ class ReminderScheduler {
       logger.info(`📤 리마인더 발송됨 (사용자: ${userId})`);
     } catch (error) {
       logger.error("리마인더 메시지 발송 실패:", error);
-      throw error;
-    }
-  }
-
-  /**
-   * ✅ 리마인더 발송 완료 처리
-   */
-  async markReminderSent(reminder) {
-    try {
-      await this.reminderService.markReminderSent(reminder._id);
-      logger.debug(`✅ 리마인더 발송 완료 처리 (ID: ${reminder._id})`);
-    } catch (error) {
-      logger.error("리마인더 발송 완료 처리 실패:", error);
       throw error;
     }
   }

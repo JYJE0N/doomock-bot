@@ -153,6 +153,11 @@ const reminderSchema = new mongoose.Schema(
       default: null
     },
 
+    sentAt: {
+      type: Date,
+      default: null
+    },
+
     // 🔔 스누즈 기능
     snoozeCount: {
       type: Number,

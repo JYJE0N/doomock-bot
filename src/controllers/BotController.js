@@ -75,6 +75,22 @@ class BotController {
       // 5. 미들웨어 설정
       this.setupMiddlewares();
 
+      // ReminderScheduler 초기화 (서비스 빌더 이후에 추가)
+      if (process.env.ENABLE_REMINDER_SCHEDULER !== "false") {
+        const ReminderScheduler = require("../utils/ReminderScheduler");
+        const reminderService =
+          await this.serviceBuilder.getOrCreate("reminder");
+
+        this.reminderScheduler = new ReminderScheduler({
+          bot: this.bot,
+          reminderService: reminderService
+        });
+
+        // 스케줄러 시작
+        await this.reminderScheduler.start();
+        logger.success("✅ ReminderScheduler 시작됨");
+      }
+
       this.isInitialized = true;
       logger.success("✅ BotController 초기화 완료");
     } catch (error) {
@@ -586,6 +602,12 @@ class BotController {
         } catch (error) {
           logger.warn("⚠️ ServiceBuilder 정리 실패:", error.message);
         }
+      }
+
+      // ReminderScheduler 정리
+      if (this.reminderScheduler) {
+        await this.reminderScheduler.stop();
+        logger.info("🛑 ReminderScheduler 중지됨");
       }
 
       // ModuleManager 정리

@@ -132,6 +132,7 @@ class TodoModule extends BaseModule {
       remind_edit_select: this.showReminderEditSelect,
       remind_delete_select: this.showReminderDeleteSelect,
       remind_quick: this.setQuickReminder,
+      remind_time_input: this.retryReminderTimeInput,
 
       remind: this.setReminder, // 리마인드 설정
       remind_list: this.showReminders, // 리마인드 목록
@@ -1424,6 +1425,47 @@ class TodoModule extends BaseModule {
   }
 
   // ===== 🆕 입력 처리 메서드들 =====
+  // 재시도 메서드 추가
+  async retryReminderTimeInput(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    const userId = getUserId(callbackQuery.from);
+    const userState = this.getUserState(userId);
+
+    if (
+      !userState ||
+      userState.state !== this.constants.INPUT_STATES.WAITING_REMINDER_TIME
+    ) {
+      return {
+        type: "error",
+        action: "error",
+        module: "todo",
+        data: {
+          message: "리마인드 설정 세션이 만료되었습니다. 다시 시도해주세요.",
+          action: "remind_time_input"
+        }
+      };
+    }
+
+    // 다시 입력 요청
+    return {
+      type: "input_request",
+      action: "input_request",
+      module: "todo",
+      data: {
+        title: "⏰ 리마인드 시간 설정",
+        message: this.generateReminderTimeInstructions(userState.todo),
+        placeholder: "예: 내일 오후 3시, 30분 후",
+        inputType: "text",
+        action: "remind",
+        todo: userState.todo
+      }
+    };
+  }
 
   /**
    * ⏰ 리마인드 시간 입력 처리
@@ -1446,7 +1488,7 @@ class TodoModule extends BaseModule {
             message: `시간을 이해할 수 없습니다: "${timeText}"\n\n올바른 예시:\n• 30분 후\n• 내일 오후 3시\n• 12월 25일 오전 9시`,
             action: "remind_time_input",
             canRetry: true,
-            keepState: true // 상태 유지
+            keepState: true
           }
         };
       }
@@ -1490,16 +1532,16 @@ class TodoModule extends BaseModule {
         };
       }
 
+      // ✅ parseResult.readableTime 사용 (이미 포맷된 시간)
       return {
-        type: "success",
-        action: "success",
+        type: "remind_set",
+        action: "remind_set",
         module: "todo",
         data: {
           title: "✅ 리마인드 설정 완료",
           message: `"${userState.todo.text}" 할일에 대한 리마인드가 설정되었습니다.\n\n⏰ ${parseResult.readableTime}`,
-          action: "remind_set",
-          reminder: reminderResult.data,
-          todo: userState.todo
+          todo: userState.todo,
+          reminder: reminderResult.data
         }
       };
     } catch (error) {
@@ -1528,12 +1570,7 @@ class TodoModule extends BaseModule {
     return `📋 "${todo.text}" 할일의 리마인드 시간을 설정해주세요.
 
 🕐 자연어로 편리하게 입력하세요:
-• "30분 후" - 30분 뒤에 알림
-• "내일 오후 3시" - 내일 15:00에 알림  
-• "다음주 월요일 오전 9시" - 다음주 월요일 09:00에 알림
-• "12월 25일 오후 2시" - 12월 25일 14:00에 알림
-
-⏰ 언제 이 할일을 완료하시겠습니까?`;
+⏰ 언제 알려드릴까요?`;
   }
 
   // ===== 기존 메서드들 (상태 관리 등) =====
