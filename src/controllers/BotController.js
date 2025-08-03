@@ -358,6 +358,7 @@ class BotController {
       await ctx.reply("시작 중 오류가 발생했습니다.");
     }
   }
+
   /**
    * /help 명령어 처리 (순수 라우팅)
    */
