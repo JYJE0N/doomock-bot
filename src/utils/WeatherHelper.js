@@ -110,7 +110,10 @@ class WeatherHelper {
       });
 
       // 5. Weather 모델로 데이터 변환
-      const weatherData = Weather.createFromApiResponse(response.data, location);
+      const weatherData = Weather.createFromApiResponse(
+        response.data,
+        location
+      );
 
       // 6. 데이터 검증 (Weather 모델 활용)
       const validation = Weather.validateWeatherData(weatherData);
@@ -129,7 +132,9 @@ class WeatherHelper {
       // 7. 캐시 저장
       this.setCache(cacheKey, weatherData);
 
-      logger.success(`✅ 날씨 조회 성공: ${location} (${weatherData.temperature}°C)`);
+      logger.success(
+        `✅ 날씨 조회 성공: ${location} (${weatherData.temperature}°C)`
+      );
 
       return { success: true, data: weatherData, source: "api" };
     } catch (error) {

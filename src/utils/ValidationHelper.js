@@ -57,7 +57,9 @@ class ValidationHelper {
     // 📝 기본 스키마 등록
     this.registerDefaultSchemas();
 
-    logger.info("🛡️ ValidationHelper v4.0.1 초기화됨 (callbackData 스키마 포함)");
+    logger.info(
+      "🛡️ ValidationHelper v4.0.1 초기화됨 (callbackData 스키마 포함)"
+    );
   }
 
   /**
@@ -93,7 +95,9 @@ class ValidationHelper {
       noExcessiveRepetition: (value) => {
         if (typeof value !== "string") return true;
         const repetitionPattern = /(.)\1{4,}/;
-        return !repetitionPattern.test(value) || "과도한 반복은 허용되지 않습니다.";
+        return (
+          !repetitionPattern.test(value) || "과도한 반복은 허용되지 않습니다."
+        );
       },
 
       // 금지된 단어 체크
@@ -101,7 +105,9 @@ class ValidationHelper {
         if (typeof value !== "string") return true;
         const forbiddenWords = ["spam", "test123", "테스트123"];
         const lowerValue = value.toLowerCase();
-        const hasForbidden = forbiddenWords.some((word) => lowerValue.includes(word));
+        const hasForbidden = forbiddenWords.some((word) =>
+          lowerValue.includes(word)
+        );
         return !hasForbidden || "부적절한 내용이 포함되어 있습니다.";
       },
 
@@ -109,7 +115,9 @@ class ValidationHelper {
       noMaliciousContent: (value) => {
         if (typeof value !== "string") return true;
         const maliciousPatterns = [/<script/i, /javascript:/i, /on\w+\s*=/i];
-        const hasMalicious = maliciousPatterns.some((pattern) => pattern.test(value));
+        const hasMalicious = maliciousPatterns.some((pattern) =>
+          pattern.test(value)
+        );
         return !hasMalicious || "보안 위험 요소가 감지되었습니다.";
       }
     };
@@ -130,8 +138,12 @@ class ValidationHelper {
         customValidators: [
           (value) => {
             // 콜백 데이터 형식 검증: "module:action" 또는 "module:action:params"
-            const validPattern = /^[a-zA-Z0-9_]+:[a-zA-Z0-9_]+(?::[a-zA-Z0-9_.-]*)?$/;
-            return validPattern.test(value) || "올바르지 않은 콜백 데이터 형식입니다.";
+            const validPattern =
+              /^[a-zA-Z0-9_]+:[a-zA-Z0-9_]+(?::[a-zA-Z0-9_.-]*)?$/;
+            return (
+              validPattern.test(value) ||
+              "올바르지 않은 콜백 데이터 형식입니다."
+            );
           }
         ]
       },
@@ -382,7 +394,9 @@ class ValidationHelper {
     // 필수 필드 체크
     if (
       fieldSchema.required &&
-      (processedValue === undefined || processedValue === null || processedValue === "")
+      (processedValue === undefined ||
+        processedValue === null ||
+        processedValue === "")
     ) {
       errors.push(`${fieldName}은(는) 필수 항목입니다.`);
       return { isValid: false, errors, value: processedValue };
@@ -454,12 +468,17 @@ class ValidationHelper {
     }
 
     // 커스텀 검증자 실행
-    if (fieldSchema.customValidators && Array.isArray(fieldSchema.customValidators)) {
+    if (
+      fieldSchema.customValidators &&
+      Array.isArray(fieldSchema.customValidators)
+    ) {
       for (const validator of fieldSchema.customValidators) {
         try {
           const result = validator(processedValue);
           if (result !== true) {
-            errors.push(typeof result === "string" ? result : `${fieldName} 검증 실패`);
+            errors.push(
+              typeof result === "string" ? result : `${fieldName} 검증 실패`
+            );
           }
         } catch (error) {
           errors.push(`커스텀 검증 오류: ${error.message}`);
@@ -552,7 +571,10 @@ class ValidationHelper {
     const errors = [];
     let processedValue = String(value);
 
-    if (schema.allowedValues && !schema.allowedValues.includes(processedValue)) {
+    if (
+      schema.allowedValues &&
+      !schema.allowedValues.includes(processedValue)
+    ) {
       errors.push(`허용된 값: ${schema.allowedValues.join(", ")}`);
     }
 
@@ -600,7 +622,9 @@ class ValidationHelper {
     if (schema.maxTagLength) {
       for (const tag of processedValue) {
         if (String(tag).length > schema.maxTagLength) {
-          errors.push(`각 태그는 최대 ${schema.maxTagLength}글자까지 가능합니다.`);
+          errors.push(
+            `각 태그는 최대 ${schema.maxTagLength}글자까지 가능합니다.`
+          );
           break;
         }
       }
@@ -673,7 +697,8 @@ class ValidationHelper {
       const message = result.isValid ? "검증 성공" : "검증 실패";
 
       logger[logLevel](`🛡️ [${schemaName}] ${message} (${validationTime}ms)`, {
-        errors: Object.keys(result.errors).length > 0 ? result.errors : undefined,
+        errors:
+          Object.keys(result.errors).length > 0 ? result.errors : undefined,
         fieldCount: result.metadata?.fieldCount
       });
     }
@@ -718,7 +743,9 @@ class ValidationHelper {
         maxSize: this.config.maxCacheSize,
         hitRate:
           this.stats.totalValidations > 0
-            ? Math.round((this.stats.cacheHits / this.stats.totalValidations) * 100)
+            ? Math.round(
+                (this.stats.cacheHits / this.stats.totalValidations) * 100
+              )
             : 0
       }
     };

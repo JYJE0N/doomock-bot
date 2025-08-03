@@ -81,27 +81,51 @@ class NavigationHandler {
       ],
       [
         "todo",
-        new (require("../renderers/TodoRenderer"))(this.bot, this, this.markdownHelper)
+        new (require("../renderers/TodoRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        )
       ],
       [
         "system",
-        new (require("../renderers/SystemRenderer"))(this.bot, this, this.markdownHelper)
+        new (require("../renderers/SystemRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        )
       ],
       [
         "tts",
-        new (require("../renderers/TTSRenderer"))(this.bot, this, this.markdownHelper)
+        new (require("../renderers/TTSRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        )
       ],
       [
         "weather",
-        new (require("../renderers/WeatherRenderer"))(this.bot, this, this.markdownHelper)
+        new (require("../renderers/WeatherRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        )
       ],
       [
         "timer",
-        new (require("../renderers/TimerRenderer"))(this.bot, this, this.markdownHelper)
+        new (require("../renderers/TimerRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        )
       ],
       [
         "leave",
-        new (require("../renderers/LeaveRenderer"))(this.bot, this, this.markdownHelper)
+        new (require("../renderers/LeaveRenderer"))(
+          this.bot,
+          this,
+          this.markdownHelper
+        )
       ],
       [
         "worktime",
@@ -118,7 +142,9 @@ class NavigationHandler {
       logger.debug(`📱 ${name} 렌더러 등록됨 (의존성 위임 방식)`);
     });
 
-    logger.info(`✅ ${this.renderers.size}개 렌더러 등록 완료 - 깔끔한 의존성 구조`);
+    logger.info(
+      `✅ ${this.renderers.size}개 렌더러 등록 완료 - 깔끔한 의존성 구조`
+    );
   }
 
   setModuleManager(moduleManager) {
@@ -168,14 +194,21 @@ class NavigationHandler {
       });
 
       if (!success) {
-        return this.errorHandler.handleMessageSendError(ctx, "메인 메뉴 전송 실패");
+        return this.errorHandler.handleMessageSendError(
+          ctx,
+          "메인 메뉴 전송 실패"
+        );
       }
 
       logger.debug("🏠 메인 메뉴 표시 완료");
       return true;
     } catch (error) {
       // try 블록 내에서 발생하는 모든 에러를 일관되게 처리합니다.
-      return this.errorHandler.handleUnexpectedError(ctx, error, "showMainMenu");
+      return this.errorHandler.handleUnexpectedError(
+        ctx,
+        error,
+        "showMainMenu"
+      );
     }
   }
 
@@ -312,7 +345,11 @@ class NavigationHandler {
       this.stats.errorsCount++;
 
       // 🎯 ErrorHandler 위임 - 모든 예외 처리
-      return await this.errorHandler.handleUnexpectedError(ctx, error, "handleCallback");
+      return await this.errorHandler.handleUnexpectedError(
+        ctx,
+        error,
+        "handleCallback"
+      );
     }
   }
 
@@ -371,7 +408,9 @@ class NavigationHandler {
             // 모듈이 메시지를 성공적으로 처리했다면
             if (result === true) {
               // ✅ 수정: boolean true는 단순히 "처리됨"을 의미하므로 렌더링하지 않음
-              logger.info(`✅ ${moduleName} 모듈이 메시지 처리함 (렌더링 불필요)`);
+              logger.info(
+                `✅ ${moduleName} 모듈이 메시지 처리함 (렌더링 불필요)`
+              );
               logger.info(
                 `🏁 NavigationHandler: 메시지 처리 완료 (${moduleName}이 처리함)`
               );
@@ -384,14 +423,20 @@ class NavigationHandler {
               });
 
               // 해당 모듈의 렌더러를 찾아 결과를 화면에 표시합니다.
-              const renderer = this.renderers.get(result.module || module.moduleName);
+              const renderer = this.renderers.get(
+                result.module || module.moduleName
+              );
 
               if (renderer) {
-                logger.debug(`🎨 NavigationHandler: ${moduleName} 렌더러로 결과 전송`);
+                logger.debug(
+                  `🎨 NavigationHandler: ${moduleName} 렌더러로 결과 전송`
+                );
                 await renderer.render(result, ctx);
                 logger.info(`✅ NavigationHandler: ${moduleName} 렌더링 완료`);
               } else {
-                logger.warn(`📱 렌더러 없음: ${result.module || module.moduleName}`);
+                logger.warn(
+                  `📱 렌더러 없음: ${result.module || module.moduleName}`
+                );
                 await this.errorHandler.handleMissingRenderer(
                   ctx,
                   result.module || module.moduleName,
@@ -418,7 +463,9 @@ class NavigationHandler {
             continue;
           }
         } else {
-          logger.debug(`⏭️ NavigationHandler: ${moduleName} 모듈에 onHandleMessage 없음`);
+          logger.debug(
+            `⏭️ NavigationHandler: ${moduleName} 모듈에 onHandleMessage 없음`
+          );
         }
       }
 
@@ -428,7 +475,11 @@ class NavigationHandler {
     } catch (error) {
       logger.error("❌ NavigationHandler: handleMessage 전체 오류:", error);
       // 🎯 ErrorHandler 위임
-      await this.errorHandler.handleUnexpectedError(ctx, error, "handleMessage");
+      await this.errorHandler.handleUnexpectedError(
+        ctx,
+        error,
+        "handleMessage"
+      );
     }
   }
 
@@ -475,7 +526,9 @@ class NavigationHandler {
             : 100,
         fallbackRate:
           this.stats.callbacksProcessed > 0
-            ? Math.round((this.stats.fallbackUsed / this.stats.callbacksProcessed) * 100)
+            ? Math.round(
+                (this.stats.fallbackUsed / this.stats.callbacksProcessed) * 100
+              )
             : 0
       },
       rendererCount: this.renderers.size,

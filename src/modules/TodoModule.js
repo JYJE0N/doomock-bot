@@ -33,8 +33,10 @@ class TodoModule extends BaseModule {
       cacheTimeout: parseInt(process.env.TODO_CACHE_TIMEOUT) || 300000,
 
       // 🆕 리마인드 관련 설정
-      defaultReminderMinutes: parseInt(process.env.TODO_DEFAULT_REMINDER_MINUTES) || 60,
-      maxRemindersPerTodo: parseInt(process.env.TODO_MAX_REMINDERS_PER_TODO) || 3,
+      defaultReminderMinutes:
+        parseInt(process.env.TODO_DEFAULT_REMINDER_MINUTES) || 60,
+      maxRemindersPerTodo:
+        parseInt(process.env.TODO_MAX_REMINDERS_PER_TODO) || 3,
       enableSmartReminders: process.env.TODO_ENABLE_SMART_REMINDERS !== "false",
 
       ...this.config
@@ -86,7 +88,8 @@ class TodoModule extends BaseModule {
 
       // 🆕 ReminderService 가져오기
       if (this.config.enableReminders) {
-        this.reminderService = await this.serviceBuilder.getOrCreate("reminder");
+        this.reminderService =
+          await this.serviceBuilder.getOrCreate("reminder");
       }
 
       if (!this.todoService) {
@@ -404,7 +407,11 @@ class TodoModule extends BaseModule {
       data: {
         title: "➕ 새로운 할일 추가",
         message: "추가할 할일을 입력해주세요:",
-        suggestions: ["예: 보고서 작성하기", "예: 오후 3시 회의 참석", "예: 운동하기"]
+        suggestions: [
+          "예: 보고서 작성하기",
+          "예: 오후 3시 회의 참석",
+          "예: 운동하기"
+        ]
       }
     };
   }
@@ -556,14 +563,26 @@ class TodoModule extends BaseModule {
    * ✅ 할일 완료
    */
   async completeTodo(bot, callbackQuery, subAction, params, moduleManager) {
-    return this.toggleTodo(bot, callbackQuery, subAction, params, moduleManager);
+    return this.toggleTodo(
+      bot,
+      callbackQuery,
+      subAction,
+      params,
+      moduleManager
+    );
   }
 
   /**
    * ↩️ 할일 미완료
    */
   async uncompleteTodo(bot, callbackQuery, subAction, params, moduleManager) {
-    return this.toggleTodo(bot, callbackQuery, subAction, params, moduleManager);
+    return this.toggleTodo(
+      bot,
+      callbackQuery,
+      subAction,
+      params,
+      moduleManager
+    );
   }
 
   /**
@@ -642,7 +661,10 @@ class TodoModule extends BaseModule {
     const priority = params;
 
     try {
-      const result = await this.todoService.getTodosByPriority(userId, priority);
+      const result = await this.todoService.getTodosByPriority(
+        userId,
+        priority
+      );
 
       return {
         type: "filtered_list",
@@ -720,7 +742,10 @@ class TodoModule extends BaseModule {
     }
 
     try {
-      const result = await this.reminderService.deleteReminder(userId, reminderId);
+      const result = await this.reminderService.deleteReminder(
+        userId,
+        reminderId
+      );
 
       if (!result.success) {
         return {
@@ -806,7 +831,13 @@ class TodoModule extends BaseModule {
   /**
    * 💡 스마트 제안
    */
-  async showSmartSuggestions(bot, callbackQuery, subAction, params, moduleManager) {
+  async showSmartSuggestions(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
     const userId = getUserId(callbackQuery.from);
 
     try {
@@ -925,7 +956,9 @@ class TodoModule extends BaseModule {
       };
     }
 
-    const result = await this.todoService.updateTodo(userId, userState.todoId, { text });
+    const result = await this.todoService.updateTodo(userId, userState.todoId, {
+      text
+    });
     this.clearUserState(userId);
 
     if (!result.success) {

@@ -292,7 +292,9 @@ reminderSchema.methods.snooze = function (minutes = 10) {
     throw new Error("최대 스누즈 횟수를 초과했습니다.");
   }
 
-  const newReminderTime = new Date(this.reminderTime.getTime() + minutes * 60 * 1000);
+  const newReminderTime = new Date(
+    this.reminderTime.getTime() + minutes * 60 * 1000
+  );
 
   this.reminderTime = newReminderTime;
   this.snoozeCount += 1;
@@ -446,20 +448,24 @@ reminderSchema.pre("save", function (next) {
 });
 
 // 삭제 시 관련 데이터 정리
-reminderSchema.pre("deleteOne", { document: true, query: false }, async function (next) {
-  try {
-    // 자식 반복 리마인드들도 함께 삭제
-    if (this.isRecurring) {
-      await this.constructor.deleteMany({
-        "metadata.parentReminderId": this._id
-      });
-    }
+reminderSchema.pre(
+  "deleteOne",
+  { document: true, query: false },
+  async function (next) {
+    try {
+      // 자식 반복 리마인드들도 함께 삭제
+      if (this.isRecurring) {
+        await this.constructor.deleteMany({
+          "metadata.parentReminderId": this._id
+        });
+      }
 
-    next();
-  } catch (error) {
-    next(error);
+      next();
+    } catch (error) {
+      next(error);
+    }
   }
-});
+);
 
 // ===== JSON 출력 설정 =====
 reminderSchema.set("toJSON", {

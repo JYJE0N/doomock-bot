@@ -189,9 +189,9 @@ const UNIFIED_MODULES = [
  * NavigationHandler.showMainMenu()에서 직접 사용
  */
 function getEnabledModules() {
-  return UNIFIED_MODULES.filter((module) => module.enabled && module.showInMenu).sort(
-    (a, b) => a.priority - b.priority
-  );
+  return UNIFIED_MODULES.filter(
+    (module) => module.enabled && module.showInMenu
+  ).sort((a, b) => a.priority - b.priority);
 }
 
 /**
@@ -228,7 +228,8 @@ function getModulesByCategory() {
 function getModuleInfo(moduleKey) {
   return UNIFIED_MODULES.find(
     (module) =>
-      module.key === moduleKey || module.name.toLowerCase() === moduleKey.toLowerCase()
+      module.key === moduleKey ||
+      module.name.toLowerCase() === moduleKey.toLowerCase()
   );
 }
 
@@ -245,7 +246,9 @@ function findModuleByKey(key) {
 function getModuleStats() {
   const total = UNIFIED_MODULES.length;
   const enabled = UNIFIED_MODULES.filter((m) => m.enabled).length;
-  const visible = UNIFIED_MODULES.filter((m) => m.enabled && m.showInMenu).length;
+  const visible = UNIFIED_MODULES.filter(
+    (m) => m.enabled && m.showInMenu
+  ).length;
   const enhanced = UNIFIED_MODULES.filter((m) => m.enhanced).length;
 
   return {

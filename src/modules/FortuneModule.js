@@ -147,12 +147,15 @@ class FortuneModule extends BaseModule {
 
         // 키 목록 (상위 5개만)
         botKeys: bot ? Object.keys(bot).slice(0, 5) : [],
-        telegramKeys: bot && bot.telegram ? Object.keys(bot.telegram).slice(0, 5) : []
+        telegramKeys:
+          bot && bot.telegram ? Object.keys(bot.telegram).slice(0, 5) : []
       });
 
       // 일일 제한 확인
       const todayCount = await this.getTodayDrawCount(userId, userName);
-      logger.debug(`📅 오늘 뽑기 횟수: ${todayCount}/${this.config.maxDrawsPerDay}`);
+      logger.debug(
+        `📅 오늘 뽑기 횟수: ${todayCount}/${this.config.maxDrawsPerDay}`
+      );
 
       if (todayCount >= this.config.maxDrawsPerDay) {
         logger.warn(`⛔ 일일 제한 도달: ${userName}`);
@@ -207,7 +210,10 @@ class FortuneModule extends BaseModule {
         } else {
           try {
             logger.debug("🎬 AnimationHelper 호출 시도");
-            animationMessage = await AnimationHelper.performShuffle(bot, chatId);
+            animationMessage = await AnimationHelper.performShuffle(
+              bot,
+              chatId
+            );
 
             if (
               animationMessage === "animation_skipped" ||
@@ -229,7 +235,12 @@ class FortuneModule extends BaseModule {
 
         // 일반 운세 뽑기 (애니메이션 실패와 관계없이 진행)
         logger.debug(`🎴 performDraw 호출 시작: ${userName}, ${fortuneType}`);
-        const result = await this.performDraw(userId, fortuneType, null, userName);
+        const result = await this.performDraw(
+          userId,
+          fortuneType,
+          null,
+          userName
+        );
 
         // 결과 검증
         if (!result) {
@@ -346,7 +357,10 @@ class FortuneModule extends BaseModule {
       logger.debug(`🔄 카드 셔플 시작: ${userName}`);
 
       // 🎬 셔플 애니메이션 실행
-      const animationMessage = await AnimationHelper.performShuffle(bot, chatId);
+      const animationMessage = await AnimationHelper.performShuffle(
+        bot,
+        chatId
+      );
 
       // 셔플 처리 (새 FortuneService 호환)
       let result;
@@ -394,14 +408,17 @@ class FortuneModule extends BaseModule {
       const userId = getUserId(callbackQuery.from);
       const userName = getUserName(callbackQuery.from);
 
-      logger.debug(`🔮 캘틱 크로스 상세 해석 요청: ${userName}, params: ${params}`);
+      logger.debug(
+        `🔮 캘틱 크로스 상세 해석 요청: ${userName}, params: ${params}`
+      );
 
       // 최근 캘틱 크로스 결과 조회 시도
       let lastCelticResult = null;
 
       try {
         if (this.fortuneService) {
-          const historyResult = await this.fortuneService.getDrawHistory(userId);
+          const historyResult =
+            await this.fortuneService.getDrawHistory(userId);
           if (historyResult.success && historyResult.data.records) {
             // 가장 최근의 캘틱 크로스 찾기
             const celticRecord = historyResult.data.records
@@ -409,7 +426,8 @@ class FortuneModule extends BaseModule {
               .sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp))[0];
 
             if (celticRecord && celticRecord.timestamp) {
-              const timeDiff = Date.now() - new Date(celticRecord.timestamp).getTime();
+              const timeDiff =
+                Date.now() - new Date(celticRecord.timestamp).getTime();
               // 1시간 이내의 최근 결과만 사용
               if (timeDiff < 60 * 60 * 1000) {
                 lastCelticResult = celticRecord;
@@ -434,7 +452,8 @@ class FortuneModule extends BaseModule {
             question: "내 인생의 방향은 무엇인가요?",
             cards: this.generateDummyCelticCards(),
             detailedInterpretation: this.generateDetailedInterpretation(),
-            overallMessage: "현재 상황을 잘 이해하고 있으며, 앞으로의 방향이 밝습니다.",
+            overallMessage:
+              "현재 상황을 잘 이해하고 있으며, 앞으로의 방향이 밝습니다.",
             isDemo: true
           }
         };
@@ -711,7 +730,8 @@ class FortuneModule extends BaseModule {
           type: "error",
           module: "fortune",
           data: {
-            message: result.message || "질문 운세를 뽑는 중 오류가 발생했습니다."
+            message:
+              result.message || "질문 운세를 뽑는 중 오류가 발생했습니다."
           }
         };
       }

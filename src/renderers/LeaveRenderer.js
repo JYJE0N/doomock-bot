@@ -74,7 +74,10 @@ class LeaveRenderer extends BaseRenderer {
         case "error":
           return await this.renderError(data, ctx);
         default:
-          return await this.renderError({ message: `지원하지 않는 기능: ${type}` }, ctx);
+          return await this.renderError(
+            { message: `지원하지 않는 기능: ${type}` },
+            ctx
+          );
       }
     } catch (error) {
       logger.error("LeaveRenderer.render 실패:", error);
@@ -97,7 +100,8 @@ class LeaveRenderer extends BaseRenderer {
       } = data || {};
 
       // 상태 아이콘
-      const statusIcon = remainingLeave > 10 ? "😊" : remainingLeave > 5 ? "😐" : "😰";
+      const statusIcon =
+        remainingLeave > 10 ? "😊" : remainingLeave > 5 ? "😐" : "😰";
 
       // 연차 추가 정보
       const bonusInfo =
@@ -208,7 +212,11 @@ ${message}
           count: 0
         };
         const isCurrentMonth = month === currentMonth;
-        const monthIcon = isCurrentMonth ? "📍" : month <= currentMonth ? "✅" : "⏳";
+        const monthIcon = isCurrentMonth
+          ? "📍"
+          : month <= currentMonth
+            ? "✅"
+            : "⏳";
 
         text += `${monthIcon} **${monthNames[month]}**: ${usage.days}일 사용`;
         if (usage.count > 0) {
@@ -444,7 +452,8 @@ ${message}
    */
   async renderInputError(data, ctx) {
     try {
-      const { message = "입력에 오류가 있습니다.", remainingLeave = 0 } = data || {};
+      const { message = "입력에 오류가 있습니다.", remainingLeave = 0 } =
+        data || {};
 
       const text = `⚠️ **입력 오류**
 
@@ -565,7 +574,9 @@ ${data.message}
 취소하려면 /cancel 을 입력해주세요.`;
 
       const keyboard = {
-        inline_keyboard: [[{ text: "❌ 취소", callback_data: "leave:settings" }]]
+        inline_keyboard: [
+          [{ text: "❌ 취소", callback_data: "leave:settings" }]
+        ]
       };
 
       await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });

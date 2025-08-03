@@ -43,12 +43,16 @@ class TimeParseHelper {
       for (const strategy of strategies) {
         const result = strategy.call(this, cleanText, now);
         if (result.success) {
-          logger.info(`✅ 시간 파싱 성공: "${cleanText}" → ${result.datetime.format()}`);
+          logger.info(
+            `✅ 시간 파싱 성공: "${cleanText}" → ${result.datetime.format()}`
+          );
           return result;
         }
       }
 
-      return this.createErrorResult(`시간 표현을 이해할 수 없습니다: "${timeText}"`);
+      return this.createErrorResult(
+        `시간 표현을 이해할 수 없습니다: "${timeText}"`
+      );
     } catch (error) {
       logger.error("TimeParseHelper 오류:", error);
       return this.createErrorResult("시간 처리 중 오류가 발생했습니다.");
@@ -283,7 +287,8 @@ class TimeParseHelper {
 
     if (dateKeyword) {
       dateResult =
-        this.parseRelativeDay(dateKeyword, now) || this.parseRelativeDay(text, now);
+        this.parseRelativeDay(dateKeyword, now) ||
+        this.parseRelativeDay(text, now);
     }
 
     // 시간 부분 파싱

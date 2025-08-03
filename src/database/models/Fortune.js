@@ -305,7 +305,8 @@ FortuneUserSchema.virtual("remainingDrawsToday").get(function () {
 
 // 메이저/마이너 아르카나 비율
 FortuneUserSchema.virtual("arcanaRatio").get(function () {
-  const total = this.dailyStats.majorArcanaDraws + this.dailyStats.minorArcanaDraws;
+  const total =
+    this.dailyStats.majorArcanaDraws + this.dailyStats.minorArcanaDraws;
   if (total === 0) return { major: 0, minor: 0 };
 
   return {
@@ -379,7 +380,9 @@ FortuneUserSchema.methods.recordDraw = function (cardData, userName) {
 
 // ✅ 수정: 선호 카드 업데이트 (78장 덱 지원)
 FortuneUserSchema.methods.updateFavoriteCards = function (cardId, cardData) {
-  const existing = this.preferences.favoriteCards.find((card) => card.cardId === cardId);
+  const existing = this.preferences.favoriteCards.find(
+    (card) => card.cardId === cardId
+  );
 
   if (existing) {
     existing.drawCount += 1;

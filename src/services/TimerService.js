@@ -227,9 +227,11 @@ class TimerService extends BaseService {
 
       // 통계 업데이트 (비동기)
       if (this.config.enableStats) {
-        this.updateDailyStats(session.userId, session.type, "stopped").catch((error) => {
-          logger.warn("통계 업데이트 실패:", error);
-        });
+        this.updateDailyStats(session.userId, session.type, "stopped").catch(
+          (error) => {
+            logger.warn("통계 업데이트 실패:", error);
+          }
+        );
       }
 
       logger.info(`⏹️ 타이머 중지: ${session.userId} - ${sessionId}`);
@@ -299,7 +301,10 @@ class TimerService extends BaseService {
       if (useCache && this.statsCache.has(cacheKey)) {
         const cached = this.statsCache.get(cacheKey);
         if (Date.now() - cached.timestamp < this.statsCacheTimeout) {
-          return this.createSuccessResponse(cached.data, "통계 조회 완료 (캐시)");
+          return this.createSuccessResponse(
+            cached.data,
+            "통계 조회 완료 (캐시)"
+          );
         }
       }
 
@@ -571,7 +576,9 @@ class TimerService extends BaseService {
     let tempStreak = 0;
 
     // 최신 날짜부터 역순으로 확인
-    const sorted = statsArray.sort((a, b) => new Date(b.date) - new Date(a.date));
+    const sorted = statsArray.sort(
+      (a, b) => new Date(b.date) - new Date(a.date)
+    );
 
     for (const stat of sorted) {
       if (stat.totalCompleted > 0) {
@@ -613,7 +620,9 @@ class TimerService extends BaseService {
       }
 
       if (abandonedSessions.length > 0) {
-        logger.info(`🔄 총 ${abandonedSessions.length}개의 버려진 세션을 복구했습니다.`);
+        logger.info(
+          `🔄 총 ${abandonedSessions.length}개의 버려진 세션을 복구했습니다.`
+        );
       }
     } catch (error) {
       logger.error("버려진 세션 복구 실패:", error);

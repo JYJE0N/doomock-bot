@@ -210,7 +210,10 @@ class TimerRenderer extends BaseRenderer {
       }
     } catch (error) {
       logger.error("TimerRenderer.render 오류:", error);
-      return await this.renderError({ message: "렌더링 중 오류가 발생했습니다." }, ctx);
+      return await this.renderError(
+        { message: "렌더링 중 오류가 발생했습니다." },
+        ctx
+      );
     }
   }
 
@@ -229,7 +232,9 @@ class TimerRenderer extends BaseRenderer {
       // 활성 타이머가 있을 때 - 화려한 시각적 표시
       const progressBar = this.createProgressBar(activeTimer);
       const statusIcon = this.getStatusIcon(activeTimer);
-      const motivationMsg = this.getMotivationMessage(data.motivationData || {});
+      const motivationMsg = this.getMotivationMessage(
+        data.motivationData || {}
+      );
 
       text += `${statusIcon} **실행 중인 타이머**\n\n`;
       text += `${progressBar}\n\n`;
@@ -906,7 +911,11 @@ ${message}
 
     sessions.slice(-5).forEach((session, index) => {
       const completionIcon =
-        session.completion >= 90 ? "🟢" : session.completion >= 70 ? "🟡" : "🔴";
+        session.completion >= 90
+          ? "🟢"
+          : session.completion >= 70
+            ? "🟡"
+            : "🔴";
       history += `${completionIcon} ${session.type} - ${session.completion}%\n`;
     });
 

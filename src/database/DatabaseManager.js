@@ -100,7 +100,9 @@ class DatabaseManager {
       // 재연결 시도
       if (this.connectionAttempts < this.maxReconnectAttempts) {
         logger.info(`🔄 ${this.reconnectDelay / 1000}초 후 재연결 시도...`);
-        await new Promise((resolve) => setTimeout(resolve, this.reconnectDelay));
+        await new Promise((resolve) =>
+          setTimeout(resolve, this.reconnectDelay)
+        );
         return await this.connect();
       }
 

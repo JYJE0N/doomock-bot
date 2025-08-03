@@ -311,7 +311,9 @@ timerSchema.methods.complete = async function () {
   };
 
   const saved = await this.save();
-  logger.info(`✅ 타이머 완료: ${this.userId} - ${this.type} (${this.duration}분)`);
+  logger.info(
+    `✅ 타이머 완료: ${this.userId} - ${this.type} (${this.duration}분)`
+  );
 
   return saved;
 };
@@ -612,7 +614,9 @@ timerSchema.statics.cleanupOldSessions = async function (daysOld = 90) {
     }
   );
 
-  logger.info(`🧹 ${result.modifiedCount}개의 오래된 타이머 세션을 정리했습니다.`);
+  logger.info(
+    `🧹 ${result.modifiedCount}개의 오래된 타이머 세션을 정리했습니다.`
+  );
   return result;
 };
 
@@ -643,10 +647,14 @@ timerSchema.pre("save", function (next) {
 /**
  * 🗑️ 삭제 전 관련 데이터 정리
  */
-timerSchema.pre("deleteOne", { document: true, query: false }, async function () {
-  logger.info(`🗑️ 타이머 세션 삭제: ${this._id}`);
-  // 필요시 관련 통계 데이터 정리 로직 추가
-});
+timerSchema.pre(
+  "deleteOne",
+  { document: true, query: false },
+  async function () {
+    logger.info(`🗑️ 타이머 세션 삭제: ${this._id}`);
+    // 필요시 관련 통계 데이터 정리 로직 추가
+  }
+);
 
 // ===== 📊 모델 생성 =====
 

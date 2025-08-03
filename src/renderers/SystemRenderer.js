@@ -35,7 +35,10 @@ class SystemRenderer extends BaseRenderer {
         return await this.renderError(result, ctx);
       default:
         logger.warn(`🖥️ 지원하지 않는 렌더링 타입: ${type}`);
-        return await this.renderError({ message: "지원하지 않는 기능입니다." }, ctx);
+        return await this.renderError(
+          { message: "지원하지 않는 기능입니다." },
+          ctx
+        );
     }
   }
 

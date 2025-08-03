@@ -74,7 +74,9 @@ class CallbackResponseManager {
       this.respondedCallbacks.add(callbackId);
       this.stats.successfulResponses++;
 
-      logger.debug(`콜백 응답 성공: ${callbackId} - "${options.text || "처리 중..."}"`);
+      logger.debug(
+        `콜백 응답 성공: ${callbackId} - "${options.text || "처리 중..."}"`
+      );
 
       return {
         success: true,
@@ -138,7 +140,8 @@ class CallbackResponseManager {
     ];
 
     const text =
-      loadingText || loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+      loadingText ||
+      loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 
     return await this.answerCallback(bot, callbackQuery, { text });
   }
@@ -146,7 +149,11 @@ class CallbackResponseManager {
   /**
    * ❌ 에러 응답 (알림 팝업)
    */
-  async answerError(bot, callbackQuery, errorText = "처리 중 오류가 발생했습니다") {
+  async answerError(
+    bot,
+    callbackQuery,
+    errorText = "처리 중 오류가 발생했습니다"
+  ) {
     return await this.answerCallback(bot, callbackQuery, {
       text: `❌ ${errorText}`,
       show_alert: true
@@ -170,7 +177,8 @@ class CallbackResponseManager {
       responded: this.respondedCallbacks.has(callbackId),
       pending: this.pendingCallbacks.has(callbackId),
       canRespond:
-        !this.respondedCallbacks.has(callbackId) && !this.pendingCallbacks.has(callbackId)
+        !this.respondedCallbacks.has(callbackId) &&
+        !this.pendingCallbacks.has(callbackId)
     };
   }
 
@@ -184,9 +192,10 @@ class CallbackResponseManager {
       totalTracked: this.respondedCallbacks.size,
       successRate:
         this.stats.totalResponses > 0
-          ? ((this.stats.successfulResponses / this.stats.totalResponses) * 100).toFixed(
-              2
-            )
+          ? (
+              (this.stats.successfulResponses / this.stats.totalResponses) *
+              100
+            ).toFixed(2)
           : 0
     };
   }

@@ -149,17 +149,25 @@ class TodoRenderer extends BaseRenderer {
           text: `${this.emojis.reminder} 리마인드 목록`,
           callback_data: "todo:remind_list"
         },
-        { text: `${this.emojis.report} 주간 리포트`, callback_data: "todo:weekly_report" }
+        {
+          text: `${this.emojis.report} 주간 리포트`,
+          callback_data: "todo:weekly_report"
+        }
       ]);
     }
 
     // 추가 기능들
     keyboard.push([
       { text: `${this.emojis.search} 검색`, callback_data: "todo:search" },
-      { text: `${this.emojis.smart} 스마트 정리`, callback_data: "todo:cleanup" }
+      {
+        text: `${this.emojis.smart} 스마트 정리`,
+        callback_data: "todo:cleanup"
+      }
     ]);
 
-    keyboard.push([{ text: `${this.emojis.back} 뒤로가기`, callback_data: "main:menu" }]);
+    keyboard.push([
+      { text: `${this.emojis.back} 뒤로가기`, callback_data: "main:menu" }
+    ]);
 
     return {
       text,
@@ -171,7 +179,8 @@ class TodoRenderer extends BaseRenderer {
    * 📋 할일 목록 렌더링 (리마인드 정보 포함)
    */
   renderTodoList(data) {
-    const { todos, totalCount, currentPage, totalPages, enableReminders } = data;
+    const { todos, totalCount, currentPage, totalPages, enableReminders } =
+      data;
 
     let text = `${this.emojis.todo} *할일 목록*\n\n`;
 
@@ -195,7 +204,9 @@ class TodoRenderer extends BaseRenderer {
     // 할일 목록
     todos.forEach((todo, index) => {
       const number = (currentPage - 1) * 8 + index + 1;
-      const status = todo.completed ? this.emojis.completed : this.emojis.pending;
+      const status = todo.completed
+        ? this.emojis.completed
+        : this.emojis.pending;
 
       text += `${number}. ${status} ${todo.text}`;
 
@@ -216,7 +227,10 @@ class TodoRenderer extends BaseRenderer {
 
       // 완료 시간 표시
       if (todo.completed && todo.completedAt) {
-        const completedTime = TimeHelper.format(new Date(todo.completedAt), "relative");
+        const completedTime = TimeHelper.format(
+          new Date(todo.completedAt),
+          "relative"
+        );
         text += `   ✓ *${completedTime} 완료*\n`;
       }
 
@@ -239,7 +253,10 @@ class TodoRenderer extends BaseRenderer {
           callback_data: `todo:uncomplete:${todo1._id}`
         });
       } else {
-        row.push({ text: `${num1}. 완료`, callback_data: `todo:complete:${todo1._id}` });
+        row.push({
+          text: `${num1}. 완료`,
+          callback_data: `todo:complete:${todo1._id}`
+        });
       }
 
       // 두 번째 할일 (있는 경우)
@@ -302,7 +319,9 @@ class TodoRenderer extends BaseRenderer {
       }
     ]);
 
-    keyboard.push([{ text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }]);
+    keyboard.push([
+      { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
+    ]);
 
     return {
       text,
@@ -323,8 +342,14 @@ class TodoRenderer extends BaseRenderer {
 
     const keyboard = [
       [
-        { text: "⏰ 30분 후", callback_data: `todo:remind_quick:${todo._id}:30m` },
-        { text: "⏰ 1시간 후", callback_data: `todo:remind_quick:${todo._id}:1h` }
+        {
+          text: "⏰ 30분 후",
+          callback_data: `todo:remind_quick:${todo._id}:30m`
+        },
+        {
+          text: "⏰ 1시간 후",
+          callback_data: `todo:remind_quick:${todo._id}:1h`
+        }
       ],
       [
         {
@@ -361,7 +386,12 @@ class TodoRenderer extends BaseRenderer {
       return {
         text,
         reply_markup: this.createInlineKeyboard([
-          [{ text: `${this.emojis.todo} 할일 목록`, callback_data: "todo:list:1" }],
+          [
+            {
+              text: `${this.emojis.todo} 할일 목록`,
+              callback_data: "todo:list:1"
+            }
+          ],
           [{ text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }]
         ])
       };
@@ -399,7 +429,9 @@ class TodoRenderer extends BaseRenderer {
     const keyboard = [];
 
     // 활성 리마인드만 관리 버튼 제공
-    const activeReminders = reminders.filter((r) => new Date(r.reminderTime) > now);
+    const activeReminders = reminders.filter(
+      (r) => new Date(r.reminderTime) > now
+    );
     if (activeReminders.length > 0) {
       keyboard.push([
         {
@@ -415,10 +447,15 @@ class TodoRenderer extends BaseRenderer {
 
     keyboard.push([
       { text: `${this.emojis.add} 새 리마인드`, callback_data: "todo:list:1" },
-      { text: `${this.emojis.refresh} 새로고침`, callback_data: "todo:remind_list" }
+      {
+        text: `${this.emojis.refresh} 새로고침`,
+        callback_data: "todo:remind_list"
+      }
     ]);
 
-    keyboard.push([{ text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }]);
+    keyboard.push([
+      { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
+    ]);
 
     return {
       text,
@@ -431,7 +468,10 @@ class TodoRenderer extends BaseRenderer {
    */
   renderReminderSuccess(data) {
     const { todo, reminder } = data;
-    const reminderTime = TimeHelper.format(new Date(reminder.reminderTime), "full");
+    const reminderTime = TimeHelper.format(
+      new Date(reminder.reminderTime),
+      "full"
+    );
 
     let text = `${this.emojis.completed} *리마인드 설정 완료!*\n\n`;
     text += `📋 할일: *${todo.text}*\n`;
@@ -440,7 +480,10 @@ class TodoRenderer extends BaseRenderer {
 
     const keyboard = [
       [
-        { text: `${this.emojis.bell} 내 리마인드`, callback_data: "todo:remind_list" },
+        {
+          text: `${this.emojis.bell} 내 리마인드`,
+          callback_data: "todo:remind_list"
+        },
         { text: `${this.emojis.todo} 할일 목록`, callback_data: "todo:list:1" }
       ],
       [{ text: `${this.emojis.back} 메뉴로`, callback_data: "todo:menu" }]
@@ -500,10 +543,16 @@ class TodoRenderer extends BaseRenderer {
           text: `${this.emojis.smart} 개선 제안`,
           callback_data: "todo:smart_suggestions"
         },
-        { text: `${this.emojis.cleanup} 스마트 정리`, callback_data: "todo:cleanup" }
+        {
+          text: `${this.emojis.cleanup} 스마트 정리`,
+          callback_data: "todo:cleanup"
+        }
       ],
       [
-        { text: `${this.emojis.refresh} 새로고침`, callback_data: "todo:weekly_report" },
+        {
+          text: `${this.emojis.refresh} 새로고침`,
+          callback_data: "todo:weekly_report"
+        },
         { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
       ]
     ];
@@ -557,11 +606,16 @@ class TodoRenderer extends BaseRenderer {
 
     if (canRetry && action) {
       keyboard.push([
-        { text: `${this.emojis.refresh} 다시 시도`, callback_data: `todo:${action}` }
+        {
+          text: `${this.emojis.refresh} 다시 시도`,
+          callback_data: `todo:${action}`
+        }
       ]);
     }
 
-    keyboard.push([{ text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }]);
+    keyboard.push([
+      { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
+    ]);
 
     return {
       text,

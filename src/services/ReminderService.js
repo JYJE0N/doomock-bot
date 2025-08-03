@@ -81,10 +81,16 @@ class ReminderService extends BaseService {
         .sort({ createdAt: -1 })
         .lean();
 
-      return this.createSuccessResponse(reminders, "리마인더 목록을 조회했습니다.");
+      return this.createSuccessResponse(
+        reminders,
+        "리마인더 목록을 조회했습니다."
+      );
     } catch (error) {
       logger.error("리마인더 목록 조회 실패:", error);
-      return this.createErrorResponse(error, "리마인더 목록 조회에 실패했습니다.");
+      return this.createErrorResponse(
+        error,
+        "리마인더 목록 조회에 실패했습니다."
+      );
     }
   }
 
@@ -142,7 +148,10 @@ class ReminderService extends BaseService {
       return this.createSuccessResponse(result, "리마인더가 완료되었습니다.");
     } catch (error) {
       logger.error("리마인더 완료 처리 실패:", error);
-      return this.createErrorResponse(error, "리마인더 완료 처리에 실패했습니다.");
+      return this.createErrorResponse(
+        error,
+        "리마인더 완료 처리에 실패했습니다."
+      );
     }
   }
 

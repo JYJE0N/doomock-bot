@@ -4,7 +4,9 @@ const { Telegraf } = require("telegraf");
 const express = require("express");
 const path = require("path");
 const logger = require("../utils/Logger");
-const { getInstance: getMongooseManager } = require("../database/MongooseManager");
+const {
+  getInstance: getMongooseManager
+} = require("../database/MongooseManager");
 const { createServiceBuilder } = require("../core/ServiceBuilder");
 const ModuleManager = require("../core/ModuleManager");
 const NavigationHandler = require("../handlers/NavigationHandler");
@@ -157,7 +159,9 @@ class BotController {
       // TTS 파일 목록 (디버깅용)
       this.app.get("/tts", (req, res) => {
         try {
-          const files = fs.readdirSync(ttsPath).filter((f) => f.endsWith(".mp3"));
+          const files = fs
+            .readdirSync(ttsPath)
+            .filter((f) => f.endsWith(".mp3"));
           res.json({
             count: files.length,
             files: files,
@@ -183,7 +187,8 @@ class BotController {
         logger.error("Express 에러:", err);
         res.status(500).json({
           error: "Internal Server Error",
-          message: process.env.NODE_ENV === "development" ? err.message : undefined
+          message:
+            process.env.NODE_ENV === "development" ? err.message : undefined
         });
       });
 
@@ -219,7 +224,9 @@ class BotController {
   validateEnvironment() {
     const requiredEnvVars = ["BOT_TOKEN", "MONGO_URL"];
 
-    const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
+    const missingVars = requiredEnvVars.filter(
+      (varName) => !process.env[varName]
+    );
 
     if (missingVars.length > 0) {
       throw new Error(`필수 환경변수가 누락됨: ${missingVars.join(", ")}`);
@@ -471,16 +478,23 @@ class BotController {
         this.commandHandler &&
         typeof this.commandHandler.handleNaturalMessage === "function"
       ) {
-        const handled = await this.commandHandler.handleNaturalMessage(this.bot, msg);
+        const handled = await this.commandHandler.handleNaturalMessage(
+          this.bot,
+          msg
+        );
 
         if (handled) {
-          logger.debug(`✅ CommandHandler가 자연어 메시지 처리 완료: "${messageText}"`);
+          logger.debug(
+            `✅ CommandHandler가 자연어 메시지 처리 완료: "${messageText}"`
+          );
           return;
         }
       }
 
       // 🎯 2단계: NavigationHandler의 기존 메시지 처리로 폴백
-      logger.debug(`🔄 CommandHandler에서 처리하지 못함 - NavigationHandler로 폴백`);
+      logger.debug(
+        `🔄 CommandHandler에서 처리하지 못함 - NavigationHandler로 폴백`
+      );
       await this.navigationHandler.handleMessage(ctx);
     } catch (error) {
       logger.error("텍스트 메시지 처리 오류:", error);
@@ -504,7 +518,9 @@ class BotController {
       await this.bot.launch();
 
       logger.success("✅ 텔레그램 봇이 성공적으로 시작되었습니다!");
-      logger.info(`🤖 봇 사용자명: @${this.bot.botInfo?.username || "unknown"}`);
+      logger.info(
+        `🤖 봇 사용자명: @${this.bot.botInfo?.username || "unknown"}`
+      );
 
       // Graceful 종료 설정
       process.once("SIGINT", () => this.stop("SIGINT"));

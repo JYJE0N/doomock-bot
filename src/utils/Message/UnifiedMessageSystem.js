@@ -116,8 +116,10 @@ class UnifiedMessageSystem {
       debug: (text) => chalk.gray(`🔍 ${text}`),
 
       // 사용자 관련
-      userJoin: (userName) => chalk.green.bold(`👋 ${userName}님이 접속했습니다!`),
-      userMessage: (userName, message) => chalk.cyan(`📨 ${userName}: ${message}`),
+      userJoin: (userName) =>
+        chalk.green.bold(`👋 ${userName}님이 접속했습니다!`),
+      userMessage: (userName, message) =>
+        chalk.cyan(`📨 ${userName}: ${message}`),
 
       // 모듈별 색상
       moduleTitle: (moduleName, icon) => {
@@ -149,9 +151,14 @@ class UnifiedMessageSystem {
         const filled = Math.round(width * (current / total));
         const empty = width - filled;
 
-        const bar = chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(empty));
+        const bar =
+          chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(empty));
         const color =
-          percentage >= 80 ? chalk.green : percentage >= 60 ? chalk.yellow : chalk.red;
+          percentage >= 80
+            ? chalk.green
+            : percentage >= 60
+              ? chalk.yellow
+              : chalk.red;
 
         return `${bar} ${color.bold(`${percentage}%`)} (${current}/${total})`;
       }
@@ -243,7 +250,9 @@ ${this.markdownStyles.bold("원하는 기능을 선택해주세요\\!")}
   async sendTodoList(bot, chatId, todos, page = 1, pageSize = 10) {
     // 🖥️ 콘솔 출력
     console.log(this.consoleStyles.moduleTitle("todo", "📝"));
-    console.log(chalk.blue(`📝 할일 목록 표시: ${todos.length}개 (페이지 ${page})`));
+    console.log(
+      chalk.blue(`📝 할일 목록 표시: ${todos.length}개 (페이지 ${page})`)
+    );
 
     if (todos.length === 0) {
       const emptyText = `📝 ${this.markdownStyles.bold("할일 목록")}
@@ -274,7 +283,11 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
       const displayIndex = startIndex + index + 1;
       const status = todo.completed ? "✅" : "◻️";
       const priority =
-        todo.priority === "high" ? "🔴" : todo.priority === "medium" ? "🟡" : "🔵";
+        todo.priority === "high"
+          ? "🔴"
+          : todo.priority === "medium"
+            ? "🟡"
+            : "🔵";
 
       todoText += `${status} ${priority} ${this.markdownStyles.bold(displayIndex.toString())}\\. ${this.escape(todo.title)}\n`;
 
@@ -307,12 +320,16 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
     // 🖥️ 콘솔 출력
     console.log(this.rainbow(`🎉 성공: ${message}`));
     if (details) {
-      console.log(chalk.gray(`   세부사항: ${JSON.stringify(details, null, 2)}`));
+      console.log(
+        chalk.gray(`   세부사항: ${JSON.stringify(details, null, 2)}`)
+      );
     }
 
     // 📱 텔레그램 메시지
     const successEmoji =
-      this.emojiSets.success[Math.floor(Math.random() * this.emojiSets.success.length)];
+      this.emojiSets.success[
+        Math.floor(Math.random() * this.emojiSets.success.length)
+      ];
     const telegramText = `${successEmoji} ${this.markdownStyles.bold("성공\\!")}
 
 ${this.escape(message)}${details ? `\n\n${this.markdownStyles.code(JSON.stringify(details, null, 2))}` : ""}`;
@@ -338,7 +355,9 @@ ${this.escape(message)}${details ? `\n\n${this.markdownStyles.code(JSON.stringif
 
     // 📱 텔레그램 메시지
     const errorEmoji =
-      this.emojiSets.error[Math.floor(Math.random() * this.emojiSets.error.length)];
+      this.emojiSets.error[
+        Math.floor(Math.random() * this.emojiSets.error.length)
+      ];
     const telegramText = `${errorEmoji} ${this.markdownStyles.bold("오류 발생")}
 
 ${this.escape(message)}
@@ -440,7 +459,9 @@ class LoggerEnhancer {
     this.injectMessageFeatures();
 
     // ✅ 수정: messageSystem.rainbow() 사용 (chalk.rainbow 대신)
-    console.log(this.messageSystem.rainbow("🎨 Logger 알록달록 업그레이드 완료!"));
+    console.log(
+      this.messageSystem.rainbow("🎨 Logger 알록달록 업그레이드 완료!")
+    );
   }
 
   /**
@@ -452,12 +473,24 @@ class LoggerEnhancer {
     this.logger.gradient = this.messageSystem.gradient.bind(this.messageSystem);
 
     // 통합 메시지 메서드들 추가
-    this.logger.sendMainMenu = this.messageSystem.sendMainMenu.bind(this.messageSystem);
-    this.logger.sendTodoList = this.messageSystem.sendTodoList.bind(this.messageSystem);
-    this.logger.sendSuccess = this.messageSystem.sendSuccess.bind(this.messageSystem);
-    this.logger.sendError = this.messageSystem.sendError.bind(this.messageSystem);
-    this.logger.sendLoading = this.messageSystem.sendLoading.bind(this.messageSystem);
-    this.logger.updateLoading = this.messageSystem.updateLoading.bind(this.messageSystem);
+    this.logger.sendMainMenu = this.messageSystem.sendMainMenu.bind(
+      this.messageSystem
+    );
+    this.logger.sendTodoList = this.messageSystem.sendTodoList.bind(
+      this.messageSystem
+    );
+    this.logger.sendSuccess = this.messageSystem.sendSuccess.bind(
+      this.messageSystem
+    );
+    this.logger.sendError = this.messageSystem.sendError.bind(
+      this.messageSystem
+    );
+    this.logger.sendLoading = this.messageSystem.sendLoading.bind(
+      this.messageSystem
+    );
+    this.logger.updateLoading = this.messageSystem.updateLoading.bind(
+      this.messageSystem
+    );
 
     // 콘솔 스타일 추가
     this.logger.styles = this.messageSystem.consoleStyles;

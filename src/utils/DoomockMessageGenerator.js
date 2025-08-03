@@ -17,7 +17,12 @@ class DoomockMessageGenerator {
   /**
    * 🎭 두목봇 캐릭터 메시지 생성
    */
-  static generateMessage(type, userName = null, cardData = null, extraData = null) {
+  static generateMessage(
+    type,
+    userName = null,
+    cardData = null,
+    extraData = null
+  ) {
     const name = userName ? `${userName}씨` : "자네";
 
     const messageTemplates = {

@@ -162,7 +162,11 @@ class FortuneService extends BaseService {
 
       return {
         success: true,
-        message: this.generateDoomockComment("draw", savedResult.userName, drawResult),
+        message: this.generateDoomockComment(
+          "draw",
+          savedResult.userName,
+          drawResult
+        ),
         data: {
           ...drawResult,
           remainingDraws:
@@ -338,7 +342,9 @@ class FortuneService extends BaseService {
    */
   drawMultipleCards(deck, count, positions = []) {
     if (deck.length < count) {
-      throw new Error(`덱에 카드가 부족합니다. 필요: ${count}장, 남은: ${deck.length}장`);
+      throw new Error(
+        `덱에 카드가 부족합니다. 필요: ${count}장, 남은: ${deck.length}장`
+      );
     }
 
     const cards = [];
@@ -366,7 +372,9 @@ class FortuneService extends BaseService {
    */
   drawCelticCrossFromDeck(deck) {
     if (deck.length < 10) {
-      throw new Error(`캘틱 크로스에는 10장이 필요합니다. 덱 남은: ${deck.length}장`);
+      throw new Error(
+        `캘틱 크로스에는 10장이 필요합니다. 덱 남은: ${deck.length}장`
+      );
     }
 
     const positions = [
@@ -479,7 +487,8 @@ class FortuneService extends BaseService {
         "덱이 초기화되어 순수한 에너지로 가득 찼습니다! 💫"
       ];
 
-      const randomMessage = messages[Math.floor(Math.random() * messages.length)];
+      const randomMessage =
+        messages[Math.floor(Math.random() * messages.length)];
 
       return {
         success: true,
@@ -640,10 +649,15 @@ class FortuneService extends BaseService {
       const stats = {
         totalDraws: userRecord.totalDraws,
         todayDraws:
-          userRecord.lastDrawDate === today ? userRecord.todayDrawCount || 0 : 0,
+          userRecord.lastDrawDate === today
+            ? userRecord.todayDrawCount || 0
+            : 0,
         remainingDraws:
           userRecord.lastDrawDate === today
-            ? Math.max(0, this.config.maxDrawsPerDay - (userRecord.todayDrawCount || 0))
+            ? Math.max(
+                0,
+                this.config.maxDrawsPerDay - (userRecord.todayDrawCount || 0)
+              )
             : this.config.maxDrawsPerDay,
         streak: recentDays.streak,
         favoriteType: recentDays.favoriteType,
@@ -723,7 +737,9 @@ class FortuneService extends BaseService {
       const today = new Date();
       const recentRecords = userRecord.drawHistory.filter((record) => {
         const recordDate = new Date(record.timestamp);
-        const diffDays = Math.floor((today - recordDate) / (1000 * 60 * 60 * 24));
+        const diffDays = Math.floor(
+          (today - recordDate) / (1000 * 60 * 60 * 24)
+        );
         return diffDays <= days;
       });
 

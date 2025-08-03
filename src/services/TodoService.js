@@ -35,8 +35,14 @@ class TodoService extends BaseService {
     try {
       // 인덱스 최적화
       if (this.models.Todo) {
-        await this.models.Todo.collection.createIndex({ userId: 1, isActive: 1 });
-        await this.models.Todo.collection.createIndex({ userId: 1, completed: 1 });
+        await this.models.Todo.collection.createIndex({
+          userId: 1,
+          isActive: 1
+        });
+        await this.models.Todo.collection.createIndex({
+          userId: 1,
+          completed: 1
+        });
         await this.models.Todo.collection.createIndex({ createdAt: -1 });
       }
 
@@ -156,7 +162,10 @@ class TodoService extends BaseService {
 
       logger.info(`📋 할일 추가: ${userId} - "${todoText}"`);
 
-      return this.createSuccessResponse(savedTodo.toJSON(), "할일이 추가되었습니다.");
+      return this.createSuccessResponse(
+        savedTodo.toJSON(),
+        "할일이 추가되었습니다."
+      );
     } catch (error) {
       return this.createErrorResponse(error, "할일 추가 실패");
     }
@@ -236,7 +245,10 @@ class TodoService extends BaseService {
 
       logger.info(`🗑️ 할일 삭제: ${userId} - "${todo.text}"`);
 
-      return this.createSuccessResponse(todo.toJSON(), "할일이 삭제되었습니다.");
+      return this.createSuccessResponse(
+        todo.toJSON(),
+        "할일이 삭제되었습니다."
+      );
     } catch (error) {
       return this.createErrorResponse(error, "할일 삭제 실패");
     }
@@ -353,7 +365,11 @@ class TodoService extends BaseService {
       }
 
       // 일별 생산성 분석
-      const dailyStats = await this.getDailyProductivity(userId, weekStart, weekEnd);
+      const dailyStats = await this.getDailyProductivity(
+        userId,
+        weekStart,
+        weekEnd
+      );
 
       const weeklyStats = {
         period: "이번 주",

@@ -41,7 +41,10 @@ class FortuneRenderer extends BaseRenderer {
       case "error":
         return await this.renderError(data, ctx);
       default:
-        return await this.renderError({ message: "지원하지 않는 기능입니다." }, ctx);
+        return await this.renderError(
+          { message: "지원하지 않는 기능입니다." },
+          ctx
+        );
     }
   }
 
@@ -201,7 +204,8 @@ class FortuneRenderer extends BaseRenderer {
       if (drawType === "triple") {
         const positions = ["과거", "현재", "미래"];
         cards.forEach((card, index) => {
-          const position = card.position || positions[index] || `${index + 1}번째`;
+          const position =
+            card.position || positions[index] || `${index + 1}번째`;
           text += `**${position}**: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
 
           if (card.isReversed) {
@@ -487,9 +491,14 @@ ${data.message}
     } else {
       history.slice(0, 10).forEach((record, index) => {
         const cardName =
-          record.koreanName || record.cardName || record.card?.korean || "알 수 없음";
+          record.koreanName ||
+          record.cardName ||
+          record.card?.korean ||
+          "알 수 없음";
         const recordDate = record.date || "날짜 불명";
-        const fortuneType = this.getFortuneTypeName(record.drawType || record.type);
+        const fortuneType = this.getFortuneTypeName(
+          record.drawType || record.type
+        );
 
         text += `${index + 1}. ${recordDate}\n`;
         text += `   ${fortuneType} - ${cardName}\n`;
@@ -549,7 +558,9 @@ ${errorMessage}
       logger.error("FortuneRenderer.renderError 중 오류:", error);
 
       try {
-        await ctx.reply("❌ 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
+        await ctx.reply(
+          "❌ 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
+        );
       } catch (replyError) {
         logger.error("최후 에러 메시지 전송도 실패:", replyError);
       }
@@ -710,7 +721,10 @@ ${errorMessage}
       await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
     } catch (error) {
       logger.error("FortuneRenderer.renderCelticDetail 오류:", error);
-      await this.renderError({ message: "상세 해석 표시 중 오류가 발생했습니다." }, ctx);
+      await this.renderError(
+        { message: "상세 해석 표시 중 오류가 발생했습니다." },
+        ctx
+      );
     }
   }
 

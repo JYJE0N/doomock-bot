@@ -156,7 +156,9 @@ todoSchema.statics.findByUser = function (userId, options = {}) {
     query.where("tags").in(options.tags);
   }
 
-  return query.sort(options.sort || { createdAt: -1 }).limit(options.limit || 0);
+  return query
+    .sort(options.sort || { createdAt: -1 })
+    .limit(options.limit || 0);
 };
 
 /**

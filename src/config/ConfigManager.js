@@ -36,9 +36,15 @@ class ConfigManager {
     this.isStaging = this.nodeEnv === "staging";
 
     // 🌈 초기화 시작 로그
-    console.log(this.messageSystem.rainbow("🔧 ═══ ConfigManager v4.0.1 초기화 ═══"));
     console.log(
-      this.messageSystem.gradient("알록달록 설정 관리 시스템 시작!", "cyan", "magenta")
+      this.messageSystem.rainbow("🔧 ═══ ConfigManager v4.0.1 초기화 ═══")
+    );
+    console.log(
+      this.messageSystem.gradient(
+        "알록달록 설정 관리 시스템 시작!",
+        "cyan",
+        "magenta"
+      )
     );
 
     // 설정 로드
@@ -59,7 +65,9 @@ class ConfigManager {
    * 📋 모든 설정 로드 (알록달록 진행 표시!)
    */
   loadAllConfigurations() {
-    console.log(this.messageSystem.gradient("📦 설정 정보 로딩 중...", "blue", "purple"));
+    console.log(
+      this.messageSystem.gradient("📦 설정 정보 로딩 중...", "blue", "purple")
+    );
 
     // 🎯 설정 섹션별 로딩 표시
     const sections = [
@@ -85,7 +93,9 @@ class ConfigManager {
         "pink"
       ];
       const color = colors[index % colors.length];
-      console.log(this.messageSystem.gradient(`   ${section} 로딩...`, color, "white"));
+      console.log(
+        this.messageSystem.gradient(`   ${section} 로딩...`, color, "white")
+      );
     });
 
     this.config = {
@@ -124,7 +134,9 @@ class ConfigManager {
       // 🗄️ 데이터베이스 설정 (Railway 최적화)
       database: {
         url: process.env.MONGO_URL || process.env.MONGODB_URI,
-        name: this.extractDatabaseName(process.env.MONGO_URL || process.env.MONGODB_URI),
+        name: this.extractDatabaseName(
+          process.env.MONGO_URL || process.env.MONGODB_URI
+        ),
 
         // Railway 환경 최적화
         connection: {
@@ -190,10 +202,13 @@ class ConfigManager {
       // 🔧 시스템 설정
       system: {
         startupMaxRetries: parseInt(process.env.STARTUP_MAX_RETRIES) || 3,
-        startupRetryBackoff: parseInt(process.env.STARTUP_RETRY_BACKOFF) || 5000,
+        startupRetryBackoff:
+          parseInt(process.env.STARTUP_RETRY_BACKOFF) || 5000,
         componentTimeout:
-          parseInt(process.env.COMPONENT_TIMEOUT) || (this.isRailway ? 45000 : 30000),
-        gracefulShutdownTimeout: parseInt(process.env.SHUTDOWN_TIMEOUT) || 15000,
+          parseInt(process.env.COMPONENT_TIMEOUT) ||
+          (this.isRailway ? 45000 : 30000),
+        gracefulShutdownTimeout:
+          parseInt(process.env.SHUTDOWN_TIMEOUT) || 15000,
         rainbow: {
           startup: true, // 🌈 시작 시 알록달록!
           shutdown: true, // 🌈 종료 시 알록달록!
@@ -244,7 +259,9 @@ class ConfigManager {
       }
     };
 
-    console.log(this.messageSystem.gradient("✅ 모든 설정 로딩 완료!", "green", "blue"));
+    console.log(
+      this.messageSystem.gradient("✅ 모든 설정 로딩 완료!", "green", "blue")
+    );
   }
 
   /**
@@ -252,10 +269,14 @@ class ConfigManager {
    */
   showConfigSummary() {
     console.log();
-    console.log(this.messageSystem.rainbow("🎯 ═══ DooMockBot v4.0.1 설정 요약 ═══"));
+    console.log(
+      this.messageSystem.rainbow("🎯 ═══ DooMockBot v4.0.1 설정 요약 ═══")
+    );
 
     // 환경 정보 (알록달록!)
-    console.log(this.messageSystem.gradient(`🌍 환경: ${this.nodeEnv}`, "blue", "cyan"));
+    console.log(
+      this.messageSystem.gradient(`🌍 환경: ${this.nodeEnv}`, "blue", "cyan")
+    );
     console.log(
       this.messageSystem.gradient(
         `🚂 Railway: ${this.isRailway ? "✅ 활성" : "❌ 비활성"}`,
@@ -282,14 +303,18 @@ class ConfigManager {
     );
 
     // 성능 설정
-    const cacheStatus = this.get("performance.cacheEnabled") ? "✅ 활성" : "❌ 비활성";
+    const cacheStatus = this.get("performance.cacheEnabled")
+      ? "✅ 활성"
+      : "❌ 비활성";
     console.log(
       this.messageSystem.gradient(`⚡ 캐시: ${cacheStatus}`, "yellow", "orange")
     );
 
     // 로깅
     const logLevel = this.get("logging.level");
-    const rainbowLogs = this.get("logging.rainbow.enabled") ? "🌈 활성" : "❌ 비활성";
+    const rainbowLogs = this.get("logging.rainbow.enabled")
+      ? "🌈 활성"
+      : "❌ 비활성";
     console.log(
       this.messageSystem.gradient(
         `📝 로그레벨: ${logLevel} (알록달록: ${rainbowLogs})`,
@@ -301,7 +326,11 @@ class ConfigManager {
     // 헬스체크
     const healthInterval = this.get("health.interval");
     console.log(
-      this.messageSystem.gradient(`🏥 헬스체크: ${healthInterval}ms`, "blue", "purple")
+      this.messageSystem.gradient(
+        `🏥 헬스체크: ${healthInterval}ms`,
+        "blue",
+        "purple"
+      )
     );
 
     // 메모리 설정
@@ -323,8 +352,12 @@ class ConfigManager {
       const region = this.get("railway.region") || "미설정";
       const deployment = this.get("railway.deployment") || "미설정";
 
-      console.log(this.messageSystem.gradient(`📦 서비스: ${service}`, "green", "blue"));
-      console.log(this.messageSystem.gradient(`🌍 지역: ${region}`, "cyan", "purple"));
+      console.log(
+        this.messageSystem.gradient(`📦 서비스: ${service}`, "green", "blue")
+      );
+      console.log(
+        this.messageSystem.gradient(`🌍 지역: ${region}`, "cyan", "purple")
+      );
       console.log(
         this.messageSystem.gradient(
           `🚀 배포: ${deployment.substring(0, 8)}...`,
@@ -349,14 +382,22 @@ class ConfigManager {
     // 🌈 알록달록 기능 상태
     console.log();
     console.log(this.messageSystem.rainbow("🌈 ═══ 알록달록 기능 상태 ═══"));
-    console.log(this.messageSystem.gradient("🎨 테마 시스템: 활성화", "purple", "pink"));
-    console.log(this.messageSystem.gradient("🎭 애니메이션: 활성화", "cyan", "magenta"));
+    console.log(
+      this.messageSystem.gradient("🎨 테마 시스템: 활성화", "purple", "pink")
+    );
+    console.log(
+      this.messageSystem.gradient("🎭 애니메이션: 활성화", "cyan", "magenta")
+    );
     console.log(
       this.messageSystem.gradient("📊 실시간 모니터링: 활성화", "green", "blue")
     );
-    console.log(this.messageSystem.gradient("📱 MarkdownV2: 활성화", "yellow", "orange"));
+    console.log(
+      this.messageSystem.gradient("📱 MarkdownV2: 활성화", "yellow", "orange")
+    );
 
-    console.log(this.messageSystem.rainbow("🎯 ═══════════════════════════════════════"));
+    console.log(
+      this.messageSystem.rainbow("🎯 ═══════════════════════════════════════")
+    );
     console.log();
   }
 
@@ -364,7 +405,9 @@ class ConfigManager {
    * ✅ 설정 검증 (알록달록 결과!)
    */
   validateConfigurations() {
-    console.log(this.messageSystem.gradient("🔍 설정 검증 시작...", "blue", "purple"));
+    console.log(
+      this.messageSystem.gradient("🔍 설정 검증 시작...", "blue", "purple")
+    );
 
     const issues = [];
     const warnings = [];
@@ -374,10 +417,15 @@ class ConfigManager {
       issues.push("BOT_TOKEN이 설정되지 않음");
     } else {
       // 토큰 형식 검증
-      if (!this.config.bot.token.includes(":") || this.config.bot.token.length < 40) {
+      if (
+        !this.config.bot.token.includes(":") ||
+        this.config.bot.token.length < 40
+      ) {
         issues.push("BOT_TOKEN 형식이 올바르지 않음");
       } else {
-        console.log(this.messageSystem.gradient("✅ 봇 토큰 검증 통과", "green", "blue"));
+        console.log(
+          this.messageSystem.gradient("✅ 봇 토큰 검증 통과", "green", "blue")
+        );
       }
     }
 
@@ -392,14 +440,22 @@ class ConfigManager {
     // Railway 환경 특별 검증
     if (this.isRailway) {
       console.log(
-        this.messageSystem.gradient("🚂 Railway 환경 최적화 검증...", "purple", "pink")
+        this.messageSystem.gradient(
+          "🚂 Railway 환경 최적화 검증...",
+          "purple",
+          "pink"
+        )
       );
 
       if (this.config.performance.memoryThreshold > 450) {
         warnings.push("Railway 메모리 임계값이 높음 (최대 450MB 권장)");
       } else {
         console.log(
-          this.messageSystem.gradient("✅ Railway 메모리 설정 최적화됨", "green", "blue")
+          this.messageSystem.gradient(
+            "✅ Railway 메모리 설정 최적화됨",
+            "green",
+            "blue"
+          )
         );
       }
 
@@ -407,7 +463,11 @@ class ConfigManager {
         warnings.push("Railway DB 풀 크기가 큼 (최대 5 권장)");
       } else {
         console.log(
-          this.messageSystem.gradient("✅ Railway DB 풀 설정 최적화됨", "cyan", "blue")
+          this.messageSystem.gradient(
+            "✅ Railway DB 풀 설정 최적화됨",
+            "cyan",
+            "blue"
+          )
         );
       }
     }
@@ -415,14 +475,22 @@ class ConfigManager {
     // 🌈 알록달록 기능 검증
     if (this.config.rainbow.enabled) {
       console.log(
-        this.messageSystem.gradient("🌈 알록달록 시스템 활성화 확인", "purple", "pink")
+        this.messageSystem.gradient(
+          "🌈 알록달록 시스템 활성화 확인",
+          "purple",
+          "pink"
+        )
       );
 
       // 테마 검증
       const themes = this.config.rainbow.themes;
       const themeCount = Object.keys(themes).length;
       console.log(
-        this.messageSystem.gradient(`🎨 ${themeCount}개 테마 로드됨`, "yellow", "orange")
+        this.messageSystem.gradient(
+          `🎨 ${themeCount}개 테마 로드됨`,
+          "yellow",
+          "orange"
+        )
       );
 
       // 애니메이션 검증
@@ -452,16 +520,24 @@ class ConfigManager {
       );
     } else {
       if (issues.length > 0) {
-        console.log(this.messageSystem.gradient("❌ 설정 오류 발견:", "red", "orange"));
+        console.log(
+          this.messageSystem.gradient("❌ 설정 오류 발견:", "red", "orange")
+        );
         issues.forEach((issue) => {
-          console.log(this.messageSystem.gradient(`   • ${issue}`, "red", "orange"));
+          console.log(
+            this.messageSystem.gradient(`   • ${issue}`, "red", "orange")
+          );
         });
       }
 
       if (warnings.length > 0) {
-        console.log(this.messageSystem.gradient("⚠️ 설정 경고:", "yellow", "orange"));
+        console.log(
+          this.messageSystem.gradient("⚠️ 설정 경고:", "yellow", "orange")
+        );
         warnings.forEach((warning) => {
-          console.log(this.messageSystem.gradient(`   • ${warning}`, "yellow", "orange"));
+          console.log(
+            this.messageSystem.gradient(`   • ${warning}`, "yellow", "orange")
+          );
         });
       }
     }
@@ -557,7 +633,8 @@ class ConfigManager {
   getRainbowConfig() {
     return {
       ...this.config.rainbow,
-      enabled: this.config.rainbow.enabled && this.config.logging.rainbow.enabled,
+      enabled:
+        this.config.rainbow.enabled && this.config.logging.rainbow.enabled,
       environment: this.config.environment
     };
   }
@@ -591,7 +668,9 @@ class ConfigManager {
    * 📊 실시간 설정 통계
    */
   showLiveConfigStats() {
-    const memoryUsage = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
+    const memoryUsage = Math.round(
+      process.memoryUsage().heapUsed / 1024 / 1024
+    );
     const memoryThreshold = this.get("performance.memoryThreshold");
     const memoryPercent = Math.round((memoryUsage / memoryThreshold) * 100);
 
@@ -607,7 +686,11 @@ class ConfigManager {
     const uptime = process.uptime();
     const uptimeMin = Math.floor(uptime / 60);
     console.log(
-      this.messageSystem.gradient(`⏰ 가동시간: ${uptimeMin}분`, "cyan", "purple")
+      this.messageSystem.gradient(
+        `⏰ 가동시간: ${uptimeMin}분`,
+        "cyan",
+        "purple"
+      )
     );
 
     const isHealthy = memoryPercent < 90 && this.validationResult.isValid;
@@ -641,7 +724,11 @@ class ConfigManager {
    */
   cleanup() {
     console.log(
-      this.messageSystem.gradient("🧹 ConfigManager 정리 중...", "yellow", "orange")
+      this.messageSystem.gradient(
+        "🧹 ConfigManager 정리 중...",
+        "yellow",
+        "orange"
+      )
     );
 
     // 설정 정보 저장 (필요시)

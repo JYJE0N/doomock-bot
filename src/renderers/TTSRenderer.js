@@ -27,7 +27,10 @@ class TTSRenderer extends BaseRenderer {
       case "error":
         return await this.renderError(data, ctx);
       default:
-        return await this.renderError({ message: "알 수 없는 명령입니다" }, ctx);
+        return await this.renderError(
+          { message: "알 수 없는 명령입니다" },
+          ctx
+        );
     }
   }
 
@@ -295,9 +298,13 @@ ${message}`;
       }
     } else {
       // 오디오 파일이 없는 경우 텍스트 메시지로 대체
-      await this.sendSafeMessageForAudio(ctx, "⚠️ 음성 파일을 찾을 수 없습니다.", {
-        reply_markup: keyboard
-      });
+      await this.sendSafeMessageForAudio(
+        ctx,
+        "⚠️ 음성 파일을 찾을 수 없습니다.",
+        {
+          reply_markup: keyboard
+        }
+      );
     }
   }
 

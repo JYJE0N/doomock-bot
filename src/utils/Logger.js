@@ -30,7 +30,9 @@ class HybridLogger {
       enableDataMasking: true,
       retentionDays: parseInt(process.env.LOG_RETENTION_DAYS) || 30,
       devMode: process.env.DEV_MODE === "true",
-      devUsers: new Set((process.env.DEV_USERS || "").split(",").filter(Boolean))
+      devUsers: new Set(
+        (process.env.DEV_USERS || "").split(",").filter(Boolean)
+      )
     };
 
     // 통계
@@ -95,7 +97,8 @@ class HybridLogger {
 
     // 🎯 더 명확한 환경 판단
     const isProduction = nodeEnv === "production";
-    const isDevelopment = nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
+    const isDevelopment =
+      nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
     const isTest = nodeEnv === "test";
 
     // ✅ 수정된 로거 선택 로직 - 개발환경 최우선!
@@ -183,7 +186,8 @@ class HybridLogger {
         const isCI = !!process.env.CI;
 
         const isProduction = nodeEnv === "production";
-        const isDevelopment = nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
+        const isDevelopment =
+          nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
         const isTest = nodeEnv === "test";
 
         return {
@@ -206,7 +210,8 @@ class HybridLogger {
 
         // 🎯 명시적인 환경 우선순위
         const isProduction = nodeEnv === "production";
-        const isDevelopment = nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
+        const isDevelopment =
+          nodeEnv === "development" || !nodeEnv || nodeEnv === "dev";
         const isTest = nodeEnv === "test";
 
         // 🎯 로거 전략 - 개발환경을 최우선으로!
@@ -367,7 +372,9 @@ class HybridLogger {
 
     this.winston = winston.createLogger({
       levels: customLevels.levels,
-      level: process.env.LOG_LEVEL || (this.environment.isProduction ? "info" : "debug"),
+      level:
+        process.env.LOG_LEVEL ||
+        (this.environment.isProduction ? "info" : "debug"),
       format: colorfulFormat,
       transports,
       exitOnError: false
@@ -444,7 +451,9 @@ class HybridLogger {
         levelLabel = level.toUpperCase();
     }
 
-    console.log(colorFn(`${timestamp} [${levelLabel.padEnd(7)}] ${safeMessage}`));
+    console.log(
+      colorFn(`${timestamp} [${levelLabel.padEnd(7)}] ${safeMessage}`)
+    );
 
     if (meta) {
       const maskedMeta = this.maskObjectData(meta);
@@ -471,7 +480,9 @@ class HybridLogger {
         : "";
 
     if (this.environment.shouldUseChalk) {
-      console.log(chalk.green.bold(`${envIcon} HybridLogger v${this.version} 시작`));
+      console.log(
+        chalk.green.bold(`${envIcon} HybridLogger v${this.version} 시작`)
+      );
       console.log(chalk.cyan(`🎯 환경: ${this.environment.name}`));
       console.log(chalk.yellow(`📝 로거: ${loggerType}${additionalInfo}`));
       console.log(
@@ -578,7 +589,15 @@ class HybridLogger {
     if (!obj || typeof obj !== "object") return obj;
 
     const masked = JSON.parse(JSON.stringify(obj));
-    const sensitiveKeys = ["password", "token", "key", "secret", "userId", "id", "email"];
+    const sensitiveKeys = [
+      "password",
+      "token",
+      "key",
+      "secret",
+      "userId",
+      "id",
+      "email"
+    ];
 
     const maskRecursive = (target) => {
       if (!target || typeof target !== "object") return target;
@@ -587,7 +606,9 @@ class HybridLogger {
         const lowerKey = key.toLowerCase();
         const value = target[key];
 
-        if (sensitiveKeys.some((sensitiveKey) => lowerKey.includes(sensitiveKey))) {
+        if (
+          sensitiveKeys.some((sensitiveKey) => lowerKey.includes(sensitiveKey))
+        ) {
           if (typeof value === "string" || typeof value === "number") {
             target[key] = "***MASKED***";
             this.stats.maskedData++;
@@ -783,7 +804,8 @@ class HybridLogger {
       const midIndex = Math.floor(text.length / 2);
 
       return (
-        chalk[colors[0]](text.slice(0, midIndex)) + chalk[colors[1]](text.slice(midIndex))
+        chalk[colors[0]](text.slice(0, midIndex)) +
+        chalk[colors[1]](text.slice(midIndex))
       );
     } else {
       return text;

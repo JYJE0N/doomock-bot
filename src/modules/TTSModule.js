@@ -113,7 +113,9 @@ class TTSModule extends BaseModule {
     const baseUrl = process.env.BASE_URL || process.env.RAILWAY_PUBLIC_DOMAIN;
 
     if (!baseUrl) {
-      logger.warn("BASE_URL 또는 RAILWAY_PUBLIC_DOMAIN 환경변수가 설정되지 않음");
+      logger.warn(
+        "BASE_URL 또는 RAILWAY_PUBLIC_DOMAIN 환경변수가 설정되지 않음"
+      );
       return {
         type: "error",
         module: "tts",

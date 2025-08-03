@@ -41,7 +41,8 @@ class CommandHandler {
       maxUserStates: parseInt(process.env.COMMAND_MAX_USER_STATES) || 1000,
       stateTimeoutMs: parseInt(process.env.COMMAND_STATE_TIMEOUT) || 1800000, // 30분
       enableDetailedLogging: process.env.COMMAND_DETAILED_LOGGING === "true",
-      enablePerformanceTracking: process.env.COMMAND_PERFORMANCE_TRACKING !== "false",
+      enablePerformanceTracking:
+        process.env.COMMAND_PERFORMANCE_TRACKING !== "false",
       enableNaturalLanguage: true // 🆕 자연어 명령어 활성화
     };
 
@@ -239,17 +240,35 @@ class CommandHandler {
 
       switch (commandType) {
         case "system":
-          handled = await this.routeSystemCommand(bot, msg, command, args, parseInfo);
+          handled = await this.routeSystemCommand(
+            bot,
+            msg,
+            command,
+            args,
+            parseInfo
+          );
           this.stats.systemCommands++;
           break;
 
         case "module":
-          handled = await this.routeModuleCommand(bot, msg, command, args, parseInfo);
+          handled = await this.routeModuleCommand(
+            bot,
+            msg,
+            command,
+            args,
+            parseInfo
+          );
           this.stats.moduleCommands++;
           break;
 
         default:
-          handled = await this.routeUnknownCommand(bot, msg, command, args, parseInfo);
+          handled = await this.routeUnknownCommand(
+            bot,
+            msg,
+            command,
+            args,
+            parseInfo
+          );
           this.stats.unknownCommands++;
       }
 
@@ -302,7 +321,11 @@ class CommandHandler {
         this.stats.naturalCommands++;
 
         // 시작메뉴 표시 (NavigationHandler로 위임)
-        const handled = await this.routeToNavigationHandler(bot, msg, "showMainMenu");
+        const handled = await this.routeToNavigationHandler(
+          bot,
+          msg,
+          "showMainMenu"
+        );
 
         if (this.config.enableDetailedLogging) {
           logger.debug(`✅ 두목 호출 처리 완료: ${userName}`);
@@ -314,7 +337,9 @@ class CommandHandler {
       // 🎯 2단계: 모듈 자연어 별칭 체크
       const moduleMatch = this.findModuleByNaturalAlias(messageText);
       if (moduleMatch) {
-        logger.debug(`🎯 자연어 모듈 매칭: "${messageText}" → ${moduleMatch.module}`);
+        logger.debug(
+          `🎯 자연어 모듈 매칭: "${messageText}" → ${moduleMatch.module}`
+        );
         this.stats.naturalCommands++;
 
         const handled = await this.routeToModule(
@@ -418,7 +443,8 @@ class CommandHandler {
         message: msg,
         from: msg.from,
         chat: msg.chat,
-        reply: (text, extra) => bot.telegram.sendMessage(msg.chat.id, text, extra),
+        reply: (text, extra) =>
+          bot.telegram.sendMessage(msg.chat.id, text, extra),
         replyWithMarkdown: (text, extra) =>
           bot.telegram.sendMessage(msg.chat.id, text, {
             parse_mode: "Markdown",
@@ -671,7 +697,10 @@ class CommandHandler {
         userName: getUserName(msg.from)
       };
 
-      const result = await this.navigationHandler.handleUnknownCommand(bot, routingInfo);
+      const result = await this.navigationHandler.handleUnknownCommand(
+        bot,
+        routingInfo
+      );
       return result !== false;
     } catch (error) {
       logger.error(`❌ 알 수 없는 명령어 라우팅 실패 (${command}):`, error);
@@ -705,7 +734,10 @@ class CommandHandler {
     let cleanedCount = 0;
 
     for (const [userId, state] of this.userStates.entries()) {
-      if (state.timestamp && now - state.timestamp > this.config.stateTimeoutMs) {
+      if (
+        state.timestamp &&
+        now - state.timestamp > this.config.stateTimeoutMs
+      ) {
         this.userStates.delete(userId);
         cleanedCount++;
       }
@@ -738,7 +770,9 @@ class CommandHandler {
         unknown: this.stats.unknownCommands,
         successRate:
           this.stats.commandsProcessed > 0
-            ? Math.round((this.stats.validCommands / this.stats.commandsProcessed) * 100)
+            ? Math.round(
+                (this.stats.validCommands / this.stats.commandsProcessed) * 100
+              )
             : 100
       },
       performance: {

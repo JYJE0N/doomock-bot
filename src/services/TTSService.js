@@ -185,7 +185,8 @@ class TTSService extends BaseService {
       } else if (error.code === "PERMISSION_DENIED") {
         errorMessage = "TTS API 권한이 없습니다. 관리자에게 문의하세요.";
       } else if (error.code === "RESOURCE_EXHAUSTED") {
-        errorMessage = "TTS API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.";
+        errorMessage =
+          "TTS API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.";
       }
 
       return this.createErrorResponse(error, errorMessage);

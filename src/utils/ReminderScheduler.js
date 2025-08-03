@@ -91,7 +91,9 @@ class ReminderScheduler {
       this.cronJob.start();
       this.isRunning = true;
 
-      logger.success(`✅ ReminderScheduler 시작됨 (패턴: ${this.config.cronPattern})`);
+      logger.success(
+        `✅ ReminderScheduler 시작됨 (패턴: ${this.config.cronPattern})`
+      );
 
       // Railway 환경에서는 즉시 한 번 체크
       if (this.isRailway) {
@@ -175,7 +177,9 @@ class ReminderScheduler {
         }
       }
 
-      logger.success(`✅ 리마인더 체크 완료 (발송: ${pendingReminders.length}개)`);
+      logger.success(
+        `✅ 리마인더 체크 완료 (발송: ${pendingReminders.length}개)`
+      );
     } catch (error) {
       logger.error("❌ 리마인더 체크 중 오류:", error);
       this.stats.errors++;
@@ -275,7 +279,9 @@ class ReminderScheduler {
 
       if (retryCount <= this.config.maxRetries) {
         // 재시도 예약
-        const nextRetryTime = new Date(Date.now() + this.config.retryDelay * retryCount);
+        const nextRetryTime = new Date(
+          Date.now() + this.config.retryDelay * retryCount
+        );
 
         await this.reminderService.updateReminderRetry(reminder._id, {
           retryCount,
@@ -283,10 +289,15 @@ class ReminderScheduler {
           lastError: error.message
         });
 
-        logger.info(`🔄 리마인더 재시도 예약 (${retryCount}/${this.config.maxRetries})`);
+        logger.info(
+          `🔄 리마인더 재시도 예약 (${retryCount}/${this.config.maxRetries})`
+        );
       } else {
         // 최대 재시도 횟수 초과 - 실패 처리
-        await this.reminderService.markReminderFailed(reminder._id, error.message);
+        await this.reminderService.markReminderFailed(
+          reminder._id,
+          error.message
+        );
         logger.warn(`❌ 리마인더 최종 실패 (ID: ${reminder._id})`);
       }
     } catch (retryError) {

@@ -34,7 +34,9 @@ class WeatherService extends BaseService {
     if (!this.config.apiKey) {
       logger.error("❌ OpenWeatherMap API 키가 설정되지 않았습니다");
     } else {
-      logger.info(`✅ OpenWeatherMap API 키 설정됨 (길이: ${this.config.apiKey.length})`);
+      logger.info(
+        `✅ OpenWeatherMap API 키 설정됨 (길이: ${this.config.apiKey.length})`
+      );
     }
 
     logger.info("✅ WeatherService 초기화 완료");
@@ -472,7 +474,9 @@ class WeatherService extends BaseService {
     arr.forEach((item) => {
       counts[item] = (counts[item] || 0) + 1;
     });
-    return Object.keys(counts).reduce((a, b) => (counts[a] > counts[b] ? a : b));
+    return Object.keys(counts).reduce((a, b) =>
+      counts[a] > counts[b] ? a : b
+    );
   }
 
   /**

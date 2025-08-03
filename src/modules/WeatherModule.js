@@ -253,7 +253,8 @@ class WeatherModule extends BaseModule {
    * 날씨 예보 표시
    */
   async showForecast(bot, callbackQuery, subAction, params) {
-    const cityId = params || this.getDefaultCityId(getUserId(callbackQuery.from));
+    const cityId =
+      params || this.getDefaultCityId(getUserId(callbackQuery.from));
     const city = this.majorCities.find((c) => c.id === cityId);
 
     if (!city) {
@@ -271,7 +272,9 @@ class WeatherModule extends BaseModule {
     }
 
     try {
-      const forecastResult = await this.weatherService.getForecast(city.fullName);
+      const forecastResult = await this.weatherService.getForecast(
+        city.fullName
+      );
 
       if (forecastResult.success) {
         return {
@@ -330,7 +333,9 @@ class WeatherModule extends BaseModule {
     }
 
     // 날씨 정보 조회
-    const weatherResult = await this.weatherService.getCurrentWeather(city.fullName);
+    const weatherResult = await this.weatherService.getCurrentWeather(
+      city.fullName
+    );
 
     // 미세먼지 정보 조회 (옵션)
     let dustResult = null;

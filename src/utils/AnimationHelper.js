@@ -22,7 +22,9 @@ class AnimationHelper {
         hasBot: !!bot,
         hasTelegram: !!bot.telegram,
         botKeys: Object.keys(bot),
-        telegrafMethods: bot.telegram ? Object.keys(bot.telegram).slice(0, 5) : []
+        telegrafMethods: bot.telegram
+          ? Object.keys(bot.telegram).slice(0, 5)
+          : []
       });
 
       // 2. Telegraf bot 인스턴스 체크 (일반적인 경우)
@@ -57,14 +59,20 @@ class AnimationHelper {
       }
 
       // 6. ✅ 추가: ModuleManager를 통해 전달되는 경우
-      if (bot.moduleManager && bot.moduleManager.bot && bot.moduleManager.bot.telegram) {
+      if (
+        bot.moduleManager &&
+        bot.moduleManager.bot &&
+        bot.moduleManager.bot.telegram
+      ) {
         logger.debug("AnimationHelper: ✅ ModuleManager를 통한 bot 감지됨");
         return bot.moduleManager.bot;
       }
 
       // 7. ✅ 추가: context 객체에서 bot 추출 시도
       if (bot.botInfo && typeof bot.reply === "function") {
-        logger.debug("AnimationHelper: ✅ Telegraf context 객체에서 bot 추출 시도");
+        logger.debug(
+          "AnimationHelper: ✅ Telegraf context 객체에서 bot 추출 시도"
+        );
         // context 객체인 경우, telegram API 직접 접근
         return { telegram: bot.telegram };
       }
@@ -225,7 +233,10 @@ class AnimationHelper {
             });
             currentMessageId = sentMessage.message_id;
           } catch (sendError) {
-            logger.error(`프레임 ${i + 1} 새 메시지 전송도 실패:`, sendError.message);
+            logger.error(
+              `프레임 ${i + 1} 새 메시지 전송도 실패:`,
+              sendError.message
+            );
           }
         }
       }
@@ -265,7 +276,12 @@ class AnimationHelper {
   /**
    * ⏳ 로딩 애니메이션 (안전한 버전)
    */
-  static async performLoading(bot, chatId, loadingText = "처리 중", messageId = null) {
+  static async performLoading(
+    bot,
+    chatId,
+    loadingText = "처리 중",
+    messageId = null
+  ) {
     try {
       const validBot = this.validateAndNormalizeBot(bot);
       if (!validBot) {

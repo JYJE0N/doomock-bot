@@ -117,7 +117,10 @@ userLeaveSettingSchema.virtual("finalTotalLeave").get(function () {
 /**
  * 📊 사용자 연차 설정 조회 또는 생성
  */
-userLeaveSettingSchema.statics.getOrCreate = async function (userId, year = null) {
+userLeaveSettingSchema.statics.getOrCreate = async function (
+  userId,
+  year = null
+) {
   const targetYear = year || new Date().getFullYear();
 
   let setting = await this.findOne({
@@ -219,7 +222,10 @@ userLeaveSettingSchema.statics.setJoinDate = async function (userId, joinDate) {
 /**
  * 🔄 연차 초기화 (신년)
  */
-userLeaveSettingSchema.statics.resetForNewYear = async function (userId, newYear) {
+userLeaveSettingSchema.statics.resetForNewYear = async function (
+  userId,
+  newYear
+) {
   // 기존 설정에서 입사일만 가져오기
   const lastYearSetting = await this.findOne({
     userId: String(userId),
@@ -282,5 +288,8 @@ userLeaveSettingSchema.set("toJSON", {
   }
 });
 
-const UserLeaveSetting = mongoose.model("UserLeaveSetting", userLeaveSettingSchema);
+const UserLeaveSetting = mongoose.model(
+  "UserLeaveSetting",
+  userLeaveSettingSchema
+);
 module.exports = UserLeaveSetting;

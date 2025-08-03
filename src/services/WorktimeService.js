@@ -282,7 +282,8 @@ class WorktimeService extends BaseService {
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
         avgDailyHours:
           safeRecords.length > 0
-            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) / 10
+            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) /
+              10
             : 0,
         records: safeRecords,
         analysis: this.analyzeWeeklyPattern(safeRecords)
@@ -330,7 +331,8 @@ class WorktimeService extends BaseService {
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
         avgDailyHours:
           safeRecords.length > 0
-            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) / 10
+            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) /
+              10
             : 0,
         records: safeRecords,
         performance: this.analyzeMonthlyPerformance(safeRecords),

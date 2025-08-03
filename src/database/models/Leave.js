@@ -199,7 +199,13 @@ leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
 /**
  * ➕ 연차 사용 기록 추가
  */
-leaveSchema.statics.addUsage = async function (userId, amount, date, reason, type) {
+leaveSchema.statics.addUsage = async function (
+  userId,
+  amount,
+  date,
+  reason,
+  type
+) {
   const useDate = date ? new Date(date) : new Date();
 
   // ✅ type이 전달되지 않으면 자동 계산

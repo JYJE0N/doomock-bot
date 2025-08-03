@@ -336,7 +336,10 @@ class FancyBanner {
       const content = ` ${item.icon} ${item.label}: ${item.value}`;
       const padding = boxWidth - content.length - 1;
       const line =
-        "│" + chalk.bold[item.color](content) + " ".repeat(Math.max(0, padding)) + "│";
+        "│" +
+        chalk.bold[item.color](content) +
+        " ".repeat(Math.max(0, padding)) +
+        "│";
       console.log(chalk.gray(line));
     });
 

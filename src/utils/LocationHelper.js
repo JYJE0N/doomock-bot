@@ -68,7 +68,10 @@ class LocationHelper {
         timeout: 3000
       });
 
-      if (response.data.status === "success" && response.data.country === "South Korea") {
+      if (
+        response.data.status === "success" &&
+        response.data.country === "South Korea"
+      ) {
         const city = this.translateCityName(response.data.city);
         return {
           success: true,

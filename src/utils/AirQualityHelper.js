@@ -10,7 +10,8 @@ const TimeHelper = require("./TimeHelper");
 class AirQualityHelper {
   constructor() {
     // API 설정 - 디코딩된 키 직접 사용
-    this.apiKey = process.env.AIR_KOREA_API_KEY || process.env.DATA_GO_KR_API_KEY;
+    this.apiKey =
+      process.env.AIR_KOREA_API_KEY || process.env.DATA_GO_KR_API_KEY;
     this.baseUrl = "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc";
 
     // 캐시 설정

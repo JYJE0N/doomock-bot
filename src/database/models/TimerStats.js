@@ -64,7 +64,11 @@ timerStatsSchema.statics.updateDaily = async function (userId, date, updates) {
 /**
  * 기간별 통계 조회
  */
-timerStatsSchema.statics.getStatsByDateRange = function (userId, startDate, endDate) {
+timerStatsSchema.statics.getStatsByDateRange = function (
+  userId,
+  startDate,
+  endDate
+) {
   return this.find({
     userId: String(userId),
     date: { $gte: startDate, $lte: endDate },
@@ -75,7 +79,11 @@ timerStatsSchema.statics.getStatsByDateRange = function (userId, startDate, endD
 /**
  * 월별 집계
  */
-timerStatsSchema.statics.getMonthlyAggregate = async function (userId, year, month) {
+timerStatsSchema.statics.getMonthlyAggregate = async function (
+  userId,
+  year,
+  month
+) {
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
 

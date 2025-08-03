@@ -124,9 +124,12 @@ class ErrorHandler {
           }
         );
       } else {
-        await ctx.reply("⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.", {
-          reply_markup: keyboard
-        });
+        await ctx.reply(
+          "⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.",
+          {
+            reply_markup: keyboard
+          }
+        );
       }
 
       this.stats.handledErrors++;
@@ -185,13 +188,18 @@ class ErrorHandler {
     this.stats.rendererErrors++;
     this.stats.lastError = new Date();
 
-    const { module = "unknown", renderer = "unknown", fallbackMessage } = options;
+    const {
+      module = "unknown",
+      renderer = "unknown",
+      fallbackMessage
+    } = options;
 
     logger.error(`🎨 렌더링 오류 [${module}/${renderer}]:`, error);
 
     try {
       // 사용자에게 에러 알림
-      const errorMessage = fallbackMessage || this.config.fallbackMessages.renderer;
+      const errorMessage =
+        fallbackMessage || this.config.fallbackMessages.renderer;
 
       // 🛡️ callbackQuery가 있을 때만 답변
       if (callbackQuery && callbackQuery.id) {
@@ -257,7 +265,9 @@ class ErrorHandler {
       }
 
       const keyboard = {
-        inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]]
+        inline_keyboard: [
+          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
+        ]
       };
 
       if (ctx.callbackQuery) {
@@ -399,11 +409,15 @@ class ErrorHandler {
       config: this.config,
       successRate:
         this.stats.totalErrors > 0
-          ? Math.round((this.stats.handledErrors / this.stats.totalErrors) * 100)
+          ? Math.round(
+              (this.stats.handledErrors / this.stats.totalErrors) * 100
+            )
           : 100,
       criticalRate:
         this.stats.totalErrors > 0
-          ? Math.round((this.stats.criticalErrors / this.stats.totalErrors) * 100)
+          ? Math.round(
+              (this.stats.criticalErrors / this.stats.totalErrors) * 100
+            )
           : 0
     };
   }

@@ -460,9 +460,15 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
       config: this.config,
       rates: {
         markdownV2:
-          total > 0 ? Math.round((this.stats.markdownV2Success / total) * 100) : 0,
-        html: total > 0 ? Math.round((this.stats.htmlFallback / total) * 100) : 0,
-        plain: total > 0 ? Math.round((this.stats.plainTextFallback / total) * 100) : 0,
+          total > 0
+            ? Math.round((this.stats.markdownV2Success / total) * 100)
+            : 0,
+        html:
+          total > 0 ? Math.round((this.stats.htmlFallback / total) * 100) : 0,
+        plain:
+          total > 0
+            ? Math.round((this.stats.plainTextFallback / total) * 100)
+            : 0,
         success:
           total > 0
             ? Math.round(

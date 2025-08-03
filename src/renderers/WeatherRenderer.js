@@ -113,7 +113,9 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
           { text: "🌡️ 현재 날씨", action: "current" },
           { text: "🏙️ 도시 선택", action: "cities" }
         ],
-        config?.enableForecast ? [{ text: "📊 날씨 예보", action: "forecast" }] : null,
+        config?.enableForecast
+          ? [{ text: "📊 날씨 예보", action: "forecast" }]
+          : null,
         [
           { text: "❓ 도움말", action: "help" },
           { text: "◀️ 메인", action: "menu", module: "system" }

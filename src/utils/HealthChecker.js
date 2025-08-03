@@ -133,7 +133,10 @@ class HealthChecker {
       const mongooseManager = this.getComponent("mongoose");
 
       if (!mongooseManager) {
-        return this.createHealthResult("warning", "MongooseManager가 등록되지 않음");
+        return this.createHealthResult(
+          "warning",
+          "MongooseManager가 등록되지 않음"
+        );
       }
 
       const issues = [];
@@ -227,7 +230,13 @@ class HealthChecker {
       const systemHealth = await this.checkSystemResources();
 
       // 📊 결과 통합 및 분석
-      const allChecks = [botHealth, moduleHealth, dbHealth, todoHealth, systemHealth];
+      const allChecks = [
+        botHealth,
+        moduleHealth,
+        dbHealth,
+        todoHealth,
+        systemHealth
+      ];
 
       // 전체 상태 계산
       this.calculateOverallStatus(allChecks, timestamp);
@@ -261,7 +270,10 @@ class HealthChecker {
       const botController = this.getComponent("botController");
 
       if (!botController) {
-        return this.createHealthResult("warning", "BotController가 등록되지 않음");
+        return this.createHealthResult(
+          "warning",
+          "BotController가 등록되지 않음"
+        );
       }
 
       const issues = [];
@@ -311,7 +323,10 @@ class HealthChecker {
       const moduleManager = this.getComponent("moduleManager");
 
       if (!moduleManager) {
-        return this.createHealthResult("warning", "ModuleManager가 등록되지 않음");
+        return this.createHealthResult(
+          "warning",
+          "ModuleManager가 등록되지 않음"
+        );
       }
 
       const issues = [];
@@ -348,12 +363,15 @@ class HealthChecker {
         // 초기화되지 않은 모듈 찾기
         const uninitializedModules = Object.entries(moduleDetails)
           .filter(
-            ([key, detail]) => !detail.configInitialized || !detail.instanceInitialized
+            ([key, detail]) =>
+              !detail.configInitialized || !detail.instanceInitialized
           )
           .map(([key]) => key);
 
         if (uninitializedModules.length > 0) {
-          issues.push(`초기화되지 않은 모듈: ${uninitializedModules.join(", ")}`);
+          issues.push(
+            `초기화되지 않은 모듈: ${uninitializedModules.join(", ")}`
+          );
           severity = severity === "critical" ? "critical" : "warning";
         }
       }
@@ -378,7 +396,10 @@ class HealthChecker {
       const dbManager = this.getComponent("database");
 
       if (!dbManager) {
-        return this.createHealthResult("warning", "DatabaseManager가 등록되지 않음");
+        return this.createHealthResult(
+          "warning",
+          "DatabaseManager가 등록되지 않음"
+        );
       }
 
       const issues = [];
@@ -453,7 +474,10 @@ class HealthChecker {
       }
 
       if (!todoService) {
-        return this.createHealthResult("warning", "TodoService가 등록되지 않음");
+        return this.createHealthResult(
+          "warning",
+          "TodoService가 등록되지 않음"
+        );
       }
 
       const issues = [];
@@ -732,7 +756,9 @@ class HealthChecker {
       this.recoveryAttempts.set(recoveryKey, attempts + 1);
 
       // 복구 지연
-      await new Promise((resolve) => setTimeout(resolve, this.config.recoveryDelay));
+      await new Promise((resolve) =>
+        setTimeout(resolve, this.config.recoveryDelay)
+      );
 
       logger.info("✅ 자동 복구 시도 완료");
     } catch (error) {
@@ -872,7 +898,9 @@ class HealthChecker {
                   this.metrics.memoryUsage.length
               )
             : 0,
-        currentMemoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+        currentMemoryUsage: Math.round(
+          process.memoryUsage().heapUsed / 1024 / 1024
+        )
       },
       config: this.config,
       isRunning: this.isRunning

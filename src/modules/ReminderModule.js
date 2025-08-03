@@ -23,7 +23,8 @@ class ReminderModule extends BaseModule {
     // 모듈 설정
     this.config = {
       maxRemindersPerUser: parseInt(process.env.MAX_REMINDERS_PER_USER) || 20,
-      defaultReminderMinutes: parseInt(process.env.DEFAULT_REMINDER_MINUTES) || 30,
+      defaultReminderMinutes:
+        parseInt(process.env.DEFAULT_REMINDER_MINUTES) || 30,
       maxReminderDays: parseInt(process.env.MAX_REMINDER_DAYS) || 365,
       enableRecurring: process.env.REMINDER_ENABLE_RECURRING !== "false",
       enableSnooze: process.env.REMINDER_ENABLE_SNOOZE !== "false",
@@ -49,9 +50,12 @@ class ReminderModule extends BaseModule {
   async onInitialize() {
     try {
       if (this.serviceBuilder) {
-        this.reminderService = await this.serviceBuilder.getOrCreate("reminder", {
-          config: this.config
-        });
+        this.reminderService = await this.serviceBuilder.getOrCreate(
+          "reminder",
+          {
+            config: this.config
+          }
+        );
       }
 
       if (!this.reminderService) {
@@ -250,7 +254,10 @@ class ReminderModule extends BaseModule {
     }
 
     try {
-      const result = await this.reminderService.deleteReminder(userId, reminderId);
+      const result = await this.reminderService.deleteReminder(
+        userId,
+        reminderId
+      );
 
       if (result.success) {
         logger.info(`🗑️ 리마인더 삭제 성공`, { userId, reminderId });

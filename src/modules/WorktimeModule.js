@@ -31,9 +31,12 @@ class WorktimeModule extends BaseModule {
   async onInitialize() {
     try {
       if (this.serviceBuilder) {
-        this.worktimeService = await this.serviceBuilder.getOrCreate("worktime", {
-          config: this.config
-        });
+        this.worktimeService = await this.serviceBuilder.getOrCreate(
+          "worktime",
+          {
+            config: this.config
+          }
+        );
       }
 
       if (!this.worktimeService) {
@@ -339,7 +342,10 @@ class WorktimeModule extends BaseModule {
           workDuration: workDuration,
           displayTime: this.formatDuration(workDuration),
           isOvertime: workDuration > this.config.overtimeThreshold,
-          overtimeMinutes: Math.max(0, workDuration - this.config.overtimeThreshold)
+          overtimeMinutes: Math.max(
+            0,
+            workDuration - this.config.overtimeThreshold
+          )
         }
       };
       // 🔥 Service가 없으면 더미 데이터 (폴백)

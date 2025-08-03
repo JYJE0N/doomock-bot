@@ -235,7 +235,11 @@ class LeaveModule extends BaseModule {
       const reason = `${info.displayName} 사용`;
 
       // 연차 사용 처리
-      const useResult = await this.leaveService.useLeave(userId, info.amount, reason);
+      const useResult = await this.leaveService.useLeave(
+        userId,
+        info.amount,
+        reason
+      );
 
       if (!useResult.success) {
         return this.createErrorResult(useResult.message);
@@ -265,7 +269,12 @@ class LeaveModule extends BaseModule {
 
       // 설정 관련 액션 처리 (settings:action:value 형태)
       if (params) {
-        return await this.handleSettingsAction(bot, callbackQuery, params, moduleManager);
+        return await this.handleSettingsAction(
+          bot,
+          callbackQuery,
+          params,
+          moduleManager
+        );
       }
 
       // 기본 설정 메뉴 조회
@@ -303,12 +312,16 @@ class LeaveModule extends BaseModule {
       // 현재 연차 현황 확인
       const statusResult = await this.leaveService.getLeaveStatus(userId);
       if (!statusResult.success) {
-        logger.error(`❌ LeaveModule: 연차 현황 조회 실패 - ${statusResult.message}`);
+        logger.error(
+          `❌ LeaveModule: 연차 현황 조회 실패 - ${statusResult.message}`
+        );
         return this.createErrorResult("연차 현황을 확인할 수 없습니다.");
       }
 
       const { remainingLeave } = statusResult.data;
-      logger.debug(`✏️ LeaveModule: 연차 현황 확인 완료 - 잔여: ${remainingLeave}일`);
+      logger.debug(
+        `✏️ LeaveModule: 연차 현황 확인 완료 - 잔여: ${remainingLeave}일`
+      );
 
       // ✅ 사용자 입력 상태 설정 (디버깅 로그 추가)
       const inputState = {
@@ -331,7 +344,8 @@ class LeaveModule extends BaseModule {
       logger.debug(`✏️ LeaveModule: 상태 설정 검증`, {
         hasState: !!verifyState,
         stateMatches:
-          verifyState?.state === this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
+          verifyState?.state ===
+          this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
         totalStates: this.userInputStates.size,
         allUserIds: Array.from(this.userInputStates.keys())
       });
@@ -340,7 +354,9 @@ class LeaveModule extends BaseModule {
       setTimeout(() => {
         if (this.userInputStates.has(userId)) {
           this.userInputStates.delete(userId);
-          logger.info(`⏰ LeaveModule: 사용자 ${userId} 입력 대기 시간 초과로 정리됨`);
+          logger.info(
+            `⏰ LeaveModule: 사용자 ${userId} 입력 대기 시간 초과로 정리됨`
+          );
         }
       }, this.config.inputTimeout);
 
@@ -397,7 +413,8 @@ class LeaveModule extends BaseModule {
           module: "leave",
           data: {
             message:
-              inputState.state === this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT
+              inputState.state ===
+              this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT
                 ? "입사일 입력이 취소되었습니다."
                 : "연차 입력이 취소되었습니다.",
             userId
@@ -421,7 +438,13 @@ class LeaveModule extends BaseModule {
           );
 
         case this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT:
-          return await this.handleJoinDateInput(bot, msg, userId, inputText, inputState);
+          return await this.handleJoinDateInput(
+            bot,
+            msg,
+            userId,
+            inputText,
+            inputState
+          );
 
         default:
           logger.debug(`📝 LeaveModule: 알 수 없는 입력 상태`, {
@@ -465,7 +488,11 @@ class LeaveModule extends BaseModule {
 
     // 입력값 검증 및 처리
     logger.debug(`📝 LeaveModule: 입력값 검증 시작 - "${inputText}"`);
-    const result = await this.processCustomLeaveInput(userId, inputText, inputState);
+    const result = await this.processCustomLeaveInput(
+      userId,
+      inputText,
+      inputState
+    );
 
     logger.debug(`📝 LeaveModule: 검증 결과:`, {
       success: result.success,
@@ -557,7 +584,10 @@ class LeaveModule extends BaseModule {
       logger.info(`📅 LeaveModule: 입사일 설정 처리 시작 - ${result.joinDate}`);
 
       // 입사일 설정 처리
-      const setResult = await this.leaveService.setJoinDate(userId, result.joinDate);
+      const setResult = await this.leaveService.setJoinDate(
+        userId,
+        result.joinDate
+      );
 
       this.userInputStates.delete(userId);
       logger.debug(`📅 LeaveModule: 입력 상태 정리됨`);
@@ -747,14 +777,18 @@ class LeaveModule extends BaseModule {
           }
         };
 
-        logger.info(`🎨 LeaveModule: 렌더러를 통해 결과 전송 중 - ${result.type}`);
+        logger.info(
+          `🎨 LeaveModule: 렌더러를 통해 결과 전송 중 - ${result.type}`
+        );
         await renderer.render(result, ctx);
         logger.info(`✅ LeaveModule: 렌더러 전송 완료`);
         return;
       }
 
       // 2. 렌더러가 없으면 직접 메시지 생성
-      logger.warn("⚠️ LeaveModule: LeaveRenderer를 찾을 수 없어서 직접 메시지 생성");
+      logger.warn(
+        "⚠️ LeaveModule: LeaveRenderer를 찾을 수 없어서 직접 메시지 생성"
+      );
       await this.sendDirectMessage(result, bot, msg);
     } catch (renderError) {
       logger.error("❌ LeaveModule: 렌더러 전달 실패:", renderError);
@@ -879,13 +913,21 @@ class LeaveModule extends BaseModule {
         case this.constants.SETTINGS_ACTIONS.ADD:
           // 연차 추가 (settings:add:1)
           const addAmount = parseInt(value) || 1;
-          result = await this.leaveService.addLeave(userId, addAmount, "수동 추가");
+          result = await this.leaveService.addLeave(
+            userId,
+            addAmount,
+            "수동 추가"
+          );
           break;
 
         case this.constants.SETTINGS_ACTIONS.REMOVE:
           // 연차 삭제 (settings:remove:1)
           const removeAmount = parseInt(value) || 1;
-          result = await this.leaveService.removeLeave(userId, removeAmount, "수동 삭제");
+          result = await this.leaveService.removeLeave(
+            userId,
+            removeAmount,
+            "수동 삭제"
+          );
           break;
 
         case this.constants.SETTINGS_ACTIONS.JOIN_DATE:
@@ -899,7 +941,9 @@ class LeaveModule extends BaseModule {
           setTimeout(() => {
             if (this.userInputStates.has(userId)) {
               this.userInputStates.delete(userId);
-              logger.info(`⏰ LeaveModule: 사용자 ${userId} 입사일 입력 대기 시간 초과`);
+              logger.info(
+                `⏰ LeaveModule: 사용자 ${userId} 입사일 입력 대기 시간 초과`
+              );
             }
           }, this.config.inputTimeout);
 

@@ -39,7 +39,8 @@ class TimerModule extends BaseModule {
       shortBreak: parseInt(process.env.TIMER_SHORT_BREAK) || 5, // 분
       longBreak: parseInt(process.env.TIMER_LONG_BREAK) || 15, // 분
       updateInterval: parseInt(process.env.TIMER_UPDATE_INTERVAL) || 1000, // ms
-      liveUpdateInterval: parseInt(process.env.TIMER_LIVE_UPDATE_INTERVAL) || 5000, // ms
+      liveUpdateInterval:
+        parseInt(process.env.TIMER_LIVE_UPDATE_INTERVAL) || 5000, // ms
       maxCustomDuration: parseInt(process.env.TIMER_MAX_CUSTOM) || 120, // 분
       enableLiveUpdates: process.env.TIMER_ENABLE_LIVE_UPDATES !== "false",
       ...options.config
@@ -137,7 +138,9 @@ class TimerModule extends BaseModule {
     const lowerText = text.toLowerCase();
     const timerKeywords = ["타이머", "timer", "포모도로", "pomodoro", "집중"];
 
-    const hasTimerKeyword = timerKeywords.some((keyword) => lowerText.includes(keyword));
+    const hasTimerKeyword = timerKeywords.some((keyword) =>
+      lowerText.includes(keyword)
+    );
 
     if (!hasTimerKeyword) return false;
 
@@ -167,7 +170,9 @@ class TimerModule extends BaseModule {
         data: {
           userId,
           userName,
-          activeTimer: activeTimer ? this.generateTimerDisplayData(activeTimer) : null,
+          activeTimer: activeTimer
+            ? this.generateTimerDisplayData(activeTimer)
+            : null,
           config: {
             focusDuration: this.config.focusDuration,
             shortBreak: this.config.shortBreak,
@@ -232,7 +237,11 @@ class TimerModule extends BaseModule {
       }
 
       // 메모리 타이머 생성
-      const timer = this.createTimerObject(sessionResult.data._id, timerType, duration);
+      const timer = this.createTimerObject(
+        sessionResult.data._id,
+        timerType,
+        duration
+      );
       this.activeTimers.set(userId, timer);
 
       // 인터벌 시작
@@ -512,7 +521,13 @@ class TimerModule extends BaseModule {
    */
   async refreshStatus(bot, callbackQuery, subAction, params, moduleManager) {
     // showStatus와 동일한 로직
-    return await this.showStatus(bot, callbackQuery, subAction, params, moduleManager);
+    return await this.showStatus(
+      bot,
+      callbackQuery,
+      subAction,
+      params,
+      moduleManager
+    );
   }
 
   /**
@@ -656,7 +671,9 @@ class TimerModule extends BaseModule {
         };
       }
 
-      logger.info(`⚙️ ${breakType} 휴식 시간 설정 변경: ${userId} - ${newDuration}분`);
+      logger.info(
+        `⚙️ ${breakType} 휴식 시간 설정 변경: ${userId} - ${newDuration}분`
+      );
 
       return {
         type: "setting_updated",
@@ -687,7 +704,9 @@ class TimerModule extends BaseModule {
     try {
       // 서비스에서 통계 조회
       const statsResult = await this.timerService.getUserStats(userId, {
-        startDate: this.getDateString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), // 30일 전
+        startDate: this.getDateString(
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        ), // 30일 전
         endDate: this.getTodayDateString()
       });
 

@@ -35,7 +35,9 @@ class WorktimeRenderer extends BaseRenderer {
       night: "🌙"
     };
 
-    logger.info("🏢 WorktimeRenderer 생성됨 - NavigationHandler를 통한 의존성 접근");
+    logger.info(
+      "🏢 WorktimeRenderer 생성됨 - NavigationHandler를 통한 의존성 접근"
+    );
   }
 
   /**
@@ -189,7 +191,9 @@ ${workSummary?.isOvertime ? "🔥 초과근무 " + this.formatDuration(workSumma
           text: todayStatus.isWorking ? "🏃 퇴근하기" : "🏃 출근하기",
           callback_data: this.buildCallbackData(
             "worktime",
-            todayStatus.hasRecord && todayStatus.isWorking ? "checkout" : "checkin"
+            todayStatus.hasRecord && todayStatus.isWorking
+              ? "checkout"
+              : "checkin"
           )
         },
         {
@@ -389,7 +393,12 @@ ${performance.emoji} **평가**: ${performance.txt}`;
    * 📊 통계 렌더링
    */
   async renderStats(data, ctx) {
-    const { overall = {}, thisMonth = {}, lastMonth = {}, achievements = [] } = data;
+    const {
+      overall = {},
+      thisMonth = {},
+      lastMonth = {},
+      achievements = []
+    } = data;
 
     let text = `📊 **근무 통계**
 
@@ -625,12 +634,18 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
 📝 기록이 없습니다.`;
     } else {
       records.slice(0, 10).forEach((record) => {
-        const statusIcon = record.checkOutTime ? "✅" : record.checkInTime ? "💼" : "❌";
+        const statusIcon = record.checkOutTime
+          ? "✅"
+          : record.checkInTime
+            ? "💼"
+            : "❌";
 
         // 안전한 시간 표시 적용
         const duration =
           record.workDurationDisplay ||
-          (record.workDuration ? this.formatDuration(record.workDuration) : "미기록");
+          (record.workDuration
+            ? this.formatDuration(record.workDuration)
+            : "미기록");
         const checkIn = this.safeTimeDisplay(record.checkInTime);
         const checkOut = this.safeTimeDisplay(record.checkOutTime);
 
@@ -722,7 +737,11 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
         const duration = record.workDuration
           ? this.formatDuration(record.workDuration)
           : "미기록";
-        const statusIcon = record.checkOutTime ? "✅" : record.checkInTime ? "💼" : "❌";
+        const statusIcon = record.checkOutTime
+          ? "✅"
+          : record.checkInTime
+            ? "💼"
+            : "❌";
         text += `
 ${statusIcon} **${record.date}**: ${duration}`;
       });
@@ -787,7 +806,10 @@ ${statusIcon} **${record.date}**: ${duration}`;
    * @returns {object} 진행률 정보
    */
   calculateWorkProgress(currentMinutes, targetMinutes) {
-    const percentage = Math.min(100, Math.round((currentMinutes / targetMinutes) * 100));
+    const percentage = Math.min(
+      100,
+      Math.round((currentMinutes / targetMinutes) * 100)
+    );
     const label = percentage >= 100 ? "목표 달성!" : `${percentage}% 진행`;
 
     return { percentage, label };

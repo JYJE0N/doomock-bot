@@ -58,9 +58,14 @@ class ServiceBuilder {
 
     const serviceFiles = fs
       .readdirSync(servicesDir)
-      .filter((file) => file.endsWith("Service.js") && file !== "BaseService.js");
+      .filter(
+        (file) => file.endsWith("Service.js") && file !== "BaseService.js"
+      );
 
-    logger.info(`📄 발견된 서비스 파일: ${serviceFiles.length}개`, serviceFiles);
+    logger.info(
+      `📄 발견된 서비스 파일: ${serviceFiles.length}개`,
+      serviceFiles
+    );
 
     for (const file of serviceFiles) {
       try {

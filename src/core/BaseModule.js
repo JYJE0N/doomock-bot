@@ -101,7 +101,9 @@ class BaseModule {
   registerActions(actions) {
     for (const [action, handler] of Object.entries(actions)) {
       if (typeof handler !== "function") {
-        logger.warn(`⚠️ ${this.moduleName}: ${action} 액션의 핸들러가 함수가 아닙니다`);
+        logger.warn(
+          `⚠️ ${this.moduleName}: ${action} 액션의 핸들러가 함수가 아닙니다`
+        );
         continue;
       }
       this.actionMap.set(action, handler.bind(this));
