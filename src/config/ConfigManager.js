@@ -32,6 +32,9 @@ class ConfigManager {
     this.isDevelopment = this.nodeEnv === "development";
     this.isProduction = this.nodeEnv === "production";
 
+    // 🎯 스테이징 환경 감지 추가
+    this.isStaging = this.nodeEnv === "staging";
+
     // 🌈 초기화 시작 로그
     console.log(this.messageSystem.rainbow("🔧 ═══ ConfigManager v4.0.1 초기화 ═══"));
     console.log(this.messageSystem.gradient("알록달록 설정 관리 시스템 시작!", "cyan", "magenta"));
