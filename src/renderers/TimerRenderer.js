@@ -223,7 +223,7 @@ class TimerRenderer extends BaseRenderer {
    * 🍅 메뉴 렌더링 (실시간 UI 포함)
    */
   async renderMenu(data, ctx) {
-    const { userName, activeTimer, config, timerTypes } = data;
+    const { userName, activeTimer, config, _timerTypes } = data;
 
     let text = `🍅 **뽀모도로 타이머**\n\n`;
     text += `안녕하세요, ${userName}님! 🌟\n\n`;
@@ -368,7 +368,7 @@ ${this.getNextStepSuggestion(completionRate)}`;
         { text: "🍅 새 타이머", action: "menu" },
         { text: "📊 통계 보기", action: "stats" }
       ],
-      [{ text: "🔙 메인 메뉴", action: "menu" }]
+      [{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -456,7 +456,7 @@ ${suggestion}
         { text: "🌴 긴 휴식 (15분)", action: "start", params: "long" },
         { text: "❓ 도움말", action: "help" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }]
+      [{ text: "🔙 메뉴", action: "menu", module: "system" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -491,7 +491,7 @@ ${suggestion}
         { text: "🍅 바로 시작", action: "start", params: "focus" },
         { text: "📊 내 통계", action: "stats" }
       ],
-      [{ text: "🔙 메뉴로", action: "menu" }]
+      [{ text: "🔙 메뉴로", action: "menu", module: "system" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -523,7 +523,7 @@ ${message}
 
     buttons.push([
       { text: "🍅 새 타이머", action: "start", params: "focus" },
-      { text: "🔙 메인 메뉴", action: "menu" }
+      { text: "🔙 메인 메뉴", action: "menu", module: "system" }
     ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -563,7 +563,7 @@ ${message}
       ],
       [
         { text: "🍅 새 타이머", action: "start", params: "focus" },
-        { text: "🔙 메뉴", action: "menu" }
+        { text: "🔙 메뉴", action: "menu", module: "system" }
       ]
     ];
 
@@ -640,7 +640,7 @@ ${message}
    * 📋 상세 시간 정보 생성
    */
   createDetailedTimeInfo(timer) {
-    const { timeData, progressData } = timer;
+    const { timeData, _progressData } = timer;
 
     return `⏰ **남은 시간**: ${timeData.remaining.formatted}
 ⚡ **경과 시간**: ${timeData.elapsed.formatted}  
@@ -652,7 +652,7 @@ ${message}
    */
   getProgressAnalysis(timer) {
     const { progressData } = timer;
-    const { percentage, stage } = progressData;
+    const { stage } = progressData;
 
     if (stage === "early") {
       return "🚀 좋은 시작입니다! 이 페이스를 유지하세요.";
@@ -745,7 +745,7 @@ ${message}
       ]);
     }
 
-    buttons.push([{ text: "🔙 메인 메뉴", action: "menu" }]);
+    buttons.push([{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]);
     return buttons;
   }
 
@@ -779,7 +779,7 @@ ${message}
       buttons.push([{ text: "🔄 실시간 켜기", action: "live" }]);
     }
 
-    buttons.push([{ text: "🔙 메뉴", action: "menu" }]);
+    buttons.push([{ text: "🔙 메뉴", action: "menu", module: "system" }]);
     return buttons;
   }
 
@@ -796,7 +796,7 @@ ${message}
         { text: "🔄 새로고침", action: "refresh" },
         { text: "📊 상세 보기", action: "status" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }]
+      [{ text: "🔙 메뉴", action: "menu", module: "system" }]
     ];
   }
 
@@ -831,7 +831,7 @@ ${message}
       }
     }
 
-    buttons.push([{ text: "🔙 메뉴", action: "menu" }]);
+    buttons.push([{ text: "🔙 메뉴", action: "menu", module: "system" }]);
     return buttons;
   }
 

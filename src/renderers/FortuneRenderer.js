@@ -1,7 +1,7 @@
 // src/renderers/FortuneRenderer.js - 콜백 버튼 수정 버전
 
 const BaseRenderer = require("./BaseRenderer");
-const TimeHelper = require("../utils/TimeHelper");
+const logger = require("../utils/Logger");
 
 /**
  * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 (콜백 버튼 수정)
@@ -113,7 +113,8 @@ class FortuneRenderer extends BaseRenderer {
     buttons.push([
       {
         text: "🔙 메인 메뉴",
-        action: "menu"
+        action: "menu",
+        module: "system"
         // NavigationHandler의 buildCallbackData 형식에 맞게 수정
         // "system:menu"가 되도록 처리
       }
@@ -176,7 +177,7 @@ class FortuneRenderer extends BaseRenderer {
     const {
       cards,
       type: drawType,
-      timestamp,
+      _timestamp,
       fortuneType,
       remaining,
       remainingDraws,
@@ -272,7 +273,7 @@ class FortuneRenderer extends BaseRenderer {
    * 🔮 캘틱 크로스 결과 렌더링
    */
   async renderCelticResult(data, ctx) {
-    const { question, cards, fortuneType, message, isDemo } = data;
+    const { question, cards, _fortuneType, message, isDemo } = data;
 
     let text = `🔮 **캘틱 크로스 완성**\n\n`;
 
@@ -546,7 +547,7 @@ ${errorMessage}
       const buttons = [
         [
           { text: "🔄 다시 시도", action: "menu" },
-          { text: "🔙 메인 메뉴", action: "menu" }
+          { text: "🔙 메인 메뉴", action: "menu", module: "system" }
         ]
       ];
 
@@ -632,7 +633,7 @@ ${errorMessage}
   async renderCelticDetail(data, ctx) {
     try {
       const {
-        userName,
+        _userName,
         question,
         cards,
         detailedInterpretation,

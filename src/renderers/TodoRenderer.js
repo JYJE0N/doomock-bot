@@ -135,7 +135,29 @@ class TodoRenderer extends BaseRenderer {
         case "input_request":
           await this.renderInputRequest(data || {}, ctx);
           break;
+        case "reminder_select_list":
+          await this.renderReminderSelectList(data || {}, ctx);
+          break;
 
+        case "remind_edit_select":
+          await this.renderReminderEditSelect(data || {}, ctx);
+          break;
+
+        case "remind_delete_select":
+          await this.renderReminderDeleteSelect(data || {}, ctx);
+          break;
+
+        case "filter_menu":
+          await this.renderFilterMenu(data || {}, ctx);
+          break;
+
+        case "filtered_list":
+          await this.renderFilteredList(data || {}, ctx);
+          break;
+
+        case "cleanup":
+          await this.renderCleanup(data || {}, ctx);
+          break;
         // 에러
         case "error":
           await this.renderError(data || {}, ctx);
@@ -569,6 +591,332 @@ class TodoRenderer extends BaseRenderer {
         { text: `${this.emojis.todo} 할일 목록`, action: "list", params: "1" }
       ],
       [{ text: `${this.emojis.back} 메뉴로`, action: "menu" }]
+    ];
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * 📋 리마인드 설정할 할일 선택 화면
+   */
+  async renderReminderSelectList(data, ctx) {
+    const { todos, title } = data;
+
+    let text = `${this.emojis.reminder} *${title || "리마인드 설정할 할일 선택"}*\n\n`;
+
+    if (!todos || todos.length === 0) {
+      text += `${this.styles.bullet} 리마인드를 설정할 할일이 없습니다.\n\n`;
+      text += `${this.emojis.add} 먼저 할일을 추가해주세요!`;
+
+      const buttons = [
+        [{ text: `${this.emojis.add} 할일 추가`, action: "add" }],
+        [{ text: `${this.emojis.back} 뒤로가기`, action: "list", params: "1" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+      return;
+    }
+
+    text += `${this.styles.bullet} 리마인드를 설정할 할일을 선택하세요:\n`;
+    text += `${this.styles.separator}\n\n`;
+
+    // 할일 목록 표시
+    todos.forEach((todo, index) => {
+      text += `${index + 1}. ${this.emojis.pending} ${todo.text}\n`;
+    });
+
+    // 버튼 생성 - 각 할일에 대한 버튼
+    const buttons = [];
+
+    // 할일 선택 버튼들 (2개씩 배치)
+    for (let i = 0; i < todos.length; i += 2) {
+      const row = [];
+
+      // 첫 번째 할일
+      const todo1 = todos[i];
+      const num1 = i + 1;
+      row.push({
+        text: `${num1}. 설정`,
+        action: "remind",
+        params: todo1._id
+      });
+
+      // 두 번째 할일 (있는 경우)
+      if (i + 1 < todos.length) {
+        const todo2 = todos[i + 1];
+        const num2 = i + 2;
+        row.push({
+          text: `${num2}. 설정`,
+          action: "remind",
+          params: todo2._id
+        });
+      }
+
+      buttons.push(row);
+    }
+
+    // 하단 메뉴
+    buttons.push([
+      { text: `${this.emojis.back} 뒤로가기`, action: "list", params: "1" }
+    ]);
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * ✏️ 수정할 리마인드 선택 화면
+   */
+  async renderReminderEditSelect(data, ctx) {
+    const { reminders, title } = data;
+
+    let text = `${this.emojis.edit} *${title || "수정할 리마인드 선택"}*\n\n`;
+
+    if (!reminders || reminders.length === 0) {
+      text += `${this.styles.bullet} 수정할 리마인드가 없습니다.`;
+
+      const buttons = [
+        [{ text: `${this.emojis.back} 뒤로가기`, action: "remind_list" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+      return;
+    }
+
+    text += `${this.styles.bullet} 수정할 리마인드를 선택하세요:\n`;
+    text += `${this.styles.separator}\n\n`;
+
+    // 리마인드 목록 표시
+    reminders.forEach((reminder, index) => {
+      const timeStr = TimeHelper.format(
+        new Date(reminder.reminderTime),
+        "relative"
+      );
+      text += `${index + 1}. ${this.emojis.bell} ${reminder.text}\n`;
+      text += `   ⏰ ${timeStr}\n\n`;
+    });
+
+    // 버튼 생성
+    const buttons = [];
+
+    for (let i = 0; i < reminders.length; i += 2) {
+      const row = [];
+
+      const reminder1 = reminders[i];
+      const num1 = i + 1;
+      row.push({
+        text: `${num1}. 수정`,
+        action: "remind_edit",
+        params: reminder1._id
+      });
+
+      if (i + 1 < reminders.length) {
+        const reminder2 = reminders[i + 1];
+        const num2 = i + 2;
+        row.push({
+          text: `${num2}. 수정`,
+          action: "remind_edit",
+          params: reminder2._id
+        });
+      }
+
+      buttons.push(row);
+    }
+
+    buttons.push([
+      { text: `${this.emojis.back} 뒤로가기`, action: "remind_list" }
+    ]);
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * 🗑️ 삭제할 리마인드 선택 화면
+   */
+  async renderReminderDeleteSelect(data, ctx) {
+    const { reminders, title } = data;
+
+    let text = `${this.emojis.delete} *${title || "삭제할 리마인드 선택"}*\n\n`;
+
+    if (!reminders || reminders.length === 0) {
+      text += `${this.styles.bullet} 삭제할 리마인드가 없습니다.`;
+
+      const buttons = [
+        [{ text: `${this.emojis.back} 뒤로가기`, action: "remind_list" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+      return;
+    }
+
+    text += `⚠️ *주의: 삭제된 리마인드는 복구할 수 없습니다.*\n\n`;
+    text += `${this.styles.bullet} 삭제할 리마인드를 선택하세요:\n`;
+    text += `${this.styles.separator}\n\n`;
+
+    // 리마인드 목록 표시
+    reminders.forEach((reminder, index) => {
+      const timeStr = TimeHelper.format(
+        new Date(reminder.reminderTime),
+        "relative"
+      );
+      text += `${index + 1}. ${this.emojis.bell} ${reminder.text}\n`;
+      text += `   ⏰ ${timeStr}\n\n`;
+    });
+
+    // 버튼 생성
+    const buttons = [];
+
+    for (let i = 0; i < reminders.length; i += 2) {
+      const row = [];
+
+      const reminder1 = reminders[i];
+      const num1 = i + 1;
+      row.push({
+        text: `${num1}. 삭제`,
+        action: "remind_delete",
+        params: reminder1._id
+      });
+
+      if (i + 1 < reminders.length) {
+        const reminder2 = reminders[i + 1];
+        const num2 = i + 2;
+        row.push({
+          text: `${num2}. 삭제`,
+          action: "remind_delete",
+          params: reminder2._id
+        });
+      }
+
+      buttons.push(row);
+    }
+
+    buttons.push([
+      { text: `${this.emojis.back} 뒤로가기`, action: "remind_list" }
+    ]);
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * 🗂️ 필터 메뉴
+   */
+  async renderFilterMenu(data, ctx) {
+    const { _filters } = data;
+
+    let text = `${this.emojis.filter} *할일 필터*\n\n`;
+    text += `${this.styles.bullet} 필터 조건을 선택하세요:`;
+
+    const buttons = [];
+
+    // 상태별 필터
+    buttons.push([
+      { text: "⏳ 대기 중", action: "filter", params: "status:pending" },
+      { text: "✅ 완료됨", action: "filter", params: "status:completed" }
+    ]);
+
+    // 우선순위별 필터
+    buttons.push([
+      { text: "🔥 높은 우선순위", action: "priority", params: "high" },
+      { text: "📌 보통 우선순위", action: "priority", params: "medium" }
+    ]);
+
+    // 날짜별 필터
+    buttons.push([
+      { text: "📅 오늘", action: "filter", params: "date:today" },
+      { text: "📅 이번 주", action: "filter", params: "date:week" }
+    ]);
+
+    buttons.push([
+      { text: `${this.emojis.back} 뒤로가기`, action: "list", params: "1" }
+    ]);
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * 📋 필터링된 목록
+   */
+  async renderFilteredList(data, ctx) {
+    const { todos, filter, totalCount } = data;
+
+    let filterText = "";
+    if (filter.type === "priority") {
+      filterText = filter.value === "high" ? "높은 우선순위" : "보통 우선순위";
+    } else if (filter.type === "status") {
+      filterText = filter.value === "pending" ? "대기 중" : "완료됨";
+    }
+
+    let text = `${this.emojis.filter} *필터: ${filterText}*\n\n`;
+
+    if (!todos || todos.length === 0) {
+      text += `${this.styles.bullet} 조건에 맞는 할일이 없습니다.`;
+
+      const buttons = [
+        [{ text: `${this.emojis.filter} 다른 필터`, action: "filter" }],
+        [{ text: `${this.emojis.back} 전체 목록`, action: "list", params: "1" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+      return;
+    }
+
+    text += `📊 총 ${totalCount}개 검색됨\n`;
+    text += `${this.styles.separator}\n\n`;
+
+    // 할일 목록 표시
+    todos.forEach((todo, index) => {
+      const status = todo.completed
+        ? this.emojis.completed
+        : this.emojis.pending;
+      text += `${index + 1}. ${status} ${todo.text}\n`;
+    });
+
+    const buttons = [
+      [{ text: `${this.emojis.filter} 다른 필터`, action: "filter" }],
+      [{ text: `${this.emojis.back} 전체 목록`, action: "list", params: "1" }]
+    ];
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * 🧹 스마트 정리
+   */
+  async renderCleanup(data, ctx) {
+    let text = `${this.emojis.cleanup} *스마트 정리*\n\n`;
+    text += `다음 항목들을 자동으로 정리할 수 있습니다:\n\n`;
+
+    text += `${this.styles.bullet} 30일 이상 완료된 할일\n`;
+    text += `${this.styles.bullet} 만료된 리마인드\n`;
+    text += `${this.styles.bullet} 중복된 할일\n\n`;
+
+    text += `⚠️ *주의: 정리된 항목은 복구할 수 없습니다.*`;
+
+    const buttons = [
+      [
+        { text: "🧹 정리 시작", action: "cleanup_confirm" },
+        { text: "👀 미리보기", action: "cleanup_preview" }
+      ],
+      [{ text: `${this.emojis.back} 뒤로가기`, action: "menu" }]
     ];
 
     await this.sendSafeMessage(ctx, text, {

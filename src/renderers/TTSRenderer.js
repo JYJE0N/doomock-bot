@@ -35,7 +35,7 @@ class TTSRenderer extends BaseRenderer {
   }
 
   async renderMenu(data, ctx) {
-    const { userName, currentVoice, languages } = data;
+    const { userName, currentVoice, _languages } = data;
 
     const text = `🔊 **음성 변환 서비스**
 
@@ -51,7 +51,11 @@ class TTSRenderer extends BaseRenderer {
       ],
       [
         { text: "🎤 음성 변경", action: "select_voice" },
-        { text: "🔙 메인 메뉴", action: "menu" }
+        {
+          text: "🔙 메인 메뉴",
+          action: "menu",
+          module: "system"
+        }
       ]
     ];
 
@@ -211,7 +215,7 @@ ${message}`;
     const escapeMarkdownV2 = (str) => {
       if (!str) return "";
       // MarkdownV2에서 이스케이프가 필요한 모든 문자
-      return str.replace(/[_*\[\]()~`>#+=|{}.!\\-]/g, "\\$&");
+      return str.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, "\\$&");
     };
 
     // 캡션 생성 (MarkdownV2 형식)
@@ -320,7 +324,7 @@ ${message}
     const buttons = [
       [
         { text: "🔄 다시 시도", action: "menu" },
-        { text: "🔙 메인 메뉴", action: "menu" }
+        { text: "🔙 메인 메뉴", action: "menu", module: "system" }
       ]
     ];
 
