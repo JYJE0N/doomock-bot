@@ -141,7 +141,11 @@ userLeaveSettingSchema.statics.getOrCreate = async function (userId, year = null
 /**
  * ➕ 연차 추가
  */
-userLeaveSettingSchema.statics.addLeave = async function (userId, amount, reason = "수동 추가") {
+userLeaveSettingSchema.statics.addLeave = async function (
+  userId,
+  amount,
+  reason = "수동 추가"
+) {
   const currentYear = new Date().getFullYear();
   const setting = await this.getOrCreate(userId, currentYear);
 
@@ -163,7 +167,11 @@ userLeaveSettingSchema.statics.addLeave = async function (userId, amount, reason
 /**
  * ➖ 연차 삭제
  */
-userLeaveSettingSchema.statics.removeLeave = async function (userId, amount, reason = "수동 삭제") {
+userLeaveSettingSchema.statics.removeLeave = async function (
+  userId,
+  amount,
+  reason = "수동 삭제"
+) {
   const currentYear = new Date().getFullYear();
   const setting = await this.getOrCreate(userId, currentYear);
 

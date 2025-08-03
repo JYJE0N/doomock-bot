@@ -21,7 +21,26 @@ class UnifiedMessageSystem {
     this.version = "4.0.1";
 
     // 🎨 MarkdownV2 이스케이프 문자들
-    this.escapeChars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
+    this.escapeChars = [
+      "_",
+      "*",
+      "[",
+      "]",
+      "(",
+      ")",
+      "~",
+      "`",
+      ">",
+      "#",
+      "+",
+      "-",
+      "=",
+      "|",
+      "{",
+      "}",
+      ".",
+      "!"
+    ];
 
     // 🌈 콘솔 스타일 시스템
     this.consoleStyles = this.initConsoleStyles();
@@ -73,10 +92,16 @@ class UnifiedMessageSystem {
     try {
       // Chalk hex 지원 확인
       const halfPoint = Math.floor(text.length / 2);
-      return chalk.hex(startColor)(text.slice(0, halfPoint)) + chalk.hex(endColor)(text.slice(halfPoint));
+      return (
+        chalk.hex(startColor)(text.slice(0, halfPoint)) +
+        chalk.hex(endColor)(text.slice(halfPoint))
+      );
     } catch (error) {
       // Fallback: 일반 색상 사용
-      return chalk.red(text.slice(0, text.length / 2)) + chalk.blue(text.slice(text.length / 2));
+      return (
+        chalk.red(text.slice(0, text.length / 2)) +
+        chalk.blue(text.slice(text.length / 2))
+      );
     }
   }
 
@@ -125,7 +150,8 @@ class UnifiedMessageSystem {
         const empty = width - filled;
 
         const bar = chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(empty));
-        const color = percentage >= 80 ? chalk.green : percentage >= 60 ? chalk.yellow : chalk.red;
+        const color =
+          percentage >= 80 ? chalk.green : percentage >= 60 ? chalk.yellow : chalk.red;
 
         return `${bar} ${color.bold(`${percentage}%`)} (${current}/${total})`;
       }
@@ -247,7 +273,8 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
     paginatedTodos.forEach((todo, index) => {
       const displayIndex = startIndex + index + 1;
       const status = todo.completed ? "✅" : "◻️";
-      const priority = todo.priority === "high" ? "🔴" : todo.priority === "medium" ? "🟡" : "🔵";
+      const priority =
+        todo.priority === "high" ? "🔴" : todo.priority === "medium" ? "🟡" : "🔵";
 
       todoText += `${status} ${priority} ${this.markdownStyles.bold(displayIndex.toString())}\\. ${this.escape(todo.title)}\n`;
 
@@ -284,7 +311,8 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
     }
 
     // 📱 텔레그램 메시지
-    const successEmoji = this.emojiSets.success[Math.floor(Math.random() * this.emojiSets.success.length)];
+    const successEmoji =
+      this.emojiSets.success[Math.floor(Math.random() * this.emojiSets.success.length)];
     const telegramText = `${successEmoji} ${this.markdownStyles.bold("성공\\!")}
 
 ${this.escape(message)}${details ? `\n\n${this.markdownStyles.code(JSON.stringify(details, null, 2))}` : ""}`;
@@ -309,7 +337,8 @@ ${this.escape(message)}${details ? `\n\n${this.markdownStyles.code(JSON.stringif
     }
 
     // 📱 텔레그램 메시지
-    const errorEmoji = this.emojiSets.error[Math.floor(Math.random() * this.emojiSets.error.length)];
+    const errorEmoji =
+      this.emojiSets.error[Math.floor(Math.random() * this.emojiSets.error.length)];
     const telegramText = `${errorEmoji} ${this.markdownStyles.bold("오류 발생")}
 
 ${this.escape(message)}
@@ -338,7 +367,11 @@ ${this.markdownStyles.italic("잠시 후 다시 시도해주세요\\.")}`;
 
     try {
       if (bot && chatId) {
-        const sentMessage = await bot.sendMessage(chatId, telegramText, this.telegramOptions);
+        const sentMessage = await bot.sendMessage(
+          chatId,
+          telegramText,
+          this.telegramOptions
+        );
         return sentMessage.message_id;
       }
     } catch (error) {
@@ -379,7 +412,13 @@ ${this.markdownStyles.italic("잠시 후 다시 시도해주세요\\.")}`;
       escapeChars: this.escapeChars.length,
       emojiSets: Object.keys(this.emojiSets).length,
       modules: Object.keys(this.emojiSets.modules).length,
-      features: ["통합 메시지 시스템", "MarkdownV2 지원", "알록달록 콘솔 출력", "표준 매개변수 준수", "Fallback 메커니즘"],
+      features: [
+        "통합 메시지 시스템",
+        "MarkdownV2 지원",
+        "알록달록 콘솔 출력",
+        "표준 매개변수 준수",
+        "Fallback 메커니즘"
+      ],
       supportedModules: Object.keys(this.emojiSets.modules)
     };
   }
@@ -436,7 +475,12 @@ class LoggerEnhancer {
     };
 
     this.logger.moduleLog = (moduleName, message, data) => {
-      console.log(this.messageSystem.consoleStyles.moduleTitle(moduleName, this.messageSystem.emojiSets.modules[moduleName] || "📦"));
+      console.log(
+        this.messageSystem.consoleStyles.moduleTitle(
+          moduleName,
+          this.messageSystem.emojiSets.modules[moduleName] || "📦"
+        )
+      );
       if (data) console.log(chalk.gray(JSON.stringify(data, null, 2)));
     };
   }

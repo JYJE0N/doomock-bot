@@ -188,7 +188,10 @@ class ReminderScheduler {
   async getPendingReminders(currentTime) {
     try {
       // ReminderService에서 발송 대상 조회
-      const reminders = await this.reminderService.getPendingReminders(currentTime, this.config.batchSize);
+      const reminders = await this.reminderService.getPendingReminders(
+        currentTime,
+        this.config.batchSize
+      );
 
       return reminders;
     } catch (error) {
@@ -301,7 +304,26 @@ class ReminderScheduler {
   escapeMarkdownV2(text) {
     if (typeof text !== "string") text = String(text);
 
-    const escapeChars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
+    const escapeChars = [
+      "_",
+      "*",
+      "[",
+      "]",
+      "(",
+      ")",
+      "~",
+      "`",
+      ">",
+      "#",
+      "+",
+      "-",
+      "=",
+      "|",
+      "{",
+      "}",
+      ".",
+      "!"
+    ];
 
     let escaped = text;
     escapeChars.forEach((char) => {

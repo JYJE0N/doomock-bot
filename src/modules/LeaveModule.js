@@ -330,7 +330,8 @@ class LeaveModule extends BaseModule {
       const verifyState = this.userInputStates.get(userId);
       logger.debug(`✏️ LeaveModule: 상태 설정 검증`, {
         hasState: !!verifyState,
-        stateMatches: verifyState?.state === this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
+        stateMatches:
+          verifyState?.state === this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT,
         totalStates: this.userInputStates.size,
         allUserIds: Array.from(this.userInputStates.keys())
       });
@@ -411,7 +412,13 @@ class LeaveModule extends BaseModule {
       // 상태별 처리 분기
       switch (inputState.state) {
         case this.constants.INPUT_STATES.WAITING_CUSTOM_AMOUNT:
-          return await this.handleCustomAmountInput(bot, msg, userId, inputText, inputState);
+          return await this.handleCustomAmountInput(
+            bot,
+            msg,
+            userId,
+            inputText,
+            inputState
+          );
 
         case this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT:
           return await this.handleJoinDateInput(bot, msg, userId, inputText, inputState);
@@ -470,7 +477,11 @@ class LeaveModule extends BaseModule {
       logger.info(`📝 LeaveModule: 연차 사용 처리 시작 - ${result.amount}일`);
 
       // 연차 사용 처리
-      const useResult = await this.leaveService.useLeave(userId, result.amount, `직접 입력: ${result.amount}일 연차`);
+      const useResult = await this.leaveService.useLeave(
+        userId,
+        result.amount,
+        `직접 입력: ${result.amount}일 연차`
+      );
 
       this.userInputStates.delete(userId);
       logger.debug(`📝 LeaveModule: 입력 상태 정리됨`);
@@ -624,7 +635,11 @@ class LeaveModule extends BaseModule {
       // 날짜 유효성 검증
       const date = new Date(year, month - 1, day);
 
-      if (date.getFullYear() !== year || date.getMonth() !== month - 1 || date.getDate() !== day) {
+      if (
+        date.getFullYear() !== year ||
+        date.getMonth() !== month - 1 ||
+        date.getDate() !== day
+      ) {
         return {
           success: false,
           message: "유효하지 않은 날짜입니다."
@@ -687,7 +702,9 @@ class LeaveModule extends BaseModule {
         logger.debug(`🎨 LeaveModule: 렌더러 찾기 결과`, {
           hasRenderer: !!renderer,
           rendererCount: this.moduleManager.navigationHandler.renderers.size,
-          availableRenderers: Array.from(this.moduleManager.navigationHandler.renderers.keys())
+          availableRenderers: Array.from(
+            this.moduleManager.navigationHandler.renderers.keys()
+          )
         });
       }
 
@@ -826,7 +843,8 @@ class LeaveModule extends BaseModule {
       if (remainder !== 0) {
         return {
           success: false,
-          message: "0.25일 단위로만 입력 가능합니다.\n예: 0.25, 0.5, 0.75, 1, 1.25, 1.5, ..."
+          message:
+            "0.25일 단위로만 입력 가능합니다.\n예: 0.25, 0.5, 0.75, 1, 1.25, 1.5, ..."
         };
       }
 

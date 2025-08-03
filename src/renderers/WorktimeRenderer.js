@@ -78,7 +78,10 @@ class WorktimeRenderer extends BaseRenderer {
 
       if (!type) {
         logger.error("WorktimeRenderer: 결과 타입이 없습니다", result);
-        return await this.renderError({ message: "결과 타입이 지정되지 않았습니다." }, ctx);
+        return await this.renderError(
+          { message: "결과 타입이 지정되지 않았습니다." },
+          ctx
+        );
       }
 
       logger.debug(`🏢 WorktimeRenderer 렌더링: ${type}`, {
@@ -118,11 +121,19 @@ class WorktimeRenderer extends BaseRenderer {
 
         default:
           logger.warn(`🏢 WorktimeRenderer: 알 수 없는 타입 - ${type}`);
-          return await this.errorHandler.handleUnexpectedError(ctx, new Error(`지원하지 않는 타입: ${type}`), "WorktimeRenderer.render");
+          return await this.errorHandler.handleUnexpectedError(
+            ctx,
+            new Error(`지원하지 않는 타입: ${type}`),
+            "WorktimeRenderer.render"
+          );
       }
     } catch (error) {
       logger.error("💥 WorktimeRenderer.render 오류:", error);
-      return await this.errorHandler.handleUnexpectedError(ctx, error, "WorktimeRenderer.render");
+      return await this.errorHandler.handleUnexpectedError(
+        ctx,
+        error,
+        "WorktimeRenderer.render"
+      );
     }
   }
 
@@ -143,7 +154,10 @@ class WorktimeRenderer extends BaseRenderer {
       const { isWorking, workSummary } = todayStatus;
 
       if (isWorking) {
-        const progress = this.calculateWorkProgress(workSummary?.workDuration || 0, config.overtimeThreshold || 480);
+        const progress = this.calculateWorkProgress(
+          workSummary?.workDuration || 0,
+          config.overtimeThreshold || 480
+        );
         text += `${this.statusEmojis.working} **현재 근무 중**
 ⏰ **근무시간**: ${workSummary?.displayTime || "0:00"}
 ${this.createProgressBar(progress.percentage, progress.label)}
@@ -173,7 +187,10 @@ ${workSummary?.isOvertime ? "🔥 초과근무 " + this.formatDuration(workSumma
       [
         {
           text: todayStatus.isWorking ? "🏃 퇴근하기" : "🏃 출근하기",
-          callback_data: this.buildCallbackData("worktime", todayStatus.hasRecord && todayStatus.isWorking ? "checkout" : "checkin")
+          callback_data: this.buildCallbackData(
+            "worktime",
+            todayStatus.hasRecord && todayStatus.isWorking ? "checkout" : "checkin"
+          )
         },
         {
           text: "📅 오늘 현황",
@@ -290,7 +307,16 @@ ${workStatus}
    * 📊 월간 통계 렌더링
    */
   async renderMonth(data, ctx) {
-    const { month, year, workDays = 0, totalHours = 0, overtimeHours = 0, avgDailyHours = 0, performance = {}, trends = {} } = data;
+    const {
+      month,
+      year,
+      workDays = 0,
+      totalHours = 0,
+      overtimeHours = 0,
+      avgDailyHours = 0,
+      performance = {},
+      trends = {}
+    } = data;
 
     let text = `📊 **월간 근무 통계**
 
@@ -456,7 +482,9 @@ ${achievement.emoji} ${achievement.txt}`;
     //   checkOutTime: TimeHelper.debugTime(record.checkOutTime),
     // });
 
-    const statusEmoji = isWorking ? this.statusEmojis.working : this.statusEmojis.completed;
+    const statusEmoji = isWorking
+      ? this.statusEmojis.working
+      : this.statusEmojis.completed;
     const statusText = isWorking ? "근무 중" : "근무 완료";
 
     let text = `📅 **오늘 근무 현황** ${statusEmoji}
@@ -472,7 +500,10 @@ ${achievement.emoji} ${achievement.txt}`;
 
     // 근무시간 표시 (안전하게)
     const workDurationText =
-      workSummary.displayTime || (workSummary.workDuration ? this.formatDuration(workSummary.workDuration) : "계산 중...");
+      workSummary.displayTime ||
+      (workSummary.workDuration
+        ? this.formatDuration(workSummary.workDuration)
+        : "계산 중...");
 
     text += `
 ⏱️ **근무시간**: ${workDurationText}`;
@@ -597,7 +628,9 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
         const statusIcon = record.checkOutTime ? "✅" : record.checkInTime ? "💼" : "❌";
 
         // 안전한 시간 표시 적용
-        const duration = record.workDurationDisplay || (record.workDuration ? this.formatDuration(record.workDuration) : "미기록");
+        const duration =
+          record.workDurationDisplay ||
+          (record.workDuration ? this.formatDuration(record.workDuration) : "미기록");
         const checkIn = this.safeTimeDisplay(record.checkInTime);
         const checkOut = this.safeTimeDisplay(record.checkOutTime);
 
@@ -646,7 +679,16 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
    * 📈 주간 통계 렌더링 (개선됨)
    */
   async renderWeek(data, ctx) {
-    const { weekStart, weekEnd, workDays = 0, totalHours = 0, overtimeHours = 0, avgDailyHours = 0, analysis = {}, records = [] } = data;
+    const {
+      weekStart,
+      weekEnd,
+      workDays = 0,
+      totalHours = 0,
+      overtimeHours = 0,
+      avgDailyHours = 0,
+      analysis = {},
+      records = []
+    } = data;
 
     let text = `📈 **주간 근무 통계**
 
@@ -677,7 +719,9 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
 
 📋 **일별 요약**:`;
       records.slice(0, 5).forEach((record) => {
-        const duration = record.workDuration ? this.formatDuration(record.workDuration) : "미기록";
+        const duration = record.workDuration
+          ? this.formatDuration(record.workDuration)
+          : "미기록";
         const statusIcon = record.checkOutTime ? "✅" : record.checkInTime ? "💼" : "❌";
         text += `
 ${statusIcon} **${record.date}**: ${duration}`;

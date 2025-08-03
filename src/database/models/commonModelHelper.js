@@ -80,7 +80,10 @@ const paginatePlugin = function (schema) {
 
     const skip = (page - 1) * limit;
 
-    const [docs, total] = await Promise.all([this.find(filter).sort(sort).limit(limit).skip(skip), this.countDocuments(filter)]);
+    const [docs, total] = await Promise.all([
+      this.find(filter).sort(sort).limit(limit).skip(skip),
+      this.countDocuments(filter)
+    ]);
 
     return {
       docs,

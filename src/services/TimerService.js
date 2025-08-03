@@ -86,7 +86,10 @@ class TimerService extends BaseService {
 
       // 입력 검증
       if (!type || !duration) {
-        return this.createErrorResponse(new Error("INVALID_INPUT"), "타이머 타입과 지속시간이 필요합니다.");
+        return this.createErrorResponse(
+          new Error("INVALID_INPUT"),
+          "타이머 타입과 지속시간이 필요합니다."
+        );
       }
 
       // 활성 세션 수 확인
@@ -126,7 +129,10 @@ class TimerService extends BaseService {
 
       logger.info(`▶️ 타이머 세션 시작: ${userId} - ${type} (${duration}분)`);
 
-      return this.createSuccessResponse(this.transformSessionData(savedSession), "타이머 세션이 시작되었습니다.");
+      return this.createSuccessResponse(
+        this.transformSessionData(savedSession),
+        "타이머 세션이 시작되었습니다."
+      );
     } catch (error) {
       logger.error("TimerService.startSession 오류:", error);
       return this.createErrorResponse(error, "타이머 시작에 실패했습니다.");
@@ -140,11 +146,17 @@ class TimerService extends BaseService {
     try {
       const session = await this.findActiveSession(sessionId);
       if (!session) {
-        return this.createErrorResponse(new Error("SESSION_NOT_FOUND"), "세션을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "세션을 찾을 수 없습니다."
+        );
       }
 
       if (session.status === "paused") {
-        return this.createErrorResponse(new Error("ALREADY_PAUSED"), "이미 일시정지된 세션입니다.");
+        return this.createErrorResponse(
+          new Error("ALREADY_PAUSED"),
+          "이미 일시정지된 세션입니다."
+        );
       }
 
       // 일시정지 처리
@@ -152,7 +164,10 @@ class TimerService extends BaseService {
 
       logger.info(`⏸️ 타이머 일시정지: ${session.userId} - ${sessionId}`);
 
-      return this.createSuccessResponse(this.transformSessionData(session), "타이머가 일시정지되었습니다.");
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "타이머가 일시정지되었습니다."
+      );
     } catch (error) {
       logger.error("TimerService.pauseSession 오류:", error);
       return this.createErrorResponse(error, "일시정지에 실패했습니다.");
@@ -166,11 +181,17 @@ class TimerService extends BaseService {
     try {
       const session = await this.findActiveSession(sessionId);
       if (!session) {
-        return this.createErrorResponse(new Error("SESSION_NOT_FOUND"), "세션을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "세션을 찾을 수 없습니다."
+        );
       }
 
       if (session.status !== "paused") {
-        return this.createErrorResponse(new Error("NOT_PAUSED"), "일시정지 상태가 아닙니다.");
+        return this.createErrorResponse(
+          new Error("NOT_PAUSED"),
+          "일시정지 상태가 아닙니다."
+        );
       }
 
       // 재개 처리
@@ -178,7 +199,10 @@ class TimerService extends BaseService {
 
       logger.info(`▶️ 타이머 재개: ${session.userId} - ${sessionId}`);
 
-      return this.createSuccessResponse(this.transformSessionData(session), "타이머가 재개되었습니다.");
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "타이머가 재개되었습니다."
+      );
     } catch (error) {
       logger.error("TimerService.resumeSession 오류:", error);
       return this.createErrorResponse(error, "재개에 실패했습니다.");
@@ -192,7 +216,10 @@ class TimerService extends BaseService {
     try {
       const session = await this.findActiveSession(sessionId);
       if (!session) {
-        return this.createErrorResponse(new Error("SESSION_NOT_FOUND"), "세션을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "세션을 찾을 수 없습니다."
+        );
       }
 
       // 중지 처리
@@ -207,7 +234,10 @@ class TimerService extends BaseService {
 
       logger.info(`⏹️ 타이머 중지: ${session.userId} - ${sessionId}`);
 
-      return this.createSuccessResponse(this.transformSessionData(session), "타이머가 중지되었습니다.");
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "타이머가 중지되었습니다."
+      );
     } catch (error) {
       logger.error("TimerService.stopSession 오류:", error);
       return this.createErrorResponse(error, "중지에 실패했습니다.");
@@ -221,7 +251,10 @@ class TimerService extends BaseService {
     try {
       const session = await this.findActiveSession(sessionId);
       if (!session) {
-        return this.createErrorResponse(new Error("SESSION_NOT_FOUND"), "세션을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "세션을 찾을 수 없습니다."
+        );
       }
 
       // 완료 처리
@@ -229,14 +262,19 @@ class TimerService extends BaseService {
 
       // 통계 업데이트 (비동기)
       if (this.config.enableStats) {
-        this.updateDailyStats(session.userId, session.type, "completed").catch((error) => {
-          logger.warn("통계 업데이트 실패:", error);
-        });
+        this.updateDailyStats(session.userId, session.type, "completed").catch(
+          (error) => {
+            logger.warn("통계 업데이트 실패:", error);
+          }
+        );
       }
 
       logger.info(`✅ 타이머 완료: ${session.userId} - ${sessionId}`);
 
-      return this.createSuccessResponse(this.transformSessionData(session), "타이머가 완료되었습니다.");
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "타이머가 완료되었습니다."
+      );
     } catch (error) {
       logger.error("TimerService.completeSession 오류:", error);
       return this.createErrorResponse(error, "완료 처리에 실패했습니다.");
@@ -249,7 +287,9 @@ class TimerService extends BaseService {
   async getUserStats(userId, options = {}) {
     try {
       const {
-        startDate = TimeHelper.getDateString(new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)), // 30일 전
+        startDate = TimeHelper.getDateString(
+          new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)
+        ), // 30일 전
         endDate = TimeHelper.getTodayDateString(),
         useCache = true
       } = options;
@@ -264,7 +304,11 @@ class TimerService extends BaseService {
       }
 
       // DB에서 통계 조회
-      const stats = await this.models.TimerStats.getStatsByDateRange(userId, startDate, endDate);
+      const stats = await this.models.TimerStats.getStatsByDateRange(
+        userId,
+        startDate,
+        endDate
+      );
 
       // 집계 계산
       const aggregated = this.aggregateStats(stats);
@@ -291,7 +335,10 @@ class TimerService extends BaseService {
     try {
       const session = await this.findActiveSession(sessionId);
       if (!session) {
-        return this.createErrorResponse(new Error("SESSION_NOT_FOUND"), "세션을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "세션을 찾을 수 없습니다."
+        );
       }
 
       // 진행률 업데이트
@@ -302,7 +349,10 @@ class TimerService extends BaseService {
 
       await session.save();
 
-      return this.createSuccessResponse(this.transformSessionData(session), "진행률이 업데이트되었습니다.");
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "진행률이 업데이트되었습니다."
+      );
     } catch (error) {
       logger.error("TimerService.updateSessionProgress 오류:", error);
       return this.createErrorResponse(error, "진행률 업데이트에 실패했습니다.");
@@ -384,7 +434,9 @@ class TimerService extends BaseService {
       progress: sessionObj.lastProgress
         ? {
             ...sessionObj.lastProgress,
-            updatedAtDisplay: TimeHelper.safeDisplayTime(sessionObj.lastProgress.updatedAt)
+            updatedAtDisplay: TimeHelper.safeDisplayTime(
+              sessionObj.lastProgress.updatedAt
+            )
           }
         : null
     };
@@ -488,15 +540,22 @@ class TimerService extends BaseService {
       longBreak: totals.longBreakCompleted
     };
 
-    const favoriteType = Object.keys(typeCounts).reduce((a, b) => (typeCounts[a] > typeCounts[b] ? a : b));
+    const favoriteType = Object.keys(typeCounts).reduce((a, b) =>
+      typeCounts[a] > typeCounts[b] ? a : b
+    );
 
     return {
       totalDays: totals.totalDays,
       totalSessions: totals.totalCompleted,
       totalMinutes: totals.totalMinutes,
-      averageSessionsPerDay: Math.round((totals.totalCompleted / totals.totalDays) * 10) / 10,
-      averageMinutesPerDay: Math.round((totals.totalMinutes / totals.totalDays) * 10) / 10,
-      completionRate: totals.totalStarted > 0 ? Math.round((totals.totalCompleted / totals.totalStarted) * 100) : 0,
+      averageSessionsPerDay:
+        Math.round((totals.totalCompleted / totals.totalDays) * 10) / 10,
+      averageMinutesPerDay:
+        Math.round((totals.totalMinutes / totals.totalDays) * 10) / 10,
+      completionRate:
+        totals.totalStarted > 0
+          ? Math.round((totals.totalCompleted / totals.totalStarted) * 100)
+          : 0,
       favoriteType: favoriteType,
       typeCounts: typeCounts,
       streak: this.calculateStreak(statsArray)

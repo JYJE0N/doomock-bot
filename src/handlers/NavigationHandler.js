@@ -3,6 +3,7 @@
 const logger = require("../utils/Logger");
 const { getUserName } = require("../utils/UserHelper");
 const { getEnabledModules } = require("../config/ModuleRegistry");
+const { buildNavigationKeyboard } = require("../config/ModuleRegistry");
 
 /**
  * 🎹 NavigationHandler - SoC 원칙 적용 버전
@@ -60,7 +61,9 @@ class NavigationHandler {
 
     logger.info("🎹 NavigationHandler 초기화 완료 - SoC 원칙 적용");
     logger.info(`📏 파서 규칙: "${this.parserConfig.separator}" 구분자 사용`);
-    logger.info(`🔄 폴백 규칙: "${this.parserConfig.fallbackModule}:${this.parserConfig.fallbackAction}"`);
+    logger.info(
+      `🔄 폴백 규칙: "${this.parserConfig.fallbackModule}:${this.parserConfig.fallbackAction}"`
+    );
   }
 
   /**
@@ -76,12 +79,30 @@ class NavigationHandler {
           this.markdownHelper
         )
       ],
-      ["todo", new (require("../renderers/TodoRenderer"))(this.bot, this, this.markdownHelper)],
-      ["system", new (require("../renderers/SystemRenderer"))(this.bot, this, this.markdownHelper)],
-      ["tts", new (require("../renderers/TTSRenderer"))(this.bot, this, this.markdownHelper)],
-      ["weather", new (require("../renderers/WeatherRenderer"))(this.bot, this, this.markdownHelper)],
-      ["timer", new (require("../renderers/TimerRenderer"))(this.bot, this, this.markdownHelper)],
-      ["leave", new (require("../renderers/LeaveRenderer"))(this.bot, this, this.markdownHelper)],
+      [
+        "todo",
+        new (require("../renderers/TodoRenderer"))(this.bot, this, this.markdownHelper)
+      ],
+      [
+        "system",
+        new (require("../renderers/SystemRenderer"))(this.bot, this, this.markdownHelper)
+      ],
+      [
+        "tts",
+        new (require("../renderers/TTSRenderer"))(this.bot, this, this.markdownHelper)
+      ],
+      [
+        "weather",
+        new (require("../renderers/WeatherRenderer"))(this.bot, this, this.markdownHelper)
+      ],
+      [
+        "timer",
+        new (require("../renderers/TimerRenderer"))(this.bot, this, this.markdownHelper)
+      ],
+      [
+        "leave",
+        new (require("../renderers/LeaveRenderer"))(this.bot, this, this.markdownHelper)
+      ],
       [
         "worktime",
         new (require("../renderers/WorktimeRenderer"))(
@@ -113,10 +134,10 @@ class NavigationHandler {
       // ctx에서 사용자 정보 안전하게 가져오기
       const from = ctx.from || ctx.callbackQuery?.from || ctx.message?.from;
       if (!from) {
-        return await this.errorHandler.handleMissingUserInfo(ctx);
+        return this.errorHandler.handleMissingUserInfo(ctx);
       }
 
-      // 🔧 안전한 getUserName 호출
+      // 사용자 이름 가져오기
       let userName;
       try {
         userName = getUserName(from);
@@ -125,36 +146,36 @@ class NavigationHandler {
         userName = from.first_name || from.username || "사용자";
       }
 
-      // 🔧 안전한 getEnabledModules 호출
-      let enabledModules;
+      // 모듈 로드 가능 여부 확인 (에러 핸들링 목적)
       try {
-        enabledModules = getEnabledModules();
+        // 변수에 할당하지 않음으로써 'no-unused-vars' 오류를 해결합니다.
+        getEnabledModules();
       } catch (modulesError) {
         logger.error("getEnabledModules 실패:", modulesError.message);
-        return await this.errorHandler.handleModulesLoadError(ctx, modulesError);
+        return this.errorHandler.handleModulesLoadError(ctx, modulesError);
       }
 
-      // 🎯 수정: MarkdownHelper 메서드를 실제 존재하는 메서드로 변경
-      const safeUserName = this.markdownHelper.escapeMarkdownV2(userName); // ✅ 실제 존재하는 메서드
-      const text = `🏠 *메인 메뉴*\n\n안녕하세요, ${safeUserName}님\\!`; // ✅ MarkdownV2 형식
+      // MarkdownV2 형식에 맞게 사용자 이름 이스케이프
+      const safeUserName = this.markdownHelper.escapeMarkdownV2(userName);
+      const text = `🏠 *메인 메뉴*\n\n안녕하세요, ${safeUserName}님\\!`;
 
-      // 🎹 2열 배치 키보드 생성 (ModuleRegistry 함수 활용)
-      const { buildNavigationKeyboard } = require("../config/ModuleRegistry");
+      // 키보드 생성
       const keyboard = buildNavigationKeyboard();
 
-      // 🎯 수정: MarkdownHelper의 실제 메서드 사용
+      // 메시지 전송
       const success = await this.markdownHelper.sendSafeMessage(ctx, text, {
         reply_markup: keyboard
       });
 
       if (!success) {
-        return await this.errorHandler.handleMessageSendError(ctx, "메인 메뉴 전송 실패");
+        return this.errorHandler.handleMessageSendError(ctx, "메인 메뉴 전송 실패");
       }
 
       logger.debug("🏠 메인 메뉴 표시 완료");
       return true;
     } catch (error) {
-      return await this.errorHandler.handleUnexpectedError(ctx, error, "showMainMenu");
+      // try 블록 내에서 발생하는 모든 에러를 일관되게 처리합니다.
+      return this.errorHandler.handleUnexpectedError(ctx, error, "showMainMenu");
     }
   }
 
@@ -186,67 +207,6 @@ class NavigationHandler {
     });
 
     return parsed;
-  }
-
-  /**
-   * 🎯 메인 콜백 처리 (기존 방식 유지)
-   */
-  async handleCallback(ctx) {
-    try {
-      this.stats.callbacksProcessed++;
-      this.stats.lastActivity = new Date();
-
-      const callbackQuery = ctx.callbackQuery;
-      const data = callbackQuery.data;
-
-      logger.debug(`🎯 콜백 수신: ${data}`);
-
-      // 시스템 메뉴 직접 처리 (최적화)
-      if (data === "system:menu") {
-        return await this.showMainMenu(ctx);
-      }
-
-      // ✅ 표준 파서 사용 (params는 문자열로 전달)
-      const { moduleKey, subAction, params } = this.parseCallbackData(data);
-
-      logger.debug(`🎯 파싱 완료: ${moduleKey}.${subAction}(${params})`);
-
-      // 1️⃣ 모듈에서 비즈니스 로직 처리
-      const result = await this.moduleManager.handleCallback(
-        this.bot,
-        callbackQuery,
-        moduleKey,
-        subAction,
-        params // ✅ 문자열로 전달 (각 모듈이 알아서 파싱)
-      );
-
-      // result가 없거나, result.success가 false인 경우 ErrorHandler에 위임
-      if (!result || result.success === false) {
-        logger.warn(`💫 모듈 처리 실패: ${moduleKey}.${subAction}`);
-        return await this.errorHandler.handleModuleProcessingError(
-          ctx,
-          moduleKey,
-          subAction,
-          result?.message || "모듈 처리 중 오류가 발생했습니다."
-        );
-      }
-
-      // 2️⃣ 렌더러로 UI 생성
-      const renderer = this.renderers.get(result.module || moduleKey);
-
-      if (renderer) {
-        await renderer.render(result, ctx);
-        logger.debug(`✅ 렌더링 완료: ${moduleKey}.${subAction}`);
-      } else {
-        logger.warn(`📱 렌더러 없음: ${result.module || moduleKey}`);
-        return await this.errorHandler.handleMissingRenderer(ctx, result.module || moduleKey, result);
-      }
-    } catch (error) {
-      logger.error("💥 NavigationHandler 콜백 처리 오류:", error);
-      this.stats.errorsCount++;
-
-      return await this.errorHandler.handleUnexpectedError(ctx, error, "handleCallback");
-    }
   }
 
   /**
@@ -289,17 +249,46 @@ class NavigationHandler {
       logger.debug(`🎯 파싱 완료: ${moduleKey}.${subAction}(${params})`);
 
       // 1️⃣ 모듈에서 비즈니스 로직 처리
-      const result = await this.moduleManager.handleCallback(this.bot, callbackQuery, moduleKey, subAction, params);
+      const result = await this.moduleManager.handleCallback(
+        this.bot,
+        callbackQuery,
+        moduleKey,
+        subAction,
+        params
+      );
 
-      // 👇 이 부분을 수정합니다.
-      // result가 없거나, result.success가 false인 경우 ErrorHandler에 위임합니다.
-      if (!result || result.success === false) {
-        logger.warn(`💫 모듈 처리 실패: ${moduleKey}.${subAction}`);
+      // result가 없는 경우 처리
+      if (!result) {
+        logger.warn(`💫 모듈 결과 없음: ${moduleKey}.${subAction}`);
         return await this.errorHandler.handleModuleProcessingError(
           ctx,
           moduleKey,
           subAction,
-          result?.message || "모듈 처리 중 오류가 발생했습니다."
+          "모듈에서 결과를 반환하지 않았습니다."
+        );
+      }
+
+      // 명시적 에러 체크
+      if (
+        result.type === "error" ||
+        ("success" in result && result.success === false) ||
+        (result.error && !result.type)
+      ) {
+        logger.warn(`💫 모듈 처리 실패: ${moduleKey}.${subAction}`, {
+          resultType: result?.type,
+          hasSuccess: "success" in result,
+          success: result?.success,
+          error: result?.error
+        });
+
+        return await this.errorHandler.handleModuleProcessingError(
+          ctx,
+          moduleKey,
+          subAction,
+          result?.message ||
+            result?.data?.message ||
+            result?.error ||
+            "모듈 처리 중 오류가 발생했습니다."
         );
       }
 
@@ -312,7 +301,11 @@ class NavigationHandler {
       } else {
         logger.warn(`📱 렌더러 없음: ${result.module || moduleKey}`);
         // 🎯 ErrorHandler 위임
-        return await this.errorHandler.handleMissingRenderer(ctx, result.module || moduleKey, result);
+        return await this.errorHandler.handleMissingRenderer(
+          ctx,
+          result.module || moduleKey,
+          result
+        );
       }
     } catch (error) {
       logger.error("💥 NavigationHandler 콜백 처리 오류:", error);
@@ -359,7 +352,9 @@ class NavigationHandler {
 
         // 각 모듈에 메시지를 처리할 기능(onHandleMessage)이 있는지 확인합니다.
         if (typeof module.onHandleMessage === "function") {
-          logger.info(`📞 NavigationHandler: ${moduleName} 모듈의 onHandleMessage 호출 중`);
+          logger.info(
+            `📞 NavigationHandler: ${moduleName} 모듈의 onHandleMessage 호출 중`
+          );
 
           try {
             const result = await module.onHandleMessage(this.bot, ctx.message);
@@ -377,7 +372,9 @@ class NavigationHandler {
             if (result === true) {
               // ✅ 수정: boolean true는 단순히 "처리됨"을 의미하므로 렌더링하지 않음
               logger.info(`✅ ${moduleName} 모듈이 메시지 처리함 (렌더링 불필요)`);
-              logger.info(`🏁 NavigationHandler: 메시지 처리 완료 (${moduleName}이 처리함)`);
+              logger.info(
+                `🏁 NavigationHandler: 메시지 처리 완료 (${moduleName}이 처리함)`
+              );
               return;
             } else if (result && typeof result === "object") {
               // ✅ 수정: 객체 형태의 결과만 렌더링
@@ -395,17 +392,28 @@ class NavigationHandler {
                 logger.info(`✅ NavigationHandler: ${moduleName} 렌더링 완료`);
               } else {
                 logger.warn(`📱 렌더러 없음: ${result.module || module.moduleName}`);
-                await this.errorHandler.handleMissingRenderer(ctx, result.module || module.moduleName, result);
+                await this.errorHandler.handleMissingRenderer(
+                  ctx,
+                  result.module || module.moduleName,
+                  result
+                );
               }
 
               // 메시지 처리를 완료했으므로 루프를 중단합니다.
-              logger.info(`🏁 NavigationHandler: 메시지 처리 완료 (${moduleName}이 처리함)`);
+              logger.info(
+                `🏁 NavigationHandler: 메시지 처리 완료 (${moduleName}이 처리함)`
+              );
               return;
             } else {
-              logger.debug(`⏭️ NavigationHandler: ${moduleName} 모듈이 메시지를 처리하지 않음 (${result})`);
+              logger.debug(
+                `⏭️ NavigationHandler: ${moduleName} 모듈이 메시지를 처리하지 않음 (${result})`
+              );
             }
           } catch (moduleError) {
-            logger.error(`❌ NavigationHandler: ${moduleName} 모듈에서 오류 발생:`, moduleError);
+            logger.error(
+              `❌ NavigationHandler: ${moduleName} 모듈에서 오류 발생:`,
+              moduleError
+            );
             // 한 모듈에서 오류가 발생해도 다른 모듈들은 계속 시도
             continue;
           }
@@ -414,7 +422,9 @@ class NavigationHandler {
         }
       }
 
-      logger.debug("🏁 NavigationHandler: 모든 모듈 순회 완료 - 아무도 메시지를 처리하지 않음");
+      logger.debug(
+        "🏁 NavigationHandler: 모든 모듈 순회 완료 - 아무도 메시지를 처리하지 않음"
+      );
     } catch (error) {
       logger.error("❌ NavigationHandler: handleMessage 전체 오류:", error);
       // 🎯 ErrorHandler 위임
@@ -457,9 +467,16 @@ class NavigationHandler {
         ...this.stats,
         parseSuccessRate:
           this.stats.callbacksProcessed > 0
-            ? Math.round(((this.stats.callbacksProcessed - this.stats.parseErrors) / this.stats.callbacksProcessed) * 100)
+            ? Math.round(
+                ((this.stats.callbacksProcessed - this.stats.parseErrors) /
+                  this.stats.callbacksProcessed) *
+                  100
+              )
             : 100,
-        fallbackRate: this.stats.callbacksProcessed > 0 ? Math.round((this.stats.fallbackUsed / this.stats.callbacksProcessed) * 100) : 0
+        fallbackRate:
+          this.stats.callbacksProcessed > 0
+            ? Math.round((this.stats.fallbackUsed / this.stats.callbacksProcessed) * 100)
+            : 0
       },
       rendererCount: this.renderers.size,
       registeredRenderers: Array.from(this.renderers.keys()),

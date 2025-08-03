@@ -100,7 +100,10 @@ class LeaveRenderer extends BaseRenderer {
       const statusIcon = remainingLeave > 10 ? "😊" : remainingLeave > 5 ? "😐" : "😰";
 
       // 연차 추가 정보
-      const bonusInfo = workYears >= 2 ? `\n💼 ${workYears}년차 보너스: +${Math.floor(workYears / 2)}일` : "";
+      const bonusInfo =
+        workYears >= 2
+          ? `\n💼 ${workYears}년차 보너스: +${Math.floor(workYears / 2)}일`
+          : "";
 
       const text = `🏖️ **내 연차 현황** (${currentYear}년)
 
@@ -183,7 +186,21 @@ ${message}
       let text = `📈 **${currentYear}년 월별 연차 사용 현황**\n\n`;
 
       // 월별 사용 현황
-      const monthNames = ["", "1월", "2월", "3월", "4월", "5월", "6월", "7월", "8월", "9월", "10월", "11월", "12월"];
+      const monthNames = [
+        "",
+        "1월",
+        "2월",
+        "3월",
+        "4월",
+        "5월",
+        "6월",
+        "7월",
+        "8월",
+        "9월",
+        "10월",
+        "11월",
+        "12월"
+      ];
 
       for (let month = 1; month <= 12; month++) {
         const usage = monthlyUsage.find((m) => m.month === month) || {
@@ -328,7 +345,11 @@ ${congratsMessage}`;
    */
   async renderCustomInputPrompt(data, ctx) {
     try {
-      const { remainingLeave = 0, maxDays = 10, examples = ["1.5", "2", "3", "2.5"] } = data || {};
+      const {
+        remainingLeave = 0,
+        maxDays = 10,
+        examples = ["1.5", "2", "3", "2.5"]
+      } = data || {};
 
       const text = `✏️ **연차 직접 입력**
 
@@ -451,7 +472,12 @@ ${message}
    */
   async renderSettings(data, ctx) {
     try {
-      const { totalLeave = 15, joinDate = null, workYears = 0, canModify = true } = data || {};
+      const {
+        totalLeave = 15,
+        joinDate = null,
+        workYears = 0,
+        canModify = true
+      } = data || {};
 
       const text = `⚙️ **연차 설정**
 
@@ -473,7 +499,9 @@ ${canModify ? "⚡ 연차를 수동으로 추가하거나 삭제할 수 있습�
             callback_data: "leave:settings:remove:1"
           }
         ]);
-        buttons.push([{ text: "👤 입사일 설정", callback_data: "leave:settings:joindate" }]);
+        buttons.push([
+          { text: "👤 입사일 설정", callback_data: "leave:settings:joindate" }
+        ]);
       }
 
       buttons.push([{ text: "🔙 뒤로", callback_data: "leave:menu" }]);
@@ -493,7 +521,12 @@ ${canModify ? "⚡ 연차를 수동으로 추가하거나 삭제할 수 있습�
    */
   async renderSettingsSuccess(data, ctx) {
     try {
-      const { action = "변경", amount = 0, newTotal = 15, message = "설정이 변경되었습니다." } = data;
+      const {
+        action = "변경",
+        amount = 0,
+        newTotal = 15,
+        message = "설정이 변경되었습니다."
+      } = data;
 
       const text = `✅ **설정 변경 완료**
 
@@ -625,11 +658,16 @@ ${message}
    */
   async handleRenderError(ctx, error) {
     if (this.errorHandler) {
-      return await this.errorHandler.handleRenderError(ctx.bot, ctx.callbackQuery, error, {
-        module: "leave",
-        renderer: "LeaveRenderer",
-        fallbackMessage: "연차 정보를 표시할 수 없습니다."
-      });
+      return await this.errorHandler.handleRenderError(
+        ctx.bot,
+        ctx.callbackQuery,
+        error,
+        {
+          module: "leave",
+          renderer: "LeaveRenderer",
+          fallbackMessage: "연차 정보를 표시할 수 없습니다."
+        }
+      );
     }
 
     logger.error("LeaveRenderer 오류:", error);

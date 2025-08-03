@@ -152,7 +152,9 @@ class TTSModule extends BaseModule {
         type: "error",
         module: "tts",
         data: {
-          message: text ? `텍스트가 너무 깁니다 (최대 ${this.config.maxTextLength}자)` : "텍스트를 입력해주세요"
+          message: text
+            ? `텍스트가 너무 깁니다 (최대 ${this.config.maxTextLength}자)`
+            : "텍스트를 입력해주세요"
         }
       };
     }

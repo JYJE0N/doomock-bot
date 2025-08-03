@@ -65,7 +65,9 @@ class LeaveService extends BaseService {
         usedLeave,
         remainingLeave,
         usageRate: totalLeave > 0 ? (usedLeave / totalLeave) * 100 : 0,
-        joinDate: userSetting.joinDate ? userSetting.joinDate.toISOString().split("T")[0] : null,
+        joinDate: userSetting.joinDate
+          ? userSetting.joinDate.toISOString().split("T")[0]
+          : null,
         workYears: userSetting.workYears,
         yearlyBonus: userSetting.yearlyBonus,
         customLeave: userSetting.customLeave,
@@ -148,7 +150,10 @@ class LeaveService extends BaseService {
         // 직접 입력의 경우 (0초과 10이하)
         leaveType = `연차 ${amount}일`;
       } else {
-        return this.createErrorResponse(new Error("INVALID_AMOUNT"), `잘못된 연차 사용량입니다: ${amount}일`);
+        return this.createErrorResponse(
+          new Error("INVALID_AMOUNT"),
+          `잘못된 연차 사용량입니다: ${amount}일`
+        );
       }
 
       // 연차 사용 기록
@@ -194,7 +199,9 @@ class LeaveService extends BaseService {
         baseLeave: 15,
         yearlyBonus: userSetting.yearlyBonus,
         customLeave: userSetting.customLeave,
-        joinDate: userSetting.joinDate ? userSetting.joinDate.toISOString().split("T")[0] : null,
+        joinDate: userSetting.joinDate
+          ? userSetting.joinDate.toISOString().split("T")[0]
+          : null,
         workYears: userSetting.workYears,
         changeHistory: userSetting.getChangesSummary(),
         canModify: true // 개인용이므로 항상 수정 가능

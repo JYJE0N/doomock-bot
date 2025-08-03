@@ -135,7 +135,13 @@ class SystemRenderer extends BaseRenderer {
    * 📊 시스템 상태 렌더링
    */
   async renderStatus(data, ctx) {
-    const { status = "unknown", uptime = "정보 없음", memory = {}, moduleCount = 0, lastHealthCheck = null } = data;
+    const {
+      status = "unknown",
+      uptime = "정보 없음",
+      memory = {},
+      moduleCount = 0,
+      lastHealthCheck = null
+    } = data;
 
     let text = `📊 **시스템 상태**\n\n`;
 

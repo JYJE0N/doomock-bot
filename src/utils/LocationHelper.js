@@ -151,11 +151,14 @@ class LocationHelper {
     }
 
     try {
-      const response = await axios.get("https://dapi.kakao.com/v2/local/geo/coord2address.json", {
-        params: { x: longitude, y: latitude },
-        headers: { Authorization: `KakaoAK ${this.kakaoApiKey}` },
-        timeout: 3000
-      });
+      const response = await axios.get(
+        "https://dapi.kakao.com/v2/local/geo/coord2address.json",
+        {
+          params: { x: longitude, y: latitude },
+          headers: { Authorization: `KakaoAK ${this.kakaoApiKey}` },
+          timeout: 3000
+        }
+      );
 
       if (response.data.documents && response.data.documents.length > 0) {
         const address = response.data.documents[0].address;

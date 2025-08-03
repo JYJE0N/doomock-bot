@@ -56,7 +56,9 @@ class ServiceBuilder {
 
     logger.debug(`📂 서비스 디렉토리 스캔 중: ${servicesDir}`);
 
-    const serviceFiles = fs.readdirSync(servicesDir).filter((file) => file.endsWith("Service.js") && file !== "BaseService.js");
+    const serviceFiles = fs
+      .readdirSync(servicesDir)
+      .filter((file) => file.endsWith("Service.js") && file !== "BaseService.js");
 
     logger.info(`📄 발견된 서비스 파일: ${serviceFiles.length}개`, serviceFiles);
 

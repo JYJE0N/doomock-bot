@@ -295,7 +295,11 @@ class ReminderModule extends BaseModule {
     }
 
     try {
-      const result = await this.reminderService.snoozeReminder(userId, reminderId, snoozeMinutes);
+      const result = await this.reminderService.snoozeReminder(
+        userId,
+        reminderId,
+        snoozeMinutes
+      );
 
       if (result.success) {
         logger.info(`⏰ 리마인더 스누즈 성공`, {
@@ -435,7 +439,10 @@ class ReminderModule extends BaseModule {
    */
   async getUserStats(userId) {
     try {
-      if (this.reminderService && typeof this.reminderService.getUserStats === "function") {
+      if (
+        this.reminderService &&
+        typeof this.reminderService.getUserStats === "function"
+      ) {
         return await this.reminderService.getUserStats(userId);
       }
 
@@ -462,7 +469,10 @@ class ReminderModule extends BaseModule {
    */
   async getUserReminders(userId, filterType = "active") {
     try {
-      if (this.reminderService && typeof this.reminderService.getUserReminders === "function") {
+      if (
+        this.reminderService &&
+        typeof this.reminderService.getUserReminders === "function"
+      ) {
         return await this.reminderService.getUserReminders(userId, {
           filter: filterType
         });
@@ -481,7 +491,10 @@ class ReminderModule extends BaseModule {
    */
   async getTodayReminders(userId) {
     try {
-      if (this.reminderService && typeof this.reminderService.getTodayReminders === "function") {
+      if (
+        this.reminderService &&
+        typeof this.reminderService.getTodayReminders === "function"
+      ) {
         return await this.reminderService.getTodayReminders(userId);
       }
 
@@ -534,7 +547,12 @@ class ReminderModule extends BaseModule {
    */
   isModuleMessage(text, keywords) {
     const lowerText = text.trim().toLowerCase();
-    return keywords.some((keyword) => lowerText === keyword || lowerText.startsWith(keyword + " ") || lowerText.includes(keyword));
+    return keywords.some(
+      (keyword) =>
+        lowerText === keyword ||
+        lowerText.startsWith(keyword + " ") ||
+        lowerText.includes(keyword)
+    );
   }
 
   /**

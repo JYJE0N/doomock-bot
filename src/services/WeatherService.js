@@ -17,8 +17,11 @@ class WeatherService extends BaseService {
     this.config = {
       apiKey: process.env.WEATHER_API_KEY || process.env.OPENWEATHER_API_KEY,
       apiUrl: "https://api.openweathermap.org/data/2.5",
-      dustApiKey: process.env.AIR_KOREA_API_KEY ? decodeURIComponent(process.env.AIR_KOREA_API_KEY) : process.env.DUST_API_KEY,
-      dustApiUrl: "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty",
+      dustApiKey: process.env.AIR_KOREA_API_KEY
+        ? decodeURIComponent(process.env.AIR_KOREA_API_KEY)
+        : process.env.DUST_API_KEY,
+      dustApiUrl:
+        "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty",
       cacheTimeout: 300000, // 5분
       ...config
     };
@@ -280,7 +283,10 @@ class WeatherService extends BaseService {
       });
 
       const fullUrl = `${this.config.dustApiUrl}?${params.toString()}`;
-      logger.debug(`🌬️ 전체 API URL:`, fullUrl.replace(this.config.dustApiKey, "API_KEY_HIDDEN"));
+      logger.debug(
+        `🌬️ 전체 API URL:`,
+        fullUrl.replace(this.config.dustApiKey, "API_KEY_HIDDEN")
+      );
 
       const response = await axios.get(this.config.dustApiUrl, {
         params: {
@@ -322,7 +328,11 @@ class WeatherService extends BaseService {
       }
 
       // totalCount가 0이어도 items 배열 확인
-      const items = Array.isArray(body.items) ? body.items : body.items && Array.isArray(body.items.item) ? body.items.item : [];
+      const items = Array.isArray(body.items)
+        ? body.items
+        : body.items && Array.isArray(body.items.item)
+          ? body.items.item
+          : [];
 
       logger.debug(`🌬️ 미세먼지 데이터:`, {
         totalCount: body.totalCount,
@@ -349,7 +359,8 @@ class WeatherService extends BaseService {
 
       // 해당 도시의 측정소 데이터 찾기
       const cityName = location.replace("시", "");
-      const cityData = items.find((item) => item.stationName?.includes(cityName)) || items[0]; // 못 찾으면 첫 번째 데이터 사용
+      const cityData =
+        items.find((item) => item.stationName?.includes(cityName)) || items[0]; // 못 찾으면 첫 번째 데이터 사용
 
       if (cityData) {
         logger.debug(`🌬️ 선택된 측정소:`, {
@@ -431,7 +442,9 @@ class WeatherService extends BaseService {
         tempMax: Math.round(Math.max(...day.temps)),
         description: this.getMostFrequent(day.descriptions),
         iconCode: this.getMostFrequent(day.icons),
-        avgHumidity: Math.round(day.humidity.reduce((a, b) => a + b) / day.humidity.length)
+        avgHumidity: Math.round(
+          day.humidity.reduce((a, b) => a + b) / day.humidity.length
+        )
       }));
 
     return {

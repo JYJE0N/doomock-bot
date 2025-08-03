@@ -22,7 +22,12 @@ class StatusHelper {
     if (status.serviceStatus === "Not Connected") return "연결 대기";
     if (status.serviceConnected === false) return "연결 대기";
     if (status.isConnected === false) return "연결 대기";
-    if (status.serviceStatus === "Ready" || status.serviceConnected === true || status.isConnected === true) return "준비됨";
+    if (
+      status.serviceStatus === "Ready" ||
+      status.serviceConnected === true ||
+      status.isConnected === true
+    )
+      return "준비됨";
     if (status.isInitialized === true) return "준비됨";
     if (status.moduleName) return "활성";
 

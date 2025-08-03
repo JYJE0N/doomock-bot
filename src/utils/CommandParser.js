@@ -58,7 +58,17 @@ class CommandParser {
     };
 
     // 🎯 시스템 명령어 목록
-    this.systemCommands = ["start", "help", "status", "cancel", "menu", "about", "settings", "restart", "ping"];
+    this.systemCommands = [
+      "start",
+      "help",
+      "status",
+      "cancel",
+      "menu",
+      "about",
+      "settings",
+      "restart",
+      "ping"
+    ];
 
     logger.info("🎯 CommandParser 초기화 완료 - 중앙 집중식 명령어 파싱");
   }

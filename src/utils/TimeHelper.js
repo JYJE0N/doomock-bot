@@ -235,7 +235,12 @@ class TimeHelper {
       locale: moment.locale(),
       isStaticClass: true,
       version: "2.2.0", // 안전 처리 버전
-      improvements: ["safeMoment 메서드 추가", "null/undefined 안전 처리", "safeDisplayTime UI 헬퍼 추가", "debugTime 디버깅 도구 추가"]
+      improvements: [
+        "safeMoment 메서드 추가",
+        "null/undefined 안전 처리",
+        "safeDisplayTime UI 헬퍼 추가",
+        "debugTime 디버깅 도구 추가"
+      ]
     };
   }
 }

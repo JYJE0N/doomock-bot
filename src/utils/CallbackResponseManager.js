@@ -97,7 +97,10 @@ class CallbackResponseManager {
           reason: "expired",
           error: error.message
         };
-      } else if (error.message.includes("already answered") || error.message.includes("QUERY_ID_INVALID")) {
+      } else if (
+        error.message.includes("already answered") ||
+        error.message.includes("QUERY_ID_INVALID")
+      ) {
         logger.warn(`이미 응답된 콜백: ${callbackId}`);
 
         // 이미 응답된 것으로 기록
@@ -127,9 +130,15 @@ class CallbackResponseManager {
    * 🔄 로딩 응답 (즉시 반응)
    */
   async answerLoading(bot, callbackQuery, loadingText = null) {
-    const loadingMessages = ["⏳ 처리 중...", "⌛ 잠시만 기다려주세요...", "🔄 로딩 중...", "⚡ 처리하고 있어요..."];
+    const loadingMessages = [
+      "⏳ 처리 중...",
+      "⌛ 잠시만 기다려주세요...",
+      "🔄 로딩 중...",
+      "⚡ 처리하고 있어요..."
+    ];
 
-    const text = loadingText || loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+    const text =
+      loadingText || loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 
     return await this.answerCallback(bot, callbackQuery, { text });
   }
@@ -160,7 +169,8 @@ class CallbackResponseManager {
     return {
       responded: this.respondedCallbacks.has(callbackId),
       pending: this.pendingCallbacks.has(callbackId),
-      canRespond: !this.respondedCallbacks.has(callbackId) && !this.pendingCallbacks.has(callbackId)
+      canRespond:
+        !this.respondedCallbacks.has(callbackId) && !this.pendingCallbacks.has(callbackId)
     };
   }
 
@@ -172,7 +182,12 @@ class CallbackResponseManager {
       ...this.stats,
       currentPending: this.pendingCallbacks.size,
       totalTracked: this.respondedCallbacks.size,
-      successRate: this.stats.totalResponses > 0 ? ((this.stats.successfulResponses / this.stats.totalResponses) * 100).toFixed(2) : 0
+      successRate:
+        this.stats.totalResponses > 0
+          ? ((this.stats.successfulResponses / this.stats.totalResponses) * 100).toFixed(
+              2
+            )
+          : 0
     };
   }
 

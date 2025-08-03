@@ -165,7 +165,8 @@ class FortuneService extends BaseService {
         message: this.generateDoomockComment("draw", savedResult.userName, drawResult),
         data: {
           ...drawResult,
-          remainingDraws: this.config.maxDrawsPerDay - (userRecord.todayDrawCount || 0) - 1,
+          remainingDraws:
+            this.config.maxDrawsPerDay - (userRecord.todayDrawCount || 0) - 1,
           totalDraws: userRecord.totalDraws + 1
         }
       };
@@ -271,7 +272,11 @@ class FortuneService extends BaseService {
           break;
 
         case "triple":
-          result.cards = this.drawMultipleCards(availableDeck, 3, ["past", "present", "future"]);
+          result.cards = this.drawMultipleCards(availableDeck, 3, [
+            "past",
+            "present",
+            "future"
+          ]);
           break;
 
         case "celtic":
@@ -317,7 +322,9 @@ class FortuneService extends BaseService {
 
     card.drawnAt = new Date();
 
-    logger.debug(`🎴 카드 뽑음: ${card.korean} (${card.name}), 덱 남은 개수: ${deck.length}`);
+    logger.debug(
+      `🎴 카드 뽑음: ${card.korean} (${card.name}), 덱 남은 개수: ${deck.length}`
+    );
 
     return card;
   }
@@ -431,7 +438,9 @@ class FortuneService extends BaseService {
       cards.push(card);
     }
 
-    logger.info(`🔮 캘틱 크로스 10카드 뽑기 완료 (모두 다른 카드), 덱 남은: ${deck.length}장`);
+    logger.info(
+      `🔮 캘틱 크로스 10카드 뽑기 완료 (모두 다른 카드), 덱 남은: ${deck.length}장`
+    );
 
     // ✅ 중복 검증 로그
     const cardIds = cards.map((card) => card.id);
@@ -505,7 +514,11 @@ class FortuneService extends BaseService {
         isReversed: mainCard.isReversed,
         drawType: type,
         timestamp: new Date(),
-        doomockComment: this.generateDoomockComment("draw", userRecord.userName, drawResult),
+        doomockComment: this.generateDoomockComment(
+          "draw",
+          userRecord.userName,
+          drawResult
+        ),
         question: type === "celtic" ? question : null,
         cardCount: drawResult.cards.length
       };
@@ -531,7 +544,14 @@ class FortuneService extends BaseService {
         updateData.$inc.todayDrawCount = 1;
       }
 
-      const updatedUser = await Fortune.findOneAndUpdate({ userId: userRecord.userId }, updateData, { new: true, runValidators: true });
+      const updatedUser = await Fortune.findOneAndUpdate(
+        { userId: userRecord.userId },
+        updateData,
+        {
+          new: true,
+          runValidators: true
+        }
+      );
 
       logger.debug(`💾 뽑기 결과 저장 완료: 사용자 ${userRecord.userId}`);
 
@@ -619,7 +639,8 @@ class FortuneService extends BaseService {
 
       const stats = {
         totalDraws: userRecord.totalDraws,
-        todayDraws: userRecord.lastDrawDate === today ? userRecord.todayDrawCount || 0 : 0,
+        todayDraws:
+          userRecord.lastDrawDate === today ? userRecord.todayDrawCount || 0 : 0,
         remainingDraws:
           userRecord.lastDrawDate === today
             ? Math.max(0, this.config.maxDrawsPerDay - (userRecord.todayDrawCount || 0))
@@ -722,7 +743,10 @@ class FortuneService extends BaseService {
         typeCount[record.drawType] = (typeCount[record.drawType] || 0) + 1;
       });
 
-      const favoriteType = Object.keys(typeCount).reduce((a, b) => (typeCount[a] > typeCount[b] ? a : b), "single");
+      const favoriteType = Object.keys(typeCount).reduce(
+        (a, b) => (typeCount[a] > typeCount[b] ? a : b),
+        "single"
+      );
 
       return {
         streak: Math.min(streak, days),

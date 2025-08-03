@@ -148,7 +148,14 @@ class FancyBanner {
    * 🌟 네온 레인보우 효과 (새로운!)
    */
   printNeonRainbow(text) {
-    const neonColors = ["redBright", "yellowBright", "greenBright", "cyanBright", "blueBright", "magentaBright"];
+    const neonColors = [
+      "redBright",
+      "yellowBright",
+      "greenBright",
+      "cyanBright",
+      "blueBright",
+      "magentaBright"
+    ];
     const lines = text.split("\n");
 
     lines.forEach((line, lineIndex) => {
@@ -328,7 +335,8 @@ class FancyBanner {
     info.forEach((item) => {
       const content = ` ${item.icon} ${item.label}: ${item.value}`;
       const padding = boxWidth - content.length - 1;
-      const line = "│" + chalk.bold[item.color](content) + " ".repeat(Math.max(0, padding)) + "│";
+      const line =
+        "│" + chalk.bold[item.color](content) + " ".repeat(Math.max(0, padding)) + "│";
       console.log(chalk.gray(line));
     });
 

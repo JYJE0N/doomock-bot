@@ -60,7 +60,8 @@ class TTSRenderer extends BaseRenderer {
   async sendSafeMessageForAudio(ctx, text, options = {}) {
     try {
       // 오디오 메시지 콜백인지 확인
-      const isAudioCallback = ctx.callbackQuery?.message && !ctx.callbackQuery.message.text;
+      const isAudioCallback =
+        ctx.callbackQuery?.message && !ctx.callbackQuery.message.text;
 
       if (isAudioCallback) {
         // 오디오 메시지에 대한 콜백인 경우 새 메시지로 전송
@@ -282,13 +283,21 @@ ${message}`;
             logger.error("일반 텍스트 캡션도 실패:", thirdError);
 
             // 최종 폴백: 메시지만 전송
-            await this.sendSafeMessageForAudio(ctx, "음성 파일 전송에 실패했습니다. 다시 시도해주세요.", { reply_markup: keyboard });
+            await this.sendSafeMessageForAudio(
+              ctx,
+              "음성 파일 전송에 실패했습니다. 다시 시도해주세요.",
+              {
+                reply_markup: keyboard
+              }
+            );
           }
         }
       }
     } else {
       // 오디오 파일이 없는 경우 텍스트 메시지로 대체
-      await this.sendSafeMessageForAudio(ctx, "⚠️ 음성 파일을 찾을 수 없습니다.", { reply_markup: keyboard });
+      await this.sendSafeMessageForAudio(ctx, "⚠️ 음성 파일을 찾을 수 없습니다.", {
+        reply_markup: keyboard
+      });
     }
   }
 

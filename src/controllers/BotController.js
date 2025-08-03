@@ -270,7 +270,15 @@ class BotController {
 
       // 3. 필수 서비스들 미리 생성
       logger.info("📦 필수 서비스 초기화 중...");
-      const requiredServices = ["todo", "timer", "worktime", "leave", "weather", "tts", "fortune"];
+      const requiredServices = [
+        "todo",
+        "timer",
+        "worktime",
+        "leave",
+        "weather",
+        "tts",
+        "fortune"
+      ];
 
       for (const serviceName of requiredServices) {
         try {
@@ -459,7 +467,10 @@ class BotController {
       logger.debug(`💬 텍스트 메시지 수신: "${messageText}"`);
 
       // 🎯 1단계: CommandHandler의 자연어 처리 먼저 시도
-      if (this.commandHandler && typeof this.commandHandler.handleNaturalMessage === "function") {
+      if (
+        this.commandHandler &&
+        typeof this.commandHandler.handleNaturalMessage === "function"
+      ) {
         const handled = await this.commandHandler.handleNaturalMessage(this.bot, msg);
 
         if (handled) {
@@ -580,7 +591,10 @@ class BotController {
         }
       }
       // NavigationHandler 정리
-      if (this.navigationHandler && typeof this.navigationHandler.cleanup === "function") {
+      if (
+        this.navigationHandler &&
+        typeof this.navigationHandler.cleanup === "function"
+      ) {
         try {
           await this.navigationHandler.cleanup();
           logger.debug("✅ NavigationHandler 정리 완료");

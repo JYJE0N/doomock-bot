@@ -245,7 +245,9 @@ class AirQualityHelper {
         grade: this.getDustGrade(Math.max(pm25Value, pm10Value), "overall"),
         value: Math.round((pm25Value + pm10Value) / 2).toString()
       },
-      advice: this.getDustAdvice(this.getDustGrade(Math.max(pm25Value, pm10Value), "overall")),
+      advice: this.getDustAdvice(
+        this.getDustGrade(Math.max(pm25Value, pm10Value), "overall")
+      ),
       timestamp: TimeHelper.format(TimeHelper.now(), "time"),
       stationName: "추정값",
       dataTime: TimeHelper.format(TimeHelper.now(), "full")
@@ -283,7 +285,11 @@ class AirQualityHelper {
    * 🏢 측정소명 조회
    */
   getStationName(location) {
-    return this.stationMapping[location] || this.stationMapping[location.replace(/시$/, "")] || "종로구"; // 기본값
+    return (
+      this.stationMapping[location] ||
+      this.stationMapping[location.replace(/시$/, "")] ||
+      "종로구"
+    ); // 기본값
   }
 
   /**
@@ -369,7 +375,9 @@ class AirQualityHelper {
     return {
       ...this.stats,
       cacheSize: this.cache.size,
-      lastUpdate: this.stats.lastUpdate ? TimeHelper.format(this.stats.lastUpdate, "full") : "없음"
+      lastUpdate: this.stats.lastUpdate
+        ? TimeHelper.format(this.stats.lastUpdate, "full")
+        : "없음"
     };
   }
 }

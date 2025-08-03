@@ -100,7 +100,9 @@ class WeatherModule extends BaseModule {
 
     const lowerText = text.toLowerCase();
     const weatherKeywords = ["날씨", "weather", "온도", "습도"];
-    const hasWeatherKeyword = weatherKeywords.some((keyword) => lowerText.includes(keyword));
+    const hasWeatherKeyword = weatherKeywords.some((keyword) =>
+      lowerText.includes(keyword)
+    );
 
     if (!hasWeatherKeyword) return false;
 
@@ -373,7 +375,11 @@ class WeatherModule extends BaseModule {
    */
   findCityByKeyword(keyword) {
     const lowerKeyword = keyword.toLowerCase();
-    return this.majorCities.find((city) => city.name.toLowerCase().includes(lowerKeyword) || city.id.toLowerCase().includes(lowerKeyword));
+    return this.majorCities.find(
+      (city) =>
+        city.name.toLowerCase().includes(lowerKeyword) ||
+        city.id.toLowerCase().includes(lowerKeyword)
+    );
   }
 
   /**

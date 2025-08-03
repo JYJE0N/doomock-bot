@@ -69,7 +69,9 @@ class BaseRenderer {
    */
   buildCallbackData(moduleKey, subAction, params = "") {
     const paramsStr = Array.isArray(params) ? params.join(":") : String(params || "");
-    return paramsStr ? `${moduleKey}:${subAction}:${paramsStr}` : `${moduleKey}:${subAction}`;
+    return paramsStr
+      ? `${moduleKey}:${subAction}:${paramsStr}`
+      : `${moduleKey}:${subAction}`;
   }
 
   // ===== 💬 메시지 전송 시스템 =====
@@ -140,7 +142,9 @@ class BaseRenderer {
   createInlineKeyboard(buttons, moduleKey = this.moduleName) {
     return {
       inline_keyboard: buttons.map((row) =>
-        Array.isArray(row) ? row.map((btn) => this.createButton(btn, moduleKey)) : [this.createButton(row, moduleKey)]
+        Array.isArray(row)
+          ? row.map((btn) => this.createButton(btn, moduleKey))
+          : [this.createButton(row, moduleKey)]
       )
     };
   }

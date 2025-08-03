@@ -264,7 +264,9 @@ class HybridLogger {
       winston.format.errors({ stack: true }),
       winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
         // 개인정보 마스킹 적용
-        const safeMessage = this.isSystemMessage(message) ? message : this.maskSensitiveData(message);
+        const safeMessage = this.isSystemMessage(message)
+          ? message
+          : this.maskSensitiveData(message);
 
         // 🎯 레벨별 이모지 추가
         const levelEmojis = {
@@ -302,7 +304,9 @@ class HybridLogger {
       }),
       winston.format.errors({ stack: true }),
       winston.format.printf(({ timestamp, level, message, stack, ...meta }) => {
-        const safeMessage = this.isSystemMessage(message) ? message : this.maskSensitiveData(message);
+        const safeMessage = this.isSystemMessage(message)
+          ? message
+          : this.maskSensitiveData(message);
 
         let logLine = `${timestamp} [${level.toUpperCase().padEnd(7)}] ${safeMessage}`;
 
@@ -407,7 +411,9 @@ class HybridLogger {
    */
   logWithChalk(level, message, meta) {
     const timestamp = this.getTimestamp();
-    const safeMessage = this.isSystemMessage(message) ? message : this.maskSensitiveData(message);
+    const safeMessage = this.isSystemMessage(message)
+      ? message
+      : this.maskSensitiveData(message);
 
     let colorFn;
     let levelLabel;
@@ -450,19 +456,34 @@ class HybridLogger {
    * 📊 초기화 메시지 표시
    */
   showInitializationMessage() {
-    const envIcon = this.environment.isProduction ? "🏭" : this.environment.isRailway ? "🚂" : this.environment.isDevelopment ? "🏠" : "🧪";
+    const envIcon = this.environment.isProduction
+      ? "🏭"
+      : this.environment.isRailway
+        ? "🚂"
+        : this.environment.isDevelopment
+          ? "🏠"
+          : "🧪";
 
     const loggerType = this.environment.shouldUseWinston ? "Winston" : "Chalk";
-    const additionalInfo = this.environment.shouldUseWinston && this.environment.shouldUseChalk ? " + Chalk" : "";
+    const additionalInfo =
+      this.environment.shouldUseWinston && this.environment.shouldUseChalk
+        ? " + Chalk"
+        : "";
 
     if (this.environment.shouldUseChalk) {
       console.log(chalk.green.bold(`${envIcon} HybridLogger v${this.version} 시작`));
       console.log(chalk.cyan(`🎯 환경: ${this.environment.name}`));
       console.log(chalk.yellow(`📝 로거: ${loggerType}${additionalInfo}`));
-      console.log(chalk.magenta(`🛡️ 개인정보 보호: ${this.privacyConfig.enablePrivacyMode ? "활성화" : "비활성화"}`));
+      console.log(
+        chalk.magenta(
+          `🛡️ 개인정보 보호: ${this.privacyConfig.enablePrivacyMode ? "활성화" : "비활성화"}`
+        )
+      );
     } else {
       // Winston만 사용하는 경우 간단한 메시지
-      console.log(`${envIcon} HybridLogger v${this.version} 시작 - ${this.environment.name} 환경`);
+      console.log(
+        `${envIcon} HybridLogger v${this.version} 시작 - ${this.environment.name} 환경`
+      );
     }
   }
 
@@ -587,7 +608,11 @@ class HybridLogger {
   safifyUserId(userId) {
     if (!userId) return "unknown";
 
-    if (!this.privacyConfig.enablePrivacyMode && this.privacyConfig.logUserIds && !this.privacyConfig.anonymizeProduction) {
+    if (
+      !this.privacyConfig.enablePrivacyMode &&
+      this.privacyConfig.logUserIds &&
+      !this.privacyConfig.anonymizeProduction
+    ) {
       return userId.toString();
     }
 
@@ -647,9 +672,16 @@ class HybridLogger {
     return {
       ...this.stats,
       environment: this.environment.name,
-      loggerType: this.environment.shouldUseWinston ? (this.environment.shouldUseChalk ? "Winston + Chalk" : "Winston") : "Chalk",
+      loggerType: this.environment.shouldUseWinston
+        ? this.environment.shouldUseChalk
+          ? "Winston + Chalk"
+          : "Winston"
+        : "Chalk",
       uptime: Date.now() - this.startTime,
-      errorRate: this.stats.totalLogs > 0 ? ((this.stats.errors / this.stats.totalLogs) * 100).toFixed(2) + "%" : "0%"
+      errorRate:
+        this.stats.totalLogs > 0
+          ? ((this.stats.errors / this.stats.totalLogs) * 100).toFixed(2) + "%"
+          : "0%"
     };
   }
 
@@ -666,7 +698,9 @@ class HybridLogger {
       console.log(chalk.cyan(`   마스킹된 데이터: ${stats.maskedData}개`));
       console.log(chalk.cyan(`   에러율: ${stats.errorRate}`));
     } else {
-      console.log(`📊 HybridLogger 통계: ${stats.totalLogs}개 로그, 에러율 ${stats.errorRate}`);
+      console.log(
+        `📊 HybridLogger 통계: ${stats.totalLogs}개 로그, 에러율 ${stats.errorRate}`
+      );
     }
   }
 
@@ -748,7 +782,9 @@ class HybridLogger {
       const colors = [startColor, endColor];
       const midIndex = Math.floor(text.length / 2);
 
-      return chalk[colors[0]](text.slice(0, midIndex)) + chalk[colors[1]](text.slice(midIndex));
+      return (
+        chalk[colors[0]](text.slice(0, midIndex)) + chalk[colors[1]](text.slice(midIndex))
+      );
     } else {
       return text;
     }

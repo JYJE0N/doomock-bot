@@ -47,7 +47,9 @@ class ReminderService extends BaseService {
       });
 
       if (userCount >= this.config.maxRemindersPerUser) {
-        throw new Error(`리마인더는 최대 ${this.config.maxRemindersPerUser}개까지 등록 가능합니다.`);
+        throw new Error(
+          `리마인더는 최대 ${this.config.maxRemindersPerUser}개까지 등록 가능합니다.`
+        );
       }
 
       const reminder = new ReminderModel({
@@ -75,7 +77,9 @@ class ReminderService extends BaseService {
     try {
       const ReminderModel = this.models.Reminder;
 
-      const reminders = await ReminderModel.find({ userId, isActive: true }).sort({ createdAt: -1 }).lean();
+      const reminders = await ReminderModel.find({ userId, isActive: true })
+        .sort({ createdAt: -1 })
+        .lean();
 
       return this.createSuccessResponse(reminders, "리마인더 목록을 조회했습니다.");
     } catch (error) {

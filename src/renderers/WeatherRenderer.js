@@ -84,7 +84,10 @@ class WeatherRenderer extends BaseRenderer {
       case "error":
         return await this.renderError(data, ctx);
       default:
-        return await this.renderError({ message: `지원하지 않는 렌더링 타입: ${type}` }, ctx);
+        return await this.renderError(
+          { message: `지원하지 않는 렌더링 타입: ${type}` },
+          ctx
+        );
     }
   }
 
@@ -195,7 +198,9 @@ PM2.5: ${dust.pm25}㎍/㎥
           { text: "🔄 새로고침", action: `city:${city.id}` },
           { text: "⭐ 기본 설정", action: `setdefault:${city.id}` }
         ],
-        data.config?.enableForecast ? [{ text: "📊 날씨 예보", action: `forecast:${city.id}` }] : null,
+        data.config?.enableForecast
+          ? [{ text: "📊 날씨 예보", action: `forecast:${city.id}` }]
+          : null,
         [
           { text: "🏙️ 도시 목록", action: "cities" },
           { text: "🏠 메인", action: "menu" }

@@ -300,7 +300,12 @@ class WorktimeModule extends BaseModule {
           { command: "주간", description: "주간 근무통계를 확인합니다" },
           { command: "월간", description: "월간 근무통계를 확인합니다" }
         ],
-        features: ["자동 초과근무 계산", "점심시간 제외", "주간/월간 통계", "근무 이력 조회"]
+        features: [
+          "자동 초과근무 계산",
+          "점심시간 제외",
+          "주간/월간 통계",
+          "근무 이력 조회"
+        ]
       }
     };
   }
@@ -323,7 +328,8 @@ class WorktimeModule extends BaseModule {
 
       // 실제 데이터 기반으로 상태 계산
       const isWorking = todayRecord.checkInTime && !todayRecord.checkOutTime;
-      const workDuration = todayRecord.currentWorkDuration || todayRecord.workDuration || 0;
+      const workDuration =
+        todayRecord.currentWorkDuration || todayRecord.workDuration || 0;
 
       return {
         hasRecord: true,
@@ -556,7 +562,10 @@ class WorktimeModule extends BaseModule {
 
       // 날짜 범위 계산
       const endDate = TimeHelper.getTodayDateString();
-      const startDate = TimeHelper.format(TimeHelper.now().subtract(days - 1, "days"), "date");
+      const startDate = TimeHelper.format(
+        TimeHelper.now().subtract(days - 1, "days"),
+        "date"
+      );
 
       // 실제 데이터베이스에서 조회
       const records = await this.worktimeService.models.Worktime.find({
@@ -586,7 +595,10 @@ class WorktimeModule extends BaseModule {
         totalDays: days,
         workDays: safeRecords.length,
         totalHours: Math.round(totalHours * 10) / 10,
-        avgHours: safeRecords.length > 0 ? Math.round((totalHours / safeRecords.length) * 10) / 10 : 0
+        avgHours:
+          safeRecords.length > 0
+            ? Math.round((totalHours / safeRecords.length) * 10) / 10
+            : 0
       };
 
       logger.debug(`📋 근무 이력 조회 완료: ${safeRecords.length}개 기록`);

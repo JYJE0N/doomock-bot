@@ -24,7 +24,9 @@ class TimeParseHelper {
       }
 
       const cleanText = timeText.trim().toLowerCase();
-      const now = baseTime ? moment(baseTime).tz(this.TIMEZONE) : moment.tz(this.TIMEZONE);
+      const now = baseTime
+        ? moment(baseTime).tz(this.TIMEZONE)
+        : moment.tz(this.TIMEZONE);
 
       logger.debug(`⏰ 시간 파싱 시작: "${cleanText}"`);
 
@@ -280,7 +282,8 @@ class TimeParseHelper {
     const dateKeyword = dateKeywords.find((keyword) => text.includes(keyword));
 
     if (dateKeyword) {
-      dateResult = this.parseRelativeDay(dateKeyword, now) || this.parseRelativeDay(text, now);
+      dateResult =
+        this.parseRelativeDay(dateKeyword, now) || this.parseRelativeDay(text, now);
     }
 
     // 시간 부분 파싱
@@ -289,7 +292,11 @@ class TimeParseHelper {
     }
 
     if (dateResult && dateResult.success && timeResult && timeResult.success) {
-      const combinedTime = dateResult.datetime.clone().hour(timeResult.parsedInfo.hour).minute(timeResult.parsedInfo.minute).second(0);
+      const combinedTime = dateResult.datetime
+        .clone()
+        .hour(timeResult.parsedInfo.hour)
+        .minute(timeResult.parsedInfo.minute)
+        .second(0);
 
       return this.createSuccessResult(combinedTime, text, {
         type: "combined_datetime",
@@ -347,7 +354,10 @@ class TimeParseHelper {
       dateStr = momentTime.format("MM월 DD일 (ddd)");
     }
 
-    const timeStr = momentTime.format("A h:mm").replace("AM", "오전").replace("PM", "오후");
+    const timeStr = momentTime
+      .format("A h:mm")
+      .replace("AM", "오전")
+      .replace("PM", "오후");
     return `${dateStr} ${timeStr}`;
   }
 
@@ -355,7 +365,15 @@ class TimeParseHelper {
    * 🔍 시간 텍스트 제안
    */
   static getSuggestions() {
-    return ["30분 후", "1시간 후", "내일 오전 9시", "내일 오후 3시", "다음주 월요일 오전 10시", "오늘 오후 6시", "모레 오후 2시"];
+    return [
+      "30분 후",
+      "1시간 후",
+      "내일 오전 9시",
+      "내일 오후 3시",
+      "다음주 월요일 오전 10시",
+      "오늘 오후 6시",
+      "모레 오후 2시"
+    ];
   }
 
   /**

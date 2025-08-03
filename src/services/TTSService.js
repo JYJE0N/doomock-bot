@@ -52,7 +52,9 @@ class TTSService extends BaseService {
       // 주기적으로 오래된 파일 정리
       setInterval(
         () => {
-          this.fileHelper.cleanupOldFiles().catch((err) => logger.error("파일 정리 실패:", err));
+          this.fileHelper
+            .cleanupOldFiles()
+            .catch((err) => logger.error("파일 정리 실패:", err));
         },
         60 * 60 * 1000
       ); // 1시간마다
@@ -79,7 +81,8 @@ class TTSService extends BaseService {
       }
 
       // 음성 코드 가져오기
-      const voiceCode = this.getUserVoice(userId) || this.voiceConfig.getDefaultVoice(language);
+      const voiceCode =
+        this.getUserVoice(userId) || this.voiceConfig.getDefaultVoice(language);
 
       // 음성 정보 가져오기 및 검증
       const voice = this.voiceConfig.getVoiceByCode(voiceCode);
@@ -138,7 +141,10 @@ class TTSService extends BaseService {
 
       // 파일 저장
       const fileName = this.fileHelper.generateFileName(userId, text);
-      const filePaths = await this.fileHelper.saveAudioFile(response.audioContent, fileName);
+      const filePaths = await this.fileHelper.saveAudioFile(
+        response.audioContent,
+        fileName
+      );
 
       // 히스토리 저장 (실패해도 계속 진행)
       try {
@@ -199,7 +205,10 @@ class TTSService extends BaseService {
     // 음성 코드 유효성 검사
     const voice = this.voiceConfig.getVoiceByCode(voiceCode);
     if (!voice) {
-      return this.createErrorResponse(new Error(`유효하지 않은 음성 코드: ${voiceCode}`), "선택한 음성을 찾을 수 없습니다.");
+      return this.createErrorResponse(
+        new Error(`유효하지 않은 음성 코드: ${voiceCode}`),
+        "선택한 음성을 찾을 수 없습니다."
+      );
     }
 
     this.userVoices.set(userId.toString(), voiceCode);

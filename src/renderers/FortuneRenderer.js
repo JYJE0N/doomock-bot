@@ -486,7 +486,8 @@ ${data.message}
       text += `첫 번째 운세를 뽑아보세요! 🔮`;
     } else {
       history.slice(0, 10).forEach((record, index) => {
-        const cardName = record.koreanName || record.cardName || record.card?.korean || "알 수 없음";
+        const cardName =
+          record.koreanName || record.cardName || record.card?.korean || "알 수 없음";
         const recordDate = record.date || "날짜 불명";
         const fortuneType = this.getFortuneTypeName(record.drawType || record.type);
 
@@ -524,7 +525,8 @@ ${data.message}
   async renderError(data, ctx) {
     try {
       // ✅ 수정: 안전한 데이터 접근
-      const errorMessage = data && data.message ? data.message : "알 수 없는 오류가 발생했습니다.";
+      const errorMessage =
+        data && data.message ? data.message : "알 수 없는 오류가 발생했습니다.";
 
       const text = `❌ **오류 발생**
 
@@ -618,7 +620,15 @@ ${errorMessage}
    */
   async renderCelticDetail(data, ctx) {
     try {
-      const { userName, question, cards, detailedInterpretation, overallMessage, isDemo, timestamp } = data;
+      const {
+        userName,
+        question,
+        cards,
+        detailedInterpretation,
+        overallMessage,
+        isDemo,
+        timestamp
+      } = data;
 
       let text = `📖 **캘틱 크로스 상세 해석**\n\n`;
 

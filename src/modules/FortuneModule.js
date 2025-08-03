@@ -114,7 +114,9 @@ class FortuneModule extends BaseModule {
       const userName = getUserName(callbackQuery.from);
       const chatId = callbackQuery.message.chat.id;
 
-      logger.debug(`🎴 drawCard 시작: ${userName}, subAction: ${subAction}, params: ${params}`);
+      logger.debug(
+        `🎴 drawCard 시작: ${userName}, subAction: ${subAction}, params: ${params}`
+      );
 
       // ✅ 추가: Bot 객체 상세 디버깅
       logger.debug("🔍 Bot 객체 상세 분석:", {
@@ -132,8 +134,16 @@ class FortuneModule extends BaseModule {
         hasBotBotTelegram: !!(bot && bot.bot && bot.bot.telegram),
 
         // 메서드 존재 체크
-        hasSendMessage: !!(bot && bot.telegram && typeof bot.telegram.sendMessage === "function"),
-        hasEditMessage: !!(bot && bot.telegram && typeof bot.telegram.editMessageText === "function"),
+        hasSendMessage: !!(
+          bot &&
+          bot.telegram &&
+          typeof bot.telegram.sendMessage === "function"
+        ),
+        hasEditMessage: !!(
+          bot &&
+          bot.telegram &&
+          typeof bot.telegram.editMessageText === "function"
+        ),
 
         // 키 목록 (상위 5개만)
         botKeys: bot ? Object.keys(bot).slice(0, 5) : [],
@@ -199,14 +209,20 @@ class FortuneModule extends BaseModule {
             logger.debug("🎬 AnimationHelper 호출 시도");
             animationMessage = await AnimationHelper.performShuffle(bot, chatId);
 
-            if (animationMessage === "animation_skipped" || animationMessage === "animation_error") {
+            if (
+              animationMessage === "animation_skipped" ||
+              animationMessage === "animation_error"
+            ) {
               logger.warn("⚠️ 애니메이션이 스킵되었지만 계속 진행");
               animationMessage = null;
             } else {
               logger.debug("✅ 애니메이션 성공:", animationMessage);
             }
           } catch (animationError) {
-            logger.error("❌ 애니메이션 실행 중 오류 (계속 진행):", animationError.message);
+            logger.error(
+              "❌ 애니메이션 실행 중 오류 (계속 진행):",
+              animationError.message
+            );
             animationMessage = null;
           }
         }
@@ -271,9 +287,15 @@ class FortuneModule extends BaseModule {
         // ✅ 성공! 성공 애니메이션으로 전환 (bot 객체가 있는 경우만)
         if (animationMessage && bot && bot.telegram) {
           try {
-            await bot.telegram.editMessageText(chatId, animationMessage, undefined, "✨ 운세 카드 뽑기 완료\\! 결과를 확인하세요\\.", {
-              parse_mode: "MarkdownV2"
-            });
+            await bot.telegram.editMessageText(
+              chatId,
+              animationMessage,
+              undefined,
+              "✨ 운세 카드 뽑기 완료\\! 결과를 확인하세요\\.",
+              {
+                parse_mode: "MarkdownV2"
+              }
+            );
           } catch (editError) {
             logger.warn("성공 메시지 수정 실패:", editError.message);
           }
@@ -426,7 +448,9 @@ class FortuneModule extends BaseModule {
           userName,
           question: lastCelticResult.question || "질문 없음",
           cards: lastCelticResult.cards || [],
-          detailedInterpretation: this.generateDetailedInterpretation(lastCelticResult.cards),
+          detailedInterpretation: this.generateDetailedInterpretation(
+            lastCelticResult.cards
+          ),
           overallMessage: this.generateOverallMessage(lastCelticResult.cards),
           timestamp: lastCelticResult.timestamp
         }
@@ -554,15 +578,18 @@ class FortuneModule extends BaseModule {
     return {
       section1: {
         title: "현재 상황 분석 (1-3번 카드)",
-        content: "현재 상황은 새로운 시작의 기운이 강합니다. 도전해야 할 과제가 있지만, 과거의 경험이 든든한 밑바탕이 되어주고 있습니다."
+        content:
+          "현재 상황은 새로운 시작의 기운이 강합니다. 도전해야 할 과제가 있지만, 과거의 경험이 든든한 밑바탕이 되어주고 있습니다."
       },
       section2: {
         title: "미래 전망 (4-6번 카드)",
-        content: "미래는 밝은 전망을 보여줍니다. 의식적인 노력과 무의식적인 직감이 조화를 이루어 좋은 결과를 가져올 것입니다."
+        content:
+          "미래는 밝은 전망을 보여줍니다. 의식적인 노력과 무의식적인 직감이 조화를 이루어 좋은 결과를 가져올 것입니다."
       },
       section3: {
         title: "실행 가이드 (7-10번 카드)",
-        content: "적극적으로 행동하되, 주변 환경을 잘 살피세요. 내면의 희망을 믿고 나아간다면 원하는 목표를 달성할 수 있을 것입니다."
+        content:
+          "적극적으로 행동하되, 주변 환경을 잘 살피세요. 내면의 희망을 믿고 나아간다면 원하는 목표를 달성할 수 있을 것입니다."
       }
     };
   }
@@ -669,7 +696,12 @@ class FortuneModule extends BaseModule {
       // 캘틱 크로스 질문 운세 뽑기
       const isCeltic = userState?.fortuneType === "celtic";
       const userName = "User"; // 메시지에서는 안전한 표시명 사용
-      const result = await this.performDraw(userId, isCeltic ? "celtic" : "single", question, userName);
+      const result = await this.performDraw(
+        userId,
+        isCeltic ? "celtic" : "single",
+        question,
+        userName
+      );
 
       // 상태 초기화
       this.userStates.delete(userId);
@@ -690,7 +722,9 @@ class FortuneModule extends BaseModule {
         data: {
           ...result.data,
           question,
-          fortuneType: isCeltic ? this.config.fortuneTypes.celtic : this.config.fortuneTypes.single
+          fortuneType: isCeltic
+            ? this.config.fortuneTypes.celtic
+            : this.config.fortuneTypes.single
         }
       };
     } catch (error) {
@@ -747,7 +781,9 @@ class FortuneModule extends BaseModule {
    */
   async performDraw(userId, fortuneType, question = null, userName = "User") {
     try {
-      logger.debug(`🎴 performDraw 시작: ${userName}, ${fortuneType}, question: ${question ? "yes" : "no"}`);
+      logger.debug(
+        `🎴 performDraw 시작: ${userName}, ${fortuneType}, question: ${question ? "yes" : "no"}`
+      );
 
       if (this.fortuneService) {
         logger.debug(`🔗 FortuneService.drawCard 호출 시작`);
@@ -1089,7 +1125,9 @@ class FortuneModule extends BaseModule {
    */
   selectRandomCardsNoDuplicates(deck, count) {
     if (deck.length < count) {
-      logger.warn(`요청된 카드 수(${count})가 사용 가능한 카드 수(${deck.length})보다 많음`);
+      logger.warn(
+        `요청된 카드 수(${count})가 사용 가능한 카드 수(${deck.length})보다 많음`
+      );
       count = deck.length; // 최대한 많이 선택
     }
 

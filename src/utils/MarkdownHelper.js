@@ -41,7 +41,26 @@ class MarkdownHelper {
     };
 
     // 🛡️ MarkdownV2 예약 문자들
-    this.markdownV2EscapeChars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
+    this.markdownV2EscapeChars = [
+      "_",
+      "*",
+      "[",
+      "]",
+      "(",
+      ")",
+      "~",
+      "`",
+      ">",
+      "#",
+      "+",
+      "-",
+      "=",
+      "|",
+      "{",
+      "}",
+      ".",
+      "!"
+    ];
 
     // 🎯 날씨 모듈 전용 템플릿들 (MarkdownV2 최적화)
     this.weatherTemplates = {
@@ -440,12 +459,19 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
       stats: this.stats,
       config: this.config,
       rates: {
-        markdownV2: total > 0 ? Math.round((this.stats.markdownV2Success / total) * 100) : 0,
+        markdownV2:
+          total > 0 ? Math.round((this.stats.markdownV2Success / total) * 100) : 0,
         html: total > 0 ? Math.round((this.stats.htmlFallback / total) * 100) : 0,
         plain: total > 0 ? Math.round((this.stats.plainTextFallback / total) * 100) : 0,
         success:
           total > 0
-            ? Math.round(((this.stats.markdownV2Success + this.stats.htmlFallback + this.stats.plainTextFallback) / total) * 100)
+            ? Math.round(
+                ((this.stats.markdownV2Success +
+                  this.stats.htmlFallback +
+                  this.stats.plainTextFallback) /
+                  total) *
+                  100
+              )
             : 100
       },
       learning: {
@@ -468,7 +494,9 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
 
     // 학습 패턴 저장 (필요시)
     if (this.config.enablePatternLearning) {
-      logger.info(`🧠 학습된 패턴: 성공 ${status.learning.successPatterns}개, 실패 ${status.learning.problemPatterns}개`);
+      logger.info(
+        `🧠 학습된 패턴: 성공 ${status.learning.successPatterns}개, 실패 ${status.learning.problemPatterns}개`
+      );
     }
 
     logger.info("✅ 스마트 MarkdownV2 시스템 정리 완료");

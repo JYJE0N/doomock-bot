@@ -62,7 +62,9 @@ class DatabaseManager {
     this.connectionAttempts++;
 
     try {
-      logger.info(`🔌 MongoDB 연결 시도 중... (시도 ${this.connectionAttempts}/${this.maxReconnectAttempts})`);
+      logger.info(
+        `🔌 MongoDB 연결 시도 중... (시도 ${this.connectionAttempts}/${this.maxReconnectAttempts})`
+      );
 
       // URL에서 데이터베이스 이름 추출 (Railway 환경)
       const urlMatch = this.mongoUrl.match(/\/([^/?]+)(\?|$)/);

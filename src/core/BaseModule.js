@@ -64,7 +64,14 @@ class BaseModule {
       }
 
       // 핸들러 실행
-      const result = await handler.call(this, bot, callbackQuery, subAction, params, moduleManager);
+      const result = await handler.call(
+        this,
+        bot,
+        callbackQuery,
+        subAction,
+        params,
+        moduleManager
+      );
 
       return result;
     } catch (error) {

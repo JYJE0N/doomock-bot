@@ -32,13 +32,20 @@ class AnimationHelper {
       }
 
       // 3. bot.bot 형태로 중첩된 경우 체크
-      if (bot.bot && bot.bot.telegram && typeof bot.bot.telegram.sendMessage === "function") {
+      if (
+        bot.bot &&
+        bot.bot.telegram &&
+        typeof bot.bot.telegram.sendMessage === "function"
+      ) {
         logger.debug("AnimationHelper: ✅ 중첩된 bot 객체 감지됨");
         return bot.bot;
       }
 
       // 4. 직접 telegram 객체인 경우
-      if (typeof bot.sendMessage === "function" && typeof bot.editMessageText === "function") {
+      if (
+        typeof bot.sendMessage === "function" &&
+        typeof bot.editMessageText === "function"
+      ) {
         logger.debug("AnimationHelper: ✅ 직접 telegram API 객체 감지됨");
         return { telegram: bot };
       }
@@ -94,7 +101,10 @@ class AnimationHelper {
     }
 
     // 현재 객체가 telegram API인지 확인
-    if (typeof obj.sendMessage === "function" && typeof obj.editMessageText === "function") {
+    if (
+      typeof obj.sendMessage === "function" &&
+      typeof obj.editMessageText === "function"
+    ) {
       return obj;
     }
 
@@ -127,7 +137,9 @@ class AnimationHelper {
 
       const validBot = this.validateAndNormalizeBot(bot);
       if (!validBot) {
-        logger.warn("AnimationHelper.performShuffle: 유효하지 않은 bot 객체 - 애니메이션 건너뜀");
+        logger.warn(
+          "AnimationHelper.performShuffle: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
+        );
 
         // ✅ 수정: null 대신 더미 메시지 ID 반환으로 오류 방지
         return "animation_skipped";
@@ -161,7 +173,12 @@ class AnimationHelper {
    */
   static async playFrameAnimation(bot, chatId, frames, options = {}) {
     try {
-      const { messageId = null, frameDelay = 500, parseMode = "MarkdownV2", finalFrame = null } = options;
+      const {
+        messageId = null,
+        frameDelay = 500,
+        parseMode = "MarkdownV2",
+        finalFrame = null
+      } = options;
 
       let currentMessageId = messageId;
 
@@ -172,7 +189,15 @@ class AnimationHelper {
         try {
           if (currentMessageId) {
             // 기존 메시지 수정
-            await bot.telegram.editMessageText(chatId, currentMessageId, undefined, frame, { parse_mode: parseMode });
+            await bot.telegram.editMessageText(
+              chatId,
+              currentMessageId,
+              undefined,
+              frame,
+              {
+                parse_mode: parseMode
+              }
+            );
           } else {
             // 새 메시지 전송
             const sentMessage = await bot.telegram.sendMessage(chatId, frame, {
@@ -209,7 +234,15 @@ class AnimationHelper {
       if (finalFrame && currentMessageId) {
         await this.delay(frameDelay);
         try {
-          await bot.telegram.editMessageText(chatId, currentMessageId, undefined, finalFrame, { parse_mode: parseMode });
+          await bot.telegram.editMessageText(
+            chatId,
+            currentMessageId,
+            undefined,
+            finalFrame,
+            {
+              parse_mode: parseMode
+            }
+          );
         } catch (finalError) {
           logger.warn("최종 프레임 표시 실패:", finalError.message);
         }
@@ -236,7 +269,9 @@ class AnimationHelper {
     try {
       const validBot = this.validateAndNormalizeBot(bot);
       if (!validBot) {
-        logger.warn("AnimationHelper.performLoading: 유효하지 않은 bot 객체 - 애니메이션 건너뜀");
+        logger.warn(
+          "AnimationHelper.performLoading: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
+        );
         return "loading_skipped";
       }
 
@@ -262,11 +297,19 @@ class AnimationHelper {
   /**
    * 📊 진행률 애니메이션 (안전한 버전)
    */
-  static async performProgress(bot, chatId, title = "진행 중", totalSteps = 5, messageId = null) {
+  static async performProgress(
+    bot,
+    chatId,
+    title = "진행 중",
+    totalSteps = 5,
+    messageId = null
+  ) {
     try {
       const validBot = this.validateAndNormalizeBot(bot);
       if (!validBot) {
-        logger.warn("AnimationHelper.performProgress: 유효하지 않은 bot 객체 - 애니메이션 건너뜀");
+        logger.warn(
+          "AnimationHelper.performProgress: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
+        );
         return "progress_skipped";
       }
 
@@ -277,7 +320,11 @@ class AnimationHelper {
         const filledBars = "█".repeat(i);
         const emptyBars = "░".repeat(totalSteps - i);
 
-        frames.push(`📊 *${title}*\n\n` + `${filledBars}${emptyBars} ${percent}%\n\n` + `단계: ${i}/${totalSteps}`);
+        frames.push(
+          `📊 *${title}*\n\n` +
+            `${filledBars}${emptyBars} ${percent}%\n\n` +
+            `단계: ${i}/${totalSteps}`
+        );
       }
 
       return await this.playFrameAnimation(validBot, chatId, frames, {

@@ -36,7 +36,9 @@ class ModuleManager {
 
       // ✅ 중요: ServiceBuilder가 없으면 에러 발생
       if (!this.serviceBuilder) {
-        throw new Error("ServiceBuilder가 설정되지 않았습니다. ModuleManager 생성 시 전달해주세요.");
+        throw new Error(
+          "ServiceBuilder가 설정되지 않았습니다. ModuleManager 생성 시 전달해주세요."
+        );
       }
 
       // ❌ 삭제: ServiceBuilder 초기화는 BotController에서 이미 완료됨

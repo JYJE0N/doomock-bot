@@ -387,7 +387,9 @@ class TimerModule extends BaseModule {
       // 서비스에 세션 중지
       await this.timerService.stopSession(timer.sessionId);
 
-      logger.info(`⏹️ 타이머 중지: ${userId} - 경과시간: ${this.formatTime(elapsedTime)}`);
+      logger.info(
+        `⏹️ 타이머 중지: ${userId} - 경과시간: ${this.formatTime(elapsedTime)}`
+      );
 
       return {
         type: "timer_stopped",
@@ -480,7 +482,9 @@ class TimerModule extends BaseModule {
         this.stopLiveUpdateInterval(userId);
       }
 
-      logger.info(`🔄 실시간 업데이트 ${timer.liveUpdate ? "활성화" : "비활성화"}: ${userId}`);
+      logger.info(
+        `🔄 실시간 업데이트 ${timer.liveUpdate ? "활성화" : "비활성화"}: ${userId}`
+      );
 
       return {
         type: "live_update_toggled",
@@ -488,7 +492,9 @@ class TimerModule extends BaseModule {
         data: {
           timer: this.generateTimerDisplayData(timer),
           enabled: timer.liveUpdate,
-          message: timer.liveUpdate ? "🔄 실시간 업데이트가 활성화되었습니다!" : "⏹️ 실시간 업데이트가 비활성화되었습니다."
+          message: timer.liveUpdate
+            ? "🔄 실시간 업데이트가 활성화되었습니다!"
+            : "⏹️ 실시간 업데이트가 비활성화되었습니다."
         }
       };
     } catch (error) {
@@ -583,7 +589,11 @@ class TimerModule extends BaseModule {
 
     try {
       const newDuration = parseInt(params);
-      if (!newDuration || newDuration < 1 || newDuration > this.config.maxCustomDuration) {
+      if (
+        !newDuration ||
+        newDuration < 1 ||
+        newDuration > this.config.maxCustomDuration
+      ) {
         return {
           type: "error",
           module: "timer",
@@ -784,7 +794,11 @@ class TimerModule extends BaseModule {
       default:
         // 커스텀 시간 (숫자로 파싱 시도)
         const customTime = parseInt(type);
-        if (!isNaN(customTime) && customTime > 0 && customTime <= this.config.maxCustomDuration) {
+        if (
+          !isNaN(customTime) &&
+          customTime > 0 &&
+          customTime <= this.config.maxCustomDuration
+        ) {
           return customTime;
         }
         return null;
@@ -815,7 +829,9 @@ class TimerModule extends BaseModule {
    * 📊 타이머 표시용 데이터 생성 (SoC 준수: 계산만!)
    */
   generateTimerDisplayData(timer) {
-    const progress = Math.round(((timer.duration - timer.remainingTime) / timer.duration) * 100);
+    const progress = Math.round(
+      ((timer.duration - timer.remainingTime) / timer.duration) * 100
+    );
     const elapsedTime = timer.duration - timer.remainingTime;
 
     return {
@@ -877,7 +893,9 @@ class TimerModule extends BaseModule {
    * 💬 동기부여 데이터 생성 (비즈니스 로직만!)
    */
   generateMotivationData(timer) {
-    const progress = Math.round(((timer.duration - timer.remainingTime) / timer.duration) * 100);
+    const progress = Math.round(
+      ((timer.duration - timer.remainingTime) / timer.duration) * 100
+    );
     const stage = this.getTimerStage(progress);
 
     return {
@@ -889,7 +907,8 @@ class TimerModule extends BaseModule {
       needsEncouragement: progress > 20 && progress < 80,
       // 🎨 렌더러가 메시지를 선택할 수 있는 키
       messageKey: `${timer.type}_${stage}_${timer.isPaused ? "paused" : "active"}`,
-      encouragementLevel: progress < 25 ? "gentle" : progress < 75 ? "strong" : "final_push"
+      encouragementLevel:
+        progress < 25 ? "gentle" : progress < 75 ? "strong" : "final_push"
     };
   }
 

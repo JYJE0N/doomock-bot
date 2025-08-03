@@ -117,9 +117,16 @@ class ErrorHandler {
       };
 
       if (ctx.callbackQuery) {
-        await ctx.editMessageText("⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.", { reply_markup: keyboard });
+        await ctx.editMessageText(
+          "⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.",
+          {
+            reply_markup: keyboard
+          }
+        );
       } else {
-        await ctx.reply("⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.", { reply_markup: keyboard });
+        await ctx.reply("⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.", {
+          reply_markup: keyboard
+        });
       }
 
       this.stats.handledErrors++;
@@ -156,7 +163,10 @@ class ErrorHandler {
         this.stats.handledErrors++;
         return true;
       } catch (retryError) {
-        logger.warn(`메시지 재시도 ${attempt}/${this.config.maxRetries} 실패:`, retryError.message);
+        logger.warn(
+          `메시지 재시도 ${attempt}/${this.config.maxRetries} 실패:`,
+          retryError.message
+        );
 
         if (attempt === this.config.maxRetries) {
           return await this.handleCriticalError(ctx, retryError);
@@ -200,12 +210,15 @@ class ErrorHandler {
           ]
         };
 
-        await bot.editMessageText(`❌ **화면 표시 오류**\n\n${errorMessage}\n\n다시 시도하거나 메인 메뉴로 돌아가세요.`, {
-          chat_id: callbackQuery.message.chat.id,
-          message_id: callbackQuery.message.message_id,
-          reply_markup: fallbackKeyboard,
-          parse_mode: "Markdown"
-        });
+        await bot.editMessageText(
+          `❌ **화면 표시 오류**\n\n${errorMessage}\n\n다시 시도하거나 메인 메뉴로 돌아가세요.`,
+          {
+            chat_id: callbackQuery.message.chat.id,
+            message_id: callbackQuery.message.message_id,
+            reply_markup: fallbackKeyboard,
+            parse_mode: "Markdown"
+          }
+        );
 
         this.stats.handledErrors++;
         return { success: false, handled: true, error: error.message };
@@ -272,7 +285,10 @@ class ErrorHandler {
     logger.error(`🔥 모듈 처리 오류: ${moduleKey}.${subAction} - ${reason}`);
 
     try {
-      const errorMessage = `❌ ${moduleKey} 기능에서 오류가 발생했습니다.\n` + `액션: ${subAction}\n` + `잠시 후 다시 시도해주세요.`;
+      const errorMessage =
+        `❌ ${moduleKey} 기능에서 오류가 발생했습니다.\n` +
+        `액션: ${subAction}\n` +
+        `잠시 후 다시 시도해주세요.`;
 
       const keyboard = {
         inline_keyboard: [
@@ -381,8 +397,14 @@ class ErrorHandler {
     return {
       stats: this.stats,
       config: this.config,
-      successRate: this.stats.totalErrors > 0 ? Math.round((this.stats.handledErrors / this.stats.totalErrors) * 100) : 100,
-      criticalRate: this.stats.totalErrors > 0 ? Math.round((this.stats.criticalErrors / this.stats.totalErrors) * 100) : 0
+      successRate:
+        this.stats.totalErrors > 0
+          ? Math.round((this.stats.handledErrors / this.stats.totalErrors) * 100)
+          : 100,
+      criticalRate:
+        this.stats.totalErrors > 0
+          ? Math.round((this.stats.criticalErrors / this.stats.totalErrors) * 100)
+          : 0
     };
   }
 

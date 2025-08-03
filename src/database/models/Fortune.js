@@ -322,7 +322,11 @@ FortuneUserSchema.methods.recordDraw = function (cardData, userName) {
   const today = new Date().toISOString().split("T")[0];
 
   // 두목의 카드별 특별 멘트 생성
-  const doomockComment = this.constructor.getDoomockMessage("cardSpecific", userName, cardData);
+  const doomockComment = this.constructor.getDoomockMessage(
+    "cardSpecific",
+    userName,
+    cardData
+  );
 
   // 히스토리에 추가
   this.drawHistory.push({

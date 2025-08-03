@@ -54,7 +54,11 @@ timerStatsSchema.index({ date: -1 });
  * 일일 통계 업데이트 또는 생성
  */
 timerStatsSchema.statics.updateDaily = async function (userId, date, updates) {
-  return this.findOneAndUpdate({ userId: String(userId), date }, { $inc: updates }, { upsert: true, new: true });
+  return this.findOneAndUpdate(
+    { userId: String(userId), date },
+    { $inc: updates },
+    { upsert: true, new: true }
+  );
 };
 
 /**

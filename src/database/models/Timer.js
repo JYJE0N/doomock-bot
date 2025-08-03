@@ -216,7 +216,10 @@ timerSchema.virtual("totalDurationMs").get(function () {
   if (!this.startedAt) return 0;
 
   const endTime = this.completedAt || this.stoppedAt || new Date();
-  return Math.max(0, endTime.getTime() - this.startedAt.getTime() - this.totalPausedDuration);
+  return Math.max(
+    0,
+    endTime.getTime() - this.startedAt.getTime() - this.totalPausedDuration
+  );
 });
 
 /**
@@ -379,11 +382,16 @@ timerSchema.methods.stop = async function () {
   const totalTime = this.duration * 60; // 초로 변환
   const remainingTime = this.lastProgress?.remainingTime || totalTime;
   const elapsedTime = totalTime - remainingTime;
-  this.completionRate = Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
+  this.completionRate = Math.min(
+    100,
+    Math.max(0, Math.round((elapsedTime / totalTime) * 100))
+  );
   this.actualDuration = this.totalDurationMinutes;
 
   const saved = await this.save();
-  logger.info(`⏹️ 타이머 중지: ${this.userId} - ${this._id} (완료율: ${this.completionRate}%)`);
+  logger.info(
+    `⏹️ 타이머 중지: ${this.userId} - ${this._id} (완료율: ${this.completionRate}%)`
+  );
 
   return saved;
 };
@@ -618,7 +626,10 @@ timerSchema.pre("save", function (next) {
   if (this.lastProgress && this.duration && !this.completionRate) {
     const totalSeconds = this.duration * 60;
     const elapsed = totalSeconds - this.lastProgress.remainingTime;
-    this.completionRate = Math.min(100, Math.max(0, Math.round((elapsed / totalSeconds) * 100)));
+    this.completionRate = Math.min(
+      100,
+      Math.max(0, Math.round((elapsed / totalSeconds) * 100))
+    );
   }
 
   // 실제 지속시간 자동 계산

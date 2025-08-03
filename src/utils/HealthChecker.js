@@ -86,7 +86,9 @@ class HealthChecker {
         ...options
       });
 
-      logger.debug(`🔧 컴포넌트 등록됨: ${name} (타입: ${typeof componentRef === "function" ? "function" : "direct"})`);
+      logger.debug(
+        `🔧 컴포넌트 등록됨: ${name} (타입: ${typeof componentRef === "function" ? "function" : "direct"})`
+      );
     } catch (error) {
       logger.error(`❌ 컴포넌트 등록 실패: ${name}`, error);
     }
@@ -237,7 +239,9 @@ class HealthChecker {
       // 상태별 대응
       await this.handleHealthStatus();
 
-      logger.debug(`🔍 헬스체크 완료 (${checkDuration}ms) - 상태: ${this.overallStatus.health}`);
+      logger.debug(
+        `🔍 헬스체크 완료 (${checkDuration}ms) - 상태: ${this.overallStatus.health}`
+      );
     } catch (error) {
       logger.error("❌ 헬스체크 수행 실패:", error);
       this.overallStatus = {
@@ -314,7 +318,9 @@ class HealthChecker {
       let severity = "healthy";
 
       // ✅ 수정: 더 정확한 초기화 상태 확인
-      const isFullyInitialized = moduleManager.isFullyInitialized ? moduleManager.isFullyInitialized() : moduleManager.initialized;
+      const isFullyInitialized = moduleManager.isFullyInitialized
+        ? moduleManager.isFullyInitialized()
+        : moduleManager.initialized;
 
       if (!isFullyInitialized) {
         issues.push("ModuleManager가 완전히 초기화되지 않음");
@@ -341,7 +347,9 @@ class HealthChecker {
 
         // 초기화되지 않은 모듈 찾기
         const uninitializedModules = Object.entries(moduleDetails)
-          .filter(([key, detail]) => !detail.configInitialized || !detail.instanceInitialized)
+          .filter(
+            ([key, detail]) => !detail.configInitialized || !detail.instanceInitialized
+          )
           .map(([key]) => key);
 
         if (uninitializedModules.length > 0) {
@@ -520,12 +528,18 @@ class HealthChecker {
         const componentSeverity = results.components[check.name].severity;
         if (componentSeverity === "critical") {
           results.overallHealth = "critical";
-        } else if (componentSeverity === "warning" && results.overallHealth !== "critical") {
+        } else if (
+          componentSeverity === "warning" &&
+          results.overallHealth !== "critical"
+        ) {
           results.overallHealth = "warning";
         }
       } catch (error) {
         logger.error(`❌ ${check.name} 체크 실패:`, error);
-        results.components[check.name] = this.createHealthResult("error", `체크 실패: ${error.message}`);
+        results.components[check.name] = this.createHealthResult(
+          "error",
+          `체크 실패: ${error.message}`
+        );
         results.overallHealth = "critical";
       }
     }
@@ -599,7 +613,9 @@ class HealthChecker {
    */
   calculateOverallStatus(allChecks, timestamp) {
     const severities = allChecks.map((check) => check.severity);
-    const issues = allChecks.filter((check) => check.severity !== "healthy").map((check) => check.message);
+    const issues = allChecks
+      .filter((check) => check.severity !== "healthy")
+      .map((check) => check.message);
 
     // 가장 심각한 상태 결정
     let overallHealth = "healthy";
@@ -618,7 +634,13 @@ class HealthChecker {
     };
 
     // 컴포넌트별 상태 저장
-    const componentNames = ["botController", "moduleManager", "database", "todoService", "system"];
+    const componentNames = [
+      "botController",
+      "moduleManager",
+      "database",
+      "todoService",
+      "system"
+    ];
 
     allChecks.forEach((check, index) => {
       if (componentNames[index]) {
@@ -687,7 +709,9 @@ class HealthChecker {
     const attempts = this.recoveryAttempts.get(recoveryKey) || 0;
 
     try {
-      logger.info(`🔄 자동 복구 시도 중... (${attempts + 1}/${this.config.maxRecoveryAttempts})`);
+      logger.info(
+        `🔄 자동 복구 시도 중... (${attempts + 1}/${this.config.maxRecoveryAttempts})`
+      );
 
       // 캐시 정리
       if (this.getComponent("todoService")?.cache) {
@@ -768,7 +792,9 @@ class HealthChecker {
       }
     }, this.config.normalCheckInterval);
 
-    logger.debug(`⏰ 정상 헬스체크 스케줄러 시작됨 (${this.config.normalCheckInterval}ms)`);
+    logger.debug(
+      `⏰ 정상 헬스체크 스케줄러 시작됨 (${this.config.normalCheckInterval}ms)`
+    );
   }
 
   /**
@@ -785,7 +811,9 @@ class HealthChecker {
       }
     }, this.config.criticalCheckInterval);
 
-    logger.debug(`🚨 크리티컬 헬스체크 스케줄러 시작됨 (${this.config.criticalCheckInterval}ms)`);
+    logger.debug(
+      `🚨 크리티컬 헬스체크 스케줄러 시작됨 (${this.config.criticalCheckInterval}ms)`
+    );
   }
 
   /**
@@ -832,11 +860,17 @@ class HealthChecker {
       metrics: {
         avgCheckDuration:
           this.metrics.checkDuration.length > 0
-            ? Math.round(this.metrics.checkDuration.reduce((a, b) => a + b, 0) / this.metrics.checkDuration.length)
+            ? Math.round(
+                this.metrics.checkDuration.reduce((a, b) => a + b, 0) /
+                  this.metrics.checkDuration.length
+              )
             : 0,
         avgMemoryUsage:
           this.metrics.memoryUsage.length > 0
-            ? Math.round(this.metrics.memoryUsage.reduce((a, b) => a + b, 0) / this.metrics.memoryUsage.length)
+            ? Math.round(
+                this.metrics.memoryUsage.reduce((a, b) => a + b, 0) /
+                  this.metrics.memoryUsage.length
+              )
             : 0,
         currentMemoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
       },

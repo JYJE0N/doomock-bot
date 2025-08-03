@@ -53,7 +53,14 @@ class TodoService extends BaseService {
    */
   async getTodos(userId, options = {}) {
     try {
-      const { page = 1, limit = 10, includeCompleted = true, includeReminders = false, sortBy = "createdAt", sortOrder = -1 } = options;
+      const {
+        page = 1,
+        limit = 10,
+        includeCompleted = true,
+        includeReminders = false,
+        sortBy = "createdAt",
+        sortOrder = -1
+      } = options;
 
       const query = {
         userId: userId.toString(),
@@ -104,13 +111,19 @@ class TodoService extends BaseService {
       });
 
       if (userTodoCount >= this.config.maxTodosPerUser) {
-        return this.createErrorResponse(new Error("LIMIT_EXCEEDED"), `할일은 최대 ${this.config.maxTodosPerUser}개까지 등록 가능합니다.`);
+        return this.createErrorResponse(
+          new Error("LIMIT_EXCEEDED"),
+          `할일은 최대 ${this.config.maxTodosPerUser}개까지 등록 가능합니다.`
+        );
       }
 
       // 할일 텍스트 검증
       const todoText = todoData.text || todoData.title;
       if (!todoText || todoText.trim().length === 0) {
-        return this.createErrorResponse(new Error("MISSING_TEXT"), "할일 내용이 필요합니다.");
+        return this.createErrorResponse(
+          new Error("MISSING_TEXT"),
+          "할일 내용이 필요합니다."
+        );
       }
 
       // 중복 체크
@@ -122,7 +135,10 @@ class TodoService extends BaseService {
       });
 
       if (existingTodo) {
-        return this.createErrorResponse(new Error("DUPLICATE_TODO"), "이미 동일한 할일이 존재합니다.");
+        return this.createErrorResponse(
+          new Error("DUPLICATE_TODO"),
+          "이미 동일한 할일이 존재합니다."
+        );
       }
 
       // 새 할일 생성
@@ -158,7 +174,10 @@ class TodoService extends BaseService {
       });
 
       if (!todo) {
-        return this.createErrorResponse(new Error("TODO_NOT_FOUND"), "할일을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
       }
 
       const wasCompleted = todo.completed;
@@ -176,9 +195,14 @@ class TodoService extends BaseService {
 
       const updatedTodo = await todo.save();
 
-      logger.info(`✅ 할일 상태 변경: ${userId} - "${todo.text}" (${wasCompleted ? "미완료" : "완료"})`);
+      logger.info(
+        `✅ 할일 상태 변경: ${userId} - "${todo.text}" (${wasCompleted ? "미완료" : "완료"})`
+      );
 
-      return this.createSuccessResponse(updatedTodo.toJSON(), `할일을 ${todo.completed ? "완료" : "미완료"}로 변경했습니다.`);
+      return this.createSuccessResponse(
+        updatedTodo.toJSON(),
+        `할일을 ${todo.completed ? "완료" : "미완료"}로 변경했습니다.`
+      );
     } catch (error) {
       return this.createErrorResponse(error, "할일 상태 변경 실패");
     }
@@ -199,7 +223,10 @@ class TodoService extends BaseService {
       );
 
       if (!todo) {
-        return this.createErrorResponse(new Error("TODO_NOT_FOUND"), "삭제할 할일을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "삭제할 할일을 찾을 수 없습니다."
+        );
       }
 
       // 🆕 관련 리마인드도 함께 삭제
@@ -267,7 +294,8 @@ class TodoService extends BaseService {
         completed,
         archived,
         total,
-        completionRate: total > 0 ? Math.round((completed / (pending + completed)) * 100) : 0,
+        completionRate:
+          total > 0 ? Math.round((completed / (pending + completed)) * 100) : 0,
         reminders: reminderStats
       };
 
@@ -331,7 +359,10 @@ class TodoService extends BaseService {
         period: "이번 주",
         created: createdThisWeek,
         completed: completedThisWeek,
-        completionRate: createdThisWeek > 0 ? Math.round((completedThisWeek / createdThisWeek) * 100) : 0,
+        completionRate:
+          createdThisWeek > 0
+            ? Math.round((completedThisWeek / createdThisWeek) * 100)
+            : 0,
         reminders: reminderStats,
         daily: dailyStats,
         startDate: weekStart.toISOString(),
@@ -406,7 +437,9 @@ class TodoService extends BaseService {
         cleanupDate: now.toISOString()
       };
 
-      logger.info(`🧹 스마트 정리 완료: ${userId} - 아카이브: ${archiveResult.modifiedCount}, 삭제: ${deleteResult.deletedCount}`);
+      logger.info(
+        `🧹 스마트 정리 완료: ${userId} - 아카이브: ${archiveResult.modifiedCount}, 삭제: ${deleteResult.deletedCount}`
+      );
 
       return this.createSuccessResponse(
         cleanupStats,
@@ -559,7 +592,10 @@ class TodoService extends BaseService {
       }).lean();
 
       if (!todo) {
-        return this.createErrorResponse(new Error("TODO_NOT_FOUND"), "할일을 찾을 수 없습니다.");
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
       }
 
       return this.createSuccessResponse(todo, "할일 조회 완료");

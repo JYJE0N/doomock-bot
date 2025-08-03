@@ -407,7 +407,11 @@ reminderSchema.statics.getUserStats = function (userId) {
           $sum: {
             $cond: [
               {
-                $and: ["$isActive", { $not: "$completed" }, { $lt: ["$reminderTime", new Date()] }]
+                $and: [
+                  "$isActive",
+                  { $not: "$completed" },
+                  { $lt: ["$reminderTime", new Date()] }
+                ]
               },
               1,
               0

@@ -189,7 +189,9 @@ const UNIFIED_MODULES = [
  * NavigationHandler.showMainMenu()에서 직접 사용
  */
 function getEnabledModules() {
-  return UNIFIED_MODULES.filter((module) => module.enabled && module.showInMenu).sort((a, b) => a.priority - b.priority);
+  return UNIFIED_MODULES.filter((module) => module.enabled && module.showInMenu).sort(
+    (a, b) => a.priority - b.priority
+  );
 }
 
 /**
@@ -197,7 +199,9 @@ function getEnabledModules() {
  * ModuleManager에서 로딩용
  */
 function getAllEnabledModules() {
-  return UNIFIED_MODULES.filter((module) => module.enabled).sort((a, b) => a.priority - b.priority);
+  return UNIFIED_MODULES.filter((module) => module.enabled).sort(
+    (a, b) => a.priority - b.priority
+  );
 }
 
 /**
@@ -222,7 +226,10 @@ function getModulesByCategory() {
  * 🔍 특정 모듈 정보 조회
  */
 function getModuleInfo(moduleKey) {
-  return UNIFIED_MODULES.find((module) => module.key === moduleKey || module.name.toLowerCase() === moduleKey.toLowerCase());
+  return UNIFIED_MODULES.find(
+    (module) =>
+      module.key === moduleKey || module.name.toLowerCase() === moduleKey.toLowerCase()
+  );
 }
 
 /**
@@ -316,7 +323,9 @@ function initializeRegistry() {
   logger.info(`📋 ModuleRegistry v4.0.0 초기화`);
 
   const stats = getModuleStats();
-  logger.info(`📊 모듈 통계: 전체 ${stats.total}개, 활성 ${stats.enabled}개, 표시 ${stats.visible}개`);
+  logger.info(
+    `📊 모듈 통계: 전체 ${stats.total}개, 활성 ${stats.enabled}개, 표시 ${stats.visible}개`
+  );
 
   // 의존성 검증
   const errors = validateModuleDependencies();

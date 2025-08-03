@@ -231,7 +231,11 @@ leaveSchema.statics.addUsage = async function (userId, amount, date, reason, typ
  * 🗑️ 연차 사용 기록 삭제 (소프트 삭제)
  */
 leaveSchema.statics.removeUsage = async function (userId, leaveId) {
-  return await this.findOneAndUpdate({ _id: leaveId, userId: String(userId) }, { isActive: false }, { new: true });
+  return await this.findOneAndUpdate(
+    { _id: leaveId, userId: String(userId) },
+    { isActive: false },
+    { new: true }
+  );
 };
 
 // ===== 🎯 JSON 변환 설정 =====

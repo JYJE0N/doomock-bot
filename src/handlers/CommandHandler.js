@@ -317,7 +317,12 @@ class CommandHandler {
         logger.debug(`🎯 자연어 모듈 매칭: "${messageText}" → ${moduleMatch.module}`);
         this.stats.naturalCommands++;
 
-        const handled = await this.routeToModule(bot, msg, moduleMatch.module, moduleMatch.args);
+        const handled = await this.routeToModule(
+          bot,
+          msg,
+          moduleMatch.module,
+          moduleMatch.args
+        );
         return handled;
       }
 
@@ -414,7 +419,11 @@ class CommandHandler {
         from: msg.from,
         chat: msg.chat,
         reply: (text, extra) => bot.telegram.sendMessage(msg.chat.id, text, extra),
-        replyWithMarkdown: (text, extra) => bot.telegram.sendMessage(msg.chat.id, text, { parse_mode: "Markdown", ...extra })
+        replyWithMarkdown: (text, extra) =>
+          bot.telegram.sendMessage(msg.chat.id, text, {
+            parse_mode: "Markdown",
+            ...extra
+          })
       };
 
       // 액션에 따라 적절한 NavigationHandler 메서드 호출
@@ -557,7 +566,10 @@ class CommandHandler {
             userName
           };
 
-          const result = await this.navigationHandler.handleSystemCommand(bot, routingInfo);
+          const result = await this.navigationHandler.handleSystemCommand(
+            bot,
+            routingInfo
+          );
           return result !== false;
         }
       }
@@ -708,7 +720,10 @@ class CommandHandler {
     const uptime = Date.now() - this.stats.startTime;
     const avgResponseTime =
       this.stats.responseTimeMs.length > 0
-        ? Math.round(this.stats.responseTimeMs.reduce((a, b) => a + b, 0) / this.stats.responseTimeMs.length)
+        ? Math.round(
+            this.stats.responseTimeMs.reduce((a, b) => a + b, 0) /
+              this.stats.responseTimeMs.length
+          )
         : 0;
 
     return {
@@ -721,7 +736,10 @@ class CommandHandler {
         natural: this.stats.naturalCommands, // 🆕
         doomockCalls: this.stats.doomockCalls, // 🆕
         unknown: this.stats.unknownCommands,
-        successRate: this.stats.commandsProcessed > 0 ? Math.round((this.stats.validCommands / this.stats.commandsProcessed) * 100) : 100
+        successRate:
+          this.stats.commandsProcessed > 0
+            ? Math.round((this.stats.validCommands / this.stats.commandsProcessed) * 100)
+            : 100
       },
       performance: {
         uptime: uptime,

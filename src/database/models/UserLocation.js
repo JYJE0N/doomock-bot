@@ -105,7 +105,11 @@ userLocationSchema.methods.toSimpleObject = function () {
 };
 
 // 정적 메서드
-userLocationSchema.statics.setUserLocation = async function (userId, username, locationData) {
+userLocationSchema.statics.setUserLocation = async function (
+  userId,
+  username,
+  locationData
+) {
   const updateData = {
     userId,
     username,
