@@ -12,6 +12,7 @@ const NavigationHandler = require("../handlers/NavigationHandler");
 // 🎯 관심사 분리 - 전문 컴포넌트 import
 const ErrorHandler = require("../handlers/ErrorHandler");
 const MarkdownHelper = require("../utils/MarkdownHelper");
+const CommandHandler = require("../handlers/CommandHandler");
 
 /**
  * 🤖 BotController - 텔레그램 봇 중앙 제어 시스템 (Mongoose 전용)
@@ -32,6 +33,7 @@ class BotController {
     this.cleanupInProgress = false;
     this.errorHandler = null;
     this.markdownHelper = null;
+    this.commandHandler = null;
 
     // Express 서버 추가
     this.app = null;
@@ -301,11 +303,12 @@ class BotController {
       await this.navigationHandler.initialize();
       logger.success("✅ NavigationHandler 초기화 완료");
 
-      // 6. 상호 참조 설정
-      this.navigationHandler.setModuleManager(this.moduleManager);
-      this.moduleManager.setNavigationHandler(this.navigationHandler);
-
-      logger.success("✅ 핸들러 및 매니저 초기화 완료");
+      // 6. 🆕 CommandHandler 초기화 (자연어 명령어 지원)
+      this.commandHandler = new CommandHandler({
+        moduleManager: this.moduleManager,
+        navigationHandler: this.navigationHandler
+      });
+      logger.success("✅ CommandHandler 초기화 완료");
     } catch (error) {
       logger.error("❌ 핸들러 초기화 실패:", error);
       throw error;
@@ -446,7 +449,6 @@ class BotController {
     try {
       this.stats.messagesProcessed++;
 
-      // 슬래시 명령어는 스킵 (기존 핸들러가 처리)
       if (!ctx.message?.text || ctx.message.text.startsWith("/")) {
         return;
       }
@@ -568,7 +570,15 @@ class BotController {
           logger.warn("⚠️ ModuleManager 정리 실패:", error.message);
         }
       }
-
+      // CommandHandler 정리
+      if (this.commandHandler) {
+        try {
+          await this.commandHandler.cleanup();
+          logger.debug("✅ CommandHandler 정리 완료");
+        } catch (error) {
+          logger.warn("⚠️ CommandHandler 정리 실패:", error.message);
+        }
+      }
       // NavigationHandler 정리
       if (this.navigationHandler && typeof this.navigationHandler.cleanup === "function") {
         try {
