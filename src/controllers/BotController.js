@@ -313,7 +313,7 @@ class BotController {
   }
 
   /**
-   * 🔌 미들웨어 설정
+   * 🔌 미들웨어 설정 (수정된 버전 - 불필요한 명령어 제거)
    */
   setupMiddlewares() {
     // 에러 핸들링
@@ -328,62 +328,49 @@ class BotController {
       }
     });
 
-    // 명령어 핸들러
+    // 🧹 정리된 명령어 핸들러들 (불필요한 것들 제거)
     this.bot.command("start", this.handleStartCommand.bind(this));
     this.bot.command("help", this.handleHelpCommand.bind(this));
-    this.bot.command("menu", this.handleMenuCommand.bind(this));
-    this.bot.command("status", this.handleStatusCommand.bind(this));
+    // menu, status 명령어 제거 - 자연어로만 접근
 
     // 콜백 쿼리 핸들러
     this.bot.on("callback_query", this.handleCallbackQuery.bind(this));
 
-    // 텍스트 메시지 핸들러
+    // 텍스트 메시지 핸들러 (수정됨)
     this.bot.on("text", this.handleTextMessage.bind(this));
 
-    logger.info("✅ 미들웨어 설정 완료");
+    logger.info("✅ 미들웨어 설정 완료 (명령어 간소화 + 자연어 지원)");
   }
 
   // ===== 🎯 명령어 핸들러들 =====
 
   /**
-   * /start 명령어 처리
+   * /start 명령어 처리 (순수 라우팅)
    */
   async handleStartCommand(ctx) {
     try {
       this.stats.messagesProcessed++;
+
+      // NavigationHandler를 통해 직접 처리 (CommandHandler는 라우팅만)
       await this.navigationHandler.showMainMenu(ctx);
     } catch (error) {
       logger.error("start 명령 처리 오류:", error);
       await ctx.reply("시작 중 오류가 발생했습니다.");
     }
   }
-
   /**
-   * /help 명령어 처리
+   * /help 명령어 처리 (순수 라우팅)
    */
   async handleHelpCommand(ctx) {
     try {
       this.stats.messagesProcessed++;
 
-      const helpText = `📌 **DooMock Bot 도움말**
-
-🤖 **주요 명령어**:
-• /start - 메인 메뉴 보기
-• /menu - 메인 메뉴 보기
-• /help - 도움말 보기
-• /status - 봇 상태 확인
-
-📋 **주요 기능**:
-• 📋 할일 관리 - 할일 추가/완료/삭제
-• 🍅 타이머 - 뽀모도로 타이머
-• 🏢 근무시간 - 출퇴근 기록 관리
-• 🏖️ 연차 관리 - 연차 사용 현황
-• 🌤️ 날씨 - 현재 날씨 정보
-• 🔊 TTS - 텍스트 음성 변환
-
-💡 **팁**: 메뉴 버튼을 클릭하거나 텍스트 입력으로도 기능을 사용할 수 있습니다!`;
-
-      await ctx.replyWithMarkdown(helpText);
+      // NavigationHandler에 showHelp가 있으면 호출, 없으면 메인메뉴
+      if (typeof this.navigationHandler.showHelp === "function") {
+        await this.navigationHandler.showHelp(ctx);
+      } else {
+        await this.navigationHandler.showMainMenu(ctx);
+      }
     } catch (error) {
       logger.error("help 명령 처리 오류:", error);
       await ctx.reply("도움말 표시 중 오류가 발생했습니다.");
@@ -392,7 +379,7 @@ class BotController {
 
   /**
    * /menu 명령어 처리
-   */
+   
   async handleMenuCommand(ctx) {
     try {
       this.stats.messagesProcessed++;
@@ -405,7 +392,7 @@ class BotController {
 
   /**
    * /status 명령어 처리
-   */
+   
   async handleStatusCommand(ctx) {
     try {
       this.stats.messagesProcessed++;
@@ -434,7 +421,7 @@ class BotController {
       await ctx.reply("상태 확인 중 오류가 발생했습니다.");
     }
   }
-
+*/
   /**
    * 🔘 콜백 쿼리 처리
    */
@@ -452,17 +439,34 @@ class BotController {
   }
 
   /**
-   * 💬 텍스트 메시지 처리
+   * 💬 텍스트 메시지 처리 (수정된 버전 - 두목 자연어 명령어 지원)
    */
   async handleTextMessage(ctx) {
     try {
       this.stats.messagesProcessed++;
 
+      // 슬래시 명령어는 스킵 (기존 핸들러가 처리)
       if (!ctx.message?.text || ctx.message.text.startsWith("/")) {
         return;
       }
 
-      // NavigationHandler가 메시지도 처리
+      const messageText = ctx.message.text;
+      const msg = ctx.message;
+
+      logger.debug(`💬 텍스트 메시지 수신: "${messageText}"`);
+
+      // 🎯 1단계: CommandHandler의 자연어 처리 먼저 시도
+      if (this.commandHandler && typeof this.commandHandler.handleNaturalMessage === "function") {
+        const handled = await this.commandHandler.handleNaturalMessage(this.bot, msg);
+
+        if (handled) {
+          logger.debug(`✅ CommandHandler가 자연어 메시지 처리 완료: "${messageText}"`);
+          return;
+        }
+      }
+
+      // 🎯 2단계: NavigationHandler의 기존 메시지 처리로 폴백
+      logger.debug(`🔄 CommandHandler에서 처리하지 못함 - NavigationHandler로 폴백`);
       await this.navigationHandler.handleMessage(ctx);
     } catch (error) {
       logger.error("텍스트 메시지 처리 오류:", error);
