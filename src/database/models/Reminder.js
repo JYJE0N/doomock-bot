@@ -157,6 +157,10 @@ const reminderSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+    type: {
+      type: String,
+      default: "general"
+    },
     retryCount: {
       type: Number,
       default: 0
