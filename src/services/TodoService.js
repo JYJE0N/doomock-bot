@@ -1,36 +1,37 @@
-// src/services/TodoService.js - 리마인드 기능이 강화된 할일 서비스
+// src/services/TodoService.js - 데이터 관리 전담 서비스
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 
 /**
- * 📋 TodoService - 할일 데이터 서비스 (리마인드 기능 강화)
+ * 📋 TodoService - 데이터 관리만 담당
  *
- * ✅ 새로운 기능:
- * - 주간/월간 통계 분석
- * - 스마트 할일 정리
- * - 리마인드 연동 데이터
- * - 생산성 분석
+ * ✅ 역할: 데이터베이스 조회, 데이터 가공, 비즈니스 데이터 로직
+ * ❌ 하지 않는 것: UI 생성, 메시지 전송, 콜백 처리
  */
 class TodoService extends BaseService {
   constructor(options = {}) {
     super("TodoService", options);
 
-    // 서비스 설정
     this.config = {
       maxTodosPerUser: 100,
       archiveAfterDays: 30,
-      enableSmartAnalysis: true,
       cacheTimeout: 300000, // 5분
       ...options.config
     };
 
-    logger.info("📋 TodoService 생성됨 (리마인드 기능 강화)");
+    logger.info("📋 TodoService 생성됨");
   }
 
+  /**
+   * 필수 모델 정의
+   */
   getRequiredModels() {
     return ["Todo", "Reminder"];
   }
 
+  /**
+   * 서비스 초기화
+   */
   async onInitialize() {
     try {
       // 인덱스 최적화
@@ -44,18 +45,38 @@ class TodoService extends BaseService {
           completed: 1
         });
         await this.models.Todo.collection.createIndex({ createdAt: -1 });
+        await this.models.Todo.collection.createIndex({
+          userId: 1,
+          remindAt: 1
+        });
       }
 
-      logger.success("✅ TodoService 초기화 완료 (리마인드 기능 포함)");
+      if (this.models.Reminder) {
+        await this.models.Reminder.collection.createIndex({
+          userId: 1,
+          todoId: 1
+        });
+        await this.models.Reminder.collection.createIndex({
+          remindAt: 1,
+          isActive: 1
+        });
+        await this.models.Reminder.collection.createIndex({
+          userId: 1,
+          isActive: 1
+        });
+      }
+
+      logger.success("✅ TodoService 초기화 완료");
     } catch (error) {
       logger.error("❌ TodoService 초기화 실패:", error);
+      throw error;
     }
   }
 
-  // ===== 기본 CRUD 메서드들 =====
+  // ===== 기본 CRUD 메서드 =====
 
   /**
-   * 📋 할일 목록 조회 (리마인드 정보 포함)
+   * 할일 목록 조회
    */
   async getTodos(userId, options = {}) {
     try {
@@ -63,7 +84,6 @@ class TodoService extends BaseService {
         page = 1,
         limit = 10,
         includeCompleted = true,
-        includeReminders = false,
         sortBy = "createdAt",
         sortOrder = -1
       } = options;
@@ -73,7 +93,6 @@ class TodoService extends BaseService {
         isActive: true
       };
 
-      // 완료된 할일 제외 옵션
       if (!includeCompleted) {
         query.completed = false;
       }
@@ -87,18 +106,11 @@ class TodoService extends BaseService {
           .lean()
       ]);
 
-      // 🆕 리마인드 정보 포함
-      let enrichedTodos = todos;
-      if (includeReminders && this.models.Reminder) {
-        enrichedTodos = await this.enrichTodosWithReminders(todos);
-      }
-
       return this.createSuccessResponse({
-        todos: enrichedTodos,
+        todos,
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
-        currentPage: page,
-        hasReminders: includeReminders
+        currentPage: page
       });
     } catch (error) {
       return this.createErrorResponse(error, "할일 목록 조회 실패");
@@ -106,498 +118,7 @@ class TodoService extends BaseService {
   }
 
   /**
-   * ➕ 할일 추가 (개선된 버전)
-   */
-  async addTodo(userId, todoData) {
-    try {
-      // 사용자 할일 수 체크
-      const userTodoCount = await this.models.Todo.countDocuments({
-        userId: userId.toString(),
-        isActive: true
-      });
-
-      if (userTodoCount >= this.config.maxTodosPerUser) {
-        return this.createErrorResponse(
-          new Error("LIMIT_EXCEEDED"),
-          `할일은 최대 ${this.config.maxTodosPerUser}개까지 등록 가능합니다.`
-        );
-      }
-
-      // 할일 텍스트 검증
-      const todoText = todoData.text || todoData.title;
-      if (!todoText || todoText.trim().length === 0) {
-        return this.createErrorResponse(
-          new Error("MISSING_TEXT"),
-          "할일 내용이 필요합니다."
-        );
-      }
-
-      // 중복 체크
-      const existingTodo = await this.models.Todo.findOne({
-        userId: userId.toString(),
-        text: todoText.trim(),
-        isActive: true,
-        completed: false
-      });
-
-      if (existingTodo) {
-        return this.createErrorResponse(
-          new Error("DUPLICATE_TODO"),
-          "이미 동일한 할일이 존재합니다."
-        );
-      }
-
-      // 새 할일 생성
-      const newTodo = new this.models.Todo({
-        userId: userId.toString(),
-        text: todoText.trim(),
-        description: todoData.description?.trim() || null,
-        priority: this.validatePriority(todoData.priority),
-        category: todoData.category?.trim() || null,
-        tags: this.validateTags(todoData.tags),
-        estimatedMinutes: todoData.estimatedMinutes || null
-      });
-
-      const savedTodo = await newTodo.save();
-
-      logger.info(`📋 할일 추가: ${userId} - "${todoText}"`);
-
-      return this.createSuccessResponse(
-        savedTodo.toJSON(),
-        "할일이 추가되었습니다."
-      );
-    } catch (error) {
-      return this.createErrorResponse(error, "할일 추가 실패");
-    }
-  }
-
-  /**
-   * ✅ 할일 완료 토글 (개선된 버전)
-   */
-  async toggleTodo(userId, todoId) {
-    try {
-      const todo = await this.models.Todo.findOne({
-        _id: todoId,
-        userId: userId.toString(),
-        isActive: true
-      });
-
-      if (!todo) {
-        return this.createErrorResponse(
-          new Error("TODO_NOT_FOUND"),
-          "할일을 찾을 수 없습니다."
-        );
-      }
-
-      const wasCompleted = todo.completed;
-      todo.completed = !todo.completed;
-
-      if (todo.completed) {
-        todo.completedAt = new Date();
-        // 🆕 완료 시 관련 리마인드 비활성화
-        if (this.models.Reminder) {
-          await this.deactivateRemindersByTodoId(todoId);
-        }
-      } else {
-        todo.completedAt = undefined;
-      }
-
-      const updatedTodo = await todo.save();
-
-      logger.info(
-        `✅ 할일 상태 변경: ${userId} - "${todo.text}" (${wasCompleted ? "미완료" : "완료"})`
-      );
-
-      return this.createSuccessResponse(
-        updatedTodo.toJSON(),
-        `할일을 ${todo.completed ? "완료" : "미완료"}로 변경했습니다.`
-      );
-    } catch (error) {
-      return this.createErrorResponse(error, "할일 상태 변경 실패");
-    }
-  }
-
-  /**
-   * 🗑️ 할일 삭제 (소프트 삭제)
-   */
-  async deleteTodo(userId, todoId) {
-    try {
-      const todo = await this.models.Todo.findOneAndUpdate(
-        { _id: todoId, userId: userId.toString(), isActive: true },
-        {
-          isActive: false,
-          deletedAt: new Date()
-        },
-        { new: true }
-      );
-
-      if (!todo) {
-        return this.createErrorResponse(
-          new Error("TODO_NOT_FOUND"),
-          "삭제할 할일을 찾을 수 없습니다."
-        );
-      }
-
-      // 🆕 관련 리마인드도 함께 삭제
-      if (this.models.Reminder) {
-        await this.deactivateRemindersByTodoId(todoId);
-      }
-
-      logger.info(`🗑️ 할일 삭제: ${userId} - "${todo.text}"`);
-
-      return this.createSuccessResponse(
-        todo.toJSON(),
-        "할일이 삭제되었습니다."
-      );
-    } catch (error) {
-      return this.createErrorResponse(error, "할일 삭제 실패");
-    }
-  }
-
-  // ===== 🆕 통계 및 분석 메서드들 =====
-
-  /**
-   * 📊 할일 기본 통계
-   */
-  async getTodoStats(userId) {
-    try {
-      const [pending, completed, archived, total] = await Promise.all([
-        this.models.Todo.countDocuments({
-          userId: userId.toString(),
-          isActive: true,
-          completed: false
-        }),
-        this.models.Todo.countDocuments({
-          userId: userId.toString(),
-          isActive: true,
-          completed: true
-        }),
-        this.models.Todo.countDocuments({
-          userId: userId.toString(),
-          isActive: false
-        }),
-        this.models.Todo.countDocuments({
-          userId: userId.toString()
-        })
-      ]);
-
-      // 🆕 리마인드 통계 추가
-      let reminderStats = null;
-      if (this.models.Reminder) {
-        const [activeReminders, totalReminders] = await Promise.all([
-          this.models.Reminder.countDocuments({
-            userId: userId.toString(),
-            isActive: true,
-            reminderTime: { $gt: new Date() }
-          }),
-          this.models.Reminder.countDocuments({
-            userId: userId.toString()
-          })
-        ]);
-
-        reminderStats = {
-          active: activeReminders,
-          total: totalReminders
-        };
-      }
-
-      const stats = {
-        pending,
-        completed,
-        archived,
-        total,
-        completionRate:
-          total > 0 ? Math.round((completed / (pending + completed)) * 100) : 0,
-        reminders: reminderStats
-      };
-
-      return this.createSuccessResponse(stats, "통계 조회 완료");
-    } catch (error) {
-      return this.createErrorResponse(error, "통계 조회 실패");
-    }
-  }
-
-  /**
-   * 📈 주간 통계 (새로운 기능)
-   */
-  async getWeeklyStats(userId) {
-    try {
-      const now = new Date();
-      const weekStart = new Date(now);
-      weekStart.setDate(now.getDate() - now.getDay()); // 이번 주 일요일
-      weekStart.setHours(0, 0, 0, 0);
-
-      const weekEnd = new Date(weekStart);
-      weekEnd.setDate(weekStart.getDate() + 6);
-      weekEnd.setHours(23, 59, 59, 999);
-
-      // 이번 주 생성된 할일
-      const createdThisWeek = await this.models.Todo.countDocuments({
-        userId: userId.toString(),
-        createdAt: { $gte: weekStart, $lte: weekEnd }
-      });
-
-      // 이번 주 완료된 할일
-      const completedThisWeek = await this.models.Todo.countDocuments({
-        userId: userId.toString(),
-        completedAt: { $gte: weekStart, $lte: weekEnd }
-      });
-
-      // 🆕 이번 주 리마인드 통계
-      let reminderStats = null;
-      if (this.models.Reminder) {
-        const [remindersCreated, remindersTriggered] = await Promise.all([
-          this.models.Reminder.countDocuments({
-            userId: userId.toString(),
-            createdAt: { $gte: weekStart, $lte: weekEnd }
-          }),
-          this.models.Reminder.countDocuments({
-            userId: userId.toString(),
-            reminderTime: { $gte: weekStart, $lte: weekEnd },
-            isActive: false // 실행된 리마인드는 비활성화됨
-          })
-        ]);
-
-        reminderStats = {
-          created: remindersCreated,
-          triggered: remindersTriggered
-        };
-      }
-
-      // 일별 생산성 분석
-      const dailyStats = await this.getDailyProductivity(
-        userId,
-        weekStart,
-        weekEnd
-      );
-
-      const weeklyStats = {
-        period: "이번 주",
-        created: createdThisWeek,
-        completed: completedThisWeek,
-        completionRate:
-          createdThisWeek > 0
-            ? Math.round((completedThisWeek / createdThisWeek) * 100)
-            : 0,
-        reminders: reminderStats,
-        daily: dailyStats,
-        startDate: weekStart.toISOString(),
-        endDate: weekEnd.toISOString()
-      };
-
-      return this.createSuccessResponse(weeklyStats, "주간 통계 조회 완료");
-    } catch (error) {
-      return this.createErrorResponse(error, "주간 통계 조회 실패");
-    }
-  }
-
-  /**
-   * 🧹 스마트 정리 (완료된 할일 아카이브)
-   */
-  async smartCleanup(userId, options = {}) {
-    try {
-      const {
-        archiveCompletedDays = 7, // 7일 전 완료된 할일 아카이브
-        deleteArchivedDays = 30 // 30일 전 아카이브 할일 삭제
-      } = options;
-
-      const now = new Date();
-
-      // 아카이브할 완료 할일 찾기
-      const archiveDate = new Date(now);
-      archiveDate.setDate(now.getDate() - archiveCompletedDays);
-
-      const archiveResult = await this.models.Todo.updateMany(
-        {
-          userId: userId.toString(),
-          completed: true,
-          completedAt: { $lt: archiveDate },
-          isActive: true
-        },
-        {
-          $set: {
-            isActive: false,
-            archivedAt: new Date()
-          }
-        }
-      );
-
-      // 완전 삭제할 아카이브 할일 찾기
-      const deleteDate = new Date(now);
-      deleteDate.setDate(now.getDate() - deleteArchivedDays);
-
-      const deleteResult = await this.models.Todo.deleteMany({
-        userId: userId.toString(),
-        isActive: false,
-        archivedAt: { $lt: deleteDate }
-      });
-
-      // 🆕 만료된 리마인드 정리
-      let reminderCleanup = null;
-      if (this.models.Reminder) {
-        const expiredReminderResult = await this.models.Reminder.deleteMany({
-          userId: userId.toString(),
-          reminderTime: { $lt: new Date(now.getTime() - 24 * 60 * 60 * 1000) }, // 하루 전
-          isActive: false
-        });
-
-        reminderCleanup = {
-          deletedReminders: expiredReminderResult.deletedCount
-        };
-      }
-
-      const cleanupStats = {
-        archivedTodos: archiveResult.modifiedCount,
-        deletedTodos: deleteResult.deletedCount,
-        reminderCleanup,
-        cleanupDate: now.toISOString()
-      };
-
-      logger.info(
-        `🧹 스마트 정리 완료: ${userId} - 아카이브: ${archiveResult.modifiedCount}, 삭제: ${deleteResult.deletedCount}`
-      );
-
-      return this.createSuccessResponse(
-        cleanupStats,
-        `정리 완료: ${archiveResult.modifiedCount}개 아카이브, ${deleteResult.deletedCount}개 삭제`
-      );
-    } catch (error) {
-      return this.createErrorResponse(error, "스마트 정리 실패");
-    }
-  }
-
-  // ===== 🆕 리마인드 연동 메서드들 =====
-
-  /**
-   * 🔗 할일에 리마인드 정보 추가
-   */
-  async enrichTodosWithReminders(todos) {
-    if (!this.models.Reminder || !todos || todos.length === 0) {
-      return todos;
-    }
-
-    try {
-      const todoIds = todos.map((todo) => todo._id);
-
-      const reminders = await this.models.Reminder.find({
-        todoId: { $in: todoIds },
-        isActive: true
-      }).lean();
-
-      // 할일별로 리마인드 그룹화
-      const remindersByTodoId = {};
-      reminders.forEach((reminder) => {
-        const todoId = reminder.todoId.toString();
-        if (!remindersByTodoId[todoId]) {
-          remindersByTodoId[todoId] = [];
-        }
-        remindersByTodoId[todoId].push(reminder);
-      });
-
-      // 할일에 리마인드 정보 추가
-      return todos.map((todo) => ({
-        ...todo,
-        reminders: remindersByTodoId[todo._id.toString()] || []
-      }));
-    } catch (error) {
-      logger.error("리마인드 정보 추가 실패:", error);
-      return todos;
-    }
-  }
-
-  /**
-   * 🔕 할일 완료 시 관련 리마인드 비활성화
-   */
-  async deactivateRemindersByTodoId(todoId) {
-    if (!this.models.Reminder) {
-      return;
-    }
-
-    try {
-      await this.models.Reminder.updateMany(
-        { todoId, isActive: true },
-        {
-          $set: {
-            isActive: false,
-            deactivatedAt: new Date(),
-            deactivatedReason: "todo_completed"
-          }
-        }
-      );
-
-      logger.debug(`🔕 리마인드 비활성화: todoId ${todoId}`);
-    } catch (error) {
-      logger.error("리마인드 비활성화 실패:", error);
-    }
-  }
-
-  // ===== 유틸리티 메서드들 =====
-
-  /**
-   * ✅ 우선순위 검증
-   */
-  validatePriority(priority) {
-    if (typeof priority !== "number") {
-      return 3; // 기본값: 보통
-    }
-    return Math.max(1, Math.min(5, priority));
-  }
-
-  /**
-   * 🏷️ 태그 검증
-   */
-  validateTags(tags) {
-    if (!Array.isArray(tags)) {
-      return [];
-    }
-    return tags
-      .filter((tag) => typeof tag === "string" && tag.trim().length > 0)
-      .map((tag) => tag.trim().toLowerCase())
-      .slice(0, 5); // 최대 5개 태그
-  }
-
-  /**
-   * 📅 일별 생산성 분석
-   */
-  async getDailyProductivity(userId, startDate, endDate) {
-    try {
-      const pipeline = [
-        {
-          $match: {
-            userId: userId.toString(),
-            completedAt: { $gte: startDate, $lte: endDate }
-          }
-        },
-        {
-          $group: {
-            _id: {
-              $dateToString: {
-                format: "%Y-%m-%d",
-                date: "$completedAt"
-              }
-            },
-            count: { $sum: 1 }
-          }
-        },
-        {
-          $sort: { _id: 1 }
-        }
-      ];
-
-      const dailyData = await this.models.Todo.aggregate(pipeline);
-
-      return dailyData.map((item) => ({
-        date: item._id,
-        completed: item.count
-      }));
-    } catch (error) {
-      logger.error("일별 생산성 분석 실패:", error);
-      return [];
-    }
-  }
-
-  /**
-   * 🔍 할일 ID로 조회
+   * 특정 할일 조회
    */
   async getTodoById(userId, todoId) {
     try {
@@ -614,24 +135,465 @@ class TodoService extends BaseService {
         );
       }
 
-      return this.createSuccessResponse(todo, "할일 조회 완료");
+      return this.createSuccessResponse(todo);
     } catch (error) {
       return this.createErrorResponse(error, "할일 조회 실패");
     }
   }
 
   /**
-   * 🔄 할일 완료 처리 (별도 메서드)
+   * 할일 추가
    */
-  async completeTodo(userId, todoId) {
-    return this.toggleTodo(userId, todoId);
+  async addTodo(userId, todoData) {
+    try {
+      // 사용자 할일 수 체크
+      const userTodoCount = await this.models.Todo.countDocuments({
+        userId: userId.toString(),
+        isActive: true
+      });
+
+      if (userTodoCount >= this.config.maxTodosPerUser) {
+        return this.createErrorResponse(
+          new Error("LIMIT_EXCEEDED"),
+          `할일은 최대 ${this.config.maxTodosPerUser}개까지 등록 가능합니다.`
+        );
+      }
+
+      // 텍스트 검증
+      const todoText = todoData.text?.trim();
+      if (!todoText) {
+        return this.createErrorResponse(
+          new Error("MISSING_TEXT"),
+          "할일 내용이 필요합니다."
+        );
+      }
+
+      // 중복 체크
+      const existingTodo = await this.models.Todo.findOne({
+        userId: userId.toString(),
+        text: todoText,
+        isActive: true,
+        completed: false
+      });
+
+      if (existingTodo) {
+        return this.createErrorResponse(
+          new Error("DUPLICATE_TODO"),
+          "이미 동일한 할일이 존재합니다."
+        );
+      }
+
+      // 새 할일 생성
+      const newTodo = new this.models.Todo({
+        userId: userId.toString(),
+        text: todoText,
+        description: todoData.description?.trim() || null,
+        priority: todoData.priority || "medium",
+        category: todoData.category?.trim() || null,
+        tags: todoData.tags || [],
+        dueDate: todoData.dueDate || null,
+        remindAt: todoData.remindAt || null
+      });
+
+      const savedTodo = await newTodo.save();
+
+      // 리마인더 생성 (있는 경우)
+      if (todoData.remindAt && this.models.Reminder) {
+        await this.createReminder(userId, {
+          todoId: savedTodo._id,
+          remindAt: todoData.remindAt,
+          message: todoData.reminderMessage || todoText
+        });
+      }
+
+      logger.info(`📋 할일 추가: ${userId} - "${todoText}"`);
+
+      return this.createSuccessResponse(
+        savedTodo.toJSON(),
+        "할일이 추가되었습니다."
+      );
+    } catch (error) {
+      return this.createErrorResponse(error, "할일 추가 실패");
+    }
   }
 
   /**
-   * ↩️ 할일 미완료 처리 (별도 메서드)
+   * 할일 수정
    */
-  async uncompleteTodo(userId, todoId) {
-    return this.toggleTodo(userId, todoId);
+  async updateTodo(userId, todoId, updateData) {
+    try {
+      const todo = await this.models.Todo.findOne({
+        _id: todoId,
+        userId: userId.toString(),
+        isActive: true
+      });
+
+      if (!todo) {
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
+      }
+
+      // 허용된 필드만 업데이트
+      const allowedFields = [
+        "text",
+        "description",
+        "priority",
+        "category",
+        "tags",
+        "dueDate",
+        "remindAt"
+      ];
+      allowedFields.forEach((field) => {
+        if (updateData[field] !== undefined) {
+          todo[field] = updateData[field];
+        }
+      });
+
+      const updatedTodo = await todo.save();
+
+      return this.createSuccessResponse(
+        updatedTodo.toJSON(),
+        "할일이 수정되었습니다."
+      );
+    } catch (error) {
+      return this.createErrorResponse(error, "할일 수정 실패");
+    }
+  }
+
+  /**
+   * 할일 완료/미완료 토글
+   */
+  async toggleTodo(userId, todoId) {
+    try {
+      const todo = await this.models.Todo.findOne({
+        _id: todoId,
+        userId: userId.toString(),
+        isActive: true
+      });
+
+      if (!todo) {
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
+      }
+
+      // 상태 토글
+      todo.completed = !todo.completed;
+      const updatedTodo = await todo.save();
+
+      const message = todo.completed
+        ? "할일이 완료되었습니다."
+        : "할일이 미완료로 변경되었습니다.";
+
+      return this.createSuccessResponse(updatedTodo.toJSON(), message);
+    } catch (error) {
+      return this.createErrorResponse(error, "상태 변경 실패");
+    }
+  }
+
+  /**
+   * 할일 삭제
+   */
+  async deleteTodo(userId, todoId) {
+    try {
+      const todo = await this.models.Todo.findOne({
+        _id: todoId,
+        userId: userId.toString(),
+        isActive: true
+      });
+
+      if (!todo) {
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
+      }
+
+      // 소프트 삭제
+      todo.isActive = false;
+      await todo.save();
+
+      // 관련 리마인더도 비활성화
+      if (this.models.Reminder) {
+        await this.models.Reminder.updateMany(
+          { todoId: todoId, userId: userId.toString() },
+          { isActive: false }
+        );
+      }
+
+      return this.createSuccessResponse(null, "할일이 삭제되었습니다.");
+    } catch (error) {
+      return this.createErrorResponse(error, "할일 삭제 실패");
+    }
+  }
+
+  /**
+   * 할일 보관
+   */
+  async archiveTodo(userId, todoId) {
+    try {
+      const todo = await this.models.Todo.findOne({
+        _id: todoId,
+        userId: userId.toString(),
+        isActive: true
+      });
+
+      if (!todo) {
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
+      }
+
+      todo.archived = true;
+      todo.archivedAt = new Date();
+      await todo.save();
+
+      return this.createSuccessResponse(null, "할일이 보관되었습니다.");
+    } catch (error) {
+      return this.createErrorResponse(error, "할일 보관 실패");
+    }
+  }
+
+  // ===== 통계 및 분석 메서드 =====
+
+  /**
+   * 할일 통계
+   */
+  async getTodoStats(userId) {
+    try {
+      const stats = await this.models.Todo.aggregate([
+        {
+          $match: {
+            userId: userId.toString(),
+            isActive: true
+          }
+        },
+        {
+          $group: {
+            _id: null,
+            total: { $sum: 1 },
+            completed: {
+              $sum: { $cond: ["$completed", 1, 0] }
+            },
+            pending: {
+              $sum: { $cond: ["$completed", 0, 1] }
+            }
+          }
+        }
+      ]);
+
+      const result = stats[0] || { total: 0, completed: 0, pending: 0 };
+      result.completionRate =
+        result.total > 0
+          ? Math.round((result.completed / result.total) * 100)
+          : 0;
+
+      return this.createSuccessResponse(result);
+    } catch (error) {
+      return this.createErrorResponse(error, "통계 조회 실패");
+    }
+  }
+
+  /**
+   * 주간 리포트
+   */
+  async getWeeklyReport(userId) {
+    try {
+      const now = new Date();
+      const weekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+
+      const [totalAdded, totalCompleted, pendingTodos] = await Promise.all([
+        // 이번 주 추가된 할일
+        this.models.Todo.countDocuments({
+          userId: userId.toString(),
+          createdAt: { $gte: weekAgo },
+          isActive: true
+        }),
+        // 이번 주 완료된 할일
+        this.models.Todo.countDocuments({
+          userId: userId.toString(),
+          completedAt: { $gte: weekAgo },
+          completed: true,
+          isActive: true
+        }),
+        // 현재 미완료 할일
+        this.models.Todo.countDocuments({
+          userId: userId.toString(),
+          completed: false,
+          isActive: true
+        })
+      ]);
+
+      // 일별 완료 통계
+      const dailyStats = await this.models.Todo.aggregate([
+        {
+          $match: {
+            userId: userId.toString(),
+            completedAt: { $gte: weekAgo },
+            completed: true,
+            isActive: true
+          }
+        },
+        {
+          $group: {
+            _id: {
+              $dateToString: { format: "%Y-%m-%d", date: "$completedAt" }
+            },
+            count: { $sum: 1 }
+          }
+        },
+        {
+          $sort: { _id: 1 }
+        }
+      ]);
+
+      return this.createSuccessResponse({
+        totalAdded,
+        totalCompleted,
+        pendingTodos,
+        completionRate:
+          totalAdded > 0 ? Math.round((totalCompleted / totalAdded) * 100) : 0,
+        dailyStats,
+        period: {
+          start: weekAgo,
+          end: now
+        }
+      });
+    } catch (error) {
+      return this.createErrorResponse(error, "주간 리포트 생성 실패");
+    }
+  }
+
+  // ===== 리마인더 관련 메서드 =====
+
+  /**
+   * 리마인더 생성
+   */
+  async createReminder(userId, reminderData) {
+    try {
+      if (!this.models.Reminder) {
+        return this.createErrorResponse(
+          new Error("REMINDER_NOT_SUPPORTED"),
+          "리마인더 기능을 사용할 수 없습니다."
+        );
+      }
+
+      const reminder = new this.models.Reminder({
+        userId: userId.toString(),
+        todoId: reminderData.todoId,
+        remindAt: reminderData.remindAt,
+        message: reminderData.message,
+        type: reminderData.type || "simple"
+      });
+
+      const savedReminder = await reminder.save();
+
+      return this.createSuccessResponse(
+        savedReminder.toJSON(),
+        "리마인더가 설정되었습니다."
+      );
+    } catch (error) {
+      return this.createErrorResponse(error, "리마인더 생성 실패");
+    }
+  }
+
+  /**
+   * 리마인더 목록 조회
+   */
+  async getReminders(userId, options = {}) {
+    try {
+      if (!this.models.Reminder) {
+        return this.createSuccessResponse({ reminders: [], totalCount: 0 });
+      }
+
+      const query = {
+        userId: userId.toString(),
+        isActive: true
+      };
+
+      if (options.todoId) {
+        query.todoId = options.todoId;
+      }
+
+      const reminders = await this.models.Reminder.find(query)
+        .populate("todoId", "text completed")
+        .sort({ remindAt: 1 })
+        .lean();
+
+      return this.createSuccessResponse({
+        reminders,
+        totalCount: reminders.length
+      });
+    } catch (error) {
+      return this.createErrorResponse(error, "리마인더 조회 실패");
+    }
+  }
+
+  /**
+   * 리마인더 삭제
+   */
+  async deleteReminder(userId, reminderId) {
+    try {
+      if (!this.models.Reminder) {
+        return this.createErrorResponse(
+          new Error("REMINDER_NOT_SUPPORTED"),
+          "리마인더 기능을 사용할 수 없습니다."
+        );
+      }
+
+      const reminder = await this.models.Reminder.findOne({
+        _id: reminderId,
+        userId: userId.toString(),
+        isActive: true
+      });
+
+      if (!reminder) {
+        return this.createErrorResponse(
+          new Error("REMINDER_NOT_FOUND"),
+          "리마인더를 찾을 수 없습니다."
+        );
+      }
+
+      reminder.isActive = false;
+      await reminder.save();
+
+      return this.createSuccessResponse(null, "리마인더가 삭제되었습니다.");
+    } catch (error) {
+      return this.createErrorResponse(error, "리마인더 삭제 실패");
+    }
+  }
+
+  /**
+   * 서비스 헬스체크
+   */
+  async healthCheck() {
+    try {
+      const _checks = await Promise.all([
+        this.models.Todo.findOne({}).limit(1).exec(),
+        this.models.Reminder
+          ? this.models.Reminder.findOne({}).limit(1).exec()
+          : Promise.resolve()
+      ]);
+
+      return {
+        healthy: true,
+        service: "TodoService",
+        models: {
+          Todo: "connected",
+          Reminder: this.models.Reminder ? "connected" : "not available"
+        }
+      };
+    } catch (error) {
+      return {
+        healthy: false,
+        service: "TodoService",
+        message: error.message
+      };
+    }
   }
 }
 

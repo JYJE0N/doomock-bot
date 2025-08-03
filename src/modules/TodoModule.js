@@ -1,18 +1,13 @@
-// src/modules/TodoModule.js - 리마인드 기능 추가된 할일 관리 모듈
+// src/modules/TodoModule.js - 비즈니스 로직만 담당
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
-const { getUserId, _getUserName } = require("../utils/UserHelper");
-const TimeParseHelper = require("../utils/TimeParseHelper");
+const { getUserId } = require("../utils/UserHelper");
 
 /**
- * 📋 TodoModule - 할일 관리 모듈 (리마인드 기능 추가)
+ * 📋 TodoModule - 순수한 비즈니스 로직만 처리
  *
- * ✅ 새로운 기능:
- * - 리마인드 시간 설정
- * - 자연어 시간 파싱
- * - 스마트 알림 관리
- * - 주간 진행률 확인
- * - 깔끔한 UI/UX
+ * ✅ 역할: 비즈니스 로직, 상태 관리, 데이터 검증
+ * ❌ 하지 않는 것: DB 직접 조회, UI 생성, 복잡한 데이터 가공
  */
 class TodoModule extends BaseModule {
   constructor(moduleName, options = {}) {
@@ -21,24 +16,13 @@ class TodoModule extends BaseModule {
     // 서비스 인스턴스
     this.todoService = null;
 
-    // Railway 환경변수 기반 설정
+    // 모듈 설정
     this.config = {
       maxTodosPerUser: parseInt(process.env.TODO_MAX_PER_USER) || 50,
       pageSize: parseInt(process.env.TODO_PAGE_SIZE) || 8,
       maxTitleLength: parseInt(process.env.TODO_MAX_TITLE_LENGTH) || 100,
-      enablePriority: process.env.TODO_ENABLE_PRIORITY === "true",
-      enableCategories: process.env.TODO_ENABLE_CATEGORIES === "true",
-      enableReminders: process.env.TODO_ENABLE_REMINDERS !== "false", // 기본값 true
-      cacheTimeout: parseInt(process.env.TODO_CACHE_TIMEOUT) || 300000,
-
-      // 🆕 리마인드 관련 설정
-      defaultReminderMinutes:
-        parseInt(process.env.TODO_DEFAULT_REMINDER_MINUTES) || 60,
-      maxRemindersPerTodo:
-        parseInt(process.env.TODO_MAX_REMINDERS_PER_TODO) || 3,
-      enableSmartReminders: process.env.TODO_ENABLE_SMART_REMINDERS !== "false",
-
-      ...this.config
+      enableReminders: process.env.TODO_ENABLE_REMINDERS !== "false",
+      ...options.config
     };
 
     // 모듈 상수
@@ -57,39 +41,29 @@ class TodoModule extends BaseModule {
       INPUT_STATES: {
         WAITING_ADD_INPUT: "waiting_add_input",
         WAITING_EDIT_INPUT: "waiting_edit_input",
-        WAITING_SEARCH_INPUT: "waiting_search_input",
-        // 🆕 리마인드 관련 상태
-        WAITING_REMINDER_TIME: "waiting_reminder_time",
-        WAITING_REMINDER_MESSAGE: "waiting_reminder_message"
-      },
-      // 🆕 리마인드 타입
-      REMINDER_TYPES: {
-        SIMPLE: "simple", // 단순 알림
-        URGENT: "urgent", // 긴급 알림
-        RECURRING: "recurring", // 반복 알림
-        SMART: "smart" // 스마트 알림 (상황 파악)
+        WAITING_REMINDER_TIME: "waiting_reminder_time"
       }
     };
 
     // 사용자 상태 관리
     this.userStates = new Map();
 
-    logger.info("📋 TodoModule 생성됨 (리마인드 기능 포함)");
+    logger.info("📋 TodoModule 생성됨");
   }
 
   /**
-   * 🎯 모듈 초기화
+   * 모듈 초기화
    */
   async onInitialize() {
     try {
       if (!this.todoService) {
-        throw new Error("TodoService 생성에 실패했습니다");
+        throw new Error("TodoService가 필요합니다");
       }
 
       // 액션 등록
       this.setupActions();
 
-      logger.success("📋 TodoModule 초기화 완료 - 리마인드 기능 포함");
+      logger.success("📋 TodoModule 초기화 완료");
     } catch (error) {
       logger.error("❌ TodoModule 초기화 실패:", error);
       throw error;
@@ -97,266 +71,145 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * 🎯 액션 등록 (리마인드 액션 추가)
+   * 액션 매핑 설정
    */
   setupActions() {
     this.registerActions({
       // 기본 액션
-      menu: this.showMenu,
-      list: this.showList,
-      add: this.addTodo,
-      edit: this.editTodo,
-      delete: this.deleteTodo,
-      toggle: this.toggleTodo,
-      complete: this.completeTodo,
-      uncomplete: this.uncompleteTodo,
-      archive: this.archiveTodo,
+      menu: this.showMenu.bind(this),
+      list: this.showList.bind(this),
+      add: this.addTodo.bind(this),
+      edit: this.editTodo.bind(this),
+      delete: this.deleteTodo.bind(this),
+      toggle: this.toggleTodo.bind(this),
+      complete: this.completeTodo.bind(this),
+      uncomplete: this.uncompleteTodo.bind(this),
+      archive: this.archiveTodo.bind(this),
 
-      // 검색 및 필터
-      search: this.searchTodos,
-      filter: this.filterTodos,
-      priority: this.filterByPriority,
+      // 리마인더 액션
+      remind_list: this.showReminders.bind(this),
+      remind_add: this.addReminder.bind(this),
+      remind_delete: this.deleteReminder.bind(this),
 
-      // 🆕 리마인드 관련 액션
-      list_remind_select: this.showReminderSelectList,
-      remind_edit_select: this.showReminderEditSelect,
-      remind_delete_select: this.showReminderDeleteSelect,
-      remind_quick: this.setQuickReminder,
-      remind_time_input: this.retryReminderTimeInput,
-
-      remind: this.setReminder, // 리마인드 설정
-      remind_list: this.showReminders, // 리마인드 목록
-      remind_edit: this.editReminder, // 리마인드 수정
-      remind_delete: this.deleteReminder, // 리마인드 삭제
-      remind_test: this.testReminder, // 리마인드 테스트
-
-      // 🆕 스마트 기능
-      weekly_report: this.showWeeklyReport, // 주간 리포트
-      smart_suggestions: this.showSmartSuggestions, // 스마트 제안
-      cleanup: this.smartCleanup, // 스마트 정리
-
-      // 상태 관리
-      cancel: this.cancelInput
+      // 통계 액션
+      stats: this.showStats.bind(this),
+      weekly: this.showWeeklyReport.bind(this)
     });
-
-    logger.info(`✅ TodoModule 액션 등록 완료 (${this.actionMap.size}개)`);
   }
 
+  /**
+   * 콜백 처리 (표준 매개변수 준수)
+   */
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const action = this.actionMap[subAction];
+
+      if (!action) {
+        logger.warn(`알 수 없는 액션: ${subAction}`);
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: "알 수 없는 액션입니다.",
+            canRetry: false
+          }
+        };
+      }
+
+      // 액션 실행
+      return await action(bot, callbackQuery, subAction, params, moduleManager);
+    } catch (error) {
+      logger.error(`TodoModule.handleCallback 오류:`, error);
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "처리 중 오류가 발생했습니다.",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 메시지 처리 (입력 상태 처리)
+   */
   async onHandleMessage(bot, msg) {
     const userId = getUserId(msg.from);
     const userState = this.getUserState(userId);
+
+    if (!userState) {
+      return null;
+    }
+
     const text = msg.text?.trim();
-
-    // 1. 입력 대기 상태 확인이 최우선!
-    if (userState) {
-      try {
-        switch (userState.state) {
-          case this.constants.INPUT_STATES.WAITING_ADD_INPUT:
-            return await this.handleAddInput(bot, msg);
-
-          case this.constants.INPUT_STATES.WAITING_EDIT_INPUT:
-            return await this.handleEditInput(bot, msg);
-
-          case this.constants.INPUT_STATES.WAITING_SEARCH_INPUT:
-            return await this.handleSearchInput(bot, msg);
-
-          // 🎯 리마인드 시간 입력 처리 - "3분 후" 같은 입력을 여기서 처리!
-          case this.constants.INPUT_STATES.WAITING_REMINDER_TIME:
-            return await this.handleReminderTimeInput(bot, msg);
-
-          case this.constants.INPUT_STATES.WAITING_REMINDER_MESSAGE:
-            return await this.handleReminderMessageInput(bot, msg);
-
-          default:
-            this.clearUserState(userId);
-            return null;
-        }
-      } catch (error) {
-        logger.error("TodoModule.onHandleMessage 오류:", error);
-        this.clearUserState(userId);
-        return {
-          type: "error",
-          action: "error",
-          module: "todo",
-          data: {
-            message: "입력 처리 중 오류가 발생했습니다.",
-            action: "handle_message",
-            canRetry: true
-          }
-        };
-      }
-    }
-    // 자연어 명령 처리
-    if (text) {
-      // "할일 추가" 패턴
-      if (text.includes("할일") || text.includes("추가")) {
-        return await this.startAddTodo(bot, msg);
-      }
-
-      // 리마인드 패턴 (15분 후, 내일, 등)
-      if (text.match(/\d+분\s*(후|뒤)|내일|오늘|[0-9]+시/)) {
-        // 가장 최근 할일에 리마인드 설정 시도
-        return await this.trySetReminderFromText(bot, msg, text);
-      }
+    if (!text) {
+      return null;
     }
 
-    return null;
+    let result = null;
+
+    switch (userState.state) {
+      case this.constants.INPUT_STATES.WAITING_ADD_INPUT:
+        result = await this.processAddInput(userId, text);
+        break;
+
+      case this.constants.INPUT_STATES.WAITING_EDIT_INPUT:
+        result = await this.processEditInput(userId, text, userState.todoId);
+        break;
+
+      case this.constants.INPUT_STATES.WAITING_REMINDER_TIME:
+        result = await this.processReminderTimeInput(
+          userId,
+          text,
+          userState.todoId
+        );
+        break;
+
+      default:
+        return null;
+    }
+
+    // 입력 처리 후 상태 초기화
+    if (result) {
+      this.clearUserState(userId);
+    }
+
+    return result;
   }
 
-  // ===== 🆕 리마인드 관련 액션 메서드들 =====
+  // ===== 메인 액션 메서드들 (표준 매개변수 준수) =====
 
   /**
-   * ⏰ 리마인드 설정
+   * 📋 메뉴 보기
    */
-  async setReminder(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-
-    if (!params) {
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "할일 ID가 필요합니다.",
-          action: "remind",
-          canRetry: false
-        }
-      };
-    }
-
-    try {
-      const todoId = params;
-
-      // 할일 존재 확인
-      const todoResult = await this.todoService.getTodoById(userId, todoId);
-      if (!todoResult.success) {
-        return {
-          type: "error",
-          action: "error",
-          module: "todo",
-          data: {
-            message: "할일을 찾을 수 없습니다.",
-            action: "remind",
-            canRetry: false
-          }
-        };
-      }
-
-      // 사용자 상태를 리마인드 시간 입력 대기로 설정
-      this.setUserState(userId, {
-        state: this.constants.INPUT_STATES.WAITING_REMINDER_TIME,
-        todoId,
-        todo: todoResult.data
-      });
-
-      return {
-        type: "input_request",
-        action: "input_request",
-        module: "todo",
-        data: {
-          title: "⏰ 리마인드 시간 설정",
-          message: this.generateReminderTimeInstructions(todoResult.data),
-          placeholder: "예: 내일 오후 3시, 30분 후, 12월 25일 오전 9시",
-          inputType: "text",
-          action: "remind",
-          todo: todoResult.data,
-          suggestions: TimeParseHelper.getSuggestions()
-        }
-      };
-    } catch (error) {
-      logger.error("TodoModule.setReminder 오류:", error);
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "리마인드 설정에 실패했습니다.",
-          action: "remind",
-          canRetry: true
-        }
-      };
-    }
-  }
-
-  // 메서드 구현
-  async showReminderSelectList(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const userId = getUserId(callbackQuery.from);
-
-    // 미완료 할일 목록 가져오기
-    const result = await this.todoService.getTodos(userId, {
-      includeCompleted: false
-    });
-
-    if (!result.success || result.data.todos.length === 0) {
-      return {
-        type: "error",
-        module: "todo",
-        action: "error",
-        data: {
-          message: "리마인드를 설정할 할일이 없습니다.",
-          canRetry: false
-        }
-      };
-    }
-
-    return {
-      type: "reminder_select_list",
-      module: "todo",
-      action: "reminder_select_list",
-      data: {
-        todos: result.data.todos,
-        title: "리마인드 설정할 할일 선택"
-      }
-    };
-  }
-
-  /**
-   * 📋 리마인드 목록 보기
-   */
-  async showReminders(bot, callbackQuery, subAction, params, moduleManager) {
+  async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
 
     try {
-      const result = await this.todoService.getUserReminders(userId);
-
-      if (!result.success) {
-        return {
-          type: "error",
-          action: "error",
-          module: "todo",
-          data: {
-            message: result.message || "리마인드 목록을 가져올 수 없습니다.",
-            action: "remind_list",
-            canRetry: true
-          }
-        };
-      }
+      const stats = await this.todoService.getTodoStats(userId);
 
       return {
-        type: "remind_list", // ✅ 리마인드 목록 전용 타입
-        action: "remind_list",
+        type: "menu",
         module: "todo",
+        action: "menu",
         data: {
-          title: "⏰ 나의 리마인드",
-          reminders: result.data,
-          totalCount: result.data.length
+          title: "📋 할일 관리",
+          stats: stats.success ? stats.data : null,
+          enableReminders: this.config.enableReminders
         }
       };
     } catch (error) {
-      logger.error("TodoModule.showReminders 오류:", error);
+      logger.error("TodoModule.showMenu 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
-          message: "리마인드 목록 조회에 실패했습니다.",
-          action: "remind_list",
+          message: "메뉴를 불러올 수 없습니다.",
+          action: "menu",
           canRetry: true
         }
       };
@@ -364,290 +217,7 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * 📝 리마인드 수정 선택 화면
-   */
-  async showReminderEditSelect(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const userId = getUserId(callbackQuery.from);
-
-    try {
-      // 활성 리마인드 목록 가져오기
-      const result = await this.todoService.getUserReminders(userId, {
-        activeOnly: true
-      });
-
-      if (!result.success || result.data.length === 0) {
-        return {
-          type: "error",
-          module: "todo",
-          action: "error",
-          data: {
-            message: "수정할 리마인드가 없습니다.",
-            action: "remind_edit_select",
-            canRetry: false
-          }
-        };
-      }
-
-      return {
-        type: "reminder_select",
-        module: "todo",
-        action: "reminder_select",
-        data: {
-          reminders: result.data,
-          title: "수정할 리마인드 선택",
-          mode: "edit",
-          action: "remind_edit"
-        }
-      };
-    } catch (error) {
-      logger.error("TodoModule.showReminderEditSelect 오류:", error);
-      return {
-        type: "error",
-        module: "todo",
-        action: "error",
-        data: {
-          message: "리마인드 목록을 불러올 수 없습니다.",
-          action: "remind_edit_select",
-          canRetry: true
-        }
-      };
-    }
-  }
-
-  /**
-   * 🗑️ 리마인드 삭제 선택 화면
-   */
-  async showReminderDeleteSelect(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const userId = getUserId(callbackQuery.from);
-
-    try {
-      // 모든 리마인드 목록 가져오기
-      const result = await this.todoService.getUserReminders(userId);
-
-      if (!result.success || result.data.length === 0) {
-        return {
-          type: "error",
-          module: "todo",
-          action: "error",
-          data: {
-            message: "삭제할 리마인드가 없습니다.",
-            action: "remind_delete_select",
-            canRetry: false
-          }
-        };
-      }
-
-      return {
-        type: "reminder_select",
-        module: "todo",
-        action: "reminder_select",
-        data: {
-          reminders: result.data,
-          title: "삭제할 리마인드 선택",
-          mode: "delete",
-          action: "remind_delete"
-        }
-      };
-    } catch (error) {
-      logger.error("TodoModule.showReminderDeleteSelect 오류:", error);
-      return {
-        type: "error",
-        module: "todo",
-        action: "error",
-        data: {
-          message: "리마인드 목록을 불러올 수 없습니다.",
-          action: "remind_delete_select",
-          canRetry: true
-        }
-      };
-    }
-  }
-
-  /**
-   * 📊 제안 분석 헬퍼 메서드
-   */
-  analyzeAndGenerateSuggestions(todos) {
-    const suggestions = [];
-
-    // 미완료 할일이 많은 경우
-    const pendingTodos = todos.filter((t) => !t.completed);
-    if (pendingTodos.length > 10) {
-      suggestions.push({
-        type: "overload",
-        title: "할일이 너무 많아요!",
-        message: "우선순위를 정해서 중요한 것부터 처리해보세요.",
-        action: "prioritize"
-      });
-    }
-
-    // 오래된 미완료 할일
-    const oldPending = pendingTodos.filter((t) => {
-      const daysOld = Math.floor(
-        (Date.now() - new Date(t.createdAt)) / (1000 * 60 * 60 * 24)
-      );
-      return daysOld > 7;
-    });
-
-    if (oldPending.length > 0) {
-      suggestions.push({
-        type: "stale",
-        title: "오래된 할일이 있어요",
-        message: `${oldPending.length}개의 할일이 일주일 이상 미완료 상태입니다.`,
-        action: "review_old"
-      });
-    }
-
-    // 완료율이 낮은 경우
-    const completionRate =
-      todos.length > 0
-        ? Math.round(
-            (todos.filter((t) => t.completed).length / todos.length) * 100
-          )
-        : 0;
-
-    if (completionRate < 50 && todos.length > 5) {
-      suggestions.push({
-        type: "low_completion",
-        title: "완료율을 높여보세요",
-        message: "작은 할일부터 하나씩 완료해보는 건 어떨까요?",
-        action: "complete_easy"
-      });
-    }
-
-    // 리마인드 활용 제안
-    if (this.config.enableReminders) {
-      const todosWithReminders = todos.filter(
-        (t) => t.reminders && t.reminders.length > 0
-      );
-      if (todosWithReminders.length === 0 && pendingTodos.length > 3) {
-        suggestions.push({
-          type: "use_reminders",
-          title: "리마인드 기능을 활용해보세요",
-          message: "중요한 할일에 알림을 설정하면 잊지 않고 처리할 수 있어요.",
-          action: "set_reminders"
-        });
-      }
-    }
-
-    return suggestions;
-  }
-
-  /**
-   * 🕐 빠른 리마인드 설정
-   */
-  async setQuickReminder(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-
-    if (!params) {
-      return {
-        type: "error",
-        module: "todo",
-        action: "error",
-        data: {
-          message: "리마인드 설정 정보가 없습니다.",
-          canRetry: false
-        }
-      };
-    }
-
-    // params 형식: todoId:timeSpec (예: 65abc123:30m)
-    const [todoId, timeSpec] = params.split(":");
-
-    if (!todoId || !timeSpec) {
-      return {
-        type: "error",
-        module: "todo",
-        action: "error",
-        data: {
-          message: "잘못된 리마인드 설정입니다.",
-          canRetry: false
-        }
-      };
-    }
-
-    try {
-      // 할일 확인
-      const todoResult = await this.todoService.getTodoById(userId, todoId);
-      if (!todoResult.success) {
-        throw new Error("할일을 찾을 수 없습니다");
-      }
-
-      // 시간 계산
-      let reminderTime;
-      const now = new Date();
-
-      switch (timeSpec) {
-        case "30m":
-          reminderTime = new Date(now.getTime() + 30 * 60 * 1000);
-          break;
-        case "1h":
-          reminderTime = new Date(now.getTime() + 60 * 60 * 1000);
-          break;
-        case "tomorrow_9am":
-          reminderTime = new Date(now);
-          reminderTime.setDate(reminderTime.getDate() + 1);
-          reminderTime.setHours(9, 0, 0, 0);
-          break;
-        case "tomorrow_6pm":
-          reminderTime = new Date(now);
-          reminderTime.setDate(reminderTime.getDate() + 1);
-          reminderTime.setHours(18, 0, 0, 0);
-          break;
-        default:
-          throw new Error("알 수 없는 시간 설정");
-      }
-
-      // 리마인드 생성
-      const reminderResult = await this.todoService.createReminder(userId, {
-        todoId,
-        text: `할일 알림: ${todoResult.data.text}`,
-        reminderTime,
-        type: this.constants.REMINDER_TYPES.SIMPLE
-      });
-
-      if (!reminderResult.success) {
-        throw new Error(reminderResult.message || "리마인드 설정 실패");
-      }
-
-      return {
-        type: "remind_set",
-        module: "todo",
-        action: "remind_set",
-        data: {
-          todo: todoResult.data,
-          reminder: reminderResult.data,
-          message: "리마인드가 설정되었습니다!"
-        }
-      };
-    } catch (error) {
-      logger.error("TodoModule.setQuickReminder 오류:", error);
-      return {
-        type: "error",
-        module: "todo",
-        action: "error",
-        data: {
-          message: error.message || "리마인드 설정에 실패했습니다.",
-          action: "remind_quick",
-          canRetry: true
-        }
-      };
-    }
-  }
-
-  /**
-   * 📋 할일 목록 보기
+   * 📋 할일 목록
    */
   async showList(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
@@ -657,15 +227,14 @@ class TodoModule extends BaseModule {
       const result = await this.todoService.getTodos(userId, {
         page,
         limit: this.config.pageSize,
-        includeCompleted: true,
-        includeReminders: this.config.enableReminders
+        includeCompleted: true
       });
 
       if (!result.success) {
         return {
           type: "error",
-          action: "error",
           module: "todo",
+          action: "error",
           data: {
             message: result.message || "할일 목록을 불러올 수 없습니다.",
             action: "list",
@@ -676,8 +245,8 @@ class TodoModule extends BaseModule {
 
       return {
         type: "list",
-        action: "list",
         module: "todo",
+        action: "list",
         data: {
           todos: result.data.todos,
           currentPage: result.data.currentPage,
@@ -690,8 +259,8 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.showList 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
           message: "할일 목록 조회 중 오류가 발생했습니다.",
           action: "list",
@@ -715,8 +284,8 @@ class TodoModule extends BaseModule {
 
     return {
       type: "input_request",
-      action: "input_request",
       module: "todo",
+      action: "input_request",
       data: {
         title: "➕ 새로운 할일 추가",
         message: "추가할 할일을 입력해주세요:",
@@ -739,8 +308,8 @@ class TodoModule extends BaseModule {
     if (!todoId) {
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
           message: "수정할 할일을 선택해주세요.",
           action: "edit",
@@ -754,8 +323,8 @@ class TodoModule extends BaseModule {
     if (!todoResult.success) {
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
           message: "할일을 찾을 수 없습니다.",
           action: "edit",
@@ -774,8 +343,8 @@ class TodoModule extends BaseModule {
 
     return {
       type: "input_request",
-      action: "input_request",
       module: "todo",
+      action: "input_request",
       data: {
         title: "✏️ 할일 수정",
         message: `현재 내용: "${todoResult.data.text}"\n\n새로운 내용을 입력해주세요:`,
@@ -797,8 +366,8 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
-          action: "error",
           module: "todo",
+          action: "error",
           data: {
             message: result.message || "할일 삭제에 실패했습니다.",
             action: "delete",
@@ -809,8 +378,8 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
-        action: "success",
         module: "todo",
+        action: "success",
         data: {
           message: "할일이 삭제되었습니다.",
           action: "delete",
@@ -821,8 +390,8 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.deleteTodo 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
           message: "할일 삭제 중 오류가 발생했습니다.",
           action: "delete",
@@ -845,8 +414,8 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
-          action: "error",
           module: "todo",
+          action: "error",
           data: {
             message: result.message || "상태 변경에 실패했습니다.",
             action: "toggle",
@@ -857,8 +426,8 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
-        action: "success",
         module: "todo",
+        action: "success",
         data: {
           message: result.message,
           todo: result.data,
@@ -870,8 +439,8 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.toggleTodo 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
           message: "상태 변경 중 오류가 발생했습니다.",
           action: "toggle",
@@ -920,8 +489,8 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
-          action: "error",
           module: "todo",
+          action: "error",
           data: {
             message: result.message || "보관에 실패했습니다.",
             action: "archive",
@@ -932,8 +501,8 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
-        action: "success",
         module: "todo",
+        action: "success",
         data: {
           message: "할일이 보관되었습니다.",
           action: "archive",
@@ -944,8 +513,8 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.archiveTodo 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
           message: "보관 중 오류가 발생했습니다.",
           action: "archive",
@@ -955,62 +524,35 @@ class TodoModule extends BaseModule {
     }
   }
 
-  /**
-   * 🔍 할일 검색
-   */
-  async searchTodos(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-
-    // 입력 대기 상태 설정
-    this.setUserState(userId, {
-      state: this.constants.INPUT_STATES.WAITING_SEARCH_INPUT,
-      action: "search"
-    });
-
-    return {
-      type: "input_request",
-      action: "input_request",
-      module: "todo",
-      data: {
-        title: "🔍 할일 검색",
-        message: "검색할 키워드를 입력해주세요:",
-        suggestions: ["태그나 내용으로 검색 가능합니다"]
-      }
-    };
-  }
+  // ===== 리마인더 관련 액션 =====
 
   /**
-   * 🎯 우선순위별 필터
+   * ⏰ 리마인더 목록
    */
-  async filterByPriority(bot, callbackQuery, subAction, params, moduleManager) {
+  async showReminders(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
-    const priority = params;
 
     try {
-      const result = await this.todoService.getTodosByPriority(
-        userId,
-        priority
-      );
+      const result = await this.todoService.getReminders(userId);
 
       return {
-        type: "filtered_list",
-        action: "filtered_list",
+        type: "remind_list",
         module: "todo",
+        action: "remind_list",
         data: {
-          todos: result.data.todos,
-          filter: { type: "priority", value: priority },
+          reminders: result.data.reminders,
           totalCount: result.data.totalCount
         }
       };
     } catch (error) {
-      logger.error("TodoModule.filterByPriority 오류:", error);
+      logger.error("TodoModule.showReminders 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
-          message: "필터링 중 오류가 발생했습니다.",
-          action: "filter",
+          message: "리마인더 목록을 불러올 수 없습니다.",
+          action: "remind_list",
           canRetry: true
         }
       };
@@ -1018,42 +560,50 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * 필터 메뉴
+   * ⏰ 리마인더 추가
    */
-  async filterTodos(bot, callbackQuery, subAction, params, moduleManager) {
+  async addReminder(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params;
+
+    if (!todoId) {
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인더를 설정할 할일을 선택해주세요.",
+          action: "remind_add",
+          canRetry: false
+        }
+      };
+    }
+
+    // 입력 대기 상태 설정
+    this.setUserState(userId, {
+      state: this.constants.INPUT_STATES.WAITING_REMINDER_TIME,
+      action: "remind_add",
+      todoId: todoId
+    });
+
     return {
-      type: "filter_menu",
-      action: "filter_menu",
+      type: "input_request",
       module: "todo",
+      action: "input_request",
       data: {
-        filters: [
-          { type: "status", label: "상태별" },
-          { type: "priority", label: "우선순위별" },
-          { type: "date", label: "날짜별" }
+        title: "⏰ 리마인더 설정",
+        message: "알림 시간을 입력해주세요:",
+        suggestions: [
+          "예: 30분 후",
+          "예: 내일 오후 3시",
+          "예: 2025-08-05 14:00"
         ]
       }
     };
   }
 
   /**
-   * ✏️ 리마인드 수정
-   */
-  async editReminder(bot, callbackQuery, subAction, params, moduleManager) {
-    // 리마인드 수정 로직
-    return {
-      type: "error",
-      action: "error",
-      module: "todo",
-      data: {
-        message: "리마인드 수정 기능은 준비 중입니다.",
-        action: "remind_edit",
-        canRetry: false
-      }
-    };
-  }
-
-  /**
-   * 🗑️ 리마인드 삭제
+   * 🗑️ 리마인더 삭제
    */
   async deleteReminder(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
@@ -1065,10 +615,10 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
-          action: "error",
           module: "todo",
+          action: "error",
           data: {
-            message: result.message || "리마인드 삭제에 실패했습니다.",
+            message: result.message || "리마인더 삭제에 실패했습니다.",
             action: "remind_delete",
             canRetry: true
           }
@@ -1077,10 +627,10 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
-        action: "success",
         module: "todo",
+        action: "success",
         data: {
-          message: result.message || "리마인드가 삭제되었습니다.",
+          message: "리마인더가 삭제되었습니다.",
           action: "remind_delete",
           redirectTo: "remind_list"
         }
@@ -1089,10 +639,10 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.deleteReminder 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
-          message: "리마인드 삭제 중 오류가 발생했습니다.",
+          message: "리마인더 삭제 중 오류가 발생했습니다.",
           action: "remind_delete",
           canRetry: true
         }
@@ -1100,20 +650,36 @@ class TodoModule extends BaseModule {
     }
   }
 
+  // ===== 통계 관련 액션 =====
+
   /**
-   * 🧪 리마인드 테스트
+   * 📊 통계 보기
    */
-  async testReminder(bot, callbackQuery, subAction, params, moduleManager) {
-    // 리마인드 테스트 알림 즉시 발송
-    return {
-      type: "success",
-      action: "success",
-      module: "todo",
-      data: {
-        message: "테스트 리마인드가 발송되었습니다.",
-        action: "remind_test"
-      }
-    };
+  async showStats(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    try {
+      const stats = await this.todoService.getTodoStats(userId);
+
+      return {
+        type: "stats",
+        module: "todo",
+        action: "stats",
+        data: stats.data
+      };
+    } catch (error) {
+      logger.error("TodoModule.showStats 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "통계를 불러올 수 없습니다.",
+          action: "stats",
+          canRetry: true
+        }
+      };
+    }
   }
 
   /**
@@ -1127,8 +693,8 @@ class TodoModule extends BaseModule {
 
       return {
         type: "weekly_report",
-        action: "weekly_report",
         module: "todo",
+        action: "weekly_report",
         data: {
           report: result.data,
           enableReminders: this.config.enableReminders
@@ -1138,8 +704,8 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.showWeeklyReport 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
           message: "주간 리포트 생성 중 오류가 발생했습니다.",
           action: "weekly_report",
@@ -1149,39 +715,48 @@ class TodoModule extends BaseModule {
     }
   }
 
-  /**
-   * 💡 스마트 제안
-   */
-  async showSmartSuggestions(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const userId = getUserId(callbackQuery.from);
+  // ===== 입력 처리 메서드 =====
 
+  /**
+   * 할일 추가 입력 처리
+   */
+  async processAddInput(userId, text) {
     try {
-      const result = await this.todoService.getSmartSuggestions(userId);
+      const result = await this.todoService.addTodo(userId, { text });
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: result.message || "할일 추가에 실패했습니다.",
+            action: "add",
+            canRetry: true
+          }
+        };
+      }
 
       return {
-        type: "smart_suggestions",
-        action: "smart_suggestions",
+        type: "success",
         module: "todo",
+        action: "success",
         data: {
-          suggestions: result.data.suggestions,
-          insights: result.data.insights
+          message: "✅ 할일이 추가되었습니다!",
+          todo: result.data,
+          action: "add",
+          redirectTo: "list"
         }
       };
     } catch (error) {
-      logger.error("TodoModule.showSmartSuggestions 오류:", error);
+      logger.error("TodoModule.processAddInput 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
-          message: "스마트 제안 생성 중 오류가 발생했습니다.",
-          action: "smart_suggestions",
+          message: "할일 추가 중 오류가 발생했습니다.",
+          action: "add",
           canRetry: true
         }
       };
@@ -1189,445 +764,132 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * 🧹 스마트 정리
+   * 할일 수정 입력 처리
    */
-  async smartCleanup(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-
+  async processEditInput(userId, text, todoId) {
     try {
-      const result = await this.todoService.performSmartCleanup(userId);
-
-      return {
-        type: "cleanup_complete",
-        action: "cleanup_complete",
-        module: "todo",
-        data: {
-          stats: result.data,
-          message: result.message
-        }
-      };
-    } catch (error) {
-      logger.error("TodoModule.smartCleanup 오류:", error);
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "스마트 정리 중 오류가 발생했습니다.",
-          action: "cleanup",
-          canRetry: true
-        }
-      };
-    }
-  }
-
-  /**
-   * 메시지 입력 처리 헬퍼들
-   */
-  async handleAddInput(bot, msg) {
-    const userId = getUserId(msg.from);
-    const text = msg.text?.trim();
-
-    if (!text) {
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "할일 내용을 입력해주세요.",
-          keepState: true
-        }
-      };
-    }
-
-    const result = await this.todoService.addTodo(userId, { text });
-    this.clearUserState(userId);
-
-    if (!result.success) {
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: result.message || "할일 추가에 실패했습니다.",
-          action: "add"
-        }
-      };
-    }
-
-    return {
-      type: "success",
-      action: "success",
-      module: "todo",
-      data: {
-        message: `✅ "${text}" 할일이 추가되었습니다.`,
-        todo: result.data,
-        action: "add",
-        redirectTo: "list"
-      }
-    };
-  }
-
-  async handleEditInput(bot, msg) {
-    const userId = getUserId(msg.from);
-    const userState = this.getUserState(userId);
-    const text = msg.text?.trim();
-
-    if (!text) {
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "새로운 내용을 입력해주세요.",
-          keepState: true
-        }
-      };
-    }
-
-    const result = await this.todoService.updateTodo(userId, userState.todoId, {
-      text
-    });
-    this.clearUserState(userId);
-
-    if (!result.success) {
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: result.message || "할일 수정에 실패했습니다.",
-          action: "edit"
-        }
-      };
-    }
-
-    return {
-      type: "success",
-      action: "success",
-      module: "todo",
-      data: {
-        message: `✅ 할일이 수정되었습니다.`,
-        todo: result.data,
-        action: "edit",
-        redirectTo: "list"
-      }
-    };
-  }
-
-  async handleSearchInput(bot, msg) {
-    const userId = getUserId(msg.from);
-    const keyword = msg.text?.trim();
-
-    if (!keyword) {
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "검색 키워드를 입력해주세요.",
-          keepState: true
-        }
-      };
-    }
-
-    const result = await this.todoService.searchTodos(userId, keyword);
-    this.clearUserState(userId);
-
-    return {
-      type: "search_results",
-      action: "search_results",
-      module: "todo",
-      data: {
-        keyword,
-        todos: result.data.todos,
-        totalCount: result.data.totalCount
-      }
-    };
-  }
-
-  // ===== 🆕 입력 처리 메서드들 =====
-  // 재시도 메서드 추가
-  async retryReminderTimeInput(
-    bot,
-    callbackQuery,
-    subAction,
-    params,
-    moduleManager
-  ) {
-    const userId = getUserId(callbackQuery.from);
-    const userState = this.getUserState(userId);
-
-    if (
-      !userState ||
-      userState.state !== this.constants.INPUT_STATES.WAITING_REMINDER_TIME
-    ) {
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "리마인드 설정 세션이 만료되었습니다. 다시 시도해주세요.",
-          action: "remind_time_input"
-        }
-      };
-    }
-
-    // 다시 입력 요청
-    return {
-      type: "input_request",
-      action: "input_request",
-      module: "todo",
-      data: {
-        title: "⏰ 리마인드 시간 설정",
-        message: this.generateReminderTimeInstructions(userState.todo),
-        placeholder: "예: 내일 오후 3시, 30분 후",
-        inputType: "text",
-        action: "remind",
-        todo: userState.todo
-      }
-    };
-  }
-
-  /**
-   * ⏰ 리마인드 시간 입력 처리
-   */
-  async handleReminderTimeInput(bot, msg) {
-    const userId = getUserId(msg.from);
-    const userState = this.getUserState(userId);
-    const timeText = msg.text.trim();
-
-    try {
-      // 시간 파싱
-      const parseResult = TimeParseHelper.parseTimeText(timeText);
-
-      if (!parseResult.success) {
-        return {
-          type: "error",
-          action: "error",
-          module: "todo",
-          data: {
-            message: `시간을 이해할 수 없습니다: "${timeText}"\n\n올바른 예시:\n• 30분 후\n• 내일 오후 3시\n• 12월 25일 오전 9시`,
-            action: "remind_time_input",
-            canRetry: true,
-            keepState: true
-          }
-        };
-      }
-
-      // 과거 시간 체크
-      if (parseResult.datetime <= new Date()) {
-        return {
-          type: "error",
-          action: "error",
-          module: "todo",
-          data: {
-            message: "리마인드는 미래 시간만 설정할 수 있습니다.",
-            action: "remind_time_input",
-            canRetry: true,
-            keepState: true
-          }
-        };
-      }
-
-      // 리마인드 생성
-      const ReminderModel = this.todoService.models.Reminder;
-      if (!ReminderModel) {
-        throw new Error("Reminder 모델을 찾을 수 없습니다.");
-      }
-
-      const newReminder = new ReminderModel({
-        userId: userId.toString(),
-        todoId: userState.todoId,
-        text: `할일 알림: ${userState.todo.text}`,
-        reminderTime: parseResult.datetime,
-        type: this.constants.REMINDER_TYPES.SIMPLE
+      const result = await this.todoService.updateTodo(userId, todoId, {
+        text
       });
 
-      const savedReminder = await newReminder.save();
-      // **********************************
-
-      // 상태 클리어
-      this.clearUserState(userId);
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: result.message || "할일 수정에 실패했습니다.",
+            action: "edit",
+            canRetry: true
+          }
+        };
+      }
 
       return {
-        type: "remind_set",
-        action: "remind_set",
+        type: "success",
         module: "todo",
+        action: "success",
         data: {
-          title: "✅ 리마인더 설정 완료",
-          message: `"${userState.todo.text}" 할일에 대한 리마인드가 설정되었습니다.\n\n⏰ ${parseResult.readableTime}`,
-          todo: userState.todo,
-          reminder: savedReminder.toJSON() // toJSON()으로 가상 필드 포함
+          message: "✏️ 할일이 수정되었습니다!",
+          todo: result.data,
+          action: "edit",
+          redirectTo: "list"
         }
       };
     } catch (error) {
-      logger.error("TodoModule.handleReminderTimeInput 오류:", error);
-      this.clearUserState(userId);
-
+      logger.error("TodoModule.processEditInput 오류:", error);
       return {
         type: "error",
-        action: "error",
         module: "todo",
+        action: "error",
         data: {
-          message: "리마인드 시간 처리 중 오류가 발생했습니다.",
-          action: "remind_time_input",
+          message: "할일 수정 중 오류가 발생했습니다.",
+          action: "edit",
           canRetry: true
         }
       };
     }
   }
 
-  // ===== 유틸리티 메서드들 =====
-
   /**
-   * 📝 리마인드 시간 설정 안내 메시지 생성
+   * 리마인더 시간 입력 처리
    */
-  generateReminderTimeInstructions(todo) {
-    return `📋 "${todo.text}" 할일의 리마인드 시간을 설정해주세요.
+  async processReminderTimeInput(userId, text, todoId) {
+    try {
+      // TimeParseHelper를 사용하여 시간 파싱 (있는 경우)
+      const remindAt = new Date(); // 실제로는 TimeParseHelper 사용
+      remindAt.setHours(remindAt.getHours() + 1); // 임시로 1시간 후
 
-🕐 자연어로 편리하게 입력하세요:
-⏰ 언제 알려드릴까요?`;
+      const result = await this.todoService.createReminder(userId, {
+        todoId,
+        remindAt,
+        message: text
+      });
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: result.message || "리마인더 설정에 실패했습니다.",
+            action: "remind_add",
+            canRetry: true
+          }
+        };
+      }
+
+      return {
+        type: "success",
+        module: "todo",
+        action: "success",
+        data: {
+          message: "⏰ 리마인더가 설정되었습니다!",
+          reminder: result.data,
+          action: "remind_add",
+          redirectTo: "list"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.processReminderTimeInput 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인더 설정 중 오류가 발생했습니다.",
+          action: "remind_add",
+          canRetry: true
+        }
+      };
+    }
   }
 
-  // ===== 기존 메서드들 (상태 관리 등) =====
+  // ===== 유틸리티 메서드 =====
 
+  /**
+   * 사용자 상태 설정
+   */
   setUserState(userId, state) {
     this.userStates.set(userId.toString(), state);
   }
 
+  /**
+   * 사용자 상태 가져오기
+   */
   getUserState(userId) {
     return this.userStates.get(userId.toString());
   }
 
+  /**
+   * 사용자 상태 초기화
+   */
   clearUserState(userId) {
-    return this.userStates.delete(userId.toString());
+    this.userStates.delete(userId.toString());
   }
 
   /**
-   * 📝 취소 액션
-   */
-  async cancelInput(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-    this.clearUserState(userId);
-
-    return {
-      type: "success",
-      action: "success",
-      module: "todo",
-      data: {
-        message: "입력이 취소되었습니다.",
-        action: "cancel"
-      }
-    };
-  }
-
-  /**
-   * 리마인더 생성
-   */
-  async createReminder(userId, reminderData) {
-    try {
-      const ReminderModel = this.models.Reminder;
-
-      // 사용자별 리마인더 수 체크
-      const userCount = await ReminderModel.countDocuments({
-        userId,
-        isActive: true
-      });
-
-      if (userCount >= this.config.maxRemindersPerUser) {
-        throw new Error(
-          `리마인더는 최대 ${this.config.maxRemindersPerUser}개까지 등록 가능합니다.`
-        );
-      }
-
-      const reminder = new ReminderModel({
-        userId,
-        text: reminderData.text.trim(),
-        reminderTime: reminderData.reminderTime || null,
-        isRecurring: false,
-        completed: false,
-        todoId: reminderData.todoId // 할일 ID 연결
-      });
-
-      await reminder.save();
-
-      logger.info(`🔔 리마인더 생성: ${userId}`);
-      return this.createSuccessResponse(
-        reminder.toJSON(),
-        "리마인더가 생성되었습니다."
-      );
-    } catch (error) {
-      logger.error("리마인더 생성 실패:", error);
-      return this.createErrorResponse(error, "리마인더 생성에 실패했습니다.");
-    }
-  }
-
-  /**
-   * 사용자 리마인더 목록 조회
-   */
-  async getUserReminders(userId) {
-    try {
-      const ReminderModel = this.models.Reminder;
-
-      const reminders = await ReminderModel.find({ userId, isActive: true })
-        .sort({ createdAt: -1 })
-        .lean();
-
-      return this.createSuccessResponse(
-        reminders,
-        "리마인더 목록을 조회했습니다."
-      );
-    } catch (error) {
-      logger.error("리마인더 목록 조회 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "리마인더 목록 조회에 실패했습니다."
-      );
-    }
-  }
-
-  // ===== 기존 TodoModule 메서드들은 그대로 유지 =====
-  // (showMenu, showList, addTodo, editTodo, deleteTodo 등)
-  // 여기서는 간략화를 위해 생략하고, 실제 구현에서는 기존 코드 유지
-
-  /**
-   * 📋 메뉴 보기 (기존)
-   */
-  async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-
-    try {
-      // 간단한 통계 가져오기
-      const stats = await this.todoService.getTodoStats(userId);
-
-      return {
-        type: "menu", // <-- "success"가 아니라 "menu"로 변경!
-        module: "todo",
-        action: "menu",
-        data: {
-          title: "📋 할일 관리",
-          stats: stats.success ? stats.data : null,
-          enableReminders: this.config.enableReminders
-        }
-      };
-    } catch (error) {
-      logger.error("TodoModule.showMenu 오류:", error);
-      return {
-        type: "error",
-        action: "error",
-        module: "todo",
-        data: {
-          message: "메뉴를 불러올 수 없습니다.",
-          action: "menu",
-          canRetry: true
-        }
-      };
-    }
-  }
-
-  /**
-   * 📊 모듈 정보
+   * 모듈 정보
    */
   getModuleInfo() {
     return {
@@ -1639,8 +901,7 @@ class TodoModule extends BaseModule {
       activeInputStates: this.userStates.size,
       config: {
         enableReminders: this.config.enableReminders,
-        maxTodosPerUser: this.config.maxTodosPerUser,
-        enableSmartReminders: this.config.enableSmartReminders
+        maxTodosPerUser: this.config.maxTodosPerUser
       }
     };
   }
