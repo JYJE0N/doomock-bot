@@ -22,7 +22,8 @@ class TimeHelper {
     display: "MM월 DD일 (ddd) HH:mm",
     korean: "YYYY년 MM월 DD일",
     timestamp: "YYMMDDHHmm",
-    timeOnly: "HH:mm" // 추가: 시:분만 표시
+    timeOnly: "HH:mm", // 추가: 시:분만 표시
+    relative: "MM월 DD일 HH:mm" // 날짜 문자열 교정
   };
 
   static {
@@ -82,6 +83,18 @@ class TimeHelper {
       return null;
     }
   }
+  /**
+   * 📅 상대 시간 표시 (5분 전, 어제, 2일 전 등)
+   * @param {Date|string|moment|null} date - 표시할 시간
+   * @returns {string} 상대 시간 문자열
+   */
+  static formatRelative(date) {
+    const m = this.safeMoment(date);
+    if (!m) return "알 수 없음";
+
+    // moment의 fromNow() 사용 - 한국어로 자동 변환됨
+    return m.fromNow(); // "5분 전", "어제", "2일 전" 등
+  }
 
   /**
    * 📝 안전한 시간 포맷팅 - 핵심 개선!
@@ -90,13 +103,14 @@ class TimeHelper {
    * @param {string} fallback - 실패시 기본값
    * @returns {string} 포맷된 시간 문자열
    */
+  /**
+   * 📝 format 메서드 수정 - relative 처리 추가
+   */
   static format(date = null, formatKey = "log", fallback = "--:--") {
     try {
-      // null이면 현재 시간 사용
-      if (date === null || date === undefined) {
-        const currentMoment = this.now();
-        const format = this.FORMATS[formatKey] || formatKey;
-        return currentMoment.format(format);
+      // relative 포맷 특별 처리
+      if (formatKey === "relative") {
+        return this.formatRelative(date);
       }
 
       // 안전한 moment 객체 생성

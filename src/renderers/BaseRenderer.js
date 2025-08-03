@@ -1,6 +1,5 @@
 // src/renderers/BaseRenderer.js - 🎨 최종 리팩토링 버전
 const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
 /**
  * 🎨 BaseRenderer - 모든 렌더러의 표준 기반 클래스
  *
@@ -160,16 +159,27 @@ class BaseRenderer {
    * 🔘 개별 버튼 생성
    */
   createButton(config, defaultModule) {
-    const { text, action, params, url, module } = config;
+    const { text, action, params, url, module, callback_data } = config;
+
+    // URL 버튼
     if (url) return { text, url };
 
-    let targetModule = module || defaultModule;
-    if (action === "menu" && text.includes("메인 메뉴")) {
-      targetModule = "system";
+    // callback_data가 직접 지정된 경우 (레거시 지원)
+    if (callback_data) {
+      console.warn(`직접 callback_data 사용 발견: ${callback_data}`);
+      return { text, callback_data };
     }
 
-    const callback_data = this.buildCallbackData(targetModule, action, params);
-    return { text, callback_data };
+    // action이 없으면 에러
+    if (!action) {
+      console.error(`버튼에 action이 없음: ${text}`);
+      return { text, callback_data: `${defaultModule}:error:no_action` };
+    }
+
+    // 정상 처리
+    const targetModule = module || defaultModule;
+    const callbackData = this.buildCallbackData(targetModule, action, params);
+    return { text, callback_data: callbackData };
   }
 
   // ... (createHomeButton, createBackButton, createPaginationButtons 등 유틸성 키보드 메서드)

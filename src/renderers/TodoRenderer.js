@@ -1,18 +1,22 @@
-// src/renderers/TodoRenderer.js - 리마인드 UI가 추가된 할일 렌더러
+// src/renderers/TodoRenderer.js - 표준화된 할일 렌더러
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**
- * 🎨 TodoRenderer - 할일 관리 UI 렌더러 (리마인드 기능 포함)
+ * 🎨 TodoRenderer - 할일 관리 UI 렌더러 (표준화 버전)
  *
- * ✅ SoC 준수: UI 생성만 담당
- * ✅ 깔끔하고 직관적인 사용자 인터페이스
- * ✅ 리마인드 관련 UI 추가
+ * ✅ BaseRenderer 표준 준수
+ * ✅ 모든 버튼 action/params/module 형식 사용
+ * ✅ callback_data 직접 사용 제거
+ * ✅ 성공 케이스 처리 추가
  */
 class TodoRenderer extends BaseRenderer {
   constructor(bot, navigationHandler, markdownHelper) {
     super(bot, navigationHandler, markdownHelper);
+
+    // 🔥 필수! BaseRenderer에서 사용
+    this.moduleName = "todo";
 
     // 이모지 및 UI 상수
     this.emojis = {
@@ -25,7 +29,7 @@ class TodoRenderer extends BaseRenderer {
       edit: "✏️",
       delete: "🗑️",
 
-      // 🆕 리마인드 관련 이모지
+      // 리마인드 관련 이모지
       reminder: "⏰",
       bell: "🔔",
       clock: "🕐",
@@ -39,14 +43,14 @@ class TodoRenderer extends BaseRenderer {
       search: "🔍",
       filter: "🗂️",
 
-      // 🆕 스마트 기능
+      // 스마트 기능
       report: "📊",
       smart: "🤖",
       stats: "📈",
       cleanup: "🧹"
     };
 
-    // UI 색상 및 스타일 (마크다운용)
+    // UI 스타일
     this.styles = {
       title: "🔸",
       subtitle: "▫️",
@@ -55,67 +59,108 @@ class TodoRenderer extends BaseRenderer {
       highlight: "*"
     };
 
-    logger.info("🎨 TodoRenderer 생성됨 (리마인드 UI 포함)");
+    logger.info("🎨 TodoRenderer 생성됨 (표준화 버전)");
   }
 
   /**
-   * 🎯 메인 렌더링 메서드
+   * 🎯 메인 렌더링 메서드 (BaseRenderer의 추상 메서드 구현)
    */
-  async render(data) {
+  async render(result, ctx) {
     try {
-      switch (data.action) {
+      // result 검증
+      if (!result || typeof result !== "object") {
+        throw new Error("Invalid result object");
+      }
+
+      const { type, action, data } = result;
+      const renderAction = action || type;
+
+      logger.debug(`🎨 TodoRenderer.render:`, {
+        type,
+        action,
+        renderAction,
+        hasData: !!data
+      });
+
+      // 액션별 렌더링
+      switch (renderAction) {
         // 기본 액션들
         case "menu":
-          return this.renderMenu(data);
+          await this.renderMenu(data || {}, ctx);
+          break;
+
         case "list":
-          return this.renderTodoList(data);
+          await this.renderList(data || {}, ctx);
+          break;
+
         case "add":
-          return this.renderAddTodo(data);
+          await this.renderAddForm(data || {}, ctx);
+          break;
+
         case "edit":
-          return this.renderEditTodo(data);
+          await this.renderEditForm(data || {}, ctx);
+          break;
 
-        // 🆕 리마인드 관련 렌더링
+        // 성공 케이스들
+        case "success":
+        case "add_success":
+        case "edit_success":
+        case "delete_success":
+          await this.renderSuccess(data || {}, ctx);
+          break;
+
+        // 리마인드 관련
         case "remind":
-          return this.renderReminderSetup(data);
-        case "remind_list":
-          return this.renderReminderList(data);
-        case "remind_set":
-          return this.renderReminderSuccess(data);
+          await this.renderReminderSetup(data || {}, ctx);
+          break;
 
-        // 🆕 스마트 기능 렌더링
+        case "remind_list":
+          await this.renderReminderList(data || {}, ctx);
+          break;
+
+        case "remind_set":
+          await this.renderReminderSuccess(data || {}, ctx);
+          break;
+
+        // 스마트 기능
         case "weekly_report":
-          return this.renderWeeklyReport(data);
+          await this.renderWeeklyReport(data || {}, ctx);
+          break;
+
         case "smart_suggestions":
-          return this.renderSmartSuggestions(data);
+          await this.renderSmartSuggestions(data || {}, ctx);
+          break;
 
         // 입력 요청
         case "input_request":
-          return this.renderInputRequest(data);
+          await this.renderInputRequest(data || {}, ctx);
+          break;
 
         // 에러
         case "error":
-          return this.renderError(data);
+          await this.renderError(data || {}, ctx);
+          break;
 
         default:
-          logger.warn(`알 수 없는 액션: ${data.action}`);
-          return this.renderError({
-            message: "알 수 없는 요청입니다.",
-            action: data.action
-          });
+          logger.warn(`Unknown render action: ${renderAction}`);
+          await this.renderError(
+            {
+              message: "알 수 없는 요청입니다.",
+              action: renderAction
+            },
+            ctx
+          );
       }
     } catch (error) {
-      logger.error("TodoRenderer.render 오류:", error);
-      return this.renderError({
-        message: "화면 렌더링 중 오류가 발생했습니다.",
-        action: data.action
-      });
+      logger.error("TodoRenderer.render error:", error);
+      await this.renderFallback(ctx, error);
     }
   }
 
   /**
-   * 🏠 메인 메뉴 렌더링 (리마인드 기능 추가)
+   * 🏠 메뉴 렌더링
    */
-  renderMenu(data) {
+  async renderMenu(data, ctx) {
     const { stats, enableReminders } = data;
 
     let text = `${this.emojis.todo} *할일 관리*\n\n`;
@@ -126,7 +171,6 @@ class TodoRenderer extends BaseRenderer {
       text += `${this.styles.bullet} 대기 중: ${stats.pending || 0}개\n`;
       text += `${this.styles.bullet} 완료: ${stats.completed || 0}개\n`;
 
-      // 🆕 리마인드 통계 추가
       if (enableReminders && stats.reminders) {
         text += `${this.styles.bullet} 예정된 알림: ${stats.reminders.active || 0}개\n`;
       }
@@ -135,50 +179,41 @@ class TodoRenderer extends BaseRenderer {
     }
 
     // 메뉴 버튼들
-    const keyboard = [
+    const buttons = [
       [
-        { text: `${this.emojis.todo} 할일 목록`, callback_data: "todo:list:1" },
-        { text: `${this.emojis.add} 할일 추가`, callback_data: "todo:add" }
+        { text: `${this.emojis.todo} 할일 목록`, action: "list", params: "1" },
+        { text: `${this.emojis.add} 할일 추가`, action: "add" }
       ]
     ];
 
-    // 🆕 리마인드 기능이 활성화된 경우
     if (enableReminders) {
-      keyboard.push([
+      buttons.push([
         {
           text: `${this.emojis.reminder} 리마인드 목록`,
-          callback_data: "todo:remind_list"
+          action: "remind_list"
         },
-        {
-          text: `${this.emojis.report} 주간 리포트`,
-          callback_data: "todo:weekly_report"
-        }
+        { text: `${this.emojis.report} 주간 리포트`, action: "weekly_report" }
       ]);
     }
 
-    // 추가 기능들
-    keyboard.push([
-      { text: `${this.emojis.search} 검색`, callback_data: "todo:search" },
-      {
-        text: `${this.emojis.smart} 스마트 정리`,
-        callback_data: "todo:cleanup"
-      }
+    buttons.push([
+      { text: `${this.emojis.search} 검색`, action: "search" },
+      { text: `${this.emojis.smart} 스마트 정리`, action: "cleanup" }
     ]);
 
-    keyboard.push([
-      { text: `${this.emojis.back} 뒤로가기`, callback_data: "main:menu" }
+    buttons.push([
+      { text: `${this.emojis.back} 메인 메뉴`, action: "menu", module: "main" }
     ]);
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
   }
 
   /**
-   * 📋 할일 목록 렌더링 (리마인드 정보 포함)
+   * 📋 할일 목록 렌더링
    */
-  renderTodoList(data) {
+  async renderList(data, ctx) {
     const { todos, totalCount, currentPage, totalPages, enableReminders } =
       data;
 
@@ -188,13 +223,15 @@ class TodoRenderer extends BaseRenderer {
       text += `${this.styles.bullet} 등록된 할일이 없습니다.\n\n`;
       text += `${this.emojis.add} 새로운 할일을 추가해보세요!`;
 
-      return {
-        text,
-        reply_markup: this.createInlineKeyboard([
-          [{ text: `${this.emojis.add} 할일 추가`, callback_data: "todo:add" }],
-          [{ text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }]
-        ])
-      };
+      const buttons = [
+        [{ text: `${this.emojis.add} 할일 추가`, action: "add" }],
+        [{ text: `${this.emojis.back} 뒤로가기`, action: "menu" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+      return;
     }
 
     // 페이지 정보
@@ -210,7 +247,7 @@ class TodoRenderer extends BaseRenderer {
 
       text += `${number}. ${status} ${todo.text}`;
 
-      // 🆕 리마인드 정보 표시
+      // 리마인드 정보
       if (enableReminders && todo.reminders && todo.reminders.length > 0) {
         const activeReminders = todo.reminders.filter((r) => r.isActive);
         if (activeReminders.length > 0) {
@@ -238,9 +275,9 @@ class TodoRenderer extends BaseRenderer {
     });
 
     // 버튼 구성
-    const keyboard = [];
+    const buttons = [];
 
-    // 할일별 액션 버튼들 (2개씩 나열)
+    // 할일별 액션 버튼들
     for (let i = 0; i < todos.length; i += 2) {
       const row = [];
 
@@ -250,43 +287,47 @@ class TodoRenderer extends BaseRenderer {
       if (todo1.completed) {
         row.push({
           text: `${num1}. 되돌리기`,
-          callback_data: `todo:uncomplete:${todo1._id}`
+          action: "uncomplete",
+          params: todo1._id
         });
       } else {
         row.push({
           text: `${num1}. 완료`,
-          callback_data: `todo:complete:${todo1._id}`
+          action: "complete",
+          params: todo1._id
         });
       }
 
-      // 두 번째 할일 (있는 경우)
+      // 두 번째 할일
       if (i + 1 < todos.length) {
         const todo2 = todos[i + 1];
         const num2 = (currentPage - 1) * 8 + i + 2;
         if (todo2.completed) {
           row.push({
             text: `${num2}. 되돌리기`,
-            callback_data: `todo:uncomplete:${todo2._id}`
+            action: "uncomplete",
+            params: todo2._id
           });
         } else {
           row.push({
             text: `${num2}. 완료`,
-            callback_data: `todo:complete:${todo2._id}`
+            action: "complete",
+            params: todo2._id
           });
         }
       }
 
-      keyboard.push(row);
+      buttons.push(row);
     }
 
-    // 🆕 리마인드 버튼들 (미완료 할일만)
+    // 리마인드 버튼
     if (enableReminders) {
       const pendingTodos = todos.filter((todo) => !todo.completed);
       if (pendingTodos.length > 0) {
-        keyboard.push([
+        buttons.push([
           {
             text: `${this.emojis.reminder} 리마인드 설정`,
-            callback_data: "todo:list_remind_select"
+            action: "list_remind_select"
           }
         ]);
       }
@@ -297,42 +338,95 @@ class TodoRenderer extends BaseRenderer {
     if (currentPage > 1) {
       paginationRow.push({
         text: `⬅️ 이전`,
-        callback_data: `todo:list:${currentPage - 1}`
+        action: "list",
+        params: String(currentPage - 1)
       });
     }
     if (currentPage < totalPages) {
       paginationRow.push({
         text: `다음 ➡️`,
-        callback_data: `todo:list:${currentPage + 1}`
+        action: "list",
+        params: String(currentPage + 1)
       });
     }
     if (paginationRow.length > 0) {
-      keyboard.push(paginationRow);
+      buttons.push(paginationRow);
     }
 
     // 하단 메뉴
-    keyboard.push([
-      { text: `${this.emojis.add} 추가`, callback_data: "todo:add" },
+    buttons.push([
+      { text: `${this.emojis.add} 추가`, action: "add" },
       {
         text: `${this.emojis.refresh} 새로고침`,
-        callback_data: `todo:list:${currentPage}`
+        action: "list",
+        params: String(currentPage)
       }
     ]);
 
-    keyboard.push([
-      { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
-    ]);
+    buttons.push([{ text: `${this.emojis.back} 뒤로가기`, action: "menu" }]);
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
   }
 
   /**
-   * ⏰ 리마인드 설정 화면 렌더링
+   * ✅ 성공 메시지 렌더링
    */
-  renderReminderSetup(data) {
+  async renderSuccess(data, ctx) {
+    const { message, redirectTo, _action } = data;
+
+    const text = message || "✅ 작업이 완료되었습니다.";
+
+    const buttons = [];
+
+    // redirectTo에 따른 버튼 구성
+    if (redirectTo === "list") {
+      buttons.push([
+        { text: "📋 할일 목록", action: "list", params: "1" },
+        { text: "➕ 더 추가", action: "add" }
+      ]);
+    }
+
+    buttons.push([{ text: "🏠 메뉴로", action: "menu" }]);
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * ➕ 할일 추가 폼
+   */
+  async renderAddForm(data, ctx) {
+    const text = `${this.emojis.add} *새로운 할일 추가*\n\n할일 내용을 입력해주세요:`;
+
+    const buttons = [[{ text: `${this.emojis.back} 취소`, action: "cancel" }]];
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * ✏️ 할일 수정 폼
+   */
+  async renderEditForm(data, ctx) {
+    const { todo } = data;
+
+    const text = `${this.emojis.edit} *할일 수정*\n\n현재: ${todo?.text || ""}\n\n새로운 내용을 입력해주세요:`;
+
+    const buttons = [[{ text: `${this.emojis.back} 취소`, action: "cancel" }]];
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * ⏰ 리마인드 설정 화면
+   */
+  async renderReminderSetup(data, ctx) {
     const { todo } = data;
 
     let text = `${this.emojis.reminder} *리마인드 설정*\n\n`;
@@ -340,41 +434,44 @@ class TodoRenderer extends BaseRenderer {
     text += `${this.styles.title} 빠른 설정\n`;
     text += `아래 버튼을 누르거나 직접 입력하세요.\n\n`;
 
-    const keyboard = [
+    const buttons = [
       [
         {
           text: "⏰ 30분 후",
-          callback_data: `todo:remind_quick:${todo._id}:30m`
+          action: "remind_quick",
+          params: `${todo._id}:30m`
         },
         {
           text: "⏰ 1시간 후",
-          callback_data: `todo:remind_quick:${todo._id}:1h`
+          action: "remind_quick",
+          params: `${todo._id}:1h`
         }
       ],
       [
         {
           text: "📅 내일 오전 9시",
-          callback_data: `todo:remind_quick:${todo._id}:tomorrow_9am`
+          action: "remind_quick",
+          params: `${todo._id}:tomorrow_9am`
         },
         {
           text: "📅 내일 오후 6시",
-          callback_data: `todo:remind_quick:${todo._id}:tomorrow_6pm`
+          action: "remind_quick",
+          params: `${todo._id}:tomorrow_6pm`
         }
       ],
-      [{ text: "✏️ 직접 입력", callback_data: `todo:remind:${todo._id}` }],
-      [{ text: `${this.emojis.back} 취소`, callback_data: "todo:cancel" }]
+      [{ text: "✏️ 직접 입력", action: "remind", params: todo._id }],
+      [{ text: `${this.emojis.back} 취소`, action: "cancel" }]
     ];
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
   }
 
   /**
-   * 🔔 리마인드 목록 렌더링
+   * 🔔 리마인드 목록
    */
-  renderReminderList(data) {
+  async renderReminderList(data, ctx) {
     const { reminders, totalCount } = data;
 
     let text = `${this.emojis.bell} *내 리마인드*\n\n`;
@@ -383,27 +480,23 @@ class TodoRenderer extends BaseRenderer {
       text += `${this.styles.bullet} 등록된 리마인드가 없습니다.\n\n`;
       text += `${this.emojis.add} 할일에 리마인드를 설정해보세요!`;
 
-      return {
-        text,
-        reply_markup: this.createInlineKeyboard([
-          [
-            {
-              text: `${this.emojis.todo} 할일 목록`,
-              callback_data: "todo:list:1"
-            }
-          ],
-          [{ text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }]
-        ])
-      };
+      const buttons = [
+        [
+          { text: `${this.emojis.todo} 할일 목록`, action: "list", params: "1" }
+        ],
+        [{ text: `${this.emojis.back} 뒤로가기`, action: "menu" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+      return;
     }
 
     text += `📊 총 ${totalCount}개의 리마인드\n`;
     text += `${this.styles.separator}\n\n`;
 
-    // 현재 시간
     const now = new Date();
-
-    // 리마인드 목록 (시간순 정렬)
     const sortedReminders = reminders.sort(
       (a, b) => new Date(a.reminderTime) - new Date(b.reminderTime)
     );
@@ -425,48 +518,40 @@ class TodoRenderer extends BaseRenderer {
       text += `\n\n`;
     });
 
-    // 버튼 구성
-    const keyboard = [];
+    const buttons = [];
 
-    // 활성 리마인드만 관리 버튼 제공
     const activeReminders = reminders.filter(
       (r) => new Date(r.reminderTime) > now
     );
     if (activeReminders.length > 0) {
-      keyboard.push([
+      buttons.push([
         {
           text: `${this.emojis.edit} 리마인드 수정`,
-          callback_data: "todo:remind_edit_select"
+          action: "remind_edit_select"
         },
         {
           text: `${this.emojis.delete} 리마인드 삭제`,
-          callback_data: "todo:remind_delete_select"
+          action: "remind_delete_select"
         }
       ]);
     }
 
-    keyboard.push([
-      { text: `${this.emojis.add} 새 리마인드`, callback_data: "todo:list:1" },
-      {
-        text: `${this.emojis.refresh} 새로고침`,
-        callback_data: "todo:remind_list"
-      }
+    buttons.push([
+      { text: `${this.emojis.add} 새 리마인드`, action: "list", params: "1" },
+      { text: `${this.emojis.refresh} 새로고침`, action: "remind_list" }
     ]);
 
-    keyboard.push([
-      { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
-    ]);
+    buttons.push([{ text: `${this.emojis.back} 뒤로가기`, action: "menu" }]);
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
   }
 
   /**
-   * ✅ 리마인드 설정 성공 렌더링
+   * ✅ 리마인드 설정 성공
    */
-  renderReminderSuccess(data) {
+  async renderReminderSuccess(data, ctx) {
     const { todo, reminder } = data;
     const reminderTime = TimeHelper.format(
       new Date(reminder.reminderTime),
@@ -478,27 +563,23 @@ class TodoRenderer extends BaseRenderer {
     text += `⏰ 알림 시간: *${reminderTime}*\n\n`;
     text += `${this.styles.bullet} 설정된 시간에 알림을 받으실 수 있습니다.\n`;
 
-    const keyboard = [
+    const buttons = [
       [
-        {
-          text: `${this.emojis.bell} 내 리마인드`,
-          callback_data: "todo:remind_list"
-        },
-        { text: `${this.emojis.todo} 할일 목록`, callback_data: "todo:list:1" }
+        { text: `${this.emojis.bell} 내 리마인드`, action: "remind_list" },
+        { text: `${this.emojis.todo} 할일 목록`, action: "list", params: "1" }
       ],
-      [{ text: `${this.emojis.back} 메뉴로`, callback_data: "todo:menu" }]
+      [{ text: `${this.emojis.back} 메뉴로`, action: "menu" }]
     ];
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
   }
 
   /**
-   * 📊 주간 리포트 렌더링
+   * 📊 주간 리포트
    */
-  renderWeeklyReport(data) {
+  async renderWeeklyReport(data, ctx) {
     const { stats, period } = data;
 
     let text = `${this.emojis.report} *${period} 할일 리포트*\n\n`;
@@ -506,21 +587,22 @@ class TodoRenderer extends BaseRenderer {
     if (!stats) {
       text += `${this.styles.bullet} 리포트 데이터를 불러올 수 없습니다.`;
 
-      return {
-        text,
-        reply_markup: this.createInlineKeyboard([
-          [{ text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }]
-        ])
-      };
+      const buttons = [
+        [{ text: `${this.emojis.back} 뒤로가기`, action: "menu" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+      return;
     }
 
-    // 주요 통계
+    // 통계 표시
     text += `${this.styles.title} *주요 지표*\n`;
     text += `${this.styles.bullet} 생성된 할일: ${stats.created || 0}개\n`;
     text += `${this.styles.bullet} 완료한 할일: ${stats.completed || 0}개\n`;
     text += `${this.styles.bullet} 완료율: ${stats.completionRate || 0}%\n\n`;
 
-    // 🆕 리마인드 통계
     if (stats.reminders) {
       text += `${this.styles.title} *리마인드 활용*\n`;
       text += `${this.styles.bullet} 설정한 알림: ${stats.reminders.created || 0}개\n`;
@@ -537,41 +619,45 @@ class TodoRenderer extends BaseRenderer {
       text += `💪 *개선 여지가 있어요!* 리마인드를 더 활용해보세요.\n`;
     }
 
-    const keyboard = [
+    const buttons = [
       [
-        {
-          text: `${this.emojis.smart} 개선 제안`,
-          callback_data: "todo:smart_suggestions"
-        },
-        {
-          text: `${this.emojis.cleanup} 스마트 정리`,
-          callback_data: "todo:cleanup"
-        }
+        { text: `${this.emojis.smart} 개선 제안`, action: "smart_suggestions" },
+        { text: `${this.emojis.cleanup} 스마트 정리`, action: "cleanup" }
       ],
       [
-        {
-          text: `${this.emojis.refresh} 새로고침`,
-          callback_data: "todo:weekly_report"
-        },
-        { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
+        { text: `${this.emojis.refresh} 새로고침`, action: "weekly_report" },
+        { text: `${this.emojis.back} 뒤로가기`, action: "menu" }
       ]
     ];
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
   }
 
   /**
-   * 📝 입력 요청 렌더링
+   * 💡 스마트 제안 (미구현)
    */
-  renderInputRequest(data) {
+  async renderSmartSuggestions(data, ctx) {
+    const text = `${this.emojis.smart} *스마트 제안*\n\n이 기능은 준비 중입니다.`;
+
+    const buttons = [
+      [{ text: `${this.emojis.back} 뒤로가기`, action: "menu" }]
+    ];
+
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * 📝 입력 요청
+   */
+  async renderInputRequest(data, ctx) {
     const { title, message, suggestions } = data;
 
     let text = `${title}\n\n${message}`;
 
-    // 🆕 제안사항 표시 (리마인드 시간 입력 등)
     if (suggestions && suggestions.length > 0) {
       text += `\n\n${this.styles.title} *제안사항:*\n`;
       suggestions.forEach((suggestion) => {
@@ -579,48 +665,60 @@ class TodoRenderer extends BaseRenderer {
       });
     }
 
-    const keyboard = [
-      [{ text: `${this.emojis.back} 취소`, callback_data: "todo:cancel" }]
-    ];
+    const buttons = [[{ text: `${this.emojis.back} 취소`, action: "cancel" }]];
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
   }
 
   /**
    * ❌ 에러 렌더링
    */
-  renderError(data) {
+  async renderError(data, ctx) {
     const { message, action, canRetry } = data;
 
     let text = `❌ *오류가 발생했습니다*\n\n`;
-    text += `${message}\n\n`;
+    text += message || "알 수 없는 오류";
 
     if (canRetry) {
-      text += `${this.styles.bullet} 다시 시도해주세요.`;
+      text += `\n\n${this.styles.bullet} 다시 시도해주세요.`;
     }
 
-    const keyboard = [];
+    const buttons = [];
 
     if (canRetry && action) {
-      keyboard.push([
+      buttons.push([
         {
           text: `${this.emojis.refresh} 다시 시도`,
-          callback_data: `todo:${action}`
+          action: action
         }
       ]);
     }
 
-    keyboard.push([
-      { text: `${this.emojis.back} 뒤로가기`, callback_data: "todo:menu" }
-    ]);
+    buttons.push([{ text: `${this.emojis.back} 메뉴로`, action: "menu" }]);
 
-    return {
-      text,
-      reply_markup: this.createInlineKeyboard(keyboard)
-    };
+    await this.sendSafeMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons)
+    });
+  }
+
+  /**
+   * 🚨 폴백 렌더링 (최후의 수단)
+   */
+  async renderFallback(ctx, error) {
+    try {
+      const text = "❌ 화면을 표시할 수 없습니다.";
+      const buttons = [
+        [{ text: "🏠 메인 메뉴", action: "menu", module: "main" }]
+      ];
+
+      await this.sendSafeMessage(ctx, text, {
+        reply_markup: this.createInlineKeyboard(buttons)
+      });
+    } catch (fallbackError) {
+      logger.error("Fallback rendering also failed:", fallbackError);
+    }
   }
 }
 

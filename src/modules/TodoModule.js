@@ -128,6 +128,11 @@ class TodoModule extends BaseModule {
       priority: this.filterByPriority,
 
       // 🆕 리마인드 관련 액션
+      list_remind_select: this.showReminderSelectList,
+      remind_edit_select: this.showReminderEditSelect,
+      remind_delete_select: this.showReminderDeleteSelect,
+      remind_quick: this.setQuickReminder,
+
       remind: this.setReminder, // 리마인드 설정
       remind_list: this.showReminders, // 리마인드 목록
       remind_edit: this.editReminder, // 리마인드 수정
@@ -152,7 +157,27 @@ class TodoModule extends BaseModule {
   async onHandleMessage(bot, msg) {
     const userId = getUserId(msg.from);
     const userState = this.getUserState(userId);
+    const text = msg.text?.trim();
 
+    // 입력 대기 상태 확인
+    if (userState) {
+      // 기존 입력 처리 로직
+      return await this.handleStateInput(bot, msg, userState);
+    }
+
+    // 자연어 명령 처리
+    if (text) {
+      // "할일 추가" 패턴
+      if (text.includes("할일") || text.includes("추가")) {
+        return await this.startAddTodo(bot, msg);
+      }
+
+      // 리마인드 패턴 (15분 후, 내일, 등)
+      if (text.match(/\d+분\s*(후|뒤)|내일|오늘|[0-9]+시/)) {
+        // 가장 최근 할일에 리마인드 설정 시도
+        return await this.trySetReminderFromText(bot, msg, text);
+      }
+    }
     if (!userState) {
       return null; // 처리하지 않음
     }
@@ -185,6 +210,7 @@ class TodoModule extends BaseModule {
       this.clearUserState(userId);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "입력 처리 중 오류가 발생했습니다.",
@@ -206,6 +232,7 @@ class TodoModule extends BaseModule {
     if (!this.config.enableReminders || !this.reminderService) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "리마인드 기능이 비활성화되어 있습니다.",
@@ -218,6 +245,7 @@ class TodoModule extends BaseModule {
     if (!params) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "할일 ID가 필요합니다.",
@@ -235,6 +263,7 @@ class TodoModule extends BaseModule {
       if (!todoResult.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: "할일을 찾을 수 없습니다.",
@@ -253,6 +282,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "input_request",
+        action: "input_request",
         module: "todo",
         data: {
           title: "⏰ 리마인드 시간 설정",
@@ -268,6 +298,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.setReminder 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "리마인드 설정에 실패했습니다.",
@@ -276,6 +307,44 @@ class TodoModule extends BaseModule {
         }
       };
     }
+  }
+
+  // 메서드 구현
+  async showReminderSelectList(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    const userId = getUserId(callbackQuery.from);
+
+    // 미완료 할일 목록 가져오기
+    const result = await this.todoService.getTodos(userId, {
+      includeCompleted: false
+    });
+
+    if (!result.success || result.data.todos.length === 0) {
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인드를 설정할 할일이 없습니다.",
+          canRetry: false
+        }
+      };
+    }
+
+    return {
+      type: "reminder_select_list",
+      module: "todo",
+      action: "reminder_select_list",
+      data: {
+        todos: result.data.todos,
+        title: "리마인드 설정할 할일 선택"
+      }
+    };
   }
 
   /**
@@ -287,6 +356,7 @@ class TodoModule extends BaseModule {
     if (!this.reminderService) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "리마인드 서비스를 사용할 수 없습니다.",
@@ -302,6 +372,7 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: result.message || "리마인드 목록을 가져올 수 없습니다.",
@@ -313,6 +384,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
+        action: "success",
         module: "todo",
         data: {
           title: "⏰ 나의 리마인드",
@@ -325,6 +397,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.showReminders 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "리마인드 목록 조회에 실패했습니다.",
@@ -335,7 +408,314 @@ class TodoModule extends BaseModule {
     }
   }
 
-  // TodoModule.js에 추가할 메서드들
+  /**
+   * 📝 리마인드 수정 선택 화면
+   */
+  async showReminderEditSelect(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    const userId = getUserId(callbackQuery.from);
+
+    if (!this.reminderService) {
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인드 기능이 비활성화되어 있습니다.",
+          action: "remind_edit_select",
+          canRetry: false
+        }
+      };
+    }
+
+    try {
+      // 활성 리마인드 목록 가져오기
+      const result = await this.reminderService.getUserReminders(userId, {
+        activeOnly: true
+      });
+
+      if (!result.success || result.data.length === 0) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: "수정할 리마인드가 없습니다.",
+            action: "remind_edit_select",
+            canRetry: false
+          }
+        };
+      }
+
+      return {
+        type: "reminder_select",
+        module: "todo",
+        action: "reminder_select",
+        data: {
+          reminders: result.data,
+          title: "수정할 리마인드 선택",
+          mode: "edit",
+          action: "remind_edit"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.showReminderEditSelect 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인드 목록을 불러올 수 없습니다.",
+          action: "remind_edit_select",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🗑️ 리마인드 삭제 선택 화면
+   */
+  async showReminderDeleteSelect(
+    bot,
+    callbackQuery,
+    subAction,
+    params,
+    moduleManager
+  ) {
+    const userId = getUserId(callbackQuery.from);
+
+    if (!this.reminderService) {
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인드 기능이 비활성화되어 있습니다.",
+          action: "remind_delete_select",
+          canRetry: false
+        }
+      };
+    }
+
+    try {
+      // 모든 리마인드 목록 가져오기
+      const result = await this.reminderService.getUserReminders(userId);
+
+      if (!result.success || result.data.length === 0) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: "삭제할 리마인드가 없습니다.",
+            action: "remind_delete_select",
+            canRetry: false
+          }
+        };
+      }
+
+      return {
+        type: "reminder_select",
+        module: "todo",
+        action: "reminder_select",
+        data: {
+          reminders: result.data,
+          title: "삭제할 리마인드 선택",
+          mode: "delete",
+          action: "remind_delete"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.showReminderDeleteSelect 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인드 목록을 불러올 수 없습니다.",
+          action: "remind_delete_select",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 📊 제안 분석 헬퍼 메서드
+   */
+  analyzeAndGenerateSuggestions(todos) {
+    const suggestions = [];
+
+    // 미완료 할일이 많은 경우
+    const pendingTodos = todos.filter((t) => !t.completed);
+    if (pendingTodos.length > 10) {
+      suggestions.push({
+        type: "overload",
+        title: "할일이 너무 많아요!",
+        message: "우선순위를 정해서 중요한 것부터 처리해보세요.",
+        action: "prioritize"
+      });
+    }
+
+    // 오래된 미완료 할일
+    const oldPending = pendingTodos.filter((t) => {
+      const daysOld = Math.floor(
+        (Date.now() - new Date(t.createdAt)) / (1000 * 60 * 60 * 24)
+      );
+      return daysOld > 7;
+    });
+
+    if (oldPending.length > 0) {
+      suggestions.push({
+        type: "stale",
+        title: "오래된 할일이 있어요",
+        message: `${oldPending.length}개의 할일이 일주일 이상 미완료 상태입니다.`,
+        action: "review_old"
+      });
+    }
+
+    // 완료율이 낮은 경우
+    const completionRate =
+      todos.length > 0
+        ? Math.round(
+            (todos.filter((t) => t.completed).length / todos.length) * 100
+          )
+        : 0;
+
+    if (completionRate < 50 && todos.length > 5) {
+      suggestions.push({
+        type: "low_completion",
+        title: "완료율을 높여보세요",
+        message: "작은 할일부터 하나씩 완료해보는 건 어떨까요?",
+        action: "complete_easy"
+      });
+    }
+
+    // 리마인드 활용 제안
+    if (this.config.enableReminders) {
+      const todosWithReminders = todos.filter(
+        (t) => t.reminders && t.reminders.length > 0
+      );
+      if (todosWithReminders.length === 0 && pendingTodos.length > 3) {
+        suggestions.push({
+          type: "use_reminders",
+          title: "리마인드 기능을 활용해보세요",
+          message: "중요한 할일에 알림을 설정하면 잊지 않고 처리할 수 있어요.",
+          action: "set_reminders"
+        });
+      }
+    }
+
+    return suggestions;
+  }
+
+  /**
+   * 🕐 빠른 리마인드 설정
+   */
+  async setQuickReminder(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    if (!params) {
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인드 설정 정보가 없습니다.",
+          canRetry: false
+        }
+      };
+    }
+
+    // params 형식: todoId:timeSpec (예: 65abc123:30m)
+    const [todoId, timeSpec] = params.split(":");
+
+    if (!todoId || !timeSpec) {
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "잘못된 리마인드 설정입니다.",
+          canRetry: false
+        }
+      };
+    }
+
+    try {
+      // 할일 확인
+      const todoResult = await this.todoService.getTodoById(userId, todoId);
+      if (!todoResult.success) {
+        throw new Error("할일을 찾을 수 없습니다");
+      }
+
+      // 시간 계산
+      let reminderTime;
+      const now = new Date();
+
+      switch (timeSpec) {
+        case "30m":
+          reminderTime = new Date(now.getTime() + 30 * 60 * 1000);
+          break;
+        case "1h":
+          reminderTime = new Date(now.getTime() + 60 * 60 * 1000);
+          break;
+        case "tomorrow_9am":
+          reminderTime = new Date(now);
+          reminderTime.setDate(reminderTime.getDate() + 1);
+          reminderTime.setHours(9, 0, 0, 0);
+          break;
+        case "tomorrow_6pm":
+          reminderTime = new Date(now);
+          reminderTime.setDate(reminderTime.getDate() + 1);
+          reminderTime.setHours(18, 0, 0, 0);
+          break;
+        default:
+          throw new Error("알 수 없는 시간 설정");
+      }
+
+      // 리마인드 생성
+      const reminderResult = await this.reminderService.createReminder(userId, {
+        todoId,
+        text: `할일 알림: ${todoResult.data.text}`,
+        reminderTime,
+        type: this.constants.REMINDER_TYPES.SIMPLE
+      });
+
+      if (!reminderResult.success) {
+        throw new Error(reminderResult.message || "리마인드 설정 실패");
+      }
+
+      return {
+        type: "remind_set",
+        module: "todo",
+        action: "remind_set",
+        data: {
+          todo: todoResult.data,
+          reminder: reminderResult.data,
+          message: "리마인드가 설정되었습니다!"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.setQuickReminder 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: error.message || "리마인드 설정에 실패했습니다.",
+          action: "remind_quick",
+          canRetry: true
+        }
+      };
+    }
+  }
 
   /**
    * 📋 할일 목록 보기
@@ -355,6 +735,7 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: result.message || "할일 목록을 불러올 수 없습니다.",
@@ -366,6 +747,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "list",
+        action: "list",
         module: "todo",
         data: {
           todos: result.data.todos,
@@ -379,6 +761,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.showList 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "할일 목록 조회 중 오류가 발생했습니다.",
@@ -403,6 +786,7 @@ class TodoModule extends BaseModule {
 
     return {
       type: "input_request",
+      action: "input_request",
       module: "todo",
       data: {
         title: "➕ 새로운 할일 추가",
@@ -426,6 +810,7 @@ class TodoModule extends BaseModule {
     if (!todoId) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "수정할 할일을 선택해주세요.",
@@ -440,6 +825,7 @@ class TodoModule extends BaseModule {
     if (!todoResult.success) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "할일을 찾을 수 없습니다.",
@@ -459,6 +845,7 @@ class TodoModule extends BaseModule {
 
     return {
       type: "input_request",
+      action: "input_request",
       module: "todo",
       data: {
         title: "✏️ 할일 수정",
@@ -481,6 +868,7 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: result.message || "할일 삭제에 실패했습니다.",
@@ -492,6 +880,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
+        action: "success",
         module: "todo",
         data: {
           message: "할일이 삭제되었습니다.",
@@ -503,6 +892,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.deleteTodo 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "할일 삭제 중 오류가 발생했습니다.",
@@ -526,6 +916,7 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: result.message || "상태 변경에 실패했습니다.",
@@ -537,6 +928,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
+        action: "success",
         module: "todo",
         data: {
           message: result.message,
@@ -549,6 +941,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.toggleTodo 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "상태 변경 중 오류가 발생했습니다.",
@@ -598,6 +991,7 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: result.message || "보관에 실패했습니다.",
@@ -609,6 +1003,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
+        action: "success",
         module: "todo",
         data: {
           message: "할일이 보관되었습니다.",
@@ -620,6 +1015,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.archiveTodo 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "보관 중 오류가 발생했습니다.",
@@ -644,6 +1040,7 @@ class TodoModule extends BaseModule {
 
     return {
       type: "input_request",
+      action: "input_request",
       module: "todo",
       data: {
         title: "🔍 할일 검색",
@@ -668,6 +1065,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "filtered_list",
+        action: "filtered_list",
         module: "todo",
         data: {
           todos: result.data.todos,
@@ -679,6 +1077,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.filterByPriority 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "필터링 중 오류가 발생했습니다.",
@@ -695,6 +1094,7 @@ class TodoModule extends BaseModule {
   async filterTodos(bot, callbackQuery, subAction, params, moduleManager) {
     return {
       type: "filter_menu",
+      action: "filter_menu",
       module: "todo",
       data: {
         filters: [
@@ -713,6 +1113,7 @@ class TodoModule extends BaseModule {
     // 리마인드 수정 로직
     return {
       type: "error",
+      action: "error",
       module: "todo",
       data: {
         message: "리마인드 수정 기능은 준비 중입니다.",
@@ -732,6 +1133,7 @@ class TodoModule extends BaseModule {
     if (!this.reminderService) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "리마인드 기능이 비활성화되어 있습니다.",
@@ -750,6 +1152,7 @@ class TodoModule extends BaseModule {
       if (!result.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: result.message || "리마인드 삭제에 실패했습니다.",
@@ -761,6 +1164,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
+        action: "success",
         module: "todo",
         data: {
           message: result.message || "리마인드가 삭제되었습니다.",
@@ -772,6 +1176,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.deleteReminder 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "리마인드 삭제 중 오류가 발생했습니다.",
@@ -789,6 +1194,7 @@ class TodoModule extends BaseModule {
     // 리마인드 테스트 알림 즉시 발송
     return {
       type: "success",
+      action: "success",
       module: "todo",
       data: {
         message: "테스트 리마인드가 발송되었습니다.",
@@ -808,6 +1214,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "weekly_report",
+        action: "weekly_report",
         module: "todo",
         data: {
           report: result.data,
@@ -818,6 +1225,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.showWeeklyReport 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "주간 리포트 생성 중 오류가 발생했습니다.",
@@ -845,6 +1253,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "smart_suggestions",
+        action: "smart_suggestions",
         module: "todo",
         data: {
           suggestions: result.data.suggestions,
@@ -855,6 +1264,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.showSmartSuggestions 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "스마트 제안 생성 중 오류가 발생했습니다.",
@@ -876,6 +1286,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "cleanup_complete",
+        action: "cleanup_complete",
         module: "todo",
         data: {
           stats: result.data,
@@ -886,6 +1297,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.smartCleanup 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "스마트 정리 중 오류가 발생했습니다.",
@@ -906,6 +1318,7 @@ class TodoModule extends BaseModule {
     if (!text) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "할일 내용을 입력해주세요.",
@@ -920,6 +1333,7 @@ class TodoModule extends BaseModule {
     if (!result.success) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: result.message || "할일 추가에 실패했습니다.",
@@ -930,6 +1344,7 @@ class TodoModule extends BaseModule {
 
     return {
       type: "success",
+      action: "success",
       module: "todo",
       data: {
         message: `✅ "${text}" 할일이 추가되었습니다.`,
@@ -948,6 +1363,7 @@ class TodoModule extends BaseModule {
     if (!text) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "새로운 내용을 입력해주세요.",
@@ -964,6 +1380,7 @@ class TodoModule extends BaseModule {
     if (!result.success) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: result.message || "할일 수정에 실패했습니다.",
@@ -974,6 +1391,7 @@ class TodoModule extends BaseModule {
 
     return {
       type: "success",
+      action: "success",
       module: "todo",
       data: {
         message: `✅ 할일이 수정되었습니다.`,
@@ -991,6 +1409,7 @@ class TodoModule extends BaseModule {
     if (!keyword) {
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "검색 키워드를 입력해주세요.",
@@ -1004,6 +1423,7 @@ class TodoModule extends BaseModule {
 
     return {
       type: "search_results",
+      action: "search_results",
       module: "todo",
       data: {
         keyword,
@@ -1030,6 +1450,7 @@ class TodoModule extends BaseModule {
       if (!parseResult.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: `시간을 이해할 수 없습니다: "${timeText}"\n\n올바른 예시:\n• 30분 후\n• 내일 오후 3시\n• 12월 25일 오전 9시`,
@@ -1044,6 +1465,7 @@ class TodoModule extends BaseModule {
       if (parseResult.datetime <= new Date()) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: "리마인드는 미래 시간만 설정할 수 있습니다.",
@@ -1068,6 +1490,7 @@ class TodoModule extends BaseModule {
       if (!reminderResult.success) {
         return {
           type: "error",
+          action: "error",
           module: "todo",
           data: {
             message: reminderResult.message || "리마인드 설정에 실패했습니다.",
@@ -1079,6 +1502,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "success",
+        action: "success",
         module: "todo",
         data: {
           title: "✅ 리마인드 설정 완료",
@@ -1094,6 +1518,7 @@ class TodoModule extends BaseModule {
 
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "리마인드 시간 처리 중 오류가 발생했습니다.",
@@ -1138,12 +1563,13 @@ class TodoModule extends BaseModule {
   /**
    * 📝 취소 액션
    */
-  async cancelInput(bot, callbackQuery, params, moduleManager) {
+  async cancelInput(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
     this.clearUserState(userId);
 
     return {
       type: "success",
+      action: "success",
       module: "todo",
       data: {
         message: "입력이 취소되었습니다.",
@@ -1159,7 +1585,7 @@ class TodoModule extends BaseModule {
   /**
    * 📋 메뉴 보기 (기존)
    */
-  async showMenu(bot, callbackQuery, params, moduleManager) {
+  async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
 
     try {
@@ -1167,11 +1593,11 @@ class TodoModule extends BaseModule {
       const stats = await this.todoService.getTodoStats(userId);
 
       return {
-        type: "success",
+        type: "menu", // <-- "success"가 아니라 "menu"로 변경!
         module: "todo",
+        action: "menu",
         data: {
           title: "📋 할일 관리",
-          action: "menu",
           stats: stats.success ? stats.data : null,
           enableReminders: this.config.enableReminders
         }
@@ -1180,6 +1606,7 @@ class TodoModule extends BaseModule {
       logger.error("TodoModule.showMenu 오류:", error);
       return {
         type: "error",
+        action: "error",
         module: "todo",
         data: {
           message: "메뉴를 불러올 수 없습니다.",
