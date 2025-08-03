@@ -224,7 +224,11 @@ class TodoRenderer extends BaseRenderer {
     ]);
 
     buttons.push([
-      { text: `${this.emojis.back} 메인 메뉴`, action: "menu", module: "main" }
+      {
+        text: `${this.emojis.back} 메인 메뉴`,
+        action: "menu",
+        module: "system"
+      }
     ]);
 
     await this.sendSafeMessage(ctx, text, {
@@ -1058,7 +1062,7 @@ class TodoRenderer extends BaseRenderer {
     try {
       const text = "❌ 화면을 표시할 수 없습니다.";
       const buttons = [
-        [{ text: "🏠 메인 메뉴", action: "menu", module: "main" }]
+        [{ text: "🏠 메인 메뉴", action: "menu", module: "system" }]
       ];
 
       await this.sendSafeMessage(ctx, text, {
