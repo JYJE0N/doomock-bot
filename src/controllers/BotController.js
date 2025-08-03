@@ -78,17 +78,20 @@ class BotController {
       // ReminderScheduler 초기화 (서비스 빌더 이후에 추가)
       if (process.env.ENABLE_REMINDER_SCHEDULER !== "false") {
         const ReminderScheduler = require("../utils/ReminderScheduler");
-        const reminderService =
-          await this.serviceBuilder.getOrCreate("reminder");
+
+        // 👇 "reminder" 대신 "todo" 서비스를 가져옵니다.
+        const todoServiceForScheduler =
+          await this.serviceBuilder.getOrCreate("todo");
 
         this.reminderScheduler = new ReminderScheduler({
           bot: this.bot,
-          reminderService: reminderService
+          // 👇 주입되는 서비스 이름을 reminderService로 유지하되, 실제로는 TodoService 인스턴스를 전달합니다.
+          //    (ReminderScheduler 내부 코드 수정을 최소화하기 위함)
+          reminderService: todoServiceForScheduler
         });
 
-        // 스케줄러 시작
         await this.reminderScheduler.start();
-        logger.success("✅ ReminderScheduler 시작됨");
+        logger.success("✅ ReminderScheduler 시작됨 (TodoService와 연동)");
       }
 
       this.isInitialized = true;
