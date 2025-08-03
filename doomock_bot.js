@@ -2,11 +2,7 @@
 require("dotenv").config();
 const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
-const { getRegistryStats } = require("./src/config/ModuleRegistry");
-const TimeHelper = require("./src/utils/TimeHelper");
 const { showDoomockBanner } = require("./src/utils/FancyBanner");
-const express = require("express");
-const path = require("path");
 
 /**
  * 🚀 DooMockBot v4.0.1 - 안정화 버전

@@ -96,6 +96,11 @@ class TTSModule extends BaseModule {
     const result = await this.ttsService.setUserVoice(userId, voiceCode);
     const voice = this.voiceConfig.getVoiceByCode(voiceCode);
 
+    // 결과 활용 예시
+    if (!result.success) {
+      logger.warn("음성 설정 실패:", result.error);
+    }
+
     return {
       type: "voice_changed",
       module: "tts",

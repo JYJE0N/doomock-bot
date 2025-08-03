@@ -92,7 +92,7 @@ class WeatherModule extends BaseModule {
   async onHandleMessage(bot, msg) {
     const {
       text,
-      chat: { id: chatId },
+      chat: { id: _chatId },
       from: { id: userId },
     } = msg;
 

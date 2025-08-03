@@ -282,7 +282,7 @@ ${userName}님의 기본 도시가 **${city.name}**로 설정되었습니다.
    * 도움말 렌더링
    */
   async renderHelp(data, ctx) {
-    const { config, majorCities, features } = data;
+    const { _config, majorCities, features } = data;
 
     let text = `❓ **날씨 모듈 도움말**
 
