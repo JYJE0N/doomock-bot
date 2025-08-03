@@ -187,11 +187,20 @@ class ReminderScheduler {
 
   async markReminderSent(reminder) {
     try {
-      await this.reminderService.updateReminder(reminder._id, {
-        sentAt: new Date(),
-        completed: true
-      });
-      logger.debug(`✅ 리마인더 발송 완료 표시: ${reminder._id}`);
+      // ReminderService의 모델 직접 사용
+      if (this.reminderService.models && this.reminderService.models.Reminder) {
+        await this.reminderService.models.Reminder.findByIdAndUpdate(
+          reminder._id,
+          {
+            $set: {
+              sentAt: new Date(),
+              completed: true,
+              isActive: false
+            }
+          }
+        );
+        logger.debug(`✅ 리마인더 발송 완료 표시: ${reminder._id}`);
+      }
     } catch (error) {
       logger.error(`리마인더 발송 완료 표시 실패: ${reminder._id}`, error);
     }
@@ -225,42 +234,18 @@ class ReminderScheduler {
       // 메시지 구성
       let message = "";
 
-      if (type === "todo_reminder") {
-        message = `🔔 *리마인더 알림\\!*\n\n📝 ${this.escapeMarkdownV2(text)}\n\n⏰ 설정하신 시간입니다\\! 🎯`;
+      if (type === "todo_reminder" || todoId) {
+        message = `🔔 *리마인더 알림\\!*\n\n📝 ${this.escapeMarkdownV2(text)}\n\n⏰ 설정하신 시간입니다\\!`;
       } else {
-        message = `🔔 *알림*\n\n${this.escapeMarkdownV2(text)}`;
+        message = `🔔 *리마인더 알림*\n\n${this.escapeMarkdownV2(text)}`;
       }
 
-      // 인라인 키보드 (할일 리마인더인 경우)
-      let keyboard = null;
-      if (type === "todo_reminder" && todoId) {
-        keyboard = {
-          inline_keyboard: [
-            [
-              { text: "✅ 완료 처리", callback_data: `todo:toggle:${todoId}` },
-              { text: "📋 할일 목록", callback_data: "todo:menu" }
-            ],
-            [
-              {
-                text: "⏰ 30분 후 다시",
-                callback_data: `reminder:snooze:${reminder._id}:30`
-              },
-              {
-                text: "🔕 알림 끄기",
-                callback_data: `reminder:disable:${reminder._id}`
-              }
-            ]
-          ]
-        };
-      }
-
-      // 텔레그램 메시지 발송
-      await this.bot.sendMessage(userId, message, {
-        parse_mode: "MarkdownV2",
-        reply_markup: keyboard
+      // ✅ 수정: bot.telegram.sendMessage 사용
+      await this.bot.telegram.sendMessage(userId, message, {
+        parse_mode: "MarkdownV2"
       });
 
-      logger.info(`📤 리마인더 발송됨 (사용자: ${userId})`);
+      logger.info(`✅ 리마인더 발송 성공: ${reminder._id}`);
     } catch (error) {
       logger.error("리마인더 메시지 발송 실패:", error);
       throw error;
@@ -272,34 +257,57 @@ class ReminderScheduler {
    */
   async handleReminderError(reminder, error) {
     try {
-      // 재시도 카운트 증가
+      logger.error(`리마인더 처리 오류 (ID: ${reminder._id}):`, error);
+
+      // 재시도 횟수 증가
       const retryCount = (reminder.retryCount || 0) + 1;
 
-      if (retryCount <= this.config.maxRetries) {
+      if (retryCount < this.config.maxRetries) {
         // 재시도 예약
-        const nextRetryTime = new Date(
-          Date.now() + this.config.retryDelay * retryCount
-        );
-
-        await this.reminderService.updateReminderRetry(reminder._id, {
-          retryCount,
-          nextRetryTime,
-          lastError: error.message
-        });
-
         logger.info(
-          `🔄 리마인더 재시도 예약 (${retryCount}/${this.config.maxRetries})`
+          `리마인더 재시도 예약 (${retryCount}/${this.config.maxRetries})`
         );
+
+        // ReminderService에 재시도 정보 업데이트
+        // updateReminderRetry가 없으므로 직접 구현하거나 다른 방법 사용
+        if (
+          this.reminderService.models &&
+          this.reminderService.models.Reminder
+        ) {
+          await this.reminderService.models.Reminder.findByIdAndUpdate(
+            reminder._id,
+            {
+              $set: {
+                retryCount,
+                lastError: error.message,
+                lastErrorAt: new Date()
+              }
+            }
+          );
+        }
       } else {
-        // 최대 재시도 횟수 초과 - 실패 처리
-        await this.reminderService.markReminderFailed(
-          reminder._id,
-          error.message
-        );
-        logger.warn(`❌ 리마인더 최종 실패 (ID: ${reminder._id})`);
+        // 최대 재시도 횟수 초과
+        logger.error(`리마인더 최대 재시도 횟수 초과: ${reminder._id}`);
+
+        // 리마인더 비활성화
+        if (
+          this.reminderService.models &&
+          this.reminderService.models.Reminder
+        ) {
+          await this.reminderService.models.Reminder.findByIdAndUpdate(
+            reminder._id,
+            {
+              $set: {
+                isActive: false,
+                failedAt: new Date(),
+                failureReason: `최대 재시도 횟수 초과: ${error.message}`
+              }
+            }
+          );
+        }
       }
-    } catch (retryError) {
-      logger.error("리마인더 에러 처리 실패:", retryError);
+    } catch (handleError) {
+      logger.error("리마인더 에러 처리 실패:", handleError);
     }
   }
 

@@ -157,6 +157,26 @@ const reminderSchema = new mongoose.Schema(
       type: Date,
       default: null
     },
+    retryCount: {
+      type: Number,
+      default: 0
+    },
+    lastError: {
+      type: String,
+      default: null
+    },
+    lastErrorAt: {
+      type: Date,
+      default: null
+    },
+    failedAt: {
+      type: Date,
+      default: null
+    },
+    failureReason: {
+      type: String,
+      default: null
+    },
 
     // 🔔 스누즈 기능
     snoozeCount: {
