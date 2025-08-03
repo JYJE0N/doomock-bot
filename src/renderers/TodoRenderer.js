@@ -516,8 +516,8 @@ class TodoRenderer extends BaseRenderer {
       text += `할일 목록에서 ⏰ 버튼을 눌러 리마인더를 추가하세요!`;
     } else {
       reminders.forEach((reminder, index) => {
-        const todoText = reminder.todoId?.text || reminder.message;
-        const remindTime = TimeHelper.format(reminder.remindAt, "full");
+        const todoText = reminder.todoId?.text || reminder.text; // message → text
+        const remindTime = TimeHelper.format(reminder.reminderTime, "full"); // remindAt → reminderTime
 
         text += `${index + 1}. ${this.emojis.bell} ${todoText}\n`;
         text += `   ${this.styles.bullet} 알림: ${remindTime}\n`;

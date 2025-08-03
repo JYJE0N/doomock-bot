@@ -785,9 +785,9 @@ class TodoModule extends BaseModule {
    */
   async processReminderTimeInput(userId, text, todoId) {
     try {
-      // TimeParseHelper를 사용하여 시간 파싱 (있는 경우)
-      const remindAt = new Date(); // 실제로는 TimeParseHelper 사용
-      remindAt.setHours(remindAt.getHours() + 1); // 임시로 1시간 후
+      // 실제로 1분 후로 설정
+      const remindAt = new Date();
+      remindAt.setMinutes(remindAt.getMinutes() + 1); // 1분 후로 수정!
 
       const result = await this.todoService.createReminder(userId, {
         todoId,

@@ -485,8 +485,8 @@ class TodoService extends BaseService {
       const reminder = new this.models.Reminder({
         userId: userId.toString(),
         todoId: reminderData.todoId,
-        remindAt: reminderData.remindAt,
-        message: reminderData.message,
+        reminderTime: reminderData.remindAt, // remindAt을 reminderTime으로 매핑
+        text: reminderData.message, // message를 text로 매핑
         type: reminderData.type || "simple"
       });
 
@@ -521,7 +521,7 @@ class TodoService extends BaseService {
 
       const reminders = await this.models.Reminder.find(query)
         .populate("todoId", "text completed")
-        .sort({ remindAt: 1 })
+        .sort({ reminderTime: 1 })
         .lean();
 
       return this.createSuccessResponse({
@@ -571,25 +571,16 @@ class TodoService extends BaseService {
    */
   async getPendingReminders(currentTime = new Date(), limit = 10) {
     try {
-      if (!this.models.Reminder) {
-        return [];
-      }
+      const ReminderModel = this.models.Reminder;
 
       const query = {
         isActive: true,
         completed: false,
-        remindAt: { $lte: currentTime }
+        reminderTime: { $lte: currentTime },
+        sentAt: null // null인 것만 조회 (아직 발송되지 않은 것)
       };
 
-      // sentAt 필드가 스키마에 있다면 추가
-      if (this.models.Reminder.schema.paths.sentAt) {
-        query.sentAt = { $exists: false };
-      }
-
-      const reminders = await this.models.Reminder.find(query)
-        .populate("todoId", "text completed")
-        .limit(limit)
-        .lean();
+      const reminders = await ReminderModel.find(query).limit(limit).lean();
 
       logger.debug(`getPendingReminders 쿼리 결과: ${reminders.length}개`);
 
