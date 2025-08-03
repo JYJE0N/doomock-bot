@@ -1,150 +1,60 @@
-// src/database/models/Reminder.js - 🔔 리마인더 Mongoose 모델
+// database/models/Reminder.js - 리마인더 데이터베이스 모델
 const mongoose = require("mongoose");
-const logger = require("../../utils/Logger");
 
 /**
- * 🔔 Reminder Mongoose 스키마 - 스케줄링 최적화
+ * 🔔 Reminder Model - 리마인더 데이터 스키마
  *
- * 🎯 핵심 필드:
- * - text: 리마인더 메시지
- * - reminderTime: 알림 시간
- * - type: 리마인더 타입 (todo_reminder, general 등)
- * - todoId: 연결된 할일 ID (옵션)
- *
- * ✅ 특징:
- * - 스케줄링 최적화 인덱스
- * - 재시도 로직 지원
- * - 스누즈 기능
- * - 통계 집계 지원
+ * ✅ 기능:
+ * - 할일 연결 리마인드
+ * - 독립적인 리마인드
+ * - 반복 리마인드
+ * - 스마트 알림
  */
-
 const reminderSchema = new mongoose.Schema(
   {
-    // 👤 사용자 정보
-    // userId: {
-    //   type: String,
-    //   required: [true, "사용자 ID는 필수입니다"],
-    //   // index: true,
-    // },
-
-    // 📝 리마인더 내용
-    text: {
-      type: String,
-      required: [true, "리마인더 내용을 입력해주세요"],
-      trim: true,
-      maxlength: [500, "리마인더는 500자를 초과할 수 없습니다"]
-    },
-
-    // ⏰ 알림 시간 (핵심!)
-    reminderTime: {
-      type: Date,
-      required: [true, "알림 시간은 필수입니다"],
-      index: true,
-      validate: {
-        validator: function (value) {
-          return value > new Date(); // 미래 시간만 허용
-        },
-        message: "알림 시간은 현재 시간보다 미래여야 합니다"
-      }
-    },
-
-    // 🏷️ 리마인더 타입
-    type: {
+    // 기본 정보
+    userId: {
       type: String,
       required: true,
-      enum: {
-        values: ["general", "todo_reminder", "meeting", "deadline", "habit"],
-        message: "지원하지 않는 리마인더 타입입니다"
-      },
-      default: "general",
-      index: true
+      index: true,
+      trim: true
     },
 
-    // 🔗 연결된 할일 ID (할일 리마인더인 경우)
-    todoId: {
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Todo",
-      index: { sparse: true }
-    },
-
-    // 📊 상태 필드들
-    isActive: {
-      type: Boolean,
-      default: true,
-      index: true
-    },
-
-    isSent: {
-      type: Boolean,
-      default: false,
-      index: true
-    },
-
-    sentAt: {
-      type: Date
-    },
-
-    // 🔄 재시도 관련
-    retryCount: {
-      type: Number,
-      default: 0,
-      min: 0
-    },
-
-    maxRetries: {
-      type: Number,
-      default: 3,
-      min: 0,
-      max: 10
-    },
-
-    nextRetryTime: {
-      type: Date,
-      index: { sparse: true }
-    },
-
-    lastError: {
+    // 리마인드 내용
+    text: {
       type: String,
-      maxlength: 1000
-    },
-
-    // ❌ 실패 처리
-    isFailed: {
-      type: Boolean,
-      default: false,
-      index: true
-    },
-
-    failedAt: {
-      type: Date
-    },
-
-    failureReason: {
-      type: String,
+      required: true,
+      trim: true,
       maxlength: 500
     },
 
-    // ⏰ 스누즈 기능
-    snoozedAt: {
-      type: Date
+    description: {
+      type: String,
+      trim: true,
+      maxlength: 1000
     },
 
-    snoozeCount: {
-      type: Number,
-      default: 0,
-      min: 0
+    // 🔗 할일 연결 (선택적)
+    todoId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Todo",
+      default: null
     },
 
-    // 🔕 비활성화
-    disabledAt: {
-      type: Date
+    // ⏰ 시간 설정
+    reminderTime: {
+      type: Date,
+      required: true,
+      index: true
     },
 
-    deletedAt: {
-      type: Date
+    // 타임존 (기본값: 한국 표준시)
+    timezone: {
+      type: String,
+      default: "Asia/Seoul"
     },
 
-    // 🔄 반복 설정 (향후 확장용)
+    // 🔄 반복 설정
     isRecurring: {
       type: Boolean,
       default: false
@@ -152,383 +62,352 @@ const reminderSchema = new mongoose.Schema(
 
     recurringPattern: {
       type: String,
-      enum: ["daily", "weekly", "monthly", "yearly"],
-      required: function () {
-        return this.isRecurring;
+      enum: ["daily", "weekly", "monthly", "yearly", "custom"],
+      default: null
+    },
+
+    recurringInterval: {
+      type: Number,
+      min: 1,
+      default: 1 // 1일마다, 1주마다 등
+    },
+
+    recurringEndDate: {
+      type: Date,
+      default: null
+    },
+
+    // 📱 알림 타입
+    notificationType: {
+      type: String,
+      enum: ["simple", "urgent", "smart", "silent"],
+      default: "simple"
+    },
+
+    // 🎯 우선순위
+    priority: {
+      type: Number,
+      min: 1,
+      max: 5,
+      default: 3
+    },
+
+    // 📂 카테고리
+    category: {
+      type: String,
+      trim: true,
+      maxlength: 50,
+      default: null
+    },
+
+    // 🏷️ 태그
+    tags: [
+      {
+        type: String,
+        trim: true,
+        lowercase: true,
+        maxlength: 20
+      }
+    ],
+
+    // 📊 상태 관리
+    isActive: {
+      type: Boolean,
+      default: true,
+      index: true
+    },
+
+    completed: {
+      type: Boolean,
+      default: false
+    },
+
+    // 🕐 실행 관련
+    triggeredAt: {
+      type: Date,
+      default: null
+    },
+
+    completedAt: {
+      type: Date,
+      default: null
+    },
+
+    // 🔕 비활성화 관련
+    deactivatedAt: {
+      type: Date,
+      default: null
+    },
+
+    deactivatedReason: {
+      type: String,
+      enum: ["user_request", "todo_completed", "expired", "error", "system"],
+      default: null
+    },
+
+    // 📝 추가 설정
+    customMessage: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+      default: null
+    },
+
+    // 🔔 스누즈 기능
+    snoozeCount: {
+      type: Number,
+      default: 0,
+      min: 0,
+      max: 5 // 최대 5번까지 스누즈
+    },
+
+    lastSnoozeAt: {
+      type: Date,
+      default: null
+    },
+
+    // 📊 메타데이터
+    metadata: {
+      // 생성 방식 (manual, smart, template)
+      creationMethod: {
+        type: String,
+        enum: ["manual", "smart", "template", "recurring"],
+        default: "manual"
+      },
+
+      // 원본 리마인드 ID (반복 리마인드의 경우)
+      parentReminderId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Reminder",
+        default: null
+      },
+
+      // 사용자 입력 원본 텍스트
+      originalInput: {
+        type: String,
+        default: null
+      },
+
+      // 파싱된 시간 정보
+      parsedTimeInfo: {
+        type: mongoose.Schema.Types.Mixed,
+        default: null
       }
     },
 
-    // 📊 버전 관리
-    version: {
-      type: Number,
-      default: 1
+    // 📈 통계 정보
+    stats: {
+      viewCount: {
+        type: Number,
+        default: 0
+      },
+
+      editCount: {
+        type: Number,
+        default: 0
+      },
+
+      snoozeHistory: [
+        {
+          snoozeAt: Date,
+          snoozeDuration: Number, // 분 단위
+          reason: String
+        }
+      ]
     }
   },
   {
-    // Mongoose 옵션
     timestamps: true, // createdAt, updatedAt 자동 생성
-    versionKey: false,
-
-    // 컬렉션 옵션
-    collection: "reminders"
+    versionKey: false
   }
 );
 
-// ===== 🔍 인덱스 설정 (스케줄링 최적화) =====
+// ===== 인덱스 설정 =====
 
-// 스케줄링 핵심 인덱스 (가장 중요!)
-reminderSchema.index(
-  {
-    isActive: 1,
-    isSent: 1,
-    reminderTime: 1
-  },
-  {
-    name: "scheduling_core_index",
-    background: true
-  }
-);
+// 복합 인덱스: 사용자별 활성 리마인드 조회
+reminderSchema.index({ userId: 1, isActive: 1, reminderTime: 1 });
 
-// 재시도 처리용 인덱스
-reminderSchema.index(
-  {
-    isActive: 1,
-    isSent: 1,
-    retryCount: 1,
-    nextRetryTime: 1
-  },
-  {
-    name: "retry_processing_index",
-    background: true
-  }
-);
+// 복합 인덱스: 실행 대기 중인 리마인드 조회
+reminderSchema.index({
+  isActive: 1,
+  reminderTime: 1,
+  completed: 1
+});
 
-// 사용자별 조회 인덱스
-reminderSchema.index(
-  {
-    userId: 1,
-    isActive: 1,
-    reminderTime: 1
-  },
-  {
-    name: "user_reminders_index",
-    background: true
-  }
-);
+// 할일 연결 리마인드 조회
+reminderSchema.index({ todoId: 1, isActive: 1 });
 
-// 타입별 조회 인덱스
-reminderSchema.index(
-  {
-    userId: 1,
-    type: 1,
-    isActive: 1
-  },
-  {
-    name: "user_type_index",
-    background: true
-  }
-);
+// 반복 리마인드 조회
+reminderSchema.index({ isRecurring: 1, isActive: 1 });
 
-// 할일 연동 인덱스
-reminderSchema.index(
-  {
-    todoId: 1,
-    isActive: 1
-  },
-  {
-    sparse: true,
-    name: "todo_link_index",
-    background: true
-  }
-);
+// ===== 가상 필드 =====
 
-// 정리 작업용 인덱스
-reminderSchema.index(
-  {
-    isSent: 1,
-    sentAt: 1
-  },
-  {
-    name: "cleanup_sent_index",
-    background: true
-  }
-);
+// 리마인드까지 남은 시간 (분 단위)
+reminderSchema.virtual("minutesUntilReminder").get(function () {
+  if (!this.reminderTime) return null;
+  const now = new Date();
+  const diff = this.reminderTime.getTime() - now.getTime();
+  return Math.max(0, Math.round(diff / (1000 * 60)));
+});
 
-reminderSchema.index(
-  {
-    isFailed: 1,
-    failedAt: 1
-  },
-  {
-    name: "cleanup_failed_index",
-    background: true
-  }
-);
+// 읽기 쉬운 시간 표시
+reminderSchema.virtual("readableTime").get(function () {
+  if (!this.reminderTime) return null;
 
-// ===== ✨ 가상 속성 (Virtual Properties) =====
+  const TimeHelper = require("../../utils/TimeHelper");
+  return TimeHelper.format(this.reminderTime, "full");
+});
 
-/**
- * 리마인더 상태 확인
- */
+// 리마인드 상태
 reminderSchema.virtual("status").get(function () {
   if (!this.isActive) return "inactive";
-  if (this.isFailed) return "failed";
-  if (this.isSent) return "sent";
-
-  const now = new Date();
-  if (this.reminderTime <= now) return "overdue";
-
+  if (this.completed) return "completed";
+  if (this.reminderTime < new Date()) return "overdue";
   return "pending";
 });
 
-/**
- * 알림까지 남은 시간 (분 단위)
- */
-reminderSchema.virtual("minutesUntilReminder").get(function () {
-  if (this.isSent || !this.isActive) return null;
-
-  const now = new Date();
-  const diff = this.reminderTime - now;
-  return Math.ceil(diff / (1000 * 60));
-});
+// ===== 인스턴스 메서드 =====
 
 /**
- * 사용자 친화적 시간 표시
+ * 🔔 리마인드 실행
  */
-reminderSchema.virtual("friendlyTime").get(function () {
-  const minutes = this.minutesUntilReminder;
+reminderSchema.methods.trigger = function () {
+  this.triggeredAt = new Date();
+  this.stats.viewCount += 1;
 
-  if (minutes === null) return null;
-  if (minutes <= 0) return "지금";
-  if (minutes < 60) return `${minutes}분 후`;
-
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}시간 후`;
-
-  const days = Math.floor(hours / 24);
-  return `${days}일 후`;
-});
-
-/**
- * 재시도 가능 여부
- */
-reminderSchema.virtual("canRetry").get(function () {
-  return this.isActive && !this.isSent && !this.isFailed && this.retryCount < this.maxRetries;
-});
-
-// ===== 🔧 미들웨어 (Middleware) =====
-
-/**
- * 저장 전 처리
- */
-reminderSchema.pre("save", function (next) {
-  // 버전 증가 (수정된 경우)
-  if (this.isModified() && !this.isNew) {
-    this.version += 1;
+  // 반복 리마인드가 아니면 완료 처리
+  if (!this.isRecurring) {
+    this.completed = true;
+    this.completedAt = new Date();
   }
 
-  // 발송 완료 시 sentAt 자동 설정
-  if (this.isModified("isSent") && this.isSent && !this.sentAt) {
-    this.sentAt = new Date();
-  }
-
-  // 실패 처리 시 failedAt 자동 설정
-  if (this.isModified("isFailed") && this.isFailed && !this.failedAt) {
-    this.failedAt = new Date();
-  }
-
-  // 비활성화 시 disabledAt 자동 설정
-  if (this.isModified("isActive") && !this.isActive && !this.disabledAt) {
-    this.disabledAt = new Date();
-  }
-
-  next();
-});
-
-/**
- * 업데이트 전 처리
- */
-reminderSchema.pre(["updateOne", "findOneAndUpdate"], function (next) {
-  this.set({
-    updatedAt: new Date(),
-    $inc: { version: 1 }
-  });
-
-  next();
-});
-
-// ===== 🛠️ 인스턴스 메서드 (Instance Methods) =====
-
-/**
- * 리마인더 발송 완료 처리
- */
-reminderSchema.methods.markAsSent = async function () {
-  this.isSent = true;
-  this.sentAt = new Date();
-  return await this.save();
+  return this.save();
 };
 
 /**
- * 리마인더 실패 처리
+ * ⏰ 스누즈 처리
  */
-reminderSchema.methods.markAsFailed = async function (reason) {
-  this.isFailed = true;
-  this.failedAt = new Date();
-  this.failureReason = reason;
-  this.isActive = false;
-  return await this.save();
-};
+reminderSchema.methods.snooze = function (minutes = 10) {
+  if (this.snoozeCount >= 5) {
+    throw new Error("최대 스누즈 횟수를 초과했습니다.");
+  }
 
-/**
- * 스누즈 (N분 후 다시 알림)
- */
-reminderSchema.methods.snooze = async function (minutes = 30) {
-  const newTime = new Date(Date.now() + minutes * 60 * 1000);
+  const newReminderTime = new Date(this.reminderTime.getTime() + minutes * 60 * 1000);
 
-  this.reminderTime = newTime;
-  this.isSent = false;
-  this.retryCount = 0;
-  this.snoozedAt = new Date();
+  this.reminderTime = newReminderTime;
   this.snoozeCount += 1;
+  this.lastSnoozeAt = new Date();
 
-  return await this.save();
-};
-
-/**
- * 리마인더 비활성화
- */
-reminderSchema.methods.disable = async function () {
-  this.isActive = false;
-  this.disabledAt = new Date();
-  return await this.save();
-};
-
-/**
- * 소프트 삭제
- */
-reminderSchema.methods.softDelete = async function () {
-  this.isActive = false;
-  this.deletedAt = new Date();
-  return await this.save();
-};
-
-// ===== 📊 정적 메서드 (Static Methods) =====
-
-/**
- * 사용자의 활성 리마인더 조회
- */
-reminderSchema.statics.findActiveByUser = function (userId, options = {}) {
-  const query = this.find({
-    userId: String(userId),
-    isActive: true
+  // 스누즈 히스토리 추가
+  this.stats.snoozeHistory.push({
+    snoozeAt: new Date(),
+    snoozeDuration: minutes,
+    reason: "user_request"
   });
 
-  if (options.type) {
-    query.where("type", options.type);
-  }
-
-  if (options.pending) {
-    query.where("isSent", false);
-    query.where("reminderTime").gt(new Date());
-  }
-
-  return query.sort(options.sort || { reminderTime: 1 }).limit(options.limit || 0);
+  return this.save();
 };
 
 /**
- * 발송 대상 리마인더 조회 (스케줄러용)
+ * 🔕 리마인드 비활성화
  */
-reminderSchema.statics.findPendingReminders = function (currentTime, limit = 10) {
+reminderSchema.methods.deactivate = function (reason = "user_request") {
+  this.isActive = false;
+  this.deactivatedAt = new Date();
+  this.deactivatedReason = reason;
+
+  return this.save();
+};
+
+/**
+ * 🔄 다음 반복 리마인드 생성
+ */
+reminderSchema.methods.createNextRecurrence = function () {
+  if (!this.isRecurring) {
+    throw new Error("반복 리마인드가 아닙니다.");
+  }
+
+  let nextTime = new Date(this.reminderTime);
+
+  switch (this.recurringPattern) {
+    case "daily":
+      nextTime.setDate(nextTime.getDate() + this.recurringInterval);
+      break;
+    case "weekly":
+      nextTime.setDate(nextTime.getDate() + 7 * this.recurringInterval);
+      break;
+    case "monthly":
+      nextTime.setMonth(nextTime.getMonth() + this.recurringInterval);
+      break;
+    case "yearly":
+      nextTime.setFullYear(nextTime.getFullYear() + this.recurringInterval);
+      break;
+    default:
+      throw new Error("지원하지 않는 반복 패턴입니다.");
+  }
+
+  // 종료 날짜 체크
+  if (this.recurringEndDate && nextTime > this.recurringEndDate) {
+    return null;
+  }
+
+  // 새 리마인드 생성
+  const Reminder = this.constructor;
+  const nextReminder = new Reminder({
+    userId: this.userId,
+    text: this.text,
+    description: this.description,
+    todoId: this.todoId,
+    reminderTime: nextTime,
+    timezone: this.timezone,
+    isRecurring: true,
+    recurringPattern: this.recurringPattern,
+    recurringInterval: this.recurringInterval,
+    recurringEndDate: this.recurringEndDate,
+    notificationType: this.notificationType,
+    priority: this.priority,
+    category: this.category,
+    tags: [...this.tags],
+    metadata: {
+      ...this.metadata,
+      parentReminderId: this.metadata.parentReminderId || this._id,
+      creationMethod: "recurring"
+    }
+  });
+
+  return nextReminder.save();
+};
+
+// ===== 정적 메서드 =====
+
+/**
+ * 🔍 실행 대기 중인 리마인드 조회
+ */
+reminderSchema.statics.findPendingReminders = function () {
   return this.find({
     isActive: true,
-    isSent: false,
-    isFailed: false,
-    reminderTime: { $lte: currentTime },
-
-    // 재시도 로직
-    $or: [
-      { retryCount: { $lte: 0 } }, // 첫 시도
-      {
-        retryCount: { $gt: 0 },
-        nextRetryTime: { $lte: currentTime }
-      }
-    ]
-  })
-    .sort({ reminderTime: 1 })
-    .limit(limit);
+    completed: false,
+    reminderTime: { $lte: new Date() }
+  }).sort({ priority: -1, reminderTime: 1 });
 };
 
 /**
- * 사용자 리마인더 통계
+ * 📊 사용자 리마인드 통계
  */
-reminderSchema.statics.getUserStats = async function (userId) {
-  const now = new Date();
-
-  return await this.aggregate([
-    {
-      $match: {
-        userId: String(userId),
-        isActive: true
-      }
-    },
+reminderSchema.statics.getUserStats = function (userId) {
+  return this.aggregate([
+    { $match: { userId } },
     {
       $group: {
         _id: null,
         total: { $sum: 1 },
-        pending: {
-          $sum: {
-            $cond: [
-              {
-                $and: [{ $gt: ["$reminderTime", now] }, { $eq: ["$isSent", false] }]
-              },
-              1,
-              0
-            ]
-          }
-        },
-        sent: {
-          $sum: { $cond: ["$isSent", 1, 0] }
-        },
+        active: { $sum: { $cond: ["$isActive", 1, 0] } },
+        completed: { $sum: { $cond: ["$completed", 1, 0] } },
         overdue: {
           $sum: {
             $cond: [
               {
-                $and: [{ $lte: ["$reminderTime", now] }, { $eq: ["$isSent", false] }, { $eq: ["$isFailed", false] }]
-              },
-              1,
-              0
-            ]
-          }
-        },
-        failed: {
-          $sum: { $cond: ["$isFailed", 1, 0] }
-        }
-      }
-    }
-  ]);
-};
-
-/**
- * 타입별 리마인더 통계
- */
-reminderSchema.statics.getTypeStats = async function (userId) {
-  return await this.aggregate([
-    {
-      $match: {
-        userId: String(userId),
-        isActive: true
-      }
-    },
-    {
-      $group: {
-        _id: "$type",
-        count: { $sum: 1 },
-        sent: { $sum: { $cond: ["$isSent", 1, 0] } },
-        pending: {
-          $sum: {
-            $cond: [
-              {
-                $and: [{ $eq: ["$isSent", false] }, { $gt: ["$reminderTime", new Date()] }]
+                $and: ["$isActive", { $not: "$completed" }, { $lt: ["$reminderTime", new Date()] }]
               },
               1,
               0
@@ -536,66 +415,65 @@ reminderSchema.statics.getTypeStats = async function (userId) {
           }
         }
       }
-    },
-    {
-      $project: {
-        type: "$_id",
-        count: 1,
-        sent: 1,
-        pending: 1,
-        _id: 0
-      }
-    },
-    {
-      $sort: { count: -1 }
     }
   ]);
 };
 
-// ===== 🎯 스키마 후킹 =====
+// ===== 미들웨어 =====
 
-/**
- * JSON 변환 시 가상 속성 포함
- */
+// 저장 전 유효성 검증
+reminderSchema.pre("save", function (next) {
+  // 과거 시간 체크 (새 리마인드만)
+  if (this.isNew && this.reminderTime <= new Date()) {
+    return next(new Error("리마인드 시간은 미래여야 합니다."));
+  }
+
+  // 반복 리마인드 유효성 체크
+  if (this.isRecurring && !this.recurringPattern) {
+    return next(new Error("반복 리마인드는 반복 패턴이 필요합니다."));
+  }
+
+  // 태그 개수 제한
+  if (this.tags && this.tags.length > 5) {
+    this.tags = this.tags.slice(0, 5);
+  }
+
+  next();
+});
+
+// 삭제 시 관련 데이터 정리
+reminderSchema.pre("deleteOne", { document: true, query: false }, async function (next) {
+  try {
+    // 자식 반복 리마인드들도 함께 삭제
+    if (this.isRecurring) {
+      await this.constructor.deleteMany({
+        "metadata.parentReminderId": this._id
+      });
+    }
+
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ===== JSON 출력 설정 =====
 reminderSchema.set("toJSON", {
   virtuals: true,
   transform: function (doc, ret) {
+    // 민감한 정보 제거
+    delete ret.__v;
+    delete ret.stats.snoozeHistory;
+
+    // ID 형태 통일
     ret.id = ret._id;
     delete ret._id;
-    delete ret.__v;
+
     return ret;
   }
 });
 
-/**
- * Object 변환 시 가상 속성 포함
- */
-reminderSchema.set("toObject", { virtuals: true });
-
-// ===== 📝 로깅 미들웨어 =====
-
-/**
- * 저장 후 로깅
- */
-reminderSchema.post("save", function (doc) {
-  if (doc.isNew) {
-    logger.debug(`🔔 새 리마인더 저장됨: ${doc._id} (${doc.reminderTime.toISOString()})`);
-  } else if (doc.isSent) {
-    logger.debug(`✅ 리마인더 발송 완료: ${doc._id}`);
-  }
-});
-
-/**
- * 업데이트 후 로깅
- */
-reminderSchema.post("findOneAndUpdate", function (doc) {
-  if (doc && doc.isSent) {
-    logger.debug(`✅ 리마인더 상태 업데이트: ${doc._id}`);
-  }
-});
-
-// ===== 🏭 모델 생성 및 내보내기 =====
-
+// 모델 생성 및 내보내기
 const Reminder = mongoose.model("Reminder", reminderSchema);
 
 module.exports = Reminder;
