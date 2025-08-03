@@ -78,35 +78,35 @@ class TodoRenderer extends BaseRenderer {
       // 렌더링 액션에 따라 처리
       switch (renderAction) {
         case "menu":
-          return this.renderMenu(data, ctx);
+          return await this.renderMenu(data, ctx);
 
         case "list":
-          return this.renderTodoList(data, ctx);
+          return await this.renderTodoList(data, ctx);
 
         case "input_request":
-          return this.renderInputRequest(data, ctx);
+          return await this.renderInputRequest(data, ctx);
 
         case "success":
-          return this.renderSuccess(data, ctx);
+          return await this.renderSuccess(data, ctx);
 
         case "error":
-          return this.renderError(data, ctx);
+          return await this.renderError(data, ctx);
 
         case "stats":
-          return this.renderStats(data, ctx);
+          return await this.renderStats(data, ctx);
 
         case "weekly_report":
-          return this.renderWeeklyReport(data, ctx);
+          return await this.renderWeeklyReport(data, ctx);
 
         case "remind_list":
-          return this.renderReminderList(data, ctx);
+          return await this.renderReminderList(data, ctx);
 
         default:
           throw new Error(`Unknown render action: ${renderAction}`);
       }
     } catch (error) {
       logger.error("TodoRenderer.render 오류:", error);
-      return this.renderError(
+      return await this.renderError(
         {
           message: "렌더링 중 오류가 발생했습니다.",
           canRetry: true
@@ -119,7 +119,7 @@ class TodoRenderer extends BaseRenderer {
   /**
    * 📋 메뉴 렌더링
    */
-  renderMenu(data, _ctx) {
+  async renderMenu(data, ctx) {
     const { title, stats, enableReminders } = data;
 
     let text = `${title}\n\n`;
@@ -160,21 +160,24 @@ class TodoRenderer extends BaseRenderer {
       this.createButton("🏠 홈으로", { module: "system", action: "menu" })
     ]);
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   /**
    * 📋 할일 목록 렌더링
    */
-  renderTodoList(data, _ctx) {
+  async renderTodoList(data, ctx) {
     const { todos, currentPage, totalPages, totalCount, enableReminders } =
       data;
 
@@ -217,7 +220,7 @@ class TodoRenderer extends BaseRenderer {
 
     // 할일 액션 버튼 (각 할일별로)
     if (todos.length > 0) {
-      todos.forEach((todo, index) => {
+      todos.forEach((todo) => {
         const row = [];
 
         // 완료/미완료 토글
@@ -267,22 +270,25 @@ class TodoRenderer extends BaseRenderer {
       this.createButton("🏠 홈으로", { module: "system", action: "menu" })
     ]);
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   /**
    * 📝 입력 요청 렌더링
    */
-  renderInputRequest(data, _ctx) {
-    const { title, message, suggestions, _currentText } = data;
+  async renderInputRequest(data, ctx) {
+    const { title, message, suggestions } = data;
 
     let text = `${title}\n\n`;
     text += `${message}\n`;
@@ -299,22 +305,25 @@ class TodoRenderer extends BaseRenderer {
     // 취소 버튼만 표시
     const keyboard = [[this.createButton("❌ 취소", "menu")]];
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   /**
    * ✅ 성공 메시지 렌더링
    */
-  renderSuccess(data, _ctx) {
-    const { message, _action, redirectTo, todo } = data;
+  async renderSuccess(data, ctx) {
+    const { message, redirectTo, todo } = data;
 
     let text = `${message}\n`;
 
@@ -339,21 +348,24 @@ class TodoRenderer extends BaseRenderer {
       this.createButton("🏠 홈으로", { module: "system", action: "menu" })
     ]);
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   /**
    * ❌ 에러 메시지 렌더링
    */
-  renderError(data, _ctx) {
+  async renderError(data, ctx) {
     const { message, action, canRetry } = data;
 
     let text = `❌ *오류*\n\n`;
@@ -376,21 +388,24 @@ class TodoRenderer extends BaseRenderer {
       this.createButton("🏠 홈으로", { module: "system", action: "menu" })
     ]);
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   /**
    * 📊 통계 렌더링
    */
-  renderStats(data, _ctx) {
+  async renderStats(data, ctx) {
     let text = `📊 *할일 통계*\n\n`;
 
     text += `${this.styles.title} 전체 현황\n`;
@@ -414,22 +429,25 @@ class TodoRenderer extends BaseRenderer {
       ]
     ];
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   /**
    * 📈 주간 리포트 렌더링
    */
-  renderWeeklyReport(data, _ctx) {
-    const { report, _enableReminders } = data;
+  async renderWeeklyReport(data, ctx) {
+    const { report } = data;
 
     let text = `📈 *주간 리포트*\n`;
     text += `${TimeHelper.format(report.period.start, "date")} ~ ${TimeHelper.format(report.period.end, "date")}\n\n`;
@@ -471,21 +489,24 @@ class TodoRenderer extends BaseRenderer {
       ]
     ];
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   /**
    * ⏰ 리마인더 목록 렌더링
    */
-  renderReminderList(data, _ctx) {
+  async renderReminderList(data, ctx) {
     const { reminders, totalCount } = data;
 
     let text = `⏰ *리마인더 목록* (${totalCount}개)\n\n`;
@@ -537,15 +558,18 @@ class TodoRenderer extends BaseRenderer {
       this.createButton("🏠 홈으로", { module: "system", action: "menu" })
     ]);
 
-    return {
-      text,
-      options: {
-        parse_mode: "Markdown",
-        reply_markup: {
-          inline_keyboard: keyboard
-        }
+    // 실제로 메시지 전송
+    await this.sendSafeMessage(ctx, text, {
+      parse_mode: "Markdown",
+      reply_markup: {
+        inline_keyboard: keyboard
       }
-    };
+    });
+
+    // 콜백 쿼리 응답
+    if (ctx.callbackQuery && ctx.answerCbQuery) {
+      await ctx.answerCbQuery();
+    }
   }
 
   // ===== 헬퍼 메서드 =====
@@ -619,20 +643,29 @@ class TodoRenderer extends BaseRenderer {
   }
 
   /**
-   * 버튼 생성 헬퍼 (BaseRenderer의 createCallbackButton 활용)
+   * 버튼 생성 헬퍼 (BaseRenderer의 형식에 맞게 수정)
    */
   createButton(text, action, params = null) {
     if (typeof action === "object") {
       // 다른 모듈로의 이동
-      return this.createCallbackButton(
-        text,
-        action.module,
-        action.action,
-        action.params
-      );
+      return {
+        text: text,
+        callback_data: this.buildCallbackData(
+          action.module,
+          action.action,
+          action.params || ""
+        )
+      };
     } else {
       // 같은 모듈 내 액션
-      return this.createCallbackButton(text, this.moduleName, action, params);
+      return {
+        text: text,
+        callback_data: this.buildCallbackData(
+          this.moduleName,
+          action,
+          params || ""
+        )
+      };
     }
   }
 

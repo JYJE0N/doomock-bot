@@ -566,6 +566,39 @@ class TodoService extends BaseService {
       return this.createErrorResponse(error, "리마인더 삭제 실패");
     }
   }
+  /**
+   * 발송 대상 리마인더 조회 (ReminderScheduler용)
+   */
+  async getPendingReminders(currentTime = new Date(), limit = 10) {
+    try {
+      if (!this.models.Reminder) {
+        return [];
+      }
+
+      const query = {
+        isActive: true,
+        completed: false,
+        remindAt: { $lte: currentTime }
+      };
+
+      // sentAt 필드가 스키마에 있다면 추가
+      if (this.models.Reminder.schema.paths.sentAt) {
+        query.sentAt = { $exists: false };
+      }
+
+      const reminders = await this.models.Reminder.find(query)
+        .populate("todoId", "text completed")
+        .limit(limit)
+        .lean();
+
+      logger.debug(`getPendingReminders 쿼리 결과: ${reminders.length}개`);
+
+      return reminders;
+    } catch (error) {
+      logger.error("getPendingReminders 오류:", error);
+      return [];
+    }
+  }
 
   /**
    * 서비스 헬스체크

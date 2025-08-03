@@ -56,8 +56,13 @@ class TodoModule extends BaseModule {
    */
   async onInitialize() {
     try {
+      // ServiceBuilder를 통해 TodoService 가져오기
+      if (this.serviceBuilder) {
+        this.todoService = await this.serviceBuilder.getOrCreate("todo");
+      }
+
       if (!this.todoService) {
-        throw new Error("TodoService가 필요합니다");
+        throw new Error("TodoService 생성에 실패했습니다");
       }
 
       // 액션 등록
@@ -95,42 +100,6 @@ class TodoModule extends BaseModule {
       stats: this.showStats.bind(this),
       weekly: this.showWeeklyReport.bind(this)
     });
-  }
-
-  /**
-   * 콜백 처리 (표준 매개변수 준수)
-   */
-  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
-    try {
-      const action = this.actionMap[subAction];
-
-      if (!action) {
-        logger.warn(`알 수 없는 액션: ${subAction}`);
-        return {
-          type: "error",
-          module: "todo",
-          action: "error",
-          data: {
-            message: "알 수 없는 액션입니다.",
-            canRetry: false
-          }
-        };
-      }
-
-      // 액션 실행
-      return await action(bot, callbackQuery, subAction, params, moduleManager);
-    } catch (error) {
-      logger.error(`TodoModule.handleCallback 오류:`, error);
-      return {
-        type: "error",
-        module: "todo",
-        action: "error",
-        data: {
-          message: "처리 중 오류가 발생했습니다.",
-          canRetry: true
-        }
-      };
-    }
   }
 
   /**
