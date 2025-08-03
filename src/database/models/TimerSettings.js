@@ -31,16 +31,16 @@ const timerSettingsSchema = new mongoose.Schema(
     notificationSound: {
       type: String,
       enum: ["default", "bell", "chime", "silent"],
-      default: "default",
+      default: "default"
     },
     notificationVolume: { type: Number, default: 0.7, min: 0, max: 1 },
 
     // 활성 상태
-    isActive: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: true }
   },
   {
     timestamps: true,
-    versionKey: false,
+    versionKey: false
   }
 );
 

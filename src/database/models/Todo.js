@@ -6,7 +6,7 @@ const todoSchema = new mongoose.Schema(
   {
     userId: {
       type: String,
-      required: true,
+      required: true
       // ✅ 수정: index: true 제거 (아래 schema.index()와 중복되므로)
     },
     text: { type: String, required: true, trim: true, maxlength: 500 },
@@ -16,11 +16,11 @@ const todoSchema = new mongoose.Schema(
     category: { type: String, default: "일반" },
     tags: [String],
     dueDate: Date,
-    isActive: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: true }
   },
   {
     timestamps: true,
-    versionKey: false,
+    versionKey: false
   }
 );
 
@@ -71,7 +71,7 @@ todoSchema.pre("save", function (next) {
 // 업데이트 시 version 증가
 todoSchema.pre(["updateOne", "findOneAndUpdate"], function (next) {
   this.set({
-    $inc: { version: 1 },
+    $inc: { version: 1 }
   });
   next();
 });
@@ -137,7 +137,7 @@ todoSchema.methods.restore = function () {
 todoSchema.statics.findByUser = function (userId, options = {}) {
   const query = this.find({
     userId: String(userId),
-    isActive: true,
+    isActive: true
   });
 
   if (options.completed !== undefined) {
@@ -156,9 +156,7 @@ todoSchema.statics.findByUser = function (userId, options = {}) {
     query.where("tags").in(options.tags);
   }
 
-  return query
-    .sort(options.sort || { createdAt: -1 })
-    .limit(options.limit || 0);
+  return query.sort(options.sort || { createdAt: -1 }).limit(options.limit || 0);
 };
 
 /**
@@ -176,8 +174,8 @@ todoSchema.statics.findDueToday = function (userId) {
     completed: false,
     dueDate: {
       $gte: today,
-      $lt: tomorrow,
-    },
+      $lt: tomorrow
+    }
   }).sort("dueDate");
 };
 
@@ -189,7 +187,7 @@ todoSchema.statics.findOverdue = function (userId) {
     userId: String(userId),
     isActive: true,
     completed: false,
-    dueDate: { $lt: new Date() },
+    dueDate: { $lt: new Date() }
   }).sort("dueDate");
 };
 
@@ -201,20 +199,20 @@ todoSchema.statics.getCategoryStats = async function (userId) {
     {
       $match: {
         userId: String(userId),
-        isActive: true,
-      },
+        isActive: true
+      }
     },
     {
       $group: {
         _id: "$category",
         total: { $sum: 1 },
         completed: {
-          $sum: { $cond: ["$completed", 1, 0] },
+          $sum: { $cond: ["$completed", 1, 0] }
         },
         pending: {
-          $sum: { $cond: ["$completed", 0, 1] },
-        },
-      },
+          $sum: { $cond: ["$completed", 0, 1] }
+        }
+      }
     },
     {
       $project: {
@@ -223,10 +221,10 @@ todoSchema.statics.getCategoryStats = async function (userId) {
         completed: 1,
         pending: 1,
         completionRate: {
-          $multiply: [{ $divide: ["$completed", "$total"] }, 100],
-        },
-      },
-    },
+          $multiply: [{ $divide: ["$completed", "$total"] }, 100]
+        }
+      }
+    }
   ]);
 };
 

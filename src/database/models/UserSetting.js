@@ -8,11 +8,11 @@ const userSettingSchema = new mongoose.Schema(
     timezone: { type: String, default: "Asia/Seoul" },
     language: { type: String, default: "ko" },
     workStartTime: { type: String, default: "09:00" },
-    workEndTime: { type: String, default: "18:00" },
+    workEndTime: { type: String, default: "18:00" }
   },
   {
     timestamps: true,
-    versionKey: false,
+    versionKey: false
   }
 );
 

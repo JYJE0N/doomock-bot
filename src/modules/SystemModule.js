@@ -12,14 +12,14 @@ class SystemModule extends BaseModule {
       maxLogLines: 50,
       botVersion: process.env.BOT_VERSION || "4.0.0",
       enableDetailedStats: true,
-      ...options.config,
+      ...options.config
     };
 
     this.systemStats = {
       startTime: Date.now(),
       totalCallbacks: 0,
       totalMessages: 0,
-      uniqueUsers: new Set(),
+      uniqueUsers: new Set()
     };
   }
 
@@ -50,7 +50,7 @@ class SystemModule extends BaseModule {
       modules: this.showModuleStatus,
       // stats: this.showSystemStats,
       // logs: this.showRecentLogs,
-      ping: this.handlePing,
+      ping: this.handlePing
       // version: this.showVersion,
     });
   }
@@ -70,10 +70,10 @@ class SystemModule extends BaseModule {
         activeModules: activeModules.map((key) => ({
           key,
           name: key.charAt(0).toUpperCase() + key.slice(1),
-          emoji: this.getModuleEmoji(key),
+          emoji: this.getModuleEmoji(key)
         })),
-        systemStats: this.getBasicStats(),
-      },
+        systemStats: this.getBasicStats()
+      }
     };
   }
 
@@ -87,8 +87,8 @@ class SystemModule extends BaseModule {
       data: {
         version: this.config.botVersion,
         commands: this.getAvailableCommands(),
-        modules: this.getModulesInfo(moduleManager),
-      },
+        modules: this.getModulesInfo(moduleManager)
+      }
     };
   }
 
@@ -103,14 +103,14 @@ class SystemModule extends BaseModule {
         data: {
           system: this.getSystemInfo(),
           process: this.getProcessInfo(),
-          modules: this.getModulesStatusData(moduleManager),
-        },
+          modules: this.getModulesStatusData(moduleManager)
+        }
       };
     } catch (error) {
       logger.error("시스템 상태 조회 실패:", error);
       return {
         type: "error",
-        message: "시스템 상태를 확인할 수 없습니다.",
+        message: "시스템 상태를 확인할 수 없습니다."
       };
     }
   }
@@ -125,13 +125,13 @@ class SystemModule extends BaseModule {
       return {
         type: "modules",
         module: "system",
-        data: modulesData,
+        data: modulesData
       };
     } catch (error) {
       logger.error("모듈 상태 조회 실패:", error);
       return {
         type: "error",
-        message: "모듈 상태를 확인할 수 없습니다.",
+        message: "모듈 상태를 확인할 수 없습니다."
       };
     }
   }
@@ -148,8 +148,8 @@ class SystemModule extends BaseModule {
       module: "system",
       data: {
         responseTime,
-        status: "pong",
-      },
+        status: "pong"
+      }
     };
   }
 
@@ -159,7 +159,7 @@ class SystemModule extends BaseModule {
       todo: "📝",
       timer: "⏰",
       worktime: "🏢",
-      system: "🤖",
+      system: "🤖"
     };
     return emojiMap[moduleKey] || "📦";
   }
@@ -168,7 +168,7 @@ class SystemModule extends BaseModule {
     return {
       uptime: this.getUptime(),
       totalCallbacks: this.systemStats.totalCallbacks,
-      uniqueUsers: this.systemStats.uniqueUsers.size,
+      uniqueUsers: this.systemStats.uniqueUsers.size
     };
   }
 
@@ -185,7 +185,7 @@ class SystemModule extends BaseModule {
       modules.push({
         name: key,
         status: module.getStatus(),
-        initialized: module.isInitialized,
+        initialized: module.isInitialized
       });
     }
     return modules;

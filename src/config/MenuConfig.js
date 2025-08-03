@@ -23,26 +23,26 @@ const UI_THEMES = {
     title: "🤖 두목봇 v4.0.0",
     subtitle: "🎯 통합 관리 시스템",
     colors: ["🔵", "🟢", "🟡", "🟠", "🔴", "🟣"],
-    buttonStyle: "primary",
+    buttonStyle: "primary"
   },
 
   module: {
     titlePrefix: "📱",
     backButton: "🔙 메뉴",
-    colors: ["🎯", "⚡", "🔧", "🎪"],
+    colors: ["🎯", "⚡", "🔧", "🎪"]
   },
 
   error: {
     title: "🚨 시스템 오류",
     color: "🔴",
-    actions: ["🔄 재시도", "🏠 메인 메뉴"],
+    actions: ["🔄 재시도", "🏠 메인 메뉴"]
   },
 
   success: {
     title: "✅ 작업 완료",
     color: "🟢",
-    celebration: ["🎉", "🎊", "✨", "🌟"],
-  },
+    celebration: ["🎉", "🎊", "✨", "🌟"]
+  }
 };
 
 /**
@@ -52,23 +52,23 @@ const TIME_BASED_THEMES = {
   morning: {
     greeting: "좋은 아침입니다",
     emoji: "🌅",
-    theme: "bright",
+    theme: "bright"
   },
   afternoon: {
     greeting: "안녕하세요",
     emoji: "☀️",
-    theme: "warm",
+    theme: "warm"
   },
   evening: {
     greeting: "좋은 저녁입니다",
     emoji: "🌆",
-    theme: "cool",
+    theme: "cool"
   },
   night: {
     greeting: "늦은 시간입니다",
     emoji: "🌙",
-    theme: "dark",
-  },
+    theme: "dark"
+  }
 };
 
 /**
@@ -81,7 +81,7 @@ class MenuBuilder {
       menusGenerated: 0,
       keyboardsCreated: 0,
       lastGenerated: null,
-      rainbowMenus: 0,
+      rainbowMenus: 0
     };
 
     logger.debug("🎨 MenuBuilder v4.0.0 생성됨 (통합 레지스트리 기반)");
@@ -176,7 +176,7 @@ class MenuBuilder {
     const animations = {
       success: ["🎉", "🎊", "✨", "🌟", "💫", "⭐"],
       loading: ["⏳", "⏰", "🔄", "🔃", "⚡", "💨"],
-      error: ["❌", "⚠️", "🚨", "💥", "🔴", "❗"],
+      error: ["❌", "⚠️", "🚨", "💥", "🔴", "❗"]
     };
 
     const emojis = animations[type] || animations.success;
@@ -207,7 +207,7 @@ class MenuBuilder {
   getStats() {
     return {
       ...this.stats,
-      moduleStats: getModuleStats(),
+      moduleStats: getModuleStats()
     };
   }
 }
@@ -254,7 +254,7 @@ module.exports = {
   // 버전 정보
   version: "4.0.0",
   unified: true,
-  legacy: false, // 레거시 데이터 제거됨
+  legacy: false // 레거시 데이터 제거됨
 };
 
 logger.info("🎨 MenuConfig v4.0.0 로드됨 (통합 레지스트리 기반)");

@@ -48,10 +48,7 @@ class LeaveService extends BaseService {
       const Leave = this.models.Leave;
       const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const userSetting = await UserLeaveSetting.getOrCreate(
-        userId,
-        currentYear
-      );
+      const userSetting = await UserLeaveSetting.getOrCreate(userId, currentYear);
 
       // ✅ 수정: getUserYearlyUsage → getYearlyUsage
       const yearlyUsage = await Leave.getYearlyUsage(userId, currentYear);
@@ -68,25 +65,18 @@ class LeaveService extends BaseService {
         usedLeave,
         remainingLeave,
         usageRate: totalLeave > 0 ? (usedLeave / totalLeave) * 100 : 0,
-        joinDate: userSetting.joinDate
-          ? userSetting.joinDate.toISOString().split("T")[0]
-          : null,
+        joinDate: userSetting.joinDate ? userSetting.joinDate.toISOString().split("T")[0] : null,
         workYears: userSetting.workYears,
         yearlyBonus: userSetting.yearlyBonus,
         customLeave: userSetting.customLeave,
-        totalUsageCount: yearlyUsage.totalCount || 0,
+        totalUsageCount: yearlyUsage.totalCount || 0
       };
 
-      logger.debug(
-        `📊 연차 현황 조회 완료: 사용자 ${userId}, ${currentYear}년`
-      );
+      logger.debug(`📊 연차 현황 조회 완료: 사용자 ${userId}, ${currentYear}년`);
       return this.createSuccessResponse(statusData, "연차 현황 조회 완료");
     } catch (error) {
       logger.error("📊 연차 현황 조회 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "연차 현황 조회 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "연차 현황 조회 중 오류가 발생했습니다.");
     }
   }
 
@@ -110,21 +100,14 @@ class LeaveService extends BaseService {
         currentMonth,
         currentYear,
         totalLeave: statusResult.success ? statusResult.data.totalLeave : 15,
-        remainingLeave: statusResult.success
-          ? statusResult.data.remainingLeave
-          : 15,
+        remainingLeave: statusResult.success ? statusResult.data.remainingLeave : 15
       };
 
-      logger.debug(
-        `📈 월별 사용량 조회 완료: 사용자 ${userId}, ${currentYear}년`
-      );
+      logger.debug(`📈 월별 사용량 조회 완료: 사용자 ${userId}, ${currentYear}년`);
       return this.createSuccessResponse(result, "월별 사용량 조회 완료");
     } catch (error) {
       logger.error("📈 월별 사용량 조회 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "월별 사용량 조회 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "월별 사용량 조회 중 오류가 발생했습니다.");
     }
   }
 
@@ -165,21 +148,12 @@ class LeaveService extends BaseService {
         // 직접 입력의 경우 (0초과 10이하)
         leaveType = `연차 ${amount}일`;
       } else {
-        return this.createErrorResponse(
-          new Error("INVALID_AMOUNT"),
-          `잘못된 연차 사용량입니다: ${amount}일`
-        );
+        return this.createErrorResponse(new Error("INVALID_AMOUNT"), `잘못된 연차 사용량입니다: ${amount}일`);
       }
 
       // 연차 사용 기록
       const useDate = date ? new Date(date) : new Date();
-      const leave = await Leave.addUsage(
-        userId,
-        amount,
-        useDate,
-        reason,
-        leaveType
-      );
+      const leave = await Leave.addUsage(userId, amount, useDate, reason, leaveType);
 
       // 업데이트된 현황 조회
       const updatedStatus = await this.getLeaveStatus(userId);
@@ -190,19 +164,14 @@ class LeaveService extends BaseService {
         amount,
         type: leave.type || leaveType,
         reason: reason || "",
-        remainingLeave: updatedStatus.success
-          ? updatedStatus.data.remainingLeave
-          : 0,
+        remainingLeave: updatedStatus.success ? updatedStatus.data.remainingLeave : 0
       };
 
       logger.info(`🏖️ 연차 사용 기록 완료: 사용자 ${userId}, ${amount}일`);
       return this.createSuccessResponse(result, "연차 사용이 기록되었습니다.");
     } catch (error) {
       logger.error("🏖️ 연차 사용 기록 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "연차 사용 기록 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "연차 사용 기록 중 오류가 발생했습니다.");
     }
   }
 
@@ -216,10 +185,7 @@ class LeaveService extends BaseService {
       const UserLeaveSetting = this.models.UserLeaveSetting;
       const currentYear = new Date().getFullYear();
 
-      const userSetting = await UserLeaveSetting.getOrCreate(
-        userId,
-        currentYear
-      );
+      const userSetting = await UserLeaveSetting.getOrCreate(userId, currentYear);
 
       const settingsData = {
         userId,
@@ -228,22 +194,17 @@ class LeaveService extends BaseService {
         baseLeave: 15,
         yearlyBonus: userSetting.yearlyBonus,
         customLeave: userSetting.customLeave,
-        joinDate: userSetting.joinDate
-          ? userSetting.joinDate.toISOString().split("T")[0]
-          : null,
+        joinDate: userSetting.joinDate ? userSetting.joinDate.toISOString().split("T")[0] : null,
         workYears: userSetting.workYears,
         changeHistory: userSetting.getChangesSummary(),
-        canModify: true, // 개인용이므로 항상 수정 가능
+        canModify: true // 개인용이므로 항상 수정 가능
       };
 
       logger.debug(`⚙️ 사용자 설정 조회 완료: 사용자 ${userId}`);
       return this.createSuccessResponse(settingsData, "사용자 설정 조회 완료");
     } catch (error) {
       logger.error("⚙️ 사용자 설정 조회 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "사용자 설정 조회 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "사용자 설정 조회 중 오류가 발생했습니다.");
     }
   }
 
@@ -254,11 +215,7 @@ class LeaveService extends BaseService {
     try {
       const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const updatedSetting = await UserLeaveSetting.addLeave(
-        userId,
-        amount,
-        reason
-      );
+      const updatedSetting = await UserLeaveSetting.addLeave(userId, amount, reason);
       const newTotal = updatedSetting.calculateTotalLeave();
 
       const result = {
@@ -266,17 +223,14 @@ class LeaveService extends BaseService {
         amount,
         newTotal,
         customLeave: updatedSetting.customLeave,
-        message: `연차 ${amount}일이 추가되었습니다.`,
+        message: `연차 ${amount}일이 추가되었습니다.`
       };
 
       logger.info(`➕ 연차 추가 완료: 사용자 ${userId}, +${amount}일`);
       return this.createSuccessResponse(result, "연차가 추가되었습니다.");
     } catch (error) {
       logger.error("➕ 연차 추가 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "연차 추가 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "연차 추가 중 오류가 발생했습니다.");
     }
   }
 
@@ -287,11 +241,7 @@ class LeaveService extends BaseService {
     try {
       const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const updatedSetting = await UserLeaveSetting.removeLeave(
-        userId,
-        amount,
-        reason
-      );
+      const updatedSetting = await UserLeaveSetting.removeLeave(userId, amount, reason);
       const newTotal = updatedSetting.calculateTotalLeave();
 
       const result = {
@@ -299,17 +249,14 @@ class LeaveService extends BaseService {
         amount,
         newTotal,
         customLeave: updatedSetting.customLeave,
-        message: `연차 ${amount}일이 삭제되었습니다.`,
+        message: `연차 ${amount}일이 삭제되었습니다.`
       };
 
       logger.info(`➖ 연차 삭제 완료: 사용자 ${userId}, -${amount}일`);
       return this.createSuccessResponse(result, "연차가 삭제되었습니다.");
     } catch (error) {
       logger.error("➖ 연차 삭제 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "연차 삭제 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "연차 삭제 중 오류가 발생했습니다.");
     }
   }
 
@@ -320,10 +267,7 @@ class LeaveService extends BaseService {
     try {
       const UserLeaveSetting = this.models.UserLeaveSetting;
 
-      const updatedSetting = await UserLeaveSetting.setJoinDate(
-        userId,
-        joinDate
-      );
+      const updatedSetting = await UserLeaveSetting.setJoinDate(userId, joinDate);
       const newTotal = updatedSetting.calculateTotalLeave();
 
       const result = {
@@ -332,17 +276,14 @@ class LeaveService extends BaseService {
         workYears: updatedSetting.workYears,
         yearlyBonus: updatedSetting.yearlyBonus,
         newTotal,
-        message: `입사일이 ${joinDate}로 설정되었습니다. (${updatedSetting.workYears}년차)`,
+        message: `입사일이 ${joinDate}로 설정되었습니다. (${updatedSetting.workYears}년차)`
       };
 
       logger.info(`💼 입사일 설정 완료: 사용자 ${userId}, ${joinDate}`);
       return this.createSuccessResponse(result, "입사일이 설정되었습니다.");
     } catch (error) {
       logger.error("💼 입사일 설정 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "입사일 설정 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "입사일 설정 중 오류가 발생했습니다.");
     }
   }
 
@@ -356,30 +297,19 @@ class LeaveService extends BaseService {
       const UserLeaveSetting = this.models.UserLeaveSetting;
       const targetYear = newYear || new Date().getFullYear();
 
-      const newSetting = await UserLeaveSetting.resetForNewYear(
-        userId,
-        targetYear
-      );
+      const newSetting = await UserLeaveSetting.resetForNewYear(userId, targetYear);
 
       const result = {
         year: targetYear,
         totalLeave: newSetting.calculateTotalLeave(),
-        message: `${targetYear}년 새로운 연차가 생성되었습니다.`,
+        message: `${targetYear}년 새로운 연차가 생성되었습니다.`
       };
 
-      logger.info(
-        `🔄 신년 연차 초기화 완료: 사용자 ${userId}, ${targetYear}년`
-      );
-      return this.createSuccessResponse(
-        result,
-        "새로운 연차가 생성되었습니다."
-      );
+      logger.info(`🔄 신년 연차 초기화 완료: 사용자 ${userId}, ${targetYear}년`);
+      return this.createSuccessResponse(result, "새로운 연차가 생성되었습니다.");
     } catch (error) {
       logger.error("🔄 신년 연차 초기화 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "신년 연차 초기화 중 오류가 발생했습니다."
-      );
+      return this.createErrorResponse(error, "신년 연차 초기화 중 오류가 발생했습니다.");
     }
   }
 
@@ -397,9 +327,9 @@ class LeaveService extends BaseService {
         "월별 사용량 조회",
         "연차 설정 관리",
         "입사일 기반 보너스",
-        "연말 소멸/신년 생성",
+        "연말 소멸/신년 생성"
       ],
-      version: "2.0.0-simple",
+      version: "2.0.0-simple"
     };
   }
 

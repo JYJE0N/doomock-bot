@@ -8,7 +8,7 @@ const timerStatsSchema = new mongoose.Schema(
     userId: {
       type: String,
       required: true,
-      index: true,
+      index: true
     },
     date: { type: String, required: true }, // YYYY-MM-DD 형식
 
@@ -36,11 +36,11 @@ const timerStatsSchema = new mongoose.Schema(
     averageFocusDuration: { type: Number, default: 0 },
 
     // 활성 상태
-    isActive: { type: Boolean, default: true },
+    isActive: { type: Boolean, default: true }
   },
   {
     timestamps: true,
-    versionKey: false,
+    versionKey: false
   }
 );
 
@@ -54,36 +54,24 @@ timerStatsSchema.index({ date: -1 });
  * 일일 통계 업데이트 또는 생성
  */
 timerStatsSchema.statics.updateDaily = async function (userId, date, updates) {
-  return this.findOneAndUpdate(
-    { userId: String(userId), date },
-    { $inc: updates },
-    { upsert: true, new: true }
-  );
+  return this.findOneAndUpdate({ userId: String(userId), date }, { $inc: updates }, { upsert: true, new: true });
 };
 
 /**
  * 기간별 통계 조회
  */
-timerStatsSchema.statics.getStatsByDateRange = function (
-  userId,
-  startDate,
-  endDate
-) {
+timerStatsSchema.statics.getStatsByDateRange = function (userId, startDate, endDate) {
   return this.find({
     userId: String(userId),
     date: { $gte: startDate, $lte: endDate },
-    isActive: true,
+    isActive: true
   }).sort({ date: -1 });
 };
 
 /**
  * 월별 집계
  */
-timerStatsSchema.statics.getMonthlyAggregate = async function (
-  userId,
-  year,
-  month
-) {
+timerStatsSchema.statics.getMonthlyAggregate = async function (userId, year, month) {
   const startDate = `${year}-${String(month).padStart(2, "0")}-01`;
   const endDate = `${year}-${String(month).padStart(2, "0")}-31`;
 
@@ -92,8 +80,8 @@ timerStatsSchema.statics.getMonthlyAggregate = async function (
       $match: {
         userId: String(userId),
         date: { $gte: startDate, $lte: endDate },
-        isActive: true,
-      },
+        isActive: true
+      }
     },
     {
       $group: {
@@ -102,9 +90,9 @@ timerStatsSchema.statics.getMonthlyAggregate = async function (
         totalMinutes: { $sum: "$totalMinutes" },
         totalDays: { $sum: 1 },
         avgSessionsPerDay: { $avg: "$totalCompleted" },
-        avgMinutesPerDay: { $avg: "$totalMinutes" },
-      },
-    },
+        avgMinutesPerDay: { $avg: "$totalMinutes" }
+      }
+    }
   ]);
 };
 

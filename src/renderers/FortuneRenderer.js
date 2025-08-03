@@ -41,10 +41,7 @@ class FortuneRenderer extends BaseRenderer {
       case "error":
         return await this.renderError(data, ctx);
       default:
-        return await this.renderError(
-          { message: "지원하지 않는 기능입니다." },
-          ctx
-        );
+        return await this.renderError({ message: "지원하지 않는 기능입니다." }, ctx);
     }
   }
 
@@ -83,7 +80,7 @@ class FortuneRenderer extends BaseRenderer {
           text: `${config1.emoji} ${config1.label}`,
           // 🎯 핵심 수정: action을 "draw"에서 "draw"로, params에 실제 타입을 넘김
           action: "draw",
-          params: key1, // "single", "triple", "celtic"이 정확히 전달됨
+          params: key1 // "single", "triple", "celtic"이 정확히 전달됨
         });
 
         // 두 번째 운세 타입 (있으면)
@@ -92,7 +89,7 @@ class FortuneRenderer extends BaseRenderer {
           row.push({
             text: `${config2.emoji} ${config2.label}`,
             action: "draw",
-            params: key2, // "single", "triple", "celtic"이 정확히 전달됨
+            params: key2 // "single", "triple", "celtic"이 정확히 전달됨
           });
         }
 
@@ -106,17 +103,17 @@ class FortuneRenderer extends BaseRenderer {
     // 통계/기록 버튼
     buttons.push([
       { text: "📊 통계", action: "stats" },
-      { text: "📋 기록", action: "history" },
+      { text: "📋 기록", action: "history" }
     ]);
 
     // 메인 메뉴 버튼 - 🔧 수정: system 모듈로 올바르게 라우팅
     buttons.push([
       {
         text: "🔙 메인 메뉴",
-        action: "menu",
+        action: "menu"
         // NavigationHandler의 buildCallbackData 형식에 맞게 수정
         // "system:menu"가 되도록 처리
-      },
+      }
     ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -146,7 +143,7 @@ class FortuneRenderer extends BaseRenderer {
       row.push({
         text: `${config1.emoji} ${config1.label}`,
         action: "draw",
-        params: key1, // "single", "triple", "celtic"이 정확히 전달됨
+        params: key1 // "single", "triple", "celtic"이 정확히 전달됨
       });
 
       if (i + 1 < fortuneTypeEntries.length) {
@@ -154,7 +151,7 @@ class FortuneRenderer extends BaseRenderer {
         row.push({
           text: `${config2.emoji} ${config2.label}`,
           action: "draw",
-          params: key2, // "single", "triple", "celtic"이 정확히 전달됨
+          params: key2 // "single", "triple", "celtic"이 정확히 전달됨
         });
       }
 
@@ -182,12 +179,10 @@ class FortuneRenderer extends BaseRenderer {
       remainingDraws,
       totalDraws,
       message,
-      isDemo, // 더미 데이터 표시용
+      isDemo // 더미 데이터 표시용
     } = data;
 
-    let text = `✨ **${
-      fortuneType?.label || this.getFortuneTypeName(drawType)
-    } 결과**\n\n`;
+    let text = `✨ **${fortuneType?.label || this.getFortuneTypeName(drawType)} 결과**\n\n`;
 
     // 더미 데이터 표시
     if (isDemo) {
@@ -206,11 +201,8 @@ class FortuneRenderer extends BaseRenderer {
       if (drawType === "triple") {
         const positions = ["과거", "현재", "미래"];
         cards.forEach((card, index) => {
-          const position =
-            card.position || positions[index] || `${index + 1}번째`;
-          text += `**${position}**: ${card.emoji || "🎴"} ${
-            card.korean || card.name
-          }\n`;
+          const position = card.position || positions[index] || `${index + 1}번째`;
+          text += `**${position}**: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
 
           if (card.isReversed) {
             text += `🔄 역방향 - `;
@@ -259,12 +251,12 @@ class FortuneRenderer extends BaseRenderer {
     const buttons = [
       [
         { text: "🎴 다시 뽑기", action: "draw" },
-        { text: "🔄 카드 셔플", action: "shuffle" },
+        { text: "🔄 카드 셔플", action: "shuffle" }
       ],
       [
         { text: "📊 통계", action: "stats" },
-        { text: "🔙 메뉴", action: "menu" },
-      ],
+        { text: "🔙 메뉴", action: "menu" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -300,9 +292,7 @@ class FortuneRenderer extends BaseRenderer {
         const card = cards[i];
         const reversed = card.isReversed ? " (역방향)" : "";
         const positionName = card.positionName || `위치 ${i + 1}`;
-        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${
-          card.korean || card.name
-        }${reversed}\n`;
+        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${card.korean || card.name}${reversed}\n`;
       }
 
       text += `\n🎴 **카드 배치 (6-10)**\n`;
@@ -310,9 +300,7 @@ class FortuneRenderer extends BaseRenderer {
         const card = cards[i];
         const reversed = card.isReversed ? " (역방향)" : "";
         const positionName = card.positionName || `위치 ${i + 1}`;
-        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${
-          card.korean || card.name
-        }${reversed}\n`;
+        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${card.korean || card.name}${reversed}\n`;
       }
 
       text += `\n📖 **상세 해석을 보려면 아래 버튼을 누르세요**`;
@@ -322,9 +310,9 @@ class FortuneRenderer extends BaseRenderer {
       [{ text: "📖 상세 해석 보기", action: "celtic_detail", params: "show" }],
       [
         { text: "🔮 다른 질문", action: "draw", params: "celtic" },
-        { text: "🎴 간단한 운세", action: "draw" },
+        { text: "🎴 간단한 운세", action: "draw" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -411,9 +399,9 @@ ${data.message}
     const buttons = [
       [
         { text: "📊 통계 보기", action: "stats" },
-        { text: "📋 기록 보기", action: "history" },
+        { text: "📋 기록 보기", action: "history" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -434,8 +422,8 @@ ${data.message}
     const buttons = [
       [
         { text: "🎴 운세 뽑기", action: "draw" },
-        { text: "🔙 메뉴", action: "menu" },
-      ],
+        { text: "🔙 메뉴", action: "menu" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -475,9 +463,9 @@ ${data.message}
     const buttons = [
       [
         { text: "🎴 운세 뽑기", action: "draw" },
-        { text: "📋 기록 보기", action: "history" },
+        { text: "📋 기록 보기", action: "history" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -498,15 +486,9 @@ ${data.message}
       text += `첫 번째 운세를 뽑아보세요! 🔮`;
     } else {
       history.slice(0, 10).forEach((record, index) => {
-        const cardName =
-          record.koreanName ||
-          record.cardName ||
-          record.card?.korean ||
-          "알 수 없음";
+        const cardName = record.koreanName || record.cardName || record.card?.korean || "알 수 없음";
         const recordDate = record.date || "날짜 불명";
-        const fortuneType = this.getFortuneTypeName(
-          record.drawType || record.type
-        );
+        const fortuneType = this.getFortuneTypeName(record.drawType || record.type);
 
         text += `${index + 1}. ${recordDate}\n`;
         text += `   ${fortuneType} - ${cardName}\n`;
@@ -526,9 +508,9 @@ ${data.message}
     const buttons = [
       [
         { text: "🎴 운세 뽑기", action: "draw" },
-        { text: "📊 통계 보기", action: "stats" },
+        { text: "📊 통계 보기", action: "stats" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -542,8 +524,7 @@ ${data.message}
   async renderError(data, ctx) {
     try {
       // ✅ 수정: 안전한 데이터 접근
-      const errorMessage =
-        data && data.message ? data.message : "알 수 없는 오류가 발생했습니다.";
+      const errorMessage = data && data.message ? data.message : "알 수 없는 오류가 발생했습니다.";
 
       const text = `❌ **오류 발생**
 
@@ -554,8 +535,8 @@ ${errorMessage}
       const buttons = [
         [
           { text: "🔄 다시 시도", action: "menu" },
-          { text: "🔙 메인 메뉴", action: "menu" },
-        ],
+          { text: "🔙 메인 메뉴", action: "menu" }
+        ]
       ];
 
       const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -566,9 +547,7 @@ ${errorMessage}
       logger.error("FortuneRenderer.renderError 중 오류:", error);
 
       try {
-        await ctx.reply(
-          "❌ 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-        );
+        await ctx.reply("❌ 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요.");
       } catch (replyError) {
         logger.error("최후 에러 메시지 전송도 실패:", replyError);
       }
@@ -587,7 +566,7 @@ ${errorMessage}
       celtic: "캘틱 크로스",
       love: "연애운",
       work: "사업운",
-      custom: "자유질문",
+      custom: "자유질문"
     };
 
     return typeNames[type] || type;
@@ -604,7 +583,7 @@ ${errorMessage}
       "The Magician": "의지력과 창조적 능력",
       마법사: "의지력과 창조적 능력",
       "The Star": "희망과 영감, 밝은 미래",
-      별: "희망과 영감, 밝은 미래",
+      별: "희망과 영감, 밝은 미래"
     };
 
     const cardKey = card.korean || card.name;
@@ -627,7 +606,7 @@ ${errorMessage}
       "The Magician": "당신의 능력을 믿고 목표를 향해 나아가세요.",
       마법사: "당신의 능력을 믿고 목표를 향해 나아가세요.",
       "The Star": "희망을 잃지 말고 긍정적으로 생각하세요.",
-      별: "희망을 잃지 말고 긍정적으로 생각하세요.",
+      별: "희망을 잃지 말고 긍정적으로 생각하세요."
     };
 
     const cardKey = card.korean || card.name;
@@ -639,15 +618,7 @@ ${errorMessage}
    */
   async renderCelticDetail(data, ctx) {
     try {
-      const {
-        userName,
-        question,
-        cards,
-        detailedInterpretation,
-        overallMessage,
-        isDemo,
-        timestamp,
-      } = data;
+      const { userName, question, cards, detailedInterpretation, overallMessage, isDemo, timestamp } = data;
 
       let text = `📖 **캘틱 크로스 상세 해석**\n\n`;
 
@@ -658,9 +629,7 @@ ${errorMessage}
       text += `**질문**: "${question}"\n`;
 
       if (timestamp) {
-        text += `**뽑은 시간**: ${new Date(timestamp).toLocaleString(
-          "ko-KR"
-        )}\n`;
+        text += `**뽑은 시간**: ${new Date(timestamp).toLocaleString("ko-KR")}\n`;
       }
 
       text += `\n`;
@@ -674,9 +643,7 @@ ${errorMessage}
         for (let i = 0; i < 5 && i < cards.length; i++) {
           const card = cards[i];
           const reversed = card.isReversed ? " 🔄" : "";
-          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${
-            card.korean
-          }${reversed}\n`;
+          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${card.korean}${reversed}\n`;
           text += `   ${card.positionDescription}\n`;
 
           // 카드별 간단 해석
@@ -693,9 +660,7 @@ ${errorMessage}
         for (let i = 5; i < 10 && i < cards.length; i++) {
           const card = cards[i];
           const reversed = card.isReversed ? " 🔄" : "";
-          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${
-            card.korean
-          }${reversed}\n`;
+          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${card.korean}${reversed}\n`;
           text += `   ${card.positionDescription}\n\n`;
         }
       }
@@ -721,13 +686,13 @@ ${errorMessage}
       const buttons = [
         [
           { text: "🔮 새로운 질문", action: "draw", params: "celtic" },
-          { text: "🎴 간단 운세", action: "draw" },
+          { text: "🎴 간단 운세", action: "draw" }
         ],
         [
           { text: "📊 통계", action: "stats" },
-          { text: "📋 기록", action: "history" },
+          { text: "📋 기록", action: "history" }
         ],
-        [{ text: "🔙 메뉴", action: "menu" }],
+        [{ text: "🔙 메뉴", action: "menu" }]
       ];
 
       const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -735,10 +700,7 @@ ${errorMessage}
       await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
     } catch (error) {
       logger.error("FortuneRenderer.renderCelticDetail 오류:", error);
-      await this.renderError(
-        { message: "상세 해석 표시 중 오류가 발생했습니다." },
-        ctx
-      );
+      await this.renderError({ message: "상세 해석 표시 중 오류가 발생했습니다." }, ctx);
     }
   }
 

@@ -149,7 +149,7 @@ function getUserInfo(input) {
       fullName: getUserName(input),
       languageCode: user.language_code || "ko",
       isBot: user.is_bot || false,
-      isPremium: user.is_premium || false,
+      isPremium: user.is_premium || false
     };
   } catch (error) {
     logger.warn("getUserInfo 오류:", error.message);
@@ -194,7 +194,7 @@ function getChatInfo(input) {
       lastName: chat.last_name || "",
       isPrivate: chat.type === "private",
       isGroup: chat.type === "group" || chat.type === "supergroup",
-      isChannel: chat.type === "channel",
+      isChannel: chat.type === "channel"
     };
   } catch (error) {
     logger.warn("getChatInfo 오류:", error.message);
@@ -335,7 +335,7 @@ function validateUser(input) {
       return {
         valid: false,
         reason: "사용자 정보 없음",
-        details: "입력에서 사용자 정보를 찾을 수 없습니다.",
+        details: "입력에서 사용자 정보를 찾을 수 없습니다."
       };
     }
 
@@ -345,7 +345,7 @@ function validateUser(input) {
         return {
           valid: false,
           reason: "다른 봇의 메시지",
-          details: `봇 ID ${userInfo.id}는 허용되지 않습니다.`,
+          details: `봇 ID ${userInfo.id}는 허용되지 않습니다.`
         };
       }
     }
@@ -353,14 +353,14 @@ function validateUser(input) {
     return {
       valid: true,
       reason: "검증 통과",
-      userInfo,
+      userInfo
     };
   } catch (error) {
     logger.warn("validateUser 오류:", error.message);
     return {
       valid: false,
       reason: "검증 중 오류 발생",
-      details: error.message,
+      details: error.message
     };
   }
 }
@@ -523,7 +523,7 @@ module.exports = {
   getAnonymousId,
 
   // 테스트
-  testUserHelper,
+  testUserHelper
 };
 
 // 로깅

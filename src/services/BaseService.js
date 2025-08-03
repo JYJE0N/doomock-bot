@@ -52,7 +52,7 @@ class BaseService {
     return {
       serviceName: this.serviceName,
       isInitialized: this.isInitialized,
-      modelCount: Object.keys(this.models).length,
+      modelCount: Object.keys(this.models).length
     };
   }
 

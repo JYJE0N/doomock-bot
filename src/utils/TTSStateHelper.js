@@ -10,7 +10,7 @@ class TTSStateHelper {
   setState(userId, state) {
     this.userStates.set(userId, {
       ...state,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
 
     // 자동 정리

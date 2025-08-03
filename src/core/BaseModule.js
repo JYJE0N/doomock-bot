@@ -59,19 +59,12 @@ class BaseModule {
         return {
           type: "error",
           message: `알 수 없는 액션입니다: ${subAction}`,
-          module: this.moduleName,
+          module: this.moduleName
         };
       }
 
       // 핸들러 실행
-      const result = await handler.call(
-        this,
-        bot,
-        callbackQuery,
-        subAction,
-        params,
-        moduleManager
-      );
+      const result = await handler.call(this, bot, callbackQuery, subAction, params, moduleManager);
 
       return result;
     } catch (error) {
@@ -80,7 +73,7 @@ class BaseModule {
         type: "error",
         message: "처리 중 오류가 발생했습니다.",
         module: this.moduleName,
-        error: error.message,
+        error: error.message
       };
     }
   }
@@ -101,9 +94,7 @@ class BaseModule {
   registerActions(actions) {
     for (const [action, handler] of Object.entries(actions)) {
       if (typeof handler !== "function") {
-        logger.warn(
-          `⚠️ ${this.moduleName}: ${action} 액션의 핸들러가 함수가 아닙니다`
-        );
+        logger.warn(`⚠️ ${this.moduleName}: ${action} 액션의 핸들러가 함수가 아닙니다`);
         continue;
       }
       this.actionMap.set(action, handler.bind(this));
@@ -133,7 +124,7 @@ class BaseModule {
       moduleName: this.moduleName,
       isInitialized: this.isInitialized,
       actionCount: this.actionMap.size,
-      actions: Array.from(this.actionMap.keys()),
+      actions: Array.from(this.actionMap.keys())
     };
   }
 }

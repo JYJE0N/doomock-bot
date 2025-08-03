@@ -27,7 +27,7 @@ class WeatherModule extends BaseModule {
       { id: "daegu", name: "대구", fullName: "대구시" },
       { id: "busan", name: "부산", fullName: "부산시" },
       { id: "gwangju", name: "광주", fullName: "광주시" },
-      { id: "jeju", name: "제주", fullName: "제주시" },
+      { id: "jeju", name: "제주", fullName: "제주시" }
     ];
 
     // 모듈 설정
@@ -35,7 +35,7 @@ class WeatherModule extends BaseModule {
       defaultCity: process.env.DEFAULT_WEATHER_CITY || "서울",
       enableDustInfo: process.env.WEATHER_ENABLE_DUST !== "false",
       enableForecast: process.env.WEATHER_ENABLE_FORECAST !== "false",
-      ...options.config,
+      ...options.config
     };
 
     // 사용자별 선호 도시 (메모리 캐시)
@@ -53,8 +53,8 @@ class WeatherModule extends BaseModule {
         this.weatherService = await this.serviceBuilder.getOrCreate("weather", {
           config: {
             defaultLocation: this.config.defaultCity + "시",
-            enableDustInfo: this.config.enableDustInfo,
-          },
+            enableDustInfo: this.config.enableDustInfo
+          }
         });
       }
 
@@ -80,7 +80,7 @@ class WeatherModule extends BaseModule {
       current: this.showCurrentWeather,
       setdefault: this.setDefaultCity,
       forecast: this.showForecast,
-      help: this.showHelp,
+      help: this.showHelp
     });
 
     logger.info(`✅ WeatherModule 액션 등록 완료 (${this.actionMap.size}개)`);
@@ -93,16 +93,14 @@ class WeatherModule extends BaseModule {
     const {
       text,
       chat: { id: _chatId },
-      from: { id: userId },
+      from: { id: userId }
     } = msg;
 
     if (!text) return false;
 
     const lowerText = text.toLowerCase();
     const weatherKeywords = ["날씨", "weather", "온도", "습도"];
-    const hasWeatherKeyword = weatherKeywords.some((keyword) =>
-      lowerText.includes(keyword)
-    );
+    const hasWeatherKeyword = weatherKeywords.some((keyword) => lowerText.includes(keyword));
 
     if (!hasWeatherKeyword) return false;
 
@@ -113,7 +111,7 @@ class WeatherModule extends BaseModule {
       return {
         type: "city_weather_direct",
         module: "weather",
-        data: weatherData,
+        data: weatherData
       };
     }
 
@@ -123,7 +121,7 @@ class WeatherModule extends BaseModule {
     return {
       type: "default_weather_direct",
       module: "weather",
-      data: weatherData,
+      data: weatherData
     };
   }
 
@@ -144,8 +142,8 @@ class WeatherModule extends BaseModule {
         userName,
         defaultCity,
         majorCities: this.majorCities,
-        config: this.config,
-      },
+        config: this.config
+      }
     };
   }
 
@@ -158,8 +156,8 @@ class WeatherModule extends BaseModule {
       module: "weather",
       data: {
         cities: this.majorCities,
-        defaultCity: this.getUserPreferredCity(getUserId(callbackQuery.from)),
-      },
+        defaultCity: this.getUserPreferredCity(getUserId(callbackQuery.from))
+      }
     };
   }
 
@@ -173,7 +171,7 @@ class WeatherModule extends BaseModule {
     if (!city) {
       return {
         type: "error",
-        message: "알 수 없는 도시입니다.",
+        message: "알 수 없는 도시입니다."
       };
     }
 
@@ -182,15 +180,15 @@ class WeatherModule extends BaseModule {
       return {
         type: "weather",
         module: "weather",
-        data: weatherData,
+        data: weatherData
       };
     } catch (error) {
       logger.error(`날씨 조회 실패: ${city.name}`, error);
       return {
         type: "error",
         data: {
-          message: this.getErrorMessage(error),
-        },
+          message: this.getErrorMessage(error)
+        }
       };
     }
   }
@@ -207,15 +205,15 @@ class WeatherModule extends BaseModule {
       return {
         type: "current_weather",
         module: "weather",
-        data: weatherData,
+        data: weatherData
       };
     } catch (error) {
       logger.error("현재 날씨 조회 실패:", error);
       return {
         type: "error",
         data: {
-          message: this.getErrorMessage(error),
-        },
+          message: this.getErrorMessage(error)
+        }
       };
     }
   }
@@ -230,7 +228,7 @@ class WeatherModule extends BaseModule {
     if (!city) {
       return {
         type: "error",
-        message: "알 수 없는 도시입니다.",
+        message: "알 수 없는 도시입니다."
       };
     }
 
@@ -244,8 +242,8 @@ class WeatherModule extends BaseModule {
       module: "weather",
       data: {
         city,
-        userName: getUserName(callbackQuery.from),
-      },
+        userName: getUserName(callbackQuery.from)
+      }
     };
   }
 
@@ -253,28 +251,25 @@ class WeatherModule extends BaseModule {
    * 날씨 예보 표시
    */
   async showForecast(bot, callbackQuery, subAction, params) {
-    const cityId =
-      params || this.getDefaultCityId(getUserId(callbackQuery.from));
+    const cityId = params || this.getDefaultCityId(getUserId(callbackQuery.from));
     const city = this.majorCities.find((c) => c.id === cityId);
 
     if (!city) {
       return {
         type: "error",
-        message: "알 수 없는 도시입니다.",
+        message: "알 수 없는 도시입니다."
       };
     }
 
     if (!this.config.enableForecast) {
       return {
         type: "error",
-        message: "날씨 예보 기능이 비활성화되어 있습니다.",
+        message: "날씨 예보 기능이 비활성화되어 있습니다."
       };
     }
 
     try {
-      const forecastResult = await this.weatherService.getForecast(
-        city.fullName
-      );
+      const forecastResult = await this.weatherService.getForecast(city.fullName);
 
       if (forecastResult.success) {
         return {
@@ -283,8 +278,8 @@ class WeatherModule extends BaseModule {
           data: {
             city,
             forecast: forecastResult.data,
-            timestamp: TimeHelper.format(TimeHelper.now(), "full"),
-          },
+            timestamp: TimeHelper.format(TimeHelper.now(), "full")
+          }
         };
       } else {
         throw new Error(forecastResult.error || "예보 조회 실패");
@@ -294,8 +289,8 @@ class WeatherModule extends BaseModule {
       return {
         type: "error",
         data: {
-          message: this.getErrorMessage(error),
-        },
+          message: this.getErrorMessage(error)
+        }
       };
     }
   }
@@ -315,9 +310,9 @@ class WeatherModule extends BaseModule {
           cities: "주요 8개 도시 지원",
           dust: this.config.enableDustInfo ? "미세먼지 정보" : null,
           forecast: this.config.enableForecast ? "5일 날씨 예보" : null,
-          setting: "기본 도시 설정",
-        },
-      },
+          setting: "기본 도시 설정"
+        }
+      }
     };
   }
 
@@ -333,9 +328,7 @@ class WeatherModule extends BaseModule {
     }
 
     // 날씨 정보 조회
-    const weatherResult = await this.weatherService.getCurrentWeather(
-      city.fullName
-    );
+    const weatherResult = await this.weatherService.getCurrentWeather(city.fullName);
 
     // 미세먼지 정보 조회 (옵션)
     let dustResult = null;
@@ -355,7 +348,7 @@ class WeatherModule extends BaseModule {
       city,
       weather: weatherResult.data,
       dust: dustResult?.success ? dustResult.data : null,
-      timestamp: TimeHelper.format(TimeHelper.now(), "full"),
+      timestamp: TimeHelper.format(TimeHelper.now(), "full")
     };
   }
 
@@ -380,11 +373,7 @@ class WeatherModule extends BaseModule {
    */
   findCityByKeyword(keyword) {
     const lowerKeyword = keyword.toLowerCase();
-    return this.majorCities.find(
-      (city) =>
-        city.name.toLowerCase().includes(lowerKeyword) ||
-        city.id.toLowerCase().includes(lowerKeyword)
-    );
+    return this.majorCities.find((city) => city.name.toLowerCase().includes(lowerKeyword) || city.id.toLowerCase().includes(lowerKeyword));
   }
 
   /**
@@ -412,8 +401,8 @@ class WeatherModule extends BaseModule {
       config: {
         defaultCity: this.config.defaultCity,
         enableDustInfo: this.config.enableDustInfo,
-        enableForecast: this.config.enableForecast,
-      },
+        enableForecast: this.config.enableForecast
+      }
     };
   }
 

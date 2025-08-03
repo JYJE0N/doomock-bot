@@ -10,8 +10,7 @@ const TimeHelper = require("./TimeHelper");
 class AirQualityHelper {
   constructor() {
     // API 설정 - 디코딩된 키 직접 사용
-    this.apiKey =
-      process.env.AIR_KOREA_API_KEY || process.env.DATA_GO_KR_API_KEY;
+    this.apiKey = process.env.AIR_KOREA_API_KEY || process.env.DATA_GO_KR_API_KEY;
     this.baseUrl = "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc";
 
     // 캐시 설정
@@ -26,12 +25,12 @@ class AirQualityHelper {
       apiCalls: 0,
       cacheHits: 0,
       errors: 0,
-      lastUpdate: null,
+      lastUpdate: null
     };
 
     logger.info("🌬️ AirQualityHelper 초기화", {
       hasApiKey: !!this.apiKey,
-      keyLength: this.apiKey ? this.apiKey.length : 0,
+      keyLength: this.apiKey ? this.apiKey.length : 0
     });
   }
 
@@ -76,7 +75,7 @@ class AirQualityHelper {
       대전: "문창동",
       대전광역시: "문창동",
       울산: "삼산동",
-      울산광역시: "삼산동",
+      울산광역시: "삼산동"
     };
   }
 
@@ -100,7 +99,7 @@ class AirQualityHelper {
           success: true,
           data: cached,
           location: normalizedLocation,
-          source: "cache",
+          source: "cache"
         };
       }
 
@@ -122,7 +121,7 @@ class AirQualityHelper {
           success: true,
           data: data,
           location: normalizedLocation,
-          source: "api",
+          source: "api"
         };
       } else {
         // API 실패 시 추정 데이터
@@ -150,9 +149,9 @@ class AirQualityHelper {
           pageNo: 1,
           stationName: stationName,
           dataTerm: "DAILY",
-          ver: "1.0",
+          ver: "1.0"
         },
-        timeout: 5000,
+        timeout: 5000
       });
 
       if (response.data?.response?.body?.items?.[0]) {
@@ -162,36 +161,36 @@ class AirQualityHelper {
           pm25: {
             value: item.pm25Value || "-",
             grade: this.getGrade(item.pm25Grade),
-            flag: item.pm25Flag,
+            flag: item.pm25Flag
           },
           pm10: {
             value: item.pm10Value || "-",
             grade: this.getGrade(item.pm10Grade),
-            flag: item.pm10Flag,
+            flag: item.pm10Flag
           },
           overall: {
             value: item.khaiValue || "-",
-            grade: this.getGrade(item.khaiGrade),
+            grade: this.getGrade(item.khaiGrade)
           },
           o3: {
             value: item.o3Value || "-",
-            grade: this.getGrade(item.o3Grade),
+            grade: this.getGrade(item.o3Grade)
           },
           no2: {
             value: item.no2Value || "-",
-            grade: this.getGrade(item.no2Grade),
+            grade: this.getGrade(item.no2Grade)
           },
           co: {
             value: item.coValue || "-",
-            grade: this.getGrade(item.coGrade),
+            grade: this.getGrade(item.coGrade)
           },
           so2: {
             value: item.so2Value || "-",
-            grade: this.getGrade(item.so2Grade),
+            grade: this.getGrade(item.so2Grade)
           },
           stationName: stationName,
           dataTime: item.dataTime,
-          timestamp: TimeHelper.format(item.dataTime, "time"),
+          timestamp: TimeHelper.format(item.dataTime, "time")
         };
       }
 
@@ -236,22 +235,20 @@ class AirQualityHelper {
     const data = {
       pm25: {
         value: pm25Value.toString(),
-        grade: this.getDustGrade(pm25Value, "pm25"),
+        grade: this.getDustGrade(pm25Value, "pm25")
       },
       pm10: {
         value: pm10Value.toString(),
-        grade: this.getDustGrade(pm10Value, "pm10"),
+        grade: this.getDustGrade(pm10Value, "pm10")
       },
       overall: {
         grade: this.getDustGrade(Math.max(pm25Value, pm10Value), "overall"),
-        value: Math.round((pm25Value + pm10Value) / 2).toString(),
+        value: Math.round((pm25Value + pm10Value) / 2).toString()
       },
-      advice: this.getDustAdvice(
-        this.getDustGrade(Math.max(pm25Value, pm10Value), "overall")
-      ),
+      advice: this.getDustAdvice(this.getDustGrade(Math.max(pm25Value, pm10Value), "overall")),
       timestamp: TimeHelper.format(TimeHelper.now(), "time"),
       stationName: "추정값",
-      dataTime: TimeHelper.format(TimeHelper.now(), "full"),
+      dataTime: TimeHelper.format(TimeHelper.now(), "full")
     };
 
     logger.info(`📊 추정 미세먼지 데이터 생성: ${location}`);
@@ -261,7 +258,7 @@ class AirQualityHelper {
       data: data,
       location: location,
       source: "estimated",
-      warning: "실시간 데이터를 가져올 수 없어 추정값을 제공합니다",
+      warning: "실시간 데이터를 가져올 수 없어 추정값을 제공합니다"
     };
   }
 
@@ -286,11 +283,7 @@ class AirQualityHelper {
    * 🏢 측정소명 조회
    */
   getStationName(location) {
-    return (
-      this.stationMapping[location] ||
-      this.stationMapping[location.replace(/시$/, "")] ||
-      "종로구"
-    ); // 기본값
+    return this.stationMapping[location] || this.stationMapping[location.replace(/시$/, "")] || "종로구"; // 기본값
   }
 
   /**
@@ -301,7 +294,7 @@ class AirQualityHelper {
       1: "좋음",
       2: "보통",
       3: "나쁨",
-      4: "매우나쁨",
+      4: "매우나쁨"
     };
     return gradeMap[gradeValue] || "알 수 없음";
   }
@@ -340,7 +333,7 @@ class AirQualityHelper {
       좋음: "외출하기 좋은 날씨입니다! 야외활동을 즐기세요.",
       보통: "일반적인 야외활동에 지장이 없습니다.",
       나쁨: "장시간 야외활동을 자제하고, 외출 시 마스크를 착용하세요.",
-      매우나쁨: "외출을 자제하고, 부득이한 외출 시 보건용 마스크를 착용하세요.",
+      매우나쁨: "외출을 자제하고, 부득이한 외출 시 보건용 마스크를 착용하세요."
     };
     return adviceMap[grade] || "대기질 정보를 확인하세요.";
   }
@@ -360,7 +353,7 @@ class AirQualityHelper {
   setCache(key, data) {
     this.cache.set(key, {
       data: data,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
   }
 
@@ -376,9 +369,7 @@ class AirQualityHelper {
     return {
       ...this.stats,
       cacheSize: this.cache.size,
-      lastUpdate: this.stats.lastUpdate
-        ? TimeHelper.format(this.stats.lastUpdate, "full")
-        : "없음",
+      lastUpdate: this.stats.lastUpdate ? TimeHelper.format(this.stats.lastUpdate, "full") : "없음"
     };
   }
 }

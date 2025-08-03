@@ -22,8 +22,8 @@ class FancyBanner {
         "Speed", // 스피드감 있는 스타일
         "Starwars", // 스타워즈 스타일
         "Block", // 블록 스타일
-        "Colossal", // 거대한 스타일
-      ],
+        "Colossal" // 거대한 스타일
+      ]
     };
 
     // 레인보우 색상 배열
@@ -40,7 +40,7 @@ class FancyBanner {
       { start: "#A8EDEA", end: "#FED6E3" }, // 민트 → 분홍
       { start: "#FF9A9E", end: "#FECFEF" }, // 연분홍 그라디언트
       { start: "#667EEA", end: "#764BA2" }, // 보라 그라디언트
-      { start: "#F093FB", end: "#F5576C" }, // 네온 핑크
+      { start: "#F093FB", end: "#F5576C" } // 네온 핑크
     ];
   }
 
@@ -60,7 +60,7 @@ class FancyBanner {
     // 메인 타이틀 - 더 크고 선명하게
     await this.printFigletText("DOOMOCK", {
       font: "Larry 3D", // Big 폰트가 더 선명함
-      style: "neonRainbow", // 새로운 네온 레인보우 스타일
+      style: "neonRainbow" // 새로운 네온 레인보우 스타일
     });
 
     console.log(""); // 여백
@@ -96,7 +96,7 @@ class FancyBanner {
           horizontalLayout: "default",
           verticalLayout: "default",
           width: 80,
-          whitespaceBreak: true,
+          whitespaceBreak: true
         },
         (err, data) => {
           if (err) {
@@ -148,14 +148,7 @@ class FancyBanner {
    * 🌟 네온 레인보우 효과 (새로운!)
    */
   printNeonRainbow(text) {
-    const neonColors = [
-      "redBright",
-      "yellowBright",
-      "greenBright",
-      "cyanBright",
-      "blueBright",
-      "magentaBright",
-    ];
+    const neonColors = ["redBright", "yellowBright", "greenBright", "cyanBright", "blueBright", "magentaBright"];
     const lines = text.split("\n");
 
     lines.forEach((line, lineIndex) => {
@@ -304,42 +297,38 @@ class FancyBanner {
         icon: "🌍",
         label: "Environment",
         value: process.env.NODE_ENV || "development",
-        color: "cyanBright",
+        color: "cyanBright"
       },
       {
         icon: "🚂",
         label: "Railway",
         value: process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No",
-        color: "magentaBright",
+        color: "magentaBright"
       },
       {
         icon: "🕐",
         label: "Started",
         value: new Date().toLocaleString("ko-KR"),
-        color: "yellowBright",
+        color: "yellowBright"
       },
       {
         icon: "💾",
         label: "Memory",
         value: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
-        color: "greenBright",
+        color: "greenBright"
       },
       {
         icon: "📦",
         label: "Node.js",
         value: process.version,
-        color: "blueBright",
-      },
+        color: "blueBright"
+      }
     ];
 
     info.forEach((item) => {
       const content = ` ${item.icon} ${item.label}: ${item.value}`;
       const padding = boxWidth - content.length - 1;
-      const line =
-        "│" +
-        chalk.bold[item.color](content) +
-        " ".repeat(Math.max(0, padding)) +
-        "│";
+      const line = "│" + chalk.bold[item.color](content) + " ".repeat(Math.max(0, padding)) + "│";
       console.log(chalk.gray(line));
     });
 
@@ -357,23 +346,23 @@ class FancyBanner {
       {
         icon: "🌍",
         label: "Environment",
-        value: process.env.NODE_ENV || "development",
+        value: process.env.NODE_ENV || "development"
       },
       {
         icon: "🚂",
         label: "Railway",
-        value: process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No",
+        value: process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No"
       },
       {
         icon: "🕐",
         label: "Started",
-        value: new Date().toLocaleString("ko-KR"),
+        value: new Date().toLocaleString("ko-KR")
       },
       {
         icon: "💾",
         label: "Memory",
-        value: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`,
-      },
+        value: `${Math.round(process.memoryUsage().heapUsed / 1024 / 1024)}MB`
+      }
     ];
 
     info.forEach((item, index) => {
@@ -428,5 +417,5 @@ module.exports = {
   FancyBanner,
   fancyBanner,
   showDoomockBanner,
-  showModuleBanner,
+  showModuleBanner
 };

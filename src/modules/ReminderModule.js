@@ -23,8 +23,7 @@ class ReminderModule extends BaseModule {
     // 모듈 설정
     this.config = {
       maxRemindersPerUser: parseInt(process.env.MAX_REMINDERS_PER_USER) || 20,
-      defaultReminderMinutes:
-        parseInt(process.env.DEFAULT_REMINDER_MINUTES) || 30,
+      defaultReminderMinutes: parseInt(process.env.DEFAULT_REMINDER_MINUTES) || 30,
       maxReminderDays: parseInt(process.env.MAX_REMINDER_DAYS) || 365,
       enableRecurring: process.env.REMINDER_ENABLE_RECURRING !== "false",
       enableSnooze: process.env.REMINDER_ENABLE_SNOOZE !== "false",
@@ -35,7 +34,7 @@ class ReminderModule extends BaseModule {
       // 반복 옵션
       recurringOptions: ["daily", "weekly", "monthly"],
 
-      ...options.config,
+      ...options.config
     };
 
     // 사용자 입력 상태 관리
@@ -50,12 +49,9 @@ class ReminderModule extends BaseModule {
   async onInitialize() {
     try {
       if (this.serviceBuilder) {
-        this.reminderService = await this.serviceBuilder.getOrCreate(
-          "reminder",
-          {
-            config: this.config,
-          }
-        );
+        this.reminderService = await this.serviceBuilder.getOrCreate("reminder", {
+          config: this.config
+        });
       }
 
       if (!this.reminderService) {
@@ -93,7 +89,7 @@ class ReminderModule extends BaseModule {
 
       // 기타
       stats: this.showStats,
-      help: this.showHelp,
+      help: this.showHelp
     });
 
     logger.info(`✅ ReminderModule 액션 등록 완료 (${this.actionMap.size}개)`);
@@ -106,7 +102,7 @@ class ReminderModule extends BaseModule {
     const {
       text,
       chat: { id: chatId },
-      from: { id: userId },
+      from: { id: userId }
     } = msg;
 
     if (!text) return false;
@@ -125,7 +121,7 @@ class ReminderModule extends BaseModule {
         module: "reminder",
         action: "menu",
         chatId: chatId,
-        data: await this.getMenuData(userId),
+        data: await this.getMenuData(userId)
       };
     }
 
@@ -150,14 +146,14 @@ class ReminderModule extends BaseModule {
         module: "reminder",
         data: {
           ...menuData,
-          userName,
-        },
+          userName
+        }
       };
     } catch (error) {
       logger.error("리마인더 메뉴 데이터 조회 실패:", error);
       return {
         type: "error",
-        message: "메뉴를 불러올 수 없습니다.",
+        message: "메뉴를 불러올 수 없습니다."
       };
     }
   }
@@ -179,8 +175,8 @@ class ReminderModule extends BaseModule {
           module: "reminder",
           data: {
             current: stats.activeReminders,
-            max: this.config.maxRemindersPerUser,
-          },
+            max: this.config.maxRemindersPerUser
+          }
         };
       }
 
@@ -189,7 +185,7 @@ class ReminderModule extends BaseModule {
         awaitingInput: true,
         action: "add_reminder",
         step: "content",
-        timestamp: Date.now(),
+        timestamp: Date.now()
       });
 
       return {
@@ -197,14 +193,14 @@ class ReminderModule extends BaseModule {
         module: "reminder",
         data: {
           supportedTypes: this.config.supportedTypes,
-          maxDays: this.config.maxReminderDays,
-        },
+          maxDays: this.config.maxReminderDays
+        }
       };
     } catch (error) {
       logger.error("리마인더 추가 요청 실패:", error);
       return {
         type: "error",
-        message: "리마인더 추가를 시작할 수 없습니다.",
+        message: "리마인더 추가를 시작할 수 없습니다."
       };
     }
   }
@@ -226,14 +222,14 @@ class ReminderModule extends BaseModule {
         data: {
           reminders,
           filterType,
-          config: this.config,
-        },
+          config: this.config
+        }
       };
     } catch (error) {
       logger.error("리마인더 목록 조회 실패:", error);
       return {
         type: "error",
-        message: "리마인더 목록을 불러올 수 없습니다.",
+        message: "리마인더 목록을 불러올 수 없습니다."
       };
     }
   }
@@ -249,15 +245,12 @@ class ReminderModule extends BaseModule {
     if (!reminderId) {
       return {
         type: "error",
-        message: "삭제할 리마인더 ID가 필요합니다.",
+        message: "삭제할 리마인더 ID가 필요합니다."
       };
     }
 
     try {
-      const result = await this.reminderService.deleteReminder(
-        userId,
-        reminderId
-      );
+      const result = await this.reminderService.deleteReminder(userId, reminderId);
 
       if (result.success) {
         logger.info(`🗑️ 리마인더 삭제 성공`, { userId, reminderId });
@@ -267,20 +260,20 @@ class ReminderModule extends BaseModule {
           module: "reminder",
           data: {
             deletedId: reminderId,
-            message: "리마인더가 삭제되었습니다.",
-          },
+            message: "리마인더가 삭제되었습니다."
+          }
         };
       } else {
         return {
           type: "error",
-          message: result.message || "리마인더 삭제에 실패했습니다.",
+          message: result.message || "리마인더 삭제에 실패했습니다."
         };
       }
     } catch (error) {
       logger.error("리마인더 삭제 실패:", error);
       return {
         type: "error",
-        message: "리마인더 삭제 중 오류가 발생했습니다.",
+        message: "리마인더 삭제 중 오류가 발생했습니다."
       };
     }
   }
@@ -297,22 +290,18 @@ class ReminderModule extends BaseModule {
     if (!reminderId) {
       return {
         type: "error",
-        message: "스누즈할 리마인더 ID가 필요합니다.",
+        message: "스누즈할 리마인더 ID가 필요합니다."
       };
     }
 
     try {
-      const result = await this.reminderService.snoozeReminder(
-        userId,
-        reminderId,
-        snoozeMinutes
-      );
+      const result = await this.reminderService.snoozeReminder(userId, reminderId, snoozeMinutes);
 
       if (result.success) {
         logger.info(`⏰ 리마인더 스누즈 성공`, {
           userId,
           reminderId,
-          minutes: snoozeMinutes,
+          minutes: snoozeMinutes
         });
 
         return {
@@ -322,20 +311,20 @@ class ReminderModule extends BaseModule {
             reminderId,
             snoozeMinutes,
             newTime: result.newTime,
-            message: `${snoozeMinutes}분 후에 다시 알려드리겠습니다.`,
-          },
+            message: `${snoozeMinutes}분 후에 다시 알려드리겠습니다.`
+          }
         };
       } else {
         return {
           type: "error",
-          message: result.message || "스누즈 설정에 실패했습니다.",
+          message: result.message || "스누즈 설정에 실패했습니다."
         };
       }
     } catch (error) {
       logger.error("리마인더 스누즈 실패:", error);
       return {
         type: "error",
-        message: "스누즈 설정 중 오류가 발생했습니다.",
+        message: "스누즈 설정 중 오류가 발생했습니다."
       };
     }
   }
@@ -357,14 +346,14 @@ class ReminderModule extends BaseModule {
         data: {
           userName,
           stats,
-          config: this.config,
-        },
+          config: this.config
+        }
       };
     } catch (error) {
       logger.error("리마인더 통계 조회 실패:", error);
       return {
         type: "error",
-        message: "통계를 불러올 수 없습니다.",
+        message: "통계를 불러올 수 없습니다."
       };
     }
   }
@@ -383,9 +372,9 @@ class ReminderModule extends BaseModule {
           list: "리마인더 목록 확인",
           snooze: "리마인더 연기",
           recurring: "반복 리마인더",
-          types: "다양한 리마인더 타입",
-        },
-      },
+          types: "다양한 리마인더 타입"
+        }
+      }
     };
   }
 
@@ -397,7 +386,7 @@ class ReminderModule extends BaseModule {
   async handleUserInput(bot, msg, text, inputState) {
     const { action, step } = inputState;
     const {
-      from: { id: userId },
+      from: { id: userId }
     } = msg;
 
     if (action !== "add_reminder") return false;
@@ -414,7 +403,7 @@ class ReminderModule extends BaseModule {
           this.clearUserInputState(userId);
           return {
             type: "error",
-            message: "알 수 없는 입력 단계입니다.",
+            message: "알 수 없는 입력 단계입니다."
           };
       }
     } catch (error) {
@@ -422,7 +411,7 @@ class ReminderModule extends BaseModule {
       this.clearUserInputState(userId);
       return {
         type: "error",
-        message: "입력 처리 중 오류가 발생했습니다.",
+        message: "입력 처리 중 오류가 발생했습니다."
       };
     }
   }
@@ -437,7 +426,7 @@ class ReminderModule extends BaseModule {
     return {
       stats,
       todayReminders,
-      config: this.config,
+      config: this.config
     };
   }
 
@@ -446,10 +435,7 @@ class ReminderModule extends BaseModule {
    */
   async getUserStats(userId) {
     try {
-      if (
-        this.reminderService &&
-        typeof this.reminderService.getUserStats === "function"
-      ) {
+      if (this.reminderService && typeof this.reminderService.getUserStats === "function") {
         return await this.reminderService.getUserStats(userId);
       }
 
@@ -458,7 +444,7 @@ class ReminderModule extends BaseModule {
         totalReminders: 0,
         activeReminders: 0,
         completedReminders: 0,
-        todayReminders: 0,
+        todayReminders: 0
       };
     } catch (error) {
       logger.error("사용자 통계 조회 실패:", error);
@@ -466,7 +452,7 @@ class ReminderModule extends BaseModule {
         totalReminders: 0,
         activeReminders: 0,
         completedReminders: 0,
-        todayReminders: 0,
+        todayReminders: 0
       };
     }
   }
@@ -476,12 +462,9 @@ class ReminderModule extends BaseModule {
    */
   async getUserReminders(userId, filterType = "active") {
     try {
-      if (
-        this.reminderService &&
-        typeof this.reminderService.getUserReminders === "function"
-      ) {
+      if (this.reminderService && typeof this.reminderService.getUserReminders === "function") {
         return await this.reminderService.getUserReminders(userId, {
-          filter: filterType,
+          filter: filterType
         });
       }
 
@@ -498,10 +481,7 @@ class ReminderModule extends BaseModule {
    */
   async getTodayReminders(userId) {
     try {
-      if (
-        this.reminderService &&
-        typeof this.reminderService.getTodayReminders === "function"
-      ) {
+      if (this.reminderService && typeof this.reminderService.getTodayReminders === "function") {
         return await this.reminderService.getTodayReminders(userId);
       }
 
@@ -518,7 +498,7 @@ class ReminderModule extends BaseModule {
   setUserInputState(userId, state) {
     this.userInputStates.set(userId.toString(), {
       ...state,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
     logger.debug(`사용자 입력 상태 설정: ${userId}`, state);
   }
@@ -554,12 +534,7 @@ class ReminderModule extends BaseModule {
    */
   isModuleMessage(text, keywords) {
     const lowerText = text.trim().toLowerCase();
-    return keywords.some(
-      (keyword) =>
-        lowerText === keyword ||
-        lowerText.startsWith(keyword + " ") ||
-        lowerText.includes(keyword)
-    );
+    return keywords.some((keyword) => lowerText === keyword || lowerText.startsWith(keyword + " ") || lowerText.includes(keyword));
   }
 
   /**
@@ -575,8 +550,8 @@ class ReminderModule extends BaseModule {
         maxRemindersPerUser: this.config.maxRemindersPerUser,
         defaultReminderMinutes: this.config.defaultReminderMinutes,
         enableRecurring: this.config.enableRecurring,
-        enableSnooze: this.config.enableSnooze,
-      },
+        enableSnooze: this.config.enableSnooze
+      }
     };
   }
 

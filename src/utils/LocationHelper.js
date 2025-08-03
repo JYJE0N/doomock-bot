@@ -20,12 +20,12 @@ class LocationHelper {
       simpleCity: "화성",
       method: "default",
       latitude: 37.1498,
-      longitude: 126.832,
+      longitude: 126.832
     };
 
     logger.info("📍 LocationHelper 초기화됨", {
       hasKakaoKey: !!this.kakaoApiKey,
-      hasIpApiKey: !!this.ipApiKey,
+      hasIpApiKey: !!this.ipApiKey
     });
   }
 
@@ -65,13 +65,10 @@ class LocationHelper {
   async getLocationByIP() {
     try {
       const response = await axios.get("http://ip-api.com/json", {
-        timeout: 3000,
+        timeout: 3000
       });
 
-      if (
-        response.data.status === "success" &&
-        response.data.country === "South Korea"
-      ) {
+      if (response.data.status === "success" && response.data.country === "South Korea") {
         const city = this.translateCityName(response.data.city);
         return {
           success: true,
@@ -81,8 +78,8 @@ class LocationHelper {
             simpleCity: city.replace("시", ""),
             method: "ip_api",
             latitude: response.data.lat,
-            longitude: response.data.lon,
-          },
+            longitude: response.data.lon
+          }
         };
       }
 
@@ -106,7 +103,7 @@ class LocationHelper {
       { city: "울산시", district: "남구", lat: 35.5384, lon: 129.3114 },
       { city: "수원시", district: "팔달구", lat: 37.2636, lon: 127.0286 },
       { city: "화성시", district: "동탄", lat: 37.1498, lon: 126.832 },
-      { city: "용인시", district: "수지구", lat: 37.3236, lon: 127.0979 },
+      { city: "용인시", district: "수지구", lat: 37.3236, lon: 127.0979 }
     ];
 
     const randomCity = cities[Math.floor(Math.random() * cities.length)];
@@ -119,7 +116,7 @@ class LocationHelper {
       simpleCity: randomCity.city.replace("시", ""),
       method: "random",
       latitude: randomCity.lat,
-      longitude: randomCity.lon,
+      longitude: randomCity.lon
     };
   }
 
@@ -139,7 +136,7 @@ class LocationHelper {
       Changwon: "창원시",
       Seongnam: "성남시",
       Hwaseong: "화성시",
-      Yongin: "용인시",
+      Yongin: "용인시"
     };
 
     return cityMap[englishName] || englishName;
@@ -154,14 +151,11 @@ class LocationHelper {
     }
 
     try {
-      const response = await axios.get(
-        "https://dapi.kakao.com/v2/local/geo/coord2address.json",
-        {
-          params: { x: longitude, y: latitude },
-          headers: { Authorization: `KakaoAK ${this.kakaoApiKey}` },
-          timeout: 3000,
-        }
-      );
+      const response = await axios.get("https://dapi.kakao.com/v2/local/geo/coord2address.json", {
+        params: { x: longitude, y: latitude },
+        headers: { Authorization: `KakaoAK ${this.kakaoApiKey}` },
+        timeout: 3000
+      });
 
       if (response.data.documents && response.data.documents.length > 0) {
         const address = response.data.documents[0].address;
@@ -170,8 +164,8 @@ class LocationHelper {
           data: {
             city: address.region_2depth_name,
             district: address.region_3depth_name,
-            fullAddress: address.address_name,
-          },
+            fullAddress: address.address_name
+          }
         };
       }
 

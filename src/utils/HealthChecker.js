@@ -20,7 +20,7 @@ class HealthChecker {
       alertCooldown: options.alertCooldown || 300000,
       recoveryDelay: options.recoveryDelay || 5000,
       maxRecoveryAttempts: options.maxRecoveryAttempts || 3,
-      ...options,
+      ...options
     };
 
     // 🔧 컴포넌트 등록 시스템 수정
@@ -35,7 +35,7 @@ class HealthChecker {
           reference: componentRef,
           registered: false,
           lastCheck: null,
-          status: "unknown",
+          status: "unknown"
         });
       }
     }
@@ -45,7 +45,7 @@ class HealthChecker {
       health: "unknown",
       lastCheck: null,
       issues: [],
-      alerts: [],
+      alerts: []
     };
 
     // 🔧 개별 컴포넌트 상태
@@ -61,7 +61,7 @@ class HealthChecker {
       checkDuration: [],
       memoryUsage: [],
       responseTime: [],
-      errorCounts: new Map(),
+      errorCounts: new Map()
     };
 
     // 🚨 알림 관리
@@ -83,14 +83,10 @@ class HealthChecker {
         lastCheck: null,
         status: "unknown",
         required: options.required !== false,
-        ...options,
+        ...options
       });
 
-      logger.debug(
-        `🔧 컴포넌트 등록됨: ${name} (타입: ${
-          typeof componentRef === "function" ? "function" : "direct"
-        })`
-      );
+      logger.debug(`🔧 컴포넌트 등록됨: ${name} (타입: ${typeof componentRef === "function" ? "function" : "direct"})`);
     } catch (error) {
       logger.error(`❌ 컴포넌트 등록 실패: ${name}`, error);
     }
@@ -135,10 +131,7 @@ class HealthChecker {
       const mongooseManager = this.getComponent("mongoose");
 
       if (!mongooseManager) {
-        return this.createHealthResult(
-          "warning",
-          "MongooseManager가 등록되지 않음"
-        );
+        return this.createHealthResult("warning", "MongooseManager가 등록되지 않음");
       }
 
       const issues = [];
@@ -167,7 +160,7 @@ class HealthChecker {
 
       return this.createHealthResult(severity, issues.join(", ") || "정상", {
         ...status,
-        issues: issues.length,
+        issues: issues.length
       });
     } catch (error) {
       logger.error("❌ Mongoose 상태 체크 실패:", error);
@@ -232,13 +225,7 @@ class HealthChecker {
       const systemHealth = await this.checkSystemResources();
 
       // 📊 결과 통합 및 분석
-      const allChecks = [
-        botHealth,
-        moduleHealth,
-        dbHealth,
-        todoHealth,
-        systemHealth,
-      ];
+      const allChecks = [botHealth, moduleHealth, dbHealth, todoHealth, systemHealth];
 
       // 전체 상태 계산
       this.calculateOverallStatus(allChecks, timestamp);
@@ -250,16 +237,14 @@ class HealthChecker {
       // 상태별 대응
       await this.handleHealthStatus();
 
-      logger.debug(
-        `🔍 헬스체크 완료 (${checkDuration}ms) - 상태: ${this.overallStatus.health}`
-      );
+      logger.debug(`🔍 헬스체크 완료 (${checkDuration}ms) - 상태: ${this.overallStatus.health}`);
     } catch (error) {
       logger.error("❌ 헬스체크 수행 실패:", error);
       this.overallStatus = {
         health: "error",
         lastCheck: timestamp,
         issues: [`헬스체크 수행 실패: ${error.message}`],
-        alerts: this.overallStatus.alerts || [],
+        alerts: this.overallStatus.alerts || []
       };
     }
   }
@@ -272,10 +257,7 @@ class HealthChecker {
       const botController = this.getComponent("botController");
 
       if (!botController) {
-        return this.createHealthResult(
-          "warning",
-          "BotController가 등록되지 않음"
-        );
+        return this.createHealthResult("warning", "BotController가 등록되지 않음");
       }
 
       const issues = [];
@@ -309,7 +291,7 @@ class HealthChecker {
       return this.createHealthResult(severity, issues.join(", ") || "정상", {
         initialized: botController.initialized,
         hasBot: !!botController.bot,
-        stats: botController.stats || {},
+        stats: botController.stats || {}
       });
     } catch (error) {
       logger.error("❌ BotController 상태 체크 실패:", error);
@@ -325,19 +307,14 @@ class HealthChecker {
       const moduleManager = this.getComponent("moduleManager");
 
       if (!moduleManager) {
-        return this.createHealthResult(
-          "warning",
-          "ModuleManager가 등록되지 않음"
-        );
+        return this.createHealthResult("warning", "ModuleManager가 등록되지 않음");
       }
 
       const issues = [];
       let severity = "healthy";
 
       // ✅ 수정: 더 정확한 초기화 상태 확인
-      const isFullyInitialized = moduleManager.isFullyInitialized
-        ? moduleManager.isFullyInitialized()
-        : moduleManager.initialized;
+      const isFullyInitialized = moduleManager.isFullyInitialized ? moduleManager.isFullyInitialized() : moduleManager.initialized;
 
       if (!isFullyInitialized) {
         issues.push("ModuleManager가 완전히 초기화되지 않음");
@@ -364,16 +341,11 @@ class HealthChecker {
 
         // 초기화되지 않은 모듈 찾기
         const uninitializedModules = Object.entries(moduleDetails)
-          .filter(
-            ([key, detail]) =>
-              !detail.configInitialized || !detail.instanceInitialized
-          )
+          .filter(([key, detail]) => !detail.configInitialized || !detail.instanceInitialized)
           .map(([key]) => key);
 
         if (uninitializedModules.length > 0) {
-          issues.push(
-            `초기화되지 않은 모듈: ${uninitializedModules.join(", ")}`
-          );
+          issues.push(`초기화되지 않은 모듈: ${uninitializedModules.join(", ")}`);
           severity = severity === "critical" ? "critical" : "warning";
         }
       }
@@ -382,7 +354,7 @@ class HealthChecker {
         initialized: isFullyInitialized,
         moduleCount: moduleCount,
         stats: moduleManager.stats || {},
-        moduleDetails: moduleDetails,
+        moduleDetails: moduleDetails
       });
     } catch (error) {
       logger.error("❌ ModuleManager 상태 체크 실패:", error);
@@ -398,10 +370,7 @@ class HealthChecker {
       const dbManager = this.getComponent("database");
 
       if (!dbManager) {
-        return this.createHealthResult(
-          "warning",
-          "DatabaseManager가 등록되지 않음"
-        );
+        return this.createHealthResult("warning", "DatabaseManager가 등록되지 않음");
       }
 
       const issues = [];
@@ -445,7 +414,7 @@ class HealthChecker {
         database: dbStatus.database,
         railway: dbStatus.railway,
         connectionAttempts: dbStatus.connectionAttempts,
-        hasMongoUrl: dbStatus.mongoUrl === "SET",
+        hasMongoUrl: dbStatus.mongoUrl === "SET"
       });
     } catch (error) {
       logger.error("❌ DatabaseManager 상태 체크 실패:", error);
@@ -476,10 +445,7 @@ class HealthChecker {
       }
 
       if (!todoService) {
-        return this.createHealthResult(
-          "warning",
-          "TodoService가 등록되지 않음"
-        );
+        return this.createHealthResult("warning", "TodoService가 등록되지 않음");
       }
 
       const issues = [];
@@ -521,7 +487,7 @@ class HealthChecker {
         initialized: todoService.initialized !== false,
         hasCollection: !!todoService.collection,
         cacheSize: todoService.cache?.size || 0,
-        stats: todoService.stats || {},
+        stats: todoService.stats || {}
       });
     } catch (error) {
       logger.error("❌ TodoService 상태 체크 실패:", error);
@@ -536,14 +502,14 @@ class HealthChecker {
     const results = {
       timestamp: new Date().toISOString(),
       overallHealth: "healthy",
-      components: {},
+      components: {}
     };
 
     // 각 컴포넌트 체크
     const checks = [
       { name: "bot", method: this.checkBot },
       { name: "mongoose", method: this.checkMongoose },
-      { name: "moduleManager", method: this.checkModuleManager },
+      { name: "moduleManager", method: this.checkModuleManager }
     ];
 
     for (const check of checks) {
@@ -554,18 +520,12 @@ class HealthChecker {
         const componentSeverity = results.components[check.name].severity;
         if (componentSeverity === "critical") {
           results.overallHealth = "critical";
-        } else if (
-          componentSeverity === "warning" &&
-          results.overallHealth !== "critical"
-        ) {
+        } else if (componentSeverity === "warning" && results.overallHealth !== "critical") {
           results.overallHealth = "warning";
         }
       } catch (error) {
         logger.error(`❌ ${check.name} 체크 실패:`, error);
-        results.components[check.name] = this.createHealthResult(
-          "error",
-          `체크 실패: ${error.message}`
-        );
+        results.components[check.name] = this.createHealthResult("error", `체크 실패: ${error.message}`);
         results.overallHealth = "critical";
       }
     }
@@ -575,7 +535,7 @@ class HealthChecker {
       nodeVersion: process.version,
       platform: process.platform,
       uptime: process.uptime(),
-      memoryUsage: process.memoryUsage(),
+      memoryUsage: process.memoryUsage()
     };
 
     return results;
@@ -614,7 +574,7 @@ class HealthChecker {
         memoryTotal: memTotalMB,
         uptime: uptime,
         platform: process.platform,
-        nodeVersion: process.version,
+        nodeVersion: process.version
       });
     } catch (error) {
       logger.error("❌ 시스템 리소스 체크 실패:", error);
@@ -630,7 +590,7 @@ class HealthChecker {
       severity,
       message,
       data,
-      timestamp: TimeHelper.getLogTimeString(),
+      timestamp: TimeHelper.getLogTimeString()
     };
   }
 
@@ -639,9 +599,7 @@ class HealthChecker {
    */
   calculateOverallStatus(allChecks, timestamp) {
     const severities = allChecks.map((check) => check.severity);
-    const issues = allChecks
-      .filter((check) => check.severity !== "healthy")
-      .map((check) => check.message);
+    const issues = allChecks.filter((check) => check.severity !== "healthy").map((check) => check.message);
 
     // 가장 심각한 상태 결정
     let overallHealth = "healthy";
@@ -656,17 +614,11 @@ class HealthChecker {
       health: overallHealth,
       lastCheck: timestamp,
       issues: issues,
-      alerts: this.overallStatus.alerts || [],
+      alerts: this.overallStatus.alerts || []
     };
 
     // 컴포넌트별 상태 저장
-    const componentNames = [
-      "botController",
-      "moduleManager",
-      "database",
-      "todoService",
-      "system",
-    ];
+    const componentNames = ["botController", "moduleManager", "database", "todoService", "system"];
 
     allChecks.forEach((check, index) => {
       if (componentNames[index]) {
@@ -735,11 +687,7 @@ class HealthChecker {
     const attempts = this.recoveryAttempts.get(recoveryKey) || 0;
 
     try {
-      logger.info(
-        `🔄 자동 복구 시도 중... (${attempts + 1}/${
-          this.config.maxRecoveryAttempts
-        })`
-      );
+      logger.info(`🔄 자동 복구 시도 중... (${attempts + 1}/${this.config.maxRecoveryAttempts})`);
 
       // 캐시 정리
       if (this.getComponent("todoService")?.cache) {
@@ -760,9 +708,7 @@ class HealthChecker {
       this.recoveryAttempts.set(recoveryKey, attempts + 1);
 
       // 복구 지연
-      await new Promise((resolve) =>
-        setTimeout(resolve, this.config.recoveryDelay)
-      );
+      await new Promise((resolve) => setTimeout(resolve, this.config.recoveryDelay));
 
       logger.info("✅ 자동 복구 시도 완료");
     } catch (error) {
@@ -786,9 +732,7 @@ class HealthChecker {
 
     try {
       const emoji = status === "critical" ? "🚨" : "⚠️";
-      const alertMessage = `${emoji} 헬스체크 알림\n상태: ${status}\n문제: ${issues.join(
-        ", "
-      )}\n시간: ${TimeHelper.getLogTimeString()}`;
+      const alertMessage = `${emoji} 헬스체크 알림\n상태: ${status}\n문제: ${issues.join(", ")}\n시간: ${TimeHelper.getLogTimeString()}`;
 
       logger.warn(alertMessage);
 
@@ -798,7 +742,7 @@ class HealthChecker {
       this.overallStatus.alerts.push({
         status,
         issues,
-        timestamp: TimeHelper.getLogTimeString(),
+        timestamp: TimeHelper.getLogTimeString()
       });
 
       // 알림 히스토리 크기 제한
@@ -824,9 +768,7 @@ class HealthChecker {
       }
     }, this.config.normalCheckInterval);
 
-    logger.debug(
-      `⏰ 정상 헬스체크 스케줄러 시작됨 (${this.config.normalCheckInterval}ms)`
-    );
+    logger.debug(`⏰ 정상 헬스체크 스케줄러 시작됨 (${this.config.normalCheckInterval}ms)`);
   }
 
   /**
@@ -843,9 +785,7 @@ class HealthChecker {
       }
     }, this.config.criticalCheckInterval);
 
-    logger.debug(
-      `🚨 크리티컬 헬스체크 스케줄러 시작됨 (${this.config.criticalCheckInterval}ms)`
-    );
+    logger.debug(`🚨 크리티컬 헬스체크 스케줄러 시작됨 (${this.config.criticalCheckInterval}ms)`);
   }
 
   /**
@@ -892,24 +832,16 @@ class HealthChecker {
       metrics: {
         avgCheckDuration:
           this.metrics.checkDuration.length > 0
-            ? Math.round(
-                this.metrics.checkDuration.reduce((a, b) => a + b, 0) /
-                  this.metrics.checkDuration.length
-              )
+            ? Math.round(this.metrics.checkDuration.reduce((a, b) => a + b, 0) / this.metrics.checkDuration.length)
             : 0,
         avgMemoryUsage:
           this.metrics.memoryUsage.length > 0
-            ? Math.round(
-                this.metrics.memoryUsage.reduce((a, b) => a + b, 0) /
-                  this.metrics.memoryUsage.length
-              )
+            ? Math.round(this.metrics.memoryUsage.reduce((a, b) => a + b, 0) / this.metrics.memoryUsage.length)
             : 0,
-        currentMemoryUsage: Math.round(
-          process.memoryUsage().heapUsed / 1024 / 1024
-        ),
+        currentMemoryUsage: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
       },
       config: this.config,
-      isRunning: this.isRunning,
+      isRunning: this.isRunning
     };
   }
 

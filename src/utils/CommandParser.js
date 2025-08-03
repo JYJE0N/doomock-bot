@@ -54,21 +54,11 @@ class CommandParser {
       // 약어
       wt: "worktime",
       tm: "timer",
-      td: "todo",
+      td: "todo"
     };
 
     // 🎯 시스템 명령어 목록
-    this.systemCommands = [
-      "start",
-      "help",
-      "status",
-      "cancel",
-      "menu",
-      "about",
-      "settings",
-      "restart",
-      "ping",
-    ];
+    this.systemCommands = ["start", "help", "status", "cancel", "menu", "about", "settings", "restart", "ping"];
 
     logger.info("🎯 CommandParser 초기화 완료 - 중앙 집중식 명령어 파싱");
   }
@@ -81,7 +71,7 @@ class CommandParser {
       return {
         isCommand: false,
         type: "text",
-        originalText: text || "",
+        originalText: text || ""
       };
     }
 
@@ -122,7 +112,7 @@ class CommandParser {
           isCommand: false,
           type: "invalid_command",
           originalText: text,
-          error: "empty_command",
+          error: "empty_command"
         };
       }
 
@@ -143,7 +133,7 @@ class CommandParser {
         args: args,
         commandType: commandType,
         originalText: text,
-        partsCount: parts.length,
+        partsCount: parts.length
       };
     } catch (error) {
       logger.warn("슬래시 명령어 파싱 오류:", error);
@@ -151,7 +141,7 @@ class CommandParser {
         isCommand: false,
         type: "parse_error",
         originalText: text,
-        error: error.message,
+        error: error.message
       };
     }
   }
@@ -186,7 +176,7 @@ class CommandParser {
         originalKeyword: matchedAlias,
         args: args,
         commandType: commandType,
-        originalText: text,
+        originalText: text
       };
     }
 
@@ -194,7 +184,7 @@ class CommandParser {
     return {
       isCommand: false,
       type: "text",
-      originalText: text,
+      originalText: text
     };
   }
 
@@ -224,7 +214,7 @@ class CommandParser {
     return {
       totalAliases: Object.keys(this.commandAliases).length,
       systemCommands: this.systemCommands.length,
-      version: "1.0.0",
+      version: "1.0.0"
     };
   }
 }

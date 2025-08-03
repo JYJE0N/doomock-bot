@@ -21,26 +21,7 @@ class UnifiedMessageSystem {
     this.version = "4.0.1";
 
     // 🎨 MarkdownV2 이스케이프 문자들
-    this.escapeChars = [
-      "_",
-      "*",
-      "[",
-      "]",
-      "(",
-      ")",
-      "~",
-      "`",
-      ">",
-      "#",
-      "+",
-      "-",
-      "=",
-      "|",
-      "{",
-      "}",
-      ".",
-      "!",
-    ];
+    this.escapeChars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
 
     // 🌈 콘솔 스타일 시스템
     this.consoleStyles = this.initConsoleStyles();
@@ -48,7 +29,7 @@ class UnifiedMessageSystem {
     // 📱 텔레그램 옵션
     this.telegramOptions = {
       parse_mode: "MarkdownV2",
-      disable_web_page_preview: true,
+      disable_web_page_preview: true
     };
 
     // 🎯 이모지 세트들
@@ -64,8 +45,8 @@ class UnifiedMessageSystem {
         worktime: "🏢",
         fortune: "🔮",
         weather: "🌤️",
-        reminder: "🔔",
-      },
+        reminder: "🔔"
+      }
     };
 
     // ✅ 수정: this.rainbow 사용 (chalk.rainbow 대신)
@@ -92,16 +73,10 @@ class UnifiedMessageSystem {
     try {
       // Chalk hex 지원 확인
       const halfPoint = Math.floor(text.length / 2);
-      return (
-        chalk.hex(startColor)(text.slice(0, halfPoint)) +
-        chalk.hex(endColor)(text.slice(halfPoint))
-      );
+      return chalk.hex(startColor)(text.slice(0, halfPoint)) + chalk.hex(endColor)(text.slice(halfPoint));
     } catch (error) {
       // Fallback: 일반 색상 사용
-      return (
-        chalk.red(text.slice(0, text.length / 2)) +
-        chalk.blue(text.slice(text.length / 2))
-      );
+      return chalk.red(text.slice(0, text.length / 2)) + chalk.blue(text.slice(text.length / 2));
     }
   }
 
@@ -116,10 +91,8 @@ class UnifiedMessageSystem {
       debug: (text) => chalk.gray(`🔍 ${text}`),
 
       // 사용자 관련
-      userJoin: (userName) =>
-        chalk.green.bold(`👋 ${userName}님이 접속했습니다!`),
-      userMessage: (userName, message) =>
-        chalk.cyan(`📨 ${userName}: ${message}`),
+      userJoin: (userName) => chalk.green.bold(`👋 ${userName}님이 접속했습니다!`),
+      userMessage: (userName, message) => chalk.cyan(`📨 ${userName}: ${message}`),
 
       // 모듈별 색상
       moduleTitle: (moduleName, icon) => {
@@ -129,7 +102,7 @@ class UnifiedMessageSystem {
           worktime: chalk.green.bold,
           fortune: (text) => this.rainbow(text), // ✅ 수정: this.rainbow 사용
           weather: chalk.yellow.bold,
-          reminder: chalk.magenta.bold,
+          reminder: chalk.magenta.bold
         };
         const colorFn = colors[moduleName] || chalk.white.bold;
         return colorFn(`${icon} === ${moduleName.toUpperCase()} ===`);
@@ -151,17 +124,11 @@ class UnifiedMessageSystem {
         const filled = Math.round(width * (current / total));
         const empty = width - filled;
 
-        const bar =
-          chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(empty));
-        const color =
-          percentage >= 80
-            ? chalk.green
-            : percentage >= 60
-            ? chalk.yellow
-            : chalk.red;
+        const bar = chalk.green("█".repeat(filled)) + chalk.gray("░".repeat(empty));
+        const color = percentage >= 80 ? chalk.green : percentage >= 60 ? chalk.yellow : chalk.red;
 
         return `${bar} ${color.bold(`${percentage}%`)} (${current}/${total})`;
-      },
+      }
     };
   }
 
@@ -183,7 +150,7 @@ class UnifiedMessageSystem {
     strikethrough: (text) => `~${this.escape(text)}~`,
     underline: (text) => `__${this.escape(text)}__`,
     spoiler: (text) => `||${this.escape(text)}||`,
-    link: (text, url) => `[${this.escape(text)}](${url})`,
+    link: (text, url) => `[${this.escape(text)}](${url})`
   };
 
   // ===== 🎯 시간 관련 유틸리티 =====
@@ -225,9 +192,7 @@ class UnifiedMessageSystem {
     const menuText = `
 🏠 ${this.markdownStyles.bold("두목봇 메인 메뉴")}
 
-${this.getGreeting()} ${this.markdownStyles.bold(
-      userName
-    )}님\\! ${this.getTimeEmoji()}
+${this.getGreeting()} ${this.markdownStyles.bold(userName)}님\\! ${this.getTimeEmoji()}
 
 📊 ${this.markdownStyles.italic("오늘의 현황")}
 • 할일: ${stats.todos || 0}개
@@ -252,9 +217,7 @@ ${this.markdownStyles.bold("원하는 기능을 선택해주세요\\!")}
   async sendTodoList(bot, chatId, todos, page = 1, pageSize = 10) {
     // 🖥️ 콘솔 출력
     console.log(this.consoleStyles.moduleTitle("todo", "📝"));
-    console.log(
-      chalk.blue(`📝 할일 목록 표시: ${todos.length}개 (페이지 ${page})`)
-    );
+    console.log(chalk.blue(`📝 할일 목록 표시: ${todos.length}개 (페이지 ${page})`));
 
     if (todos.length === 0) {
       const emptyText = `📝 ${this.markdownStyles.bold("할일 목록")}
@@ -279,28 +242,17 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
     const paginatedTodos = todos.slice(startIndex, endIndex);
     const totalPages = Math.ceil(todos.length / pageSize);
 
-    let todoText = `📝 ${this.markdownStyles.bold(
-      "할일 목록"
-    )} \\(${page}/${totalPages}\\)\n\n`;
+    let todoText = `📝 ${this.markdownStyles.bold("할일 목록")} \\(${page}/${totalPages}\\)\n\n`;
 
     paginatedTodos.forEach((todo, index) => {
       const displayIndex = startIndex + index + 1;
       const status = todo.completed ? "✅" : "◻️";
-      const priority =
-        todo.priority === "high"
-          ? "🔴"
-          : todo.priority === "medium"
-          ? "🟡"
-          : "🔵";
+      const priority = todo.priority === "high" ? "🔴" : todo.priority === "medium" ? "🟡" : "🔵";
 
-      todoText += `${status} ${priority} ${this.markdownStyles.bold(
-        displayIndex.toString()
-      )}\\. ${this.escape(todo.title)}\n`;
+      todoText += `${status} ${priority} ${this.markdownStyles.bold(displayIndex.toString())}\\. ${this.escape(todo.title)}\n`;
 
       if (todo.description) {
-        todoText += `   ${this.markdownStyles.italic(
-          this.escape(todo.description)
-        )}\n`;
+        todoText += `   ${this.markdownStyles.italic(this.escape(todo.description))}\n`;
       }
 
       if (todo.dueDate) {
@@ -310,9 +262,7 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
       todoText += "\n";
     });
 
-    todoText += `📊 ${this.markdownStyles.italic(
-      `총 ${todos.length}개의 할일`
-    )}`;
+    todoText += `📊 ${this.markdownStyles.italic(`총 ${todos.length}개의 할일`)}`;
 
     try {
       if (bot && chatId) {
@@ -330,23 +280,14 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
     // 🖥️ 콘솔 출력
     console.log(this.rainbow(`🎉 성공: ${message}`));
     if (details) {
-      console.log(
-        chalk.gray(`   세부사항: ${JSON.stringify(details, null, 2)}`)
-      );
+      console.log(chalk.gray(`   세부사항: ${JSON.stringify(details, null, 2)}`));
     }
 
     // 📱 텔레그램 메시지
-    const successEmoji =
-      this.emojiSets.success[
-        Math.floor(Math.random() * this.emojiSets.success.length)
-      ];
+    const successEmoji = this.emojiSets.success[Math.floor(Math.random() * this.emojiSets.success.length)];
     const telegramText = `${successEmoji} ${this.markdownStyles.bold("성공\\!")}
 
-${this.escape(message)}${
-      details
-        ? `\n\n${this.markdownStyles.code(JSON.stringify(details, null, 2))}`
-        : ""
-    }`;
+${this.escape(message)}${details ? `\n\n${this.markdownStyles.code(JSON.stringify(details, null, 2))}` : ""}`;
 
     try {
       if (bot && chatId) {
@@ -368,10 +309,7 @@ ${this.escape(message)}${
     }
 
     // 📱 텔레그램 메시지
-    const errorEmoji =
-      this.emojiSets.error[
-        Math.floor(Math.random() * this.emojiSets.error.length)
-      ];
+    const errorEmoji = this.emojiSets.error[Math.floor(Math.random() * this.emojiSets.error.length)];
     const telegramText = `${errorEmoji} ${this.markdownStyles.bold("오류 발생")}
 
 ${this.escape(message)}
@@ -396,17 +334,11 @@ ${this.markdownStyles.italic("잠시 후 다시 시도해주세요\\.")}`;
     console.log(chalk.blue(`${loadingEmoji} 로딩: ${message}`));
 
     // 📱 텔레그램 메시지
-    const telegramText = `⏳ ${this.markdownStyles.italic(
-      this.escape(message)
-    )}`;
+    const telegramText = `⏳ ${this.markdownStyles.italic(this.escape(message))}`;
 
     try {
       if (bot && chatId) {
-        const sentMessage = await bot.sendMessage(
-          chatId,
-          telegramText,
-          this.telegramOptions
-        );
+        const sentMessage = await bot.sendMessage(chatId, telegramText, this.telegramOptions);
         return sentMessage.message_id;
       }
     } catch (error) {
@@ -423,16 +355,14 @@ ${this.markdownStyles.italic("잠시 후 다시 시도해주세요\\.")}`;
     console.log(chalk.blue(`🔄 로딩 업데이트: ${newMessage}`));
 
     // 📱 텔레그램 메시지 수정
-    const telegramText = `⌛ ${this.markdownStyles.italic(
-      this.escape(newMessage)
-    )}`;
+    const telegramText = `⌛ ${this.markdownStyles.italic(this.escape(newMessage))}`;
 
     try {
       if (bot && chatId && messageId) {
         await bot.editMessageText(telegramText, {
           chat_id: chatId,
           message_id: messageId,
-          parse_mode: "MarkdownV2",
+          parse_mode: "MarkdownV2"
         });
       }
     } catch (error) {
@@ -449,14 +379,8 @@ ${this.markdownStyles.italic("잠시 후 다시 시도해주세요\\.")}`;
       escapeChars: this.escapeChars.length,
       emojiSets: Object.keys(this.emojiSets).length,
       modules: Object.keys(this.emojiSets.modules).length,
-      features: [
-        "통합 메시지 시스템",
-        "MarkdownV2 지원",
-        "알록달록 콘솔 출력",
-        "표준 매개변수 준수",
-        "Fallback 메커니즘",
-      ],
-      supportedModules: Object.keys(this.emojiSets.modules),
+      features: ["통합 메시지 시스템", "MarkdownV2 지원", "알록달록 콘솔 출력", "표준 매개변수 준수", "Fallback 메커니즘"],
+      supportedModules: Object.keys(this.emojiSets.modules)
     };
   }
 }
@@ -477,9 +401,7 @@ class LoggerEnhancer {
     this.injectMessageFeatures();
 
     // ✅ 수정: messageSystem.rainbow() 사용 (chalk.rainbow 대신)
-    console.log(
-      this.messageSystem.rainbow("🎨 Logger 알록달록 업그레이드 완료!")
-    );
+    console.log(this.messageSystem.rainbow("🎨 Logger 알록달록 업그레이드 완료!"));
   }
 
   /**
@@ -491,24 +413,12 @@ class LoggerEnhancer {
     this.logger.gradient = this.messageSystem.gradient.bind(this.messageSystem);
 
     // 통합 메시지 메서드들 추가
-    this.logger.sendMainMenu = this.messageSystem.sendMainMenu.bind(
-      this.messageSystem
-    );
-    this.logger.sendTodoList = this.messageSystem.sendTodoList.bind(
-      this.messageSystem
-    );
-    this.logger.sendSuccess = this.messageSystem.sendSuccess.bind(
-      this.messageSystem
-    );
-    this.logger.sendError = this.messageSystem.sendError.bind(
-      this.messageSystem
-    );
-    this.logger.sendLoading = this.messageSystem.sendLoading.bind(
-      this.messageSystem
-    );
-    this.logger.updateLoading = this.messageSystem.updateLoading.bind(
-      this.messageSystem
-    );
+    this.logger.sendMainMenu = this.messageSystem.sendMainMenu.bind(this.messageSystem);
+    this.logger.sendTodoList = this.messageSystem.sendTodoList.bind(this.messageSystem);
+    this.logger.sendSuccess = this.messageSystem.sendSuccess.bind(this.messageSystem);
+    this.logger.sendError = this.messageSystem.sendError.bind(this.messageSystem);
+    this.logger.sendLoading = this.messageSystem.sendLoading.bind(this.messageSystem);
+    this.logger.updateLoading = this.messageSystem.updateLoading.bind(this.messageSystem);
 
     // 콘솔 스타일 추가
     this.logger.styles = this.messageSystem.consoleStyles;
@@ -526,12 +436,7 @@ class LoggerEnhancer {
     };
 
     this.logger.moduleLog = (moduleName, message, data) => {
-      console.log(
-        this.messageSystem.consoleStyles.moduleTitle(
-          moduleName,
-          this.messageSystem.emojiSets.modules[moduleName] || "📦"
-        )
-      );
+      console.log(this.messageSystem.consoleStyles.moduleTitle(moduleName, this.messageSystem.emojiSets.modules[moduleName] || "📦"));
       if (data) console.log(chalk.gray(JSON.stringify(data, null, 2)));
     };
   }
@@ -543,5 +448,5 @@ class LoggerEnhancer {
 
 module.exports = {
   UnifiedMessageSystem,
-  LoggerEnhancer,
+  LoggerEnhancer
 };

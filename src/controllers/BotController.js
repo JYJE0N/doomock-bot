@@ -4,9 +4,7 @@ const { Telegraf } = require("telegraf");
 const express = require("express");
 const path = require("path");
 const logger = require("../utils/Logger");
-const {
-  getInstance: getMongooseManager,
-} = require("../database/MongooseManager");
+const { getInstance: getMongooseManager } = require("../database/MongooseManager");
 const { createServiceBuilder } = require("../core/ServiceBuilder");
 const ModuleManager = require("../core/ModuleManager");
 const NavigationHandler = require("../handlers/NavigationHandler");
@@ -44,7 +42,7 @@ class BotController {
       messagesProcessed: 0,
       callbacksProcessed: 0,
       errorsCount: 0,
-      startTime: new Date(),
+      startTime: new Date()
     };
 
     logger.info("🤖 BotController 인스턴스 생성됨 (Mongoose 전용)");
@@ -132,7 +130,7 @@ class BotController {
           name: "DoomockBot API",
           version: "4.0.1",
           status: "running",
-          timestamp: new Date().toISOString(),
+          timestamp: new Date().toISOString()
         });
       });
 
@@ -145,25 +143,23 @@ class BotController {
           bot: {
             initialized: this.isInitialized,
             mongooseConnected: this.mongooseManager?.isConnected() || false,
-            modules: this.moduleManager?.modules?.size || 0,
+            modules: this.moduleManager?.modules?.size || 0
           },
           memory: {
             used: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-            total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024),
-          },
+            total: Math.round(process.memoryUsage().heapTotal / 1024 / 1024)
+          }
         });
       });
 
       // TTS 파일 목록 (디버깅용)
       this.app.get("/tts", (req, res) => {
         try {
-          const files = fs
-            .readdirSync(ttsPath)
-            .filter((f) => f.endsWith(".mp3"));
+          const files = fs.readdirSync(ttsPath).filter((f) => f.endsWith(".mp3"));
           res.json({
             count: files.length,
             files: files,
-            path: ttsPath,
+            path: ttsPath
           });
         } catch (error) {
           res.status(500).json({ error: "Failed to list TTS files" });
@@ -176,7 +172,7 @@ class BotController {
         res.status(404).json({
           error: "Not Found",
           path: req.url,
-          method: req.method,
+          method: req.method
         });
       });
 
@@ -185,8 +181,7 @@ class BotController {
         logger.error("Express 에러:", err);
         res.status(500).json({
           error: "Internal Server Error",
-          message:
-            process.env.NODE_ENV === "development" ? err.message : undefined,
+          message: process.env.NODE_ENV === "development" ? err.message : undefined
         });
       });
 
@@ -222,9 +217,7 @@ class BotController {
   validateEnvironment() {
     const requiredEnvVars = ["BOT_TOKEN", "MONGO_URL"];
 
-    const missingVars = requiredEnvVars.filter(
-      (varName) => !process.env[varName]
-    );
+    const missingVars = requiredEnvVars.filter((varName) => !process.env[varName]);
 
     if (missingVars.length > 0) {
       throw new Error(`필수 환경변수가 누락됨: ${missingVars.join(", ")}`);
@@ -275,15 +268,7 @@ class BotController {
 
       // 3. 필수 서비스들 미리 생성
       logger.info("📦 필수 서비스 초기화 중...");
-      const requiredServices = [
-        "todo",
-        "timer",
-        "worktime",
-        "leave",
-        "weather",
-        "tts",
-        "fortune",
-      ];
+      const requiredServices = ["todo", "timer", "worktime", "leave", "weather", "tts", "fortune"];
 
       for (const serviceName of requiredServices) {
         try {
@@ -297,11 +282,11 @@ class BotController {
       // 4. ModuleManager 초기화
       this.moduleManager = new ModuleManager({
         bot: this.bot,
-        serviceBuilder: this.serviceBuilder,
+        serviceBuilder: this.serviceBuilder
       });
 
       await this.moduleManager.initialize(this.bot, {
-        mongooseManager: this.mongooseManager,
+        mongooseManager: this.mongooseManager
       });
 
       logger.success("✅ ModuleManager 초기화 완료");
@@ -461,7 +446,7 @@ class BotController {
     } catch (error) {
       logger.error("콜백 쿼리 처리 오류:", error);
       await ctx.answerCbQuery("처리 중 오류가 발생했습니다.", {
-        show_alert: true,
+        show_alert: true
       });
     }
   }
@@ -501,9 +486,7 @@ class BotController {
       await this.bot.launch();
 
       logger.success("✅ 텔레그램 봇이 성공적으로 시작되었습니다!");
-      logger.info(
-        `🤖 봇 사용자명: @${this.bot.botInfo?.username || "unknown"}`
-      );
+      logger.info(`🤖 봇 사용자명: @${this.bot.botInfo?.username || "unknown"}`);
 
       // Graceful 종료 설정
       process.once("SIGINT", () => this.stop("SIGINT"));
@@ -582,10 +565,7 @@ class BotController {
       }
 
       // NavigationHandler 정리
-      if (
-        this.navigationHandler &&
-        typeof this.navigationHandler.cleanup === "function"
-      ) {
+      if (this.navigationHandler && typeof this.navigationHandler.cleanup === "function") {
         try {
           await this.navigationHandler.cleanup();
           logger.debug("✅ NavigationHandler 정리 완료");
@@ -631,7 +611,7 @@ class BotController {
       initialized: this.isInitialized,
       stats: this.stats,
       modules: this.moduleManager?.modules?.size || 0,
-      mongooseConnected: this.mongooseManager?.isConnected() || false,
+      mongooseConnected: this.mongooseManager?.isConnected() || false
     };
   }
 }

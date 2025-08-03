@@ -29,7 +29,7 @@ class DooMockBot {
       startAttempts: 0,
       successfulStarts: 0,
       gracefulShutdowns: 0,
-      errors: 0,
+      errors: 0
     };
 
     // 🛡️ 전역 Promise 거부 처리
@@ -47,7 +47,7 @@ class DooMockBot {
       logger.error("🚨 처리되지 않은 Promise 거부:", {
         reason: reason?.message || reason,
         stack: reason?.stack || "No stack trace",
-        promise: promise?.toString() || "Unknown promise",
+        promise: promise?.toString() || "Unknown promise"
       });
 
       this.stats.errors++;
@@ -95,9 +95,7 @@ class DooMockBot {
     try {
       logger.celebration("🎊 DooMockBot v4.0.1 시작!");
       logger.info(`🌍 환경: ${process.env.NODE_ENV || "development"}`);
-      logger.info(
-        `🚀 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No"}`
-      );
+      logger.info(`🚀 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No"}`);
 
       // 🎯 BotController 초기화
       logger.info("🤖 BotController 초기화 중...");
@@ -130,7 +128,7 @@ class DooMockBot {
     logger.error("💀 시작 오류 상세:", {
       message: error.message,
       code: error.code,
-      stack: error.stack,
+      stack: error.stack
     });
 
     // 정리 작업 시도
@@ -141,11 +139,7 @@ class DooMockBot {
     }
 
     // 치명적 오류는 종료
-    if (
-      error.code === "EADDRINUSE" ||
-      error.message?.includes("MONGO_URL") ||
-      error.message?.includes("TELEGRAM_BOT_TOKEN")
-    ) {
+    if (error.code === "EADDRINUSE" || error.message?.includes("MONGO_URL") || error.message?.includes("TELEGRAM_BOT_TOKEN")) {
       logger.error("🚨 치명적 오류로 인한 종료");
       process.exit(1);
     }
@@ -240,8 +234,8 @@ class DooMockBot {
       environment: {
         node: process.env.NODE_ENV || "development",
         railway: !!process.env.RAILWAY_ENVIRONMENT,
-        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
-      },
+        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+      }
     };
   }
 }

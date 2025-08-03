@@ -38,7 +38,7 @@ class TimerRenderer extends BaseRenderer {
       STAGE_ICONS: {
         early: "🚀",
         middle: "💪",
-        late: "🔥",
+        late: "🔥"
       },
 
       // 타이머 타입별 아이콘
@@ -47,20 +47,20 @@ class TimerRenderer extends BaseRenderer {
           main: "🍅",
           early: "📚",
           middle: "🍅",
-          late: "🎯",
+          late: "🎯"
         },
         short: {
           main: "☕",
           early: "😴",
           middle: "🍪",
-          late: "☕",
+          late: "☕"
         },
         long: {
           main: "🌴",
           early: "🛋️",
           middle: "🏖️",
-          late: "🌴",
-        },
+          late: "🌴"
+        }
       },
 
       // 상태 아이콘
@@ -68,107 +68,39 @@ class TimerRenderer extends BaseRenderer {
         running: "▶️",
         paused: "⏸️",
         stopped: "⏹️",
-        completed: "✅",
-      },
+        completed: "✅"
+      }
     };
 
     // 💬 동기부여 메시지 시스템 (UI 전담)
     this.motivationMessages = {
       // 집중 시간
-      focus_early_active: [
-        "🚀 좋은 시작이에요! 집중해봅시다!",
-        "📚 차근차근 해나가고 있어요!",
-        "💪 이미 좋은 흐름이네요!",
-      ],
-      focus_middle_active: [
-        "🎯 절반 완주! 계속 집중하세요!",
-        "🔥 점점 더 집중되고 있어요!",
-        "⚡ 리듬이 좋아졌네요!",
-      ],
-      focus_late_active: [
-        "🏃‍♂️ 거의 다 왔어요! 마지막 스퍼트!",
-        "🌟 완주까지 얼마 안 남았어요!",
-        "💎 최고의 집중력을 보여주고 있어요!",
-      ],
+      focus_early_active: ["🚀 좋은 시작이에요! 집중해봅시다!", "📚 차근차근 해나가고 있어요!", "💪 이미 좋은 흐름이네요!"],
+      focus_middle_active: ["🎯 절반 완주! 계속 집중하세요!", "🔥 점점 더 집중되고 있어요!", "⚡ 리듬이 좋아졌네요!"],
+      focus_late_active: ["🏃‍♂️ 거의 다 왔어요! 마지막 스퍼트!", "🌟 완주까지 얼마 안 남았어요!", "💎 최고의 집중력을 보여주고 있어요!"],
       focus_early_paused: [
         "📚 잠시 멈춰도 괜찮아요. 다시 시작해봅시다!",
         "🍅 언제든 재개할 수 있어요!",
-        "💪 잠깐의 휴식 후 다시 집중해요!",
+        "💪 잠깐의 휴식 후 다시 집중해요!"
       ],
-      focus_middle_paused: [
-        "🎯 중간에 멈췄네요. 언제든 재개하세요!",
-        "🔥 지금까지 잘 하고 있어요!",
-        "⚡ 준비되면 계속해봐요!",
-      ],
-      focus_late_paused: [
-        "🌟 거의 다 왔는데! 조금만 더 힘내세요!",
-        "🏃‍♂️ 마지막 구간이에요! 파이팅!",
-        "💎 완주가 눈앞에 있어요!",
-      ],
+      focus_middle_paused: ["🎯 중간에 멈췄네요. 언제든 재개하세요!", "🔥 지금까지 잘 하고 있어요!", "⚡ 준비되면 계속해봐요!"],
+      focus_late_paused: ["🌟 거의 다 왔는데! 조금만 더 힘내세요!", "🏃‍♂️ 마지막 구간이에요! 파이팅!", "💎 완주가 눈앞에 있어요!"],
 
       // 짧은 휴식
-      short_early_active: [
-        "☕ 잠깐의 휴식을 즐겨보세요!",
-        "😴 천천히 쉬어가세요!",
-        "🍃 깊게 숨을 들이쉬어보세요!",
-      ],
-      short_middle_active: [
-        "🍪 휴식도 절반 지났네요!",
-        "🌸 마음이 차분해지고 있나요?",
-        "✨ 에너지가 충전되고 있어요!",
-      ],
-      short_late_active: [
-        "⚡ 곧 다시 일할 시간이에요!",
-        "🌈 에너지 충전 거의 완료!",
-        "🎉 휴식도 마무리단계네요!",
-      ],
-      short_early_paused: [
-        "😴 충분히 쉬어가세요!",
-        "☁️ 여유롭게 시간을 보내세요!",
-        "🌙 편안하게 쉬어요!",
-      ],
-      short_middle_paused: [
-        "🍃 마음을 편히 가져보세요!",
-        "🌸 천천히 재충전하세요!",
-        "✨ 조용한 시간을 즐겨요!",
-      ],
-      short_late_paused: [
-        "🌈 곧 다시 시작할 준비 되셨나요?",
-        "⚡ 에너지 충전 완료 임박!",
-        "🎉 준비되면 다시 시작해요!",
-      ],
+      short_early_active: ["☕ 잠깐의 휴식을 즐겨보세요!", "😴 천천히 쉬어가세요!", "🍃 깊게 숨을 들이쉬어보세요!"],
+      short_middle_active: ["🍪 휴식도 절반 지났네요!", "🌸 마음이 차분해지고 있나요?", "✨ 에너지가 충전되고 있어요!"],
+      short_late_active: ["⚡ 곧 다시 일할 시간이에요!", "🌈 에너지 충전 거의 완료!", "🎉 휴식도 마무리단계네요!"],
+      short_early_paused: ["😴 충분히 쉬어가세요!", "☁️ 여유롭게 시간을 보내세요!", "🌙 편안하게 쉬어요!"],
+      short_middle_paused: ["🍃 마음을 편히 가져보세요!", "🌸 천천히 재충전하세요!", "✨ 조용한 시간을 즐겨요!"],
+      short_late_paused: ["🌈 곧 다시 시작할 준비 되셨나요?", "⚡ 에너지 충전 완료 임박!", "🎉 준비되면 다시 시작해요!"],
 
       // 긴 휴식
-      long_early_active: [
-        "🏖️ 긴 휴식의 시작이에요!",
-        "🛋️ 충분히 쉬어가세요!",
-        "☁️ 여유롭게 시간을 보내세요!",
-      ],
-      long_middle_active: [
-        "🌴 휴식의 중간지점이에요!",
-        "🌙 마음이 편안해지고 있나요?",
-        "🕯️ 충분히 재충전하고 있어요!",
-      ],
-      long_late_active: [
-        "🔋 곧 상쾌한 기분으로 돌아가요!",
-        "🌅 긴 휴식도 끝이 보여요!",
-        "🎊 에너지가 가득 충전됐어요!",
-      ],
-      long_early_paused: [
-        "🌙 충분히 쉬어가세요!",
-        "☁️ 여유롭게 시간을 보내세요!",
-        "🛋️ 편안하게 휴식하세요!",
-      ],
-      long_middle_paused: [
-        "🌴 천천히 재충전 중이네요!",
-        "🌙 마음의 평안을 찾으세요!",
-        "🕯️ 고요한 시간을 즐겨요!",
-      ],
-      long_late_paused: [
-        "🌅 휴식도 마무리 단계네요!",
-        "🔋 충분히 쉬었나요?",
-        "🎊 준비되면 새로 시작해요!",
-      ],
+      long_early_active: ["🏖️ 긴 휴식의 시작이에요!", "🛋️ 충분히 쉬어가세요!", "☁️ 여유롭게 시간을 보내세요!"],
+      long_middle_active: ["🌴 휴식의 중간지점이에요!", "🌙 마음이 편안해지고 있나요?", "🕯️ 충분히 재충전하고 있어요!"],
+      long_late_active: ["🔋 곧 상쾌한 기분으로 돌아가요!", "🌅 긴 휴식도 끝이 보여요!", "🎊 에너지가 가득 충전됐어요!"],
+      long_early_paused: ["🌙 충분히 쉬어가세요!", "☁️ 여유롭게 시간을 보내세요!", "🛋️ 편안하게 휴식하세요!"],
+      long_middle_paused: ["🌴 천천히 재충전 중이네요!", "🌙 마음의 평안을 찾으세요!", "🕯️ 고요한 시간을 즐겨요!"],
+      long_late_paused: ["🌅 휴식도 마무리 단계네요!", "🔋 충분히 쉬었나요?", "🎊 준비되면 새로 시작해요!"]
     };
 
     logger.debug("🎨 TimerRenderer 생성됨 (표준 준수 + 실시간 UI)");
@@ -203,17 +135,11 @@ class TimerRenderer extends BaseRenderer {
         case "error":
           return await this.renderError(data, ctx);
         default:
-          return await this.renderError(
-            { message: `지원하지 않는 기능입니다: ${type}` },
-            ctx
-          );
+          return await this.renderError({ message: `지원하지 않는 기능입니다: ${type}` }, ctx);
       }
     } catch (error) {
       logger.error("TimerRenderer.render 오류:", error);
-      return await this.renderError(
-        { message: "렌더링 중 오류가 발생했습니다." },
-        ctx
-      );
+      return await this.renderError({ message: "렌더링 중 오류가 발생했습니다." }, ctx);
     }
   }
 
@@ -232,16 +158,12 @@ class TimerRenderer extends BaseRenderer {
       // 활성 타이머가 있을 때 - 화려한 시각적 표시
       const progressBar = this.createProgressBar(activeTimer);
       const statusIcon = this.getStatusIcon(activeTimer);
-      const motivationMsg = this.getMotivationMessage(
-        data.motivationData || {}
-      );
+      const motivationMsg = this.getMotivationMessage(data.motivationData || {});
 
       text += `${statusIcon} **실행 중인 타이머**\n\n`;
       text += `${progressBar}\n\n`;
       text += `🎯 **타입**: ${this.getTimerTypeDisplay(activeTimer.type)}\n`;
-      text += `📊 **상태**: ${
-        activeTimer.isPaused ? "일시정지" : "실행중"
-      }\n\n`;
+      text += `📊 **상태**: ${activeTimer.isPaused ? "일시정지" : "실행중"}\n\n`;
       text += `💬 ${motivationMsg}\n\n`;
     } else {
       text += `집중력 향상을 위한 뽀모도로 기법을 사용해보세요!\n\n`;
@@ -368,9 +290,9 @@ ${this.getNextStepSuggestion(completionRate)}`;
     const buttons = [
       [
         { text: "🍅 새 타이머", action: "menu" },
-        { text: "📊 통계 보기", action: "stats" },
+        { text: "📊 통계 보기", action: "stats" }
       ],
-      [{ text: "🔙 메인 메뉴", action: "menu" }],
+      [{ text: "🔙 메인 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -424,11 +346,7 @@ ${progressBar}
 🎯 **타입**: ${this.getTimerTypeDisplay(timer.type)}
 📊 **진행률**: ${timer.progress}%
 
-${
-  enabled
-    ? "✨ 이제 5초마다 자동으로 업데이트됩니다!"
-    : "📱 수동 새로고침 모드로 변경되었습니다."
-}`;
+${enabled ? "✨ 이제 5초마다 자동으로 업데이트됩니다!" : "📱 수동 새로고침 모드로 변경되었습니다."}`;
 
     const buttons = this.buildActiveTimerButtons(timer);
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -456,13 +374,13 @@ ${suggestion}
     const buttons = [
       [
         { text: "🍅 집중 (25분)", action: "start", params: "focus" },
-        { text: "☕ 짧은 휴식 (5분)", action: "start", params: "short" },
+        { text: "☕ 짧은 휴식 (5분)", action: "start", params: "short" }
       ],
       [
         { text: "🌴 긴 휴식 (15분)", action: "start", params: "long" },
-        { text: "❓ 도움말", action: "help" },
+        { text: "❓ 도움말", action: "help" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -495,9 +413,9 @@ ${suggestion}
     const buttons = [
       [
         { text: "🍅 바로 시작", action: "start", params: "focus" },
-        { text: "📊 내 통계", action: "stats" },
+        { text: "📊 내 통계", action: "stats" }
       ],
-      [{ text: "🔙 메뉴로", action: "menu" }],
+      [{ text: "🔙 메뉴로", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -509,11 +427,7 @@ ${suggestion}
    */
   async renderError(data, ctx) {
     // ✅ 수정: data 구조 안전하게 처리
-    const {
-      message = "알 수 없는 오류가 발생했습니다.",
-      action = "menu",
-      canRetry = false,
-    } = data || {};
+    const { message = "알 수 없는 오류가 발생했습니다.", action = "menu", canRetry = false } = data || {};
 
     const text = `❌ **앗, 문제가 생겼어요!**
 
@@ -529,7 +443,7 @@ ${message}
 
     buttons.push([
       { text: "🍅 새 타이머", action: "start", params: "focus" },
-      { text: "🔙 메인 메뉴", action: "menu" },
+      { text: "🔙 메인 메뉴", action: "menu" }
     ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -559,20 +473,18 @@ ${message}
       text += `📅 하루 평균: ${stats.averageSessionsPerDay}회\n`;
       text += `⏰ 하루 평균: ${Math.round(stats.averageMinutesPerDay)}분\n\n`;
 
-      text += `💡 **가장 좋아하는 타입**: ${this.getTypeDisplay(
-        stats.favoriteType
-      )}`;
+      text += `💡 **가장 좋아하는 타입**: ${this.getTypeDisplay(stats.favoriteType)}`;
     }
 
     const buttons = [
       [
         { text: "🔄 새로고침", action: "stats" },
-        { text: "📊 상세 보기", action: "status" },
+        { text: "📊 상세 보기", action: "status" }
       ],
       [
         { text: "🍅 새 타이머", action: "start", params: "focus" },
-        { text: "🔙 메뉴", action: "menu" },
-      ],
+        { text: "🔙 메뉴", action: "menu" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -638,7 +550,7 @@ ${message}
     const typeDisplays = {
       focus: "🍅 집중 시간",
       short: "☕ 짧은 휴식",
-      long: "🌴 긴 휴식",
+      long: "🌴 긴 휴식"
     };
 
     return typeDisplays[type] || `⏰ 커스텀 (${type}분)`;
@@ -678,7 +590,7 @@ ${message}
     const tips = {
       focus: "💡 **팁**: 한 가지 작업에만 집중하고, 알림을 꺼두세요!",
       short: "💡 **팁**: 스트레칭하거나 물을 마시며 잠깐 쉬어보세요!",
-      long: "💡 **팁**: 산책하거나 가벼운 간식을 드시며 충분히 쉬세요!",
+      long: "💡 **팁**: 산책하거나 가벼운 간식을 드시며 충분히 쉬세요!"
     };
 
     return tips[timerType] || "💡 **팁**: 자신만의 리듬을 찾아보세요!";
@@ -710,18 +622,18 @@ ${message}
       if (activeTimer.isPaused) {
         buttons.push([
           { text: "▶️ 재개", action: "resume" },
-          { text: "⏹️ 중지", action: "stop" },
+          { text: "⏹️ 중지", action: "stop" }
         ]);
       } else {
         buttons.push([
           { text: "⏸️ 일시정지", action: "pause" },
-          { text: "⏹️ 중지", action: "stop" },
+          { text: "⏹️ 중지", action: "stop" }
         ]);
       }
 
       buttons.push([
         { text: "📊 상태 확인", action: "status" },
-        { text: "🔄 실시간 토글", action: "live" },
+        { text: "🔄 실시간 토글", action: "live" }
       ]);
     } else {
       // 새 타이머 시작 버튼들
@@ -729,27 +641,27 @@ ${message}
         {
           text: `🍅 집중 (${config.focusDuration}분)`,
           action: "start",
-          params: "focus",
+          params: "focus"
         },
         {
           text: `☕ 짧은 휴식 (${config.shortBreak}분)`,
           action: "start",
-          params: "short",
-        },
+          params: "short"
+        }
       ]);
 
       buttons.push([
         {
           text: `🌴 긴 휴식 (${config.longBreak}분)`,
           action: "start",
-          params: "long",
+          params: "long"
         },
-        { text: "⏱️ 커스텀", action: "start", params: "30" },
+        { text: "⏱️ 커스텀", action: "start", params: "30" }
       ]);
 
       buttons.push([
         { text: "📊 내 통계", action: "stats" },
-        { text: "❓ 도움말", action: "help" },
+        { text: "❓ 도움말", action: "help" }
       ]);
     }
 
@@ -766,18 +678,18 @@ ${message}
     if (timer.isPaused) {
       buttons.push([
         { text: "▶️ 재개", action: "resume" },
-        { text: "⏹️ 중지", action: "stop" },
+        { text: "⏹️ 중지", action: "stop" }
       ]);
     } else {
       buttons.push([
         { text: "⏸️ 일시정지", action: "pause" },
-        { text: "⏹️ 중지", action: "stop" },
+        { text: "⏹️ 중지", action: "stop" }
       ]);
     }
 
     buttons.push([
       { text: "📊 상세 보기", action: "status" },
-      { text: "🔄 새로고침", action: "refresh" },
+      { text: "🔄 새로고침", action: "refresh" }
     ]);
 
     // 실시간 업데이트 버튼
@@ -798,13 +710,13 @@ ${message}
     return [
       [
         { text: "▶️ 재개", action: "resume" },
-        { text: "⏹️ 중지", action: "stop" },
+        { text: "⏹️ 중지", action: "stop" }
       ],
       [
         { text: "🔄 새로고침", action: "refresh" },
-        { text: "📊 상세 보기", action: "status" },
+        { text: "📊 상세 보기", action: "status" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
   }
 
@@ -817,18 +729,18 @@ ${message}
     if (timer.isPaused) {
       buttons.push([
         { text: "▶️ 재개", action: "resume" },
-        { text: "⏹️ 중지", action: "stop" },
+        { text: "⏹️ 중지", action: "stop" }
       ]);
     } else {
       buttons.push([
         { text: "⏸️ 일시정지", action: "pause" },
-        { text: "⏹️ 중지", action: "stop" },
+        { text: "⏹️ 중지", action: "stop" }
       ]);
     }
 
     buttons.push([
       { text: "🔄 새로고침", action: "refresh" },
-      { text: "📈 진행률 분석", action: "stats" },
+      { text: "📈 진행률 분석", action: "stats" }
     ]);
 
     if (canEnableLiveUpdate) {
@@ -888,7 +800,7 @@ ${message}
       "🌅 자연광이 있는 곳에서 작업하면 더 좋아요",
       "📝 작업 전에 오늘의 목표를 명확히 정하세요",
       "🏃‍♂️ 집중 전 가벼운 스트레칭으로 몸을 풀어주세요",
-      "🧘‍♀️ 심호흡을 3회 하고 마음을 가라앉혀보세요",
+      "🧘‍♀️ 심호흡을 3회 하고 마음을 가라앉혀보세요"
     ];
 
     return tips[Math.floor(Math.random() * tips.length)];
@@ -902,7 +814,7 @@ ${message}
       running_to_paused: "⏸️ 타이머가 멈췄습니다... 잠시 휴식하세요 💫",
       paused_to_running: "▶️ 다시 시작합니다! 집중 모드 ON 🔥",
       running_to_stopped: "⏹️ 타이머가 종료되었습니다. 수고하셨어요! 👏",
-      stopped_to_running: "🚀 새로운 타이머가 시작됩니다! 화이팅! ⚡",
+      stopped_to_running: "🚀 새로운 타이머가 시작됩니다! 화이팅! ⚡"
     };
 
     const effectKey = `${fromStatus}_to_${toStatus}`;
@@ -918,12 +830,7 @@ ${message}
     let history = "📊 **최근 세션 기록**\n";
 
     sessions.slice(-5).forEach((session, index) => {
-      const completionIcon =
-        session.completion >= 90
-          ? "🟢"
-          : session.completion >= 70
-          ? "🟡"
-          : "🔴";
+      const completionIcon = session.completion >= 90 ? "🟢" : session.completion >= 70 ? "🟡" : "🔴";
       history += `${completionIcon} ${session.type} - ${session.completion}%\n`;
     });
 

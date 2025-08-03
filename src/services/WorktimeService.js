@@ -74,15 +74,12 @@ class WorktimeService extends BaseService {
       checkOutDisplay: TimeHelper.safeDisplayTime(record.checkOutTime),
 
       // 날짜 문자열 (정렬용)
-      dateString: record.date || TimeHelper.format(record.createdAt, "date"),
+      dateString: record.date || TimeHelper.format(record.createdAt, "date")
     };
 
     // 근무시간 계산 (안전하게)
     if (transformed.checkInTime && transformed.checkOutTime) {
-      const duration = TimeHelper.diffMinutes(
-        transformed.checkInTime,
-        transformed.checkOutTime
-      );
+      const duration = TimeHelper.diffMinutes(transformed.checkInTime, transformed.checkOutTime);
       transformed.workDuration = Math.max(0, duration);
       transformed.workDurationDisplay = this.formatWorkDuration(duration);
     }
@@ -100,7 +97,7 @@ class WorktimeService extends BaseService {
         userId: userId,
         status: "working",
         checkOutTime: null,
-        isActive: true,
+        isActive: true
       });
 
       if (workingRecord) {
@@ -113,7 +110,7 @@ class WorktimeService extends BaseService {
         date: today, // 출근 시점의 날짜
         checkInTime: now,
         status: "working",
-        isActive: true,
+        isActive: true
       });
 
       logger.info(`✅ 출근 기록: ${userId} at ${now}`);
@@ -136,7 +133,7 @@ class WorktimeService extends BaseService {
         userId: userId,
         status: "working",
         checkOutTime: null,
-        isActive: true,
+        isActive: true
       }).sort({ checkInTime: -1 }); // 가장 최근 출근 기록
 
       if (!record) {
@@ -155,12 +152,7 @@ class WorktimeService extends BaseService {
       const checkInHour = record.checkInTime.getHours();
       const checkOutHour = now.getHours();
 
-      if (
-        checkOutHour < 6 ||
-        checkOutHour >= 22 ||
-        checkInHour < 6 ||
-        checkInHour >= 22
-      ) {
+      if (checkOutHour < 6 || checkOutHour >= 22 || checkInHour < 6 || checkInHour >= 22) {
         record.workType = "night"; // 야간근무
       }
 
@@ -195,20 +187,17 @@ class WorktimeService extends BaseService {
         userId: userId,
         status: "working",
         checkOutTime: null,
-        isActive: true,
+        isActive: true
       }).sort({ checkInTime: -1 });
 
       if (workingRecord) {
         const transformed = this.safeTransformRecord(workingRecord);
-        const currentDuration = this.calculateCurrentWorkDuration(
-          transformed.checkInTime,
-          new Date()
-        );
+        const currentDuration = this.calculateCurrentWorkDuration(transformed.checkInTime, new Date());
 
         return {
           ...transformed,
           currentWorkDuration: currentDuration,
-          isWorking: true,
+          isWorking: true
         };
       }
 
@@ -217,7 +206,7 @@ class WorktimeService extends BaseService {
         userId: userId,
         date: today,
         status: "completed",
-        isActive: true,
+        isActive: true
       });
 
       if (todayRecords.length === 0) {
@@ -237,7 +226,7 @@ class WorktimeService extends BaseService {
         ...transformed,
         workDuration: totalWorkDuration, // 합산된 시간
         isWorking: false,
-        todayRecordCount: todayRecords.length, // 오늘 출퇴근 횟수
+        todayRecordCount: todayRecords.length // 오늘 출퇴근 횟수
       };
     } catch (error) {
       logger.error("오늘 기록 조회 실패:", error);
@@ -257,20 +246,18 @@ class WorktimeService extends BaseService {
         userId: userId,
         date: {
           $gte: TimeHelper.format(weekStart, "date"),
-          $lte: TimeHelper.format(weekEnd, "date"),
+          $lte: TimeHelper.format(weekEnd, "date")
         },
         isActive: true,
         // ✅ 수정: checkOutTime 필터 완화 (출근만 있어도 표시)
         $or: [
           { checkOutTime: { $exists: true, $ne: null } }, // 퇴근 완료
-          { checkInTime: { $exists: true, $ne: null } }, // 출근만 있어도 표시
-        ],
+          { checkInTime: { $exists: true, $ne: null } } // 출근만 있어도 표시
+        ]
       }).sort({ date: 1 });
 
       // ✅ 수정: 필터링 조건 완화 - 출근 기록만 있어도 표시
-      const safeRecords = records
-        .map((record) => this.safeTransformRecord(record))
-        .filter((record) => record && record.checkInTime); // workDuration > 0 조건 제거
+      const safeRecords = records.map((record) => this.safeTransformRecord(record)).filter((record) => record && record.checkInTime); // workDuration > 0 조건 제거
 
       const stats = this.calculateWeeklyStats(safeRecords);
 
@@ -280,13 +267,9 @@ class WorktimeService extends BaseService {
         workDays: safeRecords.length,
         totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
-        avgDailyHours:
-          safeRecords.length > 0
-            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) /
-              10
-            : 0,
+        avgDailyHours: safeRecords.length > 0 ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) / 10 : 0,
         records: safeRecords,
-        analysis: this.analyzeWeeklyPattern(safeRecords),
+        analysis: this.analyzeWeeklyPattern(safeRecords)
       };
     } catch (error) {
       logger.error("주간 통계 조회 실패:", error);
@@ -306,20 +289,15 @@ class WorktimeService extends BaseService {
         userId: userId,
         date: {
           $gte: TimeHelper.format(monthStart, "date"),
-          $lte: TimeHelper.format(monthEnd, "date"),
+          $lte: TimeHelper.format(monthEnd, "date")
         },
         isActive: true,
         // ✅ 수정: 필터링 완화
-        $or: [
-          { checkOutTime: { $exists: true, $ne: null } },
-          { checkInTime: { $exists: true, $ne: null } },
-        ],
+        $or: [{ checkOutTime: { $exists: true, $ne: null } }, { checkInTime: { $exists: true, $ne: null } }]
       }).sort({ date: 1 });
 
       // ✅ 수정: 출근 기록만 있어도 표시
-      const safeRecords = records
-        .map((record) => this.safeTransformRecord(record))
-        .filter((record) => record && record.checkInTime);
+      const safeRecords = records.map((record) => this.safeTransformRecord(record)).filter((record) => record && record.checkInTime);
 
       const stats = this.calculateMonthlyStats(safeRecords);
 
@@ -329,14 +307,10 @@ class WorktimeService extends BaseService {
         workDays: safeRecords.length,
         totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
-        avgDailyHours:
-          safeRecords.length > 0
-            ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) /
-              10
-            : 0,
+        avgDailyHours: safeRecords.length > 0 ? Math.round((stats.totalMinutes / safeRecords.length / 60) * 10) / 10 : 0,
         records: safeRecords,
         performance: this.analyzeMonthlyPerformance(safeRecords),
-        trends: this.analyzeMonthlyTrends(safeRecords),
+        trends: this.analyzeMonthlyTrends(safeRecords)
       };
     } catch (error) {
       logger.error("월간 통계 조회 실패:", error);
@@ -419,22 +393,21 @@ class WorktimeService extends BaseService {
     if (records.length === 0) {
       return {
         trend: "데이터 없음",
-        recommendation: "근무 기록을 시작해보세요.",
+        recommendation: "근무 기록을 시작해보세요."
       };
     }
 
-    const avgHours =
-      records.reduce((sum, r) => sum + r.workDuration, 0) / records.length / 60;
+    const avgHours = records.reduce((sum, r) => sum + r.workDuration, 0) / records.length / 60;
 
     if (avgHours >= 8) {
       return {
         trend: "안정적인 근무 패턴",
-        recommendation: "현재 패턴을 유지하세요.",
+        recommendation: "현재 패턴을 유지하세요."
       };
     } else {
       return {
         trend: "근무시간 부족",
-        recommendation: "목표 시간 달성을 위해 노력해보세요.",
+        recommendation: "목표 시간 달성을 위해 노력해보세요."
       };
     }
   }
@@ -447,8 +420,7 @@ class WorktimeService extends BaseService {
       return { emoji: "📝", txt: "기록이 없습니다." };
     }
 
-    const avgDaily =
-      records.reduce((sum, r) => sum + r.workDuration, 0) / records.length / 60;
+    const avgDaily = records.reduce((sum, r) => sum + r.workDuration, 0) / records.length / 60;
 
     if (avgDaily >= 8) {
       return { emoji: "🏆", txt: "우수한 근무 성과" };
@@ -466,7 +438,7 @@ class WorktimeService extends BaseService {
     return {
       weeklyTrend: "안정적",
       monthlyTrend: "증가 추세",
-      recommendation: "현재 패턴 유지",
+      recommendation: "현재 패턴 유지"
     };
   }
 }

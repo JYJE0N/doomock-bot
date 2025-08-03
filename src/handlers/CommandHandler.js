@@ -37,7 +37,7 @@ class CommandHandler {
       unknownCommands: 0,
       responseTimeMs: [],
       errorCount: 0,
-      startTime: Date.now(),
+      startTime: Date.now()
     };
 
     // 👤 사용자 상태 관리 (순수 데이터)
@@ -48,14 +48,16 @@ class CommandHandler {
       maxUserStates: parseInt(process.env.COMMAND_MAX_USER_STATES) || 1000,
       stateTimeoutMs: parseInt(process.env.COMMAND_STATE_TIMEOUT) || 1800000, // 30분
       enableDetailedLogging: process.env.COMMAND_DETAILED_LOGGING === "true",
-      enablePerformanceTracking:
-        process.env.COMMAND_PERFORMANCE_TRACKING !== "false",
+      enablePerformanceTracking: process.env.COMMAND_PERFORMANCE_TRACKING !== "false"
     };
 
     // 🧹 주기적 정리 (10분마다)
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupExpiredStates();
-    }, 10 * 60 * 1000);
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupExpiredStates();
+      },
+      10 * 60 * 1000
+    );
 
     logger.info("⌨️ CommandHandler 초기화 완료 - 순수 라우팅 전용");
   }
@@ -76,7 +78,7 @@ class CommandHandler {
         logger.debug(`⌨️ 명령어 라우팅: /${command} ${args.join(" ")}`, {
           userId,
           userName,
-          parseInfo,
+          parseInfo
         });
       }
 
@@ -88,35 +90,17 @@ class CommandHandler {
 
       switch (commandType) {
         case "system":
-          handled = await this.routeSystemCommand(
-            bot,
-            msg,
-            command,
-            args,
-            parseInfo
-          );
+          handled = await this.routeSystemCommand(bot, msg, command, args, parseInfo);
           this.stats.systemCommands++;
           break;
 
         case "module":
-          handled = await this.routeModuleCommand(
-            bot,
-            msg,
-            command,
-            args,
-            parseInfo
-          );
+          handled = await this.routeModuleCommand(bot, msg, command, args, parseInfo);
           this.stats.moduleCommands++;
           break;
 
         default:
-          handled = await this.routeUnknownCommand(
-            bot,
-            msg,
-            command,
-            args,
-            parseInfo
-          );
+          handled = await this.routeUnknownCommand(bot, msg, command, args, parseInfo);
           this.stats.unknownCommands++;
       }
 
@@ -133,7 +117,7 @@ class CommandHandler {
       logger.error(`❌ 명령어 라우팅 실패: /${command}`, {
         userId,
         userName,
-        error: error.message,
+        error: error.message
       });
       return false;
     } finally {
@@ -155,17 +139,7 @@ class CommandHandler {
     }
 
     // 시스템 명령어 체크
-    const systemCommands = [
-      "start",
-      "help",
-      "status",
-      "cancel",
-      "menu",
-      "about",
-      "settings",
-      "ping",
-      "version",
-    ];
+    const systemCommands = ["start", "help", "status", "cancel", "menu", "about", "settings", "ping", "version"];
 
     if (systemCommands.includes(command)) {
       return "system";
@@ -193,9 +167,7 @@ class CommandHandler {
 
       // ✅ NavigationHandler로 완전 위임
       if (!this.navigationHandler) {
-        logger.warn(
-          "⚠️ NavigationHandler가 설정되지 않음 - 시스템 명령어 처리 불가"
-        );
+        logger.warn("⚠️ NavigationHandler가 설정되지 않음 - 시스템 명령어 처리 불가");
         return false;
       }
 
@@ -208,14 +180,11 @@ class CommandHandler {
         msg,
         userId,
         chatId,
-        userName,
+        userName
       };
 
       // NavigationHandler에 라우팅 위임
-      const result = await this.navigationHandler.handleSystemCommand(
-        bot,
-        routingInfo
-      );
+      const result = await this.navigationHandler.handleSystemCommand(bot, routingInfo);
 
       return result !== false;
     } catch (error) {
@@ -256,8 +225,8 @@ class CommandHandler {
             command,
             args,
             parseInfo,
-            isCommand: true,
-          },
+            isCommand: true
+          }
         };
 
         const result = await moduleInstance.onHandleMessage(bot, enhancedMsg);
@@ -272,12 +241,7 @@ class CommandHandler {
 
       // 전용 명령어 핸들러 지원
       if (typeof moduleInstance.handleCommand === "function") {
-        const result = await moduleInstance.handleCommand(
-          bot,
-          msg,
-          command,
-          args
-        );
+        const result = await moduleInstance.handleCommand(bot, msg, command, args);
         return result !== false;
       }
 
@@ -309,13 +273,10 @@ class CommandHandler {
         msg,
         userId: getUserId(msg.from),
         chatId: msg.chat.id,
-        userName: getUserName(msg.from),
+        userName: getUserName(msg.from)
       };
 
-      const result = await this.navigationHandler.handleUnknownCommand(
-        bot,
-        routingInfo
-      );
+      const result = await this.navigationHandler.handleUnknownCommand(bot, routingInfo);
 
       return result !== false;
     } catch (error) {
@@ -349,7 +310,7 @@ class CommandHandler {
       worktime: "worktime",
       work: "worktime",
       tts: "tts",
-      voice: "tts",
+      voice: "tts"
     };
 
     const mappedModule = commandAliases[command];
@@ -367,7 +328,7 @@ class CommandHandler {
       연차: "leave",
       휴가: "leave",
       근무: "worktime",
-      음성: "tts",
+      음성: "tts"
     };
 
     const koreanMapped = koreanAliases[command];
@@ -397,7 +358,7 @@ class CommandHandler {
     this.userStates.set(userId.toString(), {
       ...state,
       timestamp: Date.now(),
-      lastAccessed: Date.now(),
+      lastAccessed: Date.now()
     });
 
     logger.debug(`사용자 상태 설정: ${userId}`, state);
@@ -464,7 +425,7 @@ class CommandHandler {
     return {
       end: () => {
         return Date.now() - startTime;
-      },
+      }
     };
   }
 
@@ -486,10 +447,7 @@ class CommandHandler {
   getDetailedStats() {
     const uptime = Date.now() - this.stats.startTime;
     const avgResponseTime =
-      this.stats.responseTimeMs.length > 0
-        ? this.stats.responseTimeMs.reduce((a, b) => a + b, 0) /
-          this.stats.responseTimeMs.length
-        : 0;
+      this.stats.responseTimeMs.length > 0 ? this.stats.responseTimeMs.reduce((a, b) => a + b, 0) / this.stats.responseTimeMs.length : 0;
 
     return {
       commands: {
@@ -499,27 +457,21 @@ class CommandHandler {
         system: this.stats.systemCommands,
         module: this.stats.moduleCommands,
         unknown: this.stats.unknownCommands,
-        successRate:
-          this.stats.commandsProcessed > 0
-            ? (
-                (this.stats.validCommands / this.stats.commandsProcessed) *
-                100
-              ).toFixed(1)
-            : 0,
-        errors: this.stats.errorCount,
+        successRate: this.stats.commandsProcessed > 0 ? ((this.stats.validCommands / this.stats.commandsProcessed) * 100).toFixed(1) : 0,
+        errors: this.stats.errorCount
       },
       performance: {
         uptime: uptime,
         averageResponseTime: Math.round(avgResponseTime),
         totalResponseTimes: this.stats.responseTimeMs.length,
-        memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        memoryUsageMB: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
       },
       userStates: {
         active: this.userStates.size,
         max: this.config.maxUserStates,
-        timeoutMs: this.config.stateTimeoutMs,
+        timeoutMs: this.config.stateTimeoutMs
       },
-      config: this.config,
+      config: this.config
     };
   }
 
@@ -531,7 +483,7 @@ class CommandHandler {
     const health = {
       status: "healthy",
       issues: [],
-      score: 100,
+      score: 100
     };
 
     // 성공률 체크
@@ -606,20 +558,10 @@ class CommandHandler {
         successRate: `${stats.commands.successRate}%`,
         avgResponseTime: `${stats.performance.averageResponseTime}ms`,
         activeStates: stats.userStates.active,
-        uptime: this.formatUptime(stats.performance.uptime),
+        uptime: this.formatUptime(stats.performance.uptime)
       },
-      responsibilities: [
-        "명령어 분류 및 검증",
-        "적절한 핸들러로 라우팅",
-        "사용자 상태 관리",
-        "성능 통계 수집",
-      ],
-      notResponsible: [
-        "UI 생성 및 렌더링",
-        "메시지 텍스트 구성",
-        "키보드 생성",
-        "직접적인 사용자 응답",
-      ],
+      responsibilities: ["명령어 분류 및 검증", "적절한 핸들러로 라우팅", "사용자 상태 관리", "성능 통계 수집"],
+      notResponsible: ["UI 생성 및 렌더링", "메시지 텍스트 구성", "키보드 생성", "직접적인 사용자 응답"]
     };
   }
 

@@ -27,7 +27,7 @@ class CallbackResponseManager {
       successfulResponses: 0,
       duplicateAttempts: 0,
       errorResponses: 0,
-      expiredCallbacks: 0,
+      expiredCallbacks: 0
     };
 
     // 자동 정리 스케줄러 (5분마다)
@@ -74,14 +74,12 @@ class CallbackResponseManager {
       this.respondedCallbacks.add(callbackId);
       this.stats.successfulResponses++;
 
-      logger.debug(
-        `콜백 응답 성공: ${callbackId} - "${options.text || "처리 중..."}"`
-      );
+      logger.debug(`콜백 응답 성공: ${callbackId} - "${options.text || "처리 중..."}"`);
 
       return {
         success: true,
         callbackId,
-        responseText: options.text,
+        responseText: options.text
       };
     } catch (error) {
       this.stats.errorResponses++;
@@ -97,12 +95,9 @@ class CallbackResponseManager {
         return {
           success: false,
           reason: "expired",
-          error: error.message,
+          error: error.message
         };
-      } else if (
-        error.message.includes("already answered") ||
-        error.message.includes("QUERY_ID_INVALID")
-      ) {
+      } else if (error.message.includes("already answered") || error.message.includes("QUERY_ID_INVALID")) {
         logger.warn(`이미 응답된 콜백: ${callbackId}`);
 
         // 이미 응답된 것으로 기록
@@ -111,7 +106,7 @@ class CallbackResponseManager {
         return {
           success: false,
           reason: "already_answered_external",
-          error: error.message,
+          error: error.message
         };
       } else {
         logger.error(`콜백 응답 실패: ${callbackId}`, error);
@@ -119,7 +114,7 @@ class CallbackResponseManager {
         return {
           success: false,
           reason: "unknown_error",
-          error: error.message,
+          error: error.message
         };
       }
     } finally {
@@ -132,16 +127,9 @@ class CallbackResponseManager {
    * 🔄 로딩 응답 (즉시 반응)
    */
   async answerLoading(bot, callbackQuery, loadingText = null) {
-    const loadingMessages = [
-      "⏳ 처리 중...",
-      "⌛ 잠시만 기다려주세요...",
-      "🔄 로딩 중...",
-      "⚡ 처리하고 있어요...",
-    ];
+    const loadingMessages = ["⏳ 처리 중...", "⌛ 잠시만 기다려주세요...", "🔄 로딩 중...", "⚡ 처리하고 있어요..."];
 
-    const text =
-      loadingText ||
-      loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
+    const text = loadingText || loadingMessages[Math.floor(Math.random() * loadingMessages.length)];
 
     return await this.answerCallback(bot, callbackQuery, { text });
   }
@@ -149,14 +137,10 @@ class CallbackResponseManager {
   /**
    * ❌ 에러 응답 (알림 팝업)
    */
-  async answerError(
-    bot,
-    callbackQuery,
-    errorText = "처리 중 오류가 발생했습니다"
-  ) {
+  async answerError(bot, callbackQuery, errorText = "처리 중 오류가 발생했습니다") {
     return await this.answerCallback(bot, callbackQuery, {
       text: `❌ ${errorText}`,
-      show_alert: true,
+      show_alert: true
     });
   }
 
@@ -165,7 +149,7 @@ class CallbackResponseManager {
    */
   async answerSuccess(bot, callbackQuery, successText = "완료되었습니다") {
     return await this.answerCallback(bot, callbackQuery, {
-      text: `✅ ${successText}`,
+      text: `✅ ${successText}`
     });
   }
 
@@ -176,9 +160,7 @@ class CallbackResponseManager {
     return {
       responded: this.respondedCallbacks.has(callbackId),
       pending: this.pendingCallbacks.has(callbackId),
-      canRespond:
-        !this.respondedCallbacks.has(callbackId) &&
-        !this.pendingCallbacks.has(callbackId),
+      canRespond: !this.respondedCallbacks.has(callbackId) && !this.pendingCallbacks.has(callbackId)
     };
   }
 
@@ -190,13 +172,7 @@ class CallbackResponseManager {
       ...this.stats,
       currentPending: this.pendingCallbacks.size,
       totalTracked: this.respondedCallbacks.size,
-      successRate:
-        this.stats.totalResponses > 0
-          ? (
-              (this.stats.successfulResponses / this.stats.totalResponses) *
-              100
-            ).toFixed(2)
-          : 0,
+      successRate: this.stats.totalResponses > 0 ? ((this.stats.successfulResponses / this.stats.totalResponses) * 100).toFixed(2) : 0
     };
   }
 
@@ -205,9 +181,12 @@ class CallbackResponseManager {
    */
   startCleanupScheduler() {
     // 5분마다 오래된 콜백 정리
-    this.cleanupInterval = setInterval(() => {
-      this.cleanup();
-    }, 5 * 60 * 1000);
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanup();
+      },
+      5 * 60 * 1000
+    );
 
     logger.debug("콜백 정리 스케줄러 시작됨 (5분 간격)");
   }

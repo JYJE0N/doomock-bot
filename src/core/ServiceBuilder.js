@@ -56,16 +56,9 @@ class ServiceBuilder {
 
     logger.debug(`📂 서비스 디렉토리 스캔 중: ${servicesDir}`);
 
-    const serviceFiles = fs
-      .readdirSync(servicesDir)
-      .filter(
-        (file) => file.endsWith("Service.js") && file !== "BaseService.js"
-      );
+    const serviceFiles = fs.readdirSync(servicesDir).filter((file) => file.endsWith("Service.js") && file !== "BaseService.js");
 
-    logger.info(
-      `📄 발견된 서비스 파일: ${serviceFiles.length}개`,
-      serviceFiles
-    );
+    logger.info(`📄 발견된 서비스 파일: ${serviceFiles.length}개`, serviceFiles);
 
     for (const file of serviceFiles) {
       try {
@@ -112,7 +105,7 @@ class ServiceBuilder {
 
       // 모든 서비스가 Mongoose 사용
       const instance = new ServiceClass({
-        mongooseManager: this.mongooseManager,
+        mongooseManager: this.mongooseManager
       });
 
       // 서비스 초기화
@@ -159,7 +152,7 @@ class ServiceBuilder {
     return {
       registeredServices: Array.from(this.services.keys()),
       activeInstances: Array.from(this.serviceInstances.keys()),
-      mongooseConnected: this.mongooseManager?.isConnected() || false,
+      mongooseConnected: this.mongooseManager?.isConnected() || false
     };
   }
 }

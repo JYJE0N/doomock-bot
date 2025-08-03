@@ -42,10 +42,7 @@ class TodoRenderer extends BaseRenderer {
       case "error":
         return await this.renderError(data, ctx);
       default:
-        return await this.renderError(
-          { message: "지원하지 않는 기능입니다." },
-          ctx
-        );
+        return await this.renderError({ message: "지원하지 않는 기능입니다." }, ctx);
     }
   }
 
@@ -63,9 +60,9 @@ class TodoRenderer extends BaseRenderer {
       [
         [
           { text: "📋 목록 보기", action: "list", params: "1" },
-          { text: "➕ 할일 추가", action: "add" },
+          { text: "➕ 할일 추가", action: "add" }
         ],
-        [{ text: "🔙 메인 메뉴", action: "menu" }],
+        [{ text: "🔙 메인 메뉴", action: "menu" }]
       ],
       this.moduleName
     ); // 메인 메뉴는 system으로
@@ -109,12 +106,12 @@ class TodoRenderer extends BaseRenderer {
       row.push({
         text: `${todo1.completed ? "✅" : "⬜"} ${number1}`,
         action: "toggle",
-        params: todo1._id.toString(),
+        params: todo1._id.toString()
       });
       row.push({
         text: "🗑️",
         action: "delete",
-        params: todo1._id.toString(),
+        params: todo1._id.toString()
       });
 
       // 두 번째 할일 (있으면)
@@ -124,12 +121,12 @@ class TodoRenderer extends BaseRenderer {
         row.push({
           text: `${todo2.completed ? "✅" : "⬜"} ${number2}`,
           action: "toggle",
-          params: todo2._id.toString(),
+          params: todo2._id.toString()
         });
         row.push({
           text: "🗑️",
           action: "delete",
-          params: todo2._id.toString(),
+          params: todo2._id.toString()
         });
       }
 
@@ -144,21 +141,21 @@ class TodoRenderer extends BaseRenderer {
         pageRow.push({
           text: "⬅️ 이전",
           action: "page",
-          params: (currentPage - 1).toString(),
+          params: (currentPage - 1).toString()
         });
       }
 
       pageRow.push({
         text: `📄 ${currentPage}/${totalPages}`,
         action: "page",
-        params: currentPage.toString(),
+        params: currentPage.toString()
       });
 
       if (currentPage < totalPages) {
         pageRow.push({
           text: "다음 ➡️",
           action: "page",
-          params: (currentPage + 1).toString(),
+          params: (currentPage + 1).toString()
         });
       }
 
@@ -168,7 +165,7 @@ class TodoRenderer extends BaseRenderer {
     // 하단 메뉴
     buttons.push([
       { text: "➕ 추가", action: "add" },
-      { text: "🔙 메뉴", action: "menu" },
+      { text: "🔙 메뉴", action: "menu" }
     ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -190,10 +187,7 @@ class TodoRenderer extends BaseRenderer {
 
 /cancel 명령으로 취소할 수 있습니다.`;
 
-    const keyboard = this.createInlineKeyboard(
-      [[{ text: "❌ 취소", action: "menu" }]],
-      this.moduleName
-    );
+    const keyboard = this.createInlineKeyboard([[{ text: "❌ 취소", action: "menu" }]], this.moduleName);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
@@ -210,9 +204,9 @@ ${data.message}`;
       [
         [
           { text: "📋 목록 보기", action: "list", params: "1" },
-          { text: "➕ 더 추가", action: "add" },
+          { text: "➕ 더 추가", action: "add" }
         ],
-        [{ text: "🔙 메뉴", action: "menu" }],
+        [{ text: "🔙 메뉴", action: "menu" }]
       ],
       this.moduleName
     );
@@ -234,8 +228,8 @@ ${data.message}
       [
         [
           { text: "🔄 다시 시도", action: "menu" },
-          { text: "🔙 메인 메뉴", action: "menu" },
-        ],
+          { text: "🔙 메인 메뉴", action: "menu" }
+        ]
       ],
       this.moduleName // "system" 대신 this.moduleName 사용
     );
@@ -249,10 +243,7 @@ ${data.message}
   async renderAddError(data, ctx) {
     const text = `❌ **할일 추가 실패**\n\n${data.message}`;
     const keyboard = this.createInlineKeyboard(
-      [
-        [{ text: "🔄 다시 시도", action: "add" }],
-        [{ text: "🔙 메뉴로", action: "menu" }],
-      ],
+      [[{ text: "🔄 다시 시도", action: "add" }], [{ text: "🔙 메뉴로", action: "menu" }]],
       this.moduleName
     );
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -271,10 +262,10 @@ ${data.message}
           {
             text: "✅ 예, 삭제합니다.",
             action: "executeDelete",
-            params: todo._id.toString(),
+            params: todo._id.toString()
           },
-          { text: "❌ 아니요", action: "list", params: "1" },
-        ],
+          { text: "❌ 아니요", action: "list", params: "1" }
+        ]
       ],
       this.moduleName
     );

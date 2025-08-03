@@ -27,12 +27,12 @@ const timerSchema = new mongoose.Schema(
     userId: {
       type: String,
       required: true,
-      index: true,
+      index: true
     },
     userName: {
       type: String,
       required: true,
-      trim: true,
+      trim: true
     },
 
     // 세션 정보
@@ -40,7 +40,7 @@ const timerSchema = new mongoose.Schema(
       type: String,
       enum: ["focus", "shortBreak", "longBreak"],
       default: "focus",
-      required: true,
+      required: true
     },
     duration: { type: Number, required: true, default: 25 }, // 분 단위
 
@@ -49,18 +49,17 @@ const timerSchema = new mongoose.Schema(
       type: String,
       enum: {
         values: ["focus", "shortBreak", "longBreak"],
-        message:
-          "타이머 타입은 focus, shortBreak, longBreak 중 하나여야 합니다",
+        message: "타이머 타입은 focus, shortBreak, longBreak 중 하나여야 합니다"
       },
       default: "focus",
       required: [true, "타이머 타입은 필수입니다"],
-      index: true,
+      index: true
     },
     duration: {
       type: Number,
       required: [true, "타이머 지속시간은 필수입니다"],
       min: [1, "타이머는 최소 1분 이상이어야 합니다"],
-      max: [180, "타이머는 최대 180분(3시간)까지 가능합니다"],
+      max: [180, "타이머는 최대 180분(3시간)까지 가능합니다"]
     },
 
     // 📊 상태 관리
@@ -68,11 +67,11 @@ const timerSchema = new mongoose.Schema(
       type: String,
       enum: {
         values: ["active", "paused", "completed", "stopped"],
-        message: "상태는 active, paused, completed, stopped 중 하나여야 합니다",
+        message: "상태는 active, paused, completed, stopped 중 하나여야 합니다"
       },
       default: "active",
       required: [true, "상태는 필수입니다"],
-      index: true,
+      index: true
     },
 
     // ⏰ 시간 추적
@@ -80,97 +79,97 @@ const timerSchema = new mongoose.Schema(
       type: Date,
       required: [true, "시작 시간은 필수입니다"],
       default: Date.now,
-      index: true,
+      index: true
     },
     completedAt: {
       type: Date,
-      default: null,
+      default: null
     },
     stoppedAt: {
       type: Date,
-      default: null,
+      default: null
     },
 
     // ⏸️ 일시정지 관리
     pausedAt: {
       type: Date,
-      default: null,
+      default: null
     },
     resumedAt: {
       type: Date,
-      default: null,
+      default: null
     },
     totalPausedDuration: {
       type: Number, // 밀리초
       default: 0,
-      min: [0, "일시정지 시간은 음수일 수 없습니다"],
+      min: [0, "일시정지 시간은 음수일 수 없습니다"]
     },
 
     // 📈 진행률 추적
     lastProgress: {
       remainingTime: {
         type: Number, // 초
-        min: [0, "남은 시간은 음수일 수 없습니다"],
+        min: [0, "남은 시간은 음수일 수 없습니다"]
       },
       updatedAt: {
         type: Date,
-        default: Date.now,
-      },
+        default: Date.now
+      }
     },
 
     // ✅ 완료 정보
     wasCompleted: {
       type: Boolean,
       default: false,
-      index: true,
+      index: true
     },
     completionRate: {
       type: Number, // 0-100
       min: [0, "완료율은 0% 이상이어야 합니다"],
       max: [100, "완료율은 100%를 초과할 수 없습니다"],
-      default: 0,
+      default: 0
     },
     actualDuration: {
       type: Number, // 실제 진행된 시간 (분)
       min: [0, "실제 지속시간은 음수일 수 없습니다"],
-      default: 0,
+      default: 0
     },
 
     // 🏷️ 추가 정보
     cycleNumber: {
       type: Number,
       default: 1,
-      min: [1, "사이클 번호는 1 이상이어야 합니다"],
+      min: [1, "사이클 번호는 1 이상이어야 합니다"]
     },
     tags: [
       {
         type: String,
         trim: true,
-        maxlength: [20, "태그는 20자를 초과할 수 없습니다"],
-      },
+        maxlength: [20, "태그는 20자를 초과할 수 없습니다"]
+      }
     ],
     note: {
       type: String,
       trim: true,
-      maxlength: [500, "메모는 500자를 초과할 수 없습니다"],
+      maxlength: [500, "메모는 500자를 초과할 수 없습니다"]
     },
 
     // 🔧 시스템 필드
     isActive: {
       type: Boolean,
       default: true,
-      index: true,
+      index: true
     },
 
     // 🔄 실시간 업데이트 지원
     liveUpdateEnabled: {
       type: Boolean,
-      default: false,
+      default: false
     },
     lastLiveUpdateAt: {
       type: Date,
-      default: null,
-    },
+      default: null
+    }
   },
   {
     timestamps: true, // createdAt, updatedAt 자동 생성
@@ -183,9 +182,9 @@ const timerSchema = new mongoose.Schema(
         // 민감한 정보 제거
         delete ret.__v;
         return ret;
-      },
+      }
     },
-    toObject: { virtuals: true },
+    toObject: { virtuals: true }
   }
 );
 
@@ -204,7 +203,7 @@ timerSchema.index(
   { updatedAt: 1 },
   {
     expireAfterSeconds: 30 * 24 * 60 * 60, // 30일
-    partialFilterExpression: { isActive: false },
+    partialFilterExpression: { isActive: false }
   }
 );
 
@@ -217,10 +216,7 @@ timerSchema.virtual("totalDurationMs").get(function () {
   if (!this.startedAt) return 0;
 
   const endTime = this.completedAt || this.stoppedAt || new Date();
-  return Math.max(
-    0,
-    endTime.getTime() - this.startedAt.getTime() - this.totalPausedDuration
-  );
+  return Math.max(0, endTime.getTime() - this.startedAt.getTime() - this.totalPausedDuration);
 });
 
 /**
@@ -249,7 +245,7 @@ timerSchema.virtual("statusDisplay").get(function () {
     active: "실행중",
     paused: "일시정지",
     completed: "완료",
-    stopped: "중지",
+    stopped: "중지"
   };
   return statusMap[this.status] || "알 수 없음";
 });
@@ -261,7 +257,7 @@ timerSchema.virtual("typeDisplay").get(function () {
   const typeMap = {
     focus: "🍅 집중 시간",
     shortBreak: "☕ 짧은 휴식",
-    longBreak: "🌴 긴 휴식",
+    longBreak: "🌴 긴 휴식"
   };
   return typeMap[this.type] || "⏰ 커스텀";
 });
@@ -308,13 +304,11 @@ timerSchema.methods.complete = async function () {
   // 진행률 최종 업데이트
   this.lastProgress = {
     remainingTime: 0,
-    updatedAt: now,
+    updatedAt: now
   };
 
   const saved = await this.save();
-  logger.info(
-    `✅ 타이머 완료: ${this.userId} - ${this.type} (${this.duration}분)`
-  );
+  logger.info(`✅ 타이머 완료: ${this.userId} - ${this.type} (${this.duration}분)`);
 
   return saved;
 };
@@ -385,16 +379,11 @@ timerSchema.methods.stop = async function () {
   const totalTime = this.duration * 60; // 초로 변환
   const remainingTime = this.lastProgress?.remainingTime || totalTime;
   const elapsedTime = totalTime - remainingTime;
-  this.completionRate = Math.min(
-    100,
-    Math.max(0, Math.round((elapsedTime / totalTime) * 100))
-  );
+  this.completionRate = Math.min(100, Math.max(0, Math.round((elapsedTime / totalTime) * 100)));
   this.actualDuration = this.totalDurationMinutes;
 
   const saved = await this.save();
-  logger.info(
-    `⏹️ 타이머 중지: ${this.userId} - ${this._id} (완료율: ${this.completionRate}%)`
-  );
+  logger.info(`⏹️ 타이머 중지: ${this.userId} - ${this._id} (완료율: ${this.completionRate}%)`);
 
   return saved;
 };
@@ -409,7 +398,7 @@ timerSchema.methods.updateProgress = async function (remainingTime) {
 
   this.lastProgress = {
     remainingTime: Math.max(0, parseInt(remainingTime)),
-    updatedAt: new Date(),
+    updatedAt: new Date()
   };
 
   // 실시간 업데이트 시간 갱신
@@ -446,7 +435,7 @@ timerSchema.methods.softDelete = async function () {
 timerSchema.statics.findActiveSessions = function (userId = null) {
   const query = {
     status: { $in: ["active", "paused"] },
-    isActive: true,
+    isActive: true
   };
 
   if (userId) {
@@ -469,7 +458,7 @@ timerSchema.statics.countTodayCompleted = async function (userId) {
     userId: userId.toString(),
     status: "completed",
     completedAt: { $gte: today, $lt: tomorrow },
-    isActive: true,
+    isActive: true
   });
 };
 
@@ -479,7 +468,7 @@ timerSchema.statics.countTodayCompleted = async function (userId) {
 timerSchema.statics.findByUser = function (userId, options = {}) {
   const query = this.find({
     userId: userId.toString(),
-    isActive: true,
+    isActive: true
   });
 
   // 상태 필터
@@ -533,8 +522,8 @@ timerSchema.statics.getUserBestRecords = async function (userId) {
       $match: {
         userId: userId.toString(),
         status: "completed",
-        isActive: true,
-      },
+        isActive: true
+      }
     },
     {
       $group: {
@@ -543,9 +532,9 @@ timerSchema.statics.getUserBestRecords = async function (userId) {
         totalMinutes: { $sum: "$actualDuration" },
         longestSession: { $max: "$actualDuration" },
         averageDuration: { $avg: "$actualDuration" },
-        bestCompletionRate: { $max: "$completionRate" },
-      },
-    },
+        bestCompletionRate: { $max: "$completionRate" }
+      }
+    }
   ];
 
   return this.aggregate(pipeline);
@@ -563,19 +552,19 @@ timerSchema.statics.getMonthlyStats = async function (userId, year, month) {
       $match: {
         userId: userId.toString(),
         startedAt: { $gte: startDate, $lte: endDate },
-        isActive: true,
-      },
+        isActive: true
+      }
     },
     {
       $group: {
         _id: {
           type: "$type",
-          status: "$status",
+          status: "$status"
         },
         count: { $sum: 1 },
         totalMinutes: { $sum: "$actualDuration" },
-        avgCompletionRate: { $avg: "$completionRate" },
-      },
+        avgCompletionRate: { $avg: "$completionRate" }
+      }
     },
     {
       $group: {
@@ -586,13 +575,13 @@ timerSchema.statics.getMonthlyStats = async function (userId, year, month) {
             status: "$_id.status",
             count: "$count",
             totalMinutes: "$totalMinutes",
-            avgCompletionRate: "$avgCompletionRate",
-          },
+            avgCompletionRate: "$avgCompletionRate"
+          }
         },
         totalSessions: { $sum: "$count" },
-        totalMinutes: { $sum: "$totalMinutes" },
-      },
-    },
+        totalMinutes: { $sum: "$totalMinutes" }
+      }
+    }
   ];
 
   return this.aggregate(pipeline);
@@ -608,16 +597,14 @@ timerSchema.statics.cleanupOldSessions = async function (daysOld = 90) {
     {
       isActive: true,
       status: { $in: ["stopped", "completed"] },
-      updatedAt: { $lt: cutoffDate },
+      updatedAt: { $lt: cutoffDate }
     },
     {
-      $set: { isActive: false },
+      $set: { isActive: false }
     }
   );
 
-  logger.info(
-    `🧹 ${result.modifiedCount}개의 오래된 타이머 세션을 정리했습니다.`
-  );
+  logger.info(`🧹 ${result.modifiedCount}개의 오래된 타이머 세션을 정리했습니다.`);
   return result;
 };
 
@@ -631,10 +618,7 @@ timerSchema.pre("save", function (next) {
   if (this.lastProgress && this.duration && !this.completionRate) {
     const totalSeconds = this.duration * 60;
     const elapsed = totalSeconds - this.lastProgress.remainingTime;
-    this.completionRate = Math.min(
-      100,
-      Math.max(0, Math.round((elapsed / totalSeconds) * 100))
-    );
+    this.completionRate = Math.min(100, Math.max(0, Math.round((elapsed / totalSeconds) * 100)));
   }
 
   // 실제 지속시간 자동 계산
@@ -648,14 +632,10 @@ timerSchema.pre("save", function (next) {
 /**
  * 🗑️ 삭제 전 관련 데이터 정리
  */
-timerSchema.pre(
-  "deleteOne",
-  { document: true, query: false },
-  async function () {
-    logger.info(`🗑️ 타이머 세션 삭제: ${this._id}`);
-    // 필요시 관련 통계 데이터 정리 로직 추가
-  }
-);
+timerSchema.pre("deleteOne", { document: true, query: false }, async function () {
+  logger.info(`🗑️ 타이머 세션 삭제: ${this._id}`);
+  // 필요시 관련 통계 데이터 정리 로직 추가
+});
 
 // ===== 📊 모델 생성 =====
 

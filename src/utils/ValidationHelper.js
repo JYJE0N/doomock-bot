@@ -34,7 +34,7 @@ class ValidationHelper {
       maxCacheSize: parseInt(process.env.VALIDATION_MAX_CACHE_SIZE) || 1000,
       enableLogging: process.env.VALIDATION_LOGGING_ENABLED === "true",
       strictMode: process.env.VALIDATION_STRICT_MODE === "true",
-      ...options,
+      ...options
     };
 
     // 📊 통계
@@ -45,7 +45,7 @@ class ValidationHelper {
       cacheHits: 0,
       cacheMisses: 0,
       averageValidationTime: 0,
-      schemaCount: 0,
+      schemaCount: 0
     };
 
     // 🌍 Railway 환경 최적화 제한값
@@ -57,9 +57,7 @@ class ValidationHelper {
     // 📝 기본 스키마 등록
     this.registerDefaultSchemas();
 
-    logger.info(
-      "🛡️ ValidationHelper v4.0.1 초기화됨 (callbackData 스키마 포함)"
-    );
+    logger.info("🛡️ ValidationHelper v4.0.1 초기화됨 (callbackData 스키마 포함)");
   }
 
   /**
@@ -75,7 +73,7 @@ class ValidationHelper {
       maxTagLength: isRailway ? 20 : 50,
       minSearchLength: 1,
       maxSearchLength: isRailway ? 100 : 200,
-      maxCallbackDataLength: 64, // Telegram 제한
+      maxCallbackDataLength: 64 // Telegram 제한
     };
   }
 
@@ -95,9 +93,7 @@ class ValidationHelper {
       noExcessiveRepetition: (value) => {
         if (typeof value !== "string") return true;
         const repetitionPattern = /(.)\1{4,}/;
-        return (
-          !repetitionPattern.test(value) || "과도한 반복은 허용되지 않습니다."
-        );
+        return !repetitionPattern.test(value) || "과도한 반복은 허용되지 않습니다.";
       },
 
       // 금지된 단어 체크
@@ -105,9 +101,7 @@ class ValidationHelper {
         if (typeof value !== "string") return true;
         const forbiddenWords = ["spam", "test123", "테스트123"];
         const lowerValue = value.toLowerCase();
-        const hasForbidden = forbiddenWords.some((word) =>
-          lowerValue.includes(word)
-        );
+        const hasForbidden = forbiddenWords.some((word) => lowerValue.includes(word));
         return !hasForbidden || "부적절한 내용이 포함되어 있습니다.";
       },
 
@@ -115,11 +109,9 @@ class ValidationHelper {
       noMaliciousContent: (value) => {
         if (typeof value !== "string") return true;
         const maliciousPatterns = [/<script/i, /javascript:/i, /on\w+\s*=/i];
-        const hasMalicious = maliciousPatterns.some((pattern) =>
-          pattern.test(value)
-        );
+        const hasMalicious = maliciousPatterns.some((pattern) => pattern.test(value));
         return !hasMalicious || "보안 위험 요소가 감지되었습니다.";
-      },
+      }
     };
   }
 
@@ -138,19 +130,15 @@ class ValidationHelper {
         customValidators: [
           (value) => {
             // 콜백 데이터 형식 검증: "module:action" 또는 "module:action:params"
-            const validPattern =
-              /^[a-zA-Z0-9_]+:[a-zA-Z0-9_]+(?::[a-zA-Z0-9_.-]*)?$/;
-            return (
-              validPattern.test(value) ||
-              "올바르지 않은 콜백 데이터 형식입니다."
-            );
-          },
-        ],
+            const validPattern = /^[a-zA-Z0-9_]+:[a-zA-Z0-9_]+(?::[a-zA-Z0-9_.-]*)?$/;
+            return validPattern.test(value) || "올바르지 않은 콜백 데이터 형식입니다.";
+          }
+        ]
       },
       userId: {
         type: "number",
-        required: false,
-      },
+        required: false
+      }
     });
 
     // 🔹 할일(Todo) 스키마
@@ -162,52 +150,39 @@ class ValidationHelper {
         maxLength: this.railwayLimits.maxTodoLength,
         allowEmoji: true,
         allowLineBreaks: true,
-        customValidators: [
-          this.validators.noExcessiveRepetition,
-          this.validators.meaningfulContent,
-          this.validators.noForbiddenWords,
-        ],
+        customValidators: [this.validators.noExcessiveRepetition, this.validators.meaningfulContent, this.validators.noForbiddenWords]
       },
       category: {
         type: "category",
         required: false,
         defaultValue: "general",
-        allowedValues: [
-          "work",
-          "personal",
-          "study",
-          "health",
-          "shopping",
-          "family",
-          "hobby",
-          "general",
-        ],
+        allowedValues: ["work", "personal", "study", "health", "shopping", "family", "hobby", "general"]
       },
       priority: {
         type: "range",
         required: false,
         min: 1,
         max: 5,
-        defaultValue: 3,
+        defaultValue: 3
       },
       description: {
         type: "text",
         required: false,
         maxLength: this.railwayLimits.maxDescriptionLength,
         allowEmoji: true,
-        allowLineBreaks: true,
+        allowLineBreaks: true
       },
       tags: {
         type: "tags",
         required: false,
         maxCount: this.railwayLimits.maxTagsCount,
-        maxTagLength: this.railwayLimits.maxTagLength,
+        maxTagLength: this.railwayLimits.maxTagLength
       },
       dueDate: {
         type: "date",
         required: false,
-        futureOnly: true,
-      },
+        futureOnly: true
+      }
     });
 
     // 🔹 사용자 입력 스키마
@@ -217,12 +192,12 @@ class ValidationHelper {
         required: true,
         minLength: 1,
         maxLength: 1000,
-        customValidators: [this.validators.noMaliciousContent],
+        customValidators: [this.validators.noMaliciousContent]
       },
       userId: {
         type: "number",
-        required: false,
-      },
+        required: false
+      }
     });
 
     // 🔹 검색 스키마
@@ -232,7 +207,7 @@ class ValidationHelper {
         required: true,
         minLength: this.railwayLimits.minSearchLength,
         maxLength: this.railwayLimits.maxSearchLength,
-        allowEmoji: true,
+        allowEmoji: true
       },
       filters: {
         type: "object",
@@ -240,9 +215,9 @@ class ValidationHelper {
         properties: {
           category: { type: "category" },
           priority: { type: "range", min: 1, max: 5 },
-          completed: { type: "boolean" },
-        },
-      },
+          completed: { type: "boolean" }
+        }
+      }
     });
 
     // 🔹 설정 스키마
@@ -251,23 +226,21 @@ class ValidationHelper {
         type: "range",
         min: 5,
         max: 50,
-        defaultValue: 10,
+        defaultValue: 10
       },
       notifications: {
         type: "boolean",
-        defaultValue: true,
+        defaultValue: true
       },
       theme: {
         type: "choice",
         allowedValues: ["light", "dark", "auto"],
-        defaultValue: "auto",
-      },
+        defaultValue: "auto"
+      }
     });
 
     this.stats.schemaCount = this.schemas.size;
-    logger.debug(
-      `📝 기본 스키마 등록 완료 (${this.stats.schemaCount}개, callbackData 포함)`
-    );
+    logger.debug(`📝 기본 스키마 등록 완료 (${this.stats.schemaCount}개, callbackData 포함)`);
   }
 
   /**
@@ -324,8 +297,8 @@ class ValidationHelper {
         metadata: {
           schema: schemaName,
           error: error.message,
-          timestamp: TimeHelper.getLogTimeString(),
-        },
+          timestamp: TimeHelper.getLogTimeString()
+        }
       };
     }
   }
@@ -342,12 +315,7 @@ class ValidationHelper {
     for (const [fieldName, fieldSchema] of Object.entries(schema)) {
       try {
         const fieldValue = data[fieldName];
-        const fieldResult = await this.validateField(
-          fieldName,
-          fieldValue,
-          fieldSchema,
-          options
-        );
+        const fieldResult = await this.validateField(fieldName, fieldValue, fieldSchema, options);
 
         if (!fieldResult.isValid) {
           overallValid = false;
@@ -371,8 +339,8 @@ class ValidationHelper {
         fieldCount: Object.keys(schema).length,
         errorCount: Object.keys(allErrors).length,
         timestamp: TimeHelper.getLogTimeString(),
-        options,
-      },
+        options
+      }
     };
   }
 
@@ -384,30 +352,18 @@ class ValidationHelper {
     let processedValue = value;
 
     // 기본값 처리
-    if (
-      (value === undefined || value === null) &&
-      fieldSchema.defaultValue !== undefined
-    ) {
+    if ((value === undefined || value === null) && fieldSchema.defaultValue !== undefined) {
       processedValue = fieldSchema.defaultValue;
     }
 
     // 필수 필드 체크
-    if (
-      fieldSchema.required &&
-      (processedValue === undefined ||
-        processedValue === null ||
-        processedValue === "")
-    ) {
+    if (fieldSchema.required && (processedValue === undefined || processedValue === null || processedValue === "")) {
       errors.push(`${fieldName}은(는) 필수 항목입니다.`);
       return { isValid: false, errors, value: processedValue };
     }
 
     // 값이 없으면 더 이상 검증하지 않음
-    if (
-      processedValue === undefined ||
-      processedValue === null ||
-      processedValue === ""
-    ) {
+    if (processedValue === undefined || processedValue === null || processedValue === "") {
       return { isValid: true, errors: [], value: processedValue };
     }
 
@@ -468,17 +424,12 @@ class ValidationHelper {
     }
 
     // 커스텀 검증자 실행
-    if (
-      fieldSchema.customValidators &&
-      Array.isArray(fieldSchema.customValidators)
-    ) {
+    if (fieldSchema.customValidators && Array.isArray(fieldSchema.customValidators)) {
       for (const validator of fieldSchema.customValidators) {
         try {
           const result = validator(processedValue);
           if (result !== true) {
-            errors.push(
-              typeof result === "string" ? result : `${fieldName} 검증 실패`
-            );
+            errors.push(typeof result === "string" ? result : `${fieldName} 검증 실패`);
           }
         } catch (error) {
           errors.push(`커스텀 검증 오류: ${error.message}`);
@@ -496,7 +447,7 @@ class ValidationHelper {
     return {
       isValid: errors.length === 0,
       errors,
-      value: processedValue,
+      value: processedValue
     };
   }
 
@@ -519,7 +470,7 @@ class ValidationHelper {
     return {
       isValid: errors.length === 0,
       errors,
-      value: processedValue,
+      value: processedValue
     };
   }
 
@@ -546,7 +497,7 @@ class ValidationHelper {
     return {
       isValid: errors.length === 0,
       errors,
-      value: processedValue,
+      value: processedValue
     };
   }
 
@@ -560,7 +511,7 @@ class ValidationHelper {
     return {
       isValid: true,
       errors,
-      value: processedValue,
+      value: processedValue
     };
   }
 
@@ -571,17 +522,14 @@ class ValidationHelper {
     const errors = [];
     let processedValue = String(value);
 
-    if (
-      schema.allowedValues &&
-      !schema.allowedValues.includes(processedValue)
-    ) {
+    if (schema.allowedValues && !schema.allowedValues.includes(processedValue)) {
       errors.push(`허용된 값: ${schema.allowedValues.join(", ")}`);
     }
 
     return {
       isValid: errors.length === 0,
       errors,
-      value: processedValue,
+      value: processedValue
     };
   }
 
@@ -604,7 +552,7 @@ class ValidationHelper {
     return {
       isValid: errors.length === 0,
       errors,
-      value: processedValue,
+      value: processedValue
     };
   }
 
@@ -622,9 +570,7 @@ class ValidationHelper {
     if (schema.maxTagLength) {
       for (const tag of processedValue) {
         if (String(tag).length > schema.maxTagLength) {
-          errors.push(
-            `각 태그는 최대 ${schema.maxTagLength}글자까지 가능합니다.`
-          );
+          errors.push(`각 태그는 최대 ${schema.maxTagLength}글자까지 가능합니다.`);
           break;
         }
       }
@@ -633,7 +579,7 @@ class ValidationHelper {
     return {
       isValid: errors.length === 0,
       errors,
-      value: processedValue,
+      value: processedValue
     };
   }
 
@@ -682,9 +628,7 @@ class ValidationHelper {
 
     // 평균 검증 시간 업데이트
     this.stats.averageValidationTime = Math.round(
-      (this.stats.averageValidationTime * (this.stats.totalValidations - 1) +
-        validationTime) /
-        this.stats.totalValidations
+      (this.stats.averageValidationTime * (this.stats.totalValidations - 1) + validationTime) / this.stats.totalValidations
     );
   }
 
@@ -697,9 +641,8 @@ class ValidationHelper {
       const message = result.isValid ? "검증 성공" : "검증 실패";
 
       logger[logLevel](`🛡️ [${schemaName}] ${message} (${validationTime}ms)`, {
-        errors:
-          Object.keys(result.errors).length > 0 ? result.errors : undefined,
-        fieldCount: result.metadata?.fieldCount,
+        errors: Object.keys(result.errors).length > 0 ? result.errors : undefined,
+        fieldCount: result.metadata?.fieldCount
       });
     }
   }
@@ -741,13 +684,8 @@ class ValidationHelper {
       cache: {
         size: this.cache.size,
         maxSize: this.config.maxCacheSize,
-        hitRate:
-          this.stats.totalValidations > 0
-            ? Math.round(
-                (this.stats.cacheHits / this.stats.totalValidations) * 100
-              )
-            : 0,
-      },
+        hitRate: this.stats.totalValidations > 0 ? Math.round((this.stats.cacheHits / this.stats.totalValidations) * 100) : 0
+      }
     };
   }
 

@@ -62,9 +62,7 @@ class DatabaseManager {
     this.connectionAttempts++;
 
     try {
-      logger.info(
-        `🔌 MongoDB 연결 시도 중... (시도 ${this.connectionAttempts}/${this.maxReconnectAttempts})`
-      );
+      logger.info(`🔌 MongoDB 연결 시도 중... (시도 ${this.connectionAttempts}/${this.maxReconnectAttempts})`);
 
       // URL에서 데이터베이스 이름 추출 (Railway 환경)
       const urlMatch = this.mongoUrl.match(/\/([^/?]+)(\?|$)/);
@@ -78,7 +76,7 @@ class DatabaseManager {
         minPoolSize: 2,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 30000,
-        family: 4, // IPv4 강제
+        family: 4 // IPv4 강제
       };
 
       this.client = new MongoClient(this.mongoUrl, options);
@@ -100,9 +98,7 @@ class DatabaseManager {
       // 재연결 시도
       if (this.connectionAttempts < this.maxReconnectAttempts) {
         logger.info(`🔄 ${this.reconnectDelay / 1000}초 후 재연결 시도...`);
-        await new Promise((resolve) =>
-          setTimeout(resolve, this.reconnectDelay)
-        );
+        await new Promise((resolve) => setTimeout(resolve, this.reconnectDelay));
         return await this.connect();
       }
 
@@ -219,7 +215,7 @@ class DatabaseManager {
       database: this.databaseName,
       railway: this.isRailway,
       connectionAttempts: this.connectionAttempts,
-      mongoUrl: this.mongoUrl ? "SET" : "NOT_SET",
+      mongoUrl: this.mongoUrl ? "SET" : "NOT_SET"
     };
   }
 
@@ -270,5 +266,5 @@ function createInstance(mongoUrl) {
 module.exports = {
   DatabaseManager,
   getInstance,
-  createInstance,
+  createInstance
 };

@@ -16,7 +16,7 @@ class TTSModule extends BaseModule {
     this.config = {
       maxTextLength: 500,
       defaultLanguage: "ko-KR",
-      supportedLanguages: ["ko-KR", "en-US"],
+      supportedLanguages: ["ko-KR", "en-US"]
     };
   }
 
@@ -33,7 +33,7 @@ class TTSModule extends BaseModule {
       start: this.startConvert,
       select_voice: this.selectVoice,
       change_voice: this.changeVoice,
-      share: this.shareAudio,
+      share: this.shareAudio
     });
   }
 
@@ -49,8 +49,8 @@ class TTSModule extends BaseModule {
       data: {
         userName,
         currentVoice: this.voiceConfig.getVoiceByCode(userVoice),
-        languages: this.config.supportedLanguages,
-      },
+        languages: this.config.supportedLanguages
+      }
     };
   }
 
@@ -62,7 +62,7 @@ class TTSModule extends BaseModule {
     this.stateHelper.setState(userId, {
       action: "waiting_text_input",
       language,
-      messageId: callbackQuery.message.message_id,
+      messageId: callbackQuery.message.message_id
     });
 
     return {
@@ -70,8 +70,8 @@ class TTSModule extends BaseModule {
       module: "tts",
       data: {
         language,
-        maxLength: this.config.maxTextLength,
-      },
+        maxLength: this.config.maxTextLength
+      }
     };
   }
 
@@ -84,8 +84,8 @@ class TTSModule extends BaseModule {
       module: "tts",
       data: {
         language,
-        voices,
-      },
+        voices
+      }
     };
   }
 
@@ -104,7 +104,7 @@ class TTSModule extends BaseModule {
     return {
       type: "voice_changed",
       module: "tts",
-      data: { voice },
+      data: { voice }
     };
   }
 
@@ -113,15 +113,13 @@ class TTSModule extends BaseModule {
     const baseUrl = process.env.BASE_URL || process.env.RAILWAY_PUBLIC_DOMAIN;
 
     if (!baseUrl) {
-      logger.warn(
-        "BASE_URL 또는 RAILWAY_PUBLIC_DOMAIN 환경변수가 설정되지 않음"
-      );
+      logger.warn("BASE_URL 또는 RAILWAY_PUBLIC_DOMAIN 환경변수가 설정되지 않음");
       return {
         type: "error",
         module: "tts",
         data: {
-          message: "공유 기능을 사용할 수 없습니다. 관리자에게 문의하세요.",
-        },
+          message: "공유 기능을 사용할 수 없습니다. 관리자에게 문의하세요."
+        }
       };
     }
 
@@ -134,8 +132,8 @@ class TTSModule extends BaseModule {
       module: "tts",
       data: {
         shareUrl: fullUrl,
-        message: "링크가 준비되었습니다! 복사해서 공유하세요.",
-      },
+        message: "링크가 준비되었습니다! 복사해서 공유하세요."
+      }
     };
   }
 
@@ -154,17 +152,15 @@ class TTSModule extends BaseModule {
         type: "error",
         module: "tts",
         data: {
-          message: text
-            ? `텍스트가 너무 깁니다 (최대 ${this.config.maxTextLength}자)`
-            : "텍스트를 입력해주세요",
-        },
+          message: text ? `텍스트가 너무 깁니다 (최대 ${this.config.maxTextLength}자)` : "텍스트를 입력해주세요"
+        }
       };
     }
 
     // TTS 변환
     const result = await this.ttsService.convertTextToSpeech(userId, {
       text,
-      language: state.language,
+      language: state.language
     });
 
     this.stateHelper.clearState(userId);
@@ -177,14 +173,14 @@ class TTSModule extends BaseModule {
           text: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
           audioFile: result.data.audioFile,
           shareUrl: result.data.shareUrl,
-          voice: result.data.voice,
-        },
+          voice: result.data.voice
+        }
       };
     } else {
       return {
         type: "error",
         module: "tts",
-        data: { message: "변환 중 오류가 발생했습니다" },
+        data: { message: "변환 중 오류가 발생했습니다" }
       };
     }
   }

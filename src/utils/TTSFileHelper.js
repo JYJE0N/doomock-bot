@@ -26,11 +26,7 @@ class TTSFileHelper {
   }
 
   generateFileName(userId, text) {
-    const hash = crypto
-      .createHash("md5")
-      .update(`${userId}-${text}-${Date.now()}`)
-      .digest("hex")
-      .substring(0, 8);
+    const hash = crypto.createHash("md5").update(`${userId}-${text}-${Date.now()}`).digest("hex").substring(0, 8);
     return `tts_${hash}.mp3`;
   }
 
@@ -50,13 +46,13 @@ class TTSFileHelper {
       exists: await fs
         .access(tempPath)
         .then(() => true)
-        .catch(() => false),
+        .catch(() => false)
     });
 
     return {
       tempPath,
       sharePath,
-      shareUrl: `/tts/${fileName}`,
+      shareUrl: `/tts/${fileName}`
     };
   }
 

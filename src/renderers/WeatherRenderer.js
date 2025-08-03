@@ -34,14 +34,14 @@ class WeatherRenderer extends BaseRenderer {
       "13d": "🌨️",
       "13n": "🌨️",
       "50d": "🌫️",
-      "50n": "🌫️",
+      "50n": "🌫️"
     };
 
     this.dustEmojis = {
       좋음: "🟢",
       보통: "🟡",
       나쁨: "🟠",
-      매우나쁨: "🔴",
+      매우나쁨: "🔴"
     };
 
     this.cityEmojis = {
@@ -52,7 +52,7 @@ class WeatherRenderer extends BaseRenderer {
       대구: "🍎",
       부산: "🌊",
       광주: "🌻",
-      제주: "🏝️",
+      제주: "🏝️"
     };
 
     logger.info("🌤️ WeatherRenderer 생성됨");
@@ -84,10 +84,7 @@ class WeatherRenderer extends BaseRenderer {
       case "error":
         return await this.renderError(data, ctx);
       default:
-        return await this.renderError(
-          { message: `지원하지 않는 렌더링 타입: ${type}` },
-          ctx
-        );
+        return await this.renderError({ message: `지원하지 않는 렌더링 타입: ${type}` }, ctx);
     }
   }
 
@@ -111,15 +108,13 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
       [
         [
           { text: "🌡️ 현재 날씨", action: "current" },
-          { text: "🏙️ 도시 선택", action: "cities" },
+          { text: "🏙️ 도시 선택", action: "cities" }
         ],
-        config?.enableForecast
-          ? [{ text: "📊 날씨 예보", action: "forecast" }]
-          : null,
+        config?.enableForecast ? [{ text: "📊 날씨 예보", action: "forecast" }] : null,
         [
           { text: "❓ 도움말", action: "help" },
-          { text: "◀️ 메인", action: "menu", module: "system" },
-        ],
+          { text: "◀️ 메인", action: "menu", module: "system" }
+        ]
       ].filter(Boolean)
     );
 
@@ -145,7 +140,7 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
         const city = cities[i + j];
         row.push({
           text: `${this.cityEmojis[city.name] || "🏙️"} ${city.name}`,
-          action: `city:${city.id}`,
+          action: `city:${city.id}`
         });
       }
       cityButtons.push(row);
@@ -198,15 +193,13 @@ PM2.5: ${dust.pm25}㎍/㎥
       [
         [
           { text: "🔄 새로고침", action: `city:${city.id}` },
-          { text: "⭐ 기본 설정", action: `setdefault:${city.id}` },
+          { text: "⭐ 기본 설정", action: `setdefault:${city.id}` }
         ],
-        data.config?.enableForecast
-          ? [{ text: "📊 날씨 예보", action: `forecast:${city.id}` }]
-          : null,
+        data.config?.enableForecast ? [{ text: "📊 날씨 예보", action: `forecast:${city.id}` }] : null,
         [
           { text: "🏙️ 도시 목록", action: "cities" },
-          { text: "🏠 메인", action: "menu" },
-        ],
+          { text: "🏠 메인", action: "menu" }
+        ]
       ].filter(Boolean)
     );
 
@@ -237,12 +230,12 @@ PM2.5: ${dust.pm25}㎍/㎥
     const keyboard = this.createInlineKeyboard([
       [
         { text: "🌡️ 현재 날씨", action: `city:${city.id}` },
-        { text: "🔄 새로고침", action: `forecast:${city.id}` },
+        { text: "🔄 새로고침", action: `forecast:${city.id}` }
       ],
       [
         { text: "🏙️ 도시 목록", action: "cities" },
-        { text: "🏠 메인", action: "menu" },
-      ],
+        { text: "🏠 메인", action: "menu" }
+      ]
     ]);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -262,8 +255,8 @@ ${userName}님의 기본 도시가 **${city.name}**로 설정되었습니다.
     const keyboard = this.createInlineKeyboard([
       [
         { text: "🌡️ 날씨 확인", action: `city:${city.id}` },
-        { text: "🏠 메인", action: "menu" },
-      ],
+        { text: "🏠 메인", action: "menu" }
+      ]
     ]);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -305,9 +298,9 @@ ${features.forecast ? `• ${features.forecast}` : ""}
     const keyboard = this.createInlineKeyboard([
       [
         { text: "🌡️ 날씨 확인", action: "current" },
-        { text: "🏙️ 도시 선택", action: "cities" },
+        { text: "🏙️ 도시 선택", action: "cities" }
       ],
-      [{ text: "🏠 메인", action: "menu" }],
+      [{ text: "🏠 메인", action: "menu" }]
     ]);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -329,8 +322,8 @@ ${message}
     const keyboard = this.createInlineKeyboard([
       [
         { text: "🏠 메인", action: "menu" },
-        { text: "◀️ 메인 메뉴", action: "menu", module: "system" },
-      ],
+        { text: "◀️ 메인 메뉴", action: "menu", module: "system" }
+      ]
     ]);
 
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });

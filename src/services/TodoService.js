@@ -25,14 +25,14 @@ class TodoService extends BaseService {
           .sort({ createdAt: -1 })
           .skip((page - 1) * limit)
           .limit(limit)
-          .lean(),
+          .lean()
       ]);
 
       return this.createSuccessResponse({
         todos,
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
-        currentPage: page,
+        currentPage: page
       });
     } catch (error) {
       return this.createErrorResponse(error, "할일 목록 조회 실패");
@@ -46,25 +46,19 @@ class TodoService extends BaseService {
 
       // ✅ undefined 체크 추가
       if (!todoText) {
-        return this.createErrorResponse(
-          new Error("MISSING_TEXT"),
-          "할일 내용이 필요합니다."
-        );
+        return this.createErrorResponse(new Error("MISSING_TEXT"), "할일 내용이 필요합니다.");
       }
 
       const newTodo = new this.models.Todo({
         userId: userId.toString(),
         text: todoText.trim(), // ✅ 안전하게 trim 적용
         description: todoData.description?.trim() || null,
-        priority: todoData.priority || 3,
+        priority: todoData.priority || 3
       });
 
       const savedTodo = await newTodo.save();
 
-      return this.createSuccessResponse(
-        savedTodo.toJSON(),
-        "할일이 추가되었습니다."
-      );
+      return this.createSuccessResponse(savedTodo.toJSON(), "할일이 추가되었습니다.");
     } catch (error) {
       return this.createErrorResponse(error, "할일 추가 실패");
     }
@@ -75,14 +69,11 @@ class TodoService extends BaseService {
       const todo = await this.models.Todo.findOne({
         _id: todoId,
         userId: userId.toString(),
-        isActive: true,
+        isActive: true
       });
 
       if (!todo) {
-        return this.createErrorResponse(
-          new Error("TODO_NOT_FOUND"),
-          "할일을 찾을 수 없습니다."
-        );
+        return this.createErrorResponse(new Error("TODO_NOT_FOUND"), "할일을 찾을 수 없습니다.");
       }
 
       todo.completed = !todo.completed;
@@ -90,10 +81,7 @@ class TodoService extends BaseService {
 
       const updatedTodo = await todo.save();
 
-      return this.createSuccessResponse(
-        updatedTodo.toJSON(),
-        `할일을 ${todo.completed ? "완료" : "미완료"}로 변경했습니다.`
-      );
+      return this.createSuccessResponse(updatedTodo.toJSON(), `할일을 ${todo.completed ? "완료" : "미완료"}로 변경했습니다.`);
     } catch (error) {
       return this.createErrorResponse(error, "할일 상태 변경 실패");
     }
@@ -108,16 +96,10 @@ class TodoService extends BaseService {
       );
 
       if (!todo) {
-        return this.createErrorResponse(
-          new Error("TODO_NOT_FOUND"),
-          "삭제할 할일을 찾을 수 없습니다."
-        );
+        return this.createErrorResponse(new Error("TODO_NOT_FOUND"), "삭제할 할일을 찾을 수 없습니다.");
       }
 
-      return this.createSuccessResponse(
-        { deletedId: todoId },
-        "할일이 삭제되었습니다."
-      );
+      return this.createSuccessResponse({ deletedId: todoId }, "할일이 삭제되었습니다.");
     } catch (error) {
       return this.createErrorResponse(error, "할일 삭제 실패");
     }
@@ -134,15 +116,15 @@ class TodoService extends BaseService {
         {
           $group: {
             _id: "$completed",
-            count: { $sum: 1 },
-          },
-        },
+            count: { $sum: 1 }
+          }
+        }
       ]);
 
       const result = {
         total: 0,
         completed: 0,
-        pending: 0,
+        pending: 0
       };
 
       stats.forEach((stat) => {
@@ -167,7 +149,7 @@ class TodoService extends BaseService {
     try {
       const count = await this.models.Todo.countDocuments({
         userId: userId.toString(),
-        isActive: true,
+        isActive: true
       });
       return this.createSuccessResponse(count);
     } catch (error) {
@@ -183,14 +165,11 @@ class TodoService extends BaseService {
       const todo = await this.models.Todo.findOne({
         _id: todoId,
         userId: userId.toString(),
-        isActive: true,
+        isActive: true
       }).lean();
 
       if (!todo) {
-        return this.createErrorResponse(
-          new Error("NOT_FOUND"),
-          "할일을 찾을 수 없습니다."
-        );
+        return this.createErrorResponse(new Error("NOT_FOUND"), "할일을 찾을 수 없습니다.");
       }
       return this.createSuccessResponse(todo);
     } catch (error) {

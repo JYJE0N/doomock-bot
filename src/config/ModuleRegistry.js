@@ -32,7 +32,7 @@ const UNIFIED_MODULES = [
     dependencies: [],
     keywords: ["시스템", "system", "도움말", "help", "상태", "status"],
     enhanced: true,
-    rainbow: true,
+    rainbow: true
   },
 
   // 📝 할일 관리 모듈
@@ -50,7 +50,7 @@ const UNIFIED_MODULES = [
     dependencies: ["MongooseManager"],
     keywords: ["할일", "todo", "작업", "task"],
     enhanced: true,
-    rainbow: true,
+    rainbow: true
   },
 
   // ⏰ 타이머 모듈
@@ -68,7 +68,7 @@ const UNIFIED_MODULES = [
     dependencies: ["MongooseManager"],
     keywords: ["타이머", "timer", "포모도로", "pomodoro"],
     enhanced: true,
-    rainbow: true,
+    rainbow: true
   },
 
   // 🏢 근무시간 모듈
@@ -86,7 +86,7 @@ const UNIFIED_MODULES = [
     dependencies: ["MongooseManager"],
     keywords: ["출근", "퇴근", "근무", "worktime", "출퇴근"],
     enhanced: true,
-    rainbow: true,
+    rainbow: true
   },
 
   // 🏖️ 휴가 관리 모듈
@@ -104,7 +104,7 @@ const UNIFIED_MODULES = [
     dependencies: ["MongooseManager"],
     keywords: ["휴가", "연차", "leave", "vacation"],
     enhanced: false,
-    rainbow: false,
+    rainbow: false
   },
 
   // 🔮 운세 모듈
@@ -122,7 +122,7 @@ const UNIFIED_MODULES = [
     dependencies: [],
     keywords: ["운세", "fortune", "타로", "점"],
     enhanced: false,
-    rainbow: false,
+    rainbow: false
   },
 
   // 🌤️ 날씨 모듈
@@ -140,7 +140,7 @@ const UNIFIED_MODULES = [
     dependencies: [],
     keywords: ["날씨", "weather", "미세먼지", "기상"],
     enhanced: false,
-    rainbow: false,
+    rainbow: false
   },
 
   // 🔊 TTS 모듈
@@ -158,7 +158,7 @@ const UNIFIED_MODULES = [
     dependencies: ["MongooseManager"],
     keywords: ["tts", "음성", "변환", "읽기"],
     enhanced: false,
-    rainbow: false,
+    rainbow: false
   },
 
   // 🔔 리마인더 모듈 (비활성화)
@@ -176,8 +176,8 @@ const UNIFIED_MODULES = [
     dependencies: ["MongooseManager"],
     keywords: ["알림", "reminder", "스케줄"],
     enhanced: false,
-    rainbow: false,
-  },
+    rainbow: false
+  }
 ];
 
 /**
@@ -189,9 +189,7 @@ const UNIFIED_MODULES = [
  * NavigationHandler.showMainMenu()에서 직접 사용
  */
 function getEnabledModules() {
-  return UNIFIED_MODULES.filter(
-    (module) => module.enabled && module.showInMenu
-  ).sort((a, b) => a.priority - b.priority);
+  return UNIFIED_MODULES.filter((module) => module.enabled && module.showInMenu).sort((a, b) => a.priority - b.priority);
 }
 
 /**
@@ -199,9 +197,7 @@ function getEnabledModules() {
  * ModuleManager에서 로딩용
  */
 function getAllEnabledModules() {
-  return UNIFIED_MODULES.filter((module) => module.enabled).sort(
-    (a, b) => a.priority - b.priority
-  );
+  return UNIFIED_MODULES.filter((module) => module.enabled).sort((a, b) => a.priority - b.priority);
 }
 
 /**
@@ -226,11 +222,7 @@ function getModulesByCategory() {
  * 🔍 특정 모듈 정보 조회
  */
 function getModuleInfo(moduleKey) {
-  return UNIFIED_MODULES.find(
-    (module) =>
-      module.key === moduleKey ||
-      module.name.toLowerCase() === moduleKey.toLowerCase()
-  );
+  return UNIFIED_MODULES.find((module) => module.key === moduleKey || module.name.toLowerCase() === moduleKey.toLowerCase());
 }
 
 /**
@@ -246,9 +238,7 @@ function findModuleByKey(key) {
 function getModuleStats() {
   const total = UNIFIED_MODULES.length;
   const enabled = UNIFIED_MODULES.filter((m) => m.enabled).length;
-  const visible = UNIFIED_MODULES.filter(
-    (m) => m.enabled && m.showInMenu
-  ).length;
+  const visible = UNIFIED_MODULES.filter((m) => m.enabled && m.showInMenu).length;
   const enhanced = UNIFIED_MODULES.filter((m) => m.enhanced).length;
 
   return {
@@ -256,7 +246,7 @@ function getModuleStats() {
     enabled,
     visible,
     enhanced,
-    categories: Object.keys(getModulesByCategory()).length,
+    categories: Object.keys(getModulesByCategory()).length
   };
 }
 
@@ -295,7 +285,7 @@ function buildNavigationKeyboard() {
     const module1 = modules[i];
     row.push({
       text: `${module1.icon} ${module1.displayName}`,
-      callback_data: `${module1.key}:menu`,
+      callback_data: `${module1.key}:menu`
     });
 
     // 두 번째 모듈 (있으면)
@@ -303,7 +293,7 @@ function buildNavigationKeyboard() {
       const module2 = modules[i + 1];
       row.push({
         text: `${module2.icon} ${module2.displayName}`,
-        callback_data: `${module2.key}:menu`,
+        callback_data: `${module2.key}:menu`
       });
     }
 
@@ -313,7 +303,7 @@ function buildNavigationKeyboard() {
   // 시스템 버튼들 추가
   keyboard.inline_keyboard.push([
     { text: "📊 시스템 상태", callback_data: "system:status" },
-    { text: "❓ 도움말", callback_data: "system:help" },
+    { text: "❓ 도움말", callback_data: "system:help" }
   ]);
 
   return keyboard;
@@ -326,9 +316,7 @@ function initializeRegistry() {
   logger.info(`📋 ModuleRegistry v4.0.0 초기화`);
 
   const stats = getModuleStats();
-  logger.info(
-    `📊 모듈 통계: 전체 ${stats.total}개, 활성 ${stats.enabled}개, 표시 ${stats.visible}개`
-  );
+  logger.info(`📊 모듈 통계: 전체 ${stats.total}개, 활성 ${stats.enabled}개, 표시 ${stats.visible}개`);
 
   // 의존성 검증
   const errors = validateModuleDependencies();
@@ -362,7 +350,7 @@ module.exports = {
   initializeRegistry,
 
   // ✅ 레거시 호환 (기존 코드와의 호환성)
-  ENABLED_MODULES: UNIFIED_MODULES, // 별칭
+  ENABLED_MODULES: UNIFIED_MODULES // 별칭
 };
 
 // 🎯 자동 초기화

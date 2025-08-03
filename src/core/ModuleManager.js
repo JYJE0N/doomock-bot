@@ -14,7 +14,7 @@ class ModuleManager {
       callbacksProcessed: 0,
       messagesProcessed: 0,
       errorsCount: 0,
-      lastActivity: null,
+      lastActivity: null
     };
 
     logger.info("🎯 ModuleManager 생성됨 - 표준 매개변수 전달 지원");
@@ -36,9 +36,7 @@ class ModuleManager {
 
       // ✅ 중요: ServiceBuilder가 없으면 에러 발생
       if (!this.serviceBuilder) {
-        throw new Error(
-          "ServiceBuilder가 설정되지 않았습니다. ModuleManager 생성 시 전달해주세요."
-        );
+        throw new Error("ServiceBuilder가 설정되지 않았습니다. ModuleManager 생성 시 전달해주세요.");
       }
 
       // ❌ 삭제: ServiceBuilder 초기화는 BotController에서 이미 완료됨
@@ -66,7 +64,7 @@ class ModuleManager {
         moduleKey,
         subAction,
         params,
-        userId: callbackQuery.from.id,
+        userId: callbackQuery.from.id
       });
 
       // 1. 모듈 찾기
@@ -78,7 +76,7 @@ class ModuleManager {
           error: "module_not_found",
           message: `${moduleKey} 모듈을 찾을 수 없습니다.`,
           module: moduleKey,
-          type: "error",
+          type: "error"
         };
       }
 
@@ -90,7 +88,7 @@ class ModuleManager {
           error: "module_not_initialized",
           message: `${moduleKey} 모듈이 아직 초기화되지 않았습니다.`,
           module: moduleKey,
-          type: "error",
+          type: "error"
         };
       }
 
@@ -113,14 +111,14 @@ class ModuleManager {
           error: "no_result",
           message: "모듈에서 결과를 반환하지 않았습니다.",
           module: moduleKey,
-          type: "error",
+          type: "error"
         };
       }
 
       // 5. 성공 로그
       logger.debug(`✅ ${moduleKey}.${subAction} 처리 완료`, {
         resultType: result.type || "unknown",
-        hasData: !!result.data,
+        hasData: !!result.data
       });
 
       // 6. 결과에 모듈 정보 추가
@@ -128,13 +126,13 @@ class ModuleManager {
         ...result,
         module: result.module || moduleKey,
         processedBy: "ModuleManager",
-        timestamp: new Date(),
+        timestamp: new Date()
       };
     } catch (error) {
       logger.error(`💥 ModuleManager 콜백 처리 오류:`, error, {
         moduleKey,
         subAction,
-        params,
+        params
       });
 
       this.stats.errorsCount++;
@@ -145,7 +143,7 @@ class ModuleManager {
         message: "콜백 처리 중 오류가 발생했습니다.",
         module: moduleKey,
         type: "error",
-        originalError: error.message,
+        originalError: error.message
       };
     }
   }
@@ -166,7 +164,7 @@ class ModuleManager {
           bot: bot,
           moduleManager: this,
           serviceBuilder: this.serviceBuilder,
-          config: config.config || {},
+          config: config.config || {}
         });
 
         await moduleInstance.initialize();
@@ -224,7 +222,7 @@ class ModuleManager {
         bot: this.bot,
         moduleManager: this,
         serviceBuilder: this.serviceBuilder,
-        config: config.config || {},
+        config: config.config || {}
       });
 
       await moduleInstance.initialize();

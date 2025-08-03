@@ -27,10 +27,7 @@ class TTSRenderer extends BaseRenderer {
       case "error":
         return await this.renderError(data, ctx);
       default:
-        return await this.renderError(
-          { message: "알 수 없는 명령입니다" },
-          ctx
-        );
+        return await this.renderError({ message: "알 수 없는 명령입니다" }, ctx);
     }
   }
 
@@ -47,12 +44,12 @@ class TTSRenderer extends BaseRenderer {
     const buttons = [
       [
         { text: "🇰🇷 한국어 변환", action: "start", params: "ko-KR" },
-        { text: "🇺🇸 English", action: "start", params: "en-US" },
+        { text: "🇺🇸 English", action: "start", params: "en-US" }
       ],
       [
         { text: "🎤 음성 변경", action: "select_voice" },
-        { text: "🔙 메인 메뉴", action: "menu" },
-      ],
+        { text: "🔙 메인 메뉴", action: "menu" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -63,14 +60,13 @@ class TTSRenderer extends BaseRenderer {
   async sendSafeMessageForAudio(ctx, text, options = {}) {
     try {
       // 오디오 메시지 콜백인지 확인
-      const isAudioCallback =
-        ctx.callbackQuery?.message && !ctx.callbackQuery.message.text;
+      const isAudioCallback = ctx.callbackQuery?.message && !ctx.callbackQuery.message.text;
 
       if (isAudioCallback) {
         // 오디오 메시지에 대한 콜백인 경우 새 메시지로 전송
         await ctx.reply(text, {
           parse_mode: "Markdown",
-          ...options,
+          ...options
         });
 
         // 콜백 쿼리 응답
@@ -137,7 +133,7 @@ class TTSRenderer extends BaseRenderer {
         row.push({
           text: `👨 ${maleVoices[i].name}`,
           action: "change_voice",
-          params: maleVoices[i].code,
+          params: maleVoices[i].code
         });
       }
 
@@ -145,7 +141,7 @@ class TTSRenderer extends BaseRenderer {
         row.push({
           text: `👩 ${femaleVoices[i].name}`,
           action: "change_voice",
-          params: femaleVoices[i].code,
+          params: femaleVoices[i].code
         });
       }
 
@@ -158,7 +154,7 @@ class TTSRenderer extends BaseRenderer {
 
     buttons.push([
       { text: otherLangName, action: "select_voice", params: otherLang },
-      { text: "🔙 뒤로", action: "menu" },
+      { text: "🔙 뒤로", action: "menu" }
     ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -178,9 +174,9 @@ ${voice.description || ""}
     const buttons = [
       [
         { text: "🎤 변환하기", action: "start" },
-        { text: "🎵 다른 음성", action: "select_voice" },
+        { text: "🎵 다른 음성", action: "select_voice" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -228,9 +224,9 @@ ${message}`;
     const buttons = [
       [
         { text: "🔄 다시 변환", action: "start" },
-        { text: "🎤 음성 변경", action: "select_voice" },
+        { text: "🎤 음성 변경", action: "select_voice" }
       ],
-      [{ text: "🔙 메뉴", action: "menu" }],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     // 공유 버튼 추가
@@ -238,7 +234,7 @@ ${message}`;
       buttons[1].unshift({
         text: "📤 공유하기",
         action: "share",
-        params: shareUrl,
+        params: shareUrl
       });
     }
 
@@ -252,7 +248,7 @@ ${message}`;
           {
             parse_mode: "MarkdownV2",
             caption: caption,
-            reply_markup: keyboard,
+            reply_markup: keyboard
           }
         );
       } catch (error) {
@@ -266,7 +262,7 @@ ${message}`;
             {
               parse_mode: "Markdown",
               caption: markdownCaption,
-              reply_markup: keyboard,
+              reply_markup: keyboard
             }
           );
         } catch (secondError) {
@@ -279,28 +275,20 @@ ${message}`;
               { source: audioFile },
               {
                 caption: plainCaption,
-                reply_markup: keyboard,
+                reply_markup: keyboard
               }
             );
           } catch (thirdError) {
             logger.error("일반 텍스트 캡션도 실패:", thirdError);
 
             // 최종 폴백: 메시지만 전송
-            await this.sendSafeMessageForAudio(
-              ctx,
-              "음성 파일 전송에 실패했습니다. 다시 시도해주세요.",
-              { reply_markup: keyboard }
-            );
+            await this.sendSafeMessageForAudio(ctx, "음성 파일 전송에 실패했습니다. 다시 시도해주세요.", { reply_markup: keyboard });
           }
         }
       }
     } else {
       // 오디오 파일이 없는 경우 텍스트 메시지로 대체
-      await this.sendSafeMessageForAudio(
-        ctx,
-        "⚠️ 음성 파일을 찾을 수 없습니다.",
-        { reply_markup: keyboard }
-      );
+      await this.sendSafeMessageForAudio(ctx, "⚠️ 음성 파일을 찾을 수 없습니다.", { reply_markup: keyboard });
     }
   }
 
@@ -316,8 +304,8 @@ ${message}
     const buttons = [
       [
         { text: "🔄 다시 시도", action: "menu" },
-        { text: "🔙 메인 메뉴", action: "menu" },
-      ],
+        { text: "🔙 메인 메뉴", action: "menu" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);

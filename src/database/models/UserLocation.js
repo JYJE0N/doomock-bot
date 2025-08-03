@@ -16,67 +16,67 @@ const userLocationSchema = new mongoose.Schema(
 
     username: {
       type: String,
-      required: true,
+      required: true
     },
 
     // 위치 정보
     location: {
       city: {
         type: String,
-        required: true,
+        required: true
       },
       district: {
         type: String,
-        default: "",
+        default: ""
       },
       region: {
         type: String,
-        required: true,
+        required: true
       },
       fullAddress: {
         type: String,
-        required: true,
+        required: true
       },
       coordinates: {
         lat: {
           type: Number,
-          default: null,
+          default: null
         },
         lon: {
           type: Number,
-          default: null,
-        },
-      },
+          default: null
+        }
+      }
     },
 
     // 설정 방법
     method: {
       type: String,
       enum: ["manual", "gps", "search", "default"],
-      default: "manual",
+      default: "manual"
     },
 
     // 설정 시간
     setAt: {
       type: Date,
-      default: Date.now,
+      default: Date.now
     },
 
     // 자동 감지 허용
     autoDetectEnabled: {
       type: Boolean,
-      default: false,
+      default: false
     },
 
     // 마지막 사용 시간
     lastUsed: {
       type: Date,
-      default: Date.now,
-    },
+      default: Date.now
+    }
   },
   {
     timestamps: true,
-    collection: "user_locations",
+    collection: "user_locations"
   }
 );
 
@@ -100,16 +100,12 @@ userLocationSchema.methods.toSimpleObject = function () {
     lat: this.location.coordinates.lat,
     lon: this.location.coordinates.lon,
     method: this.method,
-    setAt: this.setAt,
+    setAt: this.setAt
   };
 };
 
 // 정적 메서드
-userLocationSchema.statics.setUserLocation = async function (
-  userId,
-  username,
-  locationData
-) {
+userLocationSchema.statics.setUserLocation = async function (userId, username, locationData) {
   const updateData = {
     userId,
     username,
@@ -120,18 +116,18 @@ userLocationSchema.statics.setUserLocation = async function (
       fullAddress: locationData.fullAddress || locationData.city,
       coordinates: {
         lat: locationData.lat || null,
-        lon: locationData.lon || null,
-      },
+        lon: locationData.lon || null
+      }
     },
     method: locationData.method || "manual",
     setAt: new Date(),
-    lastUsed: new Date(),
+    lastUsed: new Date()
   };
 
   return await this.findOneAndUpdate({ userId }, updateData, {
     new: true,
     upsert: true,
-    runValidators: true,
+    runValidators: true
   });
 };
 

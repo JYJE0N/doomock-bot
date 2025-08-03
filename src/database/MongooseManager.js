@@ -41,7 +41,7 @@ class MongooseManager {
         maxPoolSize: 10,
         serverSelectionTimeoutMS: 5000,
         socketTimeoutMS: 30000,
-        family: 4, // IPv4 강제
+        family: 4 // IPv4 강제
       };
 
       await mongoose.connect(mongoUrl, options);
@@ -101,7 +101,7 @@ class MongooseManager {
         UserSetting: require("./models/UserSetting"),
         TTSHistory: require("./models/TTSHistory"),
         // 🔮 Fortune 모델 추가! (핵심 수정)
-        Fortune: require("./models/Fortune").FortuneUser, // FortuneUser를 Fortune으로 등록
+        Fortune: require("./models/Fortune").FortuneUser // FortuneUser를 Fortune으로 등록
       };
 
       for (const [name, model] of Object.entries(models)) {
@@ -184,7 +184,7 @@ class MongooseManager {
       host: mongoose.connection.host,
       name: mongoose.connection.name,
       models: Array.from(this.models.keys()),
-      railway: this.isRailway,
+      railway: this.isRailway
     };
   }
 }
@@ -199,5 +199,5 @@ function getInstance() {
 
 module.exports = {
   MongooseManager,
-  getInstance,
+  getInstance
 };

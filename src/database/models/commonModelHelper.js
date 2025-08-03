@@ -19,11 +19,11 @@ const commonSchemaOptions = {
       ret.id = ret._id;
       delete ret._id;
       return ret;
-    },
+    }
   },
   toObject: {
-    virtuals: true,
-  },
+    virtuals: true
+  }
 };
 
 /**
@@ -34,9 +34,9 @@ const softDeletePlugin = function (schema) {
     isDeleted: {
       type: Boolean,
       default: false,
-      index: true,
+      index: true
     },
-    deletedAt: Date,
+    deletedAt: Date
   });
 
   // 삭제 메서드
@@ -67,7 +67,7 @@ const softDeletePlugin = function (schema) {
 const userTrackingPlugin = function (schema) {
   schema.add({
     createdBy: String,
-    updatedBy: String,
+    updatedBy: String
   });
 };
 
@@ -80,10 +80,7 @@ const paginatePlugin = function (schema) {
 
     const skip = (page - 1) * limit;
 
-    const [docs, total] = await Promise.all([
-      this.find(filter).sort(sort).limit(limit).skip(skip),
-      this.countDocuments(filter),
-    ]);
+    const [docs, total] = await Promise.all([this.find(filter).sort(sort).limit(limit).skip(skip), this.countDocuments(filter)]);
 
     return {
       docs,
@@ -92,7 +89,7 @@ const paginatePlugin = function (schema) {
       limit,
       pages: Math.ceil(total / limit),
       hasNext: page < Math.ceil(total / limit),
-      hasPrev: page > 1,
+      hasPrev: page > 1
     };
   };
 };
@@ -101,5 +98,5 @@ module.exports = {
   commonSchemaOptions,
   softDeletePlugin,
   userTrackingPlugin,
-  paginatePlugin,
+  paginatePlugin
 };

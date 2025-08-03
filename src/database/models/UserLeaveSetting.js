@@ -17,14 +17,14 @@ const userLeaveSettingSchema = new mongoose.Schema(
     userId: {
       type: String,
       required: [true, "사용자 ID는 필수입니다"],
-      trim: true,
+      trim: true
     },
 
     // 📅 해당 연도
     year: {
       type: Number,
       required: [true, "연도는 필수입니다"],
-      default: () => new Date().getFullYear(),
+      default: () => new Date().getFullYear()
     },
 
     // 📊 총 연차 일수
@@ -33,13 +33,13 @@ const userLeaveSettingSchema = new mongoose.Schema(
       required: [true, "총 연차 일수는 필수입니다"],
       min: [0, "연차는 0일 이상이어야 합니다"],
       max: [50, "연차는 50일 이하여야 합니다"],
-      default: 15,
+      default: 15
     },
 
     // 💼 입사일
     joinDate: {
       type: Date,
-      default: null,
+      default: null
     },
 
     // 🎁 수동 조정 연차 (관리자나 사용자가 추가/삭제)
@@ -47,7 +47,7 @@ const userLeaveSettingSchema = new mongoose.Schema(
       type: Number,
       default: 0,
       min: [-20, "최대 20일까지 차감 가능합니다"],
-      max: [20, "최대 20일까지 추가 가능합니다"],
+      max: [20, "최대 20일까지 추가 가능합니다"]
     },
 
     // 📝 설정 변경 이력
@@ -58,20 +58,20 @@ const userLeaveSettingSchema = new mongoose.Schema(
         amount: { type: Number, default: 0 },
         reason: { type: String, default: "" },
         oldValue: { type: Number },
-        newValue: { type: Number },
-      },
+        newValue: { type: Number }
+      }
     ],
 
     // 🔄 활성 상태
     isActive: {
       type: Boolean,
-      default: true,
-    },
+      default: true
+    }
   },
   {
     timestamps: true,
     versionKey: false,
-    collection: "user_leave_settings",
+    collection: "user_leave_settings"
   }
 );
 
@@ -117,23 +117,20 @@ userLeaveSettingSchema.virtual("finalTotalLeave").get(function () {
 /**
  * 📊 사용자 연차 설정 조회 또는 생성
  */
-userLeaveSettingSchema.statics.getOrCreate = async function (
-  userId,
-  year = null
-) {
+userLeaveSettingSchema.statics.getOrCreate = async function (userId, year = null) {
   const targetYear = year || new Date().getFullYear();
 
   let setting = await this.findOne({
     userId: String(userId),
     year: targetYear,
-    isActive: true,
+    isActive: true
   });
 
   if (!setting) {
     setting = new this({
       userId: String(userId),
       year: targetYear,
-      totalLeave: 15,
+      totalLeave: 15
     });
     await setting.save();
   }
@@ -144,11 +141,7 @@ userLeaveSettingSchema.statics.getOrCreate = async function (
 /**
  * ➕ 연차 추가
  */
-userLeaveSettingSchema.statics.addLeave = async function (
-  userId,
-  amount,
-  reason = "수동 추가"
-) {
+userLeaveSettingSchema.statics.addLeave = async function (userId, amount, reason = "수동 추가") {
   const currentYear = new Date().getFullYear();
   const setting = await this.getOrCreate(userId, currentYear);
 
@@ -161,7 +154,7 @@ userLeaveSettingSchema.statics.addLeave = async function (
     amount: amount,
     reason: reason,
     oldValue: oldValue,
-    newValue: setting.customLeave,
+    newValue: setting.customLeave
   });
 
   return await setting.save();
@@ -170,11 +163,7 @@ userLeaveSettingSchema.statics.addLeave = async function (
 /**
  * ➖ 연차 삭제
  */
-userLeaveSettingSchema.statics.removeLeave = async function (
-  userId,
-  amount,
-  reason = "수동 삭제"
-) {
+userLeaveSettingSchema.statics.removeLeave = async function (userId, amount, reason = "수동 삭제") {
   const currentYear = new Date().getFullYear();
   const setting = await this.getOrCreate(userId, currentYear);
 
@@ -192,7 +181,7 @@ userLeaveSettingSchema.statics.removeLeave = async function (
     amount: amount,
     reason: reason,
     oldValue: oldValue,
-    newValue: setting.customLeave,
+    newValue: setting.customLeave
   });
 
   return await setting.save();
@@ -211,11 +200,9 @@ userLeaveSettingSchema.statics.setJoinDate = async function (userId, joinDate) {
   // 변경 이력 추가
   setting.changeHistory.push({
     action: "join_date",
-    reason: `입사일 변경: ${
-      oldDate ? oldDate.toISOString().split("T")[0] : "없음"
-    } → ${joinDate}`,
+    reason: `입사일 변경: ${oldDate ? oldDate.toISOString().split("T")[0] : "없음"} → ${joinDate}`,
     oldValue: oldDate ? oldDate.getTime() : null,
-    newValue: setting.joinDate.getTime(),
+    newValue: setting.joinDate.getTime()
   });
 
   return await setting.save();
@@ -224,15 +211,12 @@ userLeaveSettingSchema.statics.setJoinDate = async function (userId, joinDate) {
 /**
  * 🔄 연차 초기화 (신년)
  */
-userLeaveSettingSchema.statics.resetForNewYear = async function (
-  userId,
-  newYear
-) {
+userLeaveSettingSchema.statics.resetForNewYear = async function (userId, newYear) {
   // 기존 설정에서 입사일만 가져오기
   const lastYearSetting = await this.findOne({
     userId: String(userId),
     year: newYear - 1,
-    isActive: true,
+    isActive: true
   });
 
   const newSetting = new this({
@@ -246,9 +230,9 @@ userLeaveSettingSchema.statics.resetForNewYear = async function (
         action: "reset",
         reason: `${newYear}년 신규 연차 생성`,
         oldValue: 0,
-        newValue: 15,
-      },
-    ],
+        newValue: 15
+      }
+    ]
   });
 
   return await newSetting.save();
@@ -275,7 +259,7 @@ userLeaveSettingSchema.methods.getChangesSummary = function () {
     date: change.date.toISOString().split("T")[0],
     action: change.action,
     amount: change.amount,
-    reason: change.reason,
+    reason: change.reason
   }));
 };
 
@@ -287,11 +271,8 @@ userLeaveSettingSchema.set("toJSON", {
     delete ret._id;
     delete ret.__v;
     return ret;
-  },
+  }
 });
 
-const UserLeaveSetting = mongoose.model(
-  "UserLeaveSetting",
-  userLeaveSettingSchema
-);
+const UserLeaveSetting = mongoose.model("UserLeaveSetting", userLeaveSettingSchema);
 module.exports = UserLeaveSetting;

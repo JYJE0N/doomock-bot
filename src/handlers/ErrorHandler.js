@@ -31,7 +31,7 @@ class ErrorHandler {
       messageErrors: 0,
       rendererErrors: 0,
       unexpectedErrors: 0,
-      lastError: null,
+      lastError: null
     };
 
     // ⚙️ 설정
@@ -45,8 +45,8 @@ class ErrorHandler {
         userInfo: "사용자 정보를 확인할 수 없습니다.",
         moduleLoad: "시스템 구성요소 로드에 실패했습니다.",
         messageSend: "메시지 전송에 실패했습니다.",
-        renderer: "화면 구성에 실패했습니다.",
-      },
+        renderer: "화면 구성에 실패했습니다."
+      }
     };
 
     logger.debug("🚨 ErrorHandler 생성됨");
@@ -102,8 +102,8 @@ class ErrorHandler {
         key: "system",
         icon: "🖥️",
         displayName: "시스템",
-        showInMenu: true,
-      },
+        showInMenu: true
+      }
     ];
 
     try {
@@ -111,21 +111,15 @@ class ErrorHandler {
         inline_keyboard: fallbackModules.map((module) => [
           {
             text: `${module.icon} ${module.displayName}`,
-            callback_data: `${module.key}:menu`,
-          },
-        ]),
+            callback_data: `${module.key}:menu`
+          }
+        ])
       };
 
       if (ctx.callbackQuery) {
-        await ctx.editMessageText(
-          "⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.",
-          { reply_markup: keyboard }
-        );
+        await ctx.editMessageText("⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.", { reply_markup: keyboard });
       } else {
-        await ctx.reply(
-          "⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.",
-          { reply_markup: keyboard }
-        );
+        await ctx.reply("⚠️ 일부 기능을 로드할 수 없습니다. 기본 기능만 제공됩니다.", { reply_markup: keyboard });
       }
 
       this.stats.handledErrors++;
@@ -153,7 +147,7 @@ class ErrorHandler {
 
         if (ctx.callbackQuery) {
           await ctx.answerCbQuery(this.config.fallbackMessages.messageSend, {
-            show_alert: true,
+            show_alert: true
           });
         } else {
           await ctx.reply(`❌ ${this.config.fallbackMessages.messageSend}`);
@@ -162,10 +156,7 @@ class ErrorHandler {
         this.stats.handledErrors++;
         return true;
       } catch (retryError) {
-        logger.warn(
-          `메시지 재시도 ${attempt}/${this.config.maxRetries} 실패:`,
-          retryError.message
-        );
+        logger.warn(`메시지 재시도 ${attempt}/${this.config.maxRetries} 실패:`, retryError.message);
 
         if (attempt === this.config.maxRetries) {
           return await this.handleCriticalError(ctx, retryError);
@@ -184,24 +175,19 @@ class ErrorHandler {
     this.stats.rendererErrors++;
     this.stats.lastError = new Date();
 
-    const {
-      module = "unknown",
-      renderer = "unknown",
-      fallbackMessage,
-    } = options;
+    const { module = "unknown", renderer = "unknown", fallbackMessage } = options;
 
     logger.error(`🎨 렌더링 오류 [${module}/${renderer}]:`, error);
 
     try {
       // 사용자에게 에러 알림
-      const errorMessage =
-        fallbackMessage || this.config.fallbackMessages.renderer;
+      const errorMessage = fallbackMessage || this.config.fallbackMessages.renderer;
 
       // 🛡️ callbackQuery가 있을 때만 답변
       if (callbackQuery && callbackQuery.id) {
         await bot.answerCallbackQuery(callbackQuery.id, {
           text: errorMessage,
-          show_alert: true,
+          show_alert: true
         });
       }
 
@@ -210,19 +196,16 @@ class ErrorHandler {
         const fallbackKeyboard = {
           inline_keyboard: [
             [{ text: "🔄 다시 시도", callback_data: `${module}:menu` }],
-            [{ text: "🏠 메인으로", callback_data: "main:show" }],
-          ],
+            [{ text: "🏠 메인으로", callback_data: "main:show" }]
+          ]
         };
 
-        await bot.editMessageText(
-          `❌ **화면 표시 오류**\n\n${errorMessage}\n\n다시 시도하거나 메인 메뉴로 돌아가세요.`,
-          {
-            chat_id: callbackQuery.message.chat.id,
-            message_id: callbackQuery.message.message_id,
-            reply_markup: fallbackKeyboard,
-            parse_mode: "Markdown",
-          }
-        );
+        await bot.editMessageText(`❌ **화면 표시 오류**\n\n${errorMessage}\n\n다시 시도하거나 메인 메뉴로 돌아가세요.`, {
+          chat_id: callbackQuery.message.chat.id,
+          message_id: callbackQuery.message.message_id,
+          reply_markup: fallbackKeyboard,
+          parse_mode: "Markdown"
+        });
 
         this.stats.handledErrors++;
         return { success: false, handled: true, error: error.message };
@@ -261,9 +244,7 @@ class ErrorHandler {
       }
 
       const keyboard = {
-        inline_keyboard: [
-          [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }],
-        ],
+        inline_keyboard: [[{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]]
       };
 
       if (ctx.callbackQuery) {
@@ -291,21 +272,18 @@ class ErrorHandler {
     logger.error(`🔥 모듈 처리 오류: ${moduleKey}.${subAction} - ${reason}`);
 
     try {
-      const errorMessage =
-        `❌ ${moduleKey} 기능에서 오류가 발생했습니다.\n` +
-        `액션: ${subAction}\n` +
-        `잠시 후 다시 시도해주세요.`;
+      const errorMessage = `❌ ${moduleKey} 기능에서 오류가 발생했습니다.\n` + `액션: ${subAction}\n` + `잠시 후 다시 시도해주세요.`;
 
       const keyboard = {
         inline_keyboard: [
           [
             {
               text: "🔄 다시 시도",
-              callback_data: `${moduleKey}:${subAction}`,
+              callback_data: `${moduleKey}:${subAction}`
             },
-            { text: "🏠 메인 메뉴", callback_data: "system:menu" },
-          ],
-        ],
+            { text: "🏠 메인 메뉴", callback_data: "system:menu" }
+          ]
+        ]
       };
 
       if (ctx.callbackQuery) {
@@ -333,13 +311,13 @@ class ErrorHandler {
     logger.error(`💥 예상치 못한 오류 [${context}]:`, {
       message: error.message,
       stack: error.stack,
-      context: context,
+      context: context
     });
 
     try {
       if (ctx.callbackQuery) {
         await ctx.answerCbQuery(this.config.fallbackMessages.general, {
-          show_alert: true,
+          show_alert: true
         });
       } else {
         await ctx.reply(`❌ ${this.config.fallbackMessages.general}`);
@@ -369,7 +347,7 @@ class ErrorHandler {
         // answerCbQuery는 반드시 호출해야 함
         await this.bot.telegram.answerCbQuery(ctx.callbackQuery.id, {
           text: "시스템 오류가 발생했습니다.",
-          show_alert: true,
+          show_alert: true
         });
       }
       return false; // 치명적 오류는 복구 불가능으로 표시
@@ -403,18 +381,8 @@ class ErrorHandler {
     return {
       stats: this.stats,
       config: this.config,
-      successRate:
-        this.stats.totalErrors > 0
-          ? Math.round(
-              (this.stats.handledErrors / this.stats.totalErrors) * 100
-            )
-          : 100,
-      criticalRate:
-        this.stats.totalErrors > 0
-          ? Math.round(
-              (this.stats.criticalErrors / this.stats.totalErrors) * 100
-            )
-          : 0,
+      successRate: this.stats.totalErrors > 0 ? Math.round((this.stats.handledErrors / this.stats.totalErrors) * 100) : 100,
+      criticalRate: this.stats.totalErrors > 0 ? Math.round((this.stats.criticalErrors / this.stats.totalErrors) * 100) : 0
     };
   }
 

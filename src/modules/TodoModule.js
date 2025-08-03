@@ -32,7 +32,7 @@ class TodoModule extends BaseModule {
       enablePriority: process.env.TODO_ENABLE_PRIORITY === "true",
       enableCategories: process.env.TODO_ENABLE_CATEGORIES === "true",
       cacheTimeout: parseInt(process.env.TODO_CACHE_TIMEOUT) || 300000,
-      ...this.config,
+      ...this.config
     };
 
     // 모듈 상수
@@ -40,19 +40,19 @@ class TodoModule extends BaseModule {
       STATUS: {
         PENDING: "pending",
         COMPLETED: "completed",
-        ARCHIVED: "archived",
+        ARCHIVED: "archived"
       },
       PRIORITY: {
         LOW: "low",
         MEDIUM: "medium",
         HIGH: "high",
-        URGENT: "urgent",
+        URGENT: "urgent"
       },
       INPUT_STATES: {
         WAITING_ADD_INPUT: "waiting_add_input",
         WAITING_EDIT_INPUT: "waiting_edit_input",
-        WAITING_SEARCH_INPUT: "waiting_search_input",
-      },
+        WAITING_SEARCH_INPUT: "waiting_search_input"
+      }
     };
     // ===== 🎯 1. userStates Map 추가 =====
     this.userStates = new Map();
@@ -117,7 +117,7 @@ class TodoModule extends BaseModule {
       "settings:categories": this.toggleCategories,
 
       // 통계
-      stats: this.showStats,
+      stats: this.showStats
     });
 
     logger.info(`📋 TodoModule 액션 등록 완료 (${this.actionMap.size}개)`);
@@ -141,7 +141,7 @@ class TodoModule extends BaseModule {
         : {
             total: 0,
             completed: 0,
-            pending: 0,
+            pending: 0
           };
 
       return {
@@ -153,9 +153,9 @@ class TodoModule extends BaseModule {
           stats,
           config: {
             enablePriority: this.config.enablePriority,
-            enableCategories: this.config.enableCategories,
-          },
-        },
+            enableCategories: this.config.enableCategories
+          }
+        }
       };
     } catch (error) {
       logger.error("TodoModule.showMenu 오류:", error);
@@ -165,8 +165,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "메뉴를 표시할 수 없습니다.",
           action: "menu",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -189,7 +189,7 @@ class TodoModule extends BaseModule {
         page,
         limit: this.config.pageSize,
         status: statusFilter,
-        priority: priorityFilter,
+        priority: priorityFilter
       });
 
       if (!result.success) {
@@ -199,8 +199,8 @@ class TodoModule extends BaseModule {
           data: {
             message: result.message || "할일 목록을 불러올 수 없습니다.",
             action: "list",
-            canRetry: true,
-          },
+            canRetry: true
+          }
         };
       }
 
@@ -212,13 +212,13 @@ class TodoModule extends BaseModule {
           currentPage: page,
           filters: {
             status: statusFilter,
-            priority: priorityFilter,
+            priority: priorityFilter
           },
           config: {
             enablePriority: this.config.enablePriority,
-            enableCategories: this.config.enableCategories,
-          },
-        },
+            enableCategories: this.config.enableCategories
+          }
+        }
       };
     } catch (error) {
       logger.error("TodoModule.showList 오류:", error);
@@ -228,8 +228,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 목록을 표시할 수 없습니다.",
           action: "list",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -244,18 +244,15 @@ class TodoModule extends BaseModule {
       // 사용자별 최대 할일 개수 체크
       const countResult = await this.todoService.getTodoCount(userId);
 
-      if (
-        countResult.success &&
-        countResult.data >= this.config.maxTodosPerUser
-      ) {
+      if (countResult.success && countResult.data >= this.config.maxTodosPerUser) {
         return {
           type: "error",
           module: "todo",
           data: {
             message: `최대 ${this.config.maxTodosPerUser}개까지만 할일을 생성할 수 있습니다.`,
             action: "add",
-            canRetry: false,
-          },
+            canRetry: false
+          }
         };
       }
 
@@ -263,7 +260,7 @@ class TodoModule extends BaseModule {
       this.setUserState(userId, {
         action: this.constants.INPUT_STATES.WAITING_ADD_INPUT,
         messageId: callbackQuery.message.message_id,
-        timestamp: Date.now(),
+        timestamp: Date.now()
       });
 
       return {
@@ -272,8 +269,8 @@ class TodoModule extends BaseModule {
         data: {
           userId,
           maxLength: this.config.maxTitleLength,
-          config: this.config,
-        },
+          config: this.config
+        }
       };
     } catch (error) {
       logger.error("TodoModule.startAdd 오류:", error);
@@ -283,8 +280,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 추가를 시작할 수 없습니다.",
           action: "add",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -303,8 +300,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 ID가 필요합니다.",
           action: "toggle",
-          canRetry: false,
-        },
+          canRetry: false
+        }
       };
     }
 
@@ -318,19 +315,13 @@ class TodoModule extends BaseModule {
           data: {
             message: result.message || "할일 상태를 변경할 수 없습니다.",
             action: "toggle",
-            canRetry: true,
-          },
+            canRetry: true
+          }
         };
       }
 
       // 토글 후 목록으로 돌아가기
-      return await this.showList(
-        bot,
-        callbackQuery,
-        "list",
-        "1",
-        moduleManager
-      );
+      return await this.showList(bot, callbackQuery, "list", "1", moduleManager);
     } catch (error) {
       logger.error("TodoModule.toggleTodo 오류:", error);
       return {
@@ -339,8 +330,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 상태를 변경할 수 없습니다.",
           action: "toggle",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -358,8 +349,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 ID가 필요합니다.",
           action: "delete",
-          canRetry: false,
-        },
+          canRetry: false
+        }
       };
     }
 
@@ -376,8 +367,8 @@ class TodoModule extends BaseModule {
           data: {
             message: "삭제할 할일을 찾을 수 없습니다.",
             action: "delete",
-            canRetry: false,
-          },
+            canRetry: false
+          }
         };
       }
 
@@ -386,8 +377,8 @@ class TodoModule extends BaseModule {
         module: "todo",
         data: {
           todo: todoResult.data,
-          todoId,
-        },
+          todoId
+        }
       };
     } catch (error) {
       logger.error("TodoModule.confirmDelete 오류:", error);
@@ -397,8 +388,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "삭제 확인을 표시할 수 없습니다.",
           action: "delete",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -415,13 +406,7 @@ class TodoModule extends BaseModule {
 
       // ✅ 수정된 호출 방식
       // subAction에는 'list'를, params에는 '1'을 정확히 전달합니다.
-      return await this.showList(
-        bot,
-        callbackQuery,
-        "list",
-        "1",
-        moduleManager
-      );
+      return await this.showList(bot, callbackQuery, "list", "1", moduleManager);
     } catch (error) {
       logger.error("TodoModule.executeDelete 오류:", error);
       return {
@@ -430,8 +415,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일을 삭제할 수 없습니다.",
           action: "delete:confirm",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -441,13 +426,7 @@ class TodoModule extends BaseModule {
    */
   async changePage(bot, callbackQuery, subAction, params, moduleManager) {
     const page = parseInt(params) || 1;
-    return await this.showList(
-      bot,
-      callbackQuery,
-      subAction,
-      page.toString(),
-      moduleManager
-    );
+    return await this.showList(bot, callbackQuery, subAction, page.toString(), moduleManager);
   }
 
   /**
@@ -463,8 +442,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 ID가 필요합니다.",
           action: "edit",
-          canRetry: false,
-        },
+          canRetry: false
+        }
       };
     }
 
@@ -481,8 +460,8 @@ class TodoModule extends BaseModule {
           data: {
             message: "수정할 할일을 찾을 수 없습니다.",
             action: "edit",
-            canRetry: false,
-          },
+            canRetry: false
+          }
         };
       }
 
@@ -491,7 +470,7 @@ class TodoModule extends BaseModule {
         action: this.constants.INPUT_STATES.WAITING_EDIT_INPUT,
         todoId: todoId,
         messageId: callbackQuery.message.message_id,
-        timestamp: Date.now(),
+        timestamp: Date.now()
       });
 
       return {
@@ -500,8 +479,8 @@ class TodoModule extends BaseModule {
         data: {
           todo: todoResult.data,
           todoId,
-          maxLength: this.config.maxTitleLength,
-        },
+          maxLength: this.config.maxTitleLength
+        }
       };
     } catch (error) {
       logger.error("TodoModule.startEdit 오류:", error);
@@ -511,8 +490,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 수정을 시작할 수 없습니다.",
           action: "edit",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -530,8 +509,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 ID가 필요합니다.",
           action: "complete",
-          canRetry: false,
-        },
+          canRetry: false
+        }
       };
     }
 
@@ -546,8 +525,8 @@ class TodoModule extends BaseModule {
           data: {
             message: result.message || "할일을 완료할 수 없습니다.",
             action: "complete",
-            canRetry: true,
-          },
+            canRetry: true
+          }
         };
       }
 
@@ -560,8 +539,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일을 완료할 수 없습니다.",
           action: "complete",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -579,8 +558,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 ID가 필요합니다.",
           action: "uncomplete",
-          canRetry: false,
-        },
+          canRetry: false
+        }
       };
     }
 
@@ -595,8 +574,8 @@ class TodoModule extends BaseModule {
           data: {
             message: result.message || "할일을 미완료로 되돌릴 수 없습니다.",
             action: "uncomplete",
-            canRetry: true,
-          },
+            canRetry: true
+          }
         };
       }
 
@@ -609,8 +588,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일을 미완료로 되돌릴 수 없습니다.",
           action: "uncomplete",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -641,8 +620,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일 ID가 필요합니다.",
           action: "archive",
-          canRetry: false,
-        },
+          canRetry: false
+        }
       };
     }
 
@@ -657,8 +636,8 @@ class TodoModule extends BaseModule {
           data: {
             message: result.message || "할일을 아카이브할 수 없습니다.",
             action: "archive",
-            canRetry: true,
-          },
+            canRetry: true
+          }
         };
       }
 
@@ -671,8 +650,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "할일을 아카이브할 수 없습니다.",
           action: "archive",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -687,15 +666,15 @@ class TodoModule extends BaseModule {
     this.setUserState(userId, {
       action: this.constants.INPUT_STATES.WAITING_SEARCH_INPUT,
       messageId: callbackQuery.message.message_id,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
 
     return {
       type: "search_prompt",
       module: "todo",
       data: {
-        userId,
-      },
+        userId
+      }
     };
   }
 
@@ -708,8 +687,8 @@ class TodoModule extends BaseModule {
       module: "todo",
       data: {
         currentFilters: params ? params.split(":") : [],
-        config: this.config,
-      },
+        config: this.config
+      }
     };
   }
 
@@ -718,12 +697,7 @@ class TodoModule extends BaseModule {
    */
   async filterByStatus(bot, callbackQuery, params, moduleManager) {
     const status = params || "pending";
-    return await this.showList(
-      bot,
-      callbackQuery,
-      `1:${status}`,
-      moduleManager
-    );
+    return await this.showList(bot, callbackQuery, `1:${status}`, moduleManager);
   }
 
   /**
@@ -731,12 +705,7 @@ class TodoModule extends BaseModule {
    */
   async filterByPriority(bot, callbackQuery, params, moduleManager) {
     const priority = params || "high";
-    return await this.showList(
-      bot,
-      callbackQuery,
-      `1::${priority}`,
-      moduleManager
-    );
+    return await this.showList(bot, callbackQuery, `1::${priority}`, moduleManager);
   }
 
   /**
@@ -807,25 +776,13 @@ class TodoModule extends BaseModule {
     try {
       const result = await this.todoService.getTodos(userId, {
         page: 1,
-        limit: 1,
+        limit: 1
       });
 
       if (result.success && result.data.totalPages > 0) {
-        return await this.showList(
-          bot,
-          callbackQuery,
-          subAction,
-          result.data.totalPages.toString(),
-          moduleManager
-        );
+        return await this.showList(bot, callbackQuery, subAction, result.data.totalPages.toString(), moduleManager);
       } else {
-        return await this.showList(
-          bot,
-          callbackQuery,
-          subAction,
-          "1",
-          moduleManager
-        );
+        return await this.showList(bot, callbackQuery, subAction, "1", moduleManager);
       }
     } catch (error) {
       logger.error("TodoModule.goToLastPage 오류:", error);
@@ -835,8 +792,8 @@ class TodoModule extends BaseModule {
         data: {
           message: "마지막 페이지로 이동할 수 없습니다.",
           action: "page:last",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -854,21 +811,21 @@ class TodoModule extends BaseModule {
           {
             key: "maxTodosPerUser",
             name: "최대 할일 개수",
-            value: this.config.maxTodosPerUser,
+            value: this.config.maxTodosPerUser
           },
           { key: "pageSize", name: "페이지 크기", value: this.config.pageSize },
           {
             key: "enablePriority",
             name: "우선순위 기능",
-            value: this.config.enablePriority ? "활성화" : "비활성화",
+            value: this.config.enablePriority ? "활성화" : "비활성화"
           },
           {
             key: "enableCategories",
             name: "카테고리 기능",
-            value: this.config.enableCategories ? "활성화" : "비활성화",
-          },
-        ],
-      },
+            value: this.config.enableCategories ? "활성화" : "비활성화"
+          }
+        ]
+      }
     };
   }
 
@@ -882,8 +839,8 @@ class TodoModule extends BaseModule {
       data: {
         message: "우선순위 설정 변경 기능은 아직 구현되지 않았습니다.",
         action: "settings:priority",
-        canRetry: false,
-      },
+        canRetry: false
+      }
     };
   }
 
@@ -897,8 +854,8 @@ class TodoModule extends BaseModule {
       data: {
         message: "카테고리 설정 변경 기능은 아직 구현되지 않았습니다.",
         action: "settings:categories",
-        canRetry: false,
-      },
+        canRetry: false
+      }
     };
   }
 
@@ -916,11 +873,11 @@ class TodoModule extends BaseModule {
           "우선순위 설정 (설정에서 활성화)",
           "카테고리 관리 (설정에서 활성화)",
           "검색 및 필터링",
-          "상세 통계",
+          "상세 통계"
         ],
         commands: ["/todo - 할일 메뉴 열기", "버튼 클릭으로 쉬운 조작"],
-        config: this.config,
-      },
+        config: this.config
+      }
     };
   }
 
@@ -967,11 +924,7 @@ class TodoModule extends BaseModule {
       this.clearUserState(userId);
 
       // 에러 메시지 전송
-      await this.sendErrorMessage(
-        bot,
-        msg.chat.id,
-        "입력 처리 중 오류가 발생했습니다."
-      );
+      await this.sendErrorMessage(bot, msg.chat.id, "입력 처리 중 오류가 발생했습니다.");
 
       return true; // 이 모듈에서 처리했음을 표시
     }
@@ -986,7 +939,7 @@ class TodoModule extends BaseModule {
       return {
         type: "add_input_error",
         module: "todo",
-        data: { message: "할일 제목을 입력해주세요." },
+        data: { message: "할일 제목을 입력해주세요." }
       };
     }
 
@@ -995,8 +948,8 @@ class TodoModule extends BaseModule {
         type: "add_input_error",
         module: "todo",
         data: {
-          message: `할일 제목이 너무 깁니다. (최대 ${this.config.maxTitleLength}자)`,
-        },
+          message: `할일 제목이 너무 깁니다. (최대 ${this.config.maxTitleLength}자)`
+        }
       };
     }
 
@@ -1004,7 +957,7 @@ class TodoModule extends BaseModule {
       // ✅ 수정: 'title' 대신 'text' 사용 (스키마와 일치)
       const result = await this.todoService.addTodo(userId, {
         text: text, // ✅ 'text'로 통일
-        createdAt: TimeHelper.getLogTimeString(),
+        createdAt: TimeHelper.getLogTimeString()
       });
 
       // 사용자 상태 정리
@@ -1017,8 +970,8 @@ class TodoModule extends BaseModule {
           data: {
             message: `"${text}" 할일이 추가되었습니다!`,
             todo: result.data,
-            shouldShowList: true,
-          },
+            shouldShowList: true
+          }
         };
       } else {
         return {
@@ -1026,8 +979,8 @@ class TodoModule extends BaseModule {
           module: "todo",
           data: {
             message: result.message || "할일 추가에 실패했습니다.",
-            canRetry: true,
-          },
+            canRetry: true
+          }
         };
       }
     } catch (error) {
@@ -1039,8 +992,8 @@ class TodoModule extends BaseModule {
         module: "todo",
         data: {
           message: "할일 추가 중 오류가 발생했습니다.",
-          canRetry: true,
-        },
+          canRetry: true
+        }
       };
     }
   }
@@ -1064,8 +1017,8 @@ class TodoModule extends BaseModule {
         type: "edit_error",
         module: "todo",
         data: {
-          message: "할일 수정 기능은 아직 구현되지 않았습니다.",
-        },
+          message: "할일 수정 기능은 아직 구현되지 않았습니다."
+        }
       };
     } catch (error) {
       logger.error("할일 수정 처리 오류:", error);
@@ -1075,8 +1028,8 @@ class TodoModule extends BaseModule {
         type: "edit_error",
         module: "todo",
         data: {
-          message: "할일 수정 중 오류가 발생했습니다.",
-        },
+          message: "할일 수정 중 오류가 발생했습니다."
+        }
       };
     }
   }
@@ -1097,8 +1050,8 @@ class TodoModule extends BaseModule {
         type: "search_error",
         module: "todo",
         data: {
-          message: "할일 검색 기능은 아직 구현되지 않았습니다.",
-        },
+          message: "할일 검색 기능은 아직 구현되지 않았습니다."
+        }
       };
     } catch (error) {
       logger.error("할일 검색 처리 오류:", error);
@@ -1108,8 +1061,8 @@ class TodoModule extends BaseModule {
         type: "search_error",
         module: "todo",
         data: {
-          message: "할일 검색 중 오류가 발생했습니다.",
-        },
+          message: "할일 검색 중 오류가 발생했습니다."
+        }
       };
     }
   }

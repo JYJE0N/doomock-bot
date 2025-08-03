@@ -5,17 +5,17 @@ const TTSHistorySchema = new mongoose.Schema({
   userId: {
     type: String,
     required: true,
-    index: true,
+    index: true
   },
   text: {
     type: String,
     required: true,
-    maxlength: 500,
+    maxlength: 500
   },
   language: {
     type: String,
     required: true,
-    enum: ["ko-KR", "en-US"],
+    enum: ["ko-KR", "en-US"]
   },
   voice: String,
   voiceCode: String,
@@ -23,9 +23,9 @@ const TTSHistorySchema = new mongoose.Schema({
   shareUrl: String,
   createdAt: {
     type: Date,
-    default: Date.now,
+    default: Date.now
     // index: true,
-  },
+  }
 });
 
 // 인덱스

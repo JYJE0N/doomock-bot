@@ -13,49 +13,49 @@ const weatherSchema = new mongoose.Schema(
     // 사용자 정보
     userId: {
       type: String,
-      required: true,
+      required: true
     },
 
     // 위치 정보
     location: {
       type: String,
       required: true,
-      trim: true,
+      trim: true
     },
 
     cityName: {
       type: String,
       required: true,
-      trim: true,
+      trim: true
     },
 
     // 온도 데이터
     temperature: {
       type: Number,
-      required: true,
+      required: true
     },
 
     feelsLike: {
-      type: Number,
+      type: Number
     },
 
     tempMin: {
-      type: Number,
+      type: Number
     },
 
     tempMax: {
-      type: Number,
+      type: Number
     },
 
     // 날씨 상태
     description: {
       type: String,
-      required: true,
+      required: true
     },
 
     iconCode: {
       type: String,
-      required: true,
+      required: true
     },
 
     // 환경 데이터
@@ -63,23 +63,23 @@ const weatherSchema = new mongoose.Schema(
       type: Number,
       required: true,
       min: 0,
-      max: 100,
+      max: 100
     },
 
     pressure: {
-      type: Number,
+      type: Number
     },
 
     windSpeed: {
       type: Number,
-      default: 0,
+      default: 0
     },
 
     cloudiness: {
       type: Number,
       default: 0,
       min: 0,
-      max: 100,
+      max: 100
     },
 
     // 메타 정보
@@ -87,30 +87,30 @@ const weatherSchema = new mongoose.Schema(
       source: {
         type: String,
         enum: ["api", "cache"],
-        default: "api",
+        default: "api"
       },
       apiProvider: {
         type: String,
-        default: "OpenWeatherMap",
-      },
+        default: "OpenWeatherMap"
+      }
     },
 
     // 상태 관리
     isActive: {
       type: Boolean,
-      default: true,
+      default: true
     },
 
     // 캐시 만료 시간
     expiresAt: {
       type: Date,
-      default: () => new Date(Date.now() + 10 * 60 * 1000), // 10분
-    },
+      default: () => new Date(Date.now() + 10 * 60 * 1000) // 10분
+    }
   },
   {
     timestamps: true,
     versionKey: false,
-    collection: "weather_data",
+    collection: "weather_data"
   }
 );
 

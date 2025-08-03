@@ -45,7 +45,7 @@ function getSystemInfo() {
     pid: process.pid,
     uptime: process.uptime(),
     memory: process.memoryUsage(),
-    cpu: process.cpuUsage(),
+    cpu: process.cpuUsage()
   };
 }
 
@@ -58,7 +58,7 @@ function getEnvironmentInfo() {
     isProduction: process.env.NODE_ENV === "production",
     isDevelopment: process.env.NODE_ENV === "development",
     isRailway: !!process.env.RAILWAY_ENVIRONMENT,
-    railwayEnv: process.env.RAILWAY_ENVIRONMENT,
+    railwayEnv: process.env.RAILWAY_ENVIRONMENT
   };
 }
 
@@ -66,5 +66,5 @@ module.exports = {
   formatMemoryUsage,
   formatUptime,
   getSystemInfo,
-  getEnvironmentInfo,
+  getEnvironmentInfo
 };

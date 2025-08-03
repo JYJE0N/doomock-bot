@@ -36,13 +36,13 @@ class TTSService extends BaseService {
         type: "service_account",
         project_id: projectId,
         private_key: privateKey,
-        client_email: clientEmail,
+        client_email: clientEmail
       };
 
       // TTS 클라이언트 생성
       this.client = new TextToSpeechClient({
         credentials: credentials,
-        projectId: projectId,
+        projectId: projectId
       });
 
       logger.info("✅ Google TTS 클라이언트 초기화 완료");
@@ -50,11 +50,12 @@ class TTSService extends BaseService {
       await this.fileHelper.initialize();
 
       // 주기적으로 오래된 파일 정리
-      setInterval(() => {
-        this.fileHelper
-          .cleanupOldFiles()
-          .catch((err) => logger.error("파일 정리 실패:", err));
-      }, 60 * 60 * 1000); // 1시간마다
+      setInterval(
+        () => {
+          this.fileHelper.cleanupOldFiles().catch((err) => logger.error("파일 정리 실패:", err));
+        },
+        60 * 60 * 1000
+      ); // 1시간마다
 
       logger.success("✅ TTSService 초기화 완료");
     } catch (error) {
@@ -78,8 +79,7 @@ class TTSService extends BaseService {
       }
 
       // 음성 코드 가져오기
-      const voiceCode =
-        this.getUserVoice(userId) || this.voiceConfig.getDefaultVoice(language);
+      const voiceCode = this.getUserVoice(userId) || this.voiceConfig.getDefaultVoice(language);
 
       // 음성 정보 가져오기 및 검증
       const voice = this.voiceConfig.getVoiceByCode(voiceCode);
@@ -111,14 +111,14 @@ class TTSService extends BaseService {
         voice: {
           languageCode: language,
           name: voice.code || voiceCode, // voice.code가 있으면 사용, 없으면 voiceCode 사용
-          ssmlGender: ssmlGender,
+          ssmlGender: ssmlGender
         },
         audioConfig: {
           audioEncoding: "MP3",
           speakingRate: 1.0,
           pitch: 0.0,
-          volumeGainDb: 0.0,
-        },
+          volumeGainDb: 0.0
+        }
       };
 
       logger.debug("🎤 TTS 변환 요청:", {
@@ -126,7 +126,7 @@ class TTSService extends BaseService {
         voice: voice.code || voiceCode,
         voiceName: voice.name,
         language,
-        gender: ssmlGender,
+        gender: ssmlGender
       });
 
       // TTS API 호출
@@ -138,10 +138,7 @@ class TTSService extends BaseService {
 
       // 파일 저장
       const fileName = this.fileHelper.generateFileName(userId, text);
-      const filePaths = await this.fileHelper.saveAudioFile(
-        response.audioContent,
-        fileName
-      );
+      const filePaths = await this.fileHelper.saveAudioFile(response.audioContent, fileName);
 
       // 히스토리 저장 (실패해도 계속 진행)
       try {
@@ -152,7 +149,7 @@ class TTSService extends BaseService {
             voice: voice.name,
             voiceCode: voice.code || voiceCode,
             fileName,
-            shareUrl: filePaths.shareUrl,
+            shareUrl: filePaths.shareUrl
           });
         }
       } catch (historyError) {
@@ -165,7 +162,7 @@ class TTSService extends BaseService {
         audioFile: filePaths.tempPath,
         shareUrl: filePaths.shareUrl,
         voice: voice.name,
-        duration: Math.ceil(text.length / 5), // 대략적인 재생 시간 추정
+        duration: Math.ceil(text.length / 5) // 대략적인 재생 시간 추정
       });
     } catch (error) {
       logger.error("TTS 변환 실패:", error);
@@ -182,8 +179,7 @@ class TTSService extends BaseService {
       } else if (error.code === "PERMISSION_DENIED") {
         errorMessage = "TTS API 권한이 없습니다. 관리자에게 문의하세요.";
       } else if (error.code === "RESOURCE_EXHAUSTED") {
-        errorMessage =
-          "TTS API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.";
+        errorMessage = "TTS API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.";
       }
 
       return this.createErrorResponse(error, errorMessage);
@@ -203,10 +199,7 @@ class TTSService extends BaseService {
     // 음성 코드 유효성 검사
     const voice = this.voiceConfig.getVoiceByCode(voiceCode);
     if (!voice) {
-      return this.createErrorResponse(
-        new Error(`유효하지 않은 음성 코드: ${voiceCode}`),
-        "선택한 음성을 찾을 수 없습니다."
-      );
+      return this.createErrorResponse(new Error(`유효하지 않은 음성 코드: ${voiceCode}`), "선택한 음성을 찾을 수 없습니다.");
     }
 
     this.userVoices.set(userId.toString(), voiceCode);
@@ -215,7 +208,7 @@ class TTSService extends BaseService {
     return this.createSuccessResponse({
       voiceCode,
       voiceName: voice.name,
-      voiceDescription: voice.description,
+      voiceDescription: voice.description
     });
   }
 
@@ -225,7 +218,7 @@ class TTSService extends BaseService {
         totalConversions: 0,
         currentVoice: null,
         currentVoiceName: null,
-        lastConversion: null,
+        lastConversion: null
       };
 
       // 현재 음성 정보
@@ -239,12 +232,12 @@ class TTSService extends BaseService {
       // DB에서 통계 조회
       if (this.models.TTSHistory) {
         stats.totalConversions = await this.models.TTSHistory.countDocuments({
-          userId: userId.toString(),
+          userId: userId.toString()
         });
 
         // 마지막 변환 정보
         const lastConversion = await this.models.TTSHistory.findOne({
-          userId: userId.toString(),
+          userId: userId.toString()
         })
           .sort({ createdAt: -1 })
           .select("createdAt");
@@ -261,7 +254,7 @@ class TTSService extends BaseService {
         totalConversions: 0,
         currentVoice: this.getUserVoice(userId),
         currentVoiceName: null,
-        lastConversion: null,
+        lastConversion: null
       });
     }
   }
@@ -282,7 +275,7 @@ class TTSService extends BaseService {
         voiceCode: data.voiceCode,
         fileName: data.fileName,
         shareUrl: data.shareUrl,
-        createdAt: new Date(),
+        createdAt: new Date()
       };
 
       await this.models.TTSHistory.create(historyData);

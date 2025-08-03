@@ -26,7 +26,7 @@ class MarkdownHelper {
       lastActivity: null,
       // 🎯 새로운 통계들
       problemPatterns: new Map(), // 문제가 되는 패턴들 학습
-      successPatterns: new Map(), // 성공하는 패턴들 학습
+      successPatterns: new Map() // 성공하는 패턴들 학습
     };
 
     // ⚙️ 스마트 설정
@@ -37,36 +37,17 @@ class MarkdownHelper {
       enableSmartEscape: true, // 🧠 스마트 이스케이프
       enablePatternLearning: true, // 📚 패턴 학습
       maxRetries: 1, // 빠른 폴백
-      retryDelay: 100, // 빠른 폴백
+      retryDelay: 100 // 빠른 폴백
     };
 
     // 🛡️ MarkdownV2 예약 문자들
-    this.markdownV2EscapeChars = [
-      "_",
-      "*",
-      "[",
-      "]",
-      "(",
-      ")",
-      "~",
-      "`",
-      ">",
-      "#",
-      "+",
-      "-",
-      "=",
-      "|",
-      "{",
-      "}",
-      ".",
-      "!",
-    ];
+    this.markdownV2EscapeChars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
 
     // 🎯 날씨 모듈 전용 템플릿들 (MarkdownV2 최적화)
     this.weatherTemplates = {
       current: this.createWeatherCurrentTemplate(),
       forecast: this.createWeatherForecastTemplate(),
-      cities: this.createWeatherCitiesTemplate(),
+      cities: this.createWeatherCitiesTemplate()
     };
 
     logger.debug("🎯 스마트 MarkdownV2 시스템 생성됨");
@@ -160,9 +141,7 @@ class MarkdownHelper {
     return (data) => {
       const { city, weather, dust, timestamp } = data;
 
-      return `${city.emoji || "🏙️"} *${this.escapeMarkdownV2(
-        city.name
-      )} 날씨* ${weather.emoji || "🌤️"}
+      return `${city.emoji || "🏙️"} *${this.escapeMarkdownV2(city.name)} 날씨* ${weather.emoji || "🌤️"}
 
 🌡️ *온도*: ${weather.temperature}°C \\(체감 ${weather.feelsLike}°C\\)
 📝 *날씨*: ${this.escapeMarkdownV2(weather.description)}
@@ -181,9 +160,7 @@ ${dust.emoji || "🟡"} *등급*: ${this.escapeMarkdownV2(dust.grade)}
       }
 
 📍 *위치*: ${this.escapeMarkdownV2(city.fullName || city.name)}
-⏰ *업데이트*: ${this.escapeMarkdownV2(timestamp)}${
-        weather.isOffline ? "\n⚠️ *오프라인 모드* \\(기본 데이터\\)" : ""
-      }`;
+⏰ *업데이트*: ${this.escapeMarkdownV2(timestamp)}${weather.isOffline ? "\n⚠️ *오프라인 모드* \\(기본 데이터\\)" : ""}`;
     };
   }
 
@@ -191,9 +168,7 @@ ${dust.emoji || "🟡"} *등급*: ${this.escapeMarkdownV2(dust.grade)}
     return (data) => {
       const { city, forecast, timestamp } = data;
 
-      let text = `📊 *${this.escapeMarkdownV2(city.name)} 날씨 예보* ${
-        city.emoji || "🏙️"
-      }
+      let text = `📊 *${this.escapeMarkdownV2(city.name)} 날씨 예보* ${city.emoji || "🏙️"}
 
 `;
 
@@ -202,9 +177,7 @@ ${dust.emoji || "🟡"} *등급*: ${this.escapeMarkdownV2(dust.grade)}
           const dayEmoji = index === 0 ? "📅" : "📆";
           const weatherEmoji = day.icon || "🌤️";
 
-          text += `${dayEmoji} *${this.escapeMarkdownV2(
-            day.dayOfWeek
-          )}* \\(${this.escapeMarkdownV2(day.date)}\\)
+          text += `${dayEmoji} *${this.escapeMarkdownV2(day.dayOfWeek)}* \\(${this.escapeMarkdownV2(day.date)}\\)
 ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
 🌡️ ${day.tempMin}°C ~ ${day.tempMax}°C`;
 
@@ -333,7 +306,7 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
       try {
         const messageOptions = {
           parse_mode: "MarkdownV2",
-          ...options,
+          ...options
         };
 
         if (ctx.callbackQuery) {
@@ -361,7 +334,7 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
       const htmlText = this.convertToHtml(text);
       const messageOptions = {
         parse_mode: "HTML",
-        ...options,
+        ...options
       };
 
       if (ctx.callbackQuery) {
@@ -382,7 +355,7 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
       const plainText = this.stripAllMarkup(text);
       const messageOptions = {
         ...options,
-        parse_mode: undefined,
+        parse_mode: undefined
       };
 
       if (ctx.callbackQuery) {
@@ -467,33 +440,20 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
       stats: this.stats,
       config: this.config,
       rates: {
-        markdownV2:
-          total > 0
-            ? Math.round((this.stats.markdownV2Success / total) * 100)
-            : 0,
-        html:
-          total > 0 ? Math.round((this.stats.htmlFallback / total) * 100) : 0,
-        plain:
-          total > 0
-            ? Math.round((this.stats.plainTextFallback / total) * 100)
-            : 0,
+        markdownV2: total > 0 ? Math.round((this.stats.markdownV2Success / total) * 100) : 0,
+        html: total > 0 ? Math.round((this.stats.htmlFallback / total) * 100) : 0,
+        plain: total > 0 ? Math.round((this.stats.plainTextFallback / total) * 100) : 0,
         success:
           total > 0
-            ? Math.round(
-                ((this.stats.markdownV2Success +
-                  this.stats.htmlFallback +
-                  this.stats.plainTextFallback) /
-                  total) *
-                  100
-              )
-            : 100,
+            ? Math.round(((this.stats.markdownV2Success + this.stats.htmlFallback + this.stats.plainTextFallback) / total) * 100)
+            : 100
       },
       learning: {
         successPatterns: this.stats.successPatterns.size,
         problemPatterns: this.stats.problemPatterns.size,
-        learningEnabled: this.config.enablePatternLearning,
+        learningEnabled: this.config.enablePatternLearning
       },
-      mode: "Smart MarkdownV2 System v2.0",
+      mode: "Smart MarkdownV2 System v2.0"
     };
   }
 
@@ -508,9 +468,7 @@ ${weatherEmoji} ${this.escapeMarkdownV2(day.description)}
 
     // 학습 패턴 저장 (필요시)
     if (this.config.enablePatternLearning) {
-      logger.info(
-        `🧠 학습된 패턴: 성공 ${status.learning.successPatterns}개, 실패 ${status.learning.problemPatterns}개`
-      );
+      logger.info(`🧠 학습된 패턴: 성공 ${status.learning.successPatterns}개, 실패 ${status.learning.problemPatterns}개`);
     }
 
     logger.info("✅ 스마트 MarkdownV2 시스템 정리 완료");

@@ -34,7 +34,7 @@ class ReminderScheduler {
       retryDelay: parseInt(process.env.REMINDER_RETRY_DELAY) || 30000, // 30초
       batchSize: parseInt(process.env.REMINDER_BATCH_SIZE) || 10, // 한 번에 처리할 개수
       enableScheduler: process.env.ENABLE_REMINDER_SCHEDULER !== "false",
-      ...options.config,
+      ...options.config
     };
 
     // 통계
@@ -43,7 +43,7 @@ class ReminderScheduler {
       remindersSent: 0,
       errors: 0,
       lastCheck: null,
-      lastSent: null,
+      lastSent: null
     };
 
     // Railway 환경 감지
@@ -83,7 +83,7 @@ class ReminderScheduler {
         },
         {
           scheduled: false, // 수동 시작
-          timezone: "Asia/Seoul",
+          timezone: "Asia/Seoul"
         }
       );
 
@@ -91,9 +91,7 @@ class ReminderScheduler {
       this.cronJob.start();
       this.isRunning = true;
 
-      logger.success(
-        `✅ ReminderScheduler 시작됨 (패턴: ${this.config.cronPattern})`
-      );
+      logger.success(`✅ ReminderScheduler 시작됨 (패턴: ${this.config.cronPattern})`);
 
       // Railway 환경에서는 즉시 한 번 체크
       if (this.isRailway) {
@@ -177,9 +175,7 @@ class ReminderScheduler {
         }
       }
 
-      logger.success(
-        `✅ 리마인더 체크 완료 (발송: ${pendingReminders.length}개)`
-      );
+      logger.success(`✅ 리마인더 체크 완료 (발송: ${pendingReminders.length}개)`);
     } catch (error) {
       logger.error("❌ 리마인더 체크 중 오류:", error);
       this.stats.errors++;
@@ -192,10 +188,7 @@ class ReminderScheduler {
   async getPendingReminders(currentTime) {
     try {
       // ReminderService에서 발송 대상 조회
-      const reminders = await this.reminderService.getPendingReminders(
-        currentTime,
-        this.config.batchSize
-      );
+      const reminders = await this.reminderService.getPendingReminders(currentTime, this.config.batchSize);
 
       return reminders;
     } catch (error) {
@@ -215,9 +208,7 @@ class ReminderScheduler {
       let message = "";
 
       if (type === "todo_reminder") {
-        message = `🔔 *리마인더 알림\\!*\n\n📝 ${this.escapeMarkdownV2(
-          text
-        )}\n\n⏰ 설정하신 시간입니다\\! 🎯`;
+        message = `🔔 *리마인더 알림\\!*\n\n📝 ${this.escapeMarkdownV2(text)}\n\n⏰ 설정하신 시간입니다\\! 🎯`;
       } else {
         message = `🔔 *알림*\n\n${this.escapeMarkdownV2(text)}`;
       }
@@ -229,26 +220,26 @@ class ReminderScheduler {
           inline_keyboard: [
             [
               { text: "✅ 완료 처리", callback_data: `todo:toggle:${todoId}` },
-              { text: "📋 할일 목록", callback_data: "todo:menu" },
+              { text: "📋 할일 목록", callback_data: "todo:menu" }
             ],
             [
               {
                 text: "⏰ 30분 후 다시",
-                callback_data: `reminder:snooze:${reminder._id}:30`,
+                callback_data: `reminder:snooze:${reminder._id}:30`
               },
               {
                 text: "🔕 알림 끄기",
-                callback_data: `reminder:disable:${reminder._id}`,
-              },
-            ],
-          ],
+                callback_data: `reminder:disable:${reminder._id}`
+              }
+            ]
+          ]
         };
       }
 
       // 텔레그램 메시지 발송
       await this.bot.sendMessage(userId, message, {
         parse_mode: "MarkdownV2",
-        reply_markup: keyboard,
+        reply_markup: keyboard
       });
 
       logger.info(`📤 리마인더 발송됨 (사용자: ${userId})`);
@@ -281,25 +272,18 @@ class ReminderScheduler {
 
       if (retryCount <= this.config.maxRetries) {
         // 재시도 예약
-        const nextRetryTime = new Date(
-          Date.now() + this.config.retryDelay * retryCount
-        );
+        const nextRetryTime = new Date(Date.now() + this.config.retryDelay * retryCount);
 
         await this.reminderService.updateReminderRetry(reminder._id, {
           retryCount,
           nextRetryTime,
-          lastError: error.message,
+          lastError: error.message
         });
 
-        logger.info(
-          `🔄 리마인더 재시도 예약 (${retryCount}/${this.config.maxRetries})`
-        );
+        logger.info(`🔄 리마인더 재시도 예약 (${retryCount}/${this.config.maxRetries})`);
       } else {
         // 최대 재시도 횟수 초과 - 실패 처리
-        await this.reminderService.markReminderFailed(
-          reminder._id,
-          error.message
-        );
+        await this.reminderService.markReminderFailed(reminder._id, error.message);
         logger.warn(`❌ 리마인더 최종 실패 (ID: ${reminder._id})`);
       }
     } catch (retryError) {
@@ -317,26 +301,7 @@ class ReminderScheduler {
   escapeMarkdownV2(text) {
     if (typeof text !== "string") text = String(text);
 
-    const escapeChars = [
-      "_",
-      "*",
-      "[",
-      "]",
-      "(",
-      ")",
-      "~",
-      "`",
-      ">",
-      "#",
-      "+",
-      "-",
-      "=",
-      "|",
-      "{",
-      "}",
-      ".",
-      "!",
-    ];
+    const escapeChars = ["_", "*", "[", "]", "(", ")", "~", "`", ">", "#", "+", "-", "=", "|", "{", "}", ".", "!"];
 
     let escaped = text;
     escapeChars.forEach((char) => {
@@ -364,7 +329,7 @@ class ReminderScheduler {
       stats: this.stats,
       environment: this.isRailway ? "railway" : "local",
       cronPattern: this.config.cronPattern,
-      nextExecution: this.cronJob ? this.cronJob.nextDates() : null,
+      nextExecution: this.cronJob ? this.cronJob.nextDates() : null
     };
   }
 

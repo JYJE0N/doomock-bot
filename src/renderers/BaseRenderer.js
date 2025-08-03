@@ -26,11 +26,11 @@ class BaseRenderer {
       successCount: 0,
       errorCount: 0,
       fallbackUsed: 0,
-      lastActivity: null,
+      lastActivity: null
     };
 
     this.config = {
-      enableFallback: true,
+      enableFallback: true
     };
 
     logger.debug(`🎨 ${this.constructor.name} 생성됨`);
@@ -59,9 +59,7 @@ class BaseRenderer {
    * 🎯 메인 렌더링 메서드 (자식 클래스에서 필수 구현)
    */
   async render(result, ctx) {
-    throw new Error(
-      `render() 메서드는 ${this.constructor.name}에서 구현해야 합니다`
-    );
+    throw new Error(`render() 메서드는 ${this.constructor.name}에서 구현해야 합니다`);
   }
 
   // ===== 🔧 콜백 데이터 처리 =====
@@ -70,12 +68,8 @@ class BaseRenderer {
    * 🔧 콜백 데이터 생성
    */
   buildCallbackData(moduleKey, subAction, params = "") {
-    const paramsStr = Array.isArray(params)
-      ? params.join(":")
-      : String(params || "");
-    return paramsStr
-      ? `${moduleKey}:${subAction}:${paramsStr}`
-      : `${moduleKey}:${subAction}`;
+    const paramsStr = Array.isArray(params) ? params.join(":") : String(params || "");
+    return paramsStr ? `${moduleKey}:${subAction}:${paramsStr}` : `${moduleKey}:${subAction}`;
   }
 
   // ===== 💬 메시지 전송 시스템 =====
@@ -110,7 +104,7 @@ class BaseRenderer {
         const plainText = this.markdownHelper.stripAllMarkup(text);
         await this.sendMessage(ctx, plainText, {
           ...options,
-          parse_mode: undefined,
+          parse_mode: undefined
         });
         this.stats.fallbackUsed++;
         return true;
@@ -122,10 +116,7 @@ class BaseRenderer {
     // 3단계: 최종적으로 ErrorHandler에 위임
     this.stats.errorCount++;
     if (this.errorHandler) {
-      await this.errorHandler.handleMessageSendError(
-        ctx,
-        "메시지 전송 최종 실패"
-      );
+      await this.errorHandler.handleMessageSendError(ctx, "메시지 전송 최종 실패");
     }
     return false;
   }
@@ -149,10 +140,8 @@ class BaseRenderer {
   createInlineKeyboard(buttons, moduleKey = this.moduleName) {
     return {
       inline_keyboard: buttons.map((row) =>
-        Array.isArray(row)
-          ? row.map((btn) => this.createButton(btn, moduleKey))
-          : [this.createButton(row, moduleKey)]
-      ),
+        Array.isArray(row) ? row.map((btn) => this.createButton(btn, moduleKey)) : [this.createButton(row, moduleKey)]
+      )
     };
   }
 

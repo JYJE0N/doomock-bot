@@ -19,7 +19,7 @@ const leaveSchema = new mongoose.Schema(
       type: String,
       required: [true, "사용자 ID는 필수입니다"],
       trim: true,
-      index: true,
+      index: true
     },
 
     // 📅 연도
@@ -28,14 +28,14 @@ const leaveSchema = new mongoose.Schema(
       required: [true, "연도는 필수입니다"],
       min: [2020, "2020년 이후만 가능합니다"],
       max: [2030, "2030년 이전만 가능합니다"],
-      default: () => new Date().getFullYear(),
+      default: () => new Date().getFullYear()
     },
 
     // 📅 사용 날짜
     date: {
       type: Date,
       required: [true, "사용 날짜는 필수입니다"],
-      default: Date.now,
+      default: Date.now
     },
 
     // 📊 사용량 - 유연하게 변경
@@ -49,15 +49,15 @@ const leaveSchema = new mongoose.Schema(
           // 0.25 단위로만 허용
           return (v * 4) % 1 === 0;
         },
-        message: "연차는 0.25일 단위로만 사용 가능합니다",
-      },
+        message: "연차는 0.25일 단위로만 사용 가능합니다"
+      }
     },
 
     // 🏷️ 연차 타입 - 유연하게 변경
     type: {
       type: String,
       required: [true, "연차 타입은 필수입니다"],
-      maxlength: [20, "타입은 20자 이내여야 합니다"],
+      maxlength: [20, "타입은 20자 이내여야 합니다"]
       // enum 제거 - 자유로운 값 허용
     },
 
@@ -66,19 +66,19 @@ const leaveSchema = new mongoose.Schema(
       type: String,
       trim: true,
       maxlength: [100, "사유는 100자 이하로 입력해주세요"],
-      default: "",
+      default: ""
     },
 
     // 🔄 활성 상태
     isActive: {
       type: Boolean,
-      default: true,
-    },
+      default: true
+    }
   },
   {
     timestamps: true, // createdAt, updatedAt 자동 생성
     versionKey: false,
-    collection: "leaves",
+    collection: "leaves"
   }
 );
 
@@ -116,7 +116,7 @@ leaveSchema.statics.getYearlyUsage = async function (userId, year) {
   const leaves = await this.find({
     userId: String(userId),
     year: targetYear,
-    isActive: true,
+    isActive: true
   }).sort({ date: -1 });
 
   // 총 사용량 계산
@@ -137,7 +137,7 @@ leaveSchema.statics.getYearlyUsage = async function (userId, year) {
     year: targetYear,
     totalUsed,
     monthlyUsage,
-    details: leaves,
+    details: leaves
   };
 };
 
@@ -154,28 +154,28 @@ leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
         $match: {
           userId: userId.toString(),
           year: targetYear,
-          isActive: true,
-        },
+          isActive: true
+        }
       },
       {
         // 2. 월별 그룹을 만들면서, 'amount' 필드를 합산합니다.
         $group: {
           _id: { $month: "$date" }, // 👈 'usedDate' -> 'date'로 수정
           totalDays: { $sum: "$amount" }, // 👈 '$days' -> '$amount'로 수정
-          count: { $sum: 1 },
-        },
+          count: { $sum: 1 }
+        }
       },
       {
         // 3. 월(1-12) 기준으로 오름차순 정렬합니다.
-        $sort: { _id: 1 },
-      },
+        $sort: { _id: 1 }
+      }
     ]);
 
     // 4. 최종 결과를 1월부터 12월까지의 배열 형식으로 가공합니다.
     const result = Array.from({ length: 12 }, (_, index) => ({
       month: index + 1,
       days: 0,
-      count: 0,
+      count: 0
     }));
 
     monthlyStats.forEach((stat) => {
@@ -184,7 +184,7 @@ leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
         result[monthIndex] = {
           month: stat._id,
           days: stat.totalDays,
-          count: stat.count,
+          count: stat.count
         };
       }
     });
@@ -199,13 +199,7 @@ leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
 /**
  * ➕ 연차 사용 기록 추가
  */
-leaveSchema.statics.addUsage = async function (
-  userId,
-  amount,
-  date,
-  reason,
-  type
-) {
+leaveSchema.statics.addUsage = async function (userId, amount, date, reason, type) {
   const useDate = date ? new Date(date) : new Date();
 
   // ✅ type이 전달되지 않으면 자동 계산
@@ -227,7 +221,7 @@ leaveSchema.statics.addUsage = async function (
     date: useDate,
     amount: amount,
     type: leaveType,
-    reason: reason,
+    reason: reason
   });
 
   return await leave.save();
@@ -237,11 +231,7 @@ leaveSchema.statics.addUsage = async function (
  * 🗑️ 연차 사용 기록 삭제 (소프트 삭제)
  */
 leaveSchema.statics.removeUsage = async function (userId, leaveId) {
-  return await this.findOneAndUpdate(
-    { _id: leaveId, userId: String(userId) },
-    { isActive: false },
-    { new: true }
-  );
+  return await this.findOneAndUpdate({ _id: leaveId, userId: String(userId) }, { isActive: false }, { new: true });
 };
 
 // ===== 🎯 JSON 변환 설정 =====
@@ -252,7 +242,7 @@ leaveSchema.set("toJSON", {
     delete ret._id;
     delete ret.__v;
     return ret;
-  },
+  }
 });
 
 const Leave = mongoose.model("Leave", leaveSchema);

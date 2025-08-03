@@ -17,13 +17,10 @@ class WeatherService extends BaseService {
     this.config = {
       apiKey: process.env.WEATHER_API_KEY || process.env.OPENWEATHER_API_KEY,
       apiUrl: "https://api.openweathermap.org/data/2.5",
-      dustApiKey: process.env.AIR_KOREA_API_KEY
-        ? decodeURIComponent(process.env.AIR_KOREA_API_KEY)
-        : process.env.DUST_API_KEY,
-      dustApiUrl:
-        "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty",
+      dustApiKey: process.env.AIR_KOREA_API_KEY ? decodeURIComponent(process.env.AIR_KOREA_API_KEY) : process.env.DUST_API_KEY,
+      dustApiUrl: "http://apis.data.go.kr/B552584/ArpltnInforInqireSvc/getCtprvnRltmMesureDnsty",
       cacheTimeout: 300000, // 5분
-      ...config,
+      ...config
     };
 
     // 캐시 저장소
@@ -34,9 +31,7 @@ class WeatherService extends BaseService {
     if (!this.config.apiKey) {
       logger.error("❌ OpenWeatherMap API 키가 설정되지 않았습니다");
     } else {
-      logger.info(
-        `✅ OpenWeatherMap API 키 설정됨 (길이: ${this.config.apiKey.length})`
-      );
+      logger.info(`✅ OpenWeatherMap API 키 설정됨 (길이: ${this.config.apiKey.length})`);
     }
 
     logger.info("✅ WeatherService 초기화 완료");
@@ -46,7 +41,7 @@ class WeatherService extends BaseService {
       logger.debug("🔑 미세먼지 API 키 정보:", {
         length: this.config.dustApiKey.length,
         hasSpecialChars: /[\/+=]/.test(this.config.dustApiKey),
-        isEncoded: this.config.dustApiKey.includes("%"),
+        isEncoded: this.config.dustApiKey.includes("%")
       });
     }
   }
@@ -80,7 +75,7 @@ class WeatherService extends BaseService {
             iconCode: "01d",
             windSpeed: 3.5,
             cloudiness: 20,
-            timestamp: new Date().toISOString(),
+            timestamp: new Date().toISOString()
           };
           this.setCached(this.weatherCache, location, testData);
           return this.createSuccessResponse(testData, "⚠️ 테스트 데이터입니다");
@@ -162,7 +157,7 @@ class WeatherService extends BaseService {
         광주시: "Gwangju",
         광주: "Gwangju",
         제주시: "Jeju",
-        제주: "Jeju",
+        제주: "Jeju"
       };
 
       const englishLocation = cityNameMap[location] || location;
@@ -173,8 +168,8 @@ class WeatherService extends BaseService {
           appid: this.config.apiKey,
           units: "metric",
           lang: "kr",
-          cnt: 40, // 5일치
-        },
+          cnt: 40 // 5일치
+        }
       });
 
       const forecastData = this.transformForecastData(response.data, location);
@@ -208,7 +203,7 @@ class WeatherService extends BaseService {
       광주시: "Gwangju",
       광주: "Gwangju",
       제주시: "Jeju",
-      제주: "Jeju",
+      제주: "Jeju"
     };
 
     const englishLocation = cityNameMap[location] || location;
@@ -218,18 +213,18 @@ class WeatherService extends BaseService {
       q: englishLocation + ",KR", // 한국 지정
       appid: this.config.apiKey,
       units: "metric",
-      lang: "kr",
+      lang: "kr"
     };
 
     logger.debug(`🌐 API 호출: ${url}`, {
       originalLocation: location,
       englishLocation,
-      hasApiKey: !!this.config.apiKey,
+      hasApiKey: !!this.config.apiKey
     });
 
     const response = await axios.get(url, {
       params,
-      timeout: 5000,
+      timeout: 5000
     });
 
     return response.data;
@@ -255,7 +250,7 @@ class WeatherService extends BaseService {
       iconCode: weather.icon || "01d",
       windSpeed: wind.speed || 0,
       cloudiness: apiData.clouds?.all || 0,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
@@ -270,7 +265,7 @@ class WeatherService extends BaseService {
       location,
       sidoName,
       url: this.config.dustApiUrl,
-      hasApiKey: !!this.config.dustApiKey,
+      hasApiKey: !!this.config.dustApiKey
     });
 
     try {
@@ -281,14 +276,11 @@ class WeatherService extends BaseService {
         numOfRows: "100",
         pageNo: "1",
         sidoName: sidoName, // 인코딩하지 않음
-        ver: "1.0",
+        ver: "1.0"
       });
 
       const fullUrl = `${this.config.dustApiUrl}?${params.toString()}`;
-      logger.debug(
-        `🌬️ 전체 API URL:`,
-        fullUrl.replace(this.config.dustApiKey, "API_KEY_HIDDEN")
-      );
+      logger.debug(`🌬️ 전체 API URL:`, fullUrl.replace(this.config.dustApiKey, "API_KEY_HIDDEN"));
 
       const response = await axios.get(this.config.dustApiUrl, {
         params: {
@@ -297,12 +289,12 @@ class WeatherService extends BaseService {
           numOfRows: 100,
           pageNo: 1,
           sidoName: sidoName,
-          ver: "1.0",
+          ver: "1.0"
         },
         timeout: 10000,
         headers: {
-          Accept: "application/json",
-        },
+          Accept: "application/json"
+        }
       });
 
       // 전체 응답 구조 확인
@@ -311,7 +303,7 @@ class WeatherService extends BaseService {
         hasData: !!response.data,
         hasResponse: !!response.data?.response,
         hasBody: !!response.data?.response?.body,
-        totalCount: response.data?.response?.body?.totalCount,
+        totalCount: response.data?.response?.body?.totalCount
       });
 
       // 응답 확인
@@ -330,16 +322,12 @@ class WeatherService extends BaseService {
       }
 
       // totalCount가 0이어도 items 배열 확인
-      const items = Array.isArray(body.items)
-        ? body.items
-        : body.items && Array.isArray(body.items.item)
-        ? body.items.item
-        : [];
+      const items = Array.isArray(body.items) ? body.items : body.items && Array.isArray(body.items.item) ? body.items.item : [];
 
       logger.debug(`🌬️ 미세먼지 데이터:`, {
         totalCount: body.totalCount,
         itemsLength: items.length,
-        itemsType: Array.isArray(items) ? "array" : typeof items,
+        itemsType: Array.isArray(items) ? "array" : typeof items
       });
 
       if (items.length === 0) {
@@ -354,22 +342,21 @@ class WeatherService extends BaseService {
           items.slice(0, 3).map((item) => ({
             stationName: item.stationName,
             pm10: item.pm10Value,
-            pm25: item.pm25Value,
+            pm25: item.pm25Value
           }))
         );
       }
 
       // 해당 도시의 측정소 데이터 찾기
       const cityName = location.replace("시", "");
-      const cityData =
-        items.find((item) => item.stationName?.includes(cityName)) || items[0]; // 못 찾으면 첫 번째 데이터 사용
+      const cityData = items.find((item) => item.stationName?.includes(cityName)) || items[0]; // 못 찾으면 첫 번째 데이터 사용
 
       if (cityData) {
         logger.debug(`🌬️ 선택된 측정소:`, {
           stationName: cityData.stationName,
           pm10: cityData.pm10Value,
           pm25: cityData.pm25Value,
-          dataTime: cityData.dataTime,
+          dataTime: cityData.dataTime
         });
       }
 
@@ -379,7 +366,7 @@ class WeatherService extends BaseService {
       if (error.response) {
         logger.error(`API 응답 에러:`, {
           status: error.response.status,
-          data: error.response.data,
+          data: error.response.data
         });
       }
       throw error;
@@ -405,7 +392,7 @@ class WeatherService extends BaseService {
       pm25Grade: apiData.pm25Grade || "-",
       grade: this.calculateDustGrade(pm10Value, pm25Value),
       dataTime: apiData.dataTime,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
@@ -423,7 +410,7 @@ class WeatherService extends BaseService {
           temps: [],
           descriptions: [],
           icons: [],
-          humidity: [],
+          humidity: []
         };
       }
 
@@ -444,15 +431,13 @@ class WeatherService extends BaseService {
         tempMax: Math.round(Math.max(...day.temps)),
         description: this.getMostFrequent(day.descriptions),
         iconCode: this.getMostFrequent(day.icons),
-        avgHumidity: Math.round(
-          day.humidity.reduce((a, b) => a + b) / day.humidity.length
-        ),
+        avgHumidity: Math.round(day.humidity.reduce((a, b) => a + b) / day.humidity.length)
       }));
 
     return {
       location,
       forecasts: dailyForecasts,
-      timestamp: new Date().toISOString(),
+      timestamp: new Date().toISOString()
     };
   }
 
@@ -474,9 +459,7 @@ class WeatherService extends BaseService {
     arr.forEach((item) => {
       counts[item] = (counts[item] || 0) + 1;
     });
-    return Object.keys(counts).reduce((a, b) =>
-      counts[a] > counts[b] ? a : b
-    );
+    return Object.keys(counts).reduce((a, b) => (counts[a] > counts[b] ? a : b));
   }
 
   /**
@@ -500,7 +483,7 @@ class WeatherService extends BaseService {
       광주: "광주",
       광주시: "광주",
       제주: "제주",
-      제주시: "제주",
+      제주시: "제주"
     };
 
     const cityName = location.replace("시", "");
@@ -525,7 +508,7 @@ class WeatherService extends BaseService {
   setCached(cache, key, data) {
     cache.set(key, {
       data,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
   }
 
@@ -539,8 +522,8 @@ class WeatherService extends BaseService {
       hasDustApiKey: !!this.config.dustApiKey,
       cacheSize: {
         weather: this.weatherCache.size,
-        dust: this.dustCache.size,
-      },
+        dust: this.dustCache.size
+      }
     };
   }
 

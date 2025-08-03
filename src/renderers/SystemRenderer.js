@@ -35,10 +35,7 @@ class SystemRenderer extends BaseRenderer {
         return await this.renderError(result, ctx);
       default:
         logger.warn(`🖥️ 지원하지 않는 렌더링 타입: ${type}`);
-        return await this.renderError(
-          { message: "지원하지 않는 기능입니다." },
-          ctx
-        );
+        return await this.renderError({ message: "지원하지 않는 기능입니다." }, ctx);
     }
   }
 
@@ -75,7 +72,7 @@ class SystemRenderer extends BaseRenderer {
       row.push({
         text: `${module1.emoji} ${module1.name}`,
         action: "menu",
-        params: "",
+        params: ""
       });
 
       if (i + 1 < activeModules.length) {
@@ -83,7 +80,7 @@ class SystemRenderer extends BaseRenderer {
         row.push({
           text: `${module2.emoji} ${module2.name}`,
           action: "menu",
-          params: "",
+          params: ""
         });
       }
 
@@ -93,7 +90,7 @@ class SystemRenderer extends BaseRenderer {
     // 시스템 버튼들
     buttons.push([
       { text: "📊 시스템 상태", action: "status", params: "" },
-      { text: "❓ 도움말", action: "help", params: "" },
+      { text: "❓ 도움말", action: "help", params: "" }
     ]);
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -138,21 +135,13 @@ class SystemRenderer extends BaseRenderer {
    * 📊 시스템 상태 렌더링
    */
   async renderStatus(data, ctx) {
-    const {
-      status = "unknown",
-      uptime = "정보 없음",
-      memory = {},
-      moduleCount = 0,
-      lastHealthCheck = null,
-    } = data;
+    const { status = "unknown", uptime = "정보 없음", memory = {}, moduleCount = 0, lastHealthCheck = null } = data;
 
     let text = `📊 **시스템 상태**\n\n`;
 
     // 상태 표시
     const statusIcon = status === "healthy" ? "💚" : "❌";
-    text += `${statusIcon} **전체 상태**: ${
-      status === "healthy" ? "정상" : "문제 있음"
-    }\n\n`;
+    text += `${statusIcon} **전체 상태**: ${status === "healthy" ? "정상" : "문제 있음"}\n\n`;
 
     // 시스템 정보
     text += `🖥️ **시스템 정보**\n`;
@@ -161,10 +150,7 @@ class SystemRenderer extends BaseRenderer {
     text += `• 활성 모듈: ${moduleCount}개\n\n`;
 
     if (lastHealthCheck) {
-      text += `🔍 **마지막 체크**: ${TimeHelper.format(
-        new Date(lastHealthCheck),
-        "datetime"
-      )}\n\n`;
+      text += `🔍 **마지막 체크**: ${TimeHelper.format(new Date(lastHealthCheck), "datetime")}\n\n`;
     }
 
     text += `시스템이 정상적으로 작동 중입니다! ✨`;
@@ -172,8 +158,8 @@ class SystemRenderer extends BaseRenderer {
     const buttons = [
       [
         { text: "🔄 새로고침", action: "status", params: "" },
-        { text: "🏠 메인 메뉴", action: "menu", params: "" },
-      ],
+        { text: "🏠 메인 메뉴", action: "menu", params: "" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -216,8 +202,8 @@ class SystemRenderer extends BaseRenderer {
     const buttons = [
       [
         { text: "🔄 재시도", action: "menu", params: "" },
-        { text: "🏠 메인 메뉴", action: "menu", params: "" },
-      ],
+        { text: "🏠 메인 메뉴", action: "menu", params: "" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);

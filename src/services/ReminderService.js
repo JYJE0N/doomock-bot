@@ -13,7 +13,7 @@ class ReminderService extends BaseService {
 
     this.config = {
       maxRemindersPerUser: 20,
-      ...options.config,
+      ...options.config
     };
 
     logger.info("🔔 ReminderService 생성됨");
@@ -43,13 +43,11 @@ class ReminderService extends BaseService {
       // 사용자별 리마인더 수 체크
       const userCount = await ReminderModel.countDocuments({
         userId,
-        isActive: true,
+        isActive: true
       });
 
       if (userCount >= this.config.maxRemindersPerUser) {
-        throw new Error(
-          `리마인더는 최대 ${this.config.maxRemindersPerUser}개까지 등록 가능합니다.`
-        );
+        throw new Error(`리마인더는 최대 ${this.config.maxRemindersPerUser}개까지 등록 가능합니다.`);
       }
 
       const reminder = new ReminderModel({
@@ -57,7 +55,7 @@ class ReminderService extends BaseService {
         text: reminderData.text.trim(),
         reminderTime: reminderData.reminderTime || null,
         isRecurring: false,
-        completed: false,
+        completed: false
       });
 
       await reminder.save();
@@ -77,20 +75,12 @@ class ReminderService extends BaseService {
     try {
       const ReminderModel = this.models.Reminder;
 
-      const reminders = await ReminderModel.find({ userId, isActive: true })
-        .sort({ createdAt: -1 })
-        .lean();
+      const reminders = await ReminderModel.find({ userId, isActive: true }).sort({ createdAt: -1 }).lean();
 
-      return this.createSuccessResponse(
-        reminders,
-        "리마인더 목록을 조회했습니다."
-      );
+      return this.createSuccessResponse(reminders, "리마인더 목록을 조회했습니다.");
     } catch (error) {
       logger.error("리마인더 목록 조회 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "리마인더 목록 조회에 실패했습니다."
-      );
+      return this.createErrorResponse(error, "리마인더 목록 조회에 실패했습니다.");
     }
   }
 
@@ -106,8 +96,8 @@ class ReminderService extends BaseService {
         {
           $set: {
             isActive: false,
-            deletedAt: new Date(),
-          },
+            deletedAt: new Date()
+          }
         },
         { new: true }
       );
@@ -135,8 +125,8 @@ class ReminderService extends BaseService {
         {
           $set: {
             completed: true,
-            completedAt: new Date(),
-          },
+            completedAt: new Date()
+          }
         },
         { new: true }
       );
@@ -148,10 +138,7 @@ class ReminderService extends BaseService {
       return this.createSuccessResponse(result, "리마인더가 완료되었습니다.");
     } catch (error) {
       logger.error("리마인더 완료 처리 실패:", error);
-      return this.createErrorResponse(
-        error,
-        "리마인더 완료 처리에 실패했습니다."
-      );
+      return this.createErrorResponse(error, "리마인더 완료 처리에 실패했습니다.");
     }
   }
 
@@ -170,8 +157,8 @@ class ReminderService extends BaseService {
         completed: false,
         reminderTime: {
           $gte: now,
-          $lte: fiveMinutesLater,
-        },
+          $lte: fiveMinutesLater
+        }
       }).lean();
 
       return this.createSuccessResponse(reminders);
@@ -187,7 +174,7 @@ class ReminderService extends BaseService {
   getStatus() {
     return {
       ...super.getStatus(),
-      maxRemindersPerUser: this.config.maxRemindersPerUser,
+      maxRemindersPerUser: this.config.maxRemindersPerUser
     };
   }
 }

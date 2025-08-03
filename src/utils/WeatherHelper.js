@@ -32,7 +32,7 @@ class WeatherHelper {
 
     logger.info("🌤️ WeatherHelper 초기화됨", {
       hasApiKey: !!this.apiKey,
-      cacheTimeout: this.cacheTimeout / 1000 / 60 + "분",
+      cacheTimeout: this.cacheTimeout / 1000 / 60 + "분"
     });
   }
 
@@ -64,7 +64,7 @@ class WeatherHelper {
       안산: "Ansan,KR",
       안산시: "Ansan,KR",
       부천: "Bucheon,KR",
-      부천시: "Bucheon,KR",
+      부천시: "Bucheon,KR"
     };
 
     const normalized = city.trim();
@@ -104,16 +104,13 @@ class WeatherHelper {
           q: mappedCity,
           appid: this.apiKey,
           units: "metric",
-          lang: "kr",
+          lang: "kr"
         },
-        timeout: 10000,
+        timeout: 10000
       });
 
       // 5. Weather 모델로 데이터 변환
-      const weatherData = Weather.createFromApiResponse(
-        response.data,
-        location
-      );
+      const weatherData = Weather.createFromApiResponse(response.data, location);
 
       // 6. 데이터 검증 (Weather 모델 활용)
       const validation = Weather.validateWeatherData(weatherData);
@@ -125,16 +122,14 @@ class WeatherHelper {
         return {
           success: true,
           data: normalizedData,
-          source: "api_normalized",
+          source: "api_normalized"
         };
       }
 
       // 7. 캐시 저장
       this.setCache(cacheKey, weatherData);
 
-      logger.success(
-        `✅ 날씨 조회 성공: ${location} (${weatherData.temperature}°C)`
-      );
+      logger.success(`✅ 날씨 조회 성공: ${location} (${weatherData.temperature}°C)`);
 
       return { success: true, data: weatherData, source: "api" };
     } catch (error) {
@@ -147,7 +142,7 @@ class WeatherHelper {
         success: false,
         data: fallbackData,
         error: this.getErrorMessage(error),
-        source: "fallback",
+        source: "fallback"
       };
     }
   }
@@ -167,7 +162,7 @@ class WeatherHelper {
   setCache(key, data) {
     this.cache.set(key, {
       data,
-      timestamp: Date.now(),
+      timestamp: Date.now()
     });
   }
 
@@ -218,8 +213,8 @@ class WeatherHelper {
           message: "API 키 없음 - 폴백 모드",
           details: {
             hasApiKey: false,
-            cacheSize: this.cache.size,
-          },
+            cacheSize: this.cache.size
+          }
         };
       }
 
@@ -232,8 +227,8 @@ class WeatherHelper {
         details: {
           hasApiKey: true,
           cacheSize: this.cache.size,
-          lastTest: new Date().toISOString(),
-        },
+          lastTest: new Date().toISOString()
+        }
       };
     } catch (error) {
       return {
@@ -241,8 +236,8 @@ class WeatherHelper {
         message: error.message,
         details: {
           hasApiKey: !!this.apiKey,
-          cacheSize: this.cache.size,
-        },
+          cacheSize: this.cache.size
+        }
       };
     }
   }
@@ -255,7 +250,7 @@ class WeatherHelper {
       hasApiKey: !!this.apiKey,
       cacheSize: this.cache.size,
       cacheTimeout: this.cacheTimeout / 1000 / 60 + "분",
-      baseUrl: this.baseUrl,
+      baseUrl: this.baseUrl
     };
   }
 }

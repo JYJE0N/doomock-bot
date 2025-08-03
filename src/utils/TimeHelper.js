@@ -22,7 +22,7 @@ class TimeHelper {
     display: "MM월 DD일 (ddd) HH:mm",
     korean: "YYYY년 MM월 DD일",
     timestamp: "YYMMDDHHmm",
-    timeOnly: "HH:mm", // 추가: 시:분만 표시
+    timeOnly: "HH:mm" // 추가: 시:분만 표시
   };
 
   static {
@@ -220,7 +220,7 @@ class TimeHelper {
       isUndefined: input === undefined,
       isValid: this.isValidTime(input),
       safeMoment: this.safeMoment(input)?.format() || "null",
-      formatted: this.safeDisplayTime(input),
+      formatted: this.safeDisplayTime(input)
     };
   }
 
@@ -235,12 +235,7 @@ class TimeHelper {
       locale: moment.locale(),
       isStaticClass: true,
       version: "2.2.0", // 안전 처리 버전
-      improvements: [
-        "safeMoment 메서드 추가",
-        "null/undefined 안전 처리",
-        "safeDisplayTime UI 헬퍼 추가",
-        "debugTime 디버깅 도구 추가",
-      ],
+      improvements: ["safeMoment 메서드 추가", "null/undefined 안전 처리", "safeDisplayTime UI 헬퍼 추가", "debugTime 디버깅 도구 추가"]
     };
   }
 }
