@@ -154,23 +154,32 @@ class ReminderService extends BaseService {
     }
   }
 
+  /**
+   * 발송 대상 리마인더 조회
+   */
   async getPendingReminders(currentTime = new Date(), limit = 10) {
     try {
       const ReminderModel = this.models.Reminder;
 
-      // 현재 시간보다 이전이지만 아직 발송되지 않은 리마인더 조회
-      const reminders = await ReminderModel.find({
+      // sentAt 필드가 없을 수도 있으므로 조건 수정
+      const query = {
         isActive: true,
         completed: false,
-        reminderTime: { $lte: currentTime },
-        sentAt: { $exists: false } // 아직 발송되지 않은 것만
-      })
-        .limit(limit)
-        .lean();
+        reminderTime: { $lte: currentTime }
+      };
+
+      // sentAt 필드가 스키마에 있다면 추가
+      if (ReminderModel.schema.paths.sentAt) {
+        query.sentAt = { $exists: false };
+      }
+
+      const reminders = await ReminderModel.find(query).limit(limit).lean();
+
+      logger.debug(`getPendingReminders 쿼리 결과: ${reminders.length}개`);
 
       return reminders;
     } catch (error) {
-      logger.error("발송 대상 리마인더 조회 실패:", error);
+      logger.error("getPendingReminders 오류:", error);
       return [];
     }
   }

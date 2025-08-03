@@ -143,8 +143,26 @@ class ReminderScheduler {
 
       // 현재 시간
       const now = new Date();
+      logger.debug(`현재 시간: ${now.toISOString()}`);
 
-      // 발송 대상 리마인더 조회 (배치 처리)
+      // 디버깅: 모든 리마인더 확인
+      if (this.reminderService.models && this.reminderService.models.Reminder) {
+        const allReminders = await this.reminderService.models.Reminder.find({
+          isActive: true
+        }).lean();
+
+        logger.debug(`전체 활성 리마인더: ${allReminders.length}개`);
+
+        allReminders.forEach((r) => {
+          const reminderTime = new Date(r.reminderTime);
+          const isPast = reminderTime <= now;
+          logger.debug(
+            `리마인더: ${r.text} | 시간: ${reminderTime.toISOString()} | 지났나? ${isPast} | sentAt: ${r.sentAt}`
+          );
+        });
+      }
+
+      // 발송 대상 리마인더 조회
       const pendingReminders = await this.getPendingReminders(now);
 
       if (pendingReminders.length === 0) {
