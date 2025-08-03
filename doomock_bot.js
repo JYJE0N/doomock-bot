@@ -3,6 +3,30 @@ require("dotenv").config();
 const logger = require("./src/utils/Logger");
 const BotController = require("./src/controllers/BotController");
 const { showDoomockBanner } = require("./src/utils/FancyBanner");
+const path = require("path");
+const fs = require("fs");
+
+// 환경 감지
+const NODE_ENV = process.env.NODE_ENV || "development";
+console.log(`🌍 환경: ${NODE_ENV}`);
+
+// 환경별 .env 파일 로드
+const envFile = `.env.${NODE_ENV}`;
+const envPath = path.resolve(process.cwd(), envFile);
+
+if (fs.existsSync(envPath)) {
+  console.log(`📄 환경 파일 로드: ${envFile}`);
+  require("dotenv").config({ path: envPath });
+} else {
+  console.log(`⚠️ ${envFile} 파일이 없습니다. 기본 .env 사용`);
+  require("dotenv").config();
+}
+
+// 기본 .env 파일도 로드 (공통 설정용)
+require("dotenv").config();
+
+console.log(`🤖 봇 토큰: ${process.env.BOT_TOKEN ? "✅ 설정됨" : "❌ 없음"}`);
+console.log(`🗄️ DB: ${process.env.MONGO_URL ? "✅ 설정됨" : "❌ 없음"}`);
 
 /**
  * 🚀 DooMockBot v4.0.1 - 안정화 버전
@@ -139,7 +163,11 @@ class DooMockBot {
     }
 
     // 치명적 오류는 종료
-    if (error.code === "EADDRINUSE" || error.message?.includes("MONGO_URL") || error.message?.includes("TELEGRAM_BOT_TOKEN")) {
+    if (
+      error.code === "EADDRINUSE" ||
+      error.message?.includes("MONGO_URL") ||
+      error.message?.includes("TELEGRAM_BOT_TOKEN")
+    ) {
       logger.error("🚨 치명적 오류로 인한 종료");
       process.exit(1);
     }

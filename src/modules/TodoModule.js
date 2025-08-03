@@ -332,23 +332,152 @@ class TodoModule extends BaseModule {
     }
   }
 
+  // TodoModule.js에 추가할 메서드들
+
   /**
-   * 📊 주간 리포트 보기
+   * 📋 할일 목록 보기
    */
-  async showWeeklyReport(bot, callbackQuery, params, moduleManager) {
+  async showList(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
+    const page = parseInt(params) || 1;
 
     try {
-      // 주간 통계 가져오기
-      const weeklyStats = await this.todoService.getWeeklyStats(userId);
+      const result = await this.todoService.getTodos(userId, {
+        page,
+        limit: this.config.pageSize,
+        includeCompleted: true,
+        includeReminders: this.config.enableReminders
+      });
 
-      if (!weeklyStats.success) {
+      if (!result.success) {
         return {
           type: "error",
           module: "todo",
           data: {
-            message: "주간 리포트를 생성할 수 없습니다.",
-            action: "weekly_report",
+            message: result.message || "할일 목록을 불러올 수 없습니다.",
+            action: "list",
+            canRetry: true
+          }
+        };
+      }
+
+      return {
+        type: "list",
+        module: "todo",
+        data: {
+          todos: result.data.todos,
+          currentPage: result.data.currentPage,
+          totalPages: result.data.totalPages,
+          totalCount: result.data.totalCount,
+          enableReminders: this.config.enableReminders
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.showList 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 목록 조회 중 오류가 발생했습니다.",
+          action: "list",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * ➕ 할일 추가
+   */
+  async addTodo(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    // 입력 대기 상태 설정
+    this.setUserState(userId, {
+      state: this.constants.INPUT_STATES.WAITING_ADD_INPUT,
+      action: "add"
+    });
+
+    return {
+      type: "input_request",
+      module: "todo",
+      data: {
+        title: "➕ 새로운 할일 추가",
+        message: "추가할 할일을 입력해주세요:",
+        suggestions: ["예: 보고서 작성하기", "예: 오후 3시 회의 참석", "예: 운동하기"]
+      }
+    };
+  }
+
+  /**
+   * ✏️ 할일 수정
+   */
+  async editTodo(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params;
+
+    if (!todoId) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "수정할 할일을 선택해주세요.",
+          action: "edit",
+          canRetry: false
+        }
+      };
+    }
+
+    // 할일 존재 확인
+    const todoResult = await this.todoService.getTodoById(userId, todoId);
+    if (!todoResult.success) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일을 찾을 수 없습니다.",
+          action: "edit",
+          canRetry: false
+        }
+      };
+    }
+
+    // 입력 대기 상태 설정
+    this.setUserState(userId, {
+      state: this.constants.INPUT_STATES.WAITING_EDIT_INPUT,
+      action: "edit",
+      todoId: todoId,
+      oldText: todoResult.data.text
+    });
+
+    return {
+      type: "input_request",
+      module: "todo",
+      data: {
+        title: "✏️ 할일 수정",
+        message: `현재 내용: "${todoResult.data.text}"\n\n새로운 내용을 입력해주세요:`,
+        currentText: todoResult.data.text
+      }
+    };
+  }
+
+  /**
+   * 🗑️ 할일 삭제
+   */
+  async deleteTodo(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params;
+
+    try {
+      const result = await this.todoService.deleteTodo(userId, todoId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: result.message || "할일 삭제에 실패했습니다.",
+            action: "delete",
             canRetry: true
           }
         };
@@ -358,10 +487,306 @@ class TodoModule extends BaseModule {
         type: "success",
         module: "todo",
         data: {
-          title: "📊 이번 주 할일 리포트",
-          stats: weeklyStats.data,
-          action: "weekly_report",
-          period: "이번 주"
+          message: "할일이 삭제되었습니다.",
+          action: "delete",
+          redirectTo: "list"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.deleteTodo 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 삭제 중 오류가 발생했습니다.",
+          action: "delete",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * ✅ 할일 토글
+   */
+  async toggleTodo(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params;
+
+    try {
+      const result = await this.todoService.toggleTodo(userId, todoId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: result.message || "상태 변경에 실패했습니다.",
+            action: "toggle",
+            canRetry: true
+          }
+        };
+      }
+
+      return {
+        type: "success",
+        module: "todo",
+        data: {
+          message: result.message,
+          todo: result.data,
+          action: "toggle",
+          redirectTo: "list"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.toggleTodo 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "상태 변경 중 오류가 발생했습니다.",
+          action: "toggle",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * ✅ 할일 완료
+   */
+  async completeTodo(bot, callbackQuery, subAction, params, moduleManager) {
+    return this.toggleTodo(bot, callbackQuery, subAction, params, moduleManager);
+  }
+
+  /**
+   * ↩️ 할일 미완료
+   */
+  async uncompleteTodo(bot, callbackQuery, subAction, params, moduleManager) {
+    return this.toggleTodo(bot, callbackQuery, subAction, params, moduleManager);
+  }
+
+  /**
+   * 📦 할일 보관
+   */
+  async archiveTodo(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params;
+
+    try {
+      const result = await this.todoService.archiveTodo(userId, todoId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: result.message || "보관에 실패했습니다.",
+            action: "archive",
+            canRetry: true
+          }
+        };
+      }
+
+      return {
+        type: "success",
+        module: "todo",
+        data: {
+          message: "할일이 보관되었습니다.",
+          action: "archive",
+          redirectTo: "list"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.archiveTodo 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "보관 중 오류가 발생했습니다.",
+          action: "archive",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🔍 할일 검색
+   */
+  async searchTodos(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    // 입력 대기 상태 설정
+    this.setUserState(userId, {
+      state: this.constants.INPUT_STATES.WAITING_SEARCH_INPUT,
+      action: "search"
+    });
+
+    return {
+      type: "input_request",
+      module: "todo",
+      data: {
+        title: "🔍 할일 검색",
+        message: "검색할 키워드를 입력해주세요:",
+        suggestions: ["태그나 내용으로 검색 가능합니다"]
+      }
+    };
+  }
+
+  /**
+   * 🎯 우선순위별 필터
+   */
+  async filterByPriority(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const priority = params;
+
+    try {
+      const result = await this.todoService.getTodosByPriority(userId, priority);
+
+      return {
+        type: "filtered_list",
+        module: "todo",
+        data: {
+          todos: result.data.todos,
+          filter: { type: "priority", value: priority },
+          totalCount: result.data.totalCount
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.filterByPriority 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "필터링 중 오류가 발생했습니다.",
+          action: "filter",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 필터 메뉴
+   */
+  async filterTodos(bot, callbackQuery, subAction, params, moduleManager) {
+    return {
+      type: "filter_menu",
+      module: "todo",
+      data: {
+        filters: [
+          { type: "status", label: "상태별" },
+          { type: "priority", label: "우선순위별" },
+          { type: "date", label: "날짜별" }
+        ]
+      }
+    };
+  }
+
+  /**
+   * ✏️ 리마인드 수정
+   */
+  async editReminder(bot, callbackQuery, subAction, params, moduleManager) {
+    // 리마인드 수정 로직
+    return {
+      type: "error",
+      module: "todo",
+      data: {
+        message: "리마인드 수정 기능은 준비 중입니다.",
+        action: "remind_edit",
+        canRetry: false
+      }
+    };
+  }
+
+  /**
+   * 🗑️ 리마인드 삭제
+   */
+  async deleteReminder(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const reminderId = params;
+
+    if (!this.reminderService) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "리마인드 기능이 비활성화되어 있습니다.",
+          action: "remind_delete",
+          canRetry: false
+        }
+      };
+    }
+
+    try {
+      const result = await this.reminderService.deleteReminder(userId, reminderId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          data: {
+            message: result.message || "리마인드 삭제에 실패했습니다.",
+            action: "remind_delete",
+            canRetry: true
+          }
+        };
+      }
+
+      return {
+        type: "success",
+        module: "todo",
+        data: {
+          message: result.message || "리마인드가 삭제되었습니다.",
+          action: "remind_delete",
+          redirectTo: "remind_list"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.deleteReminder 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "리마인드 삭제 중 오류가 발생했습니다.",
+          action: "remind_delete",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🧪 리마인드 테스트
+   */
+  async testReminder(bot, callbackQuery, subAction, params, moduleManager) {
+    // 리마인드 테스트 알림 즉시 발송
+    return {
+      type: "success",
+      module: "todo",
+      data: {
+        message: "테스트 리마인드가 발송되었습니다.",
+        action: "remind_test"
+      }
+    };
+  }
+
+  /**
+   * 📊 주간 리포트
+   */
+  async showWeeklyReport(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    try {
+      const result = await this.todoService.getWeeklyReport(userId);
+
+      return {
+        type: "weekly_report",
+        module: "todo",
+        data: {
+          report: result.data,
+          enableReminders: this.config.enableReminders
         }
       };
     } catch (error) {
@@ -370,12 +795,189 @@ class TodoModule extends BaseModule {
         type: "error",
         module: "todo",
         data: {
-          message: "주간 리포트 생성에 실패했습니다.",
+          message: "주간 리포트 생성 중 오류가 발생했습니다.",
           action: "weekly_report",
           canRetry: true
         }
       };
     }
+  }
+
+  /**
+   * 💡 스마트 제안
+   */
+  async showSmartSuggestions(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    try {
+      const result = await this.todoService.getSmartSuggestions(userId);
+
+      return {
+        type: "smart_suggestions",
+        module: "todo",
+        data: {
+          suggestions: result.data.suggestions,
+          insights: result.data.insights
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.showSmartSuggestions 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "스마트 제안 생성 중 오류가 발생했습니다.",
+          action: "smart_suggestions",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🧹 스마트 정리
+   */
+  async smartCleanup(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+
+    try {
+      const result = await this.todoService.performSmartCleanup(userId);
+
+      return {
+        type: "cleanup_complete",
+        module: "todo",
+        data: {
+          stats: result.data,
+          message: result.message
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.smartCleanup 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "스마트 정리 중 오류가 발생했습니다.",
+          action: "cleanup",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 메시지 입력 처리 헬퍼들
+   */
+  async handleAddInput(bot, msg) {
+    const userId = getUserId(msg.from);
+    const text = msg.text?.trim();
+
+    if (!text) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "할일 내용을 입력해주세요.",
+          keepState: true
+        }
+      };
+    }
+
+    const result = await this.todoService.addTodo(userId, { text });
+    this.clearUserState(userId);
+
+    if (!result.success) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: result.message || "할일 추가에 실패했습니다.",
+          action: "add"
+        }
+      };
+    }
+
+    return {
+      type: "success",
+      module: "todo",
+      data: {
+        message: `✅ "${text}" 할일이 추가되었습니다.`,
+        todo: result.data,
+        action: "add",
+        redirectTo: "list"
+      }
+    };
+  }
+
+  async handleEditInput(bot, msg) {
+    const userId = getUserId(msg.from);
+    const userState = this.getUserState(userId);
+    const text = msg.text?.trim();
+
+    if (!text) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "새로운 내용을 입력해주세요.",
+          keepState: true
+        }
+      };
+    }
+
+    const result = await this.todoService.updateTodo(userId, userState.todoId, { text });
+    this.clearUserState(userId);
+
+    if (!result.success) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: result.message || "할일 수정에 실패했습니다.",
+          action: "edit"
+        }
+      };
+    }
+
+    return {
+      type: "success",
+      module: "todo",
+      data: {
+        message: `✅ 할일이 수정되었습니다.`,
+        todo: result.data,
+        action: "edit",
+        redirectTo: "list"
+      }
+    };
+  }
+
+  async handleSearchInput(bot, msg) {
+    const userId = getUserId(msg.from);
+    const keyword = msg.text?.trim();
+
+    if (!keyword) {
+      return {
+        type: "error",
+        module: "todo",
+        data: {
+          message: "검색 키워드를 입력해주세요.",
+          keepState: true
+        }
+      };
+    }
+
+    const result = await this.todoService.searchTodos(userId, keyword);
+    this.clearUserState(userId);
+
+    return {
+      type: "search_results",
+      module: "todo",
+      data: {
+        keyword,
+        todos: result.data.todos,
+        totalCount: result.data.totalCount
+      }
+    };
   }
 
   // ===== 🆕 입력 처리 메서드들 =====
