@@ -54,7 +54,7 @@ class FortuneRenderer extends BaseRenderer {
     const {
       userName,
       todayCount,
-      maxDraws,
+      maxDrawsPerDay,
       canDraw,
       fortuneTypes,
       isDeveloper
@@ -76,10 +76,10 @@ class FortuneRenderer extends BaseRenderer {
       text += `• 개발자 특권: 일일 제한 없음\n\n`;
       text += `_어떤 운세를 알아보시겠어요?_`;
     } else {
-      text += `• 뽑은 횟수: ${todayCount}/${maxDraws}번\n`;
+      text += `• 뽑은 횟수: ${todayCount}/${maxDrawsPerDay}번\n`;
 
       if (canDraw) {
-        text += `• 남은 횟수: ${maxDraws - todayCount}번\n\n`;
+        text += `• 남은 횟수: ${maxDrawsPerDay - todayCount}번\n\n`;
         text += `_어떤 운세를 알아보시겠어요?_`;
       } else {
         text += `• 오늘은 더 이상 뽑을 수 없습니다\n\n`;

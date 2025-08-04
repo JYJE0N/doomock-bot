@@ -68,6 +68,7 @@ class FortuneService extends BaseService {
       if (!this.Fortune) {
         logger.warn("Fortune 모델 없음 - 제한된 기능으로 동작");
       } else {
+        logger.success("✅ Fortune 모델 정상 로드됨");
         // 인덱스 생성
         await this.createIndexes();
       }

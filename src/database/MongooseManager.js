@@ -10,10 +10,8 @@ class MongooseManager {
       return instance;
     }
 
-    this.isConnected = false;
+    this._isConnected = false; // ✅ 변수명 변경
     this.models = new Map();
-
-    // Railway 환경 감지
     this.isRailway = !!process.env.RAILWAY_ENVIRONMENT;
 
     instance = this;
@@ -23,7 +21,8 @@ class MongooseManager {
    * MongoDB 연결
    */
   async connect() {
-    if (this.isConnected) {
+    if (this._isConnected) {
+      // ✅ 변경
       logger.debug("이미 Mongoose로 연결됨");
       return true;
     }
@@ -45,7 +44,7 @@ class MongooseManager {
       };
 
       await mongoose.connect(mongoUrl, options);
-      this.isConnected = true;
+      this._isConnected = true; // ✅ 변경
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
@@ -76,7 +75,7 @@ class MongooseManager {
 
     mongoose.connection.on("disconnected", () => {
       logger.warn("⚠️ Mongoose 연결 끊김");
-      this.isConnected = false;
+      this._isConnected = false; // ✅ 변경
     });
 
     // 프로세스 종료 시 연결 해제
@@ -139,7 +138,7 @@ class MongooseManager {
    * 🔍 연결 상태 확인 (메서드로 추가!) - 핵심 수정!
    */
   isConnected() {
-    return this.isConnected && mongoose.connection.readyState === 1;
+    return this._isConnected && mongoose.connection.readyState === 1; // ✅ 변경
   }
 
   /**
@@ -160,7 +159,7 @@ class MongooseManager {
   async disconnect() {
     if (mongoose.connection.readyState === 1) {
       await mongoose.disconnect();
-      this.isConnected = false;
+      this._isConnected = false; // ✅ 변경
       logger.info("✅ Mongoose 연결 종료됨");
     }
   }

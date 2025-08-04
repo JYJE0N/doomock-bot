@@ -25,9 +25,27 @@ class BaseService {
     const { getInstance } = require("../database/MongooseManager");
     const mongooseManager = getInstance();
 
+    // 디버깅 로그 추가
+    logger.debug(
+      `${this.serviceName} - MongoDB 연결 상태:`,
+      mongooseManager.isConnected()
+    );
+    logger.debug(
+      `${this.serviceName} - 등록된 모델:`,
+      mongooseManager.models.keys()
+    );
+
     const modelNames = this.getRequiredModels();
     for (const modelName of modelNames) {
-      this.models[modelName] = mongooseManager.getModel(modelName);
+      try {
+        this.models[modelName] = mongooseManager.getModel(modelName);
+        logger.debug(`${this.serviceName} - ${modelName} 모델 로드 성공`);
+      } catch (error) {
+        logger.error(
+          `${this.serviceName} - ${modelName} 모델 로드 실패:`,
+          error
+        );
+      }
     }
   }
 
