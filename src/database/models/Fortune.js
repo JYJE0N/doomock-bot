@@ -438,9 +438,5 @@ FortuneUserSchema.pre("findOneAndUpdate", function () {
 const Fortune = mongoose.model("Fortune", FortuneUserSchema);
 
 module.exports = {
-  Fortune,
-  FortuneUserSchema,
-  CardSchema,
-  InterpretationSchema,
-  DrawRecordSchema
+  Fortune
 };
