@@ -430,6 +430,118 @@ class SystemModule extends BaseModule {
     };
   }
 
+  /**
+   * 📦 모듈 상태 표시 (누락된 메서드)
+   */
+  async showModuleStatus(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const _userId = getUserId(callbackQuery.from);
+
+      // ModuleManager에서 모든 모듈 정보 수집
+      const modules = [];
+      if (moduleManager && moduleManager.modules) {
+        for (const [moduleKey, moduleInstance] of moduleManager.modules) {
+          const status = moduleInstance.getStatus
+            ? moduleInstance.getStatus()
+            : {
+                moduleName: moduleKey,
+                isInitialized: !!moduleInstance.isInitialized,
+                actionCount: moduleInstance.actionMap
+                  ? moduleInstance.actionMap.size
+                  : 0
+              };
+
+          modules.push({
+            key: moduleKey,
+            displayName: status.moduleName || moduleKey,
+            initialized: status.isInitialized,
+            actionCount: status.actionCount,
+            emoji: this.getModuleEmoji(moduleKey),
+            category: this.getModuleCategory(moduleKey),
+            hasService: !!moduleInstance.serviceBuilder,
+            isCore: ["system", "navigation"].includes(moduleKey)
+          });
+        }
+      }
+
+      logger.info(`📊 모듈 상태 조회 - 총 ${modules.length}개 모듈`);
+
+      return {
+        type: "modules",
+        module: "system",
+        data: {
+          modules,
+          totalModules: modules.length,
+          activeModules: modules.filter((m) => m.initialized).length,
+          timestamp: new Date()
+        }
+      };
+    } catch (error) {
+      logger.error("SystemModule.showModuleStatus 오류:", error);
+      return {
+        type: "error",
+        module: "system",
+        data: { message: "모듈 상태를 조회하는 중 오류가 발생했습니다." }
+      };
+    }
+  }
+
+  /**
+   * 🏓 핑 응답 처리 (누락된 메서드)
+   */
+  async handlePing(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const startTime = Date.now();
+      const userId = getUserId(callbackQuery.from);
+      const userName = getUserName(callbackQuery.from);
+
+      // 간단한 응답 시간 측정
+      const responseTime = Date.now() - startTime;
+
+      // 통계 업데이트
+      this.systemStats.totalCallbacks++;
+      this.systemStats.uniqueUsers.add(userId);
+
+      logger.debug(
+        `🏓 핑 요청 - ${userName} (${userId}), 응답시간: ${responseTime}ms`
+      );
+
+      return {
+        type: "ping",
+        module: "system",
+        data: {
+          status: "pong",
+          responseTime,
+          userName,
+          timestamp: new Date(),
+          uptime: this.getUptime()
+        }
+      };
+    } catch (error) {
+      logger.error("SystemModule.handlePing 오류:", error);
+      return {
+        type: "error",
+        module: "system",
+        data: { message: "핑 처리 중 오류가 발생했습니다." }
+      };
+    }
+  }
+
+  /**
+   * 🎯 모듈 카테고리 분류 헬퍼
+   */
+  getModuleCategory(moduleKey) {
+    const categoryMap = {
+      system: "system",
+      todo: "productivity",
+      timer: "productivity",
+      worktime: "work",
+      fortune: "entertainment",
+      tts: "utility"
+    };
+    return categoryMap[moduleKey] || "misc";
+  }
+
   // 기존 메서드들 유지...
   getModuleEmoji(moduleKey) {
     const emojiMap = {
