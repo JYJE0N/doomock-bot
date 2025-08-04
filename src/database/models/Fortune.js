@@ -1,471 +1,482 @@
-// 🔧 Fortune.js - 78장 전체 덱을 지원하도록 스키마 수정
+// src/database/models/Fortune.js - 타로 운세 데이터 모델
 
 const mongoose = require("mongoose");
 
 /**
- * 🔮 타로 운세 사용자 기록 스키마
- * 컬렉션명: fortune_records
- *
- * 🎯 기능:
- * - 완전한 78장 타로 덱 지원 (메이저 22장 + 마이너 56장)
- * - 사용자별 타로 뽑기 기록 관리
- * - 일일 제한 체크 (하루 3회)
- * - 뽑기 히스토리 저장
- * - 두목봇 캐릭터 멘트 포함
+ * 🎴 카드 정보 스키마
  */
-
-// 개별 카드 뽑기 기록 서브스키마
-const DrawHistorySchema = new mongoose.Schema(
+const CardSchema = new mongoose.Schema(
   {
-    date: {
-      type: String, // YYYY-MM-DD 형태
+    id: {
+      type: Number,
       required: true
     },
-    cardId: {
-      type: Number,
-      required: true,
-      min: 0,
-      // ✅ 수정: 78장 전체 덱 지원 (최대 155까지)
-      // 메이저 아르카나: 0-21 (22장)
-      // 마이너 아르카나: 100-155 (56장, 4슈트 × 14장)
-      max: 155
-    },
-    cardName: {
-      type: String, // "The Fool", "Ace of Cups" 등
-      required: true,
-      maxLength: 50
-    },
-    koreanName: {
-      type: String, // "바보", "컵 에이스" 등
-      required: true,
-      maxLength: 30 // ✅ 수정: 마이너 아르카나 이름이 길어질 수 있음
-    },
-    isReversed: {
-      type: Boolean, // 정방향(false) / 역방향(true)
-      required: true,
-      default: false
-    },
-    drawType: {
+    name: {
       type: String,
-      required: true,
-      // ✅ 수정: 캘틱 크로스 추가
-      enum: ["single", "triple", "celtic"]
+      required: true
     },
-    position: {
-      type: String, // 3장: "past"|"present"|"future", 캘틱: "present"|"challenge" 등
-      required: false,
-      // ✅ 수정: 캘틱 크로스 포지션 추가
-      enum: [
-        // 트리플 카드 포지션
-        "past",
-        "present",
-        "future",
-        // 캘틱 크로스 포지션
-        "challenge",
-        "conscious",
-        "unconscious",
-        "approach",
-        "environment",
-        "hopes_fears",
-        "outcome"
-      ]
+    korean: {
+      type: String,
+      required: true
     },
-    // ✅ 추가: 아르카나 타입
     arcana: {
       type: String,
-      required: false,
       enum: ["major", "minor"],
-      default: "major"
+      required: true
     },
-    // ✅ 추가: 마이너 아르카나용 슈트 정보
     suit: {
       type: String,
-      required: false,
-      enum: ["Cups", "Wands", "Swords", "Pentacles"]
+      enum: ["wands", "cups", "swords", "pentacles", null]
     },
-    timestamp: {
-      type: Date,
-      required: true,
-      default: Date.now
-    },
-    // 두목봇 특별 멘트 저장
-    doomockComment: {
+    number: Number,
+    court: {
       type: String,
-      required: false,
-      maxLength: 300 // ✅ 수정: 길이 증가 (캘틱 크로스용)
+      enum: ["page", "knight", "queen", "king", null]
     },
-    // ✅ 추가: 캘틱 크로스용 질문
-    question: {
-      type: String,
-      required: false,
-      maxLength: 200
-    }
+    isReversed: {
+      type: Boolean,
+      default: false
+    },
+    position: String, // 포지션 (triple, celtic에서 사용)
+    positionName: String, // 포지션 이름
+    positionDescription: String // 포지션 설명
   },
-  {
-    _id: true // 서브도큐먼트도 ID 자동 생성
-  }
+  { _id: false }
 );
 
-// 메인 사용자 기록 스키마
-const FortuneUserSchema = new mongoose.Schema(
+/**
+ * 🔮 해석 정보 스키마
+ */
+const InterpretationSchema = new mongoose.Schema(
   {
-    // 🔑 사용자 식별
-    userId: {
-      type: Number,
-      required: true,
-      unique: true
-    },
-    userName: {
+    category: {
       type: String,
-      required: false,
-      maxLength: 50,
-      trim: true
+      default: "general"
     },
+    type: {
+      type: String,
+      required: true
+    },
+    cards: [
+      {
+        type: mongoose.Schema.Types.Mixed
+      }
+    ],
+    overall: String,
+    advice: String,
+    specialPatterns: [
+      {
+        type: {
+          type: String
+        },
+        message: String
+      }
+    ],
+    analysis: {
+      majorCount: Number,
+      reversedCount: Number,
+      suits: {
+        type: Map,
+        of: Number
+      },
+      elements: {
+        type: Map,
+        of: Number
+      }
+    }
+  },
+  { _id: false }
+);
 
-    // 📊 통계 정보
+/**
+ * 📋 뽑기 기록 스키마
+ */
+const DrawRecordSchema = new mongoose.Schema({
+  type: {
+    type: String,
+    enum: ["single", "triple", "celtic"],
+    required: true
+  },
+  question: {
+    type: String,
+    default: null,
+    maxLength: 500
+  },
+  cards: [CardSchema],
+  interpretation: InterpretationSchema,
+  timestamp: {
+    type: Date,
+    default: Date.now,
+    index: true
+  },
+  isSpecialTime: {
+    type: Boolean,
+    default: false
+  }
+});
+
+/**
+ * 📊 통계 스키마
+ */
+const StatsSchema = new mongoose.Schema(
+  {
     totalDraws: {
       type: Number,
-      required: true,
-      default: 0,
-      min: 0
+      default: 0
     },
-    lastDrawDate: {
-      type: String, // YYYY-MM-DD 형태 (일일 제한용)
-      required: false,
-      match: /^\d{4}-\d{2}-\d{2}$/
+    typeCount: {
+      single: { type: Number, default: 0 },
+      triple: { type: Number, default: 0 },
+      celtic: { type: Number, default: 0 }
     },
-    lastDrawTimestamp: {
-      type: Date,
-      required: false
+    cardFrequency: {
+      type: Map,
+      of: Number,
+      default: new Map()
     },
-    // ✅ 수정: 하루 3번으로 제한 증가 (캘틱 크로스용)
-    todayDrawCount: {
+    favoriteCard: {
+      id: Number,
+      name: String,
+      korean: String,
+      count: Number
+    },
+    lastWeekDraws: {
       type: Number,
-      required: true,
-      default: 0,
-      min: 0,
-      max: 3 // 하루 최대 3번
+      default: 0
     },
-
-    // 📈 선호도 분석 (78장 덱용 확장)
-    preferences: {
-      favoriteCards: [
-        {
-          cardId: {
-            type: Number,
-            min: 0,
-            max: 155 // ✅ 수정: 78장 덱 지원
-          },
-          cardName: String,
-          koreanName: String,
-          arcana: {
-            type: String,
-            enum: ["major", "minor"]
-          },
-          drawCount: {
-            type: Number,
-            default: 1
-          }
-        }
-      ],
-      mostReversed: {
-        type: Boolean, // 역방향을 더 많이 뽑는지
-        default: false
-      },
-      preferredDrawType: {
-        type: String,
-        enum: ["single", "triple", "celtic", "mixed"],
-        default: "mixed"
-      },
-      // ✅ 추가: 선호 아르카나
-      preferredArcana: {
-        type: String,
-        enum: ["major", "minor", "mixed"],
-        default: "mixed"
-      },
-      // ✅ 추가: 선호 슈트 (마이너 아르카나용)
-      favoriteSuit: {
-        type: String,
-        enum: ["Cups", "Wands", "Swords", "Pentacles", "mixed"],
-        default: "mixed"
-      }
+    longestStreak: {
+      type: Number,
+      default: 0
     },
-
-    // 📋 뽑기 히스토리
-    drawHistory: [DrawHistorySchema],
-
-    // 🌙 일일 제한 관련
-    dailyStats: {
-      currentStreak: {
-        // 연속 사용 일수
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      longestStreak: {
-        // 최장 연속 사용 일수
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      totalDaysUsed: {
-        // 총 사용 일수
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      // ✅ 추가: 78장 덱 관련 통계
-      majorArcanaDraws: {
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      minorArcanaDraws: {
-        type: Number,
-        default: 0,
-        min: 0
-      },
-      celticCrossCount: {
-        type: Number,
-        default: 0,
-        min: 0
-      }
+    currentStreak: {
+      type: Number,
+      default: 0
     },
+    lastStreakDate: Date
+  },
+  { _id: false }
+);
 
-    // ⏰ 타임스탬프 (자동 관리)
-    createdAt: {
+/**
+ * 🏆 업적 스키마
+ */
+const AchievementSchema = new mongoose.Schema(
+  {
+    type: {
+      type: String,
+      required: true
+    },
+    name: {
+      type: String,
+      required: true
+    },
+    description: String,
+    unlockedAt: {
       type: Date,
-      required: true,
       default: Date.now
     },
-    updatedAt: {
-      type: Date,
-      required: true,
-      default: Date.now
-    },
+    data: mongoose.Schema.Types.Mixed
+  },
+  { _id: false }
+);
 
-    // 🏷️ 메타데이터
-    version: {
-      type: Number,
-      required: true,
-      default: 2 // ✅ 수정: 78장 덱 지원 버전
-    },
-    isActive: {
-      type: Boolean,
-      required: true,
-      default: true
-    },
-
-    // 🌍 환경 정보
-    timezone: {
+/**
+ * 👤 FortuneUser 메인 스키마
+ */
+const FortuneUserSchema = new mongoose.Schema(
+  {
+    userId: {
       type: String,
       required: true,
-      default: "Asia/Seoul"
+      unique: true,
+      index: true
+    },
+
+    userName: {
+      type: String,
+      default: "사용자"
+    },
+
+    // 뽑기 기록
+    draws: {
+      type: [DrawRecordSchema],
+      default: []
+    },
+
+    // 통계
+    stats: {
+      type: StatsSchema,
+      default: () => ({})
+    },
+
+    // 설정
+    settings: {
+      notifications: {
+        type: Boolean,
+        default: true
+      },
+      preferredTime: {
+        type: String,
+        default: null
+      },
+      language: {
+        type: String,
+        default: "ko"
+      }
+    },
+
+    // 업적
+    achievements: {
+      type: [AchievementSchema],
+      default: []
+    },
+
+    // 특별 이벤트
+    specialEvents: [
+      {
+        type: {
+          type: String
+        },
+        date: Date,
+        data: mongoose.Schema.Types.Mixed
+      }
+    ],
+
+    // 메타 정보
+    firstDrawAt: {
+      type: Date,
+      default: null
+    },
+
+    lastDrawAt: {
+      type: Date,
+      default: null,
+      index: true
+    },
+
+    createdAt: {
+      type: Date,
+      default: Date.now
+    },
+
+    updatedAt: {
+      type: Date,
+      default: Date.now
     }
   },
   {
-    // Mongoose 옵션
-    collection: "fortune_records",
-    timestamps: {
-      createdAt: "createdAt",
-      updatedAt: "updatedAt"
-    },
-    versionKey: "version"
+    timestamps: true,
+    collection: "fortune_users"
   }
 );
 
 /**
- * 🔍 인덱스 설정 (78장 덱 최적화)
+ * 🔧 인덱스 설정
  */
-FortuneUserSchema.index({ lastDrawDate: 1 });
-FortuneUserSchema.index({ "drawHistory.date": 1 });
-FortuneUserSchema.index({ "drawHistory.cardId": 1 }); // ✅ 추가: 카드별 통계용
-FortuneUserSchema.index({ "drawHistory.arcana": 1 }); // ✅ 추가: 아르카나별 통계용
-FortuneUserSchema.index({ "drawHistory.timestamp": -1 });
-FortuneUserSchema.index({ totalDraws: -1 });
-FortuneUserSchema.index({ createdAt: -1 });
+FortuneUserSchema.index({ userId: 1, "draws.timestamp": -1 });
+FortuneUserSchema.index({ "stats.totalDraws": -1 });
+FortuneUserSchema.index({ lastDrawAt: -1 });
+FortuneUserSchema.index({ "draws.type": 1 });
 
 /**
- * 🎯 가상 필드 (Virtual Fields) - 78장 덱용 확장
+ * 🛠️ 인스턴스 메서드
  */
-// 오늘 뽑기 가능 여부
-FortuneUserSchema.virtual("canDrawToday").get(function () {
-  const today = new Date().toISOString().split("T")[0];
-  return this.lastDrawDate !== today || (this.todayDrawCount || 0) < 3;
-});
 
-// 오늘 남은 뽑기 횟수
-FortuneUserSchema.virtual("remainingDrawsToday").get(function () {
-  const today = new Date().toISOString().split("T")[0];
-  if (this.lastDrawDate !== today) {
-    return 3; // 새로운 날이면 3번 모두 가능
-  }
-  return Math.max(0, 3 - (this.todayDrawCount || 0));
-});
+// 오늘 뽑은 횟수 계산
+FortuneUserSchema.methods.getTodayDrawCount = function () {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
 
-// 메이저/마이너 아르카나 비율
-FortuneUserSchema.virtual("arcanaRatio").get(function () {
-  const total =
-    this.dailyStats.majorArcanaDraws + this.dailyStats.minorArcanaDraws;
-  if (total === 0) return { major: 0, minor: 0 };
+  return this.draws.filter((draw) => new Date(draw.timestamp) >= today).length;
+};
 
-  return {
-    major: Math.round((this.dailyStats.majorArcanaDraws / total) * 100),
-    minor: Math.round((this.dailyStats.minorArcanaDraws / total) * 100)
-  };
-});
+// 특정 카드 뽑은 횟수
+FortuneUserSchema.methods.getCardDrawCount = function (cardId) {
+  let count = 0;
+  this.draws.forEach((draw) => {
+    draw.cards.forEach((card) => {
+      if (card.id === cardId) count++;
+    });
+  });
+  return count;
+};
 
-/**
- * 🔧 인스턴스 메서드 - 78장 덱용 확장
- */
-// 뽑기 기록에 두목 멘트 추가 (78장 덱 지원)
-FortuneUserSchema.methods.recordDraw = function (cardData, userName) {
-  const today = new Date().toISOString().split("T")[0];
+// 가장 많이 나온 카드 찾기
+FortuneUserSchema.methods.findFavoriteCard = function () {
+  const cardCounts = new Map();
 
-  // 두목의 카드별 특별 멘트 생성
-  const doomockComment = this.constructor.getDoomockMessage(
-    "cardSpecific",
-    userName,
-    cardData
-  );
-
-  // 히스토리에 추가
-  this.drawHistory.push({
-    date: today,
-    cardId: cardData.cardId || cardData.id,
-    cardName: cardData.cardName || cardData.name,
-    koreanName: cardData.koreanName || cardData.korean,
-    isReversed: cardData.isReversed || false,
-    drawType: cardData.drawType || cardData.type,
-    position: cardData.position,
-    arcana: cardData.arcana, // ✅ 추가
-    suit: cardData.suit, // ✅ 추가
-    question: cardData.question, // ✅ 추가
-    doomockComment: doomockComment,
-    timestamp: new Date()
+  this.draws.forEach((draw) => {
+    draw.cards.forEach((card) => {
+      const key = `${card.id}_${card.name}`;
+      const current = cardCounts.get(key) || {
+        card: { id: card.id, name: card.name, korean: card.korean },
+        count: 0
+      };
+      current.count++;
+      cardCounts.set(key, current);
+    });
   });
 
-  // 통계 업데이트
-  this.totalDraws += 1;
-  this.lastDrawDate = today;
-  this.lastDrawTimestamp = new Date();
+  let favorite = null;
+  let maxCount = 0;
 
-  // ✅ 수정: 오늘 뽑기 횟수 업데이트
-  if (this.lastDrawDate === today) {
-    this.todayDrawCount = (this.todayDrawCount || 0) + 1;
-  } else {
-    this.todayDrawCount = 1;
-  }
+  cardCounts.forEach((data) => {
+    if (data.count > maxCount) {
+      maxCount = data.count;
+      favorite = data.card;
+    }
+  });
 
-  // ✅ 추가: 아르카나별 통계 업데이트
-  if (cardData.arcana === "major") {
-    this.dailyStats.majorArcanaDraws += 1;
-  } else if (cardData.arcana === "minor") {
-    this.dailyStats.minorArcanaDraws += 1;
-  }
-
-  // ✅ 추가: 캘틱 크로스 횟수 업데이트
-  if (cardData.drawType === "celtic" || cardData.type === "celtic") {
-    this.dailyStats.celticCrossCount += 1;
-  }
-
-  // 연속 사용 일수 계산
-  this.updateStreakCount(today);
-
-  // ✅ 추가: 선호 카드 업데이트
-  this.updateFavoriteCards(cardData.cardId || cardData.id, cardData);
-
-  return this.save();
+  return favorite ? { ...favorite, count: maxCount } : null;
 };
 
-// ✅ 수정: 선호 카드 업데이트 (78장 덱 지원)
-FortuneUserSchema.methods.updateFavoriteCards = function (cardId, cardData) {
-  const existing = this.preferences.favoriteCards.find(
-    (card) => card.cardId === cardId
-  );
+// 연속 뽑기 일수 계산
+FortuneUserSchema.methods.calculateStreak = function () {
+  if (this.draws.length === 0) return { current: 0, longest: 0 };
 
-  if (existing) {
-    existing.drawCount += 1;
-  } else {
-    this.preferences.favoriteCards.push({
-      cardId,
-      cardName: cardData.cardName || cardData.name,
-      koreanName: cardData.koreanName || cardData.korean,
-      arcana: cardData.arcana,
-      drawCount: 1
-    });
+  // 날짜별로 정렬
+  const dates = this.draws
+    .map((draw) => {
+      const date = new Date(draw.timestamp);
+      date.setHours(0, 0, 0, 0);
+      return date.getTime();
+    })
+    .filter((date, index, self) => self.indexOf(date) === index)
+    .sort((a, b) => b - a);
+
+  let currentStreak = 1;
+  let longestStreak = 1;
+
+  // 오늘 뽑았는지 확인
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (dates[0] !== today.getTime()) {
+    currentStreak = 0;
   }
 
-  // 상위 10개까지 유지 (78장 덱이므로 더 많이)
-  this.preferences.favoriteCards.sort((a, b) => b.drawCount - a.drawCount);
-  this.preferences.favoriteCards = this.preferences.favoriteCards.slice(0, 10);
+  // 연속 일수 계산
+  for (let i = 1; i < dates.length; i++) {
+    const diff = dates[i - 1] - dates[i];
+    const daysDiff = diff / (1000 * 60 * 60 * 24);
+
+    if (daysDiff === 1) {
+      if (currentStreak > 0) currentStreak++;
+      longestStreak = Math.max(longestStreak, currentStreak);
+    } else {
+      if (currentStreak > 0) {
+        longestStreak = Math.max(longestStreak, currentStreak);
+        currentStreak = 0;
+      }
+    }
+  }
+
+  return { current: currentStreak, longest: longestStreak };
 };
 
 /**
- * 🎭 정적 메서드 (Static Methods) - 78장 덱용 확장
+ * 🔧 정적 메서드
  */
-// ✅ 추가: 카드 ID 유효성 검사
-FortuneUserSchema.statics.isValidCardId = function (cardId) {
-  // 메이저 아르카나: 0-21
-  if (cardId >= 0 && cardId <= 21) return true;
 
-  // 마이너 아르카나: 100-155 (4슈트 × 14장)
-  if (cardId >= 100 && cardId <= 155) return true;
+// 일일 활성 사용자 수
+FortuneUserSchema.statics.getDailyActiveUsers = async function (
+  date = new Date()
+) {
+  const startOfDay = new Date(date);
+  startOfDay.setHours(0, 0, 0, 0);
 
-  return false;
+  const endOfDay = new Date(date);
+  endOfDay.setHours(23, 59, 59, 999);
+
+  return this.countDocuments({
+    "draws.timestamp": {
+      $gte: startOfDay,
+      $lte: endOfDay
+    }
+  });
 };
 
-// ✅ 추가: 인기 카드 통계 (78장 덱용)
-FortuneUserSchema.statics.getPopularCards = async function (limit = 20) {
-  return this.aggregate([
-    { $unwind: "$drawHistory" },
+// 인기 카드 통계
+FortuneUserSchema.statics.getPopularCards = async function (limit = 10) {
+  const result = await this.aggregate([
+    { $unwind: "$draws" },
+    { $unwind: "$draws.cards" },
     {
       $group: {
         _id: {
-          cardId: "$drawHistory.cardId",
-          cardName: "$drawHistory.cardName",
-          koreanName: "$drawHistory.koreanName",
-          arcana: "$drawHistory.arcana"
+          id: "$draws.cards.id",
+          name: "$draws.cards.name",
+          korean: "$draws.cards.korean"
         },
-        count: { $sum: 1 },
-        reversedCount: {
-          $sum: { $cond: ["$drawHistory.isReversed", 1, 0] }
-        }
+        count: { $sum: 1 }
       }
     },
     { $sort: { count: -1 } },
     { $limit: limit }
   ]);
-};
 
-// ✅ 추가: 아르카나별 통계
-FortuneUserSchema.statics.getArcanaStats = async function () {
-  return this.aggregate([
-    { $unwind: "$drawHistory" },
-    {
-      $group: {
-        _id: "$drawHistory.arcana",
-        count: { $sum: 1 },
-        uniqueUsers: { $addToSet: "$userId" }
-      }
-    },
-    {
-      $project: {
-        _id: 1,
-        count: 1,
-        uniqueUsers: { $size: "$uniqueUsers" }
-      }
-    }
-  ]);
+  return result.map((item) => ({
+    card: item._id,
+    count: item.count
+  }));
 };
 
 /**
- * 🔮 모델 생성 및 내보내기
+ * 🔧 미들웨어
+ */
+
+// 저장 전 처리
+FortuneUserSchema.pre("save", function (next) {
+  // 통계 업데이트
+  if (this.isModified("draws")) {
+    this.stats.totalDraws = this.draws.length;
+
+    // 타입별 카운트
+    this.stats.typeCount = {
+      single: this.draws.filter((d) => d.type === "single").length,
+      triple: this.draws.filter((d) => d.type === "triple").length,
+      celtic: this.draws.filter((d) => d.type === "celtic").length
+    };
+
+    // 좋아하는 카드 업데이트
+    const favorite = this.findFavoriteCard();
+    if (favorite) {
+      this.stats.favoriteCard = favorite;
+    }
+
+    // 연속 기록 업데이트
+    const streak = this.calculateStreak();
+    this.stats.currentStreak = streak.current;
+    this.stats.longestStreak = streak.longest;
+
+    // 첫 뽑기 시간 설정
+    if (!this.firstDrawAt && this.draws.length > 0) {
+      this.firstDrawAt = this.draws[this.draws.length - 1].timestamp;
+    }
+
+    // 마지막 뽑기 시간 업데이트
+    if (this.draws.length > 0) {
+      this.lastDrawAt = this.draws[0].timestamp;
+    }
+  }
+
+  next();
+});
+
+// 업데이트 시간 자동 갱신
+FortuneUserSchema.pre("findOneAndUpdate", function () {
+  this.set({ updatedAt: new Date() });
+});
+
+/**
+ * 🏷️ 모델 생성 및 내보내기
  */
 const FortuneUser = mongoose.model("FortuneUser", FortuneUserSchema);
 
 module.exports = {
   FortuneUser,
   FortuneUserSchema,
-  DrawHistorySchema
+  CardSchema,
+  InterpretationSchema,
+  DrawRecordSchema
 };
