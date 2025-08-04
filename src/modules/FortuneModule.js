@@ -97,9 +97,8 @@ class FortuneModule extends BaseModule {
         const state = this.userStates.get(userId);
 
         if (state.type === "waiting_question" && text) {
-          // 질문 입력 완료
-          await this.handleQuestionInput(bot, msg, state, text);
-          return true;
+          // ❗❗❗ 수정: handleQuestionInput의 결과를 반환하도록 변경 ❗❗❗
+          return await this.handleQuestionInput(bot, msg, state, text);
         }
       }
 
@@ -113,8 +112,8 @@ class FortuneModule extends BaseModule {
 
       for (const { cmd, _action } of commands) {
         if (text?.toLowerCase().includes(cmd)) {
-          await this.showMenu(bot, msg);
-          return true;
+          // 렌더링이 필요한 객체를 반환하도록 수정
+          return await this.showMenu(bot, msg);
         }
       }
 
@@ -180,15 +179,14 @@ class FortuneModule extends BaseModule {
    */
   async drawCard(bot, callbackQuery, subAction, params, moduleManager) {
     try {
-      const userId = getUserId(callbackQuery.from);
-      const userName = getUserName(callbackQuery.from);
+      const user = callbackQuery.from; // ❗❗❗ 수정: userId와 userName 대신 user 객체를 통째로 사용 ❗❗❗
       const fortuneType = params || "single";
 
-      logger.info(`🎴 카드 뽑기 요청: ${userName} - ${fortuneType}`);
+      logger.info(`🎴 카드 뽑기 요청: ${getUserName(user)} - ${fortuneType}`);
 
       // 🎯 개발자인 경우, 횟수 제한 검사 건너뛰기
-      if (!isDeveloper(callbackQuery.from)) {
-        const todayInfo = await this.getTodayDrawInfo(userId);
+      if (!isDeveloper(user)) {
+        const todayInfo = await this.getTodayDrawInfo(user.id);
         if (todayInfo.remainingDraws <= 0) {
           return {
             type: "daily_limit",
@@ -213,8 +211,8 @@ class FortuneModule extends BaseModule {
       }
 
       // 일일 제한 확인
-      const todayInfo = await this.getTodayDrawInfo(userId);
-      if (!isDeveloper(callbackQuery.from) && todayInfo.remainingDraws <= 0) {
+      const todayInfo = await this.getTodayDrawInfo(user.id);
+      if (!isDeveloper(user) && todayInfo.remainingDraws <= 0) {
         // ✨ 수정: daily_limit 타입 반환
         return {
           type: "daily_limit",
@@ -227,7 +225,7 @@ class FortuneModule extends BaseModule {
       }
 
       // 일반 카드 뽑기 진행
-      return await this.performDraw(userId, userName, fortuneType);
+      return await this.performDraw(user, fortuneType);
     } catch (error) {
       logger.error("FortuneModule.drawCard 오류:", error);
       return {
@@ -261,7 +259,7 @@ class FortuneModule extends BaseModule {
       logger.info(`❓ 질문 입력 대기: ${userName} - ${fortuneType}`);
 
       return {
-        type: "ask_question",
+        type: "question_prompt",
         module: "fortune",
         data: {
           userName,
@@ -287,8 +285,8 @@ class FortuneModule extends BaseModule {
    */
   async handleQuestionInput(bot, msg, state, question) {
     try {
-      const userId = getUserId(msg.from);
-      const { fortuneType, userName } = state;
+      const user = msg.from; // ❗❗❗ 수정: user 객체 사용 ❗❗❗
+      const { fortuneType } = state;
 
       // ✨ 질문 검증
       if (!question || question.length < 10) {
@@ -297,9 +295,8 @@ class FortuneModule extends BaseModule {
           module: "fortune",
           data: { message: "질문은 최소 10자 이상 입력해주세요." }
         };
-        // 렌더러로 에러 메시지 전송
         await this.sendToRenderer(errorResult, msg);
-        return; // 여기서 처리를 중단합니다.
+        return;
       }
       if (question.length > 100) {
         const errorResult = {
@@ -311,25 +308,20 @@ class FortuneModule extends BaseModule {
         return;
       }
 
-      logger.info(`💬 질문 입력 완료: ${userName} - "${question}"`);
-      this.userStates.delete(userId);
+      logger.info(`💬 질문 입력 완료: ${getUserName(user)} - "${question}"`);
+      this.userStates.delete(user.id);
 
       // 카드 뽑기 진행
-      const result = await this.performDraw(
-        userId,
-        userName,
-        fortuneType,
-        question
-      );
+      const result = await this.performDraw(user, fortuneType, question);
 
-      // 렌더러로 결과 전송
-      await this.sendToRenderer(result, msg);
+      return result;
     } catch (error) {
       logger.error("질문 입력 처리 오류:", error);
-      await bot.sendMessage(
-        msg.chat.id,
-        "질문 처리 중 오류가 발생했습니다. 다시 시도해주세요."
-      );
+      return {
+        type: "error",
+        module: "fortune",
+        data: { message: "질문 처리 중 오류가 발생했습니다." }
+      };
     }
   }
 
@@ -367,11 +359,12 @@ class FortuneModule extends BaseModule {
   /**
    * 🎴 실제 카드 뽑기 수행
    */
-  async performDraw(userId, userName, fortuneType, question = null) {
+  async performDraw(user, fortuneType, question = null) {
     try {
       // FortuneService 사용
       if (this.fortuneService) {
-        const result = await this.fortuneService.drawCard(userId, {
+        // ❗❗❗ 수정: userId 대신 user 객체를 전달 ❗❗❗
+        const result = await this.fortuneService.drawCard(user, {
           type: fortuneType,
           question: question
         });
@@ -387,21 +380,31 @@ class FortuneModule extends BaseModule {
           };
         }
 
-        // 캘틱 크로스 결과 캐싱
+        // 캘틱 크로스 결과 캐싱 및 타입 변경
         if (fortuneType === "celtic" && result.data) {
-          this.lastCelticResults.set(userId, {
+          this.lastCelticResults.set(user.id, {
             ...result.data,
-            userName,
+            userName: getUserName(user),
             timestamp: new Date()
           });
+          return {
+            type: "celtic_result",
+            module: "fortune",
+            data: {
+              ...result.data,
+              userName: getUserName(user),
+              fortuneType: this.config.fortuneTypes[fortuneType]
+            }
+          };
         }
 
+        // 싱글, 트리플은 기존대로 "draw_result" 타입 사용
         return {
           type: "draw_result",
           module: "fortune",
           data: {
             ...result.data,
-            userName,
+            userName: getUserName(user),
             fortuneType: this.config.fortuneTypes[fortuneType]
           }
         };
@@ -457,7 +460,7 @@ class FortuneModule extends BaseModule {
         bot,
         callbackQuery.message.chat.id,
         callbackQuery.message.message_id
-      ); // <- 이렇게 수정해주세요.
+      );
 
       return {
         type: "shuffle_result",

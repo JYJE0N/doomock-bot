@@ -3,7 +3,8 @@
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const { isDeveloper } = require("../utils/UserHelper"); // ✨ 추가
+// ❗❗❗ 수정: UserHelper에서 필요한 함수들을 직접 import 합니다. ❗❗❗
+const { isDeveloper, getUserId, getUserName } = require("../utils/UserHelper");
 
 // 🎴 타로 데이터 불러오기
 const {
@@ -45,6 +46,13 @@ class FortuneService extends BaseService {
       cardFrequency: {},
       popularTypes: {}
     };
+  }
+
+  /**
+   * 🗄️ 필요한 모델 정의
+   */
+  getRequiredModels() {
+    return ["Fortune"];
   }
 
   /**
@@ -105,10 +113,12 @@ class FortuneService extends BaseService {
   /**
    * 🎴 카드 뽑기 (메인 메서드)
    */
-  async drawCard(userId, options = {}) {
+  // ❗❗❗ 수정: userId 대신 user 객체를 받도록 변경 ❗❗❗
+  async drawCard(user, options = {}) {
     try {
       const { type = "single", question = null } = options;
       const drawTime = new Date();
+      const userId = getUserId(user); // user 객체에서 ID 추출
 
       logger.info(`🎴 카드 뽑기 요청: ${userId}, 타입: ${type}`);
 
@@ -125,12 +135,12 @@ class FortuneService extends BaseService {
       // 카드 뽑기 실행
       const drawResult = this.performCardDraw(type, question);
 
-      // 해석 생성
+      // ❗❗❗ 수정: userId 대신 user 객체를 전달 ❗❗❗
       const interpretation = await this.generateInterpretation(
         drawResult.cards,
         type,
         question,
-        userId
+        user
       );
 
       // DB 저장 (가능한 경우)
@@ -309,7 +319,8 @@ class FortuneService extends BaseService {
   /**
    * 💡 카드 해석 생성
    */
-  async generateInterpretation(cards, type, question, userId) {
+  // ❗❗❗ 수정: userId 대신 user 객체를 받도록 변경 ❗❗❗
+  async generateInterpretation(cards, type, question, user) {
     try {
       const category = InterpretationHelpers.detectQuestionCategory(question);
       const interpretation = {
@@ -356,12 +367,12 @@ class FortuneService extends BaseService {
       const analysis = TarotAnalytics.analyzeCardCombination(cards);
       interpretation.analysis = analysis;
 
-      // 개인화된 조언
+      // ❗❗❗ 수정: userId 대신 user 객체를 전달 ❗❗❗
       interpretation.advice = this.generatePersonalizedAdvice(
         cards,
         analysis,
         category,
-        await this.getUserName(userId)
+        user
       );
 
       return interpretation;
@@ -516,7 +527,9 @@ class FortuneService extends BaseService {
   /**
    * 🎯 개인화된 조언 생성
    */
-  generatePersonalizedAdvice(cards, analysis, category, userName) {
+  // ❗❗❗ 수정: userId 대신 user 객체를 받도록 변경 ❗❗❗
+  generatePersonalizedAdvice(cards, analysis, category, user) {
+    const userName = getUserName(user); // user 객체에서 이름 추출
     let advice = `${userName}님을 위한 조언:\n\n`;
 
     // 메이저 아르카나 비율에 따른 조언
@@ -560,11 +573,10 @@ class FortuneService extends BaseService {
    */
   async checkDailyLimit(userId) {
     try {
-      // ✨ 개발자 모드 확인 (UserHelper에서 userId 타입이 number로 처리되므로, String으로 변환)
       if (isDeveloper({ from: { id: String(userId) } })) {
         return {
           allowed: true,
-          isDeveloper: true, // ✨ 개발자 플래그 추가
+          isDeveloper: true,
           message: "개발자 모드: 횟수 제한 없음"
         };
       }
@@ -573,7 +585,6 @@ class FortuneService extends BaseService {
       const startOfDay = new Date(today);
       startOfDay.setHours(0, 0, 0, 0);
 
-      // 기본값 설정 (환경변수로 교체 가능)
       this.config.maxDrawsPerDay = this.config.maxDrawsPerDay || 3;
 
       if (this.Fortune) {
@@ -609,7 +620,6 @@ class FortuneService extends BaseService {
         }
       }
 
-      // DB 없는 경우 기본값
       return {
         allowed: true,
         remainingDraws: this.config.maxDrawsPerDay,
@@ -650,7 +660,6 @@ class FortuneService extends BaseService {
         timestamp: drawData.timestamp
       };
 
-      // Upsert 사용자 레코드
       await this.Fortune.findOneAndUpdate(
         { userId },
         {
@@ -888,16 +897,17 @@ class FortuneService extends BaseService {
    */
   generateDummyStats() {
     return {
-      totalDraws: Math.floor(Math.random() * 50) + 10,
-      favoriteCard: "별",
-      favoriteCardCount: Math.floor(Math.random() * 10) + 1,
+      totalDraws: 0,
+      favoriteCard: null,
+      favoriteCardCount: 0,
       typeStats: {
-        single: Math.floor(Math.random() * 20) + 5,
-        triple: Math.floor(Math.random() * 10) + 2,
-        celtic: Math.floor(Math.random() * 5) + 1
+        single: 0,
+        triple: 0,
+        celtic: 0
       },
-      todayDraws: Math.floor(Math.random() * 3),
-      weeklyDraws: Math.floor(Math.random() * 15) + 3
+      todayDraws: 0,
+      weeklyDraws: 0,
+      isDemo: true
     };
   }
 
@@ -1071,10 +1081,11 @@ class FortuneService extends BaseService {
       .length;
   }
 
-  async getUserName(userId) {
-    // 실제 구현에서는 사용자 정보를 가져옴
-    return "고객";
-  }
+  // ❗❗❗ 수정: 이 메서드는 이제 필요 없으므로 삭제합니다. ❗❗❗
+  // async getUserName(userId) {
+  //   // 실제 구현에서는 사용자 정보를 가져옴
+  //   return "고객";
+  // }
 
   /**
    * 🧹 정리 작업

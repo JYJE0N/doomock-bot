@@ -218,7 +218,8 @@ class FortuneRenderer extends BaseRenderer {
             text += `🔄 역방향 - `;
           }
 
-          text += this.getCardMeaning(card, drawType, position) + "\n\n";
+          // ❗❗❗ 오류 수정: 여기서 this.getCardMeaning 대신 interpretation 데이터를 사용합니다. ❗❗❗
+          text += `${interpretation.cards[index]?.meaning || "해석을 불러오는 중..."}\n\n`;
         });
 
         // 종합 해석
@@ -347,11 +348,11 @@ class FortuneRenderer extends BaseRenderer {
     const { fortuneTypeLabel } = data;
     let text = `❓ *${fortuneTypeLabel} 질문 입력*\n\n`;
     text += `알고 싶은 것에 대해 구체적으로 질문해주세요.\n`;
-    text += `(예: "현재 진행 중인 프로젝트를 성공적으로 이끌려면 어떻게 해야 할까요?")\n\n`;
+    text += `(_예: "현재 진행 중인 프로젝트를 성공적으로 이끌려면 어떻게 해야 할까요?_")\n\n`;
     text += `*질문은 10자 이상, 100자 이하로 입력해주세요.*`;
 
     const keyboard = this.createInlineKeyboard(
-      [[{ text: "❌ 취소", action: "menu" }]],
+      [[{ text: "🙅 그만두기", action: "menu" }]],
       this.moduleName
     );
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
