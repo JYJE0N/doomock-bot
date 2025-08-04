@@ -213,14 +213,21 @@ class SystemRenderer extends BaseRenderer {
 
     const buttons = [
       [
-        { text: "🔄 새로고침", callback_data: "system:status:" },
-        { text: "🏥 건강도", callback_data: "system:health:" }
+        { text: "📊 시스템 상태", callback_data: "system:status:" },
+        { text: "🏥 건강도 진단", callback_data: "system:health:" }
       ],
       [
         { text: "📱 모듈 관리", callback_data: "system:modules:" },
-        { text: "🏓 응답속도", callback_data: "system:ping:" }
+        { text: "🏓 응답속도 테스트", callback_data: "system:ping:" }
       ],
-      [{ text: "🏠 메인 메뉴", callback_data: "system:menu:" }]
+      [
+        // ✅ 수정: 시스템 전문 도움말은 별도 버튼으로
+        { text: "🔧 시스템 도움말", callback_data: "system:help:" }
+      ],
+      [
+        // ✅ 메인 메뉴로 돌아가기
+        { text: "🔙 메인 메뉴", callback_data: "navigation:main_menu:" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -292,7 +299,7 @@ class SystemRenderer extends BaseRenderer {
         { text: "📊 시스템 상태", callback_data: "system:status:" },
         { text: "🔄 재진단", callback_data: "system:health:" }
       ],
-      [{ text: "🏠 메인 메뉴", callback_data: "system:menu:" }]
+      [{ text: "🏠 메인 메뉴", callback_data: "navigation:main_menu:" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -421,7 +428,7 @@ class SystemRenderer extends BaseRenderer {
         { text: "📊 시스템 상태", callback_data: "system:status:" },
         { text: "📱 모듈 관리", callback_data: "system:modules:" }
       ],
-      [{ text: "🏠 메인 메뉴", callback_data: "system:menu:" }]
+      [{ text: "🏠 메인 메뉴", callback_data: "navigation:main_menu:" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -466,7 +473,7 @@ class SystemRenderer extends BaseRenderer {
         { text: "📊 시스템 상태", callback_data: "system:status:" },
         { text: "🔄 새로고침", callback_data: "system:modules:" }
       ],
-      [{ text: "🏠 메인 메뉴", callback_data: "system:menu:" }]
+      [{ text: "🏠 메인 메뉴", callback_data: "navigation:main_menu:" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -494,7 +501,7 @@ class SystemRenderer extends BaseRenderer {
         { text: "🔄 다시 테스트", callback_data: "system:ping:" },
         { text: "📊 시스템 상태", callback_data: "system:status:" }
       ],
-      [{ text: "🏠 메인 메뉴", callback_data: "system:menu:" }]
+      [{ text: "🏠 메인 메뉴", callback_data: "navigation:main_menu:" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -536,7 +543,9 @@ class SystemRenderer extends BaseRenderer {
     text += `${this.ui.separators.dot}🔊 음성 변환\n\n`;
     text += `효율적인 업무 관리를 도와드립니다! 💪`;
 
-    const buttons = [[{ text: "🏠 메인 메뉴", callback_data: "system:menu:" }]];
+    const buttons = [
+      [{ text: "🏠 메인 메뉴", callback_data: "navigation:main_menu:" }]
+    ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
@@ -555,10 +564,10 @@ class SystemRenderer extends BaseRenderer {
 
     const buttons = [
       [
-        { text: "🔄 재시도", callback_data: "system:menu:" },
+        { text: "🔄 재시도", callback_data: "navigation:main_menu:" },
         { text: "📊 시스템 상태", callback_data: "system:status:" }
       ],
-      [{ text: "🏠 메인 메뉴", callback_data: "system:menu:" }]
+      [{ text: "🏠 메인 메뉴", callback_data: "navigation:main_menu:" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);

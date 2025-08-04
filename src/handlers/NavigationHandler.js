@@ -259,7 +259,7 @@ class NavigationHandler {
   }
 
   /**
-   * 🎯 메인 콜백 처리 (SoC 적용!)
+   * 🎯 메인 콜백 처리 (수정 버전)
    */
   async handleCallback(ctx) {
     try {
@@ -271,8 +271,18 @@ class NavigationHandler {
 
       logger.debug(`🎯 콜백 수신: ${data}`);
 
-      // 시스템 메뉴 직접 처리 (최적화)
-      if (data === "system:menu") {
+      // ✅ 시스템 메뉴 직접 처리 (기존 + 확장)
+      if (data === "system:menu" || data === "system:menu:") {
+        return await this.showMainMenu(ctx);
+      }
+
+      // ✅ 추가: 도움말 콜백 직접 처리 (핵심!)
+      if (data === "system:help" || data === "system:help:") {
+        return await this.showGeneralHelp(ctx);
+      }
+
+      // ✅ 추가: 명시적인 메인 메뉴 요청 처리
+      if (data === "navigation:main_menu" || data === "navigation:main_menu:") {
         return await this.showMainMenu(ctx);
       }
 
@@ -280,6 +290,16 @@ class NavigationHandler {
       const { moduleKey, subAction, params } = this.parseCallbackData(data);
 
       logger.debug(`🎯 파싱 완료: ${moduleKey}.${subAction}(${params})`);
+
+      // ✅ 추가: system 모듈의 menu 액션도 메인 메뉴로 처리
+      if (moduleKey === "system") {
+        if (subAction === "menu") {
+          return await this.showMainMenu(ctx);
+        }
+        if (subAction === "help") {
+          return await this.showGeneralHelp(ctx);
+        }
+      }
 
       // 1️⃣ 모듈에서 비즈니스 로직 처리
       const result = await this.moduleManager.handleCallback(
@@ -536,6 +556,89 @@ class NavigationHandler {
       errorHandler: this.errorHandler?.getStatus() || null,
       markdownHelper: this.markdownHelper?.getStatus() || null
     };
+  }
+
+  /**
+   * ❓ 일반 도움말 표시 (새로 추가!)
+   */
+  async showGeneralHelp(ctx) {
+    try {
+      // ctx에서 사용자 정보 안전하게 가져오기
+      const from = ctx.from || ctx.callbackQuery?.from || ctx.message?.from;
+      if (!from) {
+        return this.errorHandler.handleMissingUserInfo(ctx);
+      }
+
+      const userName = getUserName(from);
+      const safeUserName = this.markdownHelper.escapeMarkdownV2(userName);
+
+      let text = `❓ **도움말**\n━━━━━━━━━━━━━━━━━━\n\n`;
+      text += `안녕하세요, ${safeUserName}님\\!\n\n`;
+
+      text += `🤖 **두목봇 v4\\.0\\.0**\n`;
+      text += `통합 업무 관리 시스템\n\n`;
+
+      // 기본 명령어
+      text += `**⌨️ 기본 명령어**\n`;
+      text += `• /start \\- 봇 시작 및 메인 메뉴\n`;
+      text += `• /help \\- 도움말 보기\n`;
+      text += `• /status \\- 시스템 상태 확인\n\n`;
+
+      // 사용 가능한 모듈
+      text += `**🎯 사용 가능한 기능**\n`;
+
+      try {
+        const enabledModules = getEnabledModules();
+        const visibleModules = enabledModules.filter(
+          (m) => m.showInMenu !== false
+        );
+
+        visibleModules.forEach((module) => {
+          text += `• ${module.icon} **${module.displayName}** \\- ${this.markdownHelper.escapeMarkdownV2(module.description)}\n`;
+        });
+      } catch (moduleError) {
+        text += `• 📝 할일 관리\n`;
+        text += `• ⏰ 포모도로 타이머\n`;
+        text += `• 🏢 근무시간 관리\n`;
+        text += `• 🔮 타로 운세\n`;
+      }
+
+      text += `\n더 자세한 정보가 필요하시면 각 기능의 도움말을 확인해주세요\\!\n`;
+      text += `문제가 있으시면 시스템 상태를 확인해보세요\\.`;
+
+      // 키보드 생성
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "🖥️ 시스템 관리", callback_data: "system:status:" },
+            { text: "📱 모듈 관리", callback_data: "system:modules:" }
+          ],
+          [{ text: "🏠 메인 메뉴", callback_data: "navigation:main_menu:" }]
+        ]
+      };
+
+      // 메시지 전송
+      const success = await this.markdownHelper.sendSafeMessage(ctx, text, {
+        reply_markup: keyboard,
+        parse_mode: "MarkdownV2"
+      });
+
+      if (!success) {
+        return this.errorHandler.handleMessageSendError(
+          ctx,
+          "도움말 전송 실패"
+        );
+      }
+
+      logger.debug("❓ 일반 도움말 표시 완료");
+      return true;
+    } catch (error) {
+      return this.errorHandler.handleUnexpectedError(
+        ctx,
+        error,
+        "showGeneralHelp"
+      );
+    }
   }
 
   /**

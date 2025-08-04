@@ -258,55 +258,66 @@ class SystemModule extends BaseModule {
    */
   async showSystemHealth(bot, callbackQuery, subAction, params, moduleManager) {
     try {
+      logger.debug("🏥 시스템 건강도 분석 시작...");
+
+      // 시스템 스냅샷 수집
       const snapshot = getCompleteSystemSnapshot();
-      const moduleStatuses = {};
 
-      for (const [key, module] of moduleManager.modules) {
-        moduleStatuses[key] = module.getStatus();
-      }
+      // 모듈 상태를 안전하게 수집
+      const moduleStatuses = this.collectModuleStatuses(moduleManager);
 
+      // 상태 요약 생성
       const statusSummary =
         StatusHelper.summarizeMultipleStatuses(moduleStatuses);
+
+      // 안전한 건강도 데이터 생성
+      const healthData = this.createSafeHealthData(snapshot, statusSummary);
+
+      logger.debug("✅ 시스템 건강도 분석 완료", {
+        overallScore: healthData.overall.score,
+        moduleCount: Object.keys(moduleStatuses).length,
+        recommendationCount: healthData.recommendations.length
+      });
 
       return {
         type: "health",
         module: "system",
-        data: {
-          // 전체 건강도
-          overall: {
-            score: snapshot.health.overall.score,
-            status: snapshot.health.overall.status,
-            timestamp: snapshot.meta.collectedAt
-          },
-
-          // 구성요소별 건강도
-          components: {
-            memory: snapshot.memory.health,
-            cpu: snapshot.cpu.health,
-            disk: snapshot.disk.health,
-            network: snapshot.network.health,
-            modules: statusSummary.overall
-          },
-
-          // 추천사항
-          recommendations: [
-            ...snapshot.health.recommendations,
-            ...statusSummary.recommendations
-          ],
-
-          // 상세 분석
-          analysis: {
-            strengths: this.analyzeStrengths(snapshot),
-            concerns: this.analyzeConcerns(snapshot, statusSummary),
-            trends: this.analyzeTrends()
-          }
-        }
+        data: healthData
       };
     } catch (error) {
       logger.error("시스템 건강도 조회 실패:", error);
+
+      // 폴백 데이터 제공
       return {
-        type: "error",
-        message: "건강도 정보를 확인할 수 없습니다."
+        type: "health",
+        module: "system",
+        data: {
+          overall: {
+            score: 0,
+            status: "오류",
+            timestamp: new Date().toISOString()
+          },
+          components: {
+            memory: { score: 0, status: "알 수 없음" },
+            cpu: { score: 0, status: "알 수 없음" },
+            disk: { score: 0, status: "알 수 없음" },
+            network: { score: 0, status: "알 수 없음" },
+            modules: "오류"
+          },
+          recommendations: [
+            "시스템 건강도를 확인할 수 없습니다. 시스템 재시작을 권장합니다."
+          ],
+          analysis: {
+            strengths: [],
+            concerns: ["시스템 건강도 분석 실패"],
+            trends: {
+              uptime: "알 수 없음",
+              callbackRate: 0,
+              activeUsers: 0,
+              trend: "unknown"
+            }
+          }
+        }
       };
     }
   }
@@ -525,6 +536,114 @@ class SystemModule extends BaseModule {
         data: { message: "핑 처리 중 오류가 발생했습니다." }
       };
     }
+  }
+
+  /**
+   * 🛡️ 안전한 시스템 스냅샷 검증
+   */
+  validateSystemSnapshot(snapshot) {
+    const defaultSnapshot = {
+      health: {
+        overall: { score: 0, status: "알 수 없음" },
+        recommendations: []
+      },
+      memory: { health: { score: 0, status: "알 수 없음" } },
+      cpu: { health: { score: 0, status: "알 수 없음" } },
+      disk: { health: { score: 0, status: "알 수 없음" } },
+      network: { health: { score: 0, status: "알 수 없음" } },
+      meta: { collectedAt: new Date().toISOString() }
+    };
+
+    return {
+      ...defaultSnapshot,
+      ...snapshot,
+      health: {
+        ...defaultSnapshot.health,
+        ...snapshot?.health,
+        overall: {
+          ...defaultSnapshot.health.overall,
+          ...snapshot?.health?.overall
+        }
+      }
+    };
+  }
+
+  /**
+   * 🔍 모듈 상태 수집 및 검증
+   */
+  collectModuleStatuses(moduleManager) {
+    const moduleStatuses = {};
+
+    try {
+      if (moduleManager && moduleManager.modules) {
+        for (const [key, module] of moduleManager.modules) {
+          if (key !== "system") {
+            // 자기 자신 제외
+            try {
+              const status = module.getStatus
+                ? module.getStatus()
+                : {
+                    moduleName: key,
+                    isInitialized: !!module.isInitialized,
+                    actionCount: 0
+                  };
+              moduleStatuses[key] = status;
+            } catch (moduleError) {
+              logger.warn(`모듈 ${key} 상태 수집 실패:`, moduleError.message);
+              moduleStatuses[key] = {
+                moduleName: key,
+                isInitialized: false,
+                error: moduleError.message
+              };
+            }
+          }
+        }
+      }
+    } catch (error) {
+      logger.error("모듈 상태 수집 중 오류:", error);
+    }
+
+    return moduleStatuses;
+  }
+
+  /**
+   * 📊 건강도 데이터 안전 생성
+   */
+  createSafeHealthData(snapshot, statusSummary) {
+    // 검증된 스냅샷 사용
+    const safeSnapshot = this.validateSystemSnapshot(snapshot);
+
+    // 안전한 추천사항 생성
+    const systemRecommendations = Array.isArray(
+      safeSnapshot.health.recommendations
+    )
+      ? safeSnapshot.health.recommendations
+      : [];
+
+    const moduleRecommendations = Array.isArray(statusSummary?.recommendations)
+      ? statusSummary.recommendations
+      : StatusHelper.generateRecommendations(statusSummary || {});
+
+    return {
+      overall: {
+        score: safeSnapshot.health.overall.score,
+        status: safeSnapshot.health.overall.status,
+        timestamp: safeSnapshot.meta.collectedAt
+      },
+      components: {
+        memory: safeSnapshot.memory.health,
+        cpu: safeSnapshot.cpu.health,
+        disk: safeSnapshot.disk.health,
+        network: safeSnapshot.network.health,
+        modules: statusSummary?.overall || "알 수 없음"
+      },
+      recommendations: [...systemRecommendations, ...moduleRecommendations],
+      analysis: {
+        strengths: this.analyzeStrengths(safeSnapshot),
+        concerns: this.analyzeConcerns(safeSnapshot, statusSummary || {}),
+        trends: this.analyzeTrends()
+      }
+    };
   }
 
   /**
