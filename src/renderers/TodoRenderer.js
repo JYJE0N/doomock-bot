@@ -177,6 +177,9 @@ class TodoRenderer extends BaseRenderer {
   /**
    * 📋 할일 목록 렌더링 - 더블 라인 레이아웃
    */
+  /**
+   * 📋 할일 목록 렌더링 - 더블 라인 레이아웃
+   */
   async renderTodoList(data, ctx) {
     const { todos, currentPage, totalPages, totalCount, enableReminders } =
       data;
