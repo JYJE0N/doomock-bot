@@ -55,14 +55,14 @@ class FortuneRenderer extends BaseRenderer {
     const { userName, todayCount, maxDraws, canDraw, fortuneTypes } = data;
 
     let text = `🔮 *타로 카드 운세*\n\n`;
-    text += `신비로운 타로의 세계에 오신 것을 환영합니다, ${userName}님!\n\n`;
+    text += `${userName}님!\n\n 신비로운 타로의 세계에\n\n 오신 것을 환영합니다.\n\n`;
 
     text += `📊 *오늘의 현황*\n`;
     text += `• 뽑은 횟수: ${todayCount}/${maxDraws}번\n`;
 
     if (canDraw) {
       text += `• 남은 횟수: ${maxDraws - todayCount}번\n\n`;
-      text += `어떤 운세를 알아보시겠어요?`;
+      text += `_어떤 운세를 알아보시겠어요?_`;
     } else {
       text += `• 오늘은 더 이상 뽑을 수 없습니다\n\n`;
       text += `내일 다시 새로운 운세를 확인해보세요! 🌅`;
