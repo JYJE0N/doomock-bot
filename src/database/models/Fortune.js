@@ -424,9 +424,7 @@ FortuneUserSchema.statics.getPopularCards = async function (limit = 10) {
 /**
  * 🔧 미들웨어
  */
-
-// ❗❗❗ 수정: 불필요하고 문제를 일으키는 pre('save') 훅을 삭제합니다. ❗❗❗
-
+ 
 // 업데이트 시간 자동 갱신
 FortuneUserSchema.pre("findOneAndUpdate", function () {
   this.set({ updatedAt: new Date() });
@@ -435,8 +433,12 @@ FortuneUserSchema.pre("findOneAndUpdate", function () {
 /**
  * 🏷️ 모델 생성 및 내보내기
  */
-// const Fortune = mongoose.model("Fortune", FortuneUserSchema);
+const FortuneUser = mongoose.model("FortuneUser", FortuneUserSchema);
 
 module.exports = {
-  Fortune: mongoose.model("Fortune", FortuneUserSchema)
+  FortuneUser,
+  FortuneUserSchema,
+  CardSchema,
+  InterpretationSchema,
+  DrawRecordSchema
 };
