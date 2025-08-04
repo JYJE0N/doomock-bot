@@ -182,21 +182,16 @@ class FortuneRenderer extends BaseRenderer {
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
-  /**
-   * ✨ 운세 결과 렌더링 (새 데이터 구조 호환!)
-   */
   async renderDrawResult(data, ctx) {
-    // 🔧 새 FortuneService 데이터 구조 처리
     const {
       cards,
       type: drawType,
-      _timestamp,
       fortuneType,
       remaining,
       remainingDraws,
       totalDraws,
       message,
-      isDemo // 더미 데이터 표시용
+      isDemo
     } = data;
 
     let text = `✨ *${fortuneType?.label || this.getFortuneTypeName(drawType)} 결과*\n\n`;
@@ -216,14 +211,16 @@ class FortuneRenderer extends BaseRenderer {
       text += `🔮 *${cards.length}카드 리딩*\n\n`;
 
       if (drawType === "triple") {
-        const positions = ["과거", "현재", "미래"];
+        const positions = ["과거", "현재", "미래"]; // ✅ 한글로 변경
         cards.forEach((card, index) => {
           const position =
             card.position || positions[index] || `${index + 1}번째`;
+
+          // ✅ 한글 위치명 표시
           text += `*${position}*: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
 
           if (card.isReversed) {
-            text += `🔄 역방향 - `;
+            text += `🔄 역방향 - `; // ✅ 한글로 변경
           }
 
           // 간단한 의미 추가
@@ -250,8 +247,11 @@ class FortuneRenderer extends BaseRenderer {
       text += `\n`;
 
       if (card.isReversed) {
-        text += `🔄 *역방향 카드*\n`;
+        text += `🔄 *역방향 카드*\n`; // ✅ 한글로 변경
         text += `평소와는 다른 관점에서 해석해보세요.\n\n`;
+      } else {
+        text += `⬆️ *정방향 카드*\n`; // ✅ 정방향도 명시
+        text += `카드의 기본 의미가 그대로 적용됩니다.\n\n`;
       }
 
       text += `💫 *의미*: ${this.getCardMeaning(card, drawType)}\n\n`;
@@ -259,12 +259,8 @@ class FortuneRenderer extends BaseRenderer {
     }
 
     // 남은 횟수 표시
-    const remainingCount = remainingDraws ?? remaining ?? 0;
-    text += `💫 *남은 횟수*: ${remainingCount}번`;
-
-    if (totalDraws) {
-      text += ` (총 ${totalDraws}번 뽑으셨습니다)`;
-    }
+    const remainingCount = remainingDraws ?? remaining ?? "?";
+    text += `🔔 *남은 횟수*: ${remainingCount}번 (총 ${totalDraws || 0}번 뽑음)`;
 
     const buttons = [
       [
@@ -273,8 +269,9 @@ class FortuneRenderer extends BaseRenderer {
       ],
       [
         { text: "📊 통계", action: "stats" },
-        { text: "🔙 메뉴", action: "menu" }
-      ]
+        { text: "📋 기록", action: "history" }
+      ],
+      [{ text: "🔙 메뉴", action: "menu" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
@@ -286,49 +283,64 @@ class FortuneRenderer extends BaseRenderer {
    * 🔮 캘틱 크로스 결과 렌더링
    */
   async renderCelticResult(data, ctx) {
-    const { question, cards, _fortuneType, message, isDemo } = data;
+    const { cards, question, message } = data;
 
-    let text = `🔮 *캘틱 크로스 완성*\n\n`;
+    let text = `✨ *캘틱 크로스 결과*\n\n`;
 
-    if (isDemo) {
-      text += `🎭 *데모 모드*\n\n`;
+    if (question) {
+      text += `❓ *질문*: ${question}\n\n`;
     }
 
-    text += `*질문*: "${question}"\n\n`;
-
-    // 두목봇 멘트
     if (message) {
       text += `💬 ${message}\n\n`;
     }
 
+    text += `🔮 *10장의 카드가 펼쳐졌습니다*\n\n`;
+
+    // 캘틱 크로스 위치별 표시
     if (cards && cards.length === 10) {
-      text += `✨ *10장 카드 배치 완료*\n\n`;
+      // ✅ 한글 위치명 사용
+      const positionNames = {
+        present: "현재 상황",
+        challenge: "도전/장애물",
+        past: "원인/과거",
+        future: "가능한 미래",
+        conscious: "의식적 접근",
+        unconscious: "무의식적 영향",
+        approach: "당신의 접근법",
+        environment: "외부 환경",
+        hopes_fears: "희망과 두려움",
+        outcome: "최종 결과"
+      };
 
-      // 카드 요약 (5장씩 나누어 표시)
-      text += `🎴 *카드 배치 (1-5)*\n`;
-      for (let i = 0; i < 5; i++) {
-        const card = cards[i];
-        const reversed = card.isReversed ? " (역방향)" : "";
-        const positionName = card.positionName || `위치 ${i + 1}`;
-        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${card.korean || card.name}${reversed}\n`;
-      }
+      cards.forEach((card, index) => {
+        const position = card.position || Object.keys(positionNames)[index];
+        const positionName =
+          positionNames[position] || card.positionName || `${index + 1}번째`;
 
-      text += `\n🎴 *카드 배치 (6-10)*\n`;
-      for (let i = 5; i < 10; i++) {
-        const card = cards[i];
-        const reversed = card.isReversed ? " (역방향)" : "";
-        const positionName = card.positionName || `위치 ${i + 1}`;
-        text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${card.korean || card.name}${reversed}\n`;
-      }
+        text += `${index + 1}. *${positionName}*\n`;
+        text += `   ${card.emoji || "🎴"} ${card.korean || card.name}`;
 
-      text += `\n📖 *상세 해석을 보려면 아래 버튼을 누르세요*`;
+        if (card.isReversed) {
+          text += ` (역방향)`; // ✅ 한글로 변경
+        } else {
+          text += ` (정방향)`; // ✅ 정방향도 명시
+        }
+
+        text += `\n\n`;
+      });
     }
 
+    text += `💫 *해석을 원하시면 아래 버튼을 눌러주세요*`;
+
     const buttons = [
-      [{ text: "📖 상세 해석 보기", action: "celtic_detail", params: "show" }],
       [
-        { text: "🔮 다른 질문", action: "draw", params: "celtic" },
-        { text: "🎴 간단한 운세", action: "draw" }
+        { text: "📋 상세 해석", action: "celtic_detail" },
+        { text: "🔮 새 질문", action: "draw", params: "celtic" }
+      ],
+      [
+        { text: "📊 통계", action: "stats" },
+        { text: "📋 기록", action: "history" }
       ],
       [{ text: "🔙 메뉴", action: "menu" }]
     ];
@@ -601,25 +613,27 @@ ${errorMessage}
   /**
    * 카드 의미 생성
    */
-  getCardMeaning(card, fortuneType, position = null) {
-    // 메이저 아르카나 의미
-    const majorMeanings = {
-      "The Fool": "새로운 시작과 순수한 가능성",
-      바보: "새로운 시작과 순수한 가능성",
-      "The Magician": "의지력과 창조적 능력",
-      마법사: "의지력과 창조적 능력",
-      "The Star": "희망과 영감, 밝은 미래",
-      별: "희망과 영감, 밝은 미래"
+  getCardMeaning(card, drawType, position = null) {
+    // 예시 의미들
+    const meanings = {
+      "The Fool": {
+        정방향: "새로운 시작, 모험, 순수함",
+        역방향: "무모함, 경솔함, 위험"
+      },
+      "The Magician": {
+        정방향: "의지력, 창조성, 능력 발휘",
+        역방향: "조작, 속임수, 재능 낭비"
+      }
+      // ... 더 많은 카드들
     };
 
-    const cardKey = card.korean || card.name;
-    const meaning = majorMeanings[cardKey] || "새로운 기회와 변화";
+    const cardMeanings = meanings[card.name] || {
+      정방향: "긍정적인 변화와 발전",
+      역방향: "주의와 성찰이 필요한 시기"
+    };
 
-    if (position) {
-      return `${position}에서 ${meaning}을 보여줍니다.`;
-    }
-
-    return meaning;
+    const direction = card.isReversed ? "역방향" : "정방향";
+    return cardMeanings[direction];
   }
 
   /**

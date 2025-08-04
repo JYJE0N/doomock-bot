@@ -99,6 +99,46 @@ class AnimationHelper {
       return null;
     }
   }
+  /**
+   * 🎴 카드 뽑기 애니메이션 (타로 카드용)
+   * FortuneModule에서 사용하는 카드 뽑기 애니메이션
+   */
+  static async performDraw(bot, chatId, messageId = null) {
+    try {
+      logger.debug("🎬 performDraw 시작", {
+        hasBotParam: !!bot,
+        chatId,
+        messageId
+      });
+
+      const validBot = this.validateAndNormalizeBot(bot);
+      if (!validBot) {
+        logger.warn(
+          "AnimationHelper.performDraw: 유효하지 않은 bot 객체 - 애니메이션 건너뜀"
+        );
+        return "animation_skipped";
+      }
+
+      const drawFrames = [
+        "🎴 타로 카드를 준비하고 있습니다\\.\\.\\.",
+        "🔮 우주의 에너지를 모으는 중\\.\\.\\.",
+        "✨ 당신을 위한 카드를 선택하는 중\\.\\.\\.",
+        "🌟 카드의 메시지를 해석하는 중\\.\\.\\.",
+        "🎴 카드를 뽑았습니다\\! 결과를 확인하세요\\."
+      ];
+
+      logger.debug("🎬 카드 뽑기 애니메이션 시작");
+
+      return await this.playFrameAnimation(validBot, chatId, drawFrames, {
+        messageId,
+        frameDelay: 700,
+        parseMode: "MarkdownV2"
+      });
+    } catch (error) {
+      logger.error("AnimationHelper.performDraw 오류:", error);
+      return "animation_error";
+    }
+  }
 
   /**
    * 🔍 객체에서 Telegram API 깊이 탐색

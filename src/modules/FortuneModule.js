@@ -178,10 +178,14 @@ class FortuneModule extends BaseModule {
 
         // 캘틱 크로스는 질문이 필요
         if (fortuneType === "celtic") {
+          // ✅ 올바른 상태 설정
           this.userStates.set(userId, {
-            step: "waiting_question",
-            fortuneType: "celtic"
+            step: "waiting_question", // action이 아닌 step 사용
+            fortuneType: "celtic",
+            timestamp: Date.now()
           });
+
+          logger.info(`🔮 캘틱 크로스 질문 대기 상태 설정: ${userName}`);
 
           return {
             type: "question_prompt",
@@ -194,7 +198,10 @@ class FortuneModule extends BaseModule {
         }
 
         // 🎬 카드 뽑기 애니메이션 실행
-        const animationMessage = await AnimationHelper.performDraw(bot, chatId);
+        const animationMessageId = await AnimationHelper.performDraw(
+          bot,
+          chatId
+        );
 
         // 카드 뽑기 실행
         const result = await this.performDraw(
@@ -204,24 +211,28 @@ class FortuneModule extends BaseModule {
           userName
         );
 
+        // ✨ 신비로운 효과: 애니메이션 메시지 삭제
+        if (
+          animationMessageId &&
+          animationMessageId !== "animation_skipped" &&
+          animationMessageId !== "animation_error"
+        ) {
+          try {
+            // 잠시 대기 후 삭제 (마지막 프레임을 볼 수 있도록)
+            await new Promise((resolve) => setTimeout(resolve, 1000));
+            await bot.telegram.deleteMessage(chatId, animationMessageId);
+            logger.debug("✨ 카드 뽑기 애니메이션이 신비롭게 사라짐");
+          } catch (deleteError) {
+            logger.warn(
+              "카드 뽑기 애니메이션 메시지 삭제 실패:",
+              deleteError.message
+            );
+            // 삭제 실패해도 계속 진행
+          }
+        }
+
         if (!result.success) {
           logger.error("❌ performDraw 실패:", result);
-
-          // 실패 애니메이션 표시
-          if (animationMessage && bot && bot.telegram) {
-            try {
-              await bot.telegram.editMessageText(
-                chatId,
-                animationMessage,
-                undefined,
-                "❌ 카드 뽑기에 실패했습니다\\. 다시 시도해주세요\\.",
-                { parse_mode: "MarkdownV2" }
-              );
-            } catch (editError) {
-              logger.warn("실패 메시지 수정 실패:", editError.message);
-            }
-          }
-
           return {
             type: "error",
             module: "fortune",
@@ -237,7 +248,7 @@ class FortuneModule extends BaseModule {
           module: "fortune",
           data: {
             ...result.data,
-            isDeveloper // 렌더러에서 활용 가능
+            isDeveloper
           }
         };
       }
@@ -264,8 +275,29 @@ class FortuneModule extends BaseModule {
     }
   }
 
+  // 추가: 유틸리티 함수로 애니메이션 삭제 로직 분리 (선택사항)
+  async deleteAnimationMessage(bot, chatId, messageId, delay = 800) {
+    if (
+      !messageId ||
+      messageId === "animation_skipped" ||
+      messageId === "animation_error"
+    ) {
+      return false;
+    }
+
+    try {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+      await bot.telegram.deleteMessage(chatId, messageId);
+      logger.debug("✨ 애니메이션 메시지가 신비롭게 사라짐");
+      return true;
+    } catch (error) {
+      logger.warn("애니메이션 메시지 삭제 실패:", error.message);
+      return false;
+    }
+  }
+
   /**
-   * 🔄 카드 셔플 (표준 매개변수 5개 - 수정됨!)
+   * 🔄 카드 셔플 (애니메이션 메시지 삭제 추가)
    */
   async shuffleCards(bot, callbackQuery, subAction, params, moduleManager) {
     try {
@@ -276,12 +308,12 @@ class FortuneModule extends BaseModule {
       logger.debug(`🔄 카드 셔플 시작: ${userName}`);
 
       // 🎬 셔플 애니메이션 실행
-      const animationMessage = await AnimationHelper.performShuffle(
+      const animationMessageId = await AnimationHelper.performShuffle(
         bot,
         chatId
       );
 
-      // 셔플 처리 (새 FortuneService 호환)
+      // 셔플 처리
       let result;
       try {
         result = this.fortuneService
@@ -298,6 +330,23 @@ class FortuneModule extends BaseModule {
         };
       }
 
+      // ✨ 신비로운 효과: 애니메이션 메시지 삭제
+      if (
+        animationMessageId &&
+        animationMessageId !== "animation_skipped" &&
+        animationMessageId !== "animation_error"
+      ) {
+        try {
+          // 잠시 대기 후 삭제 (마지막 프레임을 볼 수 있도록)
+          await new Promise((resolve) => setTimeout(resolve, 800));
+          await bot.telegram.deleteMessage(chatId, animationMessageId);
+          logger.debug("✨ 셔플 애니메이션이 신비롭게 사라짐");
+        } catch (deleteError) {
+          logger.warn("애니메이션 메시지 삭제 실패:", deleteError.message);
+          // 삭제 실패해도 계속 진행
+        }
+      }
+
       logger.success(`✅ 카드 셔플 완료: ${userName}`);
 
       return {
@@ -305,8 +354,7 @@ class FortuneModule extends BaseModule {
         module: "fortune",
         data: {
           success: result.success,
-          message: result.message || "카드 셔플이 완료되었습니다.",
-          animationMessageId: animationMessage // 렌더러에서 활용할 수 있도록
+          message: result.message || "카드 셔플이 완료되었습니다."
         }
       };
     } catch (error) {
@@ -627,15 +675,24 @@ class FortuneModule extends BaseModule {
   }
 
   /**
-   * 💬 메시지 처리 (커스텀 질문 입력)
+   * 💬 메시지 처리 (캘틱 크로스 질문 입력)
    */
   async onHandleMessage(bot, msg) {
     try {
       const userId = getUserId(msg.from);
       const userState = this.userStates.get(userId);
 
-      if (!userState || userState.action !== "waiting_question") {
-        return; // 이 모듈에서 처리할 메시지가 아님
+      logger.debug(`🔮 FortuneModule.onHandleMessage 호출:`, {
+        userId,
+        hasUserState: !!userState,
+        userState: userState,
+        messageText: msg.text
+      });
+
+      // ✅ 수정: action이 아닌 step 확인
+      if (!userState || userState.step !== "waiting_question") {
+        logger.debug(`🔮 FortuneModule: 질문 대기 상태가 아님`);
+        return false; // false를 반환해야 다른 모듈이 처리할 수 있음
       }
 
       const question = msg.text?.trim();
@@ -658,16 +715,25 @@ class FortuneModule extends BaseModule {
 
       // 캘틱 크로스 질문 운세 뽑기
       const isCeltic = userState?.fortuneType === "celtic";
-      const userName = "User"; // 메시지에서는 안전한 표시명 사용
+      const userName = getUserName(msg.from);
+      const safeUserName =
+        userName && !/^\d+$/.test(userName) ? userName : "친구";
+
+      logger.info(
+        `🔮 ${isCeltic ? "캘틱 크로스" : "싱글 카드"} 질문 운세 시작: ${safeUserName}`
+      );
+      logger.debug(`🔮 질문: ${question}`);
+
       const result = await this.performDraw(
         userId,
         isCeltic ? "celtic" : "single",
         question,
-        userName
+        safeUserName
       );
 
       // 상태 초기화
       this.userStates.delete(userId);
+      logger.debug(`🔮 사용자 상태 초기화 완료`);
 
       if (!result.success) {
         return {
@@ -681,7 +747,7 @@ class FortuneModule extends BaseModule {
       }
 
       return {
-        type: isCeltic ? "celtic_result" : "custom_result",
+        type: isCeltic ? "celtic_result" : "draw_result",
         module: "fortune",
         data: {
           ...result.data,
@@ -693,6 +759,11 @@ class FortuneModule extends BaseModule {
       };
     } catch (error) {
       logger.error("FortuneModule.onHandleMessage 오류:", error);
+
+      // 에러 발생 시 상태 정리
+      const userId = getUserId(msg.from);
+      this.userStates.delete(userId);
+
       return {
         type: "error",
         module: "fortune",

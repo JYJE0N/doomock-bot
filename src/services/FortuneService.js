@@ -162,8 +162,12 @@ class FortuneService extends BaseService {
 
       // 개발자 모드 메시지 추가
       const message = canDraw.isDeveloper
-        ? `👑 ${this.generateDoomockComment("draw", savedResult.userName, drawResult)}`
-        : this.generateDoomockComment("draw", savedResult.userName, drawResult);
+        ? `👑 ${this.generateDoomockComment("draw", savedResult.displayName, drawResult)}`
+        : this.generateDoomockComment(
+            "draw",
+            savedResult.displayName,
+            drawResult
+          );
 
       return {
         success: true,
@@ -201,7 +205,7 @@ class FortuneService extends BaseService {
       if (!userRecord) {
         userRecord = new Fortune({
           userId,
-          userName: `User${userId}`,
+          userName: `User`, // ID를 제거하고 'User'만 사용
           totalDraws: 0,
           drawHistory: [],
           lastDrawDate: null,
@@ -210,7 +214,7 @@ class FortuneService extends BaseService {
         });
 
         await userRecord.save();
-        logger.info(`🆕 새 Fortune 사용자 생성: ${userId}`);
+        logger.info(`🆕 새 Fortune 사용자 생성: [MASKED]`); // 로그에서도 ID 마스킹
       }
 
       return userRecord;
@@ -220,9 +224,6 @@ class FortuneService extends BaseService {
     }
   }
 
-  /**
-   * 📅 일일 제한 체크
-   */
   /**
    * 📅 일일 제한 체크 (개발자 우회 추가)
    */
@@ -642,24 +643,6 @@ class FortuneService extends BaseService {
     }
   }
 
-  // /**
-  //  * 🔄 카드 덱 셔플
-  //  */
-  // async shuffleDeck(userId) {
-  //   try {
-  //     return {
-  //       success: true,
-  //       message: this.generateDoomockComment("shuffle", `User${userId}`)
-  //     };
-  //   } catch (error) {
-  //     logger.error("❌ 덱 셔플 오류:", error);
-  //     return {
-  //       success: false,
-  //       message: "카드 셔플 중 오류가 발생했습니다."
-  //     };
-  //   }
-  // }
-
   /**
    * 📊 사용자 통계 조회
    */
@@ -815,30 +798,31 @@ class FortuneService extends BaseService {
   /**
    * 💬 두목봇 멘트 생성
    */
-  generateDoomockComment(type, userId = "User", cardData = null) {
-    const name = userId || "User";
+  generateDoomockComment(type, userName = "User", cardData = null) {
+    // userName이 숫자 ID인지 확인하고 마스킹
+    const displayName = /^\d+$/.test(userName) ? "친구" : userName || "친구";
 
     const messages = {
       draw: [
-        `👔 두목: '${name}, 타로가 답을 주었네요!'`,
-        `💼 두목: '${name}, 카드의 메시지를 잘 새겨들으세요!'`,
-        `☕두목: '${name}, 심호흡하고 카드를 해석해보세요!'`,
-        `📊 두목: '${name}, 데이터만큼 정확한 타로의 지혜입니다!'`,
-        `🎯 두목: '${name}, 직감을 믿고 받아들이세요!'`
+        `🔮 '${displayName}, 타로가 답을 주었네요!'`,
+        `🔮 '${displayName}, 카드의 메시지를 잘 새겨들으세요!'`,
+        `🔮 '${displayName}, 심호흡하고 카드를 해석해보세요!'`,
+        `🔮 '${displayName}, 데이터만큼 정확한 타로의 지혜입니다!'`,
+        `🔮 '${displayName}, 직감을 믿고 받아들이세요!'`
       ],
       shuffle: [
-        `👔 두목: '${name}, 우주의 에너지로 카드를 정화했습니다!'`,
-        `💼 두목: '${name}, 새로운 기운이 카드에 깃들었어요!'`,
-        `🔄 두목: '${name}, 이제 진정한 메시지를 받을 준비가 되었습니다!'`
+        `🔮 '${displayName}, 우주의 에너지로 카드를 정화했습니다!'`,
+        `🔮 '${displayName}, 새로운 기운이 카드에 깃들었어요!'`,
+        `🔮 '${displayName}, 이제 진정한 메시지를 받을 준비가 되었습니다!'`
       ]
     };
 
     // 캘틱 크로스 특별 멘트
     if (cardData && cardData.type === "celtic") {
       const celticMessages = [
-        `👔 두목: '${name}, 캘틱 크로스가 완성되었습니다. 깊이 성찰해보세요!'`,
-        `💼 두목: '${name}, 10장의 카드가 당신의 길을 비춰줍니다!'`,
-        `🔮 두목: '${name}, 고대 켈트의 지혜가 담긴 신성한 배치입니다!'`
+        `🔮 '${displayName}, 캘틱 크로스가 완성되었습니다. 깊이 성찰해보세요!'`,
+        `🔮 '${displayName}, 10장의 카드가 당신의 길을 비춰줍니다!'`,
+        `🔮 '${displayName}, 고대 켈트의 지혜가 담긴 신성한 배치입니다!'`
       ];
       return celticMessages[Math.floor(Math.random() * celticMessages.length)];
     }
@@ -990,7 +974,7 @@ class FortuneService extends BaseService {
         });
       }
 
-      // 궁정 카드 (Page, Knight, Queen, King)
+      // 긍정 카드 (Page, Knight, Queen, King)
       const courtCards = [
         { name: "Page", korean: "페이지", emoji: "👤" },
         { name: "Knight", korean: "기사", emoji: "🐎" },
