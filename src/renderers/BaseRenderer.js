@@ -1,62 +1,50 @@
-// src/renderers/BaseRenderer.js - 🎨 최종 리팩토링 버전
+// src/renderers/BaseRenderer.js - 속도 제한 처리가 추가된 버전
+
 const logger = require("../utils/Logger");
-/**
- * 🎨 BaseRenderer - 모든 렌더러의 표준 기반 클래스
- *
- * 🎯 핵심 원칙:
- * - 의존성 위임: NavigationHandler를 통해 다른 헬퍼에 접근합니다.
- * - 단일 책임 원칙: 각 메서드는 하나의 명확한 역할만 수행합니다.
- * - 계층화된 폴백: 메시지 전송 실패 시 단계별로 안전하게 처리합니다.
- * - 표준화된 콜백 처리: 모든 렌더러가 동일한 방식으로 콜백을 생성하고 해석합니다.
- */
 
 class BaseRenderer {
   constructor(bot, navigationHandler, markdownHelper) {
     this.bot = bot;
     this.navigationHandler = navigationHandler;
-
-    // 👇 실제 값을 내부 속성(_markdownHelper)에 저장합니다.
     this._markdownHelper = markdownHelper;
-
     this.moduleName = "base";
 
+    // 📊 통계
     this.stats = {
       renderCount: 0,
       successCount: 0,
       errorCount: 0,
       fallbackUsed: 0,
-      lastActivity: null
+      lastActivity: null,
+      rateLimitHits: 0 // 추가
     };
 
-    this.config = {
-      enableFallback: true
+    // ⚙️ 속도 제한 설정
+    this.rateLimitConfig = {
+      minInterval: 50, // 최소 메시지 간격 (ms)
+      retryAttempts: 3, // 재시도 횟수
+      backoffMultiplier: 1.5, // 백오프 배수
+      maxWaitTime: 30000 // 최대 대기 시간 (ms)
     };
+
+    // 🚦 메시지 큐
+    this.messageQueue = [];
+    this.isProcessingQueue = false;
+    this.lastMessageTime = 0;
 
     logger.debug(`🎨 ${this.constructor.name} 생성됨`);
   }
 
   // ===== 🔗 의존성 접근자 =====
-
-  /**
-   * 🚨 ErrorHandler는 NavigationHandler를 통해 접근합니다.
-   */
   get errorHandler() {
     return this.navigationHandler?.errorHandler;
   }
 
-  /**
-   * 📝 MarkdownHelper 접근 (수정된 버전)
-   */
   get markdownHelper() {
-    // 👇 내부 속성(_markdownHelper)을 반환하여 무한 반복을 방지합니다.
     return this._markdownHelper || this.navigationHandler?.markdownHelper;
   }
 
   // ===== 🎯 핵심 추상 메서드 =====
-
-  /**
-   * 🎯 메인 렌더링 메서드 (자식 클래스에서 필수 구현)
-   */
   async render(result, ctx) {
     throw new Error(
       `render() 메서드는 ${this.constructor.name}에서 구현해야 합니다`
@@ -64,10 +52,6 @@ class BaseRenderer {
   }
 
   // ===== 🔧 콜백 데이터 처리 =====
-
-  /**
-   * 🔧 콜백 데이터 생성
-   */
   buildCallbackData(moduleKey, subAction, params = "") {
     const paramsStr = Array.isArray(params)
       ? params.join(":")
@@ -77,50 +61,130 @@ class BaseRenderer {
       : `${moduleKey}:${subAction}`;
   }
 
-  // ===== 💬 메시지 전송 시스템 =====
+  // ===== 💬 메시지 전송 시스템 (개선됨) =====
 
   /**
-   * 🛡️ 안전한 메시지 전송 (통합된 폴백 시스템)
+   * 🛡️ 안전한 메시지 전송 (속도 제한 포함)
    */
   async sendSafeMessage(ctx, text, options = {}) {
+    // 큐에 추가하고 처리
+    return new Promise((resolve, reject) => {
+      this.messageQueue.push({
+        ctx,
+        text,
+        options: {
+          parse_mode: "Markdown",
+          ...options
+        },
+        resolve,
+        reject,
+        retryCount: 0
+      });
+
+      // 큐 처리 시작
+      if (!this.isProcessingQueue) {
+        this.processMessageQueue();
+      }
+    });
+  }
+
+  /**
+   * 📬 메시지 큐 처리
+   */
+  async processMessageQueue() {
+    if (this.isProcessingQueue || this.messageQueue.length === 0) {
+      return;
+    }
+
+    this.isProcessingQueue = true;
+
+    while (this.messageQueue.length > 0) {
+      const message = this.messageQueue.shift();
+
+      // 속도 제한 확인
+      const now = Date.now();
+      const timeSinceLastMessage = now - this.lastMessageTime;
+
+      if (timeSinceLastMessage < this.rateLimitConfig.minInterval) {
+        const waitTime =
+          this.rateLimitConfig.minInterval - timeSinceLastMessage;
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+      }
+
+      // 메시지 전송 시도
+      try {
+        const result = await this.sendMessageWithRetry(message);
+        message.resolve(result);
+        this.lastMessageTime = Date.now();
+      } catch (error) {
+        message.reject(error);
+      }
+    }
+
+    this.isProcessingQueue = false;
+  }
+
+  /**
+   * 🔄 재시도 로직이 포함된 메시지 전송
+   */
+  async sendMessageWithRetry(message) {
+    const { ctx, text, options, retryCount } = message;
+
     try {
-      // parse_mode 기본값 추가!
-      const enhancedOptions = {
-        parse_mode: "Markdown", // 이 부분 추가!
-        ...options
-      };
-      // 콜백 쿼리인 경우 editMessageText 사용
+      // 실제 전송 시도
       if (ctx.callbackQuery) {
-        return await ctx.editMessageText(text, enhancedOptions); // options → enhancedOptions
+        return await ctx.editMessageText(text, options);
       } else {
-        return await ctx.reply(text, enhancedOptions); // options → enhancedOptions
+        return await ctx.reply(text, options);
       }
     } catch (error) {
-      // "Bad Request: message is not modified" 에러는 무시
+      // "message is not modified" 에러는 무시
       if (error.message?.includes("message is not modified")) {
         logger.debug("메시지가 변경되지 않음 - 무시");
         return null;
       }
+
+      // 429 에러 (속도 제한) 처리
+      if (
+        error.message?.includes("429") &&
+        retryCount < this.rateLimitConfig.retryAttempts
+      ) {
+        this.stats.rateLimitHits++;
+
+        // retry after 시간 추출
+        const retryAfter = this.extractRetryAfter(error.message);
+        const waitTime = Math.min(
+          (retryAfter + 1) *
+            1000 *
+            Math.pow(this.rateLimitConfig.backoffMultiplier, retryCount),
+          this.rateLimitConfig.maxWaitTime
+        );
+
+        logger.warn(
+          `⏳ 속도 제한 감지. ${waitTime}ms 후 재시도... (시도 ${retryCount + 1}/${this.rateLimitConfig.retryAttempts})`
+        );
+
+        // 대기 후 재시도
+        await new Promise((resolve) => setTimeout(resolve, waitTime));
+
+        message.retryCount++;
+        return await this.sendMessageWithRetry(message);
+      }
+
+      // 다른 에러는 그대로 전파
       throw error;
     }
   }
 
   /**
-   * 📤 실제 메시지 전송 로직 (수정/전송 분기)
+   * 🕐 retry after 시간 추출
    */
-  async sendMessage(ctx, text, options) {
-    if (ctx.callbackQuery) {
-      await ctx.editMessageText(text, options);
-    } else {
-      await ctx.reply(text, options);
-    }
+  extractRetryAfter(errorMessage) {
+    const match = errorMessage.match(/retry after (\d+)/);
+    return match ? parseInt(match[1]) : 5; // 기본값 5초
   }
 
   // ===== 🎹 키보드 생성 시스템 =====
-
-  /**
-   * 🎹 인라인 키보드 생성
-   */
   createInlineKeyboard(buttons, moduleKey = this.moduleName) {
     return {
       inline_keyboard: buttons.map((row) =>
@@ -158,7 +222,17 @@ class BaseRenderer {
     return { text, callback_data: callbackData };
   }
 
-  // ... (createHomeButton, createBackButton, createPaginationButtons 등 유틸성 키보드 메서드)
+  /**
+   * 📊 통계 조회 (개선됨)
+   */
+  getStats() {
+    return {
+      ...this.stats,
+      queueLength: this.messageQueue.length,
+      isProcessing: this.isProcessingQueue,
+      rateLimitConfig: this.rateLimitConfig
+    };
+  }
 }
 
 module.exports = BaseRenderer;
