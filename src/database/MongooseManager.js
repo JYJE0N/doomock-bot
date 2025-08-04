@@ -99,8 +99,7 @@ class MongooseManager {
         Reminder: require("./models/Reminder"),
         UserSetting: require("./models/UserSetting"),
         TTSHistory: require("./models/TTSHistory"),
-        // 🔮 Fortune 모델 추가! (핵심 수정)
-        Fortune: require("./models/Fortune").FortuneUser // FortuneUser를 Fortune으로 등록
+        Fortune: require("./models/Fortune") // FortuneUser를 Fortune으로 등록
       };
 
       for (const [name, model] of Object.entries(models)) {

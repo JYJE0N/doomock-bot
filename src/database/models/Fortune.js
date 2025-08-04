@@ -435,10 +435,10 @@ FortuneUserSchema.pre("findOneAndUpdate", function () {
 /**
  * 🏷️ 모델 생성 및 내보내기
  */
-const FortuneUser = mongoose.model("FortuneUser", FortuneUserSchema);
+const Fortune = mongoose.model("Fortune", FortuneUserSchema);
 
 module.exports = {
-  FortuneUser,
+  Fortune,
   FortuneUserSchema,
   CardSchema,
   InterpretationSchema,
