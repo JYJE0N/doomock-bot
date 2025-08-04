@@ -93,9 +93,13 @@ class WorktimeService extends BaseService {
   async checkIn(userId) {
     try {
       const now = new Date();
-      const today = TimeHelper.getTodayDateString();
 
-      // 🔥 현재 근무 중인 기록이 있는지만 확인
+      // 🎯 TimeHelper 그대로 사용! (이제 안전함)
+      const today = TimeHelper.getTodayDateString(); // 이제 확실히 "YYYY-MM-DD" 반환
+
+      logger.debug(`🏢 출근 처리: ${userId}, 날짜: ${today}`);
+
+      // 현재 근무 중인 기록 확인
       const workingRecord = await this.models.Worktime.findOne({
         userId: userId,
         status: "working",
@@ -107,16 +111,16 @@ class WorktimeService extends BaseService {
         throw new Error("이미 출근 중입니다. 먼저 퇴근을 해주세요!");
       }
 
-      // 🔥 새 출근 기록 생성 (하루에 여러 개 가능)
+      // 새 출근 기록 생성
       const record = await this.models.Worktime.create({
         userId: userId,
-        date: today, // 출근 시점의 날짜
+        date: today, // TimeHelper로 생성된 안전한 날짜
         checkInTime: now,
         status: "working",
         isActive: true
       });
 
-      logger.info(`✅ 출근 기록: ${userId} at ${now}`);
+      logger.success(`✅ 출근 기록 완료: ${userId} (${today})`);
       return this.safeTransformRecord(record);
     } catch (error) {
       logger.error("출근 처리 실패:", error);
@@ -194,6 +198,7 @@ class WorktimeService extends BaseService {
       const workingRecord = await this.models.Worktime.findOne({
         userId: userId,
         status: "working",
+        date: today,
         checkOutTime: null,
         isActive: true
       }).sort({ checkInTime: -1 });

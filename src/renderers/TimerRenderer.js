@@ -220,6 +220,41 @@ class TimerRenderer extends BaseRenderer {
   // ===== 🎨 렌더링 메서드들 (UI 생성 전담!) =====
 
   /**
+   * 📊 실시간 업데이트용 상태 텍스트 생성 (TimerModule에서 사용)
+   * @param {object} timerData - 타이머 데이터
+   * @param {object} motivationData - 동기부여 데이터
+   * @returns {string} 포맷된 텍스트 (Telegram 메시지용)
+   */
+  renderStatus(timerData, motivationData = {}) {
+    try {
+      const { timer } = timerData;
+
+      if (!timer) {
+        return "❌ 타이머 정보를 찾을 수 없습니다.";
+      }
+
+      const progressBar = this.createProgressBar(timer);
+      const statusIcon = this.getStatusIcon(timer);
+      const motivationMsg = this.getMotivationMessage(motivationData);
+      const detailedInfo = this.createDetailedTimeInfo(timer);
+
+      // Telegram MarkdownV2 호환 텍스트 생성
+      let text = `${statusIcon} *타이머 실시간 상태*\n\n`;
+      text += `${progressBar}\n\n`;
+      text += `${detailedInfo}\n\n`;
+      text += `🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}\n`;
+      text += `📊 *진행률*: ${timer.progress}%\n`;
+      text += `⏸️ *상태*: ${timer.isPaused ? "일시정지" : "실행중"}\n\n`;
+      text += `💬 ${motivationMsg}`;
+
+      return text;
+    } catch (error) {
+      logger.error("TimerRenderer.renderStatus 오류:", error);
+      return "❌ 상태 표시 중 오류가 발생했습니다.";
+    }
+  }
+
+  /**
    * 🍅 메뉴 렌더링 (실시간 UI 포함)
    */
   async renderMenu(data, ctx) {
@@ -576,75 +611,81 @@ ${message}
    * 📊 화려한 진행률 바 생성
    */
   createProgressBar(timer) {
-    const { progressData, timeData } = timer;
-    const { percentage, filledBlocks, emptyBlocks, stage } = progressData;
+    const progress = Math.min(100, Math.max(0, timer.progress || 0));
+    const filledBlocks = Math.floor(
+      (progress / 100) * this.uiConstants.PROGRESS_BAR_LENGTH
+    );
+    const emptyBlocks = this.uiConstants.PROGRESS_BAR_LENGTH - filledBlocks;
 
-    // 단계별 아이콘 선택
-    const stageIcon = this.uiConstants.STAGE_ICONS[stage];
-
-    // 진행률 바 생성
     const filled = this.uiConstants.FILLED_CHAR.repeat(filledBlocks);
     const empty = this.uiConstants.EMPTY_CHAR.repeat(emptyBlocks);
-    const progressBar = `${stageIcon} ${filled}${empty} ${percentage}%`;
 
-    // 시간 정보 추가
-    const timeInfo = `⏱️ ${timeData.elapsed.formatted} / ${timeData.total.formatted}`;
-
-    return `${progressBar}\n${timeInfo}`;
+    return `${filled}${empty} ${progress}%`;
   }
 
   /**
    * 🎯 상태 아이콘 선택
    */
   getStatusIcon(timer) {
-    if (timer.isPaused) {
-      return this.uiConstants.STATUS_ICONS.paused;
-    }
-
-    const typeIcons = this.uiConstants.TYPE_ICONS[timer.type];
-    if (!typeIcons) return "⏰";
-
-    const stage = timer.progressData?.stage || "early";
-    return typeIcons[stage] || typeIcons.main;
+    if (timer.isPaused) return this.uiConstants.STATUS_ICONS.paused;
+    if (timer.isCompleted) return this.uiConstants.STATUS_ICONS.completed;
+    return this.uiConstants.STATUS_ICONS.running;
   }
 
   /**
    * 💬 동기부여 메시지 선택
    */
-  getMotivationMessage(motivationData = {}) {
-    const { messageKey } = motivationData;
+  getMotivationMessage(motivationData) {
+    const {
+      type = "focus",
+      stage = "middle",
+      isPaused = false
+    } = motivationData;
 
-    if (!messageKey || !this.motivationMessages[messageKey]) {
-      return "⏰ 타이머가 실행 중입니다!";
-    }
+    const messageKey = `${type}_${stage}_${isPaused ? "paused" : "active"}`;
+    const messages = this.motivationMessages[messageKey] || [
+      "💪 계속 화이팅하세요!"
+    ];
 
-    const messages = this.motivationMessages[messageKey];
-    const randomIndex = Math.floor(Math.random() * messages.length);
-    return messages[randomIndex];
+    return messages[Math.floor(Math.random() * messages.length)];
   }
 
   /**
    * 🏷️ 타이머 타입 표시명 변환
    */
   getTimerTypeDisplay(type) {
-    const typeDisplays = {
+    const displays = {
       focus: "🍅 집중 시간",
       short: "☕ 짧은 휴식",
-      long: "🌴 긴 휴식"
+      long: "🌴 긴 휴식",
+      custom: "⚙️ 사용자 정의"
     };
 
-    return typeDisplays[type] || `⏰ 커스텀 (${type}분)`;
+    return displays[type] || `🔹 ${type}`;
   }
 
   /**
    * 📋 상세 시간 정보 생성
    */
   createDetailedTimeInfo(timer) {
-    const { timeData, _progressData } = timer;
+    const { remainingTime, elapsedTime, totalDuration } = timer;
 
-    return `⏰ **남은 시간**: ${timeData.remaining.formatted}
-⚡ **경과 시간**: ${timeData.elapsed.formatted}  
-🎯 **총 시간**: ${timeData.total.formatted}`;
+    let info = `⏱️ *경과시간*: ${this.formatTime(elapsedTime)}\n`;
+    info += `⏰ *남은시간*: ${this.formatTime(remainingTime)}\n`;
+    info += `📏 *전체시간*: ${this.formatTime(totalDuration)}`;
+
+    return info;
+  }
+
+  /**
+   * 🕐 시간 포맷팅 (분:초)
+   */
+  formatTime(seconds) {
+    if (!seconds || seconds < 0) return "00:00";
+
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
 
   /**

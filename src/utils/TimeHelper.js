@@ -113,11 +113,15 @@ class TimeHelper {
         return this.formatRelative(date);
       }
 
-      // 안전한 moment 객체 생성
-      const momentDate = this.safeMoment(date);
+      // 🎯 핵심 수정: date가 null이면 현재시간 사용
+      const momentDate = date === null ? this.now() : this.safeMoment(date);
 
       if (!momentDate) {
-        return fallback; // 파싱 실패시 기본값 반환
+        // 🎯 날짜 포맷일 때만 특별 처리
+        if (formatKey === "date") {
+          return new Date().toISOString().split("T")[0]; // 확실한 날짜
+        }
+        return fallback; // 나머지는 기존대로
       }
 
       // 포맷 적용
@@ -125,6 +129,11 @@ class TimeHelper {
       return momentDate.format(format);
     } catch (error) {
       console.warn("TimeHelper.format 실패:", date, formatKey, error.message);
+
+      // 🎯 에러 시에도 날짜는 확실하게
+      if (formatKey === "date") {
+        return new Date().toISOString().split("T")[0];
+      }
       return fallback;
     }
   }

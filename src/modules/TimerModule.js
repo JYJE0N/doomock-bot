@@ -144,7 +144,7 @@ class TimerModule extends BaseModule {
 
     if (!hasTimerKeyword) return false;
 
-    const userId = getUserId(msg.from);
+    const _userId = getUserId(msg.from);
     const userName = getUserName(msg.from);
 
     logger.info(`🍅 타이머 키워드 감지: ${userName} - "${text}"`);
@@ -803,25 +803,29 @@ class TimerModule extends BaseModule {
    * 🎯 타이머 타입별 시간 반환
    */
   getDurationByType(type) {
-    switch (type) {
-      case this.constants.TIMER_TYPES.FOCUS:
-        return this.config.focusDuration;
-      case this.constants.TIMER_TYPES.SHORT:
-        return this.config.shortBreak;
-      case this.constants.TIMER_TYPES.LONG:
-        return this.config.longBreak;
-      default:
-        // 커스텀 시간 (숫자로 파싱 시도)
-        const customTime = parseInt(type);
-        if (
-          !isNaN(customTime) &&
-          customTime > 0 &&
-          customTime <= this.config.maxCustomDuration
-        ) {
-          return customTime;
-        }
-        return null;
+    // 미리 정의된 타입들 처리
+    const predefinedDurations = {
+      [this.constants.TIMER_TYPES.FOCUS]: this.config.focusDuration,
+      [this.constants.TIMER_TYPES.SHORT]: this.config.shortBreak,
+      [this.constants.TIMER_TYPES.LONG]: this.config.longBreak
+    };
+
+    // 미리 정의된 타입이 있으면 반환
+    if (predefinedDurations[type]) {
+      return predefinedDurations[type];
     }
+
+    // 커스텀 시간 처리 (숫자인 경우)
+    const customTime = parseInt(type);
+    if (
+      !isNaN(customTime) &&
+      customTime > 0 &&
+      customTime <= this.config.maxCustomDuration
+    ) {
+      return customTime;
+    }
+
+    return null;
   }
 
   /**
@@ -944,19 +948,19 @@ class TimerModule extends BaseModule {
    * 🏷️ 타이머 타입 표시명 (비즈니스 로직)
    */
   getTimerTypeDisplay(type) {
-    const typeMap = {
-      [this.constants.TIMER_TYPES.FOCUS]: "집중 시간",
-      [this.constants.TIMER_TYPES.SHORT]: "짧은 휴식",
-      [this.constants.TIMER_TYPES.LONG]: "긴 휴식"
+    const displays = {
+      focus: "🍅 집중 시간",
+      short: "☕ 짧은 휴식",
+      long: "🌴 긴 휴식"
     };
-
-    return typeMap[type] || `커스텀 (${parseInt(type) || 0}분)`;
+    return displays[type] || `🔹 ${type}`;
   }
 
   /**
    * ⏰ 시간 포맷팅 (초 → MM:SS)
    */
   formatTime(seconds) {
+    if (!seconds || seconds < 0) return "00:00";
     const mins = Math.floor(seconds / 60);
     const secs = seconds % 60;
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
@@ -998,34 +1002,71 @@ class TimerModule extends BaseModule {
    * 🔄 실시간 업데이트 인터벌 시작
    */
   startLiveUpdateInterval(userId, bot) {
+    // 기존 인터벌이 있으면 정리
     this.stopLiveUpdateInterval(userId);
 
+    const timer = this.activeTimers.get(userId);
+    if (!timer) return;
+
     const liveInterval = setInterval(async () => {
-      const timer = this.activeTimers.get(userId);
-      if (!timer || timer.isPaused || !timer.liveUpdate) return;
-
       try {
-        const timerData = this.generateTimerDisplayData(timer);
-        const motivationData = this.generateMotivationData(timer);
+        const currentTimer = this.activeTimers.get(userId);
+        if (
+          !currentTimer ||
+          currentTimer.isPaused ||
+          !currentTimer.liveUpdate
+        ) {
+          this.stopLiveUpdateInterval(userId);
+          return;
+        }
 
-        // ✅ 실제 메시지 업데이트 코드 추가!
-        if (timer.chatId && timer.lastMessageId) {
-          // 렌더러에서 메시지 생성
-          const renderer = require("../renderers/TimerRenderer");
-          const messageText = renderer.renderStatus(timerData, motivationData);
-          const keyboard = renderer.buildActiveTimerButtons(timer);
+        // 🎯 간단한 해결책: 기존 메서드 활용!
+        // renderStatus 대신 직접 텍스트 생성
+        const progress = currentTimer.progress || 0;
+        const remainingTime = this.formatTime(currentTimer.remainingTime || 0);
+        const elapsedTime = this.formatTime(currentTimer.elapsedTime || 0);
 
-          // 텔레그램 메시지 업데이트
+        const progressBar =
+          "█".repeat(Math.floor(progress / 5)) +
+          "░".repeat(20 - Math.floor(progress / 5));
+
+        const messageText = `▶️ *타이머 실행 중*
+
+${progressBar} ${progress}%
+
+⏱️ *경과시간*: ${elapsedTime}
+⏰ *남은시간*: ${remainingTime}
+🎯 *타입*: ${this.getTimerTypeDisplay(currentTimer.type)}
+
+💪 계속 집중하세요\\!`;
+
+        // 키보드는 간단하게
+        const keyboard = [
+          [
+            { text: "⏸️ 일시정지", callback_data: "timer:pause" },
+            { text: "⏹️ 중지", callback_data: "timer:stop" }
+          ],
+          [
+            { text: "🔄 새로고침", callback_data: "timer:refresh" },
+            { text: "⏹️ 실시간 끄기", callback_data: "timer:live" }
+          ]
+        ];
+
+        // 텔레그램 메시지 업데이트
+        if (currentTimer.chatId && currentTimer.lastMessageId) {
           await bot.editMessageText(messageText, {
-            chat_id: timer.chatId,
-            message_id: timer.lastMessageId,
+            chat_id: currentTimer.chatId,
+            message_id: currentTimer.lastMessageId,
             parse_mode: "MarkdownV2",
             reply_markup: { inline_keyboard: keyboard }
           });
         }
       } catch (error) {
         logger.warn(`실시간 업데이트 실패 (${userId}):`, error.message);
-        timer.liveUpdate = false;
+        const timer = this.activeTimers.get(userId);
+        if (timer) {
+          timer.liveUpdate = false;
+        }
         this.stopLiveUpdateInterval(userId);
       }
     }, this.config.liveUpdateInterval);
