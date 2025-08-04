@@ -368,11 +368,15 @@ class TodoRenderer extends BaseRenderer {
   /**
    * ✅ 성공 메시지 렌더링
    */
+  /**
+   * ✅ 성공 메시지 렌더링 - 에러 수정 버전
+   */
   async renderSuccess(data, ctx) {
     try {
       const { message, _action, redirectTo, autoRefresh, refreshDelay } = data;
 
-      let text = `✅ *성공*\n\n${this.markdownHelper.escape(message)}`;
+      // 🔧 수정: markdownHelper.escape 대신 직접 텍스트 사용
+      let text = `✅ *성공*\n\n${message}`;
 
       // 키보드 생성
       const keyboard = [];
@@ -460,7 +464,78 @@ class TodoRenderer extends BaseRenderer {
       }
     } catch (error) {
       logger.error("TodoRenderer.renderSuccess 오류:", error);
-      throw error;
+
+      // 🔧 수정: this.renderError 대신 기본 에러 처리
+      try {
+        await this.sendSafeMessage(ctx, "❌ 처리 중 오류가 발생했습니다.", {
+          reply_markup: {
+            inline_keyboard: [
+              [
+                this.createButton("📋 할일 목록", "list"),
+                this.createButton("🏠 홈으로", {
+                  module: "system",
+                  action: "menu"
+                })
+              ]
+            ]
+          }
+        });
+
+        if (ctx.callbackQuery && ctx.answerCbQuery) {
+          await ctx.answerCbQuery();
+        }
+      } catch (fallbackError) {
+        logger.error("폴백 에러 처리도 실패:", fallbackError);
+      }
+    }
+  }
+
+  /**
+   * ❌ 에러 메시지 렌더링 - 에러 수정 버전
+   */
+  async renderError(data, ctx) {
+    try {
+      const { message, action, canRetry } = data;
+
+      let text = `❌ *오류*\n\n${message}`;
+
+      const keyboard = [];
+
+      // 재시도 버튼
+      if (canRetry && action) {
+        keyboard.push([this.createButton("🔄 다시 시도", action)]);
+      }
+
+      // 기본 네비게이션
+      keyboard.push([
+        this.createButton("📋 할일 목록", "list"),
+        this.createButton("🏠 홈으로", { module: "system", action: "menu" })
+      ]);
+
+      // 메시지 전송
+      await this.sendSafeMessage(ctx, text, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: keyboard
+        }
+      });
+
+      // 콜백 쿼리 응답
+      if (ctx.callbackQuery && ctx.answerCbQuery) {
+        await ctx.answerCbQuery();
+      }
+    } catch (error) {
+      logger.error("TodoRenderer.renderError 오류:", error);
+
+      // 최종 폴백: 아주 간단한 메시지
+      try {
+        await ctx.reply("❌ 시스템 오류가 발생했습니다. 다시 시도해주세요.");
+        if (ctx.callbackQuery && ctx.answerCbQuery) {
+          await ctx.answerCbQuery();
+        }
+      } catch (finalError) {
+        logger.error("최종 폴백도 실패:", finalError);
+      }
     }
   }
 
