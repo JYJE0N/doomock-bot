@@ -1,8 +1,4 @@
 // doomock_bot.js - v4.0.1 안정화 버전
-require("dotenv").config();
-const logger = require("./src/utils/Logger");
-const BotController = require("./src/controllers/BotController");
-const { showDoomockBanner } = require("./src/utils/FancyBanner");
 const path = require("path");
 const fs = require("fs");
 
@@ -25,8 +21,37 @@ if (fs.existsSync(envPath)) {
 // 기본 .env 파일도 로드 (공통 설정용)
 require("dotenv").config();
 
+const logger = require("./src/utils/Logger");
+const BotController = require("./src/controllers/BotController");
+const { showDoomockBanner } = require("./src/utils/FancyBanner");
+
 console.log(`🤖 봇 토큰: ${process.env.BOT_TOKEN ? "✅ 설정됨" : "❌ 없음"}`);
 console.log(`🗄️ DB: ${process.env.MONGO_URL ? "✅ 설정됨" : "❌ 없음"}`);
+
+// 🔍 환경변수 디버깅 (개발 환경에서만)
+if (NODE_ENV === "development") {
+  console.log("\n🔍 개발 환경 추가 정보:");
+  console.log(`👑 DEVELOPER_IDS: ${process.env.DEVELOPER_IDS || "설정 안됨"}`);
+  console.log(`👑 ADMIN_IDS: ${process.env.ADMIN_IDS || "설정 안됨"}`);
+
+  const developerIds = (
+    process.env.DEVELOPER_IDS ||
+    process.env.ADMIN_IDS ||
+    ""
+  )
+    .split(",")
+    .map((id) => id.trim())
+    .filter((id) => id);
+
+  if (developerIds.length > 0) {
+    console.log(`✅ 개발자 모드 활성 - ID: [${developerIds.join(", ")}]`);
+  } else {
+    console.log(
+      `⚠️ 개발자 ID가 설정되지 않았습니다. NODE_ENV=development로 모든 사용자가 개발자 모드 사용 가능`
+    );
+  }
+  console.log("");
+}
 
 /**
  * 🚀 DooMockBot v4.0.1 - 안정화 버전
@@ -119,7 +144,9 @@ class DooMockBot {
     try {
       logger.celebration("🎊 DooMockBot v4.0.1 시작!");
       logger.info(`🌍 환경: ${process.env.NODE_ENV || "development"}`);
-      logger.info(`🚀 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No"}`);
+      logger.info(
+        `🚀 Railway: ${process.env.RAILWAY_ENVIRONMENT ? "Yes" : "No"}`
+      );
 
       // 🎯 BotController 초기화
       logger.info("🤖 BotController 초기화 중...");
@@ -137,6 +164,36 @@ class DooMockBot {
       const uptime = Date.now() - this.startTime;
       logger.celebration(`🎉 DooMockBot 시작 완료! (${uptime}ms)`);
       logger.success("✅ 모든 시스템이 정상적으로 작동 중입니다.");
+
+      // 🔍 개발 환경에서 추가 정보 표시
+      if (process.env.NODE_ENV === "development") {
+        console.log("\n========================================");
+        console.log("👑 === 개발자 모드 상태 확인 ===");
+        console.log(`📍 환경: ${process.env.NODE_ENV}`);
+        console.log(
+          `📍 DEVELOPER_IDS: ${process.env.DEVELOPER_IDS || "❌ 설정 안됨"}`
+        );
+        console.log(`📍 ADMIN_IDS: ${process.env.ADMIN_IDS || "❌ 설정 안됨"}`);
+
+        const devIds = (
+          process.env.DEVELOPER_IDS ||
+          process.env.ADMIN_IDS ||
+          ""
+        )
+          .split(",")
+          .map((id) => id.trim())
+          .filter((id) => id);
+
+        if (devIds.length > 0) {
+          console.log(`✅ 개발자 ID 등록됨: [${devIds.join(", ")}]`);
+        } else {
+          console.log("⚠️ 개발자 ID가 설정되지 않았습니다.");
+          console.log(
+            "💡 NODE_ENV=development이므로 모든 사용자가 개발자 기능 사용 가능"
+          );
+        }
+        console.log("========================================\n");
+      }
     } catch (error) {
       logger.error("💥 애플리케이션 시작 실패:", error);
       await this.handleStartupError(error);
@@ -262,7 +319,10 @@ class DooMockBot {
       environment: {
         node: process.env.NODE_ENV || "development",
         railway: !!process.env.RAILWAY_ENVIRONMENT,
-        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024)
+        memory: Math.round(process.memoryUsage().heapUsed / 1024 / 1024),
+        developerMode:
+          process.env.NODE_ENV === "development" ||
+          !!(process.env.DEVELOPER_IDS || process.env.ADMIN_IDS)
       }
     };
   }

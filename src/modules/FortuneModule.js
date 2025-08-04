@@ -81,8 +81,24 @@ class FortuneModule extends BaseModule {
       const userId = getUserId(callbackQuery.from);
       const userName = getUserName(callbackQuery.from);
 
-      // 오늘 뽑은 횟수 확인 (새 FortuneService 호환)
+      // 🔍 개발자 모드 체크
+      const isDeveloper = this.checkDeveloperMode(userId);
+
+      // 오늘 뽑은 횟수 확인
       const todayCount = await this.getTodayDrawCount(userId, userName);
+
+      // 개발자 모드 디버깅 (콘솔에만)
+      if (process.env.NODE_ENV === "development") {
+        console.log("\n========================================");
+        console.log("🔮 Fortune 모듈 - 사용자 정보:");
+        console.log(`  이름: ${userName}`);
+        console.log(`  ID: ${userId}`);
+        console.log(`  개발자 모드: ${isDeveloper ? "✅ 활성" : "❌ 비활성"}`);
+        console.log(`  오늘 뽑기 횟수: ${todayCount}`);
+        console.log("========================================\n");
+      }
+
+      logger.debug(`🔮 운세 메뉴 요청: ${userName} (${userId})`);
 
       return {
         type: "menu",
@@ -90,10 +106,11 @@ class FortuneModule extends BaseModule {
         data: {
           userId,
           userName,
-          todayCount,
-          maxDraws: this.config.maxDrawsPerDay,
-          canDraw: todayCount < this.config.maxDrawsPerDay,
-          fortuneTypes: this.config.fortuneTypes
+          todayCount: isDeveloper ? todayCount : todayCount, // 개발자도 실제 카운트는 표시
+          maxDraws: isDeveloper ? "∞" : this.config.maxDrawsPerDay, // 개발자는 무제한 표시
+          canDraw: isDeveloper ? true : todayCount < this.config.maxDrawsPerDay, // 개발자는 항상 가능
+          fortuneTypes: this.config.fortuneTypes,
+          isDeveloper // 렌더러에서 활용 가능
         }
       };
     } catch (error) {
@@ -109,6 +126,8 @@ class FortuneModule extends BaseModule {
   /**
    * 🃏 카드 뽑기 (표준 매개변수 5개 - 수정됨!)
    */
+  // FortuneModule.js의 drawCard 메서드 수정
+
   async drawCard(bot, callbackQuery, subAction, params, moduleManager) {
     try {
       const userId = getUserId(callbackQuery.from);
@@ -119,19 +138,28 @@ class FortuneModule extends BaseModule {
         `🎴 drawCard 시작: ${userName}, subAction: ${subAction}, params: ${params}`
       );
 
-      // ✅ 수정: 일일 제한 확인 (메서드 호출 수정)
+      // 🔍 개발자 모드 체크
+      const isDeveloper = this.checkDeveloperMode(userId);
+
+      // 일일 제한 확인
       const todayCount = await this.getTodayDrawCount(userId, userName);
       logger.debug(
         `📅 오늘 뽑기 횟수: ${todayCount}/${this.config.maxDrawsPerDay}`
       );
 
-      if (todayCount >= this.config.maxDrawsPerDay) {
+      // 개발자가 아닌 경우에만 일일 제한 체크
+      if (!isDeveloper && todayCount >= this.config.maxDrawsPerDay) {
         logger.warn(`⛔ 일일 제한 도달: ${userName}`);
         return {
           type: "daily_limit",
           module: "fortune",
           data: { used: todayCount, max: this.config.maxDrawsPerDay }
         };
+      }
+
+      // 개발자 모드 로그
+      if (isDeveloper) {
+        logger.info(`👑 개발자 모드: ${userName} - 일일 제한 우회`);
       }
 
       // 운세 타입이 지정된 경우
@@ -168,7 +196,7 @@ class FortuneModule extends BaseModule {
         // 🎬 카드 뽑기 애니메이션 실행
         const animationMessage = await AnimationHelper.performDraw(bot, chatId);
 
-        // ✅ 수정: performDraw 호출 시 todayCount 변수가 정의된 상태에서 호출
+        // 카드 뽑기 실행
         const result = await this.performDraw(
           userId,
           fortuneType,
@@ -203,44 +231,27 @@ class FortuneModule extends BaseModule {
           };
         }
 
-        // ✅ 성공! 성공 애니메이션으로 전환
-        if (animationMessage && bot && bot.telegram) {
-          try {
-            await bot.telegram.editMessageText(
-              chatId,
-              animationMessage,
-              undefined,
-              "✨ 운세 카드 뽑기 완료\\! 결과를 확인하세요\\.",
-              {
-                parse_mode: "MarkdownV2"
-              }
-            );
-          } catch (editError) {
-            logger.warn("성공 메시지 수정 실패:", editError.message);
-          }
-        }
-
-        logger.success(`✅ 카드 뽑기 성공: ${userName}, ${fortuneType}`);
-
+        // 성공 - 결과에 개발자 모드 정보 추가
         return {
-          type: "draw_result",
+          type: result.data.type === "celtic" ? "celtic_result" : "draw_result",
           module: "fortune",
           data: {
             ...result.data,
-            fortuneType: this.config.fortuneTypes[fortuneType],
-            remaining: Math.max(0, this.config.maxDrawsPerDay - todayCount - 1)
+            isDeveloper // 렌더러에서 활용 가능
           }
         };
       }
 
-      // 운세 타입 선택 화면
-      logger.debug("🎯 운세 타입 선택 화면 표시");
+      // 운세 타입이 지정되지 않은 경우 - 선택 화면
       return {
         type: "draw_select",
         module: "fortune",
         data: {
           fortuneTypes: this.config.fortuneTypes,
-          remaining: Math.max(0, this.config.maxDrawsPerDay - todayCount)
+          remaining: isDeveloper
+            ? "∞"
+            : this.config.maxDrawsPerDay - todayCount,
+          isDeveloper
         }
       };
     } catch (error) {
@@ -248,7 +259,7 @@ class FortuneModule extends BaseModule {
       return {
         type: "error",
         module: "fortune",
-        data: { message: "카드 뽑기 중 오류가 발생했습니다." }
+        data: { message: "카드를 뽑는 중 오류가 발생했습니다." }
       };
     }
   }

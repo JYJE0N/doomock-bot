@@ -1,5 +1,3 @@
-// src/renderers/FortuneRenderer.js - 콜백 버튼 수정 버전
-
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
 
@@ -52,47 +50,64 @@ class FortuneRenderer extends BaseRenderer {
    * 🔮 메뉴 렌더링 (수정된 콜백 버튼)
    */
   async renderMenu(data, ctx) {
-    const { userName, todayCount, maxDraws, canDraw, fortuneTypes } = data;
+    const {
+      userName,
+      todayCount,
+      maxDraws,
+      canDraw,
+      fortuneTypes,
+      isDeveloper
+    } = data;
 
     let text = `🔮 *타로 카드 운세*\n\n`;
     text += `*${userName}님!*\n\n신비로운 타로의 세계에\n오신 것을 환영합니다.\n\n`;
 
-    text += `📊 *오늘의 현황*\n`;
-    text += `• 뽑은 횟수: ${todayCount}/${maxDraws}번\n`;
+    // 개발자 모드 표시
+    if (isDeveloper) {
+      text += `👑 *개발자 모드 활성*\n\n`;
+    }
 
-    if (canDraw) {
-      text += `• 남은 횟수: ${maxDraws - todayCount}번\n\n`;
+    text += `📊 *오늘의 현황*\n`;
+
+    // 개발자는 무제한 표시
+    if (isDeveloper) {
+      text += `• 뽑은 횟수: ${todayCount}번 (무제한)\n`;
+      text += `• 개발자 특권: 일일 제한 없음\n\n`;
       text += `_어떤 운세를 알아보시겠어요?_`;
     } else {
-      text += `• 오늘은 더 이상 뽑을 수 없습니다\n\n`;
-      text += `내일 다시 새로운 운세를 확인해보세요! 🌅`;
+      text += `• 뽑은 횟수: ${todayCount}/${maxDraws}번\n`;
+
+      if (canDraw) {
+        text += `• 남은 횟수: ${maxDraws - todayCount}번\n\n`;
+        text += `_어떤 운세를 알아보시겠어요?_`;
+      } else {
+        text += `• 오늘은 더 이상 뽑을 수 없습니다\n\n`;
+        text += `내일 다시 새로운 운세를 확인해보세요! 🌅`;
+      }
     }
 
     const buttons = [];
 
-    if (canDraw) {
-      // 🔧 수정된 운세 타입 버튼들 - 올바른 콜백 데이터 생성
+    // 개발자는 항상 버튼 표시
+    if (canDraw || isDeveloper) {
       const fortuneTypeEntries = Object.entries(fortuneTypes);
 
       for (let i = 0; i < fortuneTypeEntries.length; i += 2) {
         const row = [];
 
-        // 첫 번째 운세 타입
         const [key1, config1] = fortuneTypeEntries[i];
         row.push({
           text: `${config1.emoji} ${config1.label}`,
-          // 🎯 핵심 수정: action을 "draw"에서 "draw"로, params에 실제 타입을 넘김
           action: "draw",
-          params: key1 // "single", "triple", "celtic"이 정확히 전달됨
+          params: key1
         });
 
-        // 두 번째 운세 타입 (있으면)
         if (i + 1 < fortuneTypeEntries.length) {
           const [key2, config2] = fortuneTypeEntries[i + 1];
           row.push({
             text: `${config2.emoji} ${config2.label}`,
             action: "draw",
-            params: key2 // "single", "triple", "celtic"이 정확히 전달됨
+            params: key2
           });
         }
 
@@ -109,14 +124,12 @@ class FortuneRenderer extends BaseRenderer {
       { text: "📋 기록", action: "history" }
     ]);
 
-    // 메인 메뉴 버튼 - 🔧 수정: system 모듈로 올바르게 라우팅
+    // 메인 메뉴 버튼
     buttons.push([
       {
         text: "🔙 메인 메뉴",
         action: "menu",
         module: "system"
-        // NavigationHandler의 buildCallbackData 형식에 맞게 수정
-        // "system:menu"가 되도록 처리
       }
     ]);
 
