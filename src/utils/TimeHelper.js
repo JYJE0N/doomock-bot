@@ -247,6 +247,14 @@ class TimeHelper {
     };
   }
 
+  static getKSTDate(date = null) {
+    const momentDate = date ? this.safeMoment(date) : this.now();
+    if (!momentDate) return null;
+
+    // 시간을 00:00:00으로 설정하여 날짜만 반환
+    return momentDate.startOf("day").toDate();
+  }
+
   /**
    * ℹ️ TimeHelper 정보 반환 (업데이트됨)
    */

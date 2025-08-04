@@ -464,25 +464,29 @@ ${data.message}
    * 📊 통계 렌더링
    */
   async renderStats(data, ctx) {
-    const { userName, stats } = data;
+    const {
+      userName,
+      totalDraws = 0,
+      todayDraws = 0,
+      favoriteCard,
+      _typeStats = {}
+    } = data;
 
     let text = `📊 *${userName}님의 타로 통계*\n\n`;
 
     text += `🎴 *전체 통계*\n`;
-    text += `• 총 뽑기 횟수: ${stats.totalDraws}번\n`;
-    text += `• 오늘 뽑기 횟수: ${stats.todayDraws}번\n`;
-    text += `• 연속 뽑기: ${stats.streak}일\n`;
-    text += `• 선호 타입: ${this.getFortuneTypeName(stats.favoriteType)}\n`;
+    text += `• 총 뽑기 횟수: ${totalDraws}번\n`;
+    text += `• 오늘 뽑기 횟수: ${todayDraws}번\n`;
 
-    if (stats.accuracy) {
-      text += `• 만족도: ${stats.accuracy}%\n`;
+    if (favoriteCard) {
+      text += `• 가장 많이 나온 카드: ${favoriteCard}\n`;
     }
     text += `\n`;
 
-    // 레벨 시스템
-    const level = Math.floor(stats.totalDraws / 10) + 1;
+    // 레벨 시스템 (stats.totalDraws를 data의 totalDraws로 변경)
+    const level = Math.floor(totalDraws / 10) + 1;
     const nextLevelDraws = level * 10;
-    const remaining = nextLevelDraws - stats.totalDraws;
+    const remaining = nextLevelDraws - totalDraws;
 
     text += `🏆 *타로 레벨*: ${level}레벨\n`;
     text += `📈 *다음 레벨까지*: ${remaining}번 남음\n\n`;
@@ -506,15 +510,15 @@ ${data.message}
    * 📋 기록 렌더링
    */
   async renderHistory(data, ctx) {
-    const { history, totalCount } = data;
+    const { userName, records = [], total = 0, message } = data;
 
-    let text = `📋 *타로 뽑기 기록* (${totalCount}건)\n\n`;
+    let text = `📋 *${userName}님의 타로 뽑기 기록* (${total}건)\n\n`;
 
-    if (history.length === 0) {
-      text += `아직 뽑은 기록이 없습니다.\n\n`;
+    if (records.length === 0) {
+      text += message || `아직 뽑은 기록이 없습니다.\n\n`;
       text += `첫 번째 운세를 뽑아보세요! 🔮`;
     } else {
-      history.slice(0, 10).forEach((record, index) => {
+      records.slice(0, 10).forEach((record, index) => {
         const cardName =
           record.koreanName ||
           record.cardName ||
@@ -533,12 +537,12 @@ ${data.message}
           text += `   💬 ${record.doomockComment}\n`;
         }
         text += `\n`;
-      });
+      }); // forEach 닫기
 
-      if (history.length > 10) {
-        text += `... 그 외 ${history.length - 10}건의 기록\n\n`;
+      if (records.length > 10) {
+        text += `... 그 외 ${records.length - 10}건의 기록\n\n`;
       }
-    }
+    } // else 닫기
 
     const buttons = [
       [
