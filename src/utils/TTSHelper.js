@@ -27,7 +27,11 @@ class TTSService {
   }
 
   async handleTTSCommand(bot, chatId, userId, text) {
-    await bot.sendMessage(chatId, `🔊 [TTS] 수동 명령어 실행됨: ${text}`);
+    await MessageHelper.sendMessage(
+      bot,
+      chatId,
+      `🔊 [TTS] 수동 명령어 실행됨: ${text}`
+    );
   }
 
   async handleTTSCallback(bot, callbackQuery, params) {

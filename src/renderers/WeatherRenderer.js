@@ -176,7 +176,6 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
 💧 습도: ${weather.humidity}%
 ☁️ 구름: ${weather.cloudiness}%
 💨 바람: ${weather.windSpeed}m/s
-
 **${weather.description}**`;
 
     // 미세먼지 정보 추가
@@ -285,19 +284,16 @@ ${userName}님의 기본 도시가 **${city.name}**로 설정되었습니다.
     const { _config, majorCities, features } = data;
 
     let text = `❓ **날씨 모듈 도움말**
-
 **주요 기능:**
 • ${features.weather} - 온도, 습도, 구름량 등
 • ${features.cities} - ${majorCities.map((c) => c.name).join(", ")}
 ${features.dust ? `• ${features.dust}` : ""}
 ${features.forecast ? `• ${features.forecast}` : ""}
 • ${features.setting}
-
 **사용 방법:**
 • 채팅창에 "날씨" 또는 "서울 날씨"라고 입력
 • 버튼을 눌러 도시별 날씨 확인
 • ⭐ 버튼으로 자주 보는 도시를 기본 설정
-
 **팁:**
 • 날씨 정보는 5분마다 업데이트됩니다
 • 기본 도시를 설정하면 더 빠르게 확인 가능`;

@@ -237,7 +237,7 @@ ${this.markdownStyles.bold("원하는 기능을 선택해주세요\\!")}
 
     try {
       if (bot && chatId) {
-        await bot.sendMessage(chatId, menuText, this.telegramOptions);
+        await this.sendMessage(chatId, menuText, this.telegramOptions);
       }
     } catch (error) {
       console.log(chalk.red("❌ 텔레그램 메시지 전송 실패:"), error.message);
@@ -263,7 +263,7 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
 
       try {
         if (bot && chatId) {
-          await bot.sendMessage(chatId, emptyText, this.telegramOptions);
+          await this.sendMessage(chatId, emptyText, this.telegramOptions);
         }
       } catch (error) {
         console.log(chalk.red("❌ 빈 할일 목록 전송 실패:"), error.message);
@@ -306,7 +306,7 @@ ${this.markdownStyles.italic("등록된 할일이 없습니다\\.")}
 
     try {
       if (bot && chatId) {
-        await bot.sendMessage(chatId, todoText, this.telegramOptions);
+        await this.sendMessage(chatId, todoText, this.telegramOptions);
       }
     } catch (error) {
       console.log(chalk.red("❌ 할일 목록 전송 실패:"), error.message);
@@ -336,7 +336,7 @@ ${this.escape(message)}${details ? `\n\n${this.markdownStyles.code(JSON.stringif
 
     try {
       if (bot && chatId) {
-        await bot.sendMessage(chatId, telegramText, this.telegramOptions);
+        await this.sendMessage(chatId, telegramText, this.telegramOptions);
       }
     } catch (error) {
       console.log(chalk.red("❌ 성공 메시지 전송 실패:"), error.message);
@@ -366,7 +366,7 @@ ${this.markdownStyles.italic("잠시 후 다시 시도해주세요\\.")}`;
 
     try {
       if (bot && chatId) {
-        await bot.sendMessage(chatId, telegramText, this.telegramOptions);
+        await this.sendMessage(chatId, telegramText, this.telegramOptions);
       }
     } catch (error) {
       console.log(chalk.red("❌ 에러 메시지 전송 실패:"), error.message);

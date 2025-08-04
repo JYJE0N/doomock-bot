@@ -750,7 +750,7 @@ class LeaveModule extends BaseModule {
             if (bot.telegram) {
               return bot.telegram.sendMessage(msg.chat.id, text, options);
             } else if (bot.sendMessage) {
-              return bot.sendMessage(msg.chat.id, text, options);
+              return this.sendMessage(msg.chat.id, text, options);
             } else {
               throw new Error("Bot API not found");
             }
@@ -760,7 +760,7 @@ class LeaveModule extends BaseModule {
             if (bot.telegram) {
               return bot.telegram.sendMessage(msg.chat.id, text, opts);
             } else if (bot.sendMessage) {
-              return bot.sendMessage(msg.chat.id, text, opts);
+              return this.sendMessage(msg.chat.id, text, opts);
             }
           },
           replyWithHTML: async (text, options) => {
@@ -768,7 +768,7 @@ class LeaveModule extends BaseModule {
             if (bot.telegram) {
               return bot.telegram.sendMessage(msg.chat.id, text, opts);
             } else if (bot.sendMessage) {
-              return bot.sendMessage(msg.chat.id, text, opts);
+              return this.sendMessage(msg.chat.id, text, opts);
             }
           },
           editMessageText: async (text, options) => {
@@ -809,7 +809,7 @@ class LeaveModule extends BaseModule {
           parse_mode: "Markdown"
         });
       } else if (bot.sendMessage) {
-        await bot.sendMessage(msg.chat.id, message);
+        await MessageHelper.sendMessage(bot, msg.chat.id, message);
       } else {
         logger.error("❌ Bot API를 찾을 수 없습니다");
       }
@@ -826,9 +826,9 @@ class LeaveModule extends BaseModule {
       const fallbackText = "요청이 처리되었습니다. 다시 시도해주세요.";
 
       if (bot.telegram) {
-        await bot.telegram.sendMessage(msg.chat.id, fallbackText);
+        await MessageHelper.sendMessage(bot, msg.chat.id, fallbackText);
       } else if (bot.sendMessage) {
-        await bot.sendMessage(msg.chat.id, fallbackText);
+        await MessageHelper.sendMessage(bot, msg.chat.id, fallbackText);
       } else {
         logger.error("❌ Fallback: Bot API를 찾을 수 없습니다");
       }

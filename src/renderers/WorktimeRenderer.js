@@ -401,7 +401,6 @@ ${performance.emoji} **평가**: ${performance.txt}`;
     } = data;
 
     let text = `📊 **근무 통계**
-
 **전체 통계**
 • 총 근무일: ${overall.totalDays || 0}일
 • 총 근무시간: ${overall.totalHours || 0}시간
@@ -409,7 +408,6 @@ ${performance.emoji} **평가**: ${performance.txt}`;
 
     if (thisMonth.workDays) {
       text += `
-
 **이번 달**
 • 근무일: ${thisMonth.workDays}일
 • 총 시간: ${thisMonth.totalHours}시간
@@ -418,7 +416,6 @@ ${performance.emoji} **평가**: ${performance.txt}`;
 
     if (lastMonth.workDays) {
       text += `
-
 **지난 달**
 • 근무일: ${lastMonth.workDays}일
 • 총 시간: ${lastMonth.totalHours}시간

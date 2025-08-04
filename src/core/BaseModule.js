@@ -1,8 +1,9 @@
 // src/core/BaseModule.js
 const logger = require("../utils/Logger");
+const MessageHelper = require("../utils/MessageHelper");
 
 /**
- * 🏗️ BaseModule - 모든 모듈의 부모 클래스
+ * 🏗️ BaseModule - 모든 모듈의 부모 클래스 (MessageHelper 통합)
  */
 class BaseModule {
   constructor(moduleName, options = {}) {
@@ -135,6 +136,103 @@ class BaseModule {
       actionCount: this.actionMap.size,
       actions: Array.from(this.actionMap.keys())
     };
+  }
+
+  // ============================================
+  // 🚀 MessageHelper 통합 메서드들 (새로 추가)
+  // ============================================
+
+  /**
+   * 메시지 전송 (자동 Markdown 파싱)
+   */
+  async sendMessage(chatId, text, options = {}) {
+    return await MessageHelper.sendMessage(this.bot, chatId, text, options);
+  }
+
+  /**
+   * ctx로 메시지 전송
+   */
+  async send(ctx, text, options = {}) {
+    return await MessageHelper.send(ctx, text, options);
+  }
+
+  /**
+   * 콜백쿼리에서 메시지 편집
+   */
+  async editMessage(callbackQuery, text, options = {}) {
+    const ctx = MessageHelper.createCtx(this.bot, callbackQuery);
+    return await ctx.editMessageText(text, {
+      parse_mode: "Markdown",
+      ...options
+    });
+  }
+
+  /**
+   * 메시지 응답 (일반 메시지용)
+   */
+  async reply(msg, text, options = {}) {
+    const ctx = MessageHelper.createCtx(this.bot, msg);
+    return await MessageHelper.send(ctx, text, options);
+  }
+
+  /**
+   * ctx 생성 헬퍼
+   */
+  createCtx(msgOrCallback) {
+    return MessageHelper.createCtx(this.bot, msgOrCallback);
+  }
+
+  /**
+   * 텍스트 스타일링 헬퍼들
+   */
+  bold(text) {
+    return MessageHelper.bold(text);
+  }
+
+  italic(text) {
+    return MessageHelper.italic(text);
+  }
+
+  code(text) {
+    return MessageHelper.code(text);
+  }
+
+  escape(text) {
+    return MessageHelper.escape(text);
+  }
+
+  /**
+   * 렌더러로 결과 전달 (수정된 버전)
+   */
+  async sendToRenderer(result, msgOrCallback) {
+    try {
+      // NavigationHandler를 통해 렌더러 접근
+      if (this.moduleManager?.navigationHandler?.renderers) {
+        const renderer = this.moduleManager.navigationHandler.renderers.get(
+          this.moduleName
+        );
+
+        if (renderer) {
+          const ctx = this.createCtx(msgOrCallback);
+          await renderer.render(result, ctx);
+          return true;
+        }
+      }
+
+      // 렌더러가 없으면 직접 메시지 전송
+      logger.warn(`⚠️ ${this.moduleName}: 렌더러를 찾을 수 없어 직접 전송`);
+
+      const message = result.data?.message || "처리가 완료되었습니다.";
+      const chatId = msgOrCallback.message
+        ? msgOrCallback.message.chat.id
+        : msgOrCallback.chat.id;
+
+      await this.sendMessage(chatId, message);
+      return true;
+    } catch (error) {
+      logger.error(`❌ ${this.moduleName}: 렌더러 전달 실패:`, error);
+      return false;
+    }
   }
 }
 
