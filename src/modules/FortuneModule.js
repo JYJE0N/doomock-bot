@@ -439,7 +439,11 @@ class FortuneModule extends BaseModule {
       }
 
       // 애니메이션 효과
-      await AnimationHelper.showShuffleAnimation(bot, callbackQuery);
+      await AnimationHelper.performShuffle(
+        bot,
+        callbackQuery.message.chat.id,
+        callbackQuery.message.message_id
+      ); // <- 이렇게 수정해주세요.
 
       return {
         type: "shuffle_result",
