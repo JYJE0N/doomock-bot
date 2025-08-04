@@ -393,7 +393,10 @@ class FortuneModule extends BaseModule {
             data: {
               ...result.data,
               userName: getUserName(user),
-              fortuneType: this.config.fortuneTypes[fortuneType]
+              fortuneType: this.config.fortuneTypes[fortuneType],
+              maxDrawsPerDay: this.config.maxDrawsPerDay, // 추가
+              remainingDraws: result.data?.remainingDraws || 0, // 확실히 전달
+              todayDraws: result.data?.todayDraws || 0 // 추가
             }
           };
         }
@@ -405,7 +408,10 @@ class FortuneModule extends BaseModule {
           data: {
             ...result.data,
             userName: getUserName(user),
-            fortuneType: this.config.fortuneTypes[fortuneType]
+            fortuneType: this.config.fortuneTypes[fortuneType],
+            maxDrawsPerDay: this.config.maxDrawsPerDay, // 추가
+            remainingDraws: result.data?.remainingDraws || 0, // 확실히 전달
+            todayDraws: result.data?.todayDraws || 0 // 추가
           }
         };
       }

@@ -294,10 +294,10 @@ class FortuneRenderer extends BaseRenderer {
       const positionNames = {
         present: "현재 상황",
         challenge: "도전/장애물",
-        past: "원인/과거",
+        distant_past: "원인/과거", // past → distant_past
+        recent_past: "최근 과거", // 추가
         future: "가능한 미래",
-        conscious: "의식적 접근",
-        unconscious: "무의식적 영향",
+        immediate_future: "가까운 미래", // 추가
         approach: "당신의 접근법",
         environment: "외부 환경",
         hopes_fears: "희망과 두려움",
