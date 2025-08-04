@@ -107,22 +107,22 @@ class TodoService extends BaseService {
           .lean()
       ]);
 
-      // 🔔 각 할일의 리마인더 상태 확인 (성능 최적화)
+      // 🔔 리마인더 상태 확인 (핵심 수정!)
       if (this.models.Reminder && todos.length > 0) {
         const todoIds = todos.map((todo) => todo._id);
 
-        // 활성 리마인더가 있는 할일 ID들 조회
+        // 🎯 활성 리마인더 조회 (정확한 조건)
         const activeReminders = await this.models.Reminder.find({
           userId: userId.toString(),
           todoId: { $in: todoIds },
           isActive: true,
           completed: { $ne: true },
-          sentAt: { $exists: false }
+          sentAt: { $exists: false } // 아직 발송되지 않은 것만
         })
-          .select("todoId")
+          .select("todoId reminderTime")
           .lean();
 
-        // Set으로 빠른 조회를 위한 변환
+        // Set으로 빠른 조회
         const reminderTodoIds = new Set(
           activeReminders.map((r) => r.todoId.toString())
         );
@@ -131,6 +131,10 @@ class TodoService extends BaseService {
         todos.forEach((todo) => {
           todo.hasActiveReminder = reminderTodoIds.has(todo._id.toString());
         });
+
+        logger.debug(
+          `리마인더 상태 확인: ${activeReminders.length}개 활성 리마인더`
+        );
       }
 
       return this.createSuccessResponse({
@@ -141,12 +145,13 @@ class TodoService extends BaseService {
         enableReminders: !!this.models.Reminder
       });
     } catch (error) {
+      logger.error("할일 목록 조회 실패:", error);
       return this.createErrorResponse(error, "할일 목록 조회 실패");
     }
   }
 
   /**
-   * 🗑️ 리마인더 해제/삭제 (새로 추가)
+   * 🗑️ 리마인더 해제 (todoId 기반)
    */
   async removeReminder(userId, todoId) {
     try {
@@ -178,8 +183,11 @@ class TodoService extends BaseService {
       reminder.cancelledAt = new Date();
       await reminder.save();
 
+      logger.info(`🔕 리마인더 해제: ${userId} - todoId: ${todoId}`);
+
       return this.createSuccessResponse(null, "리마인더가 해제되었습니다.");
     } catch (error) {
+      logger.error("리마인더 해제 실패:", error);
       return this.createErrorResponse(error, "리마인더 해제 실패");
     }
   }

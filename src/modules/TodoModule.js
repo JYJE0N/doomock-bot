@@ -94,7 +94,7 @@ class TodoModule extends BaseModule {
       // 리마인더 액션
       remind_list: this.showReminders.bind(this),
       remind_add: this.addReminder.bind(this),
-      remind_remove: this.removeReminder.bind(this), // 🆕 추가
+      remind_remove: this.removeReminder.bind(this), // 🆕 추가!
       remind_delete: this.deleteReminder.bind(this),
 
       // 통계 액션
@@ -811,11 +811,11 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * 리마인더 시간 입력 처리
+   * 리마인더 시간 입력 처리 - 완전 수정 버전
    */
   async processReminderTimeInput(userId, text, todoId) {
     try {
-      // 🕐 TimeParseHelper로 자연어 시간 파싱
+      // 🕐 TimeParseHelper로 실제 자연어 파싱
       const TimeParseHelper = require("../utils/TimeParseHelper");
       const parseResult = TimeParseHelper.parseTimeText(text);
 
@@ -825,7 +825,7 @@ class TodoModule extends BaseModule {
           module: "todo",
           action: "error",
           data: {
-            message: `⏰ ${parseResult.error}\n\n다시 입력해주세요.\n예시: "30분 후", "내일 오후 3시", "2025-08-05 14:00"`,
+            message: `⏰ ${parseResult.error}\n\n예시: "30분 후", "내일 오후 3시"`,
             action: "remind_add",
             canRetry: true
           }
@@ -834,7 +834,7 @@ class TodoModule extends BaseModule {
 
       const remindAt = parseResult.datetime;
 
-      // 🔍 과거 시간 체크
+      // 과거 시간 체크
       const now = new Date();
       if (remindAt <= now) {
         return {
@@ -842,25 +842,7 @@ class TodoModule extends BaseModule {
           module: "todo",
           action: "error",
           data: {
-            message:
-              "⏰ 과거 시간으로는 리마인더를 설정할 수 없습니다.\n\n미래 시간을 입력해주세요.",
-            action: "remind_add",
-            canRetry: true
-          }
-        };
-      }
-
-      // 🚫 너무 먼 미래 체크 (1년 후까지만)
-      const oneYearLater = new Date();
-      oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
-      if (remindAt > oneYearLater) {
-        return {
-          type: "error",
-          module: "todo",
-          action: "error",
-          data: {
-            message:
-              "⏰ 1년 이후로는 리마인더를 설정할 수 없습니다.\n\n1년 이내의 시간을 입력해주세요.",
+            message: "⏰ 과거 시간으로는 리마인더를 설정할 수 없습니다.",
             action: "remind_add",
             canRetry: true
           }
@@ -875,7 +857,7 @@ class TodoModule extends BaseModule {
           module: "todo",
           action: "error",
           data: {
-            message: "할일 정보를 찾을 수 없습니다.",
+            message: "할일을 찾을 수 없습니다.",
             action: "remind_add",
             canRetry: false
           }
@@ -903,7 +885,7 @@ class TodoModule extends BaseModule {
         };
       }
 
-      // 🎯 성공 메시지에 파싱된 시간 정보 포함
+      // 🎯 성공 응답 (할일 목록으로 자동 리다이렉트)
       const TimeHelper = require("../utils/TimeHelper");
       const formattedTime = TimeHelper.format(remindAt, "full");
 
@@ -912,12 +894,11 @@ class TodoModule extends BaseModule {
         module: "todo",
         action: "success",
         data: {
-          message: `⏰ 리마인더가 설정되었습니다!\n\n📅 ${formattedTime}에 알려드릴게요!`,
+          message: `⏰ 리마인더 설정 완료!\n\n📅 ${formattedTime}에 알려드릴게요!`,
           reminder: result.data,
           reminderTime: formattedTime,
-          parsedInfo: parseResult.parsedInfo, // 파싱 정보도 함께 전달
           action: "remind_add",
-          redirectTo: "list"
+          redirectTo: "list" // 할일 목록으로 자동 이동
         }
       };
     } catch (error) {
@@ -936,7 +917,7 @@ class TodoModule extends BaseModule {
   }
 
   /**
-   * 🔕 리마인더 해제 (새로 추가)
+   * 🔕 리마인더 해제
    */
   async removeReminder(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
@@ -956,6 +937,7 @@ class TodoModule extends BaseModule {
     }
 
     try {
+      // 🎯 해당 할일의 활성 리마인더 찾아서 해제
       const result = await this.todoService.removeReminder(userId, todoId);
 
       if (!result.success) {
@@ -978,7 +960,7 @@ class TodoModule extends BaseModule {
         data: {
           message: "🔕 리마인더가 해제되었습니다!",
           action: "remind_remove",
-          redirectTo: "list"
+          redirectTo: "list" // 할일 목록으로 자동 이동
         }
       };
     } catch (error) {
