@@ -1,8 +1,18 @@
-// src/modules/SystemModule.js - 표준 매개변수 적용 버전
+// ===== 🖥️ SystemModule.js - 완전 통합 버전 =====
+
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const { getUserId, getUserName } = require("../utils/UserHelper");
-const os = require("os");
+
+// 🔧 강화된 헬퍼들 import
+const {
+  getCompleteSystemSnapshot,
+  formatMemoryUsage,
+  formatUptime,
+  _getSystemHealth
+} = require("../utils/SystemHelper");
+
+const { StatusHelper } = require("../utils/StatusHelper");
 
 class SystemModule extends BaseModule {
   constructor(moduleName, options = {}) {
@@ -12,6 +22,7 @@ class SystemModule extends BaseModule {
       maxLogLines: 50,
       botVersion: process.env.BOT_VERSION || "4.0.0",
       enableDetailedStats: true,
+      enableHealthScoring: true, // 🆕 건강도 점수 활성화
       ...options.config
     };
 
@@ -19,7 +30,8 @@ class SystemModule extends BaseModule {
       startTime: Date.now(),
       totalCallbacks: 0,
       totalMessages: 0,
-      uniqueUsers: new Set()
+      uniqueUsers: new Set(),
+      lastHealthCheck: null // 🆕 마지막 건강도 체크
     };
   }
 
@@ -28,7 +40,14 @@ class SystemModule extends BaseModule {
    */
   async onInitialize() {
     try {
-      // 필요한 서비스 초기화
+      // 초기 시스템 스냅샷 수집
+      const initialSnapshot = getCompleteSystemSnapshot();
+      logger.info("🖥️ SystemModule 초기화 - 시스템 스냅샷:", {
+        platform: initialSnapshot.basic?.platform,
+        memory: initialSnapshot.memory?.process?.heapUsed + "MB",
+        health: initialSnapshot.health?.overall?.score
+      });
+
       logger.success("✅ SystemModule 초기화 완료");
     } catch (error) {
       logger.error("❌ SystemModule 초기화 실패:", error);
@@ -43,67 +62,186 @@ class SystemModule extends BaseModule {
     this.registerActions({
       menu: this.showMainMenu,
       help: this.showHelp,
-      // about: this.showAbout,
       status: this.showSystemStatus,
-      // info: this.showSystemInfo,
-      // health: this.showHealthStatus,
       modules: this.showModuleStatus,
-      // stats: this.showSystemStats,
-      // logs: this.showRecentLogs,
-      ping: this.handlePing
-      // version: this.showVersion,
+      ping: this.handlePing,
+      health: this.showSystemHealth // 🆕 건강도 전용 액션
     });
   }
 
   /**
-   * 🏠 메인 메뉴 (표준 매개변수 5개)
+   * 🏠 메인 메뉴 (SystemHelper + StatusHelper 활용!)
    */
   async showMainMenu(bot, callbackQuery, subAction, params, moduleManager) {
     const userName = getUserName(callbackQuery.from);
-    const activeModules = Array.from(moduleManager.modules.keys());
+
+    // 🔧 SystemHelper로 완전한 시스템 정보 수집
+    const systemSnapshot = getCompleteSystemSnapshot();
+
+    // 📊 StatusHelper로 모듈 상태 분석
+    const rawModuleStatuses = {};
+    for (const [key, module] of moduleManager.modules) {
+      if (key !== "system") {
+        // 자기 자신 제외
+        rawModuleStatuses[key] = module.getStatus();
+      }
+    }
+
+    const moduleStatusSummary =
+      StatusHelper.summarizeMultipleStatuses(rawModuleStatuses);
+
+    // 🎯 통계 업데이트
+    this.updateStats(getUserId(callbackQuery.from), "callback");
 
     return {
       type: "menu",
       module: "system",
       data: {
         userName,
-        activeModules: activeModules.map((key) => ({
-          key,
-          name: key.charAt(0).toUpperCase() + key.slice(1),
-          emoji: this.getModuleEmoji(key)
+
+        // 🆕 강화된 모듈 정보 (StatusHelper 활용)
+        activeModules: moduleStatusSummary.details.map((detail) => ({
+          key: detail.name,
+          name: detail.name.charAt(0).toUpperCase() + detail.name.slice(1),
+          emoji: this.getModuleEmoji(detail.name),
+          status: detail.status,
+          healthy: detail.score >= 70,
+          score: detail.score
         })),
-        systemStats: this.getBasicStats()
+
+        // 🆕 강화된 시스템 통계 (SystemHelper 활용)
+        systemStats: {
+          uptime: this.getUptime(),
+          totalCallbacks: this.systemStats.totalCallbacks,
+          uniqueUsers: this.systemStats.uniqueUsers.size,
+
+          // SystemHelper에서 제공하는 고급 정보
+          memoryUsage: systemSnapshot.memory?.process?.heapUsed || 0,
+          memoryPercent: systemSnapshot.memory?.process?.percentage || 0,
+          cpuUsage: systemSnapshot.cpu?.usage || 0,
+          healthScore: systemSnapshot.health?.overall?.score || 0,
+          environment: systemSnapshot.environment?.cloud?.provider || "Local"
+        },
+
+        // 🆕 모듈 건강도 요약
+        moduleHealth: {
+          overall: moduleStatusSummary.overall,
+          totalCount: moduleStatusSummary.summary.total,
+          healthyCount: moduleStatusSummary.summary.healthy,
+          warningCount: moduleStatusSummary.summary.warning,
+          criticalCount: moduleStatusSummary.summary.critical
+        }
       }
     };
   }
 
   /**
-   * ❓ 도움말 표시 (표준 매개변수 5개)
+   * ❓ 도움말 표시 (완전 강화!)
    */
   async showHelp(bot, callbackQuery, subAction, params, moduleManager) {
+    // 📊 실시간 모듈 정보 수집
+    const moduleStatuses = {};
+    for (const [key, module] of moduleManager.modules) {
+      if (key !== "system") {
+        moduleStatuses[key] = module.getStatus();
+      }
+    }
+
+    const rendererData = StatusHelper.prepareForRenderer(moduleStatuses);
+
     return {
       type: "help",
       module: "system",
       data: {
         version: this.config.botVersion,
+        userName: getUserName(callbackQuery.from),
+
+        // 🆕 동적 명령어 생성
         commands: this.getAvailableCommands(),
-        modules: this.getModulesInfo(moduleManager)
+
+        // 🆕 StatusHelper로 처리된 모듈 정보
+        modules: rendererData.modules,
+
+        // 🆕 시스템 추천사항
+        recommendations: rendererData.recommendations,
+
+        // 🆕 전체 시스템 건강도
+        systemHealth: rendererData.overall
       }
     };
   }
 
   /**
-   * 📊 시스템 상태 표시 (표준 매개변수 5개)
+   * 📊 시스템 상태 표시 (완전 강화!)
    */
   async showSystemStatus(bot, callbackQuery, subAction, params, moduleManager) {
     try {
+      // 🔧 SystemHelper로 완전한 시스템 스냅샷 수집
+      const snapshot = getCompleteSystemSnapshot();
+
+      // 📊 StatusHelper로 모듈 상태 분석
+      const moduleStatuses = {};
+      for (const [key, module] of moduleManager.modules) {
+        moduleStatuses[key] = module.getStatus();
+      }
+
+      const statusData = StatusHelper.prepareForRenderer(moduleStatuses);
+
+      // 🏥 마지막 건강도 체크 시간 업데이트
+      this.systemStats.lastHealthCheck = Date.now();
+
       return {
         type: "status",
         module: "system",
         data: {
-          system: this.getSystemInfo(),
-          process: this.getProcessInfo(),
-          modules: this.getModulesStatusData(moduleManager)
+          // 🆕 완전한 시스템 정보 (SystemHelper)
+          system: {
+            platform: snapshot.basic.platform,
+            nodeVersion: snapshot.basic.nodeVersion,
+            pid: snapshot.basic.pid,
+            uptime: formatUptime(snapshot.basic.uptime * 1000),
+            memory: formatMemoryUsage(),
+            arch: snapshot.basic.arch,
+
+            // 고급 정보
+            environment: snapshot.environment.nodeEnv,
+            cloudProvider: snapshot.environment.cloud.provider,
+            isDocker: snapshot.environment.cloud.isDocker,
+
+            // 성능 정보
+            cpuModel: snapshot.cpu.model,
+            cpuCores: snapshot.cpu.cores,
+            cpuUsage: snapshot.cpu.usage,
+
+            // 네트워크 정보
+            networkInterfaces: snapshot.network.count,
+            hostname: snapshot.network.hostname,
+
+            // 건강도 정보
+            overallHealthScore: snapshot.health.overall.score,
+            healthStatus: snapshot.health.overall.status,
+            recommendations: snapshot.health.recommendations
+          },
+
+          // 🆕 상세 메모리 정보 (SystemHelper)
+          memory: {
+            process: snapshot.memory.process,
+            system: snapshot.memory.system,
+            health: snapshot.memory.health
+          },
+
+          // 🆕 StatusHelper로 처리된 모듈 정보
+          modules: statusData.modules,
+          moduleHealth: statusData.overall,
+
+          // 기본 정보
+          uptime: formatUptime(snapshot.basic.uptime * 1000),
+          status:
+            snapshot.health.overall.status === "excellent"
+              ? "healthy"
+              : "warning",
+          moduleCount: statusData.modules.length,
+          lastHealthCheck: this.systemStats.lastHealthCheck
         }
       };
     } catch (error) {
@@ -116,44 +254,183 @@ class SystemModule extends BaseModule {
   }
 
   /**
-   * 📱 모듈 상태 표시 (표준 매개변수 5개)
+   * 🏥 시스템 건강도 상세 표시 (새로 추가!)
    */
-  async showModuleStatus(bot, callbackQuery, subAction, params, moduleManager) {
+  async showSystemHealth(bot, callbackQuery, subAction, params, moduleManager) {
     try {
-      const modulesData = this.getModulesStatusData(moduleManager);
+      const snapshot = getCompleteSystemSnapshot();
+      const moduleStatuses = {};
+
+      for (const [key, module] of moduleManager.modules) {
+        moduleStatuses[key] = module.getStatus();
+      }
+
+      const statusSummary =
+        StatusHelper.summarizeMultipleStatuses(moduleStatuses);
 
       return {
-        type: "modules",
+        type: "health",
         module: "system",
-        data: modulesData
+        data: {
+          // 전체 건강도
+          overall: {
+            score: snapshot.health.overall.score,
+            status: snapshot.health.overall.status,
+            timestamp: snapshot.meta.collectedAt
+          },
+
+          // 구성요소별 건강도
+          components: {
+            memory: snapshot.memory.health,
+            cpu: snapshot.cpu.health,
+            disk: snapshot.disk.health,
+            network: snapshot.network.health,
+            modules: statusSummary.overall
+          },
+
+          // 추천사항
+          recommendations: [
+            ...snapshot.health.recommendations,
+            ...statusSummary.recommendations
+          ],
+
+          // 상세 분석
+          analysis: {
+            strengths: this.analyzeStrengths(snapshot),
+            concerns: this.analyzeConcerns(snapshot, statusSummary),
+            trends: this.analyzeTrends()
+          }
+        }
       };
     } catch (error) {
-      logger.error("모듈 상태 조회 실패:", error);
+      logger.error("시스템 건강도 조회 실패:", error);
       return {
         type: "error",
-        message: "모듈 상태를 확인할 수 없습니다."
+        message: "건강도 정보를 확인할 수 없습니다."
       };
     }
   }
 
+  // ===== 🔧 강화된 헬퍼 메서드들 =====
+
   /**
-   * 🏓 핑 처리 (표준 매개변수 5개)
+   * 🔧 사용 가능한 명령어 목록 (동적 생성)
    */
-  async handlePing(bot, callbackQuery, subAction, params, moduleManager) {
-    const startTime = Date.now();
-    const responseTime = Date.now() - startTime;
+  getAvailableCommands() {
+    const systemCommands = [
+      { command: "/start", description: "봇 시작 및 메인 메뉴" },
+      { command: "/help", description: "도움말 보기" },
+      { command: "/status", description: "시스템 상태 확인" }
+    ];
+
+    // 🆕 환경에 따른 동적 명령어 추가
+    const snapshot = getCompleteSystemSnapshot();
+    if (snapshot.environment?.cloud?.isRailway) {
+      systemCommands.push({
+        command: "/railway",
+        description: "Railway 환경 정보"
+      });
+    }
+
+    return systemCommands;
+  }
+
+  /**
+   * 📊 통계 업데이트 (StatusHelper 통합)
+   */
+  updateStats(userId, action = "callback") {
+    const oldStats = { ...this.systemStats };
+
+    if (action === "callback") {
+      this.systemStats.totalCallbacks++;
+    } else if (action === "message") {
+      this.systemStats.totalMessages++;
+    }
+
+    if (userId) {
+      this.systemStats.uniqueUsers.add(userId);
+    }
+
+    this.systemStats.lastActivity = Date.now();
+
+    // 🆕 StatusHelper로 변화 감지
+    const change = StatusHelper.detectStatusChange(oldStats, this.systemStats);
+    if (change.changed && change.needsAlert) {
+      logger.info(`📊 시스템 통계 변화: ${change.message}`);
+    }
+  }
+
+  /**
+   * 💪 시스템 강점 분석 (새로 추가!)
+   */
+  analyzeStrengths(snapshot) {
+    const strengths = [];
+
+    if (snapshot.health.overall.score >= 90) {
+      strengths.push("🏆 전체 시스템이 매우 안정적입니다");
+    }
+
+    if (snapshot.memory.health.score >= 80) {
+      strengths.push("💾 메모리 사용량이 최적화되어 있습니다");
+    }
+
+    if (snapshot.cpu.health.score >= 80) {
+      strengths.push("🖥️ CPU 성능이 우수합니다");
+    }
+
+    if (snapshot.basic.uptime > 86400) {
+      // 1일 이상
+      strengths.push("⏱️ 시스템이 장시간 안정적으로 작동 중입니다");
+    }
+
+    return strengths;
+  }
+
+  /**
+   * ⚠️ 시스템 우려사항 분석 (새로 추가!)
+   */
+  analyzeConcerns(snapshot, statusSummary) {
+    const concerns = [];
+
+    if (snapshot.health.overall.score < 60) {
+      concerns.push("🚨 전체 시스템 건강도가 낮습니다");
+    }
+
+    if (statusSummary.summary.critical > 0) {
+      concerns.push(
+        `❌ ${statusSummary.summary.critical}개 모듈이 위험 상태입니다`
+      );
+    }
+
+    if (snapshot.memory.health.score < 50) {
+      concerns.push("💾 메모리 사용량이 높습니다");
+    }
+
+    if (snapshot.cpu.usage > 80) {
+      concerns.push("🖥️ CPU 사용률이 높습니다");
+    }
+
+    return concerns;
+  }
+
+  /**
+   * 📈 시스템 트렌드 분석 (새로 추가!)
+   */
+  analyzeTrends() {
+    const uptime = Date.now() - this.systemStats.startTime;
+    const hourlyCallbacks =
+      this.systemStats.totalCallbacks / (uptime / 3600000);
 
     return {
-      type: "ping",
-      module: "system",
-      data: {
-        responseTime,
-        status: "pong"
-      }
+      uptime: formatUptime(uptime),
+      callbackRate: Math.round(hourlyCallbacks * 100) / 100,
+      activeUsers: this.systemStats.uniqueUsers.size,
+      trend:
+        hourlyCallbacks > 10 ? "high" : hourlyCallbacks > 5 ? "normal" : "low"
     };
   }
 
-  // 헬퍼 메서드들...
+  // 기존 메서드들 유지...
   getModuleEmoji(moduleKey) {
     const emojiMap = {
       todo: "📝",
@@ -177,18 +454,6 @@ class SystemModule extends BaseModule {
     const hours = Math.floor(uptimeMs / 3600000);
     const minutes = Math.floor((uptimeMs % 3600000) / 60000);
     return `${hours}시간 ${minutes}분`;
-  }
-
-  getModulesStatusData(moduleManager) {
-    const modules = [];
-    for (const [key, module] of moduleManager.modules) {
-      modules.push({
-        name: key,
-        status: module.getStatus(),
-        initialized: module.isInitialized
-      });
-    }
-    return modules;
   }
 }
 
