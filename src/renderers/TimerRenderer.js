@@ -220,10 +220,10 @@ class TimerRenderer extends BaseRenderer {
   // ===== 🎨 렌더링 메서드들 (UI 생성 전담!) =====
 
   /**
-   * 📊 실시간 업데이트용 상태 텍스트 생성 (TimerModule에서 사용)
+   * 📊 실시간 업데이트용 상태 텍스트 생성
    * @param {object} timerData - 타이머 데이터
    * @param {object} motivationData - 동기부여 데이터
-   * @returns {string} 포맷된 텍스트 (Telegram 메시지용)
+   * @returns {string} 포맷된 텍스트 (MarkdownV2 호환)
    */
   renderStatus(timerData, motivationData = {}) {
     try {
@@ -238,14 +238,18 @@ class TimerRenderer extends BaseRenderer {
       const motivationMsg = this.getMotivationMessage(motivationData);
       const detailedInfo = this.createDetailedTimeInfo(timer);
 
-      // Telegram MarkdownV2 호환 텍스트 생성
-      let text = `${statusIcon} *타이머 실시간 상태*\n\n`;
+      // MarkdownHelper 스타일 메서드 활용
+      const bold = (text) => this.markdownHelper?.bold(text) || `**${text}**`;
+      const italic = (text) => this.markdownHelper?.italic(text) || `_${text}_`;
+
+      // MarkdownV2 호환 텍스트 생성
+      let text = `${statusIcon} ${bold("타이머 실시간 상태")}\n\n`;
       text += `${progressBar}\n\n`;
       text += `${detailedInfo}\n\n`;
-      text += `🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}\n`;
-      text += `📊 *진행률*: ${timer.progress}%\n`;
-      text += `⏸️ *상태*: ${timer.isPaused ? "일시정지" : "실행중"}\n\n`;
-      text += `💬 ${motivationMsg}`;
+      text += `🎯 ${bold("타입")}: ${this.getTimerTypeDisplay(timer.type)}\n`;
+      text += `📊 ${bold("진행률")}: ${timer.progress}%\n`;
+      text += `⏸️ ${bold("상태")}: ${timer.isPaused ? "일시정지" : "실행중"}\n\n`;
+      text += `💬 ${italic(motivationMsg)}`;
 
       return text;
     } catch (error) {
@@ -611,16 +615,41 @@ ${message}
    * 📊 화려한 진행률 바 생성
    */
   createProgressBar(timer) {
-    const progress = Math.min(100, Math.max(0, timer.progress || 0));
-    const filledBlocks = Math.floor(
-      (progress / 100) * this.uiConstants.PROGRESS_BAR_LENGTH
-    );
-    const emptyBlocks = this.uiConstants.PROGRESS_BAR_LENGTH - filledBlocks;
+    if (!timer) return "";
 
-    const filled = this.uiConstants.FILLED_CHAR.repeat(filledBlocks);
-    const empty = this.uiConstants.EMPTY_CHAR.repeat(emptyBlocks);
+    const progress = timer.progress || 0;
+    const blocks = Math.floor(progress / this.uiConstants.PROGRESS_BLOCK_SIZE);
+    const emptyBlocks = this.uiConstants.PROGRESS_BAR_LENGTH - blocks;
 
-    return `${filled}${empty} ${progress}%`;
+    const filledBar = this.uiConstants.FILLED_CHAR.repeat(blocks);
+    const emptyBar = this.uiConstants.EMPTY_CHAR.repeat(emptyBlocks);
+
+    // 진행률에 따른 아이콘 선택
+    const progressIcon = this.getProgressIcon(timer);
+
+    return `${progressIcon} ${filledBar}${emptyBar} ${progress}%`;
+  }
+
+  /**
+   * 🎯 진행률 아이콘 선택 (새로운 메서드)
+   */
+  getProgressIcon(timer) {
+    const { type, progress } = timer;
+    const stage = this.getTimerStage(progress);
+
+    // 타입과 단계별 아이콘
+    const typeIcons =
+      this.uiConstants.TYPE_ICONS[type] || this.uiConstants.TYPE_ICONS.focus;
+    return typeIcons[stage] || typeIcons.main;
+  }
+
+  /**
+   * 📈 타이머 단계 계산 (헬퍼 메서드)
+   */
+  getTimerStage(progress) {
+    if (progress < 33) return "early";
+    if (progress < 67) return "middle";
+    return "late";
   }
 
   /**
@@ -668,13 +697,15 @@ ${message}
    * 📋 상세 시간 정보 생성
    */
   createDetailedTimeInfo(timer) {
-    const { remainingTime, elapsedTime, totalDuration } = timer;
+    if (!timer) return "";
 
-    let info = `⏱️ *경과시간*: ${this.formatTime(elapsedTime)}\n`;
-    info += `⏰ *남은시간*: ${this.formatTime(remainingTime)}\n`;
-    info += `📏 *전체시간*: ${this.formatTime(totalDuration)}`;
+    const elapsedTime = this.formatTime(timer.elapsedTime || 0);
+    const remainingTime = this.formatTime(timer.remainingTime || 0);
 
-    return info;
+    // MarkdownHelper 활용
+    const bold = (text) => this.markdownHelper?.bold(text) || `**${text}**`;
+
+    return `⏱️ ${bold("경과시간")}: ${elapsedTime}\n⏰ ${bold("남은시간")}: ${remainingTime}`;
   }
 
   /**
