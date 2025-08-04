@@ -3,7 +3,7 @@
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/Logger");
 const AnimationHelper = require("../utils/AnimationHelper");
-const { getUserId, getUserName } = require("../utils/UserHelper");
+const { getUserId, getUserName, isDeveloper } = require("../utils/UserHelper");
 
 /**
  * 🔮 FortuneModule - 타로 카드 운세 모듈
@@ -133,15 +133,16 @@ class FortuneModule extends BaseModule {
       const userId = getUserId(callbackQuery.from);
       const userName = getUserName(callbackQuery.from);
 
-      // 서비스 상태 확인
+      // 🎯 개발자 여부 직접 확인
+      const developerMode = isDeveloper(callbackQuery.from);
+
+      // 🎯 이 변수를 사용하도록 수정합니다.
       const serviceStatus = this.fortuneService?.getStatus() || {
         hasDatabase: false,
         stats: { totalDraws: 0 }
       };
 
-      // 오늘 뽑은 횟수 확인
       const todayInfo = await this.getTodayDrawInfo(userId);
-
       logger.debug(`🔮 Fortune 메뉴 표시: ${userName} (${userId})`);
 
       return {
@@ -152,10 +153,13 @@ class FortuneModule extends BaseModule {
           todayCount: todayInfo.todayCount,
           remainingDraws: todayInfo.remainingDraws,
           maxDrawsPerDay: this.config.maxDrawsPerDay,
+          canDraw: developerMode || todayInfo.remainingDraws > 0,
+          fortuneTypes: this.config.fortuneTypes,
+          isDeveloper: developerMode,
+          // ✨ 수정된 부분: serviceStatus 변수를 여기서 사용합니다.
           serviceConnected: !!this.fortuneService,
           hasDatabase: serviceStatus.hasDatabase,
-          totalServiceDraws: serviceStatus.stats?.totalDraws || 0,
-          fortuneTypes: this.config.fortuneTypes
+          totalServiceDraws: serviceStatus.stats?.totalDraws || 0
         }
       };
     } catch (error) {
@@ -182,7 +186,22 @@ class FortuneModule extends BaseModule {
 
       logger.info(`🎴 카드 뽑기 요청: ${userName} - ${fortuneType}`);
 
-      // 캘틱 크로스는 질문 입력 필요
+      // 🎯 개발자인 경우, 횟수 제한 검사 건너뛰기
+      if (!isDeveloper(callbackQuery.from)) {
+        const todayInfo = await this.getTodayDrawInfo(userId);
+        if (todayInfo.remainingDraws <= 0) {
+          return {
+            type: "daily_limit",
+            module: "fortune",
+            data: {
+              used: todayInfo.todayCount,
+              max: this.config.maxDrawsPerDay
+            }
+          };
+        }
+      }
+
+      // 🎯 캘틱 크로스는 질문 입력 필요
       if (fortuneType === "celtic") {
         return await this.askQuestion(
           bot,
@@ -257,9 +276,28 @@ class FortuneModule extends BaseModule {
       const userId = getUserId(msg.from);
       const { fortuneType, userName } = state;
 
-      logger.info(`💬 질문 입력 완료: ${userName} - "${question}"`);
+      // ✨ 질문 검증
+      if (!question || question.length < 10) {
+        const errorResult = {
+          type: "question_error",
+          module: "fortune",
+          data: { message: "질문은 최소 10자 이상 입력해주세요." }
+        };
+        // 렌더러로 에러 메시지 전송
+        await this.sendToRenderer(errorResult, msg);
+        return; // 여기서 처리를 중단합니다.
+      }
+      if (question.length > 100) {
+        const errorResult = {
+          type: "question_error",
+          module: "fortune",
+          data: { message: "질문은 100자를 넘을 수 없습니다." }
+        };
+        await this.sendToRenderer(errorResult, msg);
+        return;
+      }
 
-      // 상태 제거
+      logger.info(`💬 질문 입력 완료: ${userName} - "${question}"`);
       this.userStates.delete(userId);
 
       // 카드 뽑기 진행
@@ -270,17 +308,8 @@ class FortuneModule extends BaseModule {
         question
       );
 
-      // 렌더러로 전달
-      const renderer =
-        this.moduleManager?.navigationHandler?.renderers?.get("fortune");
-      if (renderer) {
-        await renderer.render(result, {
-          message: msg,
-          sendSafeMessage: async (ctx, text, options) => {
-            return await bot.sendMessage(msg.chat.id, text, options);
-          }
-        });
-      }
+      // 렌더러로 결과 전송
+      await this.sendToRenderer(result, msg);
     } catch (error) {
       logger.error("질문 입력 처리 오류:", error);
       await bot.sendMessage(
@@ -516,6 +545,22 @@ class FortuneModule extends BaseModule {
         module: "fortune",
         data: { message: "통계를 불러오는 중 오류가 발생했습니다." }
       };
+    }
+  }
+
+  // 헬퍼 메서드 추가
+  async sendToRenderer(result, msg) {
+    const renderer =
+      this.moduleManager?.navigationHandler?.renderers?.get("fortune");
+    if (renderer) {
+      // 일반 메시지에 대한 응답이므로 ctx를 새로 구성
+      const ctx = {
+        message: msg,
+        reply: (text, options) =>
+          this.bot.telegram.sendMessage(msg.chat.id, text, options),
+        answerCbQuery: () => Promise.resolve(true) // no-op for text messages
+      };
+      await renderer.render(result, ctx);
     }
   }
 

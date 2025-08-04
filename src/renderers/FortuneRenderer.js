@@ -20,18 +20,16 @@ class FortuneRenderer extends BaseRenderer {
         return await this.renderDrawSelect(data, ctx);
       case "draw_result":
         return await this.renderDrawResult(data, ctx);
-      case "celtic_result":
-        return await this.renderCelticResult(data, ctx);
+
       case "celtic_detail": // ✅ 추가
         return await this.renderCelticDetail(data, ctx);
-      case "question_prompt":
+      case "question_prompt": // ✏️ 이름 변경 및 추가
         return await this.renderQuestionPrompt(data, ctx);
-      case "question_error":
+      case "question_error": // ✨ 추가
         return await this.renderQuestionError(data, ctx);
-      case "daily_limit":
-        return await this.renderDailyLimit(data, ctx);
-      case "shuffle_result":
-        return await this.renderShuffleResult(data, ctx);
+      case "celtic_result": // ✨ 추가
+        return await this.renderCelticResult(data, ctx);
+
       case "stats":
         return await this.renderStats(data, ctx);
       case "history":
@@ -62,14 +60,14 @@ class FortuneRenderer extends BaseRenderer {
     let text = `🔮 *타로 카드 운세*\n\n`;
     text += `*${userName}님!*\n\n신비로운 타로의 세계에\n오신 것을 환영합니다.\n\n`;
 
-    // 개발자 모드 표시
+    // ✨ 개발자 모드 표시
     if (isDeveloper) {
       text += `👑 *개발자 모드 활성*\n\n`;
     }
 
     text += `📊 *오늘의 현황*\n`;
 
-    // 개발자는 무제한 표시
+    // ✨ 개발자는 무제한으로 표시
     if (isDeveloper) {
       text += `• 뽑은 횟수: ${todayCount}번 (무제한)\n`;
       text += `• 개발자 특권: 일일 제한 없음\n\n`;
@@ -88,7 +86,7 @@ class FortuneRenderer extends BaseRenderer {
 
     const buttons = [];
 
-    // 개발자는 항상 버튼 표시
+    // ✨ 개발자는 항상 버튼 표시
     if (canDraw || isDeveloper) {
       const fortuneTypeEntries = Object.entries(fortuneTypes);
 
@@ -354,44 +352,16 @@ class FortuneRenderer extends BaseRenderer {
    * 💬 질문 입력 프롬프트 렌더링
    */
   async renderQuestionPrompt(data, ctx) {
-    const { fortuneType, isCeltic } = data;
+    const { fortuneTypeLabel } = data;
+    let text = `❓ *${fortuneTypeLabel} 질문 입력*\n\n`;
+    text += `알고 싶은 것에 대해 구체적으로 질문해주세요.\n`;
+    text += `(예: "현재 진행 중인 프로젝트를 성공적으로 이끌려면 어떻게 해야 할까요?")\n\n`;
+    text += `*질문은 10자 이상, 100자 이하로 입력해주세요.*`;
 
-    let text = `❓ *${fortuneType?.label || "질문 운세"}*\n\n`;
-
-    if (isCeltic) {
-      text += `🔮 *캘틱 크로스*는 가장 강력하고 상세한 타로 스프레드입니다.\n`;
-      text += `10장의 카드가 당신의 상황을 완전히 분석해드립니다.\n\n`;
-
-      text += `*어떤 질문이든 좋습니다:*\n`;
-      text += `• "내 인생의 방향은 무엇인가요?"\n`;
-      text += `• "이 선택이 올바른 걸까요?"\n`;
-      text += `• "앞으로 어떻게 살아야 할까요?"\n`;
-      text += `• "내가 놓치고 있는 것은 무엇인가요?"\n\n`;
-
-      text += `*💎 캘틱 크로스 10개 위치:*\n`;
-      text += `1. 현재 상황 | 6. 무의식적 영향\n`;
-      text += `2. 도전/장애물 | 7. 당신의 접근법\n`;
-      text += `3. 원인/과거 | 8. 외부 환경\n`;
-      text += `4. 가능한 미래 | 9. 희망과 두려움\n`;
-      text += `5. 의식적 접근 | 10. 최종 결과\n\n`;
-    } else {
-      text += `궁금한 것을 자유롭게 질문해주세요.\n\n`;
-
-      text += `*예시 질문:*\n`;
-      text += `• "이번 주 중요한 결정을 내려야 하는데 어떻게 해야 할까요?"\n`;
-      text += `• "새로운 도전을 시작해야 할 시기인가요?"\n`;
-      text += `• "지금 내가 집중해야 할 것은 무엇인가요?"\n\n`;
-    }
-
-    text += `*입력 규칙:*\n`;
-    text += `• 최대 100자\n`;
-    text += `• 구체적이고 명확한 질문\n\n`;
-    text += `메뉴로 돌아가려면 아래 버튼을 누르세요.`;
-
-    const buttons = [[{ text: "❌ 취소", action: "menu" }]];
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-
+    const keyboard = this.createInlineKeyboard(
+      [[{ text: "❌ 취소", action: "menu" }]],
+      this.moduleName
+    );
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
@@ -399,16 +369,11 @@ class FortuneRenderer extends BaseRenderer {
    * ❌ 질문 오류 렌더링
    */
   async renderQuestionError(data, ctx) {
-    const text = `❌ *입력 오류*
-
-${data.message}
-
-다시 입력해주세요.`;
-
-    const buttons = [[{ text: "❌ 취소", action: "menu" }]];
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-
+    const text = `❌ *입력 오류*\n\n${data.message}\n\n다시 입력해주세요.`;
+    const keyboard = this.createInlineKeyboard(
+      [[{ text: "❌ 취소", action: "menu" }]],
+      this.moduleName
+    );
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 

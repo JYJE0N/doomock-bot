@@ -231,6 +231,38 @@ function isAdmin(input) {
 }
 
 /**
+ * ✨ 추가: 개발자 권한 확인
+ * @param {Object} input - msg 또는 callbackQuery 객체
+ * @returns {boolean} 개발자 여부
+ */
+function isDeveloper(input) {
+  try {
+    const userId = getUserId(input);
+    if (!userId) {
+      return false;
+    }
+
+    const developerIdsStr = process.env.DEVELOPER_IDS || "";
+    const developerIds = developerIdsStr
+      .split(",")
+      .map((id) => id.trim())
+      .filter((id) => id)
+      .map((id) => parseInt(id))
+      .filter((id) => !isNaN(id));
+
+    // 관리자는 항상 개발자 권한을 가집니다.
+    if (isAdmin(input)) {
+      return true;
+    }
+
+    return developerIds.includes(userId);
+  } catch (error) {
+    logger.warn("isDeveloper 오류:", error.message);
+    return false;
+  }
+}
+
+/**
  * 🤖 봇 여부 확인
  * @param {Object} input - msg 또는 callbackQuery 객체
  * @returns {boolean} 봇 여부
@@ -502,6 +534,7 @@ module.exports = {
   // 핵심 함수들 (가장 많이 사용됨)
   getUserName,
   getUserId,
+  isDeveloper,
   getUserInfo,
   getChatInfo,
 

@@ -3,6 +3,7 @@
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
+const { isDeveloper } = require("../utils/UserHelper"); // ✨ 추가
 
 // 🎴 타로 데이터 불러오기
 const {
@@ -559,9 +560,21 @@ class FortuneService extends BaseService {
    */
   async checkDailyLimit(userId) {
     try {
+      // ✨ 개발자 모드 확인 (UserHelper에서 userId 타입이 number로 처리되므로, String으로 변환)
+      if (isDeveloper({ from: { id: String(userId) } })) {
+        return {
+          allowed: true,
+          isDeveloper: true, // ✨ 개발자 플래그 추가
+          message: "개발자 모드: 횟수 제한 없음"
+        };
+      }
+
       const today = TimeHelper.getKSTDate();
       const startOfDay = new Date(today);
       startOfDay.setHours(0, 0, 0, 0);
+
+      // 기본값 설정 (환경변수로 교체 가능)
+      this.config.maxDrawsPerDay = this.config.maxDrawsPerDay || 3;
 
       if (this.Fortune) {
         const user = await this.Fortune.findOne({ userId });
@@ -577,11 +590,10 @@ class FortuneService extends BaseService {
             this.config.maxDrawsPerDay - todayCount
           );
 
-          if (remainingDraws === 0) {
+          if (remainingDraws <= 0) {
             return {
               allowed: false,
-              message:
-                "오늘의 운세 횟수를 모두 사용했습니다. 내일 다시 만나요! 🌙",
+              message: `오늘의 운세 횟수를 모두 사용했습니다. (${todayCount}/${this.config.maxDrawsPerDay})`,
               remainingDraws: 0,
               todayDraws: todayCount
             };
@@ -589,6 +601,7 @@ class FortuneService extends BaseService {
 
           return {
             allowed: true,
+            isDeveloper: false,
             remainingDraws,
             todayDraws: todayCount,
             message: `오늘 ${remainingDraws}번 더 뽑을 수 있습니다.`
