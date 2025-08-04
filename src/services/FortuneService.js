@@ -609,23 +609,23 @@ class FortuneService extends BaseService {
     }
   }
 
-  /**
-   * 🔄 카드 덱 셔플
-   */
-  async shuffleDeck(userId) {
-    try {
-      return {
-        success: true,
-        message: this.generateDoomockComment("shuffle", `User${userId}`)
-      };
-    } catch (error) {
-      logger.error("❌ 덱 셔플 오류:", error);
-      return {
-        success: false,
-        message: "카드 셔플 중 오류가 발생했습니다."
-      };
-    }
-  }
+  // /**
+  //  * 🔄 카드 덱 셔플
+  //  */
+  // async shuffleDeck(userId) {
+  //   try {
+  //     return {
+  //       success: true,
+  //       message: this.generateDoomockComment("shuffle", `User${userId}`)
+  //     };
+  //   } catch (error) {
+  //     logger.error("❌ 덱 셔플 오류:", error);
+  //     return {
+  //       success: false,
+  //       message: "카드 셔플 중 오류가 발생했습니다."
+  //     };
+  //   }
+  // }
 
   /**
    * 📊 사용자 통계 조회
@@ -782,8 +782,8 @@ class FortuneService extends BaseService {
   /**
    * 💬 두목봇 멘트 생성
    */
-  generateDoomockComment(type, userName = "User", cardData = null) {
-    const name = userName || "User";
+  generateDoomockComment(type, userId = "User", cardData = null) {
+    const name = userId || "User";
 
     const messages = {
       draw: [
