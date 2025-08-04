@@ -368,7 +368,7 @@ class TodoRenderer extends BaseRenderer {
    * ✅ 성공 메시지 렌더링
    */
   async renderSuccess(data, ctx) {
-    const { message, redirectTo, todo } = data;
+    const { message, redirectTo, todo, action } = data;
 
     let text = `${message}\n`;
 
@@ -381,57 +381,64 @@ class TodoRenderer extends BaseRenderer {
 
     const keyboard = [];
 
-    // 리다이렉트 버튼
+    // 🎯 스마트한 버튼 배치 - 중복 제거
     if (redirectTo) {
+      // 리다이렉트가 지정된 경우
       const redirectText = this.getRedirectButtonText(redirectTo);
       keyboard.push([this.createButton(redirectText, redirectTo)]);
-    }
 
-    // 기본 네비게이션
-    keyboard.push([
-      this.createButton("📋 할일 목록", "list"),
-      this.createButton("🏠 홈으로", { module: "system", action: "menu" })
-    ]);
-
-    // 실제로 메시지 전송
-    await this.sendSafeMessage(ctx, text, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: keyboard
+      // 리다이렉트가 'list'가 아닌 경우에만 할일 목록 버튼 추가
+      if (redirectTo !== "list") {
+        keyboard.push([
+          this.createButton("📋 할일 목록", "list"),
+          this.createButton("🏠 홈으로", { module: "system", action: "menu" })
+        ]);
+      } else {
+        // 리다이렉트가 'list'인 경우 홈 버튼만 추가
+        keyboard.push([
+          this.createButton("🏠 홈으로", { module: "system", action: "menu" })
+        ]);
       }
-    });
+    } else {
+      // 리다이렉트가 없는 경우 - 액션에 따라 적절한 버튼 제공
+      switch (action) {
+        case "add":
+          keyboard.push([
+            this.createButton("➕ 더 추가", "add"),
+            this.createButton("📋 목록 보기", "list")
+          ]);
+          break;
 
-    // 콜백 쿼리 응답
-    if (ctx.callbackQuery && ctx.answerCbQuery) {
-      await ctx.answerCbQuery();
+        case "edit":
+          keyboard.push([
+            this.createButton("📋 목록 보기", "list"),
+            this.createButton("📊 통계", "stats")
+          ]);
+          break;
+
+        case "complete":
+        case "uncomplete":
+          keyboard.push([
+            this.createButton("📋 목록 보기", "list"),
+            this.createButton("📈 주간 리포트", "weekly")
+          ]);
+          break;
+
+        case "remind_add":
+          keyboard.push([
+            this.createButton("⏰ 리마인더 목록", "remind_list"),
+            this.createButton("📋 할일 목록", "list")
+          ]);
+          break;
+
+        default:
+          // 기본 네비게이션
+          keyboard.push([
+            this.createButton("📋 할일 목록", "list"),
+            this.createButton("🏠 홈으로", { module: "system", action: "menu" })
+          ]);
+      }
     }
-  }
-
-  /**
-   * ❌ 에러 메시지 렌더링
-   */
-  async renderError(data, ctx) {
-    const { message, action, canRetry } = data;
-
-    let text = `❌ *오류*\n\n`;
-    text += `${message}\n`;
-
-    if (canRetry) {
-      text += `\n_다시 시도해주세요._`;
-    }
-
-    const keyboard = [];
-
-    // 재시도 버튼
-    if (canRetry && action) {
-      keyboard.push([this.createButton("🔄 다시 시도", action)]);
-    }
-
-    // 기본 네비게이션
-    keyboard.push([
-      this.createButton("⬅️ 돌아가기", "menu"),
-      this.createButton("🏠 홈으로", { module: "system", action: "menu" })
-    ]);
 
     // 실제로 메시지 전송
     await this.sendSafeMessage(ctx, text, {
