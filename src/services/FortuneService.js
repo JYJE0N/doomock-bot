@@ -27,7 +27,7 @@ const {
 class FortuneService extends BaseService {
   constructor(options = {}) {
     // ✅ 수정: options 매개변수 추가
-    super("FortuneService", options); // ✅ 수정: options 전달
+    super("FortuneService", options); // ✅ 올바른 구현
 
     // 전체 타로 덱 초기화
     this.tarotDeck = [...FULL_TAROT_DECK];
