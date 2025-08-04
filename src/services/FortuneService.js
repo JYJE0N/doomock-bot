@@ -26,8 +26,7 @@ const {
  */
 class FortuneService extends BaseService {
   constructor(options = {}) {
-    // ✅ 수정: options 매개변수 추가
-    super("FortuneService", options); // ✅ 올바른 구현
+    super("FortuneService", options);
 
     // 전체 타로 덱 초기화
     this.tarotDeck = [...FULL_TAROT_DECK];
@@ -55,20 +54,20 @@ class FortuneService extends BaseService {
     return ["Fortune"];
   }
 
+  // ❗❗❗ 수정: initialize -> onInitialize로 함수 이름을 변경합니다. ❗❗❗
   /**
    * 🎯 서비스 초기화
    */
-  async initialize() {
+  async onInitialize() {
     try {
       logger.info("🔮 FortuneService 초기화 시작...");
 
-      // MongoDB 모델 확인
+      // MongoDB 모델 확인 (이제 BaseService가 먼저 실행되어 this.models가 채워져 있습니다)
       this.Fortune = this.models?.Fortune;
 
       if (!this.Fortune) {
         logger.warn("Fortune 모델 없음 - 제한된 기능으로 동작");
       } else {
-        logger.success("✅ Fortune 모델 정상 로드됨");
         // 인덱스 생성
         await this.createIndexes();
       }
@@ -84,7 +83,6 @@ class FortuneService extends BaseService {
         this.tarotDeck.filter((c) => c.arcana === "minor").length
       );
 
-      this.isInitialized = true;
       logger.success("✅ FortuneService 초기화 완료");
 
       return { success: true };
@@ -574,7 +572,7 @@ class FortuneService extends BaseService {
       if (isDeveloper({ from: { id: String(userId) } })) {
         return {
           allowed: true,
-          isDeveloper: true,
+          isDeveloper: true, 
           message: "개발자 모드: 횟수 제한 없음"
         };
       }
@@ -677,12 +675,12 @@ class FortuneService extends BaseService {
         triple: user.draws.filter((d) => d.type === "triple").length,
         celtic: user.draws.filter((d) => d.type === "celtic").length
       };
-
+      
       const favorite = user.findFavoriteCard();
       if (favorite) {
         user.stats.favoriteCard = favorite;
       }
-
+      
       // 4. 마지막 뽑은 시간 및 첫 뽑은 시간을 업데이트합니다.
       user.lastDrawAt = drawData.timestamp;
       if (!user.firstDrawAt) {
@@ -697,6 +695,7 @@ class FortuneService extends BaseService {
       logger.error("뽑기 기록 저장 실패:", error);
     }
   }
+
 
   /**
    * 💬 두목봇 멘트 생성
@@ -1096,7 +1095,7 @@ class FortuneService extends BaseService {
     return user.draws.filter((draw) => new Date(draw.timestamp) >= weekAgo)
       .length;
   }
-
+  
   /**
    * 🧹 정리 작업
    */
