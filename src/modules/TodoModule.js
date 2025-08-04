@@ -814,14 +814,79 @@ class TodoModule extends BaseModule {
    */
   async processReminderTimeInput(userId, text, todoId) {
     try {
-      // 실제로 1분 후로 설정
-      const remindAt = new Date();
-      remindAt.setMinutes(remindAt.getMinutes() + 1); // 1분 후로 수정!
+      // 🕐 TimeParseHelper로 자연어 시간 파싱
+      const TimeParseHelper = require("../utils/TimeParseHelper");
+      const parseResult = TimeParseHelper.parseTimeText(text);
 
+      if (!parseResult.success) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: `⏰ ${parseResult.error}\n\n다시 입력해주세요.\n예시: "30분 후", "내일 오후 3시", "2025-08-05 14:00"`,
+            action: "remind_add",
+            canRetry: true
+          }
+        };
+      }
+
+      const remindAt = parseResult.datetime;
+
+      // 🔍 과거 시간 체크
+      const now = new Date();
+      if (remindAt <= now) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message:
+              "⏰ 과거 시간으로는 리마인더를 설정할 수 없습니다.\n\n미래 시간을 입력해주세요.",
+            action: "remind_add",
+            canRetry: true
+          }
+        };
+      }
+
+      // 🚫 너무 먼 미래 체크 (1년 후까지만)
+      const oneYearLater = new Date();
+      oneYearLater.setFullYear(oneYearLater.getFullYear() + 1);
+      if (remindAt > oneYearLater) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message:
+              "⏰ 1년 이후로는 리마인더를 설정할 수 없습니다.\n\n1년 이내의 시간을 입력해주세요.",
+            action: "remind_add",
+            canRetry: true
+          }
+        };
+      }
+
+      // 📋 할일 정보 가져오기
+      const todoResult = await this.todoService.getTodoById(userId, todoId);
+      if (!todoResult.success) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: "할일 정보를 찾을 수 없습니다.",
+            action: "remind_add",
+            canRetry: false
+          }
+        };
+      }
+
+      // 🔔 리마인더 생성
       const result = await this.todoService.createReminder(userId, {
         todoId,
         remindAt,
-        message: text
+        message: `"${todoResult.data.text}" 할일 알림`,
+        type: "simple"
       });
 
       if (!result.success) {
@@ -837,13 +902,19 @@ class TodoModule extends BaseModule {
         };
       }
 
+      // 🎯 성공 메시지에 파싱된 시간 정보 포함
+      const TimeHelper = require("../utils/TimeHelper");
+      const formattedTime = TimeHelper.format(remindAt, "full");
+
       return {
         type: "success",
         module: "todo",
         action: "success",
         data: {
-          message: "⏰ 리마인더가 설정되었습니다!",
+          message: `⏰ 리마인더가 설정되었습니다!\n\n📅 ${formattedTime}에 알려드릴게요!`,
           reminder: result.data,
+          reminderTime: formattedTime,
+          parsedInfo: parseResult.parsedInfo, // 파싱 정보도 함께 전달
           action: "remind_add",
           redirectTo: "list"
         }
