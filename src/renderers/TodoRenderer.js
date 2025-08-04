@@ -177,9 +177,6 @@ class TodoRenderer extends BaseRenderer {
   /**
    * 📋 할일 목록 렌더링 - 더블 라인 레이아웃
    */
-  /**
-   * 📋 할일 목록 렌더링 - 더블 라인 레이아웃
-   */
   async renderTodoList(data, ctx) {
     const { todos, currentPage, totalPages, totalCount, enableReminders } =
       data;
@@ -205,7 +202,7 @@ class TodoRenderer extends BaseRenderer {
       text += `페이지 ${currentPage}/${totalPages}`;
     }
 
-    // 🎨 더블 라인 레이아웃
+    // 🎨 더블 라인 레이아웃 (리마인더 상태 정확 반영)
     const keyboard = [];
 
     if (todos.length > 0) {
@@ -240,15 +237,16 @@ class TodoRenderer extends BaseRenderer {
         // ⚡ 두 번째 줄: 액션 버튼들
         const actionRow = [];
 
-        // 알림 버튼 (리마인더 활성화 + 미완료인 경우)
+        // 🔔 스마트한 알림 버튼 (리마인더 상태 정확 확인)
         if (enableReminders && !todo.completed) {
-          if (todo.remindAt) {
+          // 🎯 핵심: hasActiveReminder 필드로 정확한 상태 확인
+          if (todo.hasActiveReminder) {
             actionRow.push(
-              this.createButton("🔔 알림설정됨", "remind_remove", todo._id)
+              this.createButton("🔕 알림해제", "remind_remove", todo._id)
             );
           } else {
             actionRow.push(
-              this.createButton("🔕 알림설정", "remind_add", todo._id)
+              this.createButton("🔔 알림설정", "remind_add", todo._id)
             );
           }
         }

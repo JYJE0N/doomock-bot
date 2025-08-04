@@ -97,6 +97,7 @@ class TodoService extends BaseService {
         query.completed = false;
       }
 
+      // 🎯 기본 할일 데이터 조회
       const [totalCount, todos] = await Promise.all([
         this.models.Todo.countDocuments(query),
         this.models.Todo.find(query)
@@ -106,14 +107,80 @@ class TodoService extends BaseService {
           .lean()
       ]);
 
+      // 🔔 각 할일의 리마인더 상태 확인 (성능 최적화)
+      if (this.models.Reminder && todos.length > 0) {
+        const todoIds = todos.map((todo) => todo._id);
+
+        // 활성 리마인더가 있는 할일 ID들 조회
+        const activeReminders = await this.models.Reminder.find({
+          userId: userId.toString(),
+          todoId: { $in: todoIds },
+          isActive: true,
+          completed: { $ne: true },
+          sentAt: { $exists: false }
+        })
+          .select("todoId")
+          .lean();
+
+        // Set으로 빠른 조회를 위한 변환
+        const reminderTodoIds = new Set(
+          activeReminders.map((r) => r.todoId.toString())
+        );
+
+        // 각 할일에 hasActiveReminder 플래그 추가
+        todos.forEach((todo) => {
+          todo.hasActiveReminder = reminderTodoIds.has(todo._id.toString());
+        });
+      }
+
       return this.createSuccessResponse({
         todos,
         totalCount,
         totalPages: Math.ceil(totalCount / limit),
-        currentPage: page
+        currentPage: page,
+        enableReminders: !!this.models.Reminder
       });
     } catch (error) {
       return this.createErrorResponse(error, "할일 목록 조회 실패");
+    }
+  }
+
+  /**
+   * 🗑️ 리마인더 해제/삭제 (새로 추가)
+   */
+  async removeReminder(userId, todoId) {
+    try {
+      if (!this.models.Reminder) {
+        return this.createErrorResponse(
+          new Error("REMINDER_NOT_SUPPORTED"),
+          "리마인더 기능을 사용할 수 없습니다."
+        );
+      }
+
+      // 해당 할일의 활성 리마인더 찾기
+      const reminder = await this.models.Reminder.findOne({
+        userId: userId.toString(),
+        todoId: todoId,
+        isActive: true,
+        completed: { $ne: true },
+        sentAt: { $exists: false }
+      });
+
+      if (!reminder) {
+        return this.createErrorResponse(
+          new Error("REMINDER_NOT_FOUND"),
+          "설정된 리마인더가 없습니다."
+        );
+      }
+
+      // 리마인더 비활성화
+      reminder.isActive = false;
+      reminder.cancelledAt = new Date();
+      await reminder.save();
+
+      return this.createSuccessResponse(null, "리마인더가 해제되었습니다.");
+    } catch (error) {
+      return this.createErrorResponse(error, "리마인더 해제 실패");
     }
   }
 

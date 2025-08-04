@@ -94,6 +94,7 @@ class TodoModule extends BaseModule {
       // 리마인더 액션
       remind_list: this.showReminders.bind(this),
       remind_add: this.addReminder.bind(this),
+      remind_remove: this.removeReminder.bind(this), // 🆕 추가
       remind_delete: this.deleteReminder.bind(this),
 
       // 통계 액션
@@ -928,6 +929,67 @@ class TodoModule extends BaseModule {
         data: {
           message: "리마인더 설정 중 오류가 발생했습니다.",
           action: "remind_add",
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🔕 리마인더 해제 (새로 추가)
+   */
+  async removeReminder(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = getUserId(callbackQuery.from);
+    const todoId = params;
+
+    if (!todoId) {
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인더를 해제할 할일을 선택해주세요.",
+          action: "remind_remove",
+          canRetry: false
+        }
+      };
+    }
+
+    try {
+      const result = await this.todoService.removeReminder(userId, todoId);
+
+      if (!result.success) {
+        return {
+          type: "error",
+          module: "todo",
+          action: "error",
+          data: {
+            message: result.message || "리마인더 해제에 실패했습니다.",
+            action: "remind_remove",
+            canRetry: true
+          }
+        };
+      }
+
+      return {
+        type: "success",
+        module: "todo",
+        action: "success",
+        data: {
+          message: "🔕 리마인더가 해제되었습니다!",
+          action: "remind_remove",
+          redirectTo: "list"
+        }
+      };
+    } catch (error) {
+      logger.error("TodoModule.removeReminder 오류:", error);
+      return {
+        type: "error",
+        module: "todo",
+        action: "error",
+        data: {
+          message: "리마인더 해제 중 오류가 발생했습니다.",
+          action: "remind_remove",
           canRetry: true
         }
       };
