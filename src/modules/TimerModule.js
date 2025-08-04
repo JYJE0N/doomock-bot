@@ -1057,7 +1057,7 @@ ${progressBar} ${progress}%
           await bot.editMessageText(messageText, {
             chat_id: currentTimer.chatId,
             message_id: currentTimer.lastMessageId,
-            parse_mode: "MarkdownV2",
+            parse_mode: "Markdown",
             reply_markup: { inline_keyboard: keyboard }
           });
         }
