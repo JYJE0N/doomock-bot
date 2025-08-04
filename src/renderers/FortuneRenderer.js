@@ -55,7 +55,7 @@ class FortuneRenderer extends BaseRenderer {
     const { userName, todayCount, maxDraws, canDraw, fortuneTypes } = data;
 
     let text = `🔮 *타로 카드 운세*\n\n`;
-    text += `${userName}님!\n\n 신비로운 타로의 세계에\n\n 오신 것을 환영합니다.\n\n`;
+    text += `*${userName}님!*\n\n신비로운 타로의 세계에\n오신 것을 환영합니다.\n\n`;
 
     text += `📊 *오늘의 현황*\n`;
     text += `• 뽑은 횟수: ${todayCount}/${maxDraws}번\n`;
