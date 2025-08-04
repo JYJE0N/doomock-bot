@@ -369,89 +369,98 @@ class TodoRenderer extends BaseRenderer {
    * ✅ 성공 메시지 렌더링
    */
   async renderSuccess(data, ctx) {
-    const { message, redirectTo, todo, action } = data;
+    try {
+      const { message, _action, redirectTo, autoRefresh, refreshDelay } = data;
 
-    let text = `${message}\n`;
+      let text = `✅ *성공*\n\n${this.markdownHelper.escape(message)}`;
 
-    if (todo) {
-      text += `\n📋 할일: ${todo.text}\n`;
-      if (todo.priority) {
-        text += `🔥 우선순위: ${todo.priority}\n`;
+      // 키보드 생성
+      const keyboard = [];
+
+      if (redirectTo) {
+        // 리다이렉트가 있으면 해당 액션 버튼 추가
+        if (redirectTo === "list") {
+          keyboard.push([this.createButton("📋 할일 목록", "list")]);
+        } else if (redirectTo === "remind_list") {
+          keyboard.push([this.createButton("⏰ 리마인더 목록", "remind_list")]);
+        }
       }
-    }
 
-    const keyboard = [];
+      // 기본 네비게이션
+      keyboard.push([
+        this.createButton("⬅️ 돌아가기", "menu"),
+        this.createButton("🏠 홈으로", { module: "system", action: "menu" })
+      ]);
 
-    // 🎯 스마트한 버튼 배치 - 중복 제거
-    if (redirectTo) {
-      // 리다이렉트가 지정된 경우
-      const redirectText = this.getRedirectButtonText(redirectTo);
-      keyboard.push([this.createButton(redirectText, redirectTo)]);
+      // 메시지 전송
+      await this.sendSafeMessage(ctx, text, {
+        parse_mode: "Markdown",
+        reply_markup: {
+          inline_keyboard: keyboard
+        }
+      });
 
-      // 리다이렉트가 'list'가 아닌 경우에만 할일 목록 버튼 추가
-      if (redirectTo !== "list") {
-        keyboard.push([
-          this.createButton("📋 할일 목록", "list"),
-          this.createButton("🏠 홈으로", { module: "system", action: "menu" })
-        ]);
-      } else {
-        // 리다이렉트가 'list'인 경우 홈 버튼만 추가
-        keyboard.push([
-          this.createButton("🏠 홈으로", { module: "system", action: "menu" })
-        ]);
+      // 콜백 쿼리 응답
+      if (ctx.callbackQuery && ctx.answerCbQuery) {
+        await ctx.answerCbQuery();
       }
-    } else {
-      // 리다이렉트가 없는 경우 - 액션에 따라 적절한 버튼 제공
-      switch (action) {
-        case "add":
-          keyboard.push([
-            this.createButton("➕ 더 추가", "add"),
-            this.createButton("📋 목록 보기", "list")
-          ]);
-          break;
 
-        case "edit":
-          keyboard.push([
-            this.createButton("📋 목록 보기", "list"),
-            this.createButton("📊 통계", "stats")
-          ]);
-          break;
+      // 🔧 핵심 추가: 자동 새로고침 처리
+      if (autoRefresh && redirectTo && ctx.callbackQuery) {
+        const delay = refreshDelay || 2000; // 기본 2초
 
-        case "complete":
-        case "uncomplete":
-          keyboard.push([
-            this.createButton("📋 목록 보기", "list"),
-            this.createButton("📈 주간 리포트", "weekly")
-          ]);
-          break;
+        setTimeout(async () => {
+          try {
+            logger.debug(
+              `🔄 자동 새로고침 실행: ${redirectTo} (${delay}ms 후)`
+            );
 
-        case "remind_add":
-          keyboard.push([
-            this.createButton("⏰ 리마인더 목록", "remind_list"),
-            this.createButton("📋 할일 목록", "list")
-          ]);
-          break;
+            // 새로고침 액션 실행
+            const moduleManager = this.navigationHandler.moduleManager;
+            const _userId = ctx.callbackQuery.from.id;
 
-        default:
-          // 기본 네비게이션
-          keyboard.push([
-            this.createButton("📋 할일 목록", "list"),
-            this.createButton("🏠 홈으로", { module: "system", action: "menu" })
-          ]);
+            if (redirectTo === "list") {
+              // 할일 목록 새로고침
+              const todoModule = moduleManager.getModule("todo");
+              if (todoModule) {
+                const refreshResult = await todoModule.showList(
+                  this.bot,
+                  ctx.callbackQuery,
+                  "list",
+                  "1", // 첫 페이지
+                  moduleManager
+                );
+
+                if (refreshResult) {
+                  await this.render(refreshResult, ctx);
+                }
+              }
+            } else if (redirectTo === "remind_list") {
+              // 리마인더 목록 새로고침
+              const todoModule = moduleManager.getModule("todo");
+              if (todoModule) {
+                const refreshResult = await todoModule.showReminderList(
+                  this.bot,
+                  ctx.callbackQuery,
+                  "remind_list",
+                  null,
+                  moduleManager
+                );
+
+                if (refreshResult) {
+                  await this.render(refreshResult, ctx);
+                }
+              }
+            }
+          } catch (refreshError) {
+            logger.error("자동 새로고침 실패:", refreshError);
+            // 에러가 나도 사용자 경험을 방해하지 않도록 조용히 처리
+          }
+        }, delay);
       }
-    }
-
-    // 실제로 메시지 전송
-    await this.sendSafeMessage(ctx, text, {
-      parse_mode: "Markdown",
-      reply_markup: {
-        inline_keyboard: keyboard
-      }
-    });
-
-    // 콜백 쿼리 응답
-    if (ctx.callbackQuery && ctx.answerCbQuery) {
-      await ctx.answerCbQuery();
+    } catch (error) {
+      logger.error("TodoRenderer.renderSuccess 오류:", error);
+      throw error;
     }
   }
 

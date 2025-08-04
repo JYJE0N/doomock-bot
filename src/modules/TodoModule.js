@@ -885,7 +885,7 @@ class TodoModule extends BaseModule {
         };
       }
 
-      // 🎯 성공 응답 (할일 목록으로 자동 리다이렉트)
+      // 🎯 성공 응답 - 자동 목록 새로고침으로 변경
       const TimeHelper = require("../utils/TimeHelper");
       const formattedTime = TimeHelper.format(remindAt, "full");
 
@@ -898,7 +898,10 @@ class TodoModule extends BaseModule {
           reminder: result.data,
           reminderTime: formattedTime,
           action: "remind_add",
-          redirectTo: "list" // 할일 목록으로 자동 이동
+          redirectTo: "list",
+          // 🔧 핵심 수정: 자동 새로고침 플래그 추가
+          autoRefresh: true,
+          refreshDelay: 1000 // 1초 후 새로고침
         }
       };
     } catch (error) {
@@ -960,7 +963,10 @@ class TodoModule extends BaseModule {
         data: {
           message: "🔕 리마인더가 해제되었습니다!",
           action: "remind_remove",
-          redirectTo: "list" // 할일 목록으로 자동 이동
+          redirectTo: "list",
+          // 🔧 핵심 수정: 자동 새로고침 플래그 추가
+          autoRefresh: true,
+          refreshDelay: 1000 // 1초 후 새로고침
         }
       };
     } catch (error) {

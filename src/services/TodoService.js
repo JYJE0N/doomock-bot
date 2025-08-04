@@ -83,41 +83,56 @@ class TodoService extends BaseService {
       const {
         page = 1,
         limit = 10,
-        includeCompleted = true,
-        sortBy = "createdAt",
-        sortOrder = -1
+        includeCompleted = false,
+        priority = null,
+        search = null
       } = options;
 
-      const query = {
+      // 쿼리 조건 구성
+      const matchConditions = {
         userId: userId.toString(),
         isActive: true
       };
 
       if (!includeCompleted) {
-        query.completed = false;
+        matchConditions.completed = { $ne: true };
       }
 
-      // 🎯 기본 할일 데이터 조회
-      const [totalCount, todos] = await Promise.all([
-        this.models.Todo.countDocuments(query),
-        this.models.Todo.find(query)
-          .sort({ [sortBy]: sortOrder })
-          .skip((page - 1) * limit)
+      if (priority) {
+        matchConditions.priority = priority;
+      }
+
+      if (search) {
+        matchConditions.text = { $regex: search, $options: "i" };
+      }
+
+      // 할일 목록 조회
+      const skip = (page - 1) * limit;
+      const [todos, totalCount] = await Promise.all([
+        this.models.Todo.find(matchConditions)
+          .sort({ createdAt: -1 })
+          .skip(skip)
           .limit(limit)
-          .lean()
+          .lean(),
+        this.models.Todo.countDocuments(matchConditions)
       ]);
 
-      // 🔔 리마인더 상태 확인 (핵심 수정!)
+      // 🔧 핵심 개선: 리마인더 상태 실시간 계산
       if (this.models.Reminder && todos.length > 0) {
         const todoIds = todos.map((todo) => todo._id);
 
-        // 🎯 활성 리마인더 조회 (정확한 조건)
+        // 현재 시간 기준으로 정확한 활성 리마인더 조회
+        const currentTime = new Date();
         const activeReminders = await this.models.Reminder.find({
           userId: userId.toString(),
           todoId: { $in: todoIds },
           isActive: true,
           completed: { $ne: true },
-          sentAt: { $exists: false } // 아직 발송되지 않은 것만
+          $or: [
+            { sentAt: { $exists: false } }, // 아직 발송되지 않음
+            { sentAt: null } // sentAt이 null인 경우
+          ],
+          reminderTime: { $gte: currentTime } // 미래 시간만
         })
           .select("todoId reminderTime")
           .lean();
@@ -127,13 +142,17 @@ class TodoService extends BaseService {
           activeReminders.map((r) => r.todoId.toString())
         );
 
-        // 각 할일에 hasActiveReminder 플래그 추가
+        // 각 할일에 정확한 hasActiveReminder 플래그 추가
         todos.forEach((todo) => {
           todo.hasActiveReminder = reminderTodoIds.has(todo._id.toString());
         });
 
         logger.debug(
-          `리마인더 상태 확인: ${activeReminders.length}개 활성 리마인더`
+          `리마인더 상태 업데이트: ${activeReminders.length}개 활성 리마인더`,
+          {
+            todoCount: todos.length,
+            withReminders: Array.from(reminderTodoIds).length
+          }
         );
       }
 
@@ -182,6 +201,11 @@ class TodoService extends BaseService {
       reminder.isActive = false;
       reminder.cancelledAt = new Date();
       await reminder.save();
+
+      // 🔧 핵심 추가: 할일의 업데이트 시간 갱신 (캐시 무효화)
+      await this.models.Todo.findByIdAndUpdate(todoId, {
+        $set: { updatedAt: new Date() }
+      });
 
       logger.info(`🔕 리마인더 해제: ${userId} - todoId: ${todoId}`);
 
@@ -557,21 +581,62 @@ class TodoService extends BaseService {
         );
       }
 
-      const reminder = new this.models.Reminder({
+      const { todoId, remindAt, message, type = "simple" } = reminderData;
+
+      // 할일 존재 확인
+      const todo = await this.models.Todo.findOne({
+        _id: todoId,
         userId: userId.toString(),
-        todoId: reminderData.todoId,
-        reminderTime: reminderData.remindAt, // remindAt을 reminderTime으로 매핑
-        text: reminderData.message, // message를 text로 매핑
-        type: reminderData.type || "simple"
+        isActive: true
       });
 
-      const savedReminder = await reminder.save();
+      if (!todo) {
+        return this.createErrorResponse(
+          new Error("TODO_NOT_FOUND"),
+          "할일을 찾을 수 없습니다."
+        );
+      }
 
-      return this.createSuccessResponse(
-        savedReminder.toJSON(),
-        "리마인더가 설정되었습니다."
-      );
+      // 기존 활성 리마인더 확인
+      const existingReminder = await this.models.Reminder.findOne({
+        userId: userId.toString(),
+        todoId: todoId,
+        isActive: true,
+        completed: { $ne: true }
+      });
+
+      if (existingReminder) {
+        return this.createErrorResponse(
+          new Error("REMINDER_ALREADY_EXISTS"),
+          "이미 설정된 리마인더가 있습니다."
+        );
+      }
+
+      // 새 리마인더 생성
+      const reminder = new this.models.Reminder({
+        userId: userId.toString(),
+        todoId: todoId,
+        text: message,
+        reminderTime: remindAt,
+        timezone: "Asia/Seoul",
+        type: type,
+        isActive: true,
+        completed: false
+      });
+
+      await reminder.save();
+
+      // 🔧 핵심 추가: 할일의 hasActiveReminder 필드 즉시 업데이트
+      // (실제로는 가상 필드이지만, 캐시 무효화를 위해 업데이트 시간을 갱신)
+      await this.models.Todo.findByIdAndUpdate(todoId, {
+        $set: { updatedAt: new Date() }
+      });
+
+      logger.info(`🔔 리마인더 생성 성공: ${userId} - todoId: ${todoId}`);
+
+      return this.createSuccessResponse(reminder, "리마인더가 설정되었습니다.");
     } catch (error) {
+      logger.error("리마인더 생성 실패:", error);
       return this.createErrorResponse(error, "리마인더 생성 실패");
     }
   }
