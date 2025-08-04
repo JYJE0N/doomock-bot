@@ -14,6 +14,7 @@ class FortuneModule extends BaseModule {
 
     this.fortuneService = null;
     this.userStates = new Map(); // 사용자 질문 입력 상태
+    this.dailyDrawCounts = new Map(); // 일일 뽑기 횟수 추적 (서비스 없을 때 사용)
 
     // 전문 타로 설정
     this.config = {
@@ -151,19 +152,34 @@ class FortuneModule extends BaseModule {
           bot && bot.telegram ? Object.keys(bot.telegram).slice(0, 5) : []
       });
 
-      // 일일 제한 확인
-      const todayCount = await this.getTodayDrawCount(userId, userName);
-      logger.debug(
-        `📅 오늘 뽑기 횟수: ${todayCount}/${this.config.maxDrawsPerDay}`
-      );
+      // 🎯 개발자 모드 체크
+      const isDeveloper = this.checkDeveloperMode(userId);
 
-      if (todayCount >= this.config.maxDrawsPerDay) {
-        logger.warn(`⛔ 일일 제한 도달: ${userName}`);
-        return {
-          type: "daily_limit",
-          module: "fortune",
-          data: { used: todayCount, max: this.config.maxDrawsPerDay }
-        };
+      if (isDeveloper) {
+        logger.info(`👑 개발자 모드 활성화: ${userName} (${userId})`);
+      }
+
+      // 일일 제한 확인 (개발자는 스킵)
+      if (!isDeveloper) {
+        const todayCount = await this.getTodayDrawCount(userId, userName);
+        logger.debug(
+          `📅 오늘 뽑기 횟수: ${todayCount}/${this.config.maxDrawsPerDay}`
+        );
+
+        if (todayCount >= this.config.maxDrawsPerDay) {
+          logger.warn(`⛔ 일일 제한 도달: ${userName}`);
+          return {
+            type: "daily_limit",
+            module: "fortune",
+            data: {
+              used: todayCount,
+              max: this.config.maxDrawsPerDay,
+              isDeveloper: false
+            }
+          };
+        }
+      } else {
+        logger.debug(`👑 개발자 ${userName}: 일일 제한 체크 스킵`);
       }
 
       // 운세 타입이 지정된 경우
@@ -397,6 +413,31 @@ class FortuneModule extends BaseModule {
         module: "fortune",
         data: { message: "카드 셔플 중 오류가 발생했습니다." }
       };
+    }
+  }
+
+  /**
+   * 👑 개발자 모드 체크 (새로 추가)
+   */
+  checkDeveloperMode(userId) {
+    try {
+      // 환경변수에서 개발자 ID 확인
+      const developerIds = (
+        process.env.DEVELOPER_IDS ||
+        process.env.ADMIN_IDS ||
+        ""
+      )
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id);
+
+      // 개발 환경 체크
+      const isDevelopmentEnv = process.env.NODE_ENV === "development";
+
+      return developerIds.includes(userId.toString()) || isDevelopmentEnv;
+    } catch (error) {
+      logger.debug("개발자 모드 체크 실패:", error.message);
+      return false;
     }
   }
 
@@ -762,37 +803,42 @@ class FortuneModule extends BaseModule {
   /**
    * 📅 오늘 뽑기 횟수 조회 (디버깅 강화)
    */
-  async getTodayDrawCount(userId) {
+  /**
+   * 📊 오늘 뽑은 횟수 확인 (개발자 고려)
+   */
+  async getTodayDrawCount(userId, userName) {
     try {
-      const userName = "User"; // 안전한 표시명
+      // 개발자인 경우 항상 0 반환
+      if (this.checkDeveloperMode(userId)) {
+        return 0;
+      }
+
+      // ✅ 수정: FortuneService가 있을 때
       if (this.fortuneService) {
-        logger.debug(`🔍 getTodayDrawCount 호출: ${userName}`);
-        const result = await this.fortuneService.getTodayDrawCount(userId);
+        logger.debug(`🔗 FortuneService로 오늘 뽑기 횟수 확인`);
 
-        logger.debug("🔍 FortuneService.getTodayDrawCount 응답:", {
-          success: result?.success,
-          hasData: !!result?.data,
-          count: result?.data?.count,
-          date: result?.data?.date
-        });
+        // 사용자 정보 조회 또는 생성
+        const userRecord = await this.fortuneService.findOrCreateUser(userId);
 
-        // 새 FortuneService 응답 형식 처리
-        if (result && result.success && result.data) {
-          const count = result.data.count || 0;
-          logger.debug(`✅ 오늘 뽑기 횟수: ${count}`);
-          return count;
+        // 오늘 날짜
+        const today = new Date().toISOString().split("T")[0];
+
+        // 오늘 뽑은 횟수 계산
+        if (userRecord.lastDrawDate === today) {
+          return userRecord.todayDrawCount || 0;
         } else {
-          logger.warn("FortuneService 응답 형식이 예상과 다름:", result);
           return 0;
         }
       }
 
-      // 더미: 서비스가 없는 경우
-      logger.debug("FortuneService 없음 - 더미 데이터 사용");
-      return Math.floor(Math.random() * 3);
+      // ✅ 수정: 서비스 없이 메모리에서 확인
+      logger.debug("📝 메모리에서 뽑기 횟수 확인");
+      const today = new Date().toISOString().split("T")[0];
+      const key = `${userId}_${today}`;
+      return this.dailyDrawCounts.get(key) || 0;
     } catch (error) {
-      logger.error("오늘 뽑기 횟수 조회 실패:", error);
-      return 0; // 안전한 기본값
+      logger.error("getTodayDrawCount 오류:", error);
+      return 0;
     }
   }
 

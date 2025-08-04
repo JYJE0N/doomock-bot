@@ -134,7 +134,7 @@ class FortuneService extends BaseService {
       // 1️⃣ 사용자 정보 조회 또는 생성
       let userRecord = await this.findOrCreateUser(userId);
 
-      // 2️⃣ 일일 제한 체크
+      // 2️⃣ 일일 제한 체크 (개발자 우회 포함)
       const canDraw = await this.checkDailyLimit(userRecord, today);
       if (!canDraw.allowed) {
         return {
@@ -147,7 +147,7 @@ class FortuneService extends BaseService {
       // 3️⃣ 카드 뽑기 실행
       const drawResult = this.performCardDraw(type);
 
-      // 4️⃣ 결과를 DB에 저장
+      // 4️⃣ 결과를 DB에 저장 (개발자도 기록은 저장)
       const savedResult = await this.saveDrawResult(userRecord, drawResult, {
         type,
         question,
@@ -160,18 +160,21 @@ class FortuneService extends BaseService {
         this.stats.todayUsers++;
       }
 
+      // 개발자 모드 메시지 추가
+      const message = canDraw.isDeveloper
+        ? `👑 ${this.generateDoomockComment("draw", savedResult.userName, drawResult)}`
+        : this.generateDoomockComment("draw", savedResult.userName, drawResult);
+
       return {
         success: true,
-        message: this.generateDoomockComment(
-          "draw",
-          savedResult.userName,
-          drawResult
-        ),
+        message,
         data: {
           ...drawResult,
-          remainingDraws:
-            this.config.maxDrawsPerDay - (userRecord.todayDrawCount || 0) - 1,
-          totalDraws: userRecord.totalDraws + 1
+          remainingDraws: canDraw.isDeveloper
+            ? 999
+            : this.config.maxDrawsPerDay - (userRecord.todayDrawCount || 0) - 1,
+          totalDraws: userRecord.totalDraws + 1,
+          isDeveloper: canDraw.isDeveloper || false
         }
       };
     } catch (error) {
@@ -220,8 +223,38 @@ class FortuneService extends BaseService {
   /**
    * 📅 일일 제한 체크
    */
+  /**
+   * 📅 일일 제한 체크 (개발자 우회 추가)
+   */
   async checkDailyLimit(userRecord, today) {
     try {
+      // 개발자 ID 체크
+      const developerIds = (
+        process.env.DEVELOPER_IDS ||
+        process.env.ADMIN_IDS ||
+        ""
+      )
+        .split(",")
+        .map((id) => id.trim())
+        .filter((id) => id);
+
+      const isDeveloper =
+        developerIds.includes(userRecord.userId.toString()) ||
+        process.env.NODE_ENV === "development";
+
+      if (isDeveloper) {
+        logger.info(
+          `👑 개발자 ${userRecord.userName || userRecord.userId}: 일일 제한 우회`
+        );
+        return {
+          allowed: true,
+          remainingDraws: 999,
+          message: "👑 개발자 모드: 무제한 뽑기 가능!",
+          isDeveloper: true
+        };
+      }
+
+      // 일반 사용자 로직
       if (userRecord.lastDrawDate !== today) {
         return {
           allowed: true,
