@@ -572,20 +572,20 @@ class NavigationHandler {
       const userName = getUserName(from);
       const safeUserName = this.markdownHelper.escapeMarkdownV2(userName);
 
-      let text = `❓ **도움말**\n━━━━━━━━━━━━━━━━━━\n\n`;
+      let text = `❓ *도움말*\n━━━━━━━━━━━━━━━━━━\n\n`;
       text += `안녕하세요, ${safeUserName}님\\!\n\n`;
 
-      text += `🤖 **두목봇 v4\\.0\\.0**\n`;
+      text += `🤖 *두목봇 v4\\.0\\.0*\n`;
       text += `통합 업무 관리 시스템\n\n`;
 
       // 기본 명령어
-      text += `**⌨️ 기본 명령어**\n`;
+      text += `*⌨️ 기본 명령어*\n`;
       text += `• /start \\- 봇 시작 및 메인 메뉴\n`;
       text += `• /help \\- 도움말 보기\n`;
       text += `• /status \\- 시스템 상태 확인\n\n`;
 
       // 사용 가능한 모듈
-      text += `**🎯 사용 가능한 기능**\n`;
+      text += `*🎯 사용 가능한 기능*\n`;
 
       try {
         const enabledModules = getEnabledModules();
@@ -594,7 +594,7 @@ class NavigationHandler {
         );
 
         visibleModules.forEach((module) => {
-          text += `• ${module.icon} **${module.displayName}** \\- ${this.markdownHelper.escapeMarkdownV2(module.description)}\n`;
+          text += `• ${module.icon} *${module.displayName}* \\- ${this.markdownHelper.escapeMarkdownV2(module.description)}\n`;
         });
       } catch (moduleError) {
         text += `• 📝 할일 관리\n`;

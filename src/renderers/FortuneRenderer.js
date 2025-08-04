@@ -54,10 +54,10 @@ class FortuneRenderer extends BaseRenderer {
   async renderMenu(data, ctx) {
     const { userName, todayCount, maxDraws, canDraw, fortuneTypes } = data;
 
-    let text = `🔮 **타로 카드 운세**\n\n`;
+    let text = `🔮 *타로 카드 운세*\n\n`;
     text += `신비로운 타로의 세계에 오신 것을 환영합니다, ${userName}님!\n\n`;
 
-    text += `📊 **오늘의 현황**\n`;
+    text += `📊 *오늘의 현황*\n`;
     text += `• 뽑은 횟수: ${todayCount}/${maxDraws}번\n`;
 
     if (canDraw) {
@@ -131,8 +131,8 @@ class FortuneRenderer extends BaseRenderer {
   async renderDrawSelect(data, ctx) {
     const { fortuneTypes, remaining } = data;
 
-    let text = `🃏 **운세 선택**\n\n`;
-    text += `💫 **남은 횟수**: ${remaining}번\n\n`;
+    let text = `🃏 *운세 선택*\n\n`;
+    text += `💫 *남은 횟수*: ${remaining}번\n\n`;
     text += `어떤 종류의 운세를 알아보시겠어요?`;
 
     const buttons = [];
@@ -186,11 +186,11 @@ class FortuneRenderer extends BaseRenderer {
       isDemo // 더미 데이터 표시용
     } = data;
 
-    let text = `✨ **${fortuneType?.label || this.getFortuneTypeName(drawType)} 결과**\n\n`;
+    let text = `✨ *${fortuneType?.label || this.getFortuneTypeName(drawType)} 결과*\n\n`;
 
     // 더미 데이터 표시
     if (isDemo) {
-      text += `🎭 **데모 모드** (실제 데이터베이스 연결 후 정상 동작)\n\n`;
+      text += `🎭 *데모 모드* (실제 데이터베이스 연결 후 정상 동작)\n\n`;
     }
 
     // 두목봇 멘트가 있으면 표시
@@ -200,14 +200,14 @@ class FortuneRenderer extends BaseRenderer {
 
     if (cards && cards.length > 1) {
       // 🔮 다중 카드 결과 (트리플, 캘틱 등)
-      text += `🔮 **${cards.length}카드 리딩**\n\n`;
+      text += `🔮 *${cards.length}카드 리딩*\n\n`;
 
       if (drawType === "triple") {
         const positions = ["과거", "현재", "미래"];
         cards.forEach((card, index) => {
           const position =
             card.position || positions[index] || `${index + 1}번째`;
-          text += `**${position}**: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
+          text += `*${position}*: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
 
           if (card.isReversed) {
             text += `🔄 역방향 - `;
@@ -218,7 +218,7 @@ class FortuneRenderer extends BaseRenderer {
         });
 
         // 종합 해석
-        text += `🎯 **종합 해석**\n`;
+        text += `🎯 *종합 해석*\n`;
         text += this.getOverallInterpretation(cards, drawType) + "\n\n";
       } else if (drawType === "celtic") {
         // 캘틱 크로스는 별도 렌더링 함수 호출
@@ -228,8 +228,8 @@ class FortuneRenderer extends BaseRenderer {
       // 🎴 단일 카드 결과
       const card = cards[0];
 
-      text += `🎴 **뽑힌 카드**\n`;
-      text += `${card.emoji || "🎴"} **${card.korean || card.name}**\n`;
+      text += `🎴 *뽑힌 카드*\n`;
+      text += `${card.emoji || "🎴"} *${card.korean || card.name}*\n`;
 
       if (card.name && card.korean !== card.name) {
         text += `(${card.name})\n`;
@@ -237,17 +237,17 @@ class FortuneRenderer extends BaseRenderer {
       text += `\n`;
 
       if (card.isReversed) {
-        text += `🔄 **역방향 카드**\n`;
+        text += `🔄 *역방향 카드*\n`;
         text += `평소와는 다른 관점에서 해석해보세요.\n\n`;
       }
 
-      text += `💫 **의미**: ${this.getCardMeaning(card, drawType)}\n\n`;
-      text += `💡 **조언**: ${this.getCardAdvice(card, drawType)}\n\n`;
+      text += `💫 *의미*: ${this.getCardMeaning(card, drawType)}\n\n`;
+      text += `💡 *조언*: ${this.getCardAdvice(card, drawType)}\n\n`;
     }
 
     // 남은 횟수 표시
     const remainingCount = remainingDraws ?? remaining ?? 0;
-    text += `💫 **남은 횟수**: ${remainingCount}번`;
+    text += `💫 *남은 횟수*: ${remainingCount}번`;
 
     if (totalDraws) {
       text += ` (총 ${totalDraws}번 뽑으셨습니다)`;
@@ -275,13 +275,13 @@ class FortuneRenderer extends BaseRenderer {
   async renderCelticResult(data, ctx) {
     const { question, cards, _fortuneType, message, isDemo } = data;
 
-    let text = `🔮 **캘틱 크로스 완성**\n\n`;
+    let text = `🔮 *캘틱 크로스 완성*\n\n`;
 
     if (isDemo) {
-      text += `🎭 **데모 모드**\n\n`;
+      text += `🎭 *데모 모드*\n\n`;
     }
 
-    text += `**질문**: "${question}"\n\n`;
+    text += `*질문*: "${question}"\n\n`;
 
     // 두목봇 멘트
     if (message) {
@@ -289,10 +289,10 @@ class FortuneRenderer extends BaseRenderer {
     }
 
     if (cards && cards.length === 10) {
-      text += `✨ **10장 카드 배치 완료**\n\n`;
+      text += `✨ *10장 카드 배치 완료*\n\n`;
 
       // 카드 요약 (5장씩 나누어 표시)
-      text += `🎴 **카드 배치 (1-5)**\n`;
+      text += `🎴 *카드 배치 (1-5)*\n`;
       for (let i = 0; i < 5; i++) {
         const card = cards[i];
         const reversed = card.isReversed ? " (역방향)" : "";
@@ -300,7 +300,7 @@ class FortuneRenderer extends BaseRenderer {
         text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${card.korean || card.name}${reversed}\n`;
       }
 
-      text += `\n🎴 **카드 배치 (6-10)**\n`;
+      text += `\n🎴 *카드 배치 (6-10)*\n`;
       for (let i = 5; i < 10; i++) {
         const card = cards[i];
         const reversed = card.isReversed ? " (역방향)" : "";
@@ -308,7 +308,7 @@ class FortuneRenderer extends BaseRenderer {
         text += `${i + 1}. ${positionName}: ${card.emoji || "🎴"} ${card.korean || card.name}${reversed}\n`;
       }
 
-      text += `\n📖 **상세 해석을 보려면 아래 버튼을 누르세요**`;
+      text += `\n📖 *상세 해석을 보려면 아래 버튼을 누르세요*`;
     }
 
     const buttons = [
@@ -331,19 +331,19 @@ class FortuneRenderer extends BaseRenderer {
   async renderQuestionPrompt(data, ctx) {
     const { fortuneType, isCeltic } = data;
 
-    let text = `❓ **${fortuneType?.label || "질문 운세"}**\n\n`;
+    let text = `❓ *${fortuneType?.label || "질문 운세"}*\n\n`;
 
     if (isCeltic) {
-      text += `🔮 **캘틱 크로스**는 가장 강력하고 상세한 타로 스프레드입니다.\n`;
+      text += `🔮 *캘틱 크로스*는 가장 강력하고 상세한 타로 스프레드입니다.\n`;
       text += `10장의 카드가 당신의 상황을 완전히 분석해드립니다.\n\n`;
 
-      text += `**어떤 질문이든 좋습니다:**\n`;
+      text += `*어떤 질문이든 좋습니다:*\n`;
       text += `• "내 인생의 방향은 무엇인가요?"\n`;
       text += `• "이 선택이 올바른 걸까요?"\n`;
       text += `• "앞으로 어떻게 살아야 할까요?"\n`;
       text += `• "내가 놓치고 있는 것은 무엇인가요?"\n\n`;
 
-      text += `**💎 캘틱 크로스 10개 위치:**\n`;
+      text += `*💎 캘틱 크로스 10개 위치:*\n`;
       text += `1. 현재 상황 | 6. 무의식적 영향\n`;
       text += `2. 도전/장애물 | 7. 당신의 접근법\n`;
       text += `3. 원인/과거 | 8. 외부 환경\n`;
@@ -352,13 +352,13 @@ class FortuneRenderer extends BaseRenderer {
     } else {
       text += `궁금한 것을 자유롭게 질문해주세요.\n\n`;
 
-      text += `**예시 질문:**\n`;
+      text += `*예시 질문:*\n`;
       text += `• "이번 주 중요한 결정을 내려야 하는데 어떻게 해야 할까요?"\n`;
       text += `• "새로운 도전을 시작해야 할 시기인가요?"\n`;
       text += `• "지금 내가 집중해야 할 것은 무엇인가요?"\n\n`;
     }
 
-    text += `**입력 규칙:**\n`;
+    text += `*입력 규칙:*\n`;
     text += `• 최대 100자\n`;
     text += `• 구체적이고 명확한 질문\n\n`;
     text += `메뉴로 돌아가려면 아래 버튼을 누르세요.`;
@@ -374,7 +374,7 @@ class FortuneRenderer extends BaseRenderer {
    * ❌ 질문 오류 렌더링
    */
   async renderQuestionError(data, ctx) {
-    const text = `❌ **입력 오류**
+    const text = `❌ *입력 오류*
 
 ${data.message}
 
@@ -393,12 +393,12 @@ ${data.message}
   async renderDailyLimit(data, ctx) {
     const { used, max } = data;
 
-    const text = `🚫 **일일 제한 도달**
+    const text = `🚫 *일일 제한 도달*
 
 오늘은 이미 ${used}/${max}번의 운세를 모두 뽑으셨습니다.
 
 내일 다시 새로운 운세를 확인해보세요! 🌅
-**운세는 하루에 ${max}번까지만 뽑을 수 있습니다.**`;
+*운세는 하루에 ${max}번까지만 뽑을 수 있습니다.*`;
 
     const buttons = [
       [
@@ -417,7 +417,7 @@ ${data.message}
    * 🔄 셔플 결과 렌더링
    */
   async renderShuffleResult(data, ctx) {
-    const text = `🔄 **카드 셔플 완료**
+    const text = `🔄 *카드 셔플 완료*
 
 ${data.message}
 
@@ -441,9 +441,9 @@ ${data.message}
   async renderStats(data, ctx) {
     const { userName, stats } = data;
 
-    let text = `📊 **${userName}님의 타로 통계**\n\n`;
+    let text = `📊 *${userName}님의 타로 통계*\n\n`;
 
-    text += `🎴 **전체 통계**\n`;
+    text += `🎴 *전체 통계*\n`;
     text += `• 총 뽑기 횟수: ${stats.totalDraws}번\n`;
     text += `• 오늘 뽑기 횟수: ${stats.todayDraws}번\n`;
     text += `• 연속 뽑기: ${stats.streak}일\n`;
@@ -459,8 +459,8 @@ ${data.message}
     const nextLevelDraws = level * 10;
     const remaining = nextLevelDraws - stats.totalDraws;
 
-    text += `🏆 **타로 레벨**: ${level}레벨\n`;
-    text += `📈 **다음 레벨까지**: ${remaining}번 남음\n\n`;
+    text += `🏆 *타로 레벨*: ${level}레벨\n`;
+    text += `📈 *다음 레벨까지*: ${remaining}번 남음\n\n`;
 
     text += `계속해서 타로와 소통해보세요! 🔮`;
 
@@ -483,7 +483,7 @@ ${data.message}
   async renderHistory(data, ctx) {
     const { history, totalCount } = data;
 
-    let text = `📋 **타로 뽑기 기록** (${totalCount}건)\n\n`;
+    let text = `📋 *타로 뽑기 기록* (${totalCount}건)\n\n`;
 
     if (history.length === 0) {
       text += `아직 뽑은 기록이 없습니다.\n\n`;
@@ -537,7 +537,7 @@ ${data.message}
       const errorMessage =
         data && data.message ? data.message : "알 수 없는 오류가 발생했습니다.";
 
-      const text = `❌ **오류 발생**
+      const text = `❌ *오류 발생*
 
 ${errorMessage}
 
@@ -641,30 +641,30 @@ ${errorMessage}
         timestamp
       } = data;
 
-      let text = `📖 **캘틱 크로스 상세 해석**\n\n`;
+      let text = `📖 *캘틱 크로스 상세 해석*\n\n`;
 
       if (isDemo) {
-        text += `🎭 **데모 모드**\n\n`;
+        text += `🎭 *데모 모드*\n\n`;
       }
 
-      text += `**질문**: "${question}"\n`;
+      text += `*질문*: "${question}"\n`;
 
       if (timestamp) {
-        text += `**뽑은 시간**: ${new Date(timestamp).toLocaleString("ko-KR")}\n`;
+        text += `*뽑은 시간*: ${new Date(timestamp).toLocaleString("ko-KR")}\n`;
       }
 
       text += `\n`;
 
       // 10장 카드 상세 설명
       if (cards && cards.length === 10) {
-        text += `🎴 **10장 카드 상세 분석**\n\n`;
+        text += `🎴 *10장 카드 상세 분석*\n\n`;
 
         // 첫 5장
-        text += `**🔵 핵심 스프레드 (1-5번)**\n`;
+        text += `*🔵 핵심 스프레드 (1-5번)*\n`;
         for (let i = 0; i < 5 && i < cards.length; i++) {
           const card = cards[i];
           const reversed = card.isReversed ? " 🔄" : "";
-          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${card.korean}${reversed}\n`;
+          text += `${i + 1}. *${card.positionName}*: ${card.emoji || "🎴"} ${card.korean}${reversed}\n`;
           text += `   ${card.positionDescription}\n`;
 
           // 카드별 간단 해석
@@ -677,32 +677,32 @@ ${errorMessage}
         }
 
         // 나머지 5장
-        text += `**🟡 주변 환경 스프레드 (6-10번)**\n`;
+        text += `*🟡 주변 환경 스프레드 (6-10번)*\n`;
         for (let i = 5; i < 10 && i < cards.length; i++) {
           const card = cards[i];
           const reversed = card.isReversed ? " 🔄" : "";
-          text += `${i + 1}. **${card.positionName}**: ${card.emoji || "🎴"} ${card.korean}${reversed}\n`;
+          text += `${i + 1}. *${card.positionName}*: ${card.emoji || "🎴"} ${card.korean}${reversed}\n`;
           text += `   ${card.positionDescription}\n\n`;
         }
       }
 
       // 상세 해석
       if (detailedInterpretation) {
-        text += `📋 **단계별 상세 해석**\n\n`;
+        text += `📋 *단계별 상세 해석*\n\n`;
 
         Object.values(detailedInterpretation).forEach((section, index) => {
-          text += `**${index + 1}. ${section.title}**\n`;
+          text += `*${index + 1}. ${section.title}*\n`;
           text += `${section.content}\n\n`;
         });
       }
 
       // 종합 메시지
       if (overallMessage) {
-        text += `💫 **종합 메시지**\n`;
+        text += `💫 *종합 메시지*\n`;
         text += `${overallMessage}\n\n`;
       }
 
-      text += `🎯 **조언**: 카드가 제시하는 방향을 참고하여 현명한 판단을 내리세요.`;
+      text += `🎯 *조언*: 카드가 제시하는 방향을 참고하여 현명한 판단을 내리세요.`;
 
       const buttons = [
         [

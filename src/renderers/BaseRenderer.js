@@ -84,11 +84,16 @@ class BaseRenderer {
    */
   async sendSafeMessage(ctx, text, options = {}) {
     try {
+      // parse_mode 기본값 추가!
+      const enhancedOptions = {
+        parse_mode: "Markdown", // 이 부분 추가!
+        ...options
+      };
       // 콜백 쿼리인 경우 editMessageText 사용
       if (ctx.callbackQuery) {
-        return await ctx.editMessageText(text, options);
+        return await ctx.editMessageText(text, enhancedOptions); // options → enhancedOptions
       } else {
-        return await ctx.reply(text, options);
+        return await ctx.reply(text, enhancedOptions); // options → enhancedOptions
       }
     } catch (error) {
       // "Bad Request: message is not modified" 에러는 무시

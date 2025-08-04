@@ -81,11 +81,11 @@ class SystemRenderer extends BaseRenderer {
       moduleHealth = {}
     } = data;
 
-    let text = `🏠 **메인 메뉴**\n${this.ui.separators.main}\n\n`;
+    let text = `🏠 *메인 메뉴*\n${this.ui.separators.main}\n\n`;
     text += `안녕하세요, ${userName}님! 👋\n\n`;
 
     // 🆕 강화된 시스템 현황
-    text += `📊 **시스템 현황**\n`;
+    text += `📊 *시스템 현황*\n`;
     text += `${this.ui.separators.dot}⏱️ 가동시간: ${systemStats.uptime || "정보 없음"}\n`;
     text += `${this.ui.separators.dot}💾 메모리: ${systemStats.memoryUsage}MB (${systemStats.memoryPercent}%)\n`;
     text += `${this.ui.separators.dot}🖥️ CPU: ${systemStats.cpuUsage || 0}%\n`;
@@ -95,7 +95,7 @@ class SystemRenderer extends BaseRenderer {
     // 🆕 모듈 건강도 요약
     if (moduleHealth.totalCount > 0) {
       const healthIcon = this.getHealthIcon(moduleHealth.overall);
-      text += `📦 **모듈 상태** ${healthIcon} ${moduleHealth.overall}\n`;
+      text += `📦 *모듈 상태* ${healthIcon} ${moduleHealth.overall}\n`;
       text += `${this.ui.separators.dot}정상: ${moduleHealth.healthyCount}개\n`;
       if (moduleHealth.warningCount > 0) {
         text += `${this.ui.separators.dot}⚠️ 주의: ${moduleHealth.warningCount}개\n`;
@@ -108,7 +108,7 @@ class SystemRenderer extends BaseRenderer {
 
     // 🎯 사용 가능한 기능들 (상태와 함께 표시)
     if (activeModules.length > 0) {
-      text += `🎯 **사용 가능한 기능** (${activeModules.length}개)\n`;
+      text += `🎯 *사용 가능한 기능* (${activeModules.length}개)\n`;
       activeModules.forEach((module) => {
         const statusIcon = module.healthy
           ? "✅"
@@ -147,15 +147,15 @@ class SystemRenderer extends BaseRenderer {
       lastHealthCheck
     } = data;
 
-    let text = `📊 **시스템 진단**\n${this.ui.separators.main}\n\n`;
+    let text = `📊 *시스템 진단*\n${this.ui.separators.main}\n\n`;
 
     // 🏥 전체 건강도 표시
     const healthIcon = this.getHealthIcon(system.healthStatus || status);
     const healthScore = system.overallHealthScore || 0;
-    text += `${healthIcon} **전체 상태**: ${this.getStatusText(system.healthStatus || status)} (${healthScore}점)\n\n`;
+    text += `${healthIcon} *전체 상태*: ${this.getStatusText(system.healthStatus || status)} (${healthScore}점)\n\n`;
 
     // 🖥️ 하드웨어 정보
-    text += `${this.ui.icons.system} **하드웨어 정보**\n`;
+    text += `${this.ui.icons.system} *하드웨어 정보*\n`;
     text += `${this.ui.separators.dot}플랫폼: ${system.platform || "알 수 없음"}\n`;
     text += `${this.ui.separators.dot}CPU: ${system.cpuModel || "알 수 없음"} (${system.cpuCores || 0}코어)\n`;
     text += `${this.ui.separators.dot}CPU 사용률: ${system.cpuUsage || 0}%\n`;
@@ -163,7 +163,7 @@ class SystemRenderer extends BaseRenderer {
     text += `${this.ui.separators.dot}아키텍처: ${system.arch || "알 수 없음"}\n\n`;
 
     // 💾 메모리 상세 정보
-    text += `${this.ui.icons.memory} **메모리 상태**\n`;
+    text += `${this.ui.icons.memory} *메모리 상태*\n`;
     if (memory.process) {
       text += `${this.ui.separators.dot}프로세스: ${memory.process.heapUsed}MB / ${memory.process.heapTotal}MB\n`;
       text += `${this.ui.separators.dot}사용률: ${memory.process.percentage}%\n`;
@@ -174,7 +174,7 @@ class SystemRenderer extends BaseRenderer {
     text += `\n`;
 
     // 🌐 환경 정보
-    text += `🌍 **환경 정보**\n`;
+    text += `🌍 *환경 정보*\n`;
     text += `${this.ui.separators.dot}환경: ${system.environment || "알 수 없음"}\n`;
     text += `${this.ui.separators.dot}클라우드: ${system.cloudProvider || "Local"}\n`;
     if (system.isDocker) {
@@ -184,7 +184,7 @@ class SystemRenderer extends BaseRenderer {
 
     // 📦 모듈 상태 (StatusHelper 데이터 활용)
     if (modules.length > 0) {
-      text += `${this.ui.icons.modules} **모듈 상태** (${modules.length}개)\n`;
+      text += `${this.ui.icons.modules} *모듈 상태* (${modules.length}개)\n`;
       modules.forEach((module) => {
         const statusIcon = module.healthy ? "✅" : "⚠️";
         text += `${statusIcon} ${module.displayName}: ${module.status}`;
@@ -198,7 +198,7 @@ class SystemRenderer extends BaseRenderer {
 
     // 💡 추천사항
     if (system.recommendations && system.recommendations.length > 0) {
-      text += `💡 **추천사항**\n`;
+      text += `💡 *추천사항*\n`;
       system.recommendations.forEach((rec) => {
         text += `${this.ui.separators.dot}${rec}\n`;
       });
@@ -206,7 +206,7 @@ class SystemRenderer extends BaseRenderer {
     }
 
     if (lastHealthCheck) {
-      text += `🔍 **마지막 체크**: ${TimeHelper.format(new Date(lastHealthCheck), "HH:mm")}\n\n`;
+      text += `🔍 *마지막 체크*: ${TimeHelper.format(new Date(lastHealthCheck), "HH:mm")}\n\n`;
     }
 
     text += `시스템 진단이 완료되었습니다! 🎯`;
@@ -240,15 +240,15 @@ class SystemRenderer extends BaseRenderer {
   async renderHealth(data, ctx) {
     const { overall, components, recommendations, analysis } = data;
 
-    let text = `🏥 **시스템 건강도 진단**\n${this.ui.separators.main}\n\n`;
+    let text = `🏥 *시스템 건강도 진단*\n${this.ui.separators.main}\n\n`;
 
     // 전체 점수
     const scoreIcon = this.getScoreIcon(overall.score);
-    text += `${scoreIcon} **종합 점수**: ${overall.score}/100점\n`;
-    text += `📋 **상태**: ${this.getStatusText(overall.status)}\n\n`;
+    text += `${scoreIcon} *종합 점수*: ${overall.score}/100점\n`;
+    text += `📋 *상태*: ${this.getStatusText(overall.status)}\n\n`;
 
     // 구성요소별 건강도
-    text += `📊 **구성요소별 진단**\n`;
+    text += `📊 *구성요소별 진단*\n`;
     if (components.memory) {
       text += `💾 메모리: ${this.getScoreIcon(components.memory.score)} ${components.memory.score || 0}점\n`;
     }
@@ -262,7 +262,7 @@ class SystemRenderer extends BaseRenderer {
 
     // 강점과 우려사항
     if (analysis.strengths && analysis.strengths.length > 0) {
-      text += `💪 **시스템 강점**\n`;
+      text += `💪 *시스템 강점*\n`;
       analysis.strengths.forEach((strength) => {
         text += `${this.ui.separators.dot}${strength}\n`;
       });
@@ -270,7 +270,7 @@ class SystemRenderer extends BaseRenderer {
     }
 
     if (analysis.concerns && analysis.concerns.length > 0) {
-      text += `⚠️ **개선 필요사항**\n`;
+      text += `⚠️ *개선 필요사항*\n`;
       analysis.concerns.forEach((concern) => {
         text += `${this.ui.separators.dot}${concern}\n`;
       });
@@ -279,7 +279,7 @@ class SystemRenderer extends BaseRenderer {
 
     // 추천사항
     if (recommendations && recommendations.length > 0) {
-      text += `💡 **권장사항**\n`;
+      text += `💡 *권장사항*\n`;
       recommendations.forEach((rec) => {
         text += `${this.ui.separators.dot}${rec}\n`;
       });
@@ -288,7 +288,7 @@ class SystemRenderer extends BaseRenderer {
 
     // 트렌드 정보
     if (analysis.trends) {
-      text += `📈 **시스템 트렌드**\n`;
+      text += `📈 *시스템 트렌드*\n`;
       text += `${this.ui.separators.dot}가동시간: ${analysis.trends.uptime}\n`;
       text += `${this.ui.separators.dot}시간당 요청: ${analysis.trends.callbackRate}회\n`;
       text += `${this.ui.separators.dot}활성 사용자: ${analysis.trends.activeUsers}명\n`;
@@ -391,18 +391,18 @@ class SystemRenderer extends BaseRenderer {
   async renderHelp(data, ctx) {
     const { userName, commands = [], modules = [], version } = data;
 
-    let text = `❓ **시스템 도움말**\n${this.ui.separators.main}\n\n`;
+    let text = `❓ *시스템 도움말*\n${this.ui.separators.main}\n\n`;
     text += `안녕하세요, ${userName}님!\n\n`;
 
     // 🤖 봇 정보
     if (version) {
-      text += `🤖 **두목봇 v${version}**\n`;
+      text += `🤖 *두목봇 v${version}*\n`;
       text += `통합 업무 관리 시스템\n\n`;
     }
 
     // 📚 전체 시스템 명령어
     if (commands.length > 0) {
-      text += `**⌨️ 사용 가능한 명령어**\n`;
+      text += `*⌨️ 사용 가능한 명령어*\n`;
       commands.forEach((cmd) => {
         text += `${this.ui.separators.dot}${cmd.command} - ${cmd.description}\n`;
       });
@@ -411,17 +411,17 @@ class SystemRenderer extends BaseRenderer {
 
     // 🎯 모든 모듈 가이드 (메타-헬프)
     if (modules.length > 0) {
-      text += `**🎯 사용 가능한 모듈**\n`;
+      text += `*🎯 사용 가능한 모듈*\n`;
       modules.forEach((module) => {
         const statusIcon = module.initialized ? "✅" : "❌";
-        text += `${statusIcon} ${module.emoji} **${module.displayName}**\n`;
+        text += `${statusIcon} ${module.emoji} *${module.displayName}*\n`;
         text += `   └ ${module.category || "misc"} 카테고리\n`;
       });
       text += `\n`;
     }
 
     text += `더 자세한 정보가 필요하시면 각 모듈의 도움말을 확인해주세요.\n`;
-    text += `문제가 있으시면 **📊 시스템 상태**를 확인해보세요!`;
+    text += `문제가 있으시면 *📊 시스템 상태*를 확인해보세요!`;
 
     const buttons = [
       [
@@ -441,12 +441,12 @@ class SystemRenderer extends BaseRenderer {
   async renderModules(data, ctx) {
     const modules = Array.isArray(data) ? data : data.modules || [];
 
-    let text = `📱 **모듈 관리**\n${this.ui.separators.main}\n\n`;
+    let text = `📱 *모듈 관리*\n${this.ui.separators.main}\n\n`;
 
     if (modules.length === 0) {
       text += `등록된 모듈이 없습니다.`;
     } else {
-      text += `**등록된 모듈** (${modules.length}개)\n\n`;
+      text += `*등록된 모듈* (${modules.length}개)\n\n`;
 
       // 카테고리별 분류
       const categories = {};
@@ -457,7 +457,7 @@ class SystemRenderer extends BaseRenderer {
       });
 
       Object.entries(categories).forEach(([category, categoryModules]) => {
-        text += `**📂 ${this.getCategoryName(category)}**\n`;
+        text += `*📂 ${this.getCategoryName(category)}*\n`;
         categoryModules.forEach((module) => {
           const statusIcon = module.initialized ? "✅" : "❌";
           const coreIcon = module.isCore ? "⭐" : "";
@@ -486,15 +486,15 @@ class SystemRenderer extends BaseRenderer {
   async renderPing(data, ctx) {
     const { responseTime, status } = data;
 
-    let text = `🏓 **응답속도 테스트**\n${this.ui.separators.main}\n\n`;
-    text += `${status === "pong" ? "✅" : "❌"} **상태**: ${status}\n`;
-    text += `⚡ **응답시간**: ${responseTime}ms\n\n`;
+    let text = `🏓 *응답속도 테스트*\n${this.ui.separators.main}\n\n`;
+    text += `${status === "pong" ? "✅" : "❌"} *상태*: ${status}\n`;
+    text += `⚡ *응답시간*: ${responseTime}ms\n\n`;
 
     const speedIcon =
       responseTime < 100 ? "🚀" : responseTime < 500 ? "⚡" : "🐌";
     const speedText =
       responseTime < 100 ? "매우 빠름" : responseTime < 500 ? "정상" : "느림";
-    text += `${speedIcon} **성능**: ${speedText}`;
+    text += `${speedIcon} *성능*: ${speedText}`;
 
     const buttons = [
       [
@@ -530,10 +530,10 @@ class SystemRenderer extends BaseRenderer {
    * ℹ️ 정보 렌더링 (기존 유지)
    */
   async renderAbout(data, ctx) {
-    let text = `ℹ️ **두목봇 정보**\n${this.ui.separators.main}\n\n`;
-    text += `**🤖 두목봇 v4.0.0**\n`;
+    let text = `ℹ️ *두목봇 정보*\n${this.ui.separators.main}\n\n`;
+    text += `*🤖 두목봇 v4.0.0*\n`;
     text += `통합 업무 관리 시스템\n\n`;
-    text += `**🎯 주요 특징**\n`;
+    text += `*🎯 주요 특징*\n`;
     text += `${this.ui.separators.dot}📝 할일 관리\n`;
     text += `${this.ui.separators.dot}⏰ 타이머 기능\n`;
     text += `${this.ui.separators.dot}🏢 근무시간 추적\n`;
@@ -557,10 +557,10 @@ class SystemRenderer extends BaseRenderer {
   async renderError(data, ctx) {
     const { message = "알 수 없는 오류가 발생했습니다." } = data;
 
-    let text = `❌ **시스템 오류**\n${this.ui.separators.main}\n\n`;
+    let text = `❌ *시스템 오류*\n${this.ui.separators.main}\n\n`;
     text += `${message}\n\n`;
     text += `잠시 후 다시 시도해주세요.\n`;
-    text += `문제가 지속되면 **📊 시스템 상태**를 확인해보세요.`;
+    text += `문제가 지속되면 *📊 시스템 상태*를 확인해보세요.`;
 
     const buttons = [
       [

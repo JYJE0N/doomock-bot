@@ -440,16 +440,16 @@ class BotController {
       const minutes = Math.floor((uptime % 3600) / 60);
       const seconds = uptime % 60;
 
-      const statusText = `🤖 **봇 상태**
+      const statusText = `🤖 *봇 상태*
 
-⏱️ **가동 시간**: ${hours}시간 ${minutes}분 ${seconds}초
-📊 **처리 통계**:
+⏱️ *가동 시간*: ${hours}시간 ${minutes}분 ${seconds}초
+📊 *처리 통계*:
 • 메시지: ${this.stats.messagesProcessed}개
 • 콜백: ${this.stats.callbacksProcessed}개
 • 오류: ${this.stats.errorsCount}개
 
-📦 **모듈**: ${this.moduleManager?.modules?.size || 0}개 로드됨
-🗄️ **DB**: ${this.mongooseManager?.isConnected() ? "연결됨 ✅" : "연결 안됨 ❌"}
+📦 *모듈*: ${this.moduleManager?.modules?.size || 0}개 로드됨
+🗄️ *DB*: ${this.mongooseManager?.isConnected() ? "연결됨 ✅" : "연결 안됨 ❌"}
 
 ✅ 모든 시스템 정상 작동 중`;
 

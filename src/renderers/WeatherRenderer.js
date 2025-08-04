@@ -97,15 +97,15 @@ class WeatherRenderer extends BaseRenderer {
   async renderMenu(data, ctx) {
     const { userName, defaultCity, majorCities, config } = data;
 
-    const text = `🌤️ **날씨 정보**
+    const text = `🌤️ *날씨 정보*
 
 안녕하세요, ${userName}님!
-현재 기본 도시: **${defaultCity}** ${this.cityEmojis[defaultCity] || "🏙️"}
+현재 기본 도시: *${defaultCity}* ${this.cityEmojis[defaultCity] || "🏙️"}
 
 실시간 날씨 정보를 확인하세요! 📡
 ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬️" : ""}
 
-📍 **지원 도시**: ${majorCities?.length || 8}개 도시`;
+📍 *지원 도시*: ${majorCities?.length || 8}개 도시`;
 
     const keyboard = this.createInlineKeyboard(
       [
@@ -132,10 +132,10 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
   async renderCities(data, ctx) {
     const { cities, defaultCity } = data;
 
-    const text = `🏙️ **도시 선택**
+    const text = `🏙️ *도시 선택*
 
 날씨를 확인할 도시를 선택하세요:
-현재 기본 도시: **${defaultCity}** ${this.cityEmojis[defaultCity] || "🏙️"}`;
+현재 기본 도시: *${defaultCity}* ${this.cityEmojis[defaultCity] || "🏙️"}`;
 
     // 2x4 그리드로 도시 버튼 배열
     const cityButtons = [];
@@ -169,24 +169,24 @@ ${config?.enableDustInfo ? "미세먼지 정보도 함께 제공됩니다 🌬�
     const weatherIcon = this.getWeatherIcon(weather.iconCode);
     const tempEmoji = this.getTemperatureEmoji(weather.temperature);
 
-    let text = `${weatherIcon} **${city.name} 날씨**
+    let text = `${weatherIcon} *${city.name} 날씨*
 
-🌡️ 현재: **${weather.temperature}°C** ${tempEmoji}
+🌡️ 현재: *${weather.temperature}°C* ${tempEmoji}
 🌡️ 체감: ${weather.feelsLike}°C
 💧 습도: ${weather.humidity}%
 ☁️ 구름: ${weather.cloudiness}%
 💨 바람: ${weather.windSpeed}m/s
-**${weather.description}**`;
+*${weather.description}*`;
 
     // 미세먼지 정보 추가
     if (dust) {
       const dustEmoji = this.dustEmojis[dust.grade] || "⚪";
       text += `
 
-🌬️ **미세먼지 정보**
+🌬️ *미세먼지 정보*
 PM10: ${dust.pm10}㎍/㎥ ${dustEmoji}
 PM2.5: ${dust.pm25}㎍/㎥
-등급: **${dust.grade}**`;
+등급: *${dust.grade}*`;
     }
 
     text += `
@@ -218,14 +218,14 @@ PM2.5: ${dust.pm25}㎍/㎥
   async renderForecast(data, ctx) {
     const { city, forecast, timestamp } = data;
 
-    let text = `📊 **${city.name} 5일 날씨 예보**\n\n`;
+    let text = `📊 *${city.name} 5일 날씨 예보*\n\n`;
 
     forecast.forecasts.forEach((day, index) => {
       const date = new Date(day.date);
       const dayName = this.getDayName(date, index);
       const icon = this.getWeatherIcon(day.iconCode);
 
-      text += `**${dayName}** (${TimeHelper.format(date, "MM/DD")})\n`;
+      text += `*${dayName}* (${TimeHelper.format(date, "MM/DD")})\n`;
       text += `${icon} ${day.description}\n`;
       text += `🌡️ ${day.tempMin}°C - ${day.tempMax}°C\n`;
       text += `💧 습도: ${day.avgHumidity}%\n\n`;
@@ -253,9 +253,9 @@ PM2.5: ${dust.pm25}㎍/㎥
   async renderSettingSuccess(data, ctx) {
     const { city, userName } = data;
 
-    const text = `✅ **설정 완료!**
+    const text = `✅ *설정 완료!*
 
-${userName}님의 기본 도시가 **${city.name}**로 설정되었습니다.
+${userName}님의 기본 도시가 *${city.name}*로 설정되었습니다.
 이제 "현재 날씨"를 선택하면 ${city.name}의 날씨가 표시됩니다.`;
 
     const keyboard = this.createInlineKeyboard([
@@ -283,18 +283,18 @@ ${userName}님의 기본 도시가 **${city.name}**로 설정되었습니다.
   async renderHelp(data, ctx) {
     const { _config, majorCities, features } = data;
 
-    let text = `❓ **날씨 모듈 도움말**
-**주요 기능:**
+    let text = `❓ *날씨 모듈 도움말*
+*주요 기능:*
 • ${features.weather} - 온도, 습도, 구름량 등
 • ${features.cities} - ${majorCities.map((c) => c.name).join(", ")}
 ${features.dust ? `• ${features.dust}` : ""}
 ${features.forecast ? `• ${features.forecast}` : ""}
 • ${features.setting}
-**사용 방법:**
+*사용 방법:*
 • 채팅창에 "날씨" 또는 "서울 날씨"라고 입력
 • 버튼을 눌러 도시별 날씨 확인
 • ⭐ 버튼으로 자주 보는 도시를 기본 설정
-**팁:**
+*팁:*
 • 날씨 정보는 5분마다 업데이트됩니다
 • 기본 도시를 설정하면 더 빠르게 확인 가능`;
 
@@ -316,7 +316,7 @@ ${features.forecast ? `• ${features.forecast}` : ""}
     // data가 없거나 message가 없는 경우 처리
     const message = data?.message || "알 수 없는 오류가 발생했습니다.";
 
-    const text = `❌ **오류 발생**
+    const text = `❌ *오류 발생*
 
 ${message}
 

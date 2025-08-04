@@ -109,9 +109,9 @@ class LeaveRenderer extends BaseRenderer {
           ? `\n💼 ${workYears}년차 보너스: +${Math.floor(workYears / 2)}일`
           : "";
 
-      const text = `🏖️ **내 연차 현황** (${currentYear}년)
+      const text = `🏖️ *내 연차 현황* (${currentYear}년)
 
-📊 **연차 정보**
+📊 *연차 정보*
 • 기본 연차: 15일
 • 사용한 연차: ${usedLeave}일  
 • 남은 연차: ${remainingLeave}일${bonusInfo}
@@ -150,7 +150,7 @@ ${joinDate ? `💼 입사일: ${joinDate} (${workYears}년차)` : ""}
     try {
       const { message = "알 수 없는 오류가 발생했습니다." } = data || {}; // ✅ data 검증 추가
 
-      const text = `❌ **오류 발생**
+      const text = `❌ *오류 발생*
 
 ${message}
 
@@ -187,7 +187,7 @@ ${message}
         remainingLeave = 15
       } = data || {};
 
-      let text = `📈 **${currentYear}년 월별 연차 사용 현황**\n\n`;
+      let text = `📈 *${currentYear}년 월별 연차 사용 현황*\n\n`;
 
       // 월별 사용 현황
       const monthNames = [
@@ -218,7 +218,7 @@ ${message}
             ? "✅"
             : "⏳";
 
-        text += `${monthIcon} **${monthNames[month]}**: ${usage.days}일 사용`;
+        text += `${monthIcon} *${monthNames[month]}*: ${usage.days}일 사용`;
         if (usage.count > 0) {
           text += ` (${usage.count}회)`;
         }
@@ -233,7 +233,7 @@ ${message}
         }
       }
 
-      text += `\n📊 **전체 현황**`;
+      text += `\n📊 *전체 현황*`;
       text += `\n• 총 사용: ${totalLeave - remainingLeave}일`;
       text += `\n• 잔여 연차: ${remainingLeave}일`;
       text += `\n• 사용률: ${(((totalLeave - remainingLeave) / totalLeave) * 100).toFixed(1)}%`;
@@ -262,13 +262,13 @@ ${message}
     try {
       const { remainingLeave = 0, maxContinuousDays = 10 } = data || {};
 
-      const text = `➕ **연차 사용하기**
+      const text = `➕ *연차 사용하기*
 
-💰 **남은 연차: ${remainingLeave}일**
+💰 *남은 연차: ${remainingLeave}일*
 
 어떤 방식으로 연차를 사용하시겠어요?
 
-📝 **직접 입력**: 최대 ${maxContinuousDays}일까지, 0.25일 단위로 입력 가능`;
+📝 *직접 입력*: 최대 ${maxContinuousDays}일까지, 0.25일 단위로 입력 가능`;
 
       const keyboard = {
         inline_keyboard: [
@@ -322,9 +322,9 @@ ${message}
         congratsMessage = "☕ 짧은 휴식 되세요!";
       }
 
-      const text = `✅ **연차 사용 완료!**
+      const text = `✅ *연차 사용 완료!*
 
-${typeIcon} **${displayType} (${amount}일)** 사용했어요
+${typeIcon} *${displayType} (${amount}일)* 사용했어요
 📅 날짜: ${date}
 📊 남은 연차: ${remainingLeave}일
 
@@ -359,18 +359,18 @@ ${congratsMessage}`;
         examples = ["1.5", "2", "3", "2.5"]
       } = data || {};
 
-      const text = `✏️ **연차 직접 입력**
+      const text = `✏️ *연차 직접 입력*
 
-💰 **남은 연차: ${remainingLeave}일**
+💰 *남은 연차: ${remainingLeave}일*
 
-📝 **사용할 연차량을 입력해주세요**
-**입력 규칙:**
+📝 *사용할 연차량을 입력해주세요*
+*입력 규칙:*
 • 0.25일 단위로 입력 (0.25, 0.5, 0.75, 1, 1.25, ...)
 • 최대 ${maxDays}일까지 가능
 • 남은 연차를 초과할 수 없음
-**입력 예시:**
+*입력 예시:*
 ${examples.map((ex) => `• \`${ex}\``).join("\n")}
-**취소하려면:** \`/cancel\` 또는 \`취소\` 입력`;
+*취소하려면:* \`/cancel\` 또는 \`취소\` 입력`;
 
       const keyboard = {
         inline_keyboard: [[{ text: "❌ 취소", callback_data: "leave:use" }]]
@@ -391,7 +391,7 @@ ${examples.map((ex) => `• \`${ex}\``).join("\n")}
     try {
       const { message = "연차 사용에 실패했습니다." } = data || {};
 
-      const text = `❌ **연차 사용 실패**
+      const text = `❌ *연차 사용 실패*
 
 ${message}
 
@@ -421,7 +421,7 @@ ${message}
     try {
       const { message = "연차 입력이 취소되었습니다." } = data || {};
 
-      const text = `🚫 **입력 취소**
+      const text = `🚫 *입력 취소*
 
 ${message}
 
@@ -452,13 +452,13 @@ ${message}
       const { message = "입력에 오류가 있습니다.", remainingLeave = 0 } =
         data || {};
 
-      const text = `⚠️ **입력 오류**
+      const text = `⚠️ *입력 오류*
 
 ${message}
 
-💰 **남은 연차: ${remainingLeave}일**
+💰 *남은 연차: ${remainingLeave}일*
 
-올바른 형식으로 다시 입력해주세요.**취소하려면:** \`/cancel\` 또는 \`취소\` 입력`;
+올바른 형식으로 다시 입력해주세요.*취소하려면:* \`/cancel\` 또는 \`취소\` 입력`;
 
       const keyboard = {
         inline_keyboard: [[{ text: "❌ 취소", callback_data: "leave:use" }]]
@@ -484,9 +484,9 @@ ${message}
         canModify = true
       } = data || {};
 
-      const text = `⚙️ **연차 설정**
+      const text = `⚙️ *연차 설정*
 
-📊 **현재 설정**
+📊 *현재 설정*
 • 기본 연차: 15일
 • 총 연차: ${totalLeave}일
 ${joinDate ? `• 입사일: ${joinDate}` : ""}
@@ -533,11 +533,11 @@ ${canModify ? "⚡ 연차를 수동으로 추가하거나 삭제할 수 있습�
         message = "설정이 변경되었습니다."
       } = data;
 
-      const text = `✅ **설정 변경 완료**
+      const text = `✅ *설정 변경 완료*
 
 ${message}
 
-📊 **새로운 연차 총계: ${newTotal}일**
+📊 *새로운 연차 총계: ${newTotal}일*
 
 ${action === "add" ? `➕ ${amount}일이 추가되었습니다.` : action === "remove" ? `➖ ${amount}일이 삭제되었습니다.` : ""}`;
 
@@ -563,7 +563,7 @@ ${action === "add" ? `➕ ${amount}일이 추가되었습니다.` : action === "
    */
   async renderJoinDatePrompt(data, ctx) {
     try {
-      const text = `💼 **입사일 설정**
+      const text = `💼 *입사일 설정*
 
 ${data.message}
 
@@ -590,7 +590,7 @@ ${data.message}
     try {
       const { message = "알 수 없는 오류가 발생했습니다." } = data;
 
-      const text = `❌ **오류 발생**
+      const text = `❌ *오류 발생*
 
 ${message}
 

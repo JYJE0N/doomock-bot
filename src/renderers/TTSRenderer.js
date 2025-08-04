@@ -37,7 +37,7 @@ class TTSRenderer extends BaseRenderer {
   async renderMenu(data, ctx) {
     const { userName, currentVoice, _languages } = data;
 
-    const text = `🔊 **음성 변환 서비스**
+    const text = `🔊 *음성 변환 서비스*
 
 안녕하세요, ${userName}님!
 
@@ -103,7 +103,7 @@ class TTSRenderer extends BaseRenderer {
     const { language, maxLength } = data;
     const langName = language === "ko-KR" ? "한국어" : "영어";
 
-    const text = `🎤 **텍스트 입력**
+    const text = `🎤 *텍스트 입력*
 
 언어: ${langName}
 최대 길이: ${maxLength}자
@@ -123,7 +123,7 @@ class TTSRenderer extends BaseRenderer {
     const { language, voices } = data;
     const langName = language === "ko-KR" ? "한국어" : "English";
 
-    const text = `🎤 **음성 선택 - ${langName}**
+    const text = `🎤 *음성 선택 - ${langName}*
 
 원하는 목소리를 선택해주세요:`;
 
@@ -172,9 +172,9 @@ class TTSRenderer extends BaseRenderer {
   async renderVoiceChanged(data, ctx) {
     const { voice } = data;
 
-    const text = `✅ **음성 변경 완료**
+    const text = `✅ *음성 변경 완료*
 
-선택한 음성: **${voice.name}**
+선택한 음성: *${voice.name}*
 ${voice.description || ""}
 
 이제 이 음성으로 텍스트를 변환합니다.`;
@@ -196,7 +196,7 @@ ${voice.description || ""}
     const { shareUrl, message } = data;
 
     // URL을 코드 블록으로 감싸서 Markdown 파싱 오류 방지
-    const text = `📤 **공유 링크**
+    const text = `📤 *공유 링크*
 
 \`${shareUrl}\`
 
@@ -219,7 +219,7 @@ ${message}`;
     };
 
     // 캡션 생성 (MarkdownV2 형식)
-    let caption = `✅ **변환 완료\\!**\n\n`;
+    let caption = `✅ *변환 완료\\!*\n\n`;
     caption += `📝 텍스트: "${escapeMarkdownV2(text)}"\n`;
     caption += `🎤 음성: ${escapeMarkdownV2(voice)}`;
 
@@ -264,7 +264,7 @@ ${message}`;
 
         // 첫 번째 폴백: Markdown (V1) 시도
         try {
-          const markdownCaption = `✅ **변환 완료!**\n\n📝 텍스트: "${text}"\n🎤 음성: ${voice}`;
+          const markdownCaption = `✅ *변환 완료!*\n\n📝 텍스트: "${text}"\n🎤 음성: ${voice}`;
           await ctx.replyWithAudio(
             { source: audioFile },
             {
@@ -315,7 +315,7 @@ ${message}`;
   async renderError(data, ctx) {
     const { message = "알 수 없는 오류가 발생했습니다." } = data;
 
-    const text = `❌ **오류 발생**
+    const text = `❌ *오류 발생*
 
 ${message}
 

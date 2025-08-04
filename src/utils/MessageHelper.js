@@ -102,7 +102,7 @@ class MessageHelper {
   }
 
   static bold(text) {
-    return `**${text}**`;
+    return `*${text}*`;
   }
 
   static italic(text) {

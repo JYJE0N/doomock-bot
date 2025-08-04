@@ -219,7 +219,7 @@ class ErrorHandler {
         };
 
         await bot.editMessageText(
-          `❌ **화면 표시 오류**\n\n${errorMessage}\n\n다시 시도하거나 메인 메뉴로 돌아가세요.`,
+          `❌ *화면 표시 오류*\n\n${errorMessage}\n\n다시 시도하거나 메인 메뉴로 돌아가세요.`,
           {
             chat_id: callbackQuery.message.chat.id,
             message_id: callbackQuery.message.message_id,

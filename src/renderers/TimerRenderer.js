@@ -239,7 +239,7 @@ class TimerRenderer extends BaseRenderer {
       const detailedInfo = this.createDetailedTimeInfo(timer);
 
       // MarkdownHelper 스타일 메서드 활용
-      const bold = (text) => this.markdownHelper?.bold(text) || `**${text}**`;
+      const bold = (text) => this.markdownHelper?.bold(text) || `*${text}*`;
       const italic = (text) => this.markdownHelper?.italic(text) || `_${text}_`;
 
       // MarkdownV2 호환 텍스트 생성
@@ -264,7 +264,7 @@ class TimerRenderer extends BaseRenderer {
   async renderMenu(data, ctx) {
     const { userName, activeTimer, config, _timerTypes } = data;
 
-    let text = `🍅 **뽀모도로 타이머**\n\n`;
+    let text = `🍅 *뽀모도로 타이머*\n\n`;
     text += `안녕하세요, ${userName}님! 🌟\n\n`;
 
     if (activeTimer) {
@@ -275,14 +275,14 @@ class TimerRenderer extends BaseRenderer {
         data.motivationData || {}
       );
 
-      text += `${statusIcon} **실행 중인 타이머**\n\n`;
+      text += `${statusIcon} *실행 중인 타이머*\n\n`;
       text += `${progressBar}\n\n`;
-      text += `🎯 **타입**: ${this.getTimerTypeDisplay(activeTimer.type)}\n`;
-      text += `📊 **상태**: ${activeTimer.isPaused ? "일시정지" : "실행중"}\n\n`;
+      text += `🎯 *타입*: ${this.getTimerTypeDisplay(activeTimer.type)}\n`;
+      text += `📊 *상태*: ${activeTimer.isPaused ? "일시정지" : "실행중"}\n\n`;
       text += `💬 ${motivationMsg}\n\n`;
     } else {
       text += `집중력 향상을 위한 뽀모도로 기법을 사용해보세요!\n\n`;
-      text += `**시작할 타이머를 선택하세요:**\n`;
+      text += `*시작할 타이머를 선택하세요:*\n`;
     }
 
     const buttons = this.buildMenuButtons(activeTimer, config);
@@ -305,8 +305,8 @@ class TimerRenderer extends BaseRenderer {
 
 ${progressBar}
 
-🎯 **타입**: ${this.getTimerTypeDisplay(timer.type)}
-📊 **진행률**: ${timer.progress}%
+🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}
+📊 *진행률*: ${timer.progress}%
 
 💬 ${motivationMsg}
 
@@ -332,8 +332,8 @@ ${this.getTimerTips(timer.type)}`;
 
 ${progressBar}
 
-🎯 **타입**: ${this.getTimerTypeDisplay(timer.type)}
-📊 **진행률**: ${timer.progress}%
+🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}
+📊 *진행률*: ${timer.progress}%
 
 💬 ${motivationMsg}
 
@@ -359,8 +359,8 @@ ${progressBar}
 
 ${progressBar}
 
-🎯 **타입**: ${this.getTimerTypeDisplay(timer.type)}
-📊 **진행률**: ${timer.progress}%
+🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}
+📊 *진행률*: ${timer.progress}%
 
 💬 ${motivationMsg}
 
@@ -394,11 +394,11 @@ ${progressBar}
 
     const text = `${completionIcon} ${message}
 
-⏱️ **경과 시간**: ${elapsedTime}
-📊 **완료율**: ${completionRate}%
+⏱️ *경과 시간*: ${elapsedTime}
+📊 *완료율*: ${completionRate}%
 
 ${completionMessage} 🎯
-**다음 단계:**
+*다음 단계:*
 ${this.getNextStepSuggestion(completionRate)}`;
 
     const buttons = [
@@ -424,15 +424,15 @@ ${this.getNextStepSuggestion(completionRate)}`;
     const motivationMsg = this.getMotivationMessage(motivationData);
     const detailedInfo = this.createDetailedTimeInfo(timer);
 
-    const text = `${statusIcon} **타이머 상세 상태**
+    const text = `${statusIcon} *타이머 상세 상태*
 
 ${progressBar}
 
 ${detailedInfo}
 
-🎯 **타입**: ${this.getTimerTypeDisplay(timer.type)}
-📊 **진행률**: ${timer.progress}%
-⏸️ **상태**: ${timer.isPaused ? "일시정지" : "실행중"}
+🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}
+📊 *진행률*: ${timer.progress}%
+⏸️ *상태*: ${timer.isPaused ? "일시정지" : "실행중"}
 
 💬 ${motivationMsg}
 
@@ -457,8 +457,8 @@ ${this.getProgressAnalysis(timer)}`;
 
 ${progressBar}
 
-🎯 **타입**: ${this.getTimerTypeDisplay(timer.type)}
-📊 **진행률**: ${timer.progress}%
+🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}
+📊 *진행률*: ${timer.progress}%
 
 ${enabled ? "✨ 이제 5초마다 자동으로 업데이트됩니다!" : "📱 수동 새로고침 모드로 변경되었습니다."}`;
 
@@ -474,15 +474,15 @@ ${enabled ? "✨ 이제 5초마다 자동으로 업데이트됩니다!" : "📱 
   async renderNoTimer(data, ctx) {
     const { message, suggestion } = data;
 
-    const text = `🍅 **뽀모도로 타이머**
+    const text = `🍅 *뽀모도로 타이머*
 
 ${message}
 
 ${suggestion}
-**추천 시작법:**
-🚀 처음이신가요? **집중 (25분)**으로 시작해보세요!
-☕ 잠깐 쉬고 싶다면 **짧은 휴식 (5분)**을 선택하세요!
-🌴 충분한 휴식이 필요하다면 **긴 휴식 (15분)**을 권장해요!`;
+*추천 시작법:*
+🚀 처음이신가요? *집중 (25분)*으로 시작해보세요!
+☕ 잠깐 쉬고 싶다면 *짧은 휴식 (5분)*을 선택하세요!
+🌴 충분한 휴식이 필요하다면 *긴 휴식 (15분)*을 권장해요!`;
 
     const buttons = [
       [
@@ -506,10 +506,10 @@ ${suggestion}
   async renderHelp(data, ctx) {
     const { title, sections, tips } = data;
 
-    let text = `❓ **${title}**\n\n`;
+    let text = `❓ *${title}*\n\n`;
 
     sections.forEach((section) => {
-      text += `**${section.title}**\n`;
+      text += `*${section.title}*\n`;
       section.items.forEach((item) => {
         text += `${item}\n`;
       });
@@ -517,7 +517,7 @@ ${suggestion}
     });
 
     if (tips && tips.length > 0) {
-      text += `💡 **유용한 팁**\n`;
+      text += `💡 *유용한 팁*\n`;
       tips.forEach((tip) => {
         text += `• ${tip}\n`;
       });
@@ -546,7 +546,7 @@ ${suggestion}
       canRetry = false
     } = data || {};
 
-    const text = `❌ **앗, 문제가 생겼어요!**
+    const text = `❌ *앗, 문제가 생겼어요!*
 
 ${message}
 
@@ -571,26 +571,26 @@ ${message}
   async renderStats(data, ctx) {
     const { userName, stats, period } = data;
 
-    let text = `📊 **${userName}님의 타이머 통계** (${period})\n\n`;
+    let text = `📊 *${userName}님의 타이머 통계* (${period})\n\n`;
 
     if (stats.totalSessions === 0) {
       text += `아직 완료된 세션이 없어요.\n새로운 타이머를 시작해보세요! 🚀`;
     } else {
-      text += `✅ **총 완료 세션**: ${stats.totalSessions}개\n`;
-      text += `⏱️ **총 시간**: ${Math.round(stats.totalMinutes)}분\n`;
-      text += `📈 **완료율**: ${stats.completionRate}%\n`;
-      text += `🔥 **연속 기록**: ${stats.streak.current}일 (최고: ${stats.streak.longest}일)\n\n`;
+      text += `✅ *총 완료 세션*: ${stats.totalSessions}개\n`;
+      text += `⏱️ *총 시간*: ${Math.round(stats.totalMinutes)}분\n`;
+      text += `📈 *완료율*: ${stats.completionRate}%\n`;
+      text += `🔥 *연속 기록*: ${stats.streak.current}일 (최고: ${stats.streak.longest}일)\n\n`;
 
-      text += `**타입별 통계**\n`;
+      text += `*타입별 통계*\n`;
       text += `🍅 집중: ${stats.typeCounts.focus}회\n`;
       text += `☕ 짧은 휴식: ${stats.typeCounts.shortBreak}회\n`;
       text += `🌴 긴 휴식: ${stats.typeCounts.longBreak}회\n\n`;
 
-      text += `**평균**\n`;
+      text += `*평균*\n`;
       text += `📅 하루 평균: ${stats.averageSessionsPerDay}회\n`;
       text += `⏰ 하루 평균: ${Math.round(stats.averageMinutesPerDay)}분\n\n`;
 
-      text += `💡 **가장 좋아하는 타입**: ${this.getTypeDisplay(stats.favoriteType)}`;
+      text += `💡 *가장 좋아하는 타입*: ${this.getTypeDisplay(stats.favoriteType)}`;
     }
 
     const buttons = [
@@ -701,7 +701,7 @@ ${message}
     const remainingTime = this.formatTime(timer.remainingTime || 0);
 
     // MarkdownHelper 활용
-    const bold = (text) => this.markdownHelper?.bold(text) || `**${text}**`;
+    const bold = (text) => this.markdownHelper?.bold(text) || `*${text}*`;
 
     return `⏱️ ${bold("경과시간")}: ${elapsedTime}\n⏰ ${bold("남은시간")}: ${remainingTime}`;
   }
@@ -738,12 +738,12 @@ ${message}
    */
   getTimerTips(timerType) {
     const tips = {
-      focus: "💡 **팁**: 한 가지 작업에만 집중하고, 알림을 꺼두세요!",
-      short: "💡 **팁**: 스트레칭하거나 물을 마시며 잠깐 쉬어보세요!",
-      long: "💡 **팁**: 산책하거나 가벼운 간식을 드시며 충분히 쉬세요!"
+      focus: "💡 *팁*: 한 가지 작업에만 집중하고, 알림을 꺼두세요!",
+      short: "💡 *팁*: 스트레칭하거나 물을 마시며 잠깐 쉬어보세요!",
+      long: "💡 *팁*: 산책하거나 가벼운 간식을 드시며 충분히 쉬세요!"
     };
 
-    return tips[timerType] || "💡 **팁**: 자신만의 리듬을 찾아보세요!";
+    return tips[timerType] || "💡 *팁*: 자신만의 리듬을 찾아보세요!";
   }
 
   /**
@@ -926,12 +926,12 @@ ${message}
    */
   getLiveUpdateInfo(enabled) {
     if (enabled) {
-      return `🔄 **실시간 업데이트 활성화됨**
+      return `🔄 *실시간 업데이트 활성화됨*
 • 5초마다 자동으로 진행률이 업데이트됩니다
 • 일시정지하면 자동으로 비활성화됩니다
 • 언제든 끌 수 있습니다`;
     } else {
-      return `📱 **수동 새로고침 모드**
+      return `📱 *수동 새로고침 모드*
 • 🔄 새로고침 버튼으로 상태를 확인하세요
 • 배터리 절약에 도움이 됩니다
 • 실시간 업데이트를 켜면 자동으로 갱신됩니다`;
@@ -977,7 +977,7 @@ ${message}
   createProgressHistory(sessions = []) {
     if (!sessions.length) return "📈 아직 기록이 없습니다.";
 
-    let history = "📊 **최근 세션 기록**\n";
+    let history = "📊 *최근 세션 기록*\n";
 
     sessions.slice(-5).forEach((session, index) => {
       const completionIcon =

@@ -99,10 +99,10 @@ class MenuBuilder {
     const stats = getModuleStats();
 
     let menuText = `${UI_THEMES.main.title}\n${UI_THEMES.main.subtitle}\n\n`;
-    menuText += `${timeTheme.emoji} ${timeTheme.greeting}, **${userName}**님!\n\n`;
-    menuText += `⏰ **현재 시간:** ${currentTime}\n`;
-    menuText += `📦 **활성 모듈:** ${stats.visible}/${stats.total}개\n`;
-    menuText += `🎨 **Enhanced:** ${stats.enhanced}개\n\n`;
+    menuText += `${timeTheme.emoji} ${timeTheme.greeting}, *${userName}*님!\n\n`;
+    menuText += `⏰ *현재 시간:* ${currentTime}\n`;
+    menuText += `📦 *활성 모듈:* ${stats.visible}/${stats.total}개\n`;
+    menuText += `🎨 *Enhanced:* ${stats.enhanced}개\n\n`;
 
     if (enabledModules.length > 0) {
       menuText += `**🎯 사용 가능한 기능**\n`;
@@ -134,18 +134,18 @@ class MenuBuilder {
       return `❌ 모듈 정보를 찾을 수 없습니다: ${moduleKey}`;
     }
 
-    let text = `📱 **${moduleInfo.displayName}**\n`;
+    let text = `📱 *${moduleInfo.displayName}*\n`;
     text += `${moduleInfo.description}\n\n`;
 
     // Enhanced 모듈 표시
     if (moduleInfo.enhanced) {
-      text += `⭐ **Enhanced 모듈**\n`;
+      text += `⭐ *Enhanced 모듈*\n`;
       text += `🌈 알록달록 기능 지원\n\n`;
     }
 
     // 추가 정보 표시
     if (additionalInfo.stats) {
-      text += `📊 **모듈 통계**\n`;
+      text += `📊 *모듈 통계*\n`;
       Object.entries(additionalInfo.stats).forEach(([key, value]) => {
         text += `• ${key}: ${value}\n`;
       });

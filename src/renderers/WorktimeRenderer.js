@@ -145,7 +145,7 @@ class WorktimeRenderer extends BaseRenderer {
   async renderMenu(data, ctx) {
     const { userName, todayStatus = {}, config = {} } = data;
 
-    let text = `🏢 **근무시간 관리**
+    let text = `🏢 *근무시간 관리*
 
 안녕하세요, ${userName || "사용자"}님! ${this.getTimeEmoji()}
 
@@ -160,27 +160,27 @@ class WorktimeRenderer extends BaseRenderer {
           workSummary?.workDuration || 0,
           config.overtimeThreshold || 480
         );
-        text += `${this.statusEmojis.working} **현재 근무 중**
-⏰ **근무시간**: ${workSummary?.displayTime || "0:00"}
+        text += `${this.statusEmojis.working} *현재 근무 중*
+⏰ *근무시간*: ${workSummary?.displayTime || "0:00"}
 ${this.createProgressBar(progress.percentage, progress.label)}
 
 `;
       } else {
-        text += `✅ **오늘 근무 완료**
-⏰ **총 근무시간**: ${workSummary?.displayTime || "0:00"}
+        text += `✅ *오늘 근무 완료*
+⏰ *총 근무시간*: ${workSummary?.displayTime || "0:00"}
 ${workSummary?.isOvertime ? "🔥 초과근무 " + this.formatDuration(workSummary.overtimeMinutes) : "👍 정상근무"}
 
 `;
       }
     } else {
-      text += `📝 **오늘 근무 기록 없음**
+      text += `📝 *오늘 근무 기록 없음*
 출근 버튼을 눌러 근무를 시작하세요!
 
 `;
     }
 
     // 이번 주 요약
-    text += `📊 **이번 주 근무**
+    text += `📊 *이번 주 근무*
 • 근무일수: ${todayStatus.weekSummary?.workDays || 0}일
 • 총 시간: ${todayStatus.weekSummary?.totalHours || 0}시간`;
 
@@ -235,7 +235,7 @@ ${workSummary?.isOvertime ? "🔥 초과근무 " + this.formatDuration(workSumma
   async renderCheckinSuccess(data, ctx) {
     const { record, checkInTime, message } = data;
 
-    const text = `✅ **출근 완료!**
+    const text = `✅ *출근 완료!*
 
 💼 출근시간: ${this.safeTimeDisplay(checkInTime)}
 📍 위치: 회사
@@ -280,7 +280,7 @@ ${workSummary?.isOvertime ? "🔥 초과근무 " + this.formatDuration(workSumma
       workStatus = "👍 정상근무";
     }
 
-    const text = `🏠 **퇴근 완료!**
+    const text = `🏠 *퇴근 완료!*
 
 ⏰ 총 근무시간: ${workSummary?.displayTime || "0:00"}
 ${workStatus}
@@ -322,40 +322,40 @@ ${workStatus}
       trends = {}
     } = data;
 
-    let text = `📊 **월간 근무 통계**
+    let text = `📊 *월간 근무 통계*
 
-📅 **${year}년 ${month}월**
-📊 **근무일**: ${workDays}일
-⏰ **총 시간**: ${totalHours}시간`;
+📅 *${year}년 ${month}월*
+📊 *근무일*: ${workDays}일
+⏰ *총 시간*: ${totalHours}시간`;
 
     if (overtimeHours > 0) {
       text += `
-🔥 **초과근무**: ${overtimeHours}시간`;
+🔥 *초과근무*: ${overtimeHours}시간`;
     }
 
     text += `
-📊 **일평균**: ${avgDailyHours}시간`;
+📊 *일평균*: ${avgDailyHours}시간`;
 
     if (performance.emoji && performance.txt) {
       text += `
 
-${performance.emoji} **평가**: ${performance.txt}`;
+${performance.emoji} *평가*: ${performance.txt}`;
     }
 
     if (trends.weeklyTrend) {
       text += `
 
-📈 **트렌드**
-📊 **주간**: ${trends.weeklyTrend}`;
+📈 *트렌드*
+📊 *주간*: ${trends.weeklyTrend}`;
 
       if (trends.monthlyTrend) {
         text += `
-📈 **월간**: ${trends.monthlyTrend}`;
+📈 *월간*: ${trends.monthlyTrend}`;
       }
 
       if (trends.recommendation) {
         text += `
-💡 **추천**: ${trends.recommendation}`;
+💡 *추천*: ${trends.recommendation}`;
       }
     }
 
@@ -400,15 +400,15 @@ ${performance.emoji} **평가**: ${performance.txt}`;
       achievements = []
     } = data;
 
-    let text = `📊 **근무 통계**
-**전체 통계**
+    let text = `📊 *근무 통계*
+*전체 통계*
 • 총 근무일: ${overall.totalDays || 0}일
 • 총 근무시간: ${overall.totalHours || 0}시간
 • 평균 일일 근무: ${overall.avgDailyHours || 0}시간`;
 
     if (thisMonth.workDays) {
       text += `
-**이번 달**
+*이번 달*
 • 근무일: ${thisMonth.workDays}일
 • 총 시간: ${thisMonth.totalHours}시간
 • 초과근무: ${thisMonth.overtimeHours || 0}시간`;
@@ -416,7 +416,7 @@ ${performance.emoji} **평가**: ${performance.txt}`;
 
     if (lastMonth.workDays) {
       text += `
-**지난 달**
+*지난 달*
 • 근무일: ${lastMonth.workDays}일
 • 총 시간: ${lastMonth.totalHours}시간
 • 초과근무: ${lastMonth.overtimeHours || 0}시간`;
@@ -425,7 +425,7 @@ ${performance.emoji} **평가**: ${performance.txt}`;
     if (achievements.length > 0) {
       text += `
 
-🏆 **달성 기록**`;
+🏆 *달성 기록*`;
       achievements.forEach((achievement) => {
         text += `
 ${achievement.emoji} ${achievement.txt}`;
@@ -493,15 +493,15 @@ ${achievement.emoji} ${achievement.txt}`;
       : this.statusEmojis.completed;
     const statusText = isWorking ? "근무 중" : "근무 완료";
 
-    let text = `📅 **오늘 근무 현황** ${statusEmoji}
+    let text = `📅 *오늘 근무 현황* ${statusEmoji}
 
-📊 **상태**: ${statusText}
-⏰ **출근**: ${this.safeTimeDisplay(record.checkInTime)}`;
+📊 *상태*: ${statusText}
+⏰ *출근*: ${this.safeTimeDisplay(record.checkInTime)}`;
 
     // 퇴근 시간 (있을 때만 표시)
     if (record.checkOutTime) {
       text += `
-🏠 **퇴근**: ${this.safeTimeDisplay(record.checkOutTime)}`;
+🏠 *퇴근*: ${this.safeTimeDisplay(record.checkOutTime)}`;
     }
 
     // 근무시간 표시 (안전하게)
@@ -512,7 +512,7 @@ ${achievement.emoji} ${achievement.txt}`;
         : "계산 중...");
 
     text += `
-⏱️ **근무시간**: ${workDurationText}`;
+⏱️ *근무시간*: ${workDurationText}`;
 
     // 진행률 게이지 (근무 중일 때만)
     if (isWorking && workSummary.workDuration > 0) {
@@ -527,21 +527,21 @@ ${this.createProgressBar(progress.percentage, progress.label)}`;
       const remainingMinutes = Math.max(0, 480 - workSummary.workDuration);
       if (remainingMinutes > 0) {
         text += `
-⏳ **목표까지**: ${this.formatDuration(remainingMinutes)}`;
+⏳ *목표까지*: ${this.formatDuration(remainingMinutes)}`;
       }
     }
 
     // 초과근무 정보
     if (workSummary.isOvertime) {
       text += `
-🔥 **초과근무**: ${this.formatDuration(workSummary.overtimeMinutes)}`;
+🔥 *초과근무*: ${this.formatDuration(workSummary.overtimeMinutes)}`;
     }
 
     // 추천사항
     if (recommendations && recommendations.length > 0) {
       text += `
 
-💡 **추천사항**:
+💡 *추천사항*:
 ${recommendations.map((r) => `• ${r}`).join("\n")}`;
     }
 
@@ -549,7 +549,7 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
     if (timestamp) {
       text += `
 
-📍 **업데이트**: ${this.safeTimeDisplay(timestamp, "time")}`;
+📍 *업데이트*: ${this.safeTimeDisplay(timestamp, "time")}`;
     }
 
     // 동적 버튼
@@ -611,19 +611,19 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
   async renderHistory(data, ctx) {
     const { days = 30, records = [], summary = {} } = data;
 
-    let text = `📋 **근무 이력** (최근 ${days}일)`;
+    let text = `📋 *근무 이력* (최근 ${days}일)`;
 
     if (summary.totalDays) {
       text += `
 
-📊 **요약**
+📊 *요약*
 • 총 ${summary.totalDays}일 중 ${summary.workDays || 0}일 근무
 • 총 ${summary.totalHours || 0}시간 (평균 ${summary.avgHours || 0}시간/일)`;
     }
 
     text += `
 
-📅 **상세 기록**:`;
+📅 *상세 기록*:`;
 
     if (records.length === 0) {
       text += `
@@ -647,7 +647,7 @@ ${recommendations.map((r) => `• ${r}`).join("\n")}`;
         const checkOut = this.safeTimeDisplay(record.checkOutTime);
 
         text += `
-${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
+${statusIcon} *${record.date}* ${checkIn}~${checkOut} (${duration})`;
       });
 
       if (records.length > 10) {
@@ -702,24 +702,24 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
       records = []
     } = data;
 
-    let text = `📈 **주간 근무 통계**
+    let text = `📈 *주간 근무 통계*
 
-📅 **기간**: ${weekStart} ~ ${weekEnd}
-📊 **근무일**: ${workDays}일
-⏰ **총 시간**: ${totalHours}시간`;
+📅 *기간*: ${weekStart} ~ ${weekEnd}
+📊 *근무일*: ${workDays}일
+⏰ *총 시간*: ${totalHours}시간`;
 
     if (overtimeHours > 0) {
       text += `
-🔥 **초과근무**: ${overtimeHours}시간`;
+🔥 *초과근무*: ${overtimeHours}시간`;
     }
 
     text += `
-📊 **일평균**: ${avgDailyHours}시간`;
+📊 *일평균*: ${avgDailyHours}시간`;
 
     if (analysis.trend) {
       text += `
 
-📈 **분석**: ${analysis.trend}`;
+📈 *분석*: ${analysis.trend}`;
       if (analysis.recommendation) {
         text += ` (${analysis.recommendation})`;
       }
@@ -729,7 +729,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
     if (records.length > 0) {
       text += `
 
-📋 **일별 요약**:`;
+📋 *일별 요약*:`;
       records.slice(0, 5).forEach((record) => {
         const duration = record.workDuration
           ? this.formatDuration(record.workDuration)
@@ -740,7 +740,7 @@ ${statusIcon} **${record.date}** ${checkIn}~${checkOut} (${duration})`;
             ? "💼"
             : "❌";
         text += `
-${statusIcon} **${record.date}**: ${duration}`;
+${statusIcon} *${record.date}*: ${duration}`;
       });
 
       if (records.length > 5) {
