@@ -425,43 +425,7 @@ FortuneUserSchema.statics.getPopularCards = async function (limit = 10) {
  * 🔧 미들웨어
  */
 
-// 저장 전 처리
-FortuneUserSchema.pre("save", function (next) {
-  // 통계 업데이트
-  if (this.isModified("draws")) {
-    this.stats.totalDraws = this.draws.length;
-
-    // 타입별 카운트
-    this.stats.typeCount = {
-      single: this.draws.filter((d) => d.type === "single").length,
-      triple: this.draws.filter((d) => d.type === "triple").length,
-      celtic: this.draws.filter((d) => d.type === "celtic").length
-    };
-
-    // 좋아하는 카드 업데이트
-    const favorite = this.findFavoriteCard();
-    if (favorite) {
-      this.stats.favoriteCard = favorite;
-    }
-
-    // 연속 기록 업데이트
-    const streak = this.calculateStreak();
-    this.stats.currentStreak = streak.current;
-    this.stats.longestStreak = streak.longest;
-
-    // 첫 뽑기 시간 설정
-    if (!this.firstDrawAt && this.draws.length > 0) {
-      this.firstDrawAt = this.draws[this.draws.length - 1].timestamp;
-    }
-
-    // 마지막 뽑기 시간 업데이트
-    if (this.draws.length > 0) {
-      this.lastDrawAt = this.draws[0].timestamp;
-    }
-  }
-
-  next();
-});
+// ❗❗❗ 수정: 불필요하고 문제를 일으키는 pre('save') 훅을 삭제합니다. ❗❗❗
 
 // 업데이트 시간 자동 갱신
 FortuneUserSchema.pre("findOneAndUpdate", function () {

@@ -3,7 +3,6 @@
 const BaseService = require("./BaseService");
 const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-// ❗❗❗ 수정: UserHelper에서 필요한 함수들을 직접 import 합니다. ❗❗❗
 const { isDeveloper, getUserId, getUserName } = require("../utils/UserHelper");
 
 // 🎴 타로 데이터 불러오기
@@ -113,12 +112,11 @@ class FortuneService extends BaseService {
   /**
    * 🎴 카드 뽑기 (메인 메서드)
    */
-  // ❗❗❗ 수정: userId 대신 user 객체를 받도록 변경 ❗❗❗
   async drawCard(user, options = {}) {
     try {
       const { type = "single", question = null } = options;
       const drawTime = new Date();
-      const userId = getUserId(user); // user 객체에서 ID 추출
+      const userId = getUserId(user);
 
       logger.info(`🎴 카드 뽑기 요청: ${userId}, 타입: ${type}`);
 
@@ -135,7 +133,7 @@ class FortuneService extends BaseService {
       // 카드 뽑기 실행
       const drawResult = this.performCardDraw(type, question);
 
-      // ❗❗❗ 수정: userId 대신 user 객체를 전달 ❗❗❗
+      // 해석 생성
       const interpretation = await this.generateInterpretation(
         drawResult.cards,
         type,
@@ -319,7 +317,6 @@ class FortuneService extends BaseService {
   /**
    * 💡 카드 해석 생성
    */
-  // ❗❗❗ 수정: userId 대신 user 객체를 받도록 변경 ❗❗❗
   async generateInterpretation(cards, type, question, user) {
     try {
       const category = InterpretationHelpers.detectQuestionCategory(question);
@@ -367,7 +364,7 @@ class FortuneService extends BaseService {
       const analysis = TarotAnalytics.analyzeCardCombination(cards);
       interpretation.analysis = analysis;
 
-      // ❗❗❗ 수정: userId 대신 user 객체를 전달 ❗❗❗
+      // 개인화된 조언
       interpretation.advice = this.generatePersonalizedAdvice(
         cards,
         analysis,
@@ -527,9 +524,8 @@ class FortuneService extends BaseService {
   /**
    * 🎯 개인화된 조언 생성
    */
-  // ❗❗❗ 수정: userId 대신 user 객체를 받도록 변경 ❗❗❗
   generatePersonalizedAdvice(cards, analysis, category, user) {
-    const userName = getUserName(user); // user 객체에서 이름 추출
+    const userName = getUserName(user);
     let advice = `${userName}님을 위한 조언:\n\n`;
 
     // 메이저 아르카나 비율에 따른 조언
@@ -638,7 +634,7 @@ class FortuneService extends BaseService {
   }
 
   /**
-   * 💾 뽑기 기록 저장
+   * 💾 뽑기 기록 저장 및 통계 업데이트
    */
   async saveDrawRecord(userId, drawData) {
     try {
@@ -660,23 +656,41 @@ class FortuneService extends BaseService {
         timestamp: drawData.timestamp
       };
 
-      await this.Fortune.findOneAndUpdate(
-        { userId },
-        {
-          $push: {
-            draws: {
-              $each: [record],
-              $sort: { timestamp: -1 },
-              $slice: this.config.maxHistoryRecords
-            }
-          },
-          $inc: { "stats.totalDraws": 1 },
-          $set: { lastDrawAt: drawData.timestamp }
-        },
-        { upsert: true, new: true }
-      );
+      // 1. 먼저 사용자 문서를 찾거나 생성합니다.
+      let user = await this.Fortune.findOne({ userId });
+      if (!user) {
+        user = new this.Fortune({ userId, draws: [], stats: {} });
+      }
 
-      logger.debug(`✅ ${userId}의 뽑기 기록 저장 완료`);
+      // 2. 새로운 기록을 추가하고, 최대 기록 수를 유지합니다.
+      user.draws.unshift(record);
+      if (user.draws.length > this.config.maxHistoryRecords) {
+        user.draws.pop();
+      }
+
+      // 3. 통계를 직접 계산하여 업데이트합니다.
+      user.stats.totalDraws = user.draws.length;
+      user.stats.typeCount = {
+        single: user.draws.filter((d) => d.type === "single").length,
+        triple: user.draws.filter((d) => d.type === "triple").length,
+        celtic: user.draws.filter((d) => d.type === "celtic").length
+      };
+
+      const favorite = user.findFavoriteCard();
+      if (favorite) {
+        user.stats.favoriteCard = favorite;
+      }
+
+      // 4. 마지막 뽑은 시간 및 첫 뽑은 시간을 업데이트합니다.
+      user.lastDrawAt = drawData.timestamp;
+      if (!user.firstDrawAt) {
+        user.firstDrawAt = drawData.timestamp;
+      }
+
+      // 5. 변경된 문서를 저장합니다.
+      await user.save();
+
+      logger.debug(`✅ ${userId}의 뽑기 기록 및 통계 저장 완료`);
     } catch (error) {
       logger.error("뽑기 기록 저장 실패:", error);
     }
@@ -1080,12 +1094,6 @@ class FortuneService extends BaseService {
     return user.draws.filter((draw) => new Date(draw.timestamp) >= weekAgo)
       .length;
   }
-
-  // ❗❗❗ 수정: 이 메서드는 이제 필요 없으므로 삭제합니다. ❗❗❗
-  // async getUserName(userId) {
-  //   // 실제 구현에서는 사용자 정보를 가져옴
-  //   return "고객";
-  // }
 
   /**
    * 🧹 정리 작업
