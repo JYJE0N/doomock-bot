@@ -212,6 +212,20 @@ class FortuneModule extends BaseModule {
         );
       }
 
+      // 일일 제한 확인
+      const todayInfo = await this.getTodayDrawInfo(userId);
+      if (!isDeveloper(callbackQuery.from) && todayInfo.remainingDraws <= 0) {
+        // ✨ 수정: daily_limit 타입 반환
+        return {
+          type: "daily_limit",
+          module: "fortune",
+          data: {
+            used: todayInfo.todayCount,
+            max: this.config.maxDrawsPerDay
+          }
+        };
+      }
+
       // 일반 카드 뽑기 진행
       return await this.performDraw(userId, userName, fortuneType);
     } catch (error) {
