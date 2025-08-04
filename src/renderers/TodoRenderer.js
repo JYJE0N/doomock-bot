@@ -175,7 +175,7 @@ class TodoRenderer extends BaseRenderer {
   }
 
   /**
-   * 📋 할일 목록 렌더링
+   * 📋 할일 목록 렌더링 - 더블 라인 레이아웃
    */
   async renderTodoList(data, ctx) {
     const { todos, currentPage, totalPages, totalCount, enableReminders } =
@@ -187,25 +187,12 @@ class TodoRenderer extends BaseRenderer {
       text += `_아직 등록된 할일이 없습니다._\n`;
       text += `➕ 버튼을 눌러 새로운 할일을 추가해보세요!`;
     } else {
+      // 할일 텍스트만 심플하게 표시 (번호 + 상태 + 제목)
       todos.forEach((todo, index) => {
-        const emoji = todo.completed
-          ? this.emojis.completed
-          : this.emojis.pending;
-        const priority = this.getPriorityEmoji(todo.priority);
         const num = (currentPage - 1) * 10 + index + 1;
+        const statusEmoji = todo.completed ? "✅" : "⏳";
 
-        text += `${num}. ${emoji} ${todo.text}`;
-        if (priority) text += ` ${priority}`;
-        if (todo.remindAt) text += ` ${this.emojis.bell}`;
-        text += `\n`;
-
-        if (todo.dueDate) {
-          text += `   ${this.styles.bullet} 마감: ${TimeHelper.format(todo.dueDate, "date")}\n`;
-        }
-        if (todo.category) {
-          text += `   ${this.styles.bullet} 분류: ${todo.category}\n`;
-        }
-        text += `\n`;
+        text += `${num}. ${statusEmoji} ${todo.text}\n`;
       });
     }
 
@@ -215,62 +202,120 @@ class TodoRenderer extends BaseRenderer {
       text += `페이지 ${currentPage}/${totalPages}`;
     }
 
-    // 인라인 키보드 생성
+    // 🎨 더블 라인 레이아웃
     const keyboard = [];
 
-    // 할일 액션 버튼 (각 할일별로)
     if (todos.length > 0) {
-      todos.forEach((todo) => {
-        const row = [];
+      todos.forEach((todo, index) => {
+        // 📝 첫 번째 줄: 상태 + 제목 (전체 너비)
+        const num = (currentPage - 1) * 10 + index + 1;
+        let titleText = `${num}. ${todo.text}`;
 
-        // 완료/미완료 토글
-        if (todo.completed) {
-          row.push(this.createButton("↩️ 미완료", "uncomplete", todo._id));
-        } else {
-          row.push(this.createButton("✅ 완료", "complete", todo._id));
+        // 25자 초과시 줄임표 처리
+        if (titleText.length > 28) {
+          titleText = titleText.substring(0, 25) + "...";
         }
 
-        // 수정/삭제
-        row.push(this.createButton("✏️ 수정", "edit", todo._id));
-        row.push(this.createButton("🗑️ 삭제", "delete", todo._id));
+        // 우선순위 이모지 추가
+        const priority = this.getPriorityEmoji(todo.priority);
+        if (priority) {
+          titleText = `${priority} ${titleText}`;
+        }
 
-        // 리마인더 (활성화된 경우)
+        // 상태에 따른 버튼 스타일
+        const statusAction = todo.completed ? "uncomplete" : "complete";
+        const statusEmoji = todo.completed ? "✅" : "◯";
+
+        keyboard.push([
+          this.createButton(
+            `${statusEmoji} ${titleText}`,
+            statusAction,
+            todo._id
+          )
+        ]);
+
+        // ⚡ 두 번째 줄: 액션 버튼들
+        const actionRow = [];
+
+        // 알림 버튼 (리마인더 활성화 + 미완료인 경우)
         if (enableReminders && !todo.completed) {
-          row.push(this.createButton("⏰", "remind_add", todo._id));
+          if (todo.remindAt) {
+            actionRow.push(
+              this.createButton("🔔 알림설정됨", "remind_remove", todo._id)
+            );
+          } else {
+            actionRow.push(
+              this.createButton("🔕 알림설정", "remind_add", todo._id)
+            );
+          }
         }
 
-        keyboard.push(row);
+        // 수정 버튼
+        actionRow.push(this.createButton("✏️ 수정", "edit", todo._id));
+
+        // 삭제 버튼
+        actionRow.push(this.createButton("🗑️ 삭제", "delete", todo._id));
+
+        // 완료된 할일인 경우 보관 버튼 추가
+        if (todo.completed) {
+          actionRow.push(this.createButton("📦 보관", "archive", todo._id));
+        }
+
+        keyboard.push(actionRow);
+
+        // 할일 사이 구분을 위한 빈 줄 (마지막 할일 제외)
+        if (index < todos.length - 1) {
+          keyboard.push([]);
+        }
       });
 
-      // 구분선
+      // 전체 구분선
       keyboard.push([]);
     }
 
-    // 페이지네이션
-    const paginationRow = [];
-    if (currentPage > 1) {
-      paginationRow.push(this.createButton("⬅️ 이전", "list", currentPage - 1));
-    }
-    if (currentPage < totalPages) {
-      paginationRow.push(this.createButton("다음 ➡️", "list", currentPage + 1));
-    }
-    if (paginationRow.length > 0) {
+    // 📄 개선된 페이지네이션
+    if (totalPages > 1) {
+      const paginationRow = [];
+
+      if (currentPage > 1) {
+        paginationRow.push(
+          this.createButton("◀️ 이전", "list", currentPage - 1)
+        );
+      }
+
+      // 페이지 정보 표시
+      paginationRow.push(
+        this.createButton(`${currentPage} / ${totalPages}`, "list", currentPage)
+      );
+
+      if (currentPage < totalPages) {
+        paginationRow.push(
+          this.createButton("다음 ▶️", "list", currentPage + 1)
+        );
+      }
+
       keyboard.push(paginationRow);
     }
 
-    // 액션 버튼
+    // 🔄 메인 액션 버튼들
     keyboard.push([
-      this.createButton("➕ 추가", "add"),
+      this.createButton("➕ 할일 추가", "add"),
       this.createButton("🔄 새로고침", "list", currentPage)
     ]);
 
-    // 네비게이션
+    // 📊 추가 기능 버튼들
+    keyboard.push([
+      this.createButton("📊 통계", "stats"),
+      this.createButton("📈 리포트", "weekly")
+    ]);
+
+    // 🏠 네비게이션
     keyboard.push([
       this.createButton("⬅️ 돌아가기", "menu"),
       this.createButton("🏠 홈으로", { module: "system", action: "menu" })
     ]);
 
-    // 실제로 메시지 전송
+    // 메시지 전송
     await this.sendSafeMessage(ctx, text, {
       parse_mode: "Markdown",
       reply_markup: {

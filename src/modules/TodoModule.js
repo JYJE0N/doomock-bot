@@ -687,11 +687,19 @@ class TodoModule extends BaseModule {
   // ===== 입력 처리 메서드 =====
 
   /**
-   * 할일 추가 입력 처리
+   * 할일 추가 입력 처리 (수정된 버전)
    */
   async processAddInput(userId, text) {
     try {
-      const result = await this.todoService.addTodo(userId, { text });
+      const todoData = {
+        text: text.trim(),
+        priority: this.convertPriorityToNumber("medium"), // 🔧 수정: 숫자로 변환
+        category: null,
+        description: null,
+        tags: []
+      };
+
+      const result = await this.todoService.addTodo(userId, todoData);
 
       if (!result.success) {
         return {
@@ -699,7 +707,7 @@ class TodoModule extends BaseModule {
           module: "todo",
           action: "error",
           data: {
-            message: result.message || "할일 추가에 실패했습니다.",
+            message: result.message || "할일 추가 실패",
             action: "add",
             canRetry: true
           }
@@ -730,6 +738,27 @@ class TodoModule extends BaseModule {
         }
       };
     }
+  }
+
+  /**
+   * Priority 문자열을 숫자로 변환하는 헬퍼 함수
+   */
+  convertPriorityToNumber(priority) {
+    const priorityMap = {
+      low: 1, // 낮음
+      medium: 3, // 보통 (기본값)
+      high: 4, // 높음
+      urgent: 5 // 긴급
+    };
+
+    // 이미 숫자인 경우 그대로 반환 (1-5 범위 체크)
+    if (typeof priority === "number") {
+      return Math.min(Math.max(priority, 1), 5);
+    }
+
+    // 문자열인 경우 매핑 테이블에서 찾기
+    const lowerPriority = String(priority).toLowerCase();
+    return priorityMap[lowerPriority] || 3; // 기본값: medium(3)
   }
 
   /**
