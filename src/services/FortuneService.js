@@ -25,8 +25,9 @@ const {
  * 완전한 78장 타로 덱과 전문적인 해석을 제공합니다
  */
 class FortuneService extends BaseService {
-  constructor() {
-    super("FortuneService");
+  constructor(options = {}) {
+    // ✅ 수정: options 매개변수 추가
+    super("FortuneService", options); // ✅ 수정: options 전달
 
     // 전체 타로 덱 초기화
     this.tarotDeck = [...FULL_TAROT_DECK];
