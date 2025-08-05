@@ -115,8 +115,16 @@ class FortuneRenderer extends BaseRenderer {
         buttons.push(row);
       }
 
-      // 카드 셔플 버튼
-      buttons.push([{ text: "🔄 카드 셔플", action: "shuffle" }]);
+      // 개발자 전용 버튼
+      if (isDeveloper) {
+        buttons.push([
+          { text: "🔄 카드 셔플", action: "shuffle" },
+          { text: "🔧 일일 제한 리셋", action: "reset" }
+        ]);
+      } else {
+        // 일반 사용자 버튼
+        buttons.push([{ text: "🔄 카드 셔플", action: "shuffle" }]);
+      }
     }
 
     // 통계/기록 버튼

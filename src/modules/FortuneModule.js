@@ -74,14 +74,15 @@ class FortuneModule extends BaseModule {
    * 🎯 액션 등록
    */
   setupActions() {
+    this.actionMap = new Map();
     this.actionMap.set("menu", this.showMenu.bind(this));
     this.actionMap.set("draw", this.drawCard.bind(this));
-    this.actionMap.set("shuffle", this.shuffleCards.bind(this));
-    this.actionMap.set("history", this.showHistory.bind(this));
     this.actionMap.set("stats", this.showStats.bind(this));
-    this.actionMap.set("celtic_detail", this.showCelticDetail.bind(this));
-    this.actionMap.set("ask_question", this.askQuestion.bind(this));
-    this.actionMap.set("cancel_question", this.cancelQuestion.bind(this));
+    this.actionMap.set("history", this.showHistory.bind(this));
+    this.actionMap.set("shuffle", this.shuffleCards.bind(this));
+    this.actionMap.set("cancelQuestion", this.cancelQuestion.bind(this));
+    this.actionMap.set("celticDetail", this.showCelticDetail.bind(this));
+    this.actionMap.set("reset", this.resetDailyLimit.bind(this)); // 개발자 리셋 추가
   }
 
   /**
@@ -179,25 +180,10 @@ class FortuneModule extends BaseModule {
    */
   async drawCard(bot, callbackQuery, subAction, params, moduleManager) {
     try {
-      const user = callbackQuery.from; // ❗❗❗ 수정: userId와 userName 대신 user 객체를 통째로 사용 ❗❗❗
+      const user = callbackQuery.from;
       const fortuneType = params || "single";
 
       logger.info(`🎴 카드 뽑기 요청: ${getUserName(user)} - ${fortuneType}`);
-
-      // 🎯 개발자인 경우, 횟수 제한 검사 건너뛰기
-      if (!isDeveloper(user)) {
-        const todayInfo = await this.getTodayDrawInfo(user.id);
-        if (todayInfo.remainingDraws <= 0) {
-          return {
-            type: "daily_limit",
-            module: "fortune",
-            data: {
-              used: todayInfo.todayCount,
-              max: this.config.maxDrawsPerDay
-            }
-          };
-        }
-      }
 
       // 🎯 캘틱 크로스는 질문 입력 필요
       if (fortuneType === "celtic") {
@@ -210,18 +196,19 @@ class FortuneModule extends BaseModule {
         );
       }
 
-      // 일일 제한 확인
-      const todayInfo = await this.getTodayDrawInfo(user.id);
-      if (!isDeveloper(user) && todayInfo.remainingDraws <= 0) {
-        // ✨ 수정: daily_limit 타입 반환
-        return {
-          type: "daily_limit",
-          module: "fortune",
-          data: {
-            used: todayInfo.todayCount,
-            max: this.config.maxDrawsPerDay
-          }
-        };
+      // 🎯 개발자가 아닌 경우에만 일일 제한 확인
+      if (!isDeveloper(user)) {
+        const todayInfo = await this.getTodayDrawInfo(user.id);
+        if (todayInfo.remainingDraws <= 0) {
+          return {
+            type: "daily_limit",
+            module: "fortune",
+            data: {
+              used: todayInfo.todayCount,
+              max: this.config.maxDrawsPerDay
+            }
+          };
+        }
       }
 
       // 일반 카드 뽑기 진행
@@ -837,6 +824,56 @@ class FortuneModule extends BaseModule {
     }
 
     return message;
+  }
+
+  // 개발자 1일 제한 제어 메서드
+  async resetDailyLimit(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const user = callbackQuery.from;
+
+      // 개발자만 사용 가능
+      if (!isDeveloper(user)) {
+        return {
+          type: "error",
+          module: "fortune",
+          data: { message: "개발자만 사용 가능한 기능입니다." }
+        };
+      }
+
+      // FortuneService에서 오늘 기록 삭제
+      if (this.fortuneService && this.fortuneService.Fortune) {
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        await this.fortuneService.Fortune.updateOne(
+          { userId: user.id },
+          {
+            $pull: {
+              draws: {
+                timestamp: { $gte: today }
+              }
+            }
+          }
+        );
+
+        logger.info(`🔄 ${getUserName(user)}의 일일 제한 리셋됨`);
+      }
+
+      return await this.showMenu(
+        bot,
+        callbackQuery,
+        subAction,
+        params,
+        moduleManager
+      );
+    } catch (error) {
+      logger.error("일일 제한 리셋 오류:", error);
+      return {
+        type: "error",
+        module: "fortune",
+        data: { message: "리셋 중 오류가 발생했습니다." }
+      };
+    }
   }
 
   /**
