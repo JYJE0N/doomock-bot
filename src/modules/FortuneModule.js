@@ -13,7 +13,7 @@ class FortuneModule extends BaseModule {
     this.userStates = new Map();
     this.lastCelticResults = new Map();
     this.config = {
-      maxDrawsPerDay: 5,
+      maxDrawsPerDay: 3,
       questionTimeout: 300000,
       fortuneTypes: {
         single: { label: "싱글카드 🃏", emoji: "🃏", cost: 1 },
