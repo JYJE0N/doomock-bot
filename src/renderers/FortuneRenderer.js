@@ -335,7 +335,10 @@ class FortuneRenderer extends BaseRenderer {
         const { keyCard, date } = record;
         if (keyCard) {
           const cardEmoji = keyCard.emoji || "🎴";
-          const cardName = `${cardEmoji} *${keyCard.name}*${keyCard.isReversed ? " (역)" : ""}`;
+          // 🔥 수정: keyCard.name이 없으면 korean을 사용하고, 둘 다 없으면 "카드 이름 없음"
+          const cardDisplayName =
+            keyCard.name || keyCard.korean || "카드 이름 없음";
+          const cardName = `${cardEmoji} *${cardDisplayName}*${keyCard.isReversed ? " (역)" : ""}`;
 
           text += `${index + 1}. ${cardName} - ${date}\n`;
 
@@ -349,6 +352,9 @@ class FortuneRenderer extends BaseRenderer {
 
           text += `   └ _"${simpleMeaning}..."_\n`;
           text += `   └ 키워드: ${keywords}\n\n`;
+        } else {
+          // 🔥 추가: keyCard가 없는 경우 처리
+          text += `${index + 1}. 🎴 *기록 정보 없음* - ${date}\n\n`;
         }
       });
       if (total > records.length) {

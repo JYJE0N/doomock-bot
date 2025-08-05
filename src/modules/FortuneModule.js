@@ -94,18 +94,22 @@ class FortuneModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery.from);
     const result = await this.fortuneService.getDrawHistory(userId, 5); // 5개로 제한
+
+    const historyData = result.data || { records: [], total: 0 };
+
     return {
       type: "history",
       module: "fortune",
       data: {
         userName,
         ...result.data,
+        ...historyData, // 안전하게 펼침
+
         isEmpty: result.data.records.length === 0
       }
     };
   }
 
-  // ... (이하 다른 함수들은 이전과 동일하게 유지) ...
   async showMenu(bot, callbackQuery) {
     const user = callbackQuery.from;
     const todayInfo = await this.getTodayDrawInfo(user);

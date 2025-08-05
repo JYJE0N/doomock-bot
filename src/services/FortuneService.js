@@ -152,11 +152,15 @@ class FortuneService extends BaseService {
    */
   async getDrawHistory(userId, limit = 3) {
     try {
-      if (!this.Fortune)
-        return { success: true, data: { records: [], total: 0 } };
+      // 기본 반환값 정의
+      const emptyResult = { success: true, data: { records: [], total: 0 } };
+
+      if (!this.Fortune) return emptyResult;
+
       const user = await this.Fortune.findOne({ userId });
-      if (!user || !user.draws || user.draws.length === 0)
-        return { success: true, data: { records: [], total: 0 } };
+      if (!user || !user.draws || user.draws.length === 0) {
+        return emptyResult;
+      }
 
       const records = user.draws
         .slice(0, limit)
@@ -188,27 +192,35 @@ class FortuneService extends BaseService {
               type: draw.type,
               keyCard: keyCard
                 ? {
-                    name: keyCard.name || keyCard.korean,
-                    korean: keyCard.korean || keyCard.name,
+                    name: keyCard.name || keyCard.korean || "알 수 없는 카드",
+                    korean: keyCard.korean || keyCard.name || "알 수 없는 카드",
                     emoji: keyCard.emoji || "🎴",
-                    isReversed: keyCard.isReversed,
-                    meaning: keyCard.meaning,
+                    isReversed: keyCard.isReversed || false,
+                    meaning: keyCard.meaning || "해석을 불러올 수 없습니다",
                     keywords: keyCard.keywords || []
                   }
                 : null
             };
           } catch (mapError) {
             logger.error(`기록 가공 중 오류 발생 (ID: ${draw._id}):`, mapError);
-            return null; // 오류 발생 시 해당 기록은 건너뜀
+            return null;
           }
         })
-        .filter((record) => record !== null); // null인 기록 제거
+        .filter((record) => record !== null);
 
-      return { success: true, data: { records, total: user.draws.length } };
+      return {
+        success: true,
+        data: {
+          records,
+          total: user.draws.length
+        }
+      };
     } catch (error) {
       logger.error("기록 조회 실패:", error);
+      // 🔥 중요: 오류 발생 시에도 data 속성을 포함하여 반환
       return {
         success: false,
+        data: { records: [], total: 0 }, // 빈 데이터 제공
         message: "기록을 불러오는 중 오류가 발생했습니다."
       };
     }
