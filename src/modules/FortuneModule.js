@@ -83,7 +83,7 @@ class FortuneModule extends BaseModule {
     this.actionMap.set("history", this.showHistory.bind(this));
     this.actionMap.set("shuffle", this.shuffleCards.bind(this));
     this.actionMap.set("cancelQuestion", this.cancelQuestion.bind(this));
-    this.actionMap.set("celticDetail", this.showCelticDetail.bind(this)); // ✅ 수정: 이 부분을 추가합니다.
+    this.actionMap.set("celtic_detail", this.showCelticDetail.bind(this)); // ✅ 수정: 이 부분을 추가합니다.
     this.actionMap.set("reset", this.resetDailyLimit.bind(this));
   }
 
