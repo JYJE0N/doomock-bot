@@ -205,26 +205,28 @@ class FortuneRenderer extends BaseRenderer {
       text += `🔮 *${cards.length}카드 리딩*\n\n`;
 
       if (drawType === "triple") {
-        const positions = ["과거", "현재", "미래"]; // ✅ 한글로 변경
+        const positions = ["과거", "현재", "미래"];
 
         cards.forEach((card, index) => {
           const position =
             card.position || positions[index] || `${index + 1}번째`;
-
-          // ✅ 한글 위치명 표시
           text += `*${position}*: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
 
           if (card.isReversed) {
             text += `🔄 역방향 - `;
           }
 
-          // ❗❗❗ 오류 수정: 여기서 this.getCardMeaning 대신 interpretation 데이터를 사용합니다. ❗❗❗
           text += `${interpretation.cards[index]?.meaning || "해석을 불러오는 중..."}\n\n`;
         });
 
         // 종합 해석
         text += `🎯 *종합 해석*\n`;
         text += `${interpretation.overall || "종합적인 흐름을 파악해보세요."}\n\n`;
+
+        // ✅ 수정: 트리플카드에도 조언 추가!
+        if (interpretation.advice) {
+          text += `💡 *조언*: ${interpretation.advice}\n\n`;
+        }
       }
     } else if (drawType === "single" && cards && cards.length === 1) {
       const card = cards[0];
@@ -245,28 +247,38 @@ class FortuneRenderer extends BaseRenderer {
         text += `카드의 기본 의미가 그대로 적용됩니다.\n\n`;
       }
 
-      text += `💫 *의미*: ${interpretation.cards[0].meaning}\n\n`;
+      text += `💫 *의미*: ${interpretation.cards[0]?.meaning || "카드의 기본 의미가 그대로 적용됩니다."}\n\n`;
+
+      // ✅ 수정: 조건 개선 - interpretation과 advice 모두 체크
+      if (interpretation && interpretation.advice) {
+        text += `💡 *조언*: ${interpretation.advice}\n\n`;
+      } else {
+        // ✅ 추가: 기본 조언 제공
+        text += `💡 *조언*: 지금이 중요한 시기입니다. 카드의 메시지를 마음에 새기고 최선을 다하세요.\n\n`;
+      }
+    }
+
+    // ✅ 추가: 모든 타입에 대해 조언이 없으면 기본 조언 제공
+    if (!text.includes("💡 *조언*:") && interpretation?.advice) {
       text += `💡 *조언*: ${interpretation.advice}\n\n`;
     }
 
     // 남은 횟수 표시
     const remainingCount = remainingDraws ?? "?";
-    text += `🔔 *남은 횟수*: ${remainingCount}번 (총 ${totalDraws || 0}번 뽑음)`;
+    text += `🔔 *남은 횟수*: ${remainingCount}번 (중 ${totalDraws || 0}번 뽑음)`;
 
     const buttons = [
       [
         { text: "🎴 다시 뽑기", action: "draw" },
-        { text: "🔄 카드 셔플", action: "shuffle" }
+        { text: "📊 통계", action: "stats" }
       ],
       [
-        { text: "📊 통계", action: "stats" },
-        { text: "📋 기록", action: "history" }
-      ],
-      [{ text: "🔙 메뉴", action: "menu" }]
+        { text: "📋 기록", action: "history" },
+        { text: "🔙 메뉴", action: "menu" }
+      ]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 

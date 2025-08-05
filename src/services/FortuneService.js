@@ -51,10 +51,9 @@ class FortuneService extends BaseService {
    * 🗄️ 필요한 모델 정의
    */
   getRequiredModels() {
-    return ["FortuneUser"];
+    return ["Fortune"];
   }
 
-  // ❗❗❗ 수정: initialize -> onInitialize로 함수 이름을 변경합니다. ❗❗❗
   /**
    * 🎯 서비스 초기화
    */
@@ -62,12 +61,20 @@ class FortuneService extends BaseService {
     try {
       logger.info("🔮 FortuneService 초기화 시작...");
 
-      // MongoDB 모델 확인 (이제 BaseService가 먼저 실행되어 this.models가 채워져 있습니다)
-      this.Fortune = this.models?.FortuneUser; // ← 변수명도 통일
+      // ✅ 수정: Fortune 모델을 찾되, 실제로는 FortuneUser를 가져옴
+      this.Fortune = this.models?.Fortune;
+
+      // 📋 디버깅용: 어떤 모델들이 등록되었는지 확인
+      logger.debug("사용 가능한 모델들:", Object.keys(this.models || {}));
 
       if (!this.Fortune) {
         logger.warn("Fortune 모델 없음 - 제한된 기능으로 동작");
+        logger.debug(
+          "등록된 모델 목록:",
+          this.models ? Object.keys(this.models) : "없음"
+        );
       } else {
+        logger.success("✅ Fortune 모델 로드 성공");
         // 인덱스 생성
         await this.createIndexes();
       }
@@ -97,13 +104,18 @@ class FortuneService extends BaseService {
    */
   async createIndexes() {
     try {
-      if (!this.Fortune) return;
+      if (!this.Fortune || !this.Fortune.collection) {
+        logger.warn("Fortune 모델 또는 collection이 없어 인덱스 생성 스킵");
+        return;
+      }
+
+      logger.debug("📑 Fortune 인덱스 생성 시작...");
 
       await this.Fortune.collection.createIndex({ userId: 1, createdAt: -1 });
       await this.Fortune.collection.createIndex({ "draws.timestamp": -1 });
       await this.Fortune.collection.createIndex({ "stats.totalDraws": -1 });
 
-      logger.debug("📑 Fortune 인덱스 생성 완료");
+      logger.success("📑 Fortune 인덱스 생성 완료");
     } catch (error) {
       logger.warn("인덱스 생성 실패:", error.message);
     }
@@ -816,15 +828,40 @@ class FortuneService extends BaseService {
         };
       }
 
-      const records = user.draws.slice(0, limit).map((draw) => ({
-        date: TimeHelper.format(draw.timestamp),
-        type: draw.type,
-        cards: draw.cards
-          .map((c) => `${c.emoji || "🎴"} ${c.korean}`)
-          .join(", "),
-        question: draw.question || "일반 운세",
-        summary: this.createDrawSummary(draw)
-      }));
+      // ✅ 수정: 카드 데이터 구조를 렌더러가 기대하는 형태로 변경
+      const records = user.draws.slice(0, limit).map((draw) => {
+        // 첫 번째 카드 정보 (메인 카드)
+        const mainCard = draw.cards[0];
+
+        return {
+          date: TimeHelper.format(draw.timestamp, "relative"),
+          type: draw.type,
+          drawType: draw.type, // ← 렌더러 호환성
+
+          // ✅ 수정: 카드 정보를 렌더러가 읽을 수 있는 형태로 제공
+          card: {
+            korean: mainCard?.korean || "알 수 없는 카드",
+            name: mainCard?.name,
+            emoji: mainCard?.emoji || "🎴"
+          },
+
+          // 기존 호환성 유지
+          cardName: mainCard?.korean || "알 수 없는 카드",
+          koreanName: mainCard?.korean || "알 수 없는 카드",
+
+          // 전체 카드 문자열 (여러 카드인 경우)
+          cards: draw.cards
+            .map((c) => `${c.emoji || "🎴"} ${c.korean || "알 수 없음"}`)
+            .join(", "),
+
+          question: draw.question || "일반 운세",
+          summary: this.createDrawSummary(draw),
+
+          // 추가 정보
+          isReversed: mainCard?.isReversed || false,
+          cardCount: draw.cards.length
+        };
+      });
 
       return {
         success: true,
