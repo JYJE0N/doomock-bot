@@ -53,12 +53,19 @@ class FortuneModule extends BaseModule {
   async onHandleMessage(bot, msg) {
     const userId = getUserId(msg.from);
 
-    // 질문 대기 상태를 최우선으로 체크
+    // 🔥 질문 대기 상태를 최우선으로 체크
     if (this.userStates.has(userId)) {
       const state = this.userStates.get(userId);
       const text = msg.text?.trim();
 
-      // 🔥 중요: 대기 상태면 무조건 처리
+      logger.debug("📝 FortuneModule: 상태 확인", {
+        userId,
+        state,
+        text,
+        hasText: !!text
+      });
+
+      // 대기 상태면 무조건 처리
       if (state.type === "waiting_question") {
         // 텍스트가 있으면 질문 입력 처리
         if (text) {
@@ -75,6 +82,7 @@ class FortuneModule extends BaseModule {
     if (commands.some((cmd) => text?.toLowerCase().includes(cmd))) {
       return this.showMenu(bot, msg);
     }
+
     return false;
   }
 
@@ -84,49 +92,190 @@ class FortuneModule extends BaseModule {
   async handleQuestionInput(bot, msg, state, question) {
     const user = msg.from;
     const userName = getUserName(user);
+    const userId = getUserId(user);
+
+    logger.debug("🎯 질문 검증 시작:", {
+      userId,
+      question,
+      questionLength: question.length
+    });
 
     // 🔥 의미 없는 입력 체크
     if (!this.isValidQuestion(question)) {
-      // 사용자 메시지 삭제
+      logger.debug("❌ 유효하지 않은 질문:", question);
+
+      // 사용자 메시지 삭제 시도
       try {
         await bot.telegram.deleteMessage(msg.chat.id, msg.message_id);
       } catch (error) {
-        logger.debug("사용자 메시지 삭제 실패:", error);
+        logger.debug("사용자 메시지 삭제 실패:", error.message);
       }
 
-      const errorMessage = `${userName}님, 진정한 고민을 들려주세요. 🙏\n카드는 진심 어린 질문에만 답을 줍니다.`;
+      // 질문 프롬프트 메시지 수정
+      if (state.promptMessageId) {
+        try {
+          const errorMessage =
+            `${userName}님, 진정한 고민을 들려주세요.\n\n` +
+            `❌ **"${question.substring(0, 20)}${question.length > 20 ? "..." : ""}"**는 의미 있는 질문이 아니에요.\n\n` +
+            `💫 **좋은 질문 예시:**\n` +
+            `• "이번 프로젝트가 성공할 수 있을까요?"\n` +
+            `• "새로운 시작을 해도 될까요?"\n` +
+            `• "지금 내가 가는 길이 맞나요?"\n\n` +
+            `다시 질문해 주시거나 취소 버튼을 눌러주세요.`;
 
-      // 기존 메시지 수정 또는 새 메시지
-      await this.sendErrorMessage(bot, msg, state, errorMessage);
+          await bot.telegram.editMessageText(
+            msg.chat.id,
+            state.promptMessageId,
+            null,
+            errorMessage,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "❌ 취소", callback_data: "fortune:cancelQuestion" }]
+                ]
+              }
+            }
+          );
+        } catch (error) {
+          logger.error("프롬프트 메시지 수정 실패:", error);
+        }
+      }
 
-      return true; // 🔥 중요: 항상 true 반환
+      // 상태는 유지 (사용자가 다시 입력할 수 있도록)
+      return true;
     }
 
-    // 길이 체크
-    let errorMessage = null;
+    // 🔥 질문 길이 체크
+    if (question.length < 5) {
+      logger.debug("❌ 너무 짧은 질문:", question);
 
-    if (question.length < 10) {
-      errorMessage = `${userName}님, 고민을 좀 더 자세히 들려주세요. 🤔\n최소 10자 이상 적어주시면 카드가 더 정확한 답을 줄 수 있어요.`;
-    } else if (question.length > 100) {
-      errorMessage = `${userName}님, 고민의 핵심을 간결하게 정리해주세요. 📝\n100자 이내로 적어주시면 카드가 더 명확한 메시지를 전달할 수 있어요.`;
-    }
-
-    if (errorMessage) {
-      // 사용자 메시지 삭제
       try {
         await bot.telegram.deleteMessage(msg.chat.id, msg.message_id);
       } catch (error) {
-        logger.debug("사용자 메시지 삭제 실패:", error);
+        logger.debug("사용자 메시지 삭제 실패:", error.message);
       }
 
-      await this.sendErrorMessage(bot, msg, state, errorMessage);
+      if (state.promptMessageId) {
+        try {
+          const errorMessage =
+            `${userName}님, 조금 더 구체적으로 질문해 주세요.\n\n` +
+            `❌ 질문이 너무 짧아요. (최소 5자 이상)\n\n` +
+            `💡 **Tip:** 타로는 구체적인 질문일수록 명확한 답을 줍니다.\n` +
+            `예) "어떻게 해야 할까?" → "이직을 해야 할까요?"\n\n` +
+            `다시 질문해 주시거나 취소 버튼을 눌러주세요.`;
 
-      return true; // 🔥 중요: 항상 true 반환
+          await bot.telegram.editMessageText(
+            msg.chat.id,
+            state.promptMessageId,
+            null,
+            errorMessage,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "❌ 취소", callback_data: "fortune:cancelQuestion" }]
+                ]
+              }
+            }
+          );
+        } catch (error) {
+          logger.error("프롬프트 메시지 수정 실패:", error);
+        }
+      }
+
+      return true;
     }
 
-    // 정상 처리
-    this.userStates.delete(user.id);
-    return await this.performDraw(user, state.fortuneType, question);
+    if (question.length > 200) {
+      logger.debug("❌ 너무 긴 질문:", question.length);
+
+      try {
+        await bot.telegram.deleteMessage(msg.chat.id, msg.message_id);
+      } catch (error) {
+        logger.debug("사용자 메시지 삭제 실패:", error.message);
+      }
+
+      if (state.promptMessageId) {
+        try {
+          const errorMessage =
+            `${userName}님, 질문을 간단명료하게 정리해 주세요.\n\n` +
+            `❌ 질문이 너무 길어요. (최대 200자)\n\n` +
+            `💡 **Tip:** 핵심만 간단히 물어보세요.\n` +
+            `복잡한 상황이라면 가장 중요한 한 가지만 질문해 주세요.\n\n` +
+            `다시 질문해 주시거나 취소 버튼을 눌러주세요.`;
+
+          await bot.telegram.editMessageText(
+            msg.chat.id,
+            state.promptMessageId,
+            null,
+            errorMessage,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "❌ 취소", callback_data: "fortune:cancelQuestion" }]
+                ]
+              }
+            }
+          );
+        } catch (error) {
+          logger.error("프롬프트 메시지 수정 실패:", error);
+        }
+      }
+
+      return true;
+    }
+
+    // ✅ 유효한 질문 - 타로 진행
+    logger.success("✅ 유효한 질문 확인:", question);
+
+    // 상태 삭제
+    this.userStates.delete(userId);
+
+    // 로딩 메시지 표시
+    if (state.promptMessageId) {
+      try {
+        await bot.telegram.editMessageText(
+          msg.chat.id,
+          state.promptMessageId,
+          null,
+          `🔮 ${userName}님의 질문을 받았습니다...\n\n*"${question}"*\n\n카드를 섞고 있습니다...`,
+          { parse_mode: "Markdown" }
+        );
+      } catch (error) {
+        logger.error("로딩 메시지 표시 실패:", error);
+      }
+    }
+
+    // 타로 카드 뽑기 수행
+    const drawResult = await this.performDraw(
+      user,
+      state.fortuneType || "celtic",
+      question
+    );
+
+    // 결과 렌더링
+    const renderer =
+      this.moduleManager?.navigationHandler?.renderers?.get("fortune");
+    if (renderer && state.promptMessageId) {
+      const ctx = {
+        message: { chat: msg.chat, message_id: state.promptMessageId },
+        editMessageText: async (text, extra) => {
+          return await bot.telegram.editMessageText(
+            msg.chat.id,
+            state.promptMessageId,
+            null,
+            text,
+            extra
+          );
+        }
+      };
+
+      await renderer.render(drawResult, ctx);
+    }
+
+    return true;
   }
 
   // 에러 메시지 전송 헬퍼 메서드
