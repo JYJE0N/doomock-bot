@@ -99,7 +99,7 @@ class MongooseManager {
         Reminder: require("./models/Reminder"),
         UserSetting: require("./models/UserSetting"),
         TTSHistory: require("./models/TTSHistory"),
-        Fortune: require("./models/Fortune") // Fortune을 Fortune으로 등록
+        Fortune: require("./models/Fortune").FortuneUser // Fortune을 Fortune으로 등록
       };
 
       for (const [name, model] of Object.entries(models)) {

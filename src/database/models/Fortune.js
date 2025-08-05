@@ -424,7 +424,7 @@ FortuneUserSchema.statics.getPopularCards = async function (limit = 10) {
 /**
  * 🔧 미들웨어
  */
- 
+
 // 업데이트 시간 자동 갱신
 FortuneUserSchema.pre("findOneAndUpdate", function () {
   this.set({ updatedAt: new Date() });
@@ -436,6 +436,7 @@ FortuneUserSchema.pre("findOneAndUpdate", function () {
 const FortuneUser = mongoose.model("FortuneUser", FortuneUserSchema);
 
 module.exports = {
+  Fortune: FortuneUser, // ← 별칭 추가
   FortuneUser,
   FortuneUserSchema,
   CardSchema,

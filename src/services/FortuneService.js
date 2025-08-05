@@ -51,7 +51,7 @@ class FortuneService extends BaseService {
    * 🗄️ 필요한 모델 정의
    */
   getRequiredModels() {
-    return ["Fortune"];
+    return ["FortuneUser"];
   }
 
   // ❗❗❗ 수정: initialize -> onInitialize로 함수 이름을 변경합니다. ❗❗❗
@@ -63,7 +63,7 @@ class FortuneService extends BaseService {
       logger.info("🔮 FortuneService 초기화 시작...");
 
       // MongoDB 모델 확인 (이제 BaseService가 먼저 실행되어 this.models가 채워져 있습니다)
-      this.Fortune = this.models?.Fortune;
+      this.Fortune = this.models?.FortuneUser; // ← 변수명도 통일
 
       if (!this.Fortune) {
         logger.warn("Fortune 모델 없음 - 제한된 기능으로 동작");
@@ -572,7 +572,7 @@ class FortuneService extends BaseService {
       if (isDeveloper({ from: { id: String(userId) } })) {
         return {
           allowed: true,
-          isDeveloper: true, 
+          isDeveloper: true,
           message: "개발자 모드: 횟수 제한 없음"
         };
       }
@@ -675,12 +675,12 @@ class FortuneService extends BaseService {
         triple: user.draws.filter((d) => d.type === "triple").length,
         celtic: user.draws.filter((d) => d.type === "celtic").length
       };
-      
+
       const favorite = user.findFavoriteCard();
       if (favorite) {
         user.stats.favoriteCard = favorite;
       }
-      
+
       // 4. 마지막 뽑은 시간 및 첫 뽑은 시간을 업데이트합니다.
       user.lastDrawAt = drawData.timestamp;
       if (!user.firstDrawAt) {
@@ -695,7 +695,6 @@ class FortuneService extends BaseService {
       logger.error("뽑기 기록 저장 실패:", error);
     }
   }
-
 
   /**
    * 💬 두목봇 멘트 생성
@@ -1095,7 +1094,7 @@ class FortuneService extends BaseService {
     return user.draws.filter((draw) => new Date(draw.timestamp) >= weekAgo)
       .length;
   }
-  
+
   /**
    * 🧹 정리 작업
    */
