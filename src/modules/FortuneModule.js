@@ -52,21 +52,30 @@ class FortuneModule extends BaseModule {
 
   async onHandleMessage(bot, msg) {
     const userId = getUserId(msg.from);
+    const text = msg.text?.trim();
+
+    logger.debug("📝 FortuneModule.onHandleMessage 시작:", {
+      userId,
+      text,
+      userStatesSize: this.userStates.size,
+      hasUserState: this.userStates.has(userId)
+    });
 
     // 🔥 질문 대기 상태를 최우선으로 체크
     if (this.userStates.has(userId)) {
       const state = this.userStates.get(userId);
-      const text = msg.text?.trim();
 
       logger.debug("📝 FortuneModule: 상태 확인", {
         userId,
         state,
         text,
-        hasText: !!text
+        hasText: !!text,
+        stateType: state.type
       });
 
       // 대기 상태면 무조건 처리
       if (state.type === "waiting_question") {
+        logger.success("✅ 질문 대기 상태 감지!");
         // 텍스트가 있으면 질문 입력 처리
         if (text) {
           return await this.handleQuestionInput(bot, msg, state, text);
@@ -74,10 +83,11 @@ class FortuneModule extends BaseModule {
         // 텍스트가 없어도 true 반환 (대기 상태 유지)
         return true;
       }
+    } else {
+      logger.debug("❌ 사용자 상태 없음:", userId);
     }
 
     // 이후 일반 명령어 체크
-    const text = msg.text?.trim();
     const commands = ["/fortune", "/타로", "운세", "타로"];
     if (commands.some((cmd) => text?.toLowerCase().includes(cmd))) {
       return this.showMenu(bot, msg);
