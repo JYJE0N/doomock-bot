@@ -331,47 +331,56 @@ class FortuneRenderer extends BaseRenderer {
       text += `아직 뽑은 기록이 없습니다.\n\n첫 번째 운세를 뽑아보세요! 🔮`;
     } else {
       text += `**✨ ${userName}님의 핵심 카드 기록** (최근 ${records.length}건)\n\n`;
+
       records.forEach((record, index) => {
         const { keyCard, date } = record;
+
         if (keyCard) {
           const cardEmoji = keyCard.emoji || "🎴";
-          // 🔥 수정: keyCard.name이 없으면 korean을 사용하고, 둘 다 없으면 "카드 이름 없음"
           const cardDisplayName =
             keyCard.name || keyCard.korean || "카드 이름 없음";
           const cardName = `${cardEmoji} *${cardDisplayName}*${keyCard.isReversed ? " (역)" : ""}`;
 
           text += `${index + 1}. ${cardName} - ${date}\n`;
 
+          // 🔥 meaning과 keywords를 안전하게 처리
           const simpleMeaning = keyCard.meaning
-            ? keyCard.meaning.substring(0, 40)
+            ? keyCard.meaning.length > 40
+              ? keyCard.meaning.substring(0, 40) + "..."
+              : keyCard.meaning
             : "해석 없음";
+
           const keywords =
-            keyCard.keywords && keyCard.keywords.length > 0
+            keyCard.keywords &&
+            Array.isArray(keyCard.keywords) &&
+            keyCard.keywords.length > 0
               ? keyCard.keywords.slice(0, 2).join(", ")
               : "키워드 없음";
 
-          text += `   └ _"${simpleMeaning}..."_\n`;
+          text += `   └ _"${simpleMeaning}"_\n`;
           text += `   └ 키워드: ${keywords}\n\n`;
         } else {
-          // 🔥 추가: keyCard가 없는 경우 처리
-          text += `${index + 1}. 🎴 *기록 정보 없음* - ${date}\n\n`;
+          // keyCard가 없는 경우
+          text += `${index + 1}. 🎴 *기록 없음* - ${date}\n`;
+          text += `   └ _카드 정보를 불러올 수 없습니다_\n\n`;
         }
       });
+
       if (total > records.length) {
-        text += `... 그 외 ${total - records.length}건의 기록이 있습니다.`;
+        text += `_...그리고 ${total - records.length}개의 이전 기록들_\n`;
       }
     }
 
     const buttons = [
       [
-        { text: "🎴 운세 뽑기", action: "draw" },
-        { text: "📊 통계 보기", action: "stats" }
+        { text: "📊 통계 보기", action: "stats" },
+        { text: "🎴 운세 뽑기", action: "draw" }
       ],
       [{ text: "🔙 메뉴", action: "menu" }]
     ];
-    await this.sendSafeMessage(ctx, text, {
-      reply_markup: this.createInlineKeyboard(buttons, this.moduleName)
-    });
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
   getFortuneTypeName(type) {

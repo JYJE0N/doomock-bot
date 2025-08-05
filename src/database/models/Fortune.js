@@ -39,7 +39,20 @@ const CardSchema = new mongoose.Schema(
     },
     position: String, // 포지션 (triple, celtic에서 사용)
     positionName: String, // 포지션 이름
-    positionDescription: String // 포지션 설명
+    positionDescription: String, // 포지션 설명
+    // 🔥 추가할 필드들
+    meaning: {
+      type: String,
+      default: ""
+    },
+    keywords: {
+      type: [String],
+      default: []
+    },
+    emoji: {
+      type: String,
+      default: "🎴"
+    }
   },
   { _id: false }
 );

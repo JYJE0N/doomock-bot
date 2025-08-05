@@ -70,23 +70,35 @@ class FortuneService extends BaseService {
 
     const drawResult = this.performCardDraw(type, question);
 
+    // 🔥 interpretation 생성 전에 카드에 기본 정보 추가
+    const enrichedDrawResult = {
+      ...drawResult,
+      cards: drawResult.cards.map((card) => ({
+        ...card,
+        meaning: card.meaning || this.getCardBasicMeaning(card),
+        keywords: card.keywords || this.getCardKeywords(card),
+        emoji: card.emoji || "🎴"
+      }))
+    };
+
     const interpretation = await this.generateInterpretation(
-      drawResult.cards,
+      enrichedDrawResult.cards,
       type,
       question,
       user
     );
 
-    if (this.Fortune)
+    if (this.Fortune) {
       await this.saveDrawRecord(getUserId(user), {
-        ...drawResult,
+        ...enrichedDrawResult,
         interpretation
       });
+    }
 
-    this.updateStats(type, drawResult.cards);
+    this.updateStats(type, enrichedDrawResult.cards);
     const bossMessage = this.generateBossMessage(
       type,
-      drawResult,
+      enrichedDrawResult,
       getUserId(user)
     );
     const newLimitCheck = await this.checkDailyLimit(
@@ -97,7 +109,11 @@ class FortuneService extends BaseService {
     return {
       success: true,
       message: bossMessage,
-      data: { ...drawResult, interpretation, ...newLimitCheck }
+      data: {
+        ...enrichedDrawResult,
+        interpretation,
+        ...newLimitCheck
+      }
     };
   }
 
@@ -152,7 +168,6 @@ class FortuneService extends BaseService {
    */
   async getDrawHistory(userId, limit = 3) {
     try {
-      // 기본 반환값 정의
       const emptyResult = { success: true, data: { records: [], total: 0 } };
 
       if (!this.Fortune) return emptyResult;
@@ -162,29 +177,26 @@ class FortuneService extends BaseService {
         return emptyResult;
       }
 
+      // 🔥 slice의 인덱스 수정 (최근 기록을 가져오기 위해)
       const records = user.draws
-        .slice(0, limit)
+        .slice(-limit) // 마지막 N개 (최신순)
+        .reverse() // 역순으로 정렬
         .map((draw) => {
           try {
             if (!draw.cards || draw.cards.length === 0) return null;
 
-            const interpretedCards = draw.cards.map((card) =>
-              this.interpretSingleCard(
-                card,
-                draw.interpretation?.category || "general"
-              )
-            );
-
+            // 🔥 기록에서 핵심 카드 선택 로직 간소화
             let keyCard = null;
-            if (draw.type === "single" && interpretedCards.length > 0) {
-              keyCard = interpretedCards[0];
-            } else if (draw.type === "triple" && interpretedCards.length >= 3) {
-              keyCard = interpretedCards[2];
-            } else if (draw.type === "celtic" && interpretedCards.length > 0) {
+            if (draw.type === "single" && draw.cards.length > 0) {
+              keyCard = draw.cards[0];
+            } else if (draw.type === "triple" && draw.cards.length >= 3) {
+              keyCard = draw.cards[2]; // 미래 카드
+            } else if (draw.type === "celtic" && draw.cards.length > 0) {
+              // 결과 카드 또는 첫 번째 메이저 카드
               keyCard =
-                interpretedCards.find((c) => c.arcana === "major") ||
-                interpretedCards[9] ||
-                interpretedCards[0];
+                draw.cards[9] ||
+                draw.cards.find((c) => c.arcana === "major") ||
+                draw.cards[0];
             }
 
             return {
@@ -196,8 +208,17 @@ class FortuneService extends BaseService {
                     korean: keyCard.korean || keyCard.name || "알 수 없는 카드",
                     emoji: keyCard.emoji || "🎴",
                     isReversed: keyCard.isReversed || false,
-                    meaning: keyCard.meaning || "해석을 불러올 수 없습니다",
-                    keywords: keyCard.keywords || []
+                    // 🔥 meaning과 keywords 안전하게 처리
+                    meaning:
+                      keyCard.meaning ||
+                      this.getCardBasicMeaning(keyCard) ||
+                      "해석을 불러올 수 없습니다",
+                    keywords:
+                      keyCard.keywords &&
+                      Array.isArray(keyCard.keywords) &&
+                      keyCard.keywords.length > 0
+                        ? keyCard.keywords
+                        : this.getCardKeywords(keyCard) || []
                   }
                 : null
             };
@@ -217,16 +238,44 @@ class FortuneService extends BaseService {
       };
     } catch (error) {
       logger.error("기록 조회 실패:", error);
-      // 🔥 중요: 오류 발생 시에도 data 속성을 포함하여 반환
       return {
         success: false,
-        data: { records: [], total: 0 }, // 빈 데이터 제공
+        data: { records: [], total: 0 },
         message: "기록을 불러오는 중 오류가 발생했습니다."
       };
     }
   }
 
   // ... (이하 다른 함수들은 이전과 동일하게 유지) ...
+
+  // 카드 기본 의미 가져오기
+  getCardBasicMeaning(card) {
+    const tarotCard = this.tarotDeck.find((t) => t.id === card.id);
+    if (!tarotCard) return "해석을 불러올 수 없습니다";
+
+    if (card.isReversed && tarotCard.reversed) {
+      return (
+        tarotCard.reversed.meaning ||
+        tarotCard.reversed.general ||
+        "역방향 해석"
+      );
+    }
+    return (
+      tarotCard.upright?.meaning || tarotCard.upright?.general || "정방향 해석"
+    );
+  }
+
+  // 카드 키워드 가져오기
+  getCardKeywords(card) {
+    const tarotCard = this.tarotDeck.find((t) => t.id === card.id);
+    if (!tarotCard) return [];
+
+    if (card.isReversed && tarotCard.reversed) {
+      return tarotCard.reversed.keywords || [];
+    }
+    return tarotCard.upright?.keywords || [];
+  }
+
   performCardDraw(type, question) {
     const deck = this.createShuffledDeck();
     let cards = [];
@@ -245,6 +294,7 @@ class FortuneService extends BaseService {
     }
     return { type, question, timestamp: new Date(), cards };
   }
+
   createShuffledDeck() {
     const deck = [...this.tarotDeck];
     for (let i = deck.length - 1; i > 0; i--) {
@@ -253,11 +303,13 @@ class FortuneService extends BaseService {
     }
     return deck;
   }
+
   drawSingleCardFromDeck(deck) {
     if (deck.length === 0) throw new Error("덱에 카드가 없습니다");
     const card = deck.splice(Math.floor(Math.random() * deck.length), 1)[0];
     return { ...card, isReversed: this.shouldBeReversed(card) };
   }
+
   drawTripleCards(deck) {
     return ["past", "present", "future"].map((pos) => ({
       ...this.drawSingleCardFromDeck(deck),
@@ -308,20 +360,28 @@ class FortuneService extends BaseService {
       analysis
     };
   }
+
   interpretSingleCard(card, category) {
     const basicMeaning = TarotHelpers.getCardMeaning(card, card.isReversed);
     const special = QUESTION_CATEGORIES[category]?.interpretations?.[card.name];
+
     return {
       ...card,
+      // 🔥 기존 카드의 meaning과 keywords를 보존하면서 새로운 해석 추가
       meaning: special
         ? card.isReversed
-          ? special.reversed
-          : special.upright
-        : basicMeaning,
-      basicMeaning,
-      keywords: TarotHelpers.getKeywordString(card)
+          ? special.reversed || basicMeaning
+          : special.upright || basicMeaning
+        : card.meaning || basicMeaning,
+      keywords:
+        card.keywords && card.keywords.length > 0
+          ? card.keywords
+          : this.getCardKeywords(card),
+      emoji: card.emoji || "🎴",
+      advice: this.generateCardAdvice(card, category)
     };
   }
+
   interpretSingleSpread(card, category, question) {
     let text = `${card.emoji} **${card.korean}** ${card.isReversed ? "(역방향)" : ""}\n\n`;
     text += `**핵심 메시지**: ${card.meaning}\n\n`;
@@ -444,13 +504,23 @@ class FortuneService extends BaseService {
     ];
     return specificAdvice[Math.floor(Math.random() * specificAdvice.length)];
   }
+
   async saveDrawRecord(userId, drawData) {
     try {
       if (!this.Fortune) return;
+
+      // 🔥 cards 데이터를 저장할 때 meaning과 keywords 포함
       const record = {
         ...drawData,
-        cards: drawData.cards.map(({ drawnAt, ...rest }) => rest)
+        cards: drawData.cards.map(({ drawnAt, ...card }) => ({
+          ...card,
+          // 카드의 해석 정보도 함께 저장
+          meaning: card.meaning || "",
+          keywords: Array.isArray(card.keywords) ? card.keywords : [],
+          emoji: card.emoji || "🎴"
+        }))
       };
+
       await this.Fortune.findOneAndUpdate(
         { userId },
         {
@@ -469,6 +539,7 @@ class FortuneService extends BaseService {
       logger.error("뽑기 기록 저장 실패:", error);
     }
   }
+
   generateBossMessage(type, drawResult, userId) {
     const messages = {
       single: [
@@ -493,6 +564,7 @@ class FortuneService extends BaseService {
       : messages[type] || messages.single;
     return typeMessages[Math.floor(Math.random() * typeMessages.length)];
   }
+
   isSpecialDrawTime(time) {
     return this.config.specialDrawHours.includes(time.getHours());
   }
