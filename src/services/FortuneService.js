@@ -34,7 +34,7 @@ class FortuneService extends BaseService {
 
     // 설정
     this.config = {
-      maxDrawsPerDay: 5, // 일일 최대 뽑기 횟수
+      maxDrawsPerDay: 3, // 일일 최대 뽑기 횟수
       maxHistoryRecords: 100, // 최대 기록 보관 수
       specialDrawHours: [0, 12] // 특별 운세 시간
     };
