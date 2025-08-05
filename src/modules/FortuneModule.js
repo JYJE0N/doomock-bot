@@ -52,12 +52,20 @@ class FortuneModule extends BaseModule {
 
   async onHandleMessage(bot, msg) {
     const userId = getUserId(msg.from);
+
     // 질문 대기 상태를 최우선으로 체크
     if (this.userStates.has(userId)) {
       const state = this.userStates.get(userId);
       const text = msg.text?.trim();
-      if (state.type === "waiting_question" && text) {
-        return this.handleQuestionInput(bot, msg, state, text);
+
+      // 🔥 중요: 대기 상태면 무조건 처리
+      if (state.type === "waiting_question") {
+        // 텍스트가 있으면 질문 입력 처리
+        if (text) {
+          return await this.handleQuestionInput(bot, msg, state, text);
+        }
+        // 텍스트가 없어도 true 반환 (대기 상태 유지)
+        return true;
       }
     }
 
@@ -88,30 +96,10 @@ class FortuneModule extends BaseModule {
 
       const errorMessage = `${userName}님, 진정한 고민을 들려주세요. 🙏\n카드는 진심 어린 질문에만 답을 줍니다.`;
 
-      // 기존 메시지 수정
-      if (state.promptMessageId) {
-        try {
-          await bot.telegram.editMessageText(
-            msg.chat.id,
-            state.promptMessageId,
-            null,
-            errorMessage,
-            {
-              parse_mode: "Markdown",
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: "🙅 그만두기", callback_data: "fortune:menu" }]
-                ]
-              }
-            }
-          );
-          return true;
-        } catch (error) {
-          logger.debug("메시지 수정 실패:", error);
-        }
-      }
+      // 기존 메시지 수정 또는 새 메시지
+      await this.sendErrorMessage(bot, msg, state, errorMessage);
 
-      return true;
+      return true; // 🔥 중요: 항상 true 반환
     }
 
     // 길이 체크
@@ -131,44 +119,49 @@ class FortuneModule extends BaseModule {
         logger.debug("사용자 메시지 삭제 실패:", error);
       }
 
-      // 🔥 기존 질문 프롬프트 메시지 수정
-      if (state.promptMessageId) {
-        try {
-          await bot.telegram.editMessageText(
-            msg.chat.id,
-            state.promptMessageId,
-            null,
-            errorMessage,
-            {
-              parse_mode: "Markdown",
-              reply_markup: {
-                inline_keyboard: [
-                  [{ text: "🙅 그만두기", callback_data: "fortune:menu" }]
-                ]
-              }
-            }
-          );
-          return true;
-        } catch (error) {
-          logger.debug("메시지 수정 실패:", error);
-        }
-      }
+      await this.sendErrorMessage(bot, msg, state, errorMessage);
 
-      // 수정 실패시 새 메시지로 전송
-      await this.sendToRenderer(
-        {
-          type: "question_error",
-          module: "fortune",
-          data: { message: errorMessage }
-        },
-        msg
-      );
-      return true;
+      return true; // 🔥 중요: 항상 true 반환
     }
 
     // 정상 처리
     this.userStates.delete(user.id);
     return await this.performDraw(user, state.fortuneType, question);
+  }
+
+  // 에러 메시지 전송 헬퍼 메서드
+  async sendErrorMessage(bot, msg, state, errorMessage) {
+    if (state.promptMessageId) {
+      try {
+        await bot.telegram.editMessageText(
+          msg.chat.id,
+          state.promptMessageId,
+          null,
+          errorMessage,
+          {
+            parse_mode: "Markdown",
+            reply_markup: {
+              inline_keyboard: [
+                [{ text: "🙅 그만두기", callback_data: "fortune:menu" }]
+              ]
+            }
+          }
+        );
+        return;
+      } catch (error) {
+        logger.debug("메시지 수정 실패:", error);
+      }
+    }
+
+    // 수정 실패시 새 메시지
+    await this.sendToRenderer(
+      {
+        type: "question_error",
+        module: "fortune",
+        data: { message: errorMessage }
+      },
+      msg
+    );
   }
 
   async showHistory(bot, callbackQuery) {
