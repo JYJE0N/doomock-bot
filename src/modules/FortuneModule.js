@@ -75,17 +75,98 @@ class FortuneModule extends BaseModule {
    */
   async handleQuestionInput(bot, msg, state, question) {
     const user = msg.from;
-    if (!question || question.length < 10 || question.length > 100) {
+    const userName = getUserName(user);
+
+    // 🔥 의미 없는 입력 체크
+    if (!this.isValidQuestion(question)) {
+      // 사용자 메시지 삭제
+      try {
+        await bot.telegram.deleteMessage(msg.chat.id, msg.message_id);
+      } catch (error) {
+        logger.debug("사용자 메시지 삭제 실패:", error);
+      }
+
+      const errorMessage = `${userName}님, 진정한 고민을 들려주세요. 🙏\n카드는 진심 어린 질문에만 답을 줍니다.`;
+
+      // 기존 메시지 수정
+      if (state.promptMessageId) {
+        try {
+          await bot.telegram.editMessageText(
+            msg.chat.id,
+            state.promptMessageId,
+            null,
+            errorMessage,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "🙅 그만두기", callback_data: "fortune:menu" }]
+                ]
+              }
+            }
+          );
+          return true;
+        } catch (error) {
+          logger.debug("메시지 수정 실패:", error);
+        }
+      }
+
+      return true;
+    }
+
+    // 길이 체크
+    let errorMessage = null;
+
+    if (question.length < 10) {
+      errorMessage = `${userName}님, 고민을 좀 더 자세히 들려주세요. 🤔\n최소 10자 이상 적어주시면 카드가 더 정확한 답을 줄 수 있어요.`;
+    } else if (question.length > 100) {
+      errorMessage = `${userName}님, 고민의 핵심을 간결하게 정리해주세요. 📝\n100자 이내로 적어주시면 카드가 더 명확한 메시지를 전달할 수 있어요.`;
+    }
+
+    if (errorMessage) {
+      // 사용자 메시지 삭제
+      try {
+        await bot.telegram.deleteMessage(msg.chat.id, msg.message_id);
+      } catch (error) {
+        logger.debug("사용자 메시지 삭제 실패:", error);
+      }
+
+      // 🔥 기존 질문 프롬프트 메시지 수정
+      if (state.promptMessageId) {
+        try {
+          await bot.telegram.editMessageText(
+            msg.chat.id,
+            state.promptMessageId,
+            null,
+            errorMessage,
+            {
+              parse_mode: "Markdown",
+              reply_markup: {
+                inline_keyboard: [
+                  [{ text: "🙅 그만두기", callback_data: "fortune:menu" }]
+                ]
+              }
+            }
+          );
+          return true;
+        } catch (error) {
+          logger.debug("메시지 수정 실패:", error);
+        }
+      }
+
+      // 수정 실패시 새 메시지로 전송
       await this.sendToRenderer(
         {
           type: "question_error",
           module: "fortune",
-          data: { message: "질문은 10자 이상 100자 이하로 입력해주세요." }
+          data: { message: errorMessage }
         },
         msg
       );
-      return true; // ✅ 수정: 처리가 완료되었음을 알리기 위해 true 반환
+      return true;
     }
+
+    // 정상 처리
     this.userStates.delete(user.id);
     return await this.performDraw(user, state.fortuneType, question);
   }
@@ -145,21 +226,53 @@ class FortuneModule extends BaseModule {
     }
     return await this.performDraw(user, fortuneType);
   }
+
+  // 질문 프롬프트에 대한 메시지 ID를 저장
   async askQuestion(bot, callbackQuery, subAction, params) {
     const userId = getUserId(callbackQuery.from);
-    this.userStates.set(userId, {
-      type: "waiting_question",
-      fortuneType: params || "celtic",
-      timestamp: Date.now()
-    });
-    return {
+
+    // 질문 프롬프트 렌더링
+    const result = {
       type: "question_prompt",
       module: "fortune",
       data: {
         fortuneTypeLabel: this.config.fortuneTypes[params || "celtic"]?.label
       }
     };
+
+    // 렌더러를 통해 메시지 전송하고 ID 저장
+    const renderer =
+      this.moduleManager?.navigationHandler?.renderers?.get("fortune");
+    if (renderer) {
+      const ctx = {
+        message: callbackQuery.message,
+        update: callbackQuery,
+        editMessageText: async (text, extra) => {
+          const sentMessage = await bot.telegram.editMessageText(
+            callbackQuery.message.chat.id,
+            callbackQuery.message.message_id,
+            null,
+            text,
+            extra
+          );
+          return sentMessage;
+        }
+      };
+
+      await renderer.render(result, ctx);
+
+      // 상태에 메시지 ID 저장
+      this.userStates.set(userId, {
+        type: "waiting_question",
+        fortuneType: params || "celtic",
+        timestamp: Date.now(),
+        promptMessageId: callbackQuery.message.message_id // 🔥 중요
+      });
+    }
+
+    return result;
   }
+
   async cancelQuestion(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
     this.userStates.delete(userId);
@@ -270,6 +383,102 @@ class FortuneModule extends BaseModule {
       remainingDraws: limitCheck.remainingDraws
     };
   }
+
+  /*  헬퍼 메서드 자연어 질문 프롬프트 검증 로직 */
+
+  isValidQuestion(text) {
+    if (!text || typeof text !== "string") return false;
+
+    // 공백 제거한 텍스트
+    const trimmed = text.trim();
+
+    // 너무 짧으면 false
+    if (trimmed.length < 3) return false;
+
+    // 같은 문자가 전체의 50% 이상이면 false
+    const charCounts = {};
+    for (const char of trimmed) {
+      charCounts[char] = (charCounts[char] || 0) + 1;
+    }
+    const maxCount = Math.max(...Object.values(charCounts));
+    if (maxCount > trimmed.length * 0.5) {
+      return false;
+    }
+
+    // 의미 있는 단어가 하나라도 있는지 체크
+    const meaningfulWords = [
+      "사랑",
+      "일",
+      "직장",
+      "가족",
+      "친구",
+      "미래",
+      "고민",
+      "선택",
+      "결정",
+      "관계",
+      "건강",
+      "돈",
+      "학업",
+      "시험",
+      "이직",
+      "결혼",
+      "연애",
+      "프로젝트",
+      "계획",
+      "목표",
+      "재회",
+      "후폭풍"
+    ];
+
+    const hasMeaningfulWord = meaningfulWords.some((word) =>
+      text.includes(word)
+    );
+
+    // 의미 있는 단어가 있으면 통과
+    if (hasMeaningfulWord) return true;
+
+    // 1. 반복 패턴 체크 (ㄴㅇㄹ, ㅋㅋㅋ, ㅎㅎㅎ 등)
+    const repetitivePattern = /(.)\1{4,}|(.{2,3})\2{2,}/;
+    if (repetitivePattern.test(text)) {
+      return false;
+    }
+
+    // 2. 자음/모음만 있는지 체크
+    const onlyConsonantsOrVowels = /^[ㄱ-ㅎㅏ-ㅣ\s]+$/;
+    if (onlyConsonantsOrVowels.test(text)) {
+      return false;
+    }
+
+    // 3. 의미 없는 키보드 패턴 체크
+    const keyboardPatterns = [
+      /^[ㅁㄴㅇㄹ\s]+$/, // ㅁㄴㅇㄹ 조합
+      /^[ㅂㅈㄷㄱㅅㅛㅕㅑㅐㅔ\s]+$/, // 키보드 왼쪽
+      /^[ㅋㅌㅊㅍㅠㅜㅡ\s]+$/, // 키보드 오른쪽
+      /^[qwerty\s]+$/i, // qwerty
+      /^[asdfgh\s]+$/i, // asdf
+      /^[zxcvbn\s]+$/i // zxcv
+    ];
+
+    if (keyboardPatterns.some((pattern) => pattern.test(text))) {
+      return false;
+    }
+
+    // 4. 완성된 한글 글자가 최소 2개 이상 있는지 체크
+    const completeKoreanChars = text.match(/[가-힣]/g);
+    if (!completeKoreanChars || completeKoreanChars.length < 2) {
+      return false;
+    }
+
+    // 5. 숫자나 특수문자만 있는지 체크 (수정된 부분)
+    const onlyNumbersOrSpecial = /^[\d\s!@#$%^&*()\-_+=[\]{};:'"<>,.?/\\|`~]+$/;
+    if (onlyNumbersOrSpecial.test(text)) {
+      return false;
+    }
+
+    return true;
+  }
+
   getDefaultStats() {
     return {
       totalDraws: 0,
@@ -318,10 +527,10 @@ class FortuneModule extends BaseModule {
     const present = cards[0];
     const challenge = cards[1];
     const kph = KoreanPostpositionHelper;
-    const presentName = `**${present.korean}**${present.isReversed ? " (역방향)" : ""}`;
-    const challengeName = `**${challenge.korean}**${challenge.isReversed ? " (역방향)" : ""}`;
+    const presentName = `*${present.korean}*${present.isReversed ? " (역방향)" : ""}`;
+    const challengeName = `*${challenge.korean}*${challenge.isReversed ? " (역방향)" : ""}`;
     let interpretation = `현재 상황은 ${kph.a(presentName, "으로/로")} 나타나고 있습니다.\n`;
-    interpretation += `이를 가로막는 도전 과제는 ${challengeName}${kph.a(challengeName, "입니다/입니다")}.\n\n`;
+    interpretation += `이를 가로막는 도전 과제는 ${kph.a(challengeName, "입니다/입니다")}.\n\n`;
     interpretation +=
       "두 카드의 관계는 현재 직면한 상황과 극복해야 할 과제를 명확히 보여줍니다.";
     return interpretation;
@@ -346,7 +555,7 @@ class FortuneModule extends BaseModule {
   }
   interpretCelticOutcome(card) {
     const kph = KoreanPostpositionHelper;
-    let interpretation = `최종 결과는 **${card.emoji} ${kph.a(card.korean, "으로/로")}**`;
+    let interpretation = `최종 결과는 *${card.emoji} ${kph.a(card.korean, "으로/로")}*`;
     if (card.isReversed) interpretation += " (역방향)";
     interpretation += " 나타납니다.\n\n";
     if (card.arcana === "major") {

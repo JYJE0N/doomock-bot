@@ -444,9 +444,9 @@ class FortuneService extends BaseService {
         : card.meaning;
 
     let text = `${card.emoji} **${card.korean}** ${card.isReversed ? "(역방향)" : ""}\n\n`;
-    text += `**핵심 메시지**: ${meaningText}\n\n`;
+    text += `*핵심 메시지*: ${meaningText}\n\n`;
     if (card.keywords && Array.isArray(card.keywords)) {
-      text += `**키워드**: ${card.keywords.join(", ")}\n\n`;
+      text += `*키워드*: ${card.keywords.join(", ")}\n\n`;
     }
     text +=
       card.arcana === "major"
@@ -456,14 +456,14 @@ class FortuneService extends BaseService {
   }
 
   interpretTripleSpread(cards, category, question) {
-    let interpretation = "**과거 - 현재 - 미래의 흐름**\n\n";
+    let interpretation = "_과거 > 현재 > 미래의 흐름_\n\n";
     cards.forEach((card, index) => {
       interpretation +=
         this.getTriplePositionInterpretation(card, card.position, index) +
         "\n\n";
     });
     const flowType = this.analyzeTripleFlow(cards);
-    interpretation += `**전체적인 흐름**\n${TRIPLE_SPREAD_INTERPRETATIONS.flow_interpretations[flowType]}`;
+    interpretation += `*전체적인 흐름*\n${TRIPLE_SPREAD_INTERPRETATIONS.flow_interpretations[flowType]}`;
     const combinations = this.findCardCombinations(cards);
     if (combinations.length > 0)
       interpretation += `\n\n**특별한 조합**\n${combinations.join("\n")}`;
@@ -623,13 +623,18 @@ class FortuneService extends BaseService {
         cards: drawData.cards.map(({ drawnAt, ...card }) => ({
           ...card,
           // 카드의 해석 정보도 함께 저장
-          meaning: card.meaning || "",
+          // 🔥 meaning을 문자열로 변환 (중요!)
+          meaning:
+            typeof card.meaning === "object"
+              ? card.isReversed
+                ? card.meaning.reversed
+                : card.meaning.upright
+              : card.meaning || "",
           keywords: Array.isArray(card.keywords) ? card.keywords : [],
           emoji: card.emoji || "🎴",
           advice: card.advice || ""
         }))
       };
-
       await this.Fortune.findOneAndUpdate(
         { userId },
         {

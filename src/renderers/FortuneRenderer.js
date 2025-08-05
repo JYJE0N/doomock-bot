@@ -120,12 +120,12 @@ class FortuneRenderer extends BaseRenderer {
     }
 
     if (cards && cards.length > 1) {
-      text += `🔮 *${cards.length}카드 리딩*\n\n`;
+      text += `*${cards.length}의 조언*\n\n`;
       if (drawType === "triple") {
-        const positions = ["과거", "현재", "미래"];
+        const positions = ["*과거*", "*현재*", "*미래*"];
         cards.forEach((card, index) => {
-          const position =
-            card.position || positions[index] || `${index + 1}번째`;
+          const position = (card.position =
+            card.positionName || positions[index] || `${index + 1}번째`);
           text += `*${position}*: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
 
           if (card.isReversed) {
@@ -180,7 +180,11 @@ class FortuneRenderer extends BaseRenderer {
 
     const buttons = [
       [
-        { text: "🎴 다시 뽑기", action: "draw" },
+        {
+          text: "🎴 다시 뽑기",
+          action: "draw",
+          params: drawType // 현재 뽑은 타입을 전달
+        },
         { text: "📊 통계", action: "stats" }
       ],
       [
@@ -248,9 +252,13 @@ class FortuneRenderer extends BaseRenderer {
   async renderQuestionPrompt(data, ctx) {
     const { fortuneTypeLabel } = data;
     let text = `❓ *${fortuneTypeLabel} 질문 입력*\n\n`;
-    text += `알고 싶은 것에 대해 구체적으로 질문해주세요.\n`;
-    text += `(_예: "현재 진행 중인 프로젝트를 성공적으로 이끌려면 어떻게 해야 할까요?_")\n\n`;
-    text += `*질문은 10자 이상, 100자 이하로 입력해주세요.*`;
+    text += `무엇이 궁금하신가요? 고민을 들려주세요.\n\n`;
+    text += `💭 *예시*\n`;
+    text += `• "최근 시작한 프로젝트가 잘 될까요?"\n`;
+    text += `• "현재 관계에서 어떤 선택을 해야 할까요?"\n`;
+    text += `• "다음 달 계획하는 일이 순조롭게 진행될까요?"\n\n`;
+    text += `📏 *10자 이상, 100자 이하로 입력해주세요*`;
+
     const keyboard = this.createInlineKeyboard(
       [[{ text: "🙅 그만두기", action: "menu" }]],
       this.moduleName
