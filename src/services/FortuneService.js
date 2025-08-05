@@ -69,6 +69,7 @@ class FortuneService extends BaseService {
       };
 
     const drawResult = this.performCardDraw(type, question);
+
     const interpretation = await this.generateInterpretation(
       drawResult.cards,
       type,
@@ -149,7 +150,7 @@ class FortuneService extends BaseService {
   /**
    * 📜 사용자 기록 조회 (안정성 강화 및 핵심 카드 정보 추가)
    */
-  async getDrawHistory(userId, limit = 5) {
+  async getDrawHistory(userId, limit = 3) {
     try {
       if (!this.Fortune)
         return { success: true, data: { records: [], total: 0 } };
@@ -187,7 +188,8 @@ class FortuneService extends BaseService {
               type: draw.type,
               keyCard: keyCard
                 ? {
-                    name: keyCard.name || keyCard.korean, // 영문 이름 (없으면 한글)
+                    name: keyCard.name || keyCard.korean,
+                    korean: keyCard.korean || keyCard.name,
                     emoji: keyCard.emoji || "🎴",
                     isReversed: keyCard.isReversed,
                     meaning: keyCard.meaning,
@@ -368,7 +370,7 @@ class FortuneService extends BaseService {
       const cardAdvice =
         card.advice ||
         (card.isReversed ? card.meaning.reversed : card.meaning.upright);
-      advice += `> 🔮 ${cardAdvice}\n\n`;
+      advice += `🔮✨ ${cardAdvice}\n\n`;
     }
     if (cards.length > 1) {
       if (analysis.majorCount > cards.length / 2)
