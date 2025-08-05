@@ -75,20 +75,13 @@ class FortuneService extends BaseService {
     // 🔥 interpretation 생성 전에 카드에 기본 정보 추가
     const enrichedDrawResult = {
       ...drawResult,
-      cards: drawResult.cards.map((card) => {
-        const basicMeaning = this.getCardBasicMeaning(card);
-        return {
-          ...card,
-          meaning:
-            typeof basicMeaning === "string"
-              ? basicMeaning
-              : "해석을 불러올 수 없습니다",
-          keywords: Array.isArray(card.keywords)
-            ? card.keywords
-            : this.getCardKeywords(card),
-          emoji: card.emoji || "🎴"
-        };
-      })
+      cards: drawResult.cards.map((card) => ({
+        ...card,
+        meaning: card.meaning || this.getCardBasicMeaning(card),
+        keywords: card.keywords || this.getCardKeywords(card),
+        emoji: card.emoji || "🎴",
+        advice: card.advice || this.getCardAdvice(card) // advice 추가
+      }))
     };
 
     const interpretation = await this.generateInterpretation(
@@ -372,6 +365,13 @@ class FortuneService extends BaseService {
     };
   }
 
+  // 카드의 advice 가져오기 메서드 추가
+  getCardAdvice(card) {
+    const tarotCard = this.tarotDeck.find((t) => t.id === card.id);
+    if (!tarotCard) return null;
+    return tarotCard.advice || null;
+  }
+
   interpretSingleCard(card, category) {
     const basicMeaning = TarotHelpers.getCardMeaning(card, card.isReversed);
     const special = QUESTION_CATEGORIES[category]?.interpretations?.[card.name];
@@ -625,7 +625,8 @@ class FortuneService extends BaseService {
           // 카드의 해석 정보도 함께 저장
           meaning: card.meaning || "",
           keywords: Array.isArray(card.keywords) ? card.keywords : [],
-          emoji: card.emoji || "🎴"
+          emoji: card.emoji || "🎴",
+          advice: card.advice || ""
         }))
       };
 

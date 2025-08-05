@@ -52,6 +52,10 @@ const CardSchema = new mongoose.Schema(
     emoji: {
       type: String,
       default: "🎴"
+    },
+    advice: {
+      type: String,
+      default: ""
     }
   },
   { _id: false }
