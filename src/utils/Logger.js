@@ -231,17 +231,27 @@ class HybridLogger {
           ? "🏠"
           : "🧪";
 
-    const message = `${envIcon} HybridLogger v${this.version} 시작 - ${this.environment.name} 환경 (${this.environment.useLogger})`;
-
     if (this.environment.useLogger === "chalk") {
-      console.log(chalk.green.bold(message));
+      // 간단한 로거 정보만 표시 (메인 배너는 FancyBanner에서 처리)
+      console.log(
+        chalk.green.bold(`  ${envIcon} Logger v${this.version} 초기화`)
+      );
       console.log(
         chalk.cyan(
-          `🛡️ 개인정보 보호: ${this.privacyConfig.enablePrivacyMode ? "활성화" : "비활성화"}`
+          `  📍 환경: ${this.environment.name} (${this.environment.useLogger})`
         )
       );
+      console.log(
+        chalk.yellow(
+          `  🛡️  개인정보 보호: ${this.privacyConfig.enablePrivacyMode ? "활성화" : "비활성화"}`
+        )
+      );
+      console.log();
     } else {
-      console.log(message);
+      // Winston 환경에서는 간단하게
+      console.log(
+        `${envIcon} Logger v${this.version} 시작 - ${this.environment.name} 환경 (${this.environment.useLogger})`
+      );
     }
   }
 
