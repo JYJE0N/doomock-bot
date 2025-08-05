@@ -1,5 +1,5 @@
 const BaseRenderer = require("./BaseRenderer");
-const logger = require("../utils/Logger");
+const _logger = require("../utils/Logger");
 
 /**
  * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 (콜백 버튼 수정)
@@ -12,12 +12,9 @@ class FortuneRenderer extends BaseRenderer {
 
   async render(result, ctx) {
     const { type, data } = result;
-
     switch (type) {
       case "menu":
         return await this.renderMenu(data, ctx);
-      case "draw_select":
-        return await this.renderDrawSelect(data, ctx);
       case "draw_result":
         return await this.renderDrawResult(data, ctx);
       case "question_prompt":
@@ -54,62 +51,45 @@ class FortuneRenderer extends BaseRenderer {
       isDeveloper,
       remainingDraws
     } = data;
-
-    let text = `🔮 *타로 카드 운세*\n\n`;
-    text += `*${userName}님!*\n\n신비로운 타로의 세계에\n오신 것을 환영합니다.\n\n`;
-
-    if (isDeveloper) {
-      text += `👑 *개발자 모드 활성*\n\n`;
-    }
+    let text = `🔮 *타로 카드 운세*\n\n*${userName}님*, 신비로운 타로의 세계에 오신 것을 환영합니다.\n\n`;
 
     text += `📊 *오늘의 현황*\n`;
-
     if (isDeveloper) {
-      text += `• 뽑은 횟수: ${todayCount}번 (무제한)\n`;
-      text += `• 개발자 특권: 일일 제한 없음\n\n`;
-      text += `_어떤 운세를 알아보시겠어요?_`;
+      text += `• 뽑은 횟수: ${todayCount}번 (개발자 모드)\n`;
+      text += `• 남은 횟수: 무제한\n\n`;
     } else {
       text += `• 뽑은 횟수: ${todayCount}/${maxDrawsPerDay}번\n`;
       text += `• 남은 횟수: ${remainingDraws}번\n\n`;
-      if (canDraw) {
-        text += `_어떤 운세를 알아보시겠어요?_`;
-      } else {
-        text += `오늘은 더 이상 뽑을 수 없습니다\n\n`;
-        text += `내일 다시 새로운 운세를 확인해보세요! 🌅`;
-      }
+    }
+
+    if (canDraw) {
+      text += `_어떤 운세를 알아보시겠어요?_`;
+    } else {
+      text += `오늘은 더 이상 뽑을 수 없습니다. 내일 다시 새로운 운세를 확인해보세요! 🌅`;
     }
 
     const buttons = [];
-
-    if (canDraw || isDeveloper) {
-      const fortuneTypeEntries = Object.entries(fortuneTypes);
-      for (let i = 0; i < fortuneTypeEntries.length; i += 2) {
+    if (canDraw) {
+      const typeEntries = Object.entries(fortuneTypes);
+      for (let i = 0; i < typeEntries.length; i += 2) {
         const row = [];
-        const [key1, config1] = fortuneTypeEntries[i];
         row.push({
-          text: `${config1.emoji} ${config1.label}`,
+          text: `${typeEntries[i][1].emoji} ${typeEntries[i][1].label}`,
           action: "draw",
-          params: key1
+          params: typeEntries[i][0]
         });
-        if (i + 1 < fortuneTypeEntries.length) {
-          const [key2, config2] = fortuneTypeEntries[i + 1];
+        if (i + 1 < typeEntries.length) {
           row.push({
-            text: `${config2.emoji} ${config2.label}`,
+            text: `${typeEntries[i + 1][1].emoji} ${typeEntries[i + 1][1].label}`,
             action: "draw",
-            params: key2
+            params: typeEntries[i + 1][0]
           });
         }
         buttons.push(row);
       }
-      if (isDeveloper) {
-        buttons.push([
-          { text: "🔄 카드 셔플", action: "shuffle" },
-          { text: "🔧 일일 제한 리셋", action: "reset" }
-        ]);
-      } else {
-        buttons.push([{ text: "🔄 카드 셔플", action: "shuffle" }]);
-      }
     }
+    if (isDeveloper)
+      buttons.push([{ text: "🔧 일일 제한 리셋", action: "reset" }]);
 
     buttons.push([
       { text: "📊 통계", action: "stats" },
@@ -117,40 +97,9 @@ class FortuneRenderer extends BaseRenderer {
     ]);
     buttons.push([{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]);
 
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  async renderDrawSelect(data, ctx) {
-    const { fortuneTypes, remaining } = data;
-    let text = `🃏 *운세 선택*\n\n`;
-    text += `💫 *남은 횟수*: ${remaining}번\n\n`;
-    text += `어떤 종류의 운세를 알아보시겠어요?`;
-
-    const buttons = [];
-    const fortuneTypeEntries = Object.entries(fortuneTypes);
-    for (let i = 0; i < fortuneTypeEntries.length; i += 2) {
-      const row = [];
-      const [key1, config1] = fortuneTypeEntries[i];
-      row.push({
-        text: `${config1.emoji} ${config1.label}`,
-        action: "draw",
-        params: key1
-      });
-      if (i + 1 < fortuneTypeEntries.length) {
-        const [key2, config2] = fortuneTypeEntries[i + 1];
-        row.push({
-          text: `${config2.emoji} ${config2.label}`,
-          action: "draw",
-          params: key2
-        });
-      }
-      buttons.push(row);
-    }
-    buttons.push([{ text: "🔙 메뉴", action: "menu" }]);
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    await this.sendOrEditMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons, this.moduleName)
+    });
   }
 
   async renderDrawResult(data, ctx) {
@@ -359,38 +308,30 @@ class FortuneRenderer extends BaseRenderer {
    */
   async renderHistory(data, ctx) {
     const { userName, records = [], total = 0 } = data;
-
     let text = `📋 *${userName}님의 타로 기록*\n\n`;
 
     if (records.length === 0) {
-      text += `아직 뽑은 기록이 없습니다.\n\n`;
-      text += `첫 번째 운세를 뽑아보세요! 🔮`;
+      text += `아직 뽑은 기록이 없습니다.\n\n첫 번째 운세를 뽑아보세요! 🔮`;
     } else {
-      // 새로운 '핵심 카드' 섹션
       text += `**✨ ${userName}님의 핵심 카드 기록** (최근 ${records.length}건)\n\n`;
-
       records.forEach((record, index) => {
         const { keyCard, date } = record;
-
         if (keyCard) {
           const cardName = `${keyCard.emoji} *${keyCard.name}*${keyCard.isReversed ? " (역)" : ""}`;
-
           text += `${index + 1}. ${cardName} - ${date}\n`;
 
-          // 의미와 키워드를 안전하게 자르기
           const simpleMeaning = keyCard.meaning
             ? keyCard.meaning.substring(0, 40)
             : "해석 없음";
           const keywords =
             keyCard.keywords && keyCard.keywords.length > 0
               ? keyCard.keywords.slice(0, 2).join(", ")
-              : "핵심 없음";
+              : "키워드 없음";
 
           text += `   └ _"${simpleMeaning}..."_\n`;
           text += `   └ 키워드: ${keywords}\n\n`;
         }
       });
-
       if (total > records.length) {
         text += `... 그 외 ${total - records.length}건의 기록이 있습니다.`;
       }
@@ -403,46 +344,17 @@ class FortuneRenderer extends BaseRenderer {
       ],
       [{ text: "🔙 메뉴", action: "menu" }]
     ];
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  async renderError(data, ctx) {
-    try {
-      const errorMessage =
-        data && data.message ? data.message : "알 수 없는 오류가 발생했습니다.";
-      const text = `❌ *오류 발생*\n\n${errorMessage}\n\n다시 시도해주세요.`;
-      const buttons = [
-        [
-          { text: "🔄 다시 시도", action: "menu" },
-          { text: "🔙 메인 메뉴", action: "menu", module: "system" }
-        ]
-      ];
-      const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-    } catch (error) {
-      logger.error("FortuneRenderer.renderError 중 오류:", error);
-      try {
-        await ctx.reply(
-          "❌ 시스템 오류가 발생했습니다. 잠시 후 다시 시도해주세요."
-        );
-      } catch (replyError) {
-        logger.error("최후 에러 메시지 전송도 실패:", replyError);
-      }
-    }
+    await this.sendOrEditMessage(ctx, text, {
+      reply_markup: this.createInlineKeyboard(buttons, this.moduleName)
+    });
   }
 
   getFortuneTypeName(type) {
-    const typeNames = {
-      single: "싱글카드",
-      triple: "트리플카드",
-      celtic: "캘틱 크로스",
-      love: "연애운",
-      work: "사업운",
-      custom: "자유질문"
-    };
-    return typeNames[type] || type;
+    return (
+      { single: "싱글카드", triple: "트리플카드", celtic: "캘틱 크로스" }[
+        type
+      ] || type
+    );
   }
 
   async renderCelticDetail(data, ctx) {
