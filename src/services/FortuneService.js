@@ -75,12 +75,20 @@ class FortuneService extends BaseService {
     // 🔥 interpretation 생성 전에 카드에 기본 정보 추가
     const enrichedDrawResult = {
       ...drawResult,
-      cards: drawResult.cards.map((card) => ({
-        ...card,
-        meaning: card.meaning || this.getCardBasicMeaning(card),
-        keywords: card.keywords || this.getCardKeywords(card),
-        emoji: card.emoji || "🎴"
-      }))
+      cards: drawResult.cards.map((card) => {
+        const basicMeaning = this.getCardBasicMeaning(card);
+        return {
+          ...card,
+          meaning:
+            typeof basicMeaning === "string"
+              ? basicMeaning
+              : "해석을 불러올 수 없습니다",
+          keywords: Array.isArray(card.keywords)
+            ? card.keywords
+            : this.getCardKeywords(card),
+          emoji: card.emoji || "🎴"
+        };
+      })
     };
 
     const interpretation = await this.generateInterpretation(
@@ -255,12 +263,15 @@ class FortuneService extends BaseService {
     const tarotCard = this.tarotDeck.find((t) => t.id === card.id);
     if (!tarotCard) return "해석을 불러올 수 없습니다";
 
-    // 🔥 TarotData의 실제 구조에 맞게 수정
-    if (!tarotCard.meaning) return "해석을 불러올 수 없습니다";
+    // meaning이 객체 형태로 저장되어 있는 경우
+    if (tarotCard.meaning && typeof tarotCard.meaning === "object") {
+      return card.isReversed
+        ? tarotCard.meaning.reversed || "역방향 해석"
+        : tarotCard.meaning.upright || "정방향 해석";
+    }
 
-    return card.isReversed
-      ? tarotCard.meaning.reversed || "역방향 해석"
-      : tarotCard.meaning.upright || "정방향 해석";
+    // meaning이 문자열인 경우
+    return tarotCard.meaning || "해석을 불러올 수 없습니다";
   }
 
   // 카드 키워드 가져오기
@@ -313,13 +324,17 @@ class FortuneService extends BaseService {
       positionName: this.getPositionName(pos)
     }));
   }
+
   drawCelticCross(deck) {
     return CELTIC_CROSS_POSITIONS.map((pos, i) => ({
       ...this.drawSingleCardFromDeck(deck),
-      ...pos,
+      position: pos.key, // pos.position이 아닌 pos.key 사용
+      positionName: pos.name,
+      positionDescription: pos.description,
       order: i + 1
     }));
   }
+
   shouldBeReversed(card) {
     if (card.arcana === "major") return Math.random() < 0.3;
     if (card.court) return Math.random() < 0.25;
@@ -361,33 +376,85 @@ class FortuneService extends BaseService {
     const basicMeaning = TarotHelpers.getCardMeaning(card, card.isReversed);
     const special = QUESTION_CATEGORIES[category]?.interpretations?.[card.name];
 
+    // meaning이 객체인 경우 처리
+    let meaningText = "";
+    if (card.meaning && typeof card.meaning === "object") {
+      meaningText = card.isReversed
+        ? card.meaning.reversed || basicMeaning
+        : card.meaning.upright || basicMeaning;
+    } else if (special) {
+      meaningText = card.isReversed
+        ? special.reversed || basicMeaning
+        : special.upright || basicMeaning;
+    } else {
+      meaningText = card.meaning || basicMeaning;
+    }
+
     return {
       ...card,
-      // 🔥 기존 카드의 meaning과 keywords를 보존하면서 새로운 해석 추가
-      meaning: special
-        ? card.isReversed
-          ? special.reversed || basicMeaning
-          : special.upright || basicMeaning
-        : card.meaning || basicMeaning,
+      meaning: meaningText, // 문자열로 변환
       keywords:
         card.keywords && card.keywords.length > 0
           ? card.keywords
           : this.getCardKeywords(card),
-      emoji: card.emoji || "🎴",
-      advice: this.generateCardAdvice(card, category)
+      emoji: card.emoji || "🎴"
+      // advice 필드 제거
     };
   }
 
+  // 안 되면 주석처리 하라
+  generateSimpleAdvice(card, category) {
+    const categoryAdvice = {
+      love: {
+        positive:
+          "사랑에 있어 긍정적인 변화가 예상됩니다. 마음을 열고 기회를 받아들이세요.",
+        negative:
+          "관계에서 신중함이 필요합니다. 서두르지 말고 천천히 진행하세요."
+      },
+      career: {
+        positive:
+          "직업적 성장의 기회가 다가옵니다. 자신감을 가지고 도전하세요.",
+        negative: "업무에서 주의가 필요합니다. 세부사항을 꼼꼼히 확인하세요."
+      },
+      general: {
+        positive:
+          "긍정적인 에너지가 당신을 둘러싸고 있습니다. 희망을 잃지 마세요.",
+        negative:
+          "잠시 멈추고 상황을 재평가할 시간입니다. 급하게 결정하지 마세요."
+      }
+    };
+
+    const isPositive = !card.isReversed && card.arcana === "major";
+    const adviceType = isPositive ? "positive" : "negative";
+    const categoryKey = category || "general";
+
+    return (
+      categoryAdvice[categoryKey]?.[adviceType] ||
+      categoryAdvice.general[adviceType]
+    );
+  }
+
   interpretSingleSpread(card, category, question) {
+    // meaning이 객체인 경우 처리
+    const meaningText =
+      typeof card.meaning === "object"
+        ? card.isReversed
+          ? card.meaning.reversed
+          : card.meaning.upright
+        : card.meaning;
+
     let text = `${card.emoji} **${card.korean}** ${card.isReversed ? "(역방향)" : ""}\n\n`;
-    text += `**핵심 메시지**: ${card.meaning}\n\n`;
-    if (card.keywords) text += `**키워드**: ${card.keywords.join(", ")}\n\n`;
+    text += `**핵심 메시지**: ${meaningText}\n\n`;
+    if (card.keywords && Array.isArray(card.keywords)) {
+      text += `**키워드**: ${card.keywords.join(", ")}\n\n`;
+    }
     text +=
       card.arcana === "major"
         ? "메이저 아르카나 카드로, 인생의 중요한 전환점을 나타냅니다.\n"
         : `${TarotHelpers.getSuitDescription(card.suit)}\n`;
     return text;
   }
+
   interpretTripleSpread(cards, category, question) {
     let interpretation = "**과거 - 현재 - 미래의 흐름**\n\n";
     cards.forEach((card, index) => {
@@ -402,9 +469,20 @@ class FortuneService extends BaseService {
       interpretation += `\n\n**특별한 조합**\n${combinations.join("\n")}`;
     return interpretation;
   }
+
   interpretCelticSpread(cards, category, question) {
     let interpretation =
       "**캘틱 크로스 - 10장의 카드가 보여주는 전체 상황**\n\n";
+
+    // 각 카드가 올바른 position을 가지고 있는지 디버깅
+    console.log(
+      "Celtic cards positions:",
+      cards.map((c) => ({
+        position: c.position,
+        name: c.korean
+      }))
+    );
+
     const areas = {
       center: ["present", "challenge"],
       timeline: ["distant_past", "recent_past", "future", "immediate_future"],
@@ -412,23 +490,57 @@ class FortuneService extends BaseService {
       external: ["environment"],
       outcome: ["outcome"]
     };
+
     Object.entries(areas).forEach(([area, positions]) => {
       const areaCards = cards.filter((c) => positions.includes(c.position));
       if (areaCards.length > 0) {
         interpretation += `\n**${this.getAreaTitle(area)}**\n`;
         areaCards.forEach((card) => {
-          interpretation += `- ${card.positionName}: ${card.emoji} ${card.korean}${card.isReversed ? " (역)" : ""}\n`;
+          interpretation += `- ${card.positionName || card.position}: ${card.emoji} ${card.korean}${card.isReversed ? " (역)" : ""}\n`;
         });
-        if (CELTIC_CROSS_INTERPRETATIONS.area_synthesis[area])
+        if (CELTIC_CROSS_INTERPRETATIONS?.area_synthesis?.[area]) {
           interpretation += `\n*${CELTIC_CROSS_INTERPRETATIONS.area_synthesis[area]}*\n`;
+        }
       }
     });
-    interpretation +=
-      "\n**전체 이야기**\n" + this.createCelticStory(cards, question);
+
+    // createCelticStory도 안전하게 처리
+    if (cards.length >= 10) {
+      interpretation +=
+        "\n**전체 이야기**\n" + this.createCelticStory(cards, question);
+    }
+
     interpretation +=
       "\n\n**핵심 조언**\n" + this.generateCelticAdvice(cards, category);
     return interpretation;
   }
+
+  // createCelticStory 메서드도 수정
+  createCelticStory(cards, question) {
+    // CELTIC_CROSS_INTERPRETATIONS이 정의되어 있는지 확인
+    if (!CELTIC_CROSS_INTERPRETATIONS?.story_templates?.[0]?.template) {
+      return "카드들이 보여주는 이야기를 통해 당신의 여정을 이해해보세요.";
+    }
+
+    const templateFn = CELTIC_CROSS_INTERPRETATIONS.story_templates[0].template;
+    const cardData = cards.reduce((acc, card) => {
+      if (card.position && card.korean) {
+        acc[card.position] = card.korean;
+      }
+      return acc;
+    }, {});
+
+    // 필수 카드들이 있는지 확인
+    const requiredPositions = ["present", "challenge", "outcome"];
+    const hasAllRequired = requiredPositions.every((pos) => cardData[pos]);
+
+    if (!hasAllRequired) {
+      return "카드들이 보여주는 전체적인 흐름을 통해 통찰을 얻으세요.";
+    }
+
+    return templateFn(cardData);
+  }
+
   generatePersonalizedAdvice(cards, analysis, category, user) {
     const userName = getUserName(user);
     const _kph = KoreanPostpositionHelper;
@@ -659,22 +771,35 @@ class FortuneService extends BaseService {
     return combinations;
   }
 
-  createCelticStory(cards, question) {
-    const templateFn = CELTIC_CROSS_INTERPRETATIONS.story_templates[0].template;
-    const cardData = cards.reduce((acc, card) => {
-      acc[card.position] = card.korean;
-      return acc;
-    }, {});
-    return templateFn(cardData);
-  }
+  // createCelticStory(cards, question) {
+  //   const templateFn = CELTIC_CROSS_INTERPRETATIONS.story_templates[0].template;
+  //   const cardData = cards.reduce((acc, card) => {
+  //     acc[card.position] = card.korean;
+  //     return acc;
+  //   }, {});
+  //   return templateFn(cardData);
+  // }
 
   generateCelticAdvice(cards, category) {
     const outcome = cards.find((c) => c.position === "outcome");
     const approach = cards.find((c) => c.position === "approach");
+
+    // 카드를 찾지 못한 경우 처리
+    if (!outcome || !approach) {
+      return "카드의 전체적인 흐름을 통해 답을 찾아보세요. 당신의 직관을 믿으세요.";
+    }
+
     let advice = `${approach.korean}의 자세로 접근하면 ${outcome.korean}의 결과를 얻을 수 있습니다. `;
     const outcomeType = outcome.isReversed ? "challenging" : "positive";
-    advice +=
-      CELTIC_CROSS_INTERPRETATIONS.position_emphasis.outcome[outcomeType]();
+
+    // CELTIC_CROSS_INTERPRETATIONS이 정의되어 있는지 확인
+    if (
+      CELTIC_CROSS_INTERPRETATIONS?.position_emphasis?.outcome?.[outcomeType]
+    ) {
+      advice +=
+        CELTIC_CROSS_INTERPRETATIONS.position_emphasis.outcome[outcomeType]();
+    }
+
     return advice;
   }
 
