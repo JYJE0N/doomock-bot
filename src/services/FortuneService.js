@@ -187,7 +187,7 @@ class FortuneService extends BaseService {
               type: draw.type,
               keyCard: keyCard
                 ? {
-                    name: keyCard.korean,
+                    name: keyCard.name || keyCard.korean, // 영문 이름 (없으면 한글)
                     emoji: keyCard.emoji || "🎴",
                     isReversed: keyCard.isReversed,
                     meaning: keyCard.meaning,
@@ -361,8 +361,8 @@ class FortuneService extends BaseService {
   }
   generatePersonalizedAdvice(cards, analysis, category, user) {
     const userName = getUserName(user);
-    const kph = KoreanPostpositionHelper;
-    let advice = `${kph.a(userName, "님을")} 위한 조언:\n\n`;
+    const _kph = KoreanPostpositionHelper;
+    let advice = `${userName}님,\n\n`;
     if (cards.length === 1) {
       const card = cards[0];
       const cardAdvice =
@@ -497,21 +497,31 @@ class FortuneService extends BaseService {
       message: "카드들이 우주의 에너지로 새롭게 섞였습니다! ✨"
     };
   }
+
   async getUserStats(userId) {
     if (!this.Fortune)
       return { success: true, data: this.generateDummyStats() };
     const user = await this.Fortune.findOne({ userId });
     if (!user) return { success: true, data: this.generateDummyStats() };
+
+    // 가장 많이 나온 카드 찾기
+    const favoriteCardObj = user.findFavoriteCard();
+    const favoriteCard = favoriteCardObj
+      ? `${favoriteCardObj.emoji || "🎴"} ${favoriteCardObj.korean || favoriteCardObj.name}`
+      : null;
+
     const stats = user.stats ? user.stats.toObject() : {};
     return {
       success: true,
       data: {
         ...stats,
+        favoriteCard, // 문자열로 변환된 카드 이름
         todayDraws: this.getTodayDrawCount(user),
         weeklyDraws: this.getWeeklyDrawCount(user)
       }
     };
   }
+
   generateDummyStats() {
     return {
       totalDraws: 0,
@@ -521,11 +531,13 @@ class FortuneService extends BaseService {
       weeklyDraws: 0
     };
   }
+
   getPositionName(position) {
     return (
       { past: "과거", present: "현재", future: "미래" }[position] || position
     );
   }
+
   getAreaTitle(area) {
     return (
       {
@@ -537,6 +549,7 @@ class FortuneService extends BaseService {
       }[area] || area
     );
   }
+
   analyzeTripleFlow(cards) {
     const hasPositiveOutcome = ["The Sun", "The Star", "The World"].includes(
       cards[2].name
@@ -549,6 +562,7 @@ class FortuneService extends BaseService {
     if (hasChallenges) return "challenging_flow";
     return "stable_flow";
   }
+
   findCardCombinations(cards) {
     const combinations = [];
     for (let i = 0; i < cards.length - 1; i++) {
@@ -562,6 +576,7 @@ class FortuneService extends BaseService {
     }
     return combinations;
   }
+
   createCelticStory(cards, question) {
     const templateFn = CELTIC_CROSS_INTERPRETATIONS.story_templates[0].template;
     const cardData = cards.reduce((acc, card) => {
@@ -570,6 +585,7 @@ class FortuneService extends BaseService {
     }, {});
     return templateFn(cardData);
   }
+
   generateCelticAdvice(cards, category) {
     const outcome = cards.find((c) => c.position === "outcome");
     const approach = cards.find((c) => c.position === "approach");
@@ -579,6 +595,7 @@ class FortuneService extends BaseService {
       CELTIC_CROSS_INTERPRETATIONS.position_emphasis.outcome[outcomeType]();
     return advice;
   }
+
   getTriplePositionInterpretation(card, position, index) {
     const positionKey =
       index === 0
@@ -591,22 +608,26 @@ class FortuneService extends BaseService {
     const cardName = `${card.emoji} ${card.korean}`;
     return templateFn(cardName);
   }
+
   createDrawSummary(draw) {
     const mainCard = draw.cards[0];
     return `${mainCard.korean} - ${mainCard.isReversed ? "역방향" : "정방향"}`;
   }
+
   getTodayDrawCount(user) {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
     return user.draws.filter((draw) => new Date(draw.timestamp) >= startOfDay)
       .length;
   }
+
   getWeeklyDrawCount(user) {
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     return user.draws.filter((draw) => new Date(draw.timestamp) >= weekAgo)
       .length;
   }
+
   getStatus() {
     return {
       initialized: this.isInitialized,
