@@ -326,7 +326,7 @@ class FancyBanner {
       {
         icon: "🕐",
         label: "Started",
-        value: new Date().toLocaleString("ko-KR"),
+        value: TimeHelper.format(undefined, "logAMPM"),
         color: "yellowBright"
       },
       {
