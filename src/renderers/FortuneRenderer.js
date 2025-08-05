@@ -97,7 +97,7 @@ class FortuneRenderer extends BaseRenderer {
     ]);
     buttons.push([{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]);
 
-    await this.sendOrEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: this.createInlineKeyboard(buttons, this.moduleName)
     });
   }
@@ -317,7 +317,9 @@ class FortuneRenderer extends BaseRenderer {
       records.forEach((record, index) => {
         const { keyCard, date } = record;
         if (keyCard) {
-          const cardName = `${keyCard.emoji} *${keyCard.name}*${keyCard.isReversed ? " (역)" : ""}`;
+          const cardEmoji = keyCard.emoji || "🎴";
+          const cardName = `${cardEmoji} *${keyCard.name}*${keyCard.isReversed ? " (역)" : ""}`;
+
           text += `${index + 1}. ${cardName} - ${date}\n`;
 
           const simpleMeaning = keyCard.meaning
@@ -344,7 +346,7 @@ class FortuneRenderer extends BaseRenderer {
       ],
       [{ text: "🔙 메뉴", action: "menu" }]
     ];
-    await this.sendOrEditMessage(ctx, text, {
+    await this.sendSafeMessage(ctx, text, {
       reply_markup: this.createInlineKeyboard(buttons, this.moduleName)
     });
   }
