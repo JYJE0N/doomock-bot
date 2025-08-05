@@ -61,12 +61,14 @@ class FortuneService extends BaseService {
       user,
       this.config.maxDrawsPerDay
     );
-    if (!limitCheck.allowed)
+
+    if (!limitCheck.allowed) {
       return {
         success: false,
         message: limitCheck.message,
         data: { ...limitCheck }
       };
+    }
 
     const drawResult = this.performCardDraw(type, question);
 
@@ -253,16 +255,12 @@ class FortuneService extends BaseService {
     const tarotCard = this.tarotDeck.find((t) => t.id === card.id);
     if (!tarotCard) return "해석을 불러올 수 없습니다";
 
-    if (card.isReversed && tarotCard.reversed) {
-      return (
-        tarotCard.reversed.meaning ||
-        tarotCard.reversed.general ||
-        "역방향 해석"
-      );
-    }
-    return (
-      tarotCard.upright?.meaning || tarotCard.upright?.general || "정방향 해석"
-    );
+    // 🔥 TarotData의 실제 구조에 맞게 수정
+    if (!tarotCard.meaning) return "해석을 불러올 수 없습니다";
+
+    return card.isReversed
+      ? tarotCard.meaning.reversed || "역방향 해석"
+      : tarotCard.meaning.upright || "정방향 해석";
   }
 
   // 카드 키워드 가져오기
@@ -270,10 +268,8 @@ class FortuneService extends BaseService {
     const tarotCard = this.tarotDeck.find((t) => t.id === card.id);
     if (!tarotCard) return [];
 
-    if (card.isReversed && tarotCard.reversed) {
-      return tarotCard.reversed.keywords || [];
-    }
-    return tarotCard.upright?.keywords || [];
+    // 🔥 keywords는 카드의 최상위 레벨에 있음!
+    return tarotCard.keywords || [];
   }
 
   performCardDraw(type, question) {
