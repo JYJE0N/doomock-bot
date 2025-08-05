@@ -55,6 +55,8 @@ class FortuneModule extends BaseModule {
       if (!this.fortuneService) {
         logger.warn("FortuneService 없음 - 제한된 기능으로 동작");
       } else {
+        // 서비스의 설정값을 모듈의 설정값으로 동기화
+        this.fortuneService.config.maxDrawsPerDay = this.config.maxDrawsPerDay;
         logger.success("🔮 FortuneModule이 FortuneService와 연결됨");
       }
 
@@ -81,8 +83,8 @@ class FortuneModule extends BaseModule {
     this.actionMap.set("history", this.showHistory.bind(this));
     this.actionMap.set("shuffle", this.shuffleCards.bind(this));
     this.actionMap.set("cancelQuestion", this.cancelQuestion.bind(this));
-    this.actionMap.set("celticDetail", this.showCelticDetail.bind(this));
-    this.actionMap.set("reset", this.resetDailyLimit.bind(this)); // 개발자 리셋 추가
+    this.actionMap.set("celticDetail", this.showCelticDetail.bind(this)); // ✅ 수정: 이 부분을 추가합니다.
+    this.actionMap.set("reset", this.resetDailyLimit.bind(this));
   }
 
   /**
@@ -98,7 +100,6 @@ class FortuneModule extends BaseModule {
         const state = this.userStates.get(userId);
 
         if (state.type === "waiting_question" && text) {
-          // ❗❗❗ 수정: handleQuestionInput의 결과를 반환하도록 변경 ❗❗❗
           return await this.handleQuestionInput(bot, msg, state, text);
         }
       }
@@ -113,7 +114,6 @@ class FortuneModule extends BaseModule {
 
       for (const { cmd, _action } of commands) {
         if (text?.toLowerCase().includes(cmd)) {
-          // 렌더링이 필요한 객체를 반환하도록 수정
           return await this.showMenu(bot, msg);
         }
       }
@@ -130,20 +130,16 @@ class FortuneModule extends BaseModule {
    */
   async showMenu(bot, callbackQuery, subAction, params, moduleManager) {
     try {
-      const userId = getUserId(callbackQuery.from);
-      const userName = getUserName(callbackQuery.from);
+      const user = callbackQuery.from;
+      const userName = getUserName(user);
+      const developerMode = isDeveloper(user);
 
-      // 🎯 개발자 여부 직접 확인
-      const developerMode = isDeveloper(callbackQuery.from);
-
-      // 🎯 이 변수를 사용하도록 수정합니다.
       const serviceStatus = this.fortuneService?.getStatus() || {
         hasDatabase: false,
         stats: { totalDraws: 0 }
       };
 
-      const todayInfo = await this.getTodayDrawInfo(userId);
-      logger.debug(`🔮 Fortune 메뉴 표시: ${userName} (${userId})`);
+      const todayInfo = await this.getTodayDrawInfo(user);
 
       return {
         type: "menu",
@@ -156,7 +152,6 @@ class FortuneModule extends BaseModule {
           canDraw: developerMode || todayInfo.remainingDraws > 0,
           fortuneTypes: this.config.fortuneTypes,
           isDeveloper: developerMode,
-          // ✨ 수정된 부분: serviceStatus 변수를 여기서 사용합니다.
           serviceConnected: !!this.fortuneService,
           hasDatabase: serviceStatus.hasDatabase,
           totalServiceDraws: serviceStatus.stats?.totalDraws || 0
@@ -185,7 +180,7 @@ class FortuneModule extends BaseModule {
 
       logger.info(`🎴 카드 뽑기 요청: ${getUserName(user)} - ${fortuneType}`);
 
-      // 🎯 캘틱 크로스는 질문 입력 필요
+      // 캘틱 크로스는 질문 입력이 항상 필요
       if (fortuneType === "celtic") {
         return await this.askQuestion(
           bot,
@@ -196,9 +191,9 @@ class FortuneModule extends BaseModule {
         );
       }
 
-      // 🎯 개발자가 아닌 경우에만 일일 제한 확인
+      // 개발자인지 먼저 확인
       if (!isDeveloper(user)) {
-        const todayInfo = await this.getTodayDrawInfo(user.id);
+        const todayInfo = await this.getTodayDrawInfo(user);
         if (todayInfo.remainingDraws <= 0) {
           return {
             type: "daily_limit",
@@ -235,7 +230,6 @@ class FortuneModule extends BaseModule {
       const userName = getUserName(callbackQuery.from);
       const fortuneType = params || "celtic";
 
-      // 질문 대기 상태 설정
       this.userStates.set(userId, {
         type: "waiting_question",
         fortuneType,
@@ -272,36 +266,36 @@ class FortuneModule extends BaseModule {
    */
   async handleQuestionInput(bot, msg, state, question) {
     try {
-      const user = msg.from; // ❗❗❗ 수정: user 객체 사용 ❗❗❗
+      const user = msg.from;
       const { fortuneType } = state;
 
-      // ✨ 질문 검증
       if (!question || question.length < 10) {
-        const errorResult = {
-          type: "question_error",
-          module: "fortune",
-          data: { message: "질문은 최소 10자 이상 입력해주세요." }
-        };
-        await this.sendToRenderer(errorResult, msg);
+        await this.sendToRenderer(
+          {
+            type: "question_error",
+            module: "fortune",
+            data: { message: "질문은 최소 10자 이상 입력해주세요." }
+          },
+          msg
+        );
         return;
       }
       if (question.length > 100) {
-        const errorResult = {
-          type: "question_error",
-          module: "fortune",
-          data: { message: "질문은 100자를 넘을 수 없습니다." }
-        };
-        await this.sendToRenderer(errorResult, msg);
+        await this.sendToRenderer(
+          {
+            type: "question_error",
+            module: "fortune",
+            data: { message: "질문은 100자를 넘을 수 없습니다." }
+          },
+          msg
+        );
         return;
       }
 
       logger.info(`💬 질문 입력 완료: ${getUserName(user)} - "${question}"`);
       this.userStates.delete(user.id);
 
-      // 카드 뽑기 진행
-      const result = await this.performDraw(user, fortuneType, question);
-
-      return result;
+      return await this.performDraw(user, fortuneType, question);
     } catch (error) {
       logger.error("질문 입력 처리 오류:", error);
       return {
@@ -318,14 +312,10 @@ class FortuneModule extends BaseModule {
   async cancelQuestion(bot, callbackQuery, subAction, params, moduleManager) {
     try {
       const userId = getUserId(callbackQuery.from);
-
-      // 대기 상태 제거
       if (this.userStates.has(userId)) {
         this.userStates.delete(userId);
         logger.info(`❌ 질문 입력 취소: ${userId}`);
       }
-
-      // 메뉴로 돌아가기
       return await this.showMenu(
         bot,
         callbackQuery,
@@ -348,9 +338,7 @@ class FortuneModule extends BaseModule {
    */
   async performDraw(user, fortuneType, question = null) {
     try {
-      // FortuneService 사용
       if (this.fortuneService) {
-        // ❗❗❗ 수정: userId 대신 user 객체를 전달 ❗❗❗
         const result = await this.fortuneService.drawCard(user, {
           type: fortuneType,
           question: question
@@ -367,7 +355,6 @@ class FortuneModule extends BaseModule {
           };
         }
 
-        // 캘틱 크로스 결과 캐싱 및 타입 변경
         if (fortuneType === "celtic" && result.data) {
           this.lastCelticResults.set(user.id, {
             ...result.data,
@@ -381,14 +368,13 @@ class FortuneModule extends BaseModule {
               ...result.data,
               userName: getUserName(user),
               fortuneType: this.config.fortuneTypes[fortuneType],
-              maxDrawsPerDay: this.config.maxDrawsPerDay, // 추가
-              remainingDraws: result.data?.remainingDraws || 0, // 확실히 전달
-              todayDraws: result.data?.todayDraws || 0 // 추가
+              maxDrawsPerDay: this.config.maxDrawsPerDay,
+              remainingDraws: result.data?.remainingDraws || 0,
+              todayDraws: result.data?.todayDraws || 0
             }
           };
         }
 
-        // 싱글, 트리플은 기존대로 "draw_result" 타입 사용
         return {
           type: "draw_result",
           module: "fortune",
@@ -396,14 +382,13 @@ class FortuneModule extends BaseModule {
             ...result.data,
             userName: getUserName(user),
             fortuneType: this.config.fortuneTypes[fortuneType],
-            maxDrawsPerDay: this.config.maxDrawsPerDay, // 추가
-            remainingDraws: result.data?.remainingDraws || 0, // 확실히 전달
-            todayDraws: result.data?.todayDraws || 0 // 추가
+            maxDrawsPerDay: this.config.maxDrawsPerDay,
+            remainingDraws: result.data?.remainingDraws || 0,
+            todayDraws: result.data?.todayDraws || 0
           }
         };
       }
 
-      // 서비스 없을 때 기본 응답
       return {
         type: "error",
         module: "fortune",
@@ -432,15 +417,12 @@ class FortuneModule extends BaseModule {
     try {
       const userId = getUserId(callbackQuery.from);
       const userName = getUserName(callbackQuery.from);
-
       logger.info(`🔄 카드 셔플 요청: ${userName}`);
 
       let shuffleResult;
-
       if (this.fortuneService) {
         shuffleResult = await this.fortuneService.shuffleDeck(userId);
       } else {
-        // 서비스 없을 때 기본 동작
         shuffleResult = {
           success: true,
           message: "카드가 새롭게 섞였습니다! ✨",
@@ -448,7 +430,6 @@ class FortuneModule extends BaseModule {
         };
       }
 
-      // 애니메이션 효과
       await AnimationHelper.performShuffle(
         bot,
         callbackQuery.message.chat.id,
@@ -481,16 +462,13 @@ class FortuneModule extends BaseModule {
     try {
       const userId = getUserId(callbackQuery.from);
       const userName = getUserName(callbackQuery.from);
-
       logger.info(`📜 기록 조회: ${userName}`);
 
       let historyData;
-
       if (this.fortuneService) {
         const result = await this.fortuneService.getDrawHistory(userId, 10);
         historyData = result.success ? result.data : { records: [] };
       } else {
-        // 서비스 없을 때 더미 데이터
         historyData = {
           records: [
             {
@@ -531,11 +509,9 @@ class FortuneModule extends BaseModule {
     try {
       const userId = getUserId(callbackQuery.from);
       const userName = getUserName(callbackQuery.from);
-
       logger.info(`📊 통계 조회: ${userName}`);
 
       let statsData;
-
       if (this.fortuneService) {
         const result = await this.fortuneService.getUserStats(userId);
         statsData = result.success ? result.data : this.getDefaultStats();
@@ -562,17 +538,15 @@ class FortuneModule extends BaseModule {
     }
   }
 
-  // 헬퍼 메서드 추가
   async sendToRenderer(result, msg) {
     const renderer =
       this.moduleManager?.navigationHandler?.renderers?.get("fortune");
     if (renderer) {
-      // 일반 메시지에 대한 응답이므로 ctx를 새로 구성
       const ctx = {
         message: msg,
         reply: (text, options) =>
           this.bot.telegram.sendMessage(msg.chat.id, text, options),
-        answerCbQuery: () => Promise.resolve(true) // no-op for text messages
+        answerCbQuery: () => Promise.resolve(true)
       };
       await renderer.render(result, ctx);
     }
@@ -585,12 +559,9 @@ class FortuneModule extends BaseModule {
     try {
       const userId = getUserId(callbackQuery.from);
       const userName = getUserName(callbackQuery.from);
-
       logger.info(`📖 캘틱 크로스 상세 조회: ${userName}`);
 
-      // 캐시된 결과 확인
       const cachedResult = this.lastCelticResults.get(userId);
-
       if (!cachedResult || !cachedResult.cards) {
         return {
           type: "error",
@@ -602,7 +573,6 @@ class FortuneModule extends BaseModule {
         };
       }
 
-      // 상세 해석 생성
       const detailedInterpretation =
         this.generateDetailedCelticInterpretation(cachedResult);
 
@@ -629,18 +599,18 @@ class FortuneModule extends BaseModule {
   /**
    * 📊 오늘 뽑기 정보 조회
    */
-  async getTodayDrawInfo(userId) {
+  async getTodayDrawInfo(user) {
     try {
       if (this.fortuneService) {
-        const limitCheck = await this.fortuneService.checkDailyLimit(userId);
+        const limitCheck = await this.fortuneService.checkDailyLimit(
+          user,
+          this.config.maxDrawsPerDay
+        );
         return {
           todayCount: limitCheck.todayDraws || 0,
-          remainingDraws:
-            limitCheck.remainingDraws || this.config.maxDrawsPerDay
+          remainingDraws: limitCheck.remainingDraws
         };
       }
-
-      // 서비스 없을 때 기본값
       return {
         todayCount: 0,
         remainingDraws: this.config.maxDrawsPerDay
@@ -662,11 +632,7 @@ class FortuneModule extends BaseModule {
       totalDraws: 0,
       favoriteCard: null,
       favoriteCardCount: 0,
-      typeStats: {
-        single: 0,
-        triple: 0,
-        celtic: 0
-      },
+      typeStats: { single: 0, triple: 0, celtic: 0 },
       todayDraws: 0,
       weeklyDraws: 0,
       isDemo: true
@@ -677,38 +643,25 @@ class FortuneModule extends BaseModule {
    * 📖 캘틱 크로스 상세 해석 생성
    */
   generateDetailedCelticInterpretation(celticResult) {
-    const interpretation = {
-      sections: []
-    };
-
-    // 핵심 상황 분석 (1-2번 카드)
+    const interpretation = { sections: [] };
     interpretation.sections.push({
       title: "🎯 핵심 상황 분석",
       content: this.interpretCelticCore(celticResult.cards.slice(0, 2))
     });
-
-    // 시간의 흐름 (3-6번 카드)
     interpretation.sections.push({
       title: "⏰ 시간의 흐름",
       content: this.interpretCelticTimeline(celticResult.cards.slice(2, 6))
     });
-
-    // 내외부 영향 (7-9번 카드)
     interpretation.sections.push({
       title: "🌐 내외부 영향",
       content: this.interpretCelticInfluences(celticResult.cards.slice(6, 9))
     });
-
-    // 최종 결과 (10번 카드)
     interpretation.sections.push({
       title: "🎊 최종 전망",
       content: this.interpretCelticOutcome(celticResult.cards[9])
     });
-
-    // 종합 메시지
     interpretation.overallMessage =
       this.generateCelticOverallMessage(celticResult);
-
     return interpretation;
   }
 
@@ -718,16 +671,12 @@ class FortuneModule extends BaseModule {
   cleanupStates() {
     const now = Date.now();
     const timeout = this.config.questionTimeout;
-
-    // 오래된 질문 대기 상태 제거
     for (const [userId, state] of this.userStates.entries()) {
       if (now - state.timestamp > timeout) {
         this.userStates.delete(userId);
         logger.debug(`⏱️ 질문 대기 타임아웃: ${userId}`);
       }
     }
-
-    // 오래된 캘틱 결과 캐시 제거 (1시간)
     for (const [userId, result] of this.lastCelticResults.entries()) {
       if (now - result.timestamp > 3600000) {
         this.lastCelticResults.delete(userId);
@@ -741,48 +690,38 @@ class FortuneModule extends BaseModule {
   interpretCelticCore(cards) {
     const present = cards[0];
     const challenge = cards[1];
-
     let interpretation = `현재 상황은 **${present.korean}**`;
     if (present.isReversed) interpretation += " (역방향)";
     interpretation += "가 나타내고 있습니다. ";
-
     interpretation += `이를 가로막는 도전은 **${challenge.korean}**`;
     if (challenge.isReversed) interpretation += " (역방향)";
     interpretation += "입니다.\n\n";
-
     interpretation +=
       "두 카드의 관계는 현재 직면한 상황과 극복해야 할 과제를 명확히 보여줍니다.";
-
     return interpretation;
   }
 
   interpretCelticTimeline(cards) {
     const positions = ["원인/과거", "최근 과거", "가능한 미래", "가까운 미래"];
     let interpretation = "";
-
     cards.forEach((card, index) => {
       interpretation += `**${positions[index]}**: ${card.emoji} ${card.korean}`;
       if (card.isReversed) interpretation += " (역)";
       interpretation += "\n";
     });
-
     interpretation += "\n과거에서 미래로 이어지는 명확한 흐름이 보입니다.";
-
     return interpretation;
   }
 
   interpretCelticInfluences(cards) {
     const positions = ["당신의 접근", "외부 환경", "희망과 두려움"];
     let interpretation = "";
-
     cards.forEach((card, index) => {
       interpretation += `**${positions[index]}**: ${card.emoji} ${card.korean}`;
       if (card.isReversed) interpretation += " (역)";
       interpretation += "\n";
     });
-
     interpretation += "\n내면과 외부의 영향이 조화를 이루고 있습니다.";
-
     return interpretation;
   }
 
@@ -790,48 +729,37 @@ class FortuneModule extends BaseModule {
     let interpretation = `최종 결과는 **${card.emoji} ${card.korean}**`;
     if (card.isReversed) interpretation += " (역방향)";
     interpretation += "입니다.\n\n";
-
     if (card.arcana === "major") {
       interpretation +=
         "메이저 아르카나가 결과로 나왔으므로, 매우 중요한 의미를 갖습니다. ";
     }
-
     interpretation +=
       "모든 요소를 고려할 때, 이는 당신의 여정이 도달할 지점을 보여줍니다.";
-
     return interpretation;
   }
 
   generateCelticOverallMessage(result) {
     const majorCount = result.cards.filter((c) => c.arcana === "major").length;
     const reversedCount = result.cards.filter((c) => c.isReversed).length;
-
     let message = "";
-
     if (majorCount >= 5) {
       message += "매우 중요한 인생의 전환점에 있습니다. ";
     }
-
     if (reversedCount >= 5) {
       message +=
         "많은 에너지가 내면으로 향하고 있습니다. 성찰이 필요한 시기입니다. ";
     }
-
     if (result.question) {
       message += `"${result.question}"에 대한 답은 카드들이 보여주는 여정 속에 있습니다.`;
     } else {
       message += "카드들이 보여주는 메시지를 깊이 성찰해보세요.";
     }
-
     return message;
   }
 
-  // 개발자 1일 제한 제어 메서드
   async resetDailyLimit(bot, callbackQuery, subAction, params, moduleManager) {
     try {
       const user = callbackQuery.from;
-
-      // 개발자만 사용 가능
       if (!isDeveloper(user)) {
         return {
           type: "error",
@@ -839,26 +767,15 @@ class FortuneModule extends BaseModule {
           data: { message: "개발자만 사용 가능한 기능입니다." }
         };
       }
-
-      // FortuneService에서 오늘 기록 삭제
       if (this.fortuneService && this.fortuneService.Fortune) {
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
         await this.fortuneService.Fortune.updateOne(
           { userId: user.id },
-          {
-            $pull: {
-              draws: {
-                timestamp: { $gte: today }
-              }
-            }
-          }
+          { $pull: { draws: { timestamp: { $gte: today } } } }
         );
-
         logger.info(`🔄 ${getUserName(user)}의 일일 제한 리셋됨`);
       }
-
       return await this.showMenu(
         bot,
         callbackQuery,
