@@ -5,7 +5,7 @@ const logger = require("../utils/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 const { isDeveloper, getUserId, getUserName } = require("../utils/UserHelper");
 
-// 🎴 타로 데이터 불러오기
+// 🎴 타로 데이터 및 헬퍼 불러오기
 const {
   FULL_TAROT_DECK,
   CELTIC_CROSS_POSITIONS,
@@ -20,31 +20,19 @@ const {
   InterpretationHelpers
 } = require("../data/FortuneInterpretations");
 
-// ✅ 추가: 새로운 한국어 조사 헬퍼
 const KoreanPostpositionHelper = require("../utils/KoreanPostpositionHelper");
 
-/**
- * 🔮 FortuneService - 타로 카드 운세 서비스
- * 완전한 78장 타로 덱과 전문적인 해석을 제공합니다
- */
 class FortuneService extends BaseService {
   constructor(options = {}) {
     super("FortuneService", options);
-
     this.tarotDeck = [...FULL_TAROT_DECK];
     this.celticPositions = CELTIC_CROSS_POSITIONS;
-
     this.config = {
       maxDrawsPerDay: 5,
       maxHistoryRecords: 100,
       specialDrawHours: [0, 12]
     };
-
-    this.stats = {
-      totalDraws: 0,
-      cardFrequency: {},
-      popularTypes: {}
-    };
+    this.stats = { totalDraws: 0, cardFrequency: {}, popularTypes: {} };
   }
 
   getRequiredModels() {
@@ -53,19 +41,9 @@ class FortuneService extends BaseService {
 
   async onInitialize() {
     try {
-      logger.info("🔮 FortuneService 초기화 시작...");
       this.Fortune = this.models?.Fortune;
-
-      if (!this.Fortune) {
-        logger.warn("Fortune 모델 없음 - 제한된 기능으로 동작");
-      } else {
-        logger.success("✅ Fortune 모델 로드 성공");
-        await this.createIndexes();
-      }
-
-      logger.info(`🎴 타로 덱 초기화 완료: ${this.tarotDeck.length}장`);
+      if (this.Fortune) await this.createIndexes();
       logger.success("✅ FortuneService 초기화 완료");
-      return { success: true };
     } catch (error) {
       logger.error("FortuneService 초기화 실패:", error);
       throw error;
@@ -73,160 +51,73 @@ class FortuneService extends BaseService {
   }
 
   async createIndexes() {
-    try {
-      if (!this.Fortune || !this.Fortune.collection) {
-        logger.warn("Fortune 모델 또는 collection이 없어 인덱스 생성 스킵");
-        return;
-      }
-      await this.Fortune.collection.createIndex({ userId: 1, createdAt: -1 });
-      await this.Fortune.collection.createIndex({ "draws.timestamp": -1 });
-      await this.Fortune.collection.createIndex({ "stats.totalDraws": -1 });
-      logger.success("📑 Fortune 인덱스 생성 완료");
-    } catch (error) {
-      logger.warn("인덱스 생성 실패:", error.message);
-    }
+    if (!this.Fortune?.collection) return;
+    await this.Fortune.collection.createIndex({ userId: 1, createdAt: -1 });
+    await this.Fortune.collection.createIndex({ "draws.timestamp": -1 });
   }
 
-  /**
-   * 🎴 카드 뽑기 (메인 메서드)
-   */
   async drawCard(user, options = {}) {
-    try {
-      const { type = "single", question = null } = options;
-      const _drawTime = new Date();
-      const userId = getUserId(user);
-
-      const limitCheck = await this.checkDailyLimit(
-        user,
-        this.config.maxDrawsPerDay
-      );
-      if (!limitCheck.allowed) {
-        return {
-          success: false,
-          message: limitCheck.message,
-          data: { remainingDraws: 0, todayDraws: limitCheck.todayCount }
-        };
-      }
-
-      const drawResult = this.performCardDraw(type, question);
-      const interpretation = await this.generateInterpretation(
-        drawResult.cards,
-        type,
-        question,
-        user
-      );
-
-      if (this.Fortune) {
-        await this.saveDrawRecord(userId, { ...drawResult, interpretation });
-      }
-
-      this.updateStats(type, drawResult.cards);
-      const bossMessage = this.generateBossMessage(type, drawResult, userId);
-
-      // 뽑은 후의 횟수를 다시 한번 체크
-      const newLimitCheck = await this.checkDailyLimit(
-        user,
-        this.config.maxDrawsPerDay
-      );
-
-      return {
-        success: true,
-        message: bossMessage,
-        data: {
-          ...drawResult,
-          interpretation,
-          remainingDraws: newLimitCheck.remainingDraws,
-          todayDraws: newLimitCheck.todayCount,
-          isSpecialTime: this.isSpecialDrawTime(new Date())
-        }
-      };
-    } catch (error) {
-      logger.error("카드 뽑기 실패:", error);
+    const { type = "single", question = null } = options;
+    const limitCheck = await this.checkDailyLimit(
+      user,
+      this.config.maxDrawsPerDay
+    );
+    if (!limitCheck.allowed)
       return {
         success: false,
-        message: "카드 뽑기 중 오류가 발생했습니다.",
-        data: { error: error.message }
+        message: limitCheck.message,
+        data: { ...limitCheck }
       };
-    }
+
+    const drawResult = this.performCardDraw(type, question);
+    const interpretation = await this.generateInterpretation(
+      drawResult.cards,
+      type,
+      question,
+      user
+    );
+
+    if (this.Fortune)
+      await this.saveDrawRecord(getUserId(user), {
+        ...drawResult,
+        interpretation
+      });
+
+    this.updateStats(type, drawResult.cards);
+    const bossMessage = this.generateBossMessage(
+      type,
+      drawResult,
+      getUserId(user)
+    );
+    const newLimitCheck = await this.checkDailyLimit(
+      user,
+      this.config.maxDrawsPerDay
+    );
+
+    return {
+      success: true,
+      message: bossMessage,
+      data: { ...drawResult, interpretation, ...newLimitCheck }
+    };
   }
 
-  /**
-   * 📊 일일 제한 확인 (undefined 오류 수정)
-   */
-  async checkDailyLimit(user, maxDrawsPerDay) {
-    const userId = getUserId(user);
-    const today = TimeHelper.getKSTDate();
-    const startOfDay = new Date(today);
-    startOfDay.setHours(0, 0, 0, 0);
-    const maxDraws = maxDrawsPerDay || this.config.maxDrawsPerDay;
-
-    try {
-      // DB 조회를 한 번만 하도록 로직 개선
-      const userDoc = this.Fortune
-        ? await this.Fortune.findOne({ userId })
-        : null;
-      const todayCount = userDoc
-        ? userDoc.draws.filter((draw) => new Date(draw.timestamp) >= startOfDay)
-            .length
-        : 0;
-
-      if (isDeveloper(user)) {
-        return {
-          allowed: true,
-          isDeveloper: true,
-          message: "개발자 모드: 횟수 제한 없음",
-          remainingDraws: Infinity,
-          todayCount: todayCount // 개발자도 뽑은 횟수는 카운트
-        };
-      }
-
-      const remainingDraws = Math.max(0, maxDraws - todayCount);
-
-      if (remainingDraws <= 0) {
-        return {
-          allowed: false,
-          message: `오늘의 운세 횟수를 모두 사용했습니다. (${todayCount}/${maxDraws})`,
-          remainingDraws: 0,
-          todayCount
-        };
-      }
-
-      return {
-        allowed: true,
-        isDeveloper: false,
-        remainingDraws,
-        todayCount,
-        message: `오늘 ${remainingDraws}번 더 뽑을 수 있습니다.`
-      };
-    } catch (error) {
-      logger.error("일일 제한 확인 실패:", error);
-      return {
-        allowed: true,
-        remainingDraws: 1, // 에러 시 최소 1번은 허용
-        todayCount: 0,
-        message: "제한 확인 중 오류가 발생했지만 계속 진행합니다."
-      };
-    }
-  }
-
-  // ... 이하 다른 함수들은 이전과 동일합니다 ...
   performCardDraw(type, question) {
-    const result = { type, question, timestamp: new Date(), cards: [] };
-    const availableDeck = this.createShuffledDeck();
+    const deck = this.createShuffledDeck();
+    let cards = [];
     switch (type) {
       case "single":
-        result.cards = [this.drawSingleCardFromDeck(availableDeck)];
+        cards = [this.drawSingleCardFromDeck(deck)];
         break;
       case "triple":
-        result.cards = this.drawTripleCards(availableDeck);
+        cards = this.drawTripleCards(deck);
         break;
       case "celtic":
-        result.cards = this.drawCelticCross(availableDeck);
+        cards = this.drawCelticCross(deck);
         break;
       default:
-        result.cards = [this.drawSingleCardFromDeck(availableDeck)];
+        cards = [this.drawSingleCardFromDeck(deck)];
     }
-    return result;
+    return { type, question, timestamp: new Date(), cards };
   }
 
   createShuffledDeck() {
@@ -240,32 +131,23 @@ class FortuneService extends BaseService {
 
   drawSingleCardFromDeck(deck) {
     if (deck.length === 0) throw new Error("덱에 카드가 없습니다");
-    const randomIndex = Math.floor(Math.random() * deck.length);
-    const [selectedCard] = deck.splice(randomIndex, 1);
-    return {
-      ...selectedCard,
-      isReversed: this.shouldBeReversed(selectedCard),
-      drawnAt: new Date()
-    };
+    const card = deck.splice(Math.floor(Math.random() * deck.length), 1)[0];
+    return { ...card, isReversed: this.shouldBeReversed(card) };
   }
 
   drawTripleCards(deck) {
-    const positions = ["past", "present", "future"];
-    return positions.map((position) => ({
+    return ["past", "present", "future"].map((pos) => ({
       ...this.drawSingleCardFromDeck(deck),
-      position,
-      positionName: this.getPositionName(position)
+      position: pos,
+      positionName: this.getPositionName(pos)
     }));
   }
 
   drawCelticCross(deck) {
-    return this.celticPositions.map((positionInfo, index) => ({
+    return CELTIC_CROSS_POSITIONS.map((pos, i) => ({
       ...this.drawSingleCardFromDeck(deck),
-      position: positionInfo.key,
-      positionName: positionInfo.name,
-      positionDescription: positionInfo.description,
-      area: positionInfo.area,
-      order: index + 1
+      ...pos,
+      order: i + 1
     }));
   }
 
@@ -378,14 +260,14 @@ class FortuneService extends BaseService {
 
   generatePersonalizedAdvice(cards, analysis, category, user) {
     const userName = getUserName(user);
-    const _kph = KoreanPostpositionHelper;
-    let advice = `${userName}님,\n\n`;
+    const kph = KoreanPostpositionHelper;
+    let advice = `${kph.a(userName, "님을")} 위한 조언:\n\n`;
     if (cards.length === 1) {
       const card = cards[0];
       const cardAdvice =
         card.advice ||
         (card.isReversed ? card.meaning.reversed : card.meaning.upright);
-      advice += `🔮✨ ${cardAdvice}\n\n`;
+      advice += `> 🔮 ${cardAdvice}\n\n`;
     }
     if (cards.length > 1) {
       if (analysis.majorCount > cards.length / 2)
@@ -449,13 +331,51 @@ class FortuneService extends BaseService {
     return specificAdvice[Math.floor(Math.random() * specificAdvice.length)];
   }
 
+  async checkDailyLimit(user, maxDrawsPerDay) {
+    const userId = getUserId(user);
+    const today = TimeHelper.getKSTDate();
+    const startOfDay = new Date(today);
+    startOfDay.setHours(0, 0, 0, 0);
+    const maxDraws = maxDrawsPerDay || this.config.maxDrawsPerDay;
+    try {
+      const userDoc = this.Fortune
+        ? await this.Fortune.findOne({ userId })
+        : null;
+      const todayCount = userDoc
+        ? userDoc.draws.filter((draw) => new Date(draw.timestamp) >= startOfDay)
+            .length
+        : 0;
+      if (isDeveloper(user)) {
+        return {
+          allowed: true,
+          isDeveloper: true,
+          remainingDraws: Infinity,
+          todayCount
+        };
+      }
+      const remainingDraws = Math.max(0, maxDraws - todayCount);
+      if (remainingDraws <= 0) {
+        return {
+          allowed: false,
+          message: `오늘의 운세 횟수를 모두 사용했습니다. (${todayCount}/${maxDraws})`,
+          remainingDraws: 0,
+          todayCount
+        };
+      }
+      return { allowed: true, isDeveloper: false, remainingDraws, todayCount };
+    } catch (error) {
+      logger.error("일일 제한 확인 실패:", error);
+      return { allowed: true, remainingDraws: 1, todayCount: 0 };
+    }
+  }
+
   async saveDrawRecord(userId, drawData) {
     try {
       if (!this.Fortune) return;
       const record = {
         ...drawData,
         cards: drawData.cards.map(({ drawnAt, ...rest }) => rest)
-      }; // drawnAt 필드 제외
+      };
       await this.Fortune.findOneAndUpdate(
         { userId },
         {
@@ -521,17 +441,63 @@ class FortuneService extends BaseService {
     };
   }
 
-  async getDrawHistory(userId, limit = 10) {
-    if (!this.Fortune) return { success: true, data: { records: [] } };
-    const user = await this.Fortune.findOne({ userId });
-    if (!user || user.draws.length === 0)
-      return { success: true, data: { records: [] } };
-    const records = user.draws.slice(0, limit).map((draw) => ({
-      ...draw,
-      date: TimeHelper.format(draw.timestamp, "relative"),
-      cardName: draw.cards[0]?.korean
-    }));
-    return { success: true, data: { records, total: user.draws.length } };
+  /**
+   * 📜 사용자 기록 조회 (핵심 카드 정보 추가)
+   */
+  async getDrawHistory(userId, limit = 5) {
+    try {
+      if (!this.Fortune) {
+        return { success: true, data: { records: [], total: 0 } };
+      }
+      const user = await this.Fortune.findOne({ userId });
+      if (!user || !user.draws || user.draws.length === 0) {
+        return { success: true, data: { records: [], total: 0 } };
+      }
+
+      const records = user.draws.slice(0, limit).map((draw) => {
+        // 각 카드의 의미를 해석 (문자열로 변환)
+        const interpretedCards = draw.cards.map((card) =>
+          this.interpretSingleCard(
+            card,
+            draw.interpretation?.category || "general"
+          )
+        );
+
+        // 핵심 카드 찾기 로직
+        let keyCard = null;
+        if (draw.type === "single") {
+          keyCard = interpretedCards[0];
+        } else if (draw.type === "triple") {
+          keyCard = interpretedCards[2]; // 미래 카드
+        } else if (draw.type === "celtic") {
+          keyCard =
+            interpretedCards.find((c) => c.arcana === "major") ||
+            interpretedCards[9]; // 메이저 또는 결과 카드
+        }
+
+        return {
+          date: TimeHelper.format(draw.timestamp, "relative"),
+          type: draw.type,
+          keyCard: keyCard
+            ? {
+                name: keyCard.korean,
+                emoji: keyCard.emoji || "🎴",
+                isReversed: keyCard.isReversed,
+                meaning: keyCard.meaning,
+                keywords: keyCard.keywords || []
+              }
+            : null
+        };
+      });
+
+      return { success: true, data: { records, total: user.draws.length } };
+    } catch (error) {
+      logger.error("기록 조회 실패:", error);
+      return {
+        success: false,
+        message: "기록을 불러오는 중 오류가 발생했습니다."
+      };
+    }
   }
 
   async getUserStats(userId) {
@@ -539,7 +505,7 @@ class FortuneService extends BaseService {
       return { success: true, data: this.generateDummyStats() };
     const user = await this.Fortune.findOne({ userId });
     if (!user) return { success: true, data: this.generateDummyStats() };
-    const stats = user.stats.toObject();
+    const stats = user.stats ? user.stats.toObject() : {};
     return {
       success: true,
       data: {
@@ -606,7 +572,6 @@ class FortuneService extends BaseService {
   }
 
   createCelticStory(cards, question) {
-    const _kph = KoreanPostpositionHelper;
     const templateFn = CELTIC_CROSS_INTERPRETATIONS.story_templates[0].template;
     const cardData = cards.reduce((acc, card) => {
       acc[card.position] = card.korean;

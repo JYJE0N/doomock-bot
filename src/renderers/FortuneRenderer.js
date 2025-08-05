@@ -354,34 +354,48 @@ class FortuneRenderer extends BaseRenderer {
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
+  /**
+   * 📋 기록 렌더링 (핵심 카드 UI 적용)
+   */
   async renderHistory(data, ctx) {
-    const { userName, records = [], total = 0, message } = data;
-    let text = `📋 *${userName}님의 타로 뽑기 기록* (${total}건)\n\n`;
+    const { userName, records = [], total = 0 } = data;
+
+    let text = `📋 *${userName}님의 타로 기록*\n\n`;
+
     if (records.length === 0) {
-      text += message || `아직 뽑은 기록이 없습니다.\n\n`;
+      text += `아직 뽑은 기록이 없습니다.\n\n`;
       text += `첫 번째 운세를 뽑아보세요! 🔮`;
     } else {
-      records.slice(0, 10).forEach((record, index) => {
-        const cardName =
-          record.koreanName ||
-          record.cardName ||
-          record.card?.korean ||
-          "알 수 없음";
-        const recordDate = record.date || "날짜 불명";
-        const fortuneType = this.getFortuneTypeName(
-          record.drawType || record.type
-        );
-        text += `${index + 1}. ${recordDate}\n`;
-        text += `   ${fortuneType} - ${cardName}\n`;
-        if (record.doomockComment) {
-          text += `   💬 ${record.doomockComment}\n`;
+      // 새로운 '핵심 카드' 섹션
+      text += `**✨ ${userName}님의 핵심 카드 기록** (최근 ${records.length}건)\n\n`;
+
+      records.forEach((record, index) => {
+        const { keyCard, date } = record;
+
+        if (keyCard) {
+          const cardName = `${keyCard.emoji} *${keyCard.name}*${keyCard.isReversed ? " (역)" : ""}`;
+
+          text += `${index + 1}. ${cardName} - ${date}\n`;
+
+          // 의미와 키워드를 안전하게 자르기
+          const simpleMeaning = keyCard.meaning
+            ? keyCard.meaning.substring(0, 40)
+            : "해석 없음";
+          const keywords =
+            keyCard.keywords && keyCard.keywords.length > 0
+              ? keyCard.keywords.slice(0, 2).join(", ")
+              : "핵심 없음";
+
+          text += `   └ _"${simpleMeaning}..."_\n`;
+          text += `   └ 키워드: ${keywords}\n\n`;
         }
-        text += `\n`;
       });
-      if (records.length > 10) {
-        text += `... 그 외 ${records.length - 10}건의 기록\n\n`;
+
+      if (total > records.length) {
+        text += `... 그 외 ${total - records.length}건의 기록이 있습니다.`;
       }
     }
+
     const buttons = [
       [
         { text: "🎴 운세 뽑기", action: "draw" },
@@ -389,6 +403,7 @@ class FortuneRenderer extends BaseRenderer {
       ],
       [{ text: "🔙 메뉴", action: "menu" }]
     ];
+
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }

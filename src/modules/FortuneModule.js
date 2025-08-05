@@ -221,20 +221,42 @@ class FortuneModule extends BaseModule {
     };
   }
 
-  async showHistory(bot, callbackQuery) {
-    const userId = getUserId(callbackQuery.from);
-    const result = this.fortuneService
-      ? await this.fortuneService.getDrawHistory(userId, 10)
-      : { success: true, data: { records: [] } };
-    return {
-      type: "history",
-      module: "fortune",
-      data: {
-        userName: getUserName(callbackQuery.from),
-        ...result.data,
-        isEmpty: result.data.records.length === 0
+  /**
+   * 📜 기록 조회
+   */
+  async showHistory(bot, callbackQuery, subAction, params, moduleManager) {
+    try {
+      const userId = getUserId(callbackQuery.from);
+      const userName = getUserName(callbackQuery.from);
+      logger.info(`📜 기록 조회: ${userName}`);
+
+      let historyData;
+
+      if (this.fortuneService) {
+        // ✅ 수정: 기록 요청 개수를 5개로 변경
+        const result = await this.fortuneService.getDrawHistory(userId, 5);
+        historyData = result.success ? result.data : { records: [] };
+      } else {
+        historyData = { records: [], message: "최근 1개의 기록 (데모)" };
       }
-    };
+
+      return {
+        type: "history",
+        module: "fortune",
+        data: {
+          userName,
+          ...historyData,
+          isEmpty: historyData.records.length === 0
+        }
+      };
+    } catch (error) {
+      logger.error("기록 조회 오류:", error);
+      return {
+        type: "error",
+        module: "fortune",
+        data: { message: "기록을 불러오는 중 오류가 발생했습니다." }
+      };
+    }
   }
 
   async showStats(bot, callbackQuery) {
