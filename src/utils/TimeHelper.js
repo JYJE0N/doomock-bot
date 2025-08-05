@@ -18,7 +18,12 @@ class TimeHelper {
     date: "YYYY-MM-DD",
     time: "HH:mm:ss",
     short: "MM-DD HH:mm",
-    log: "YYYY-MM-DD HH:mm:ss",
+
+    time12: "h:mm:ss A", // ✅ 추가: 12시간 형식 (초 포함)
+    time12Short: "h:mm A", // ✅ 추가: 12시간 형식 (초 제외)
+    logAMPM: "YYYY-MM-DD h:mm:ss A", // ✅ 추가: 로그용 AM/PM
+    displayAMPM: "MM/DD (ddd) h:mm A", // ✅ 추가: 표시용 AM/PM
+
     display: "MM월 DD일 (ddd) HH:mm",
     korean: "YYYY년 MM월 DD일",
     timestamp: "YYMMDDHHmm",

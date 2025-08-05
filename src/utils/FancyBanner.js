@@ -1,6 +1,7 @@
 // src/utils/FancyBanner.js - 화려한 DooMock 배너 시스템
 const chalk = require("chalk");
 const figlet = require("figlet");
+const TimeHelper = require("./TimeHelper");
 
 /**
  * 🎨 FancyBanner - 터미널에 화려한 배너 표시
@@ -59,14 +60,14 @@ class FancyBanner {
 
     // 메인 타이틀 - 더 크고 선명하게
     await this.printFigletText("DOOMOCK", {
-      font: "Starwars", // Big 폰트가 더 선명함
+      font: "Epic", // Big 폰트가 더 선명함
       style: "neonRainbow" // 새로운 네온 레인보우 스타일
     });
 
     console.log(""); // 여백
 
     // 서브 타이틀 - 박스 안에
-    this.printBoxedText("Business Assistant Bot", "gradient");
+    this.printBoxedText("Business Assistant Bot", "rainbow");
 
     // 버전 정보 - 강조
     this.printCenteredText(`Version ${version}`, 60, "highlight");
@@ -264,16 +265,26 @@ class FancyBanner {
   /**
    * 🎯 박스 안에 텍스트
    */
+  /**
+   * 🎯 박스 안에 텍스트 (박스 자체를 가운데 정렬)
+   */
   printBoxedText(text, style = "normal") {
     const padding = 4;
     const boxWidth = text.length + padding * 2 + 2;
 
+    // 터미널 전체 너비 (보통 80 정도로 가정)
+    const terminalWidth = 60;
+
+    // 박스를 가운데 정렬하기 위한 왼쪽 여백 계산
+    const leftMargin = Math.floor((terminalWidth - boxWidth) / 2);
+    const marginStr = " ".repeat(Math.max(0, leftMargin));
+
     // 상단 테두리
-    console.log(chalk.white("╔" + "═".repeat(boxWidth - 2) + "╗"));
+    console.log(marginStr + chalk.white("╔" + "═".repeat(boxWidth - 2) + "╗"));
 
     // 텍스트 라인
     const paddedText = " ".repeat(padding) + text + " ".repeat(padding);
-    const textLine = "║" + paddedText + "║";
+    const textLine = marginStr + "║" + paddedText + "║";
 
     switch (style) {
       case "gradient":
@@ -287,7 +298,7 @@ class FancyBanner {
     }
 
     // 하단 테두리
-    console.log(chalk.white("╚" + "═".repeat(boxWidth - 2) + "╝"));
+    console.log(marginStr + chalk.white("╚" + "═".repeat(boxWidth - 2) + "╝"));
   }
 
   /**
@@ -367,7 +378,8 @@ class FancyBanner {
       {
         icon: "🕐",
         label: "Started",
-        value: new Date().toLocaleString("ko-KR")
+        // value: TimeHelper.now().format("HH:mm:ss")
+        value: TimeHelper.format(undefined, "time12")
       },
       {
         icon: "💾",
