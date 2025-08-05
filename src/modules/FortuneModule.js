@@ -153,7 +153,7 @@ class FortuneModule extends BaseModule {
       }
 
       // 상태는 유지 (사용자가 다시 입력할 수 있도록)
-      return true;
+      return true; // boolean true는 "처리됨"을 의미
     }
 
     // 🔥 질문 길이 체크
@@ -271,41 +271,8 @@ class FortuneModule extends BaseModule {
       cardsCount: drawResult.data?.cards?.length
     });
 
-    // 결과 렌더링
-    const renderer =
-      this.moduleManager?.navigationHandler?.renderers?.get("fortune");
-    if (renderer && state.promptMessageId) {
-      const ctx = {
-        message: {
-          chat: msg.chat,
-          message_id: state.promptMessageId,
-          from: msg.from // from 정보 추가
-        },
-        from: msg.from, // from 정보 추가
-        update: { message: msg }, // update 정보 추가
-        editMessageText: async (text, extra) => {
-          return await bot.telegram.editMessageText(
-            msg.chat.id,
-            state.promptMessageId,
-            null,
-            text,
-            extra
-          );
-        },
-        answerCbQuery: () => Promise.resolve(true) // 더미 함수 추가
-      };
-
-      logger.debug("🎨 렌더러로 결과 전송 시작");
-      await renderer.render(drawResult, ctx);
-      logger.success("✅ 켈틱 크로스 결과 렌더링 완료");
-    } else {
-      logger.error("❌ 렌더러를 찾을 수 없거나 메시지 ID가 없음:", {
-        hasRenderer: !!renderer,
-        hasMessageId: !!state.promptMessageId
-      });
-    }
-
-    return true;
+    // 🔥 중요: 결과 객체 반환 (NavigationHandler가 렌더러를 찾아서 처리)
+    return drawResult;
   }
 
   // 에러 메시지 전송 헬퍼 메서드
