@@ -4,7 +4,7 @@
   "description": "두목봇 - 직장인을 위한 텔레그램 어시스턴트",
   "main": "doomock_bot.js",
   "scripts": {
-    "start": "cross-env NODE_ENV=development node doomock_bot.js",
+    "start": "node doomock_bot.js",
     "dev": "cross-env NODE_ENV=development node doomock_bot.js",
     "staging": "NODE_ENV=staging node doomock_bot.js",
     "prod": "NODE_ENV=production node doomock_bot.js",
