@@ -109,6 +109,7 @@ class FortuneRenderer extends BaseRenderer {
       fortuneType,
       interpretation,
       remainingDraws,
+      todayCount,
       todayDraws,
       message
     } = data;
@@ -126,26 +127,34 @@ class FortuneRenderer extends BaseRenderer {
           const position =
             card.position || positions[index] || `${index + 1}번째`;
           text += `*${position}*: ${card.emoji || "🎴"} ${card.korean || card.name}\n`;
+
           if (card.isReversed) {
             text += `🔄 역방향 - `;
           }
+
           text += `${interpretation.cards[index]?.meaning || "해석을 불러오는 중..."}\n\n`;
         });
+
         text += `🎯 *종합 해석*\n${interpretation.overall || "종합적인 흐름을 파악해보세요."}\n\n`;
       }
     } else if (drawType === "single" && cards && cards.length === 1) {
       const card = cards[0];
+
       text += `🎴 *뽑힌 카드*\n`;
       text += `${card.emoji || "🎴"} *${card.korean || card.name}*\n`;
+
       if (card.name && card.korean !== card.name) {
         text += `(${card.name})\n`;
       }
+
       text += `\n`;
+
       if (card.isReversed) {
         text += `🔄 *역방향 카드*\n평소와는 다른 관점에서 해석해보세요.\n\n`;
       } else {
         text += `⬆️ *정방향 카드*\n카드의 기본 의미가 그대로 적용됩니다.\n\n`;
       }
+
       text += `💫 *의미*: ${interpretation.cards[0]?.meaning || "카드의 기본 의미가 그대로 적용됩니다."}\n\n`;
     }
 
@@ -158,8 +167,16 @@ class FortuneRenderer extends BaseRenderer {
       text += `💡 *조언*: ${finalAdvice}\n\n`;
     }
 
-    const remainingCount = remainingDraws ?? "?";
-    text += `🔔 *남은 횟수*: ${remainingCount}번 (오늘 ${todayDraws}번 뽑음)`;
+    // 남은 횟수 표시 부분 수정
+    const actualTodayCount = todayCount ?? todayDraws ?? "?";
+    const remainingText =
+      remainingDraws === Infinity
+        ? "무제한"
+        : remainingDraws !== null && remainingDraws !== undefined
+          ? `${remainingDraws}번`
+          : "?번";
+
+    text += `🔔 *남은 횟수*: ${remainingText} (오늘 ${actualTodayCount}번 뽑음)`;
 
     const buttons = [
       [
