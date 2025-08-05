@@ -38,16 +38,16 @@ class FortuneModule extends BaseModule {
   }
 
   setupActions() {
-    this.registerActions({
-      menu: this.showMenu,
-      draw: this.drawCard,
-      stats: this.showStats,
-      history: this.showHistory,
-      shuffle: this.shuffleCards,
-      cancelQuestion: this.cancelQuestion,
-      celtic_detail: this.showCelticDetail,
-      reset: this.resetDailyLimit
-    });
+    this.actionMap = {
+      menu: this.showMenu.bind(this),
+      draw: this.drawCard.bind(this),
+      stats: this.showStats.bind(this),
+      history: this.showHistory.bind(this),
+      shuffle: this.shuffleCards.bind(this),
+      cancelQuestion: this.cancelQuestion.bind(this),
+      celtic_detail: this.showCelticDetail.bind(this),
+      reset: this.resetDailyLimit.bind(this)
+    };
   }
 
   async onHandleMessage(bot, msg) {
