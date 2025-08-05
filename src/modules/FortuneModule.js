@@ -265,12 +265,24 @@ class FortuneModule extends BaseModule {
       question
     );
 
+    logger.debug("🎴 카드 뽑기 결과:", {
+      resultType: drawResult.type,
+      hasData: !!drawResult.data,
+      cardsCount: drawResult.data?.cards?.length
+    });
+
     // 결과 렌더링
     const renderer =
       this.moduleManager?.navigationHandler?.renderers?.get("fortune");
     if (renderer && state.promptMessageId) {
       const ctx = {
-        message: { chat: msg.chat, message_id: state.promptMessageId },
+        message: {
+          chat: msg.chat,
+          message_id: state.promptMessageId,
+          from: msg.from // from 정보 추가
+        },
+        from: msg.from, // from 정보 추가
+        update: { message: msg }, // update 정보 추가
         editMessageText: async (text, extra) => {
           return await bot.telegram.editMessageText(
             msg.chat.id,
@@ -279,10 +291,18 @@ class FortuneModule extends BaseModule {
             text,
             extra
           );
-        }
+        },
+        answerCbQuery: () => Promise.resolve(true) // 더미 함수 추가
       };
 
+      logger.debug("🎨 렌더러로 결과 전송 시작");
       await renderer.render(drawResult, ctx);
+      logger.success("✅ 켈틱 크로스 결과 렌더링 완료");
+    } else {
+      logger.error("❌ 렌더러를 찾을 수 없거나 메시지 ID가 없음:", {
+        hasRenderer: !!renderer,
+        hasMessageId: !!state.promptMessageId
+      });
     }
 
     return true;
@@ -383,6 +403,28 @@ class FortuneModule extends BaseModule {
   async askQuestion(bot, callbackQuery, subAction, params) {
     const userId = getUserId(callbackQuery.from);
 
+    logger.debug("🎯 askQuestion 호출:", {
+      userId,
+      params,
+      fortuneType: params || "celtic"
+    });
+
+    // 🔥 중요: 무조건 먼저 상태 저장!
+    const state = {
+      type: "waiting_question",
+      fortuneType: params || "celtic",
+      timestamp: Date.now(),
+      promptMessageId: callbackQuery.message.message_id
+    };
+
+    this.userStates.set(userId, state);
+
+    logger.success("✅ 질문 대기 상태 저장됨:", {
+      userId,
+      state,
+      userStatesSize: this.userStates.size
+    });
+
     // 질문 프롬프트 렌더링
     const result = {
       type: "question_prompt",
@@ -392,7 +434,7 @@ class FortuneModule extends BaseModule {
       }
     };
 
-    // 렌더러를 통해 메시지 전송하고 ID 저장
+    // 렌더러를 통해 메시지 전송 (이전 코드 그대로)
     const renderer =
       this.moduleManager?.navigationHandler?.renderers?.get("fortune");
     if (renderer) {
