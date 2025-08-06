@@ -48,6 +48,18 @@ class TodoModule extends BaseModule {
     // 사용자 상태 관리
     this.userStates = new Map();
 
+    // ✨ 30분마다 만료된 사용자 상태를 정리하는 인터벌 추가
+    setInterval(() => {
+      const now = Date.now();
+      this.userStates.forEach((state, userId) => {
+        // 30분(1800000ms) 이상 지난 상태는 삭제
+        if (now - state.timestamp > 1800000) {
+          this.userStates.delete(userId);
+          logger.debug(`🧹 만료된 TodoModule 사용자 상태 정리: ${userId}`);
+        }
+      });
+    }, 1800000);
+
     logger.info("📋 TodoModule 생성됨");
   }
 
