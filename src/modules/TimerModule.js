@@ -1354,6 +1354,16 @@ class TimerModule extends BaseModule {
   }
 
   /**
+   * ✅ 추가된 부분: 사용자 타이머 정리 함수
+   * 타이머가 완료되거나 중지되었을 때 관련 리소스를 정리합니다.
+   */
+  async cleanupUserTimer(userId) {
+    this.clearTimerInterval(userId);
+    this.activeTimers.delete(userId);
+    logger.debug(`🧹 사용자 타이머 리소스 정리 완료: ${userId}`);
+  }
+
+  /**
    * 📢 최소한의 알림 전송 (폴백용 - UI 없음)
    */
   async sendMinimalNotification(chatId, data) {
