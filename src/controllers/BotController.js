@@ -62,20 +62,20 @@ class BotController {
       // 1. 환경변수 검증
       this.validateEnvironment();
 
-      // ✨ Express 서버 초기화 추가!
-      await this.initializeExpressServer();
-
-      // 2. 텔레그램 봇 생성
+      // ✨ 2. 텔레그램 봇 먼저 생성 (순서 변경)
       this.bot = new Telegraf(process.env.BOT_TOKEN);
       logger.info("✅ 텔레그램 봇 인스턴스 생성됨");
 
-      // 3. Mongoose 초기화 (단일 데이터베이스 연결)
+      // ✨ 3. Express 서버 초기화 (이제 this.bot 접근 가능)
+      await this.initializeExpressServer();
+
+      // 4. Mongoose 초기화 (단일 데이터베이스 연결)
       await this.initializeDatabase();
 
-      // 4. 핸들러와 매니저 초기화
+      // 5. 핸들러와 매니저 초기화
       await this.initializeHandlers();
 
-      // 5. 미들웨어 설정
+      // 6. 미들웨어 설정
       this.setupMiddlewares();
 
       // ReminderScheduler 초기화 (서비스 빌더 이후에 추가)
@@ -193,6 +193,13 @@ class BotController {
           res.status(500).json({ error: "Failed to list TTS files" });
         }
       });
+
+      // ✨ 여기에 웹훅 핸들러 등록 코드를 추가합니다! (404 핸들러보다 앞에)
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        const secretPath = `/telegraf/${this.bot.secretPathComponent()}`;
+        this.app.use(this.bot.webhookCallback(secretPath));
+        logger.info(`✅ Express 웹훅 리스너 설정 완료: ${secretPath}`);
+      }
 
       // 404 핸들러
       this.app.use((req, res) => {
@@ -586,19 +593,13 @@ class BotController {
 
       logger.info("🚀 텔레그램 봇 시작 중...");
 
-      // ✨ 웹훅 또는 폴링 방식 분기 처리
+      // 웹훅 또는 폴링 방식 분기 처리
       if (process.env.RAILWAY_PUBLIC_DOMAIN) {
-        // 레일웨이 환경일 경우 웹훅 설정
+        // 레일웨이 환경에서는 웹훅 URL을 텔레그램에 등록
         const webhookUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/telegraf/${this.bot.secretPathComponent()}`;
         await this.bot.telegram.setWebhook(webhookUrl);
-        logger.info(`✅ 웹훅 설정 완료: ${webhookUrl}`);
-
-        // Express 앱에 텔레그램 웹훅 리스너 추가
-        this.app.use(
-          this.bot.webhookCallback(
-            `/telegraf/${this.bot.secretPathComponent()}`
-          )
-        );
+        logger.info(`✅ 웹훅 URL 등록 완료: ${webhookUrl}`);
+        // Express 서버는 이미 initialize 단계에서 실행되었으므로 추가 작업 불필요
       } else {
         // 로컬 개발 환경일 경우 폴링 시작
         await this.bot.launch();
