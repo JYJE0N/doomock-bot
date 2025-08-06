@@ -317,23 +317,36 @@ class WorktimeModule extends BaseModule {
   // 모두 logger 대신 require로 가져온 logger 사용
   async getTodayStatus(userId) {
     try {
-      // Service를 통해 DB 조회
-      const todayRecord = await this.worktimeService.getTodayRecord(userId);
+      // 1️⃣ 오늘 기록과 주간 통계를 병렬로 조회 (성능 향상)
+      const [todayRecord, weekStats] = await Promise.all([
+        this.worktimeService?.getTodayRecord(userId),
+        this.getWeekStats(userId)
+      ]);
 
+      // 2️⃣ 주간 요약 데이터 구성 (핵심!)
+      const weekSummary = {
+        workDays: weekStats?.workDays || 0,
+        totalHours: weekStats?.totalHours || 0,
+        avgHours: weekStats?.avgDailyHours || 0
+      };
+
+      // 3️⃣ 오늘 기록이 없는 경우
       if (!todayRecord) {
         return {
           hasRecord: false,
           isWorking: false,
           record: null,
-          workSummary: null
+          workSummary: null,
+          weekSummary: weekSummary // ✅ 핵심: 항상 주간 데이터 포함
         };
       }
 
-      // 실제 데이터 기반으로 상태 계산
+      // 4️⃣ 실제 데이터 기반으로 상태 계산
       const isWorking = todayRecord.checkInTime && !todayRecord.checkOutTime;
       const workDuration =
         todayRecord.currentWorkDuration || todayRecord.workDuration || 0;
 
+      // 5️⃣ 완성된 상태 반환
       return {
         hasRecord: true,
         isWorking: isWorking,
@@ -346,29 +359,23 @@ class WorktimeModule extends BaseModule {
             0,
             workDuration - this.config.overtimeThreshold
           )
-        }
-      };
-      // 🔥 Service가 없으면 더미 데이터 (폴백)
-      return {
-        hasRecord: true,
-        isWorking: true,
-        record: {
-          checkInTime: new Date(),
-          checkOutTime: null
         },
-        workSummary: {
-          workDuration: 120,
-          displayTime: "2:00"
-        }
+        weekSummary: weekSummary // ✅ 핵심: 항상 주간 요약 포함!
       };
     } catch (error) {
       logger.error("오늘 상태 조회 실패:", error);
-      // 에러 시에도 더미 데이터 반환
+
+      // 6️⃣ 에러 시에도 기본 구조 유지 (UI 크래시 방지)
       return {
         hasRecord: false,
         isWorking: false,
         record: null,
-        workSummary: null
+        workSummary: null,
+        weekSummary: {
+          workDays: 0,
+          totalHours: 0,
+          avgHours: 0
+        }
       };
     }
   }
@@ -445,33 +452,43 @@ class WorktimeModule extends BaseModule {
     }
   }
 
+  /**
+   * 📊 getWeekStats 안전성 강화
+   * ✅ Service 없어도 기본값 반환하도록 개선
+   */
   async getWeekStats(userId) {
     try {
       // Service가 있으면 실제 DB 조회
       if (this.worktimeService) {
         const weekStats = await this.worktimeService.getWeekStats(userId);
-        return weekStats;
+
+        // DB 조회 결과 검증
+        if (weekStats && typeof weekStats === "object") {
+          return weekStats;
+        }
       }
 
-      // 🔥 이미 import된 TimeHelper 직접 사용!
+      // Service 없거나 데이터 없을 때 기본값 반환
+      logger.warn("WorktimeService 없음 또는 데이터 없음 - 기본값 반환");
+
       return {
         weekStart: TimeHelper.format(TimeHelper.getWeekStart(), "date"),
         weekEnd: TimeHelper.format(TimeHelper.getWeekEnd(), "date"),
-        totalHours: 40,
-        workDays: 5,
-        avgDailyHours: 8,
+        workDays: 0, // ✅ 0으로 시작 (실제 데이터 반영)
+        totalHours: 0, // ✅ 0으로 시작
+        avgDailyHours: 0, // ✅ 0으로 시작
         overtimeHours: 0,
         records: []
       };
     } catch (error) {
       logger.error("주간 통계 조회 실패:", error);
 
-      // 에러 시에도 기본값
+      // 에러 시에도 안전한 기본값
       return {
         weekStart: TimeHelper.format(TimeHelper.getWeekStart(), "date"),
         weekEnd: TimeHelper.format(TimeHelper.getWeekEnd(), "date"),
-        totalHours: 0,
         workDays: 0,
+        totalHours: 0,
         avgDailyHours: 0,
         overtimeHours: 0,
         records: []
