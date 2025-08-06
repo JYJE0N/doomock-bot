@@ -1220,6 +1220,10 @@ class TimerModule extends BaseModule {
   /**
    * 타이머 인터벌 시작
    */
+
+  /**
+   * 타이머 인터벌 시작
+   */
   startTimerInterval(userId) {
     this.stopTimerInterval(userId); // 기존 인터벌 정리
 
@@ -1242,6 +1246,13 @@ class TimerModule extends BaseModule {
     }, this.config.updateInterval);
 
     this.timerIntervals.set(userId, interval);
+  }
+
+  // ✅ 추가된 부분: stopTimerInterval 함수
+  // clearTimerInterval의 별칭(alias) 역할을 합니다.
+
+  stopTimerInterval(userId) {
+    this.clearTimerInterval(userId);
   }
 
   /**

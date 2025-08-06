@@ -710,10 +710,8 @@ class TimerService extends BaseService {
       const result = await this.models.Timer.updateMany(
         {
           status: "active",
-          lastProgress: {
-            $exists: true,
-            updatedAt: { $lt: timeout }
-          }
+          // ✅ 수정된 부분: 'lastProgress.updatedAt'으로 변경
+          "lastProgress.updatedAt": { $lt: timeout }
         },
         {
           $set: {
