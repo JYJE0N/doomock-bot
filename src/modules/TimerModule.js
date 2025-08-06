@@ -139,10 +139,10 @@ class TimerModule extends BaseModule {
       // NotificationService 연결 시도
       try {
         this.notificationService =
-          await this.serviceBuilder.getOrCreate("notification");
-        logger.info("✅ NotificationService 연결됨");
+          await this.serviceBuilder.getOrCreate("reminder");
+        logger.info("✅ ReminderService (알림) 연결됨");
       } catch (err) {
-        logger.warn("NotificationService 없이 진행:", err.message);
+        logger.warn("ReminderService (알림) 없이 진행:", err.message);
       }
     } catch (error) {
       logger.error("서비스 초기화 중 오류:", error);
