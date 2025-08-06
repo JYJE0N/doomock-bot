@@ -422,9 +422,11 @@ class TimerModule extends BaseModule {
         module: "timer",
         data: { message: "타이머 중지에 실패했습니다." }
       };
+    } finally {
+      // ✨ 에러 발생 여부와 상관없이 반드시 타이머 정리
+      await this.cleanupUserTimer(userId);
     }
   }
-
   /**
    * 📊 타이머 상태 표시 (표준 매개변수)
    */
