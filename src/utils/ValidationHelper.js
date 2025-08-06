@@ -30,8 +30,8 @@ class ValidationHelper {
     // ⚙️ 설정
     this.config = {
       enableCache: process.env.VALIDATION_CACHE_ENABLED !== "false",
-      cacheTimeout: parseInt(process.env.VALIDATION_CACHE_TIMEOUT) || 300000, // 5분
-      maxCacheSize: parseInt(process.env.VALIDATION_MAX_CACHE_SIZE) || 1000,
+      cacheTimeout: parseInt(process.env.VALIDATION_CACHE_TIMEOUT) || 60000, // 1분
+      maxCacheSize: parseInt(process.env.VALIDATION_MAX_CACHE_SIZE) || 50,
       enableLogging: process.env.VALIDATION_LOGGING_ENABLED === "true",
       strictMode: process.env.VALIDATION_STRICT_MODE === "true",
       ...options
@@ -413,58 +413,53 @@ class ValidationHelper {
 
     // 타입별 검증
     switch (fieldSchema.type) {
-      case "text":
-        const textResult = this.validateText(processedValue, fieldSchema);
-        if (!textResult.isValid) {
-          errors.push(...textResult.errors);
-        }
-        processedValue = textResult.value;
+      case "text": {
+        const result = this.validateText(processedValue, fieldSchema);
+        this.processValidationResult(result, errors);
+        processedValue = result.value;
         break;
+      }
 
       case "number":
-      case "range":
-        const numberResult = this.validateNumber(processedValue, fieldSchema);
-        if (!numberResult.isValid) {
-          errors.push(...numberResult.errors);
-        }
-        processedValue = numberResult.value;
+      case "range": {
+        const result = this.validateNumber(processedValue, fieldSchema);
+        this.processValidationResult(result, errors);
+        processedValue = result.value;
         break;
+      }
 
-      case "boolean":
-        const boolResult = this.validateBoolean(processedValue, fieldSchema);
-        if (!boolResult.isValid) {
-          errors.push(...boolResult.errors);
-        }
-        processedValue = boolResult.value;
+      case "boolean": {
+        const result = this.validateBoolean(processedValue, fieldSchema);
+        this.processValidationResult(result, errors);
+        processedValue = result.value;
         break;
+      }
 
       case "category":
-      case "choice":
-        const choiceResult = this.validateChoice(processedValue, fieldSchema);
-        if (!choiceResult.isValid) {
-          errors.push(...choiceResult.errors);
-        }
-        processedValue = choiceResult.value;
+      case "choice": {
+        const result = this.validateChoice(processedValue, fieldSchema);
+        this.processValidationResult(result, errors);
+        processedValue = result.value;
         break;
+      }
 
-      case "date":
-        const dateResult = this.validateDate(processedValue, fieldSchema);
-        if (!dateResult.isValid) {
-          errors.push(...dateResult.errors);
-        }
-        processedValue = dateResult.value;
+      case "date": {
+        const result = this.validateDate(processedValue, fieldSchema);
+        this.processValidationResult(result, errors);
+        processedValue = result.value;
         break;
+      }
 
-      case "tags":
-        const tagsResult = this.validateTags(processedValue, fieldSchema);
-        if (!tagsResult.isValid) {
-          errors.push(...tagsResult.errors);
-        }
-        processedValue = tagsResult.value;
+      case "tags": {
+        const result = this.validateTags(processedValue, fieldSchema);
+        this.processValidationResult(result, errors);
+        processedValue = result.value;
         break;
+      }
 
       default:
         logger.warn(`알 수 없는 필드 타입: ${fieldSchema.type}`);
+        errors.push(`지원하지 않는 필드 타입: ${fieldSchema.type}`);
     }
 
     // 커스텀 검증자 실행

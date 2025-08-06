@@ -84,9 +84,10 @@ class TTSService extends BaseService {
       const voiceCode =
         this.getUserVoice(userId) || this.voiceConfig.getDefaultVoice(language);
 
-      // 음성 정보 가져오기 및 검증
-      const voice = this.voiceConfig.getVoiceByCode(voiceCode);
-      if (!voice) {
+      // 🎯 음성 정보 가져오기 및 검증 (const 재할당 문제 해결)
+      let selectedVoice = this.voiceConfig.getVoiceByCode(voiceCode);
+
+      if (!selectedVoice) {
         logger.warn(`음성 코드를 찾을 수 없음: ${voiceCode}, 기본값 사용`);
         const defaultVoiceCode = this.voiceConfig.getDefaultVoice(language);
         const defaultVoice = this.voiceConfig.getVoiceByCode(defaultVoiceCode);
@@ -95,25 +96,18 @@ class TTSService extends BaseService {
           throw new Error(`기본 음성도 찾을 수 없습니다: ${defaultVoiceCode}`);
         }
 
-        voice = defaultVoice;
+        selectedVoice = defaultVoice; // let으로 선언했으므로 재할당 가능
       }
 
-      // SSML 성별 매핑 (안전한 처리)
-      let ssmlGender = "NEUTRAL";
-      if (voice.gender) {
-        if (voice.gender.toLowerCase() === "male") {
-          ssmlGender = "MALE";
-        } else if (voice.gender.toLowerCase() === "female") {
-          ssmlGender = "FEMALE";
-        }
-      }
+      // 🎭 SSML 성별 매핑 (개선된 버전)
+      const ssmlGender = this.determineSsmlGender(selectedVoice.gender);
 
       // Google TTS 요청
       const request = {
         input: { text },
         voice: {
           languageCode: language,
-          name: voice.code || voiceCode, // voice.code가 있으면 사용, 없으면 voiceCode 사용
+          name: selectedVoice.code || voiceCode,
           ssmlGender: ssmlGender
         },
         audioConfig: {
@@ -126,8 +120,8 @@ class TTSService extends BaseService {
 
       logger.debug("🎤 TTS 변환 요청:", {
         text: text.substring(0, 50) + (text.length > 50 ? "..." : ""),
-        voice: voice.code || voiceCode,
-        voiceName: voice.name,
+        voice: selectedVoice.code || voiceCode,
+        voiceName: selectedVoice.name,
         language,
         gender: ssmlGender
       });
@@ -152,8 +146,8 @@ class TTSService extends BaseService {
           await this.saveHistory(userId, {
             text,
             language,
-            voice: voice.name,
-            voiceCode: voice.code || voiceCode,
+            voice: selectedVoice.name,
+            voiceCode: selectedVoice.code || voiceCode,
             fileName,
             shareUrl: filePaths.shareUrl
           });
@@ -167,30 +161,56 @@ class TTSService extends BaseService {
       return this.createSuccessResponse({
         audioFile: filePaths.tempPath,
         shareUrl: filePaths.shareUrl,
-        voice: voice.name,
+        voice: selectedVoice.name,
         duration: Math.ceil(text.length / 5) // 대략적인 재생 시간 추정
       });
     } catch (error) {
       logger.error("TTS 변환 실패:", error);
 
       // 에러 메시지 개선
-      let errorMessage = "TTS 변환 중 오류가 발생했습니다";
-
-      if (error.message.includes("인증")) {
-        errorMessage = "Google TTS 인증에 실패했습니다. 관리자에게 문의하세요.";
-      } else if (error.message.includes("길이")) {
-        errorMessage = error.message;
-      } else if (error.message.includes("텍스트")) {
-        errorMessage = error.message;
-      } else if (error.code === "PERMISSION_DENIED") {
-        errorMessage = "TTS API 권한이 없습니다. 관리자에게 문의하세요.";
-      } else if (error.code === "RESOURCE_EXHAUSTED") {
-        errorMessage =
-          "TTS API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.";
-      }
-
+      const errorMessage = this.getErrorMessage(error);
       return this.createErrorResponse(error, errorMessage);
     }
+  }
+
+  /**
+   * 🎭 SSML 성별 결정 (SRP 적용 - 단일 책임)
+   * @param {string} gender - 음성 성별 정보
+   * @returns {string} SSML 성별 코드
+   */
+  determineSsmlGender(gender) {
+    if (!gender) return "NEUTRAL";
+
+    const genderLower = gender.toLowerCase();
+
+    if (genderLower === "male") {
+      return "MALE";
+    } else if (genderLower === "female") {
+      return "FEMALE";
+    }
+
+    return "NEUTRAL";
+  }
+
+  /**
+   * 🚨 에러 메시지 생성 (SRP 적용)
+   * @param {Error} error - 발생한 오류
+   * @returns {string} 사용자용 에러 메시지
+   */
+  getErrorMessage(error) {
+    if (error.message.includes("인증")) {
+      return "Google TTS 인증에 실패했습니다. 관리자에게 문의하세요.";
+    } else if (error.message.includes("길이")) {
+      return error.message;
+    } else if (error.message.includes("텍스트")) {
+      return error.message;
+    } else if (error.code === "PERMISSION_DENIED") {
+      return "TTS API 권한이 없습니다. 관리자에게 문의하세요.";
+    } else if (error.code === "RESOURCE_EXHAUSTED") {
+      return "TTS API 할당량을 초과했습니다. 잠시 후 다시 시도하세요.";
+    }
+
+    return "TTS 변환 중 오류가 발생했습니다";
   }
 
   getUserVoice(userId) {
