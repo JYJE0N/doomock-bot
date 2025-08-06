@@ -1169,12 +1169,14 @@ class TimerModule extends BaseModule {
    * 타이머 생성
    */
   createTimer(sessionId, type, duration) {
+    // ✅ 수정: remainingTime (초 단위) 추가
     return {
       sessionId,
       type,
       duration,
       startTime: Date.now(),
       endTime: Date.now() + duration * 60 * 1000,
+      remainingTime: duration * 60, // 초 단위로 남은 시간 초기화
       status: this.constants.TIMER_STATUS.RUNNING,
       pausedAt: null,
       totalPausedTime: 0,
@@ -1229,30 +1231,22 @@ class TimerModule extends BaseModule {
 
     const interval = setInterval(() => {
       const timer = this.activeTimers.get(userId);
-      if (!timer || timer.isPaused) return;
+      // ✅ 수정: 일시정지 상태일 때 로직 실행 중단
+      if (!timer || timer.status === this.constants.TIMER_STATUS.PAUSED) {
+        return;
+      }
 
+      // ✅ 수정: remainingTime을 1초씩 감소
       timer.remainingTime--;
-
-      // 진행률 업데이트 (비즈니스 로직만!)
-      timer.elapsedTime = timer.duration * 60 - timer.remainingTime;
-      timer.progress = Math.round(
-        (timer.elapsedTime / (timer.duration * 60)) * 100
-      );
 
       // 타이머 완료 확인
       if (timer.remainingTime <= 0) {
-        this.completeTimer(userId); // 렌더러가 알림 처리
+        // 🔔 타이머가 완료되면 completeTimer 호출
+        this.completeTimer(userId);
       }
     }, this.config.updateInterval);
 
     this.timerIntervals.set(userId, interval);
-  }
-
-  // ✅ 추가된 부분: stopTimerInterval 함수
-  // clearTimerInterval의 별칭(alias) 역할을 합니다.
-
-  stopTimerInterval(userId) {
-    this.clearTimerInterval(userId);
   }
 
   /**
