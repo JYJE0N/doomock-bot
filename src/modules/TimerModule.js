@@ -950,7 +950,7 @@ class TimerModule extends BaseModule {
     const userName = getUserName(callbackQuery.from);
 
     try {
-      if (!this.timerService || !this.timerService.getSessionHistory) {
+      if (!this.timerService || !this.timerService.getRecentSessions) {
         return {
           type: "no_history",
           module: "timer",
@@ -958,7 +958,7 @@ class TimerModule extends BaseModule {
         };
       }
 
-      const result = await this.timerService.getSessionHistory(userId, 10);
+      const result = await this.timerService.getRecentSessions(userId, 10);
 
       if (!result.success || !result.data || result.data.length === 0) {
         return {
