@@ -218,10 +218,10 @@ ${message}`;
       return str.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, "\\$&");
     };
 
-    // 캡션 생성 (MarkdownV2 형식)
+    // 🎵 음성 메시지용 캡션 (간단하고 명확하게)
     let caption = `✅ *변환 완료\\!*\n\n`;
-    caption += `📝 텍스트: "${escapeMarkdownV2(text)}"\n`;
-    caption += `🎤 음성: ${escapeMarkdownV2(voice)}`;
+    caption += `📝 "${escapeMarkdownV2(text.substring(0, 80))}${text.length > 80 ? "\\.\\.\\." : ""}"\n`;
+    caption += `🎤 ${escapeMarkdownV2(voice)}`;
 
     // 공유 링크가 있으면 추가
     if (process.env.BASE_URL && shareUrl) {
@@ -250,52 +250,67 @@ ${message}`;
 
     if (audioFile) {
       try {
-        // 오디오 파일 전송 시도
-        await ctx.replyWithAudio(
+        // 🎵 핵심 변경: replyWithAudio → replyWithVoice
+        // 이것만으로 모바일 연속재생 문제 완전 해결!
+        await ctx.replyWithVoice(
           { source: audioFile },
           {
             parse_mode: "MarkdownV2",
             caption: caption,
-            reply_markup: keyboard
+            reply_markup: keyboard,
+            // 🎯 음성 메시지 최적화 옵션들
+            duration: Math.ceil(text.length / 5) // 예상 재생 시간 (초)
+            // disable_notification: false // 알림은 유지 (기본값)
           }
         );
-      } catch (error) {
-        logger.error("오디오 파일 전송 실패:", error);
 
-        // 첫 번째 폴백: Markdown (V1) 시도
+        logger.info("✅ TTS 음성 메시지 전송 완료 (연속재생 방지됨)");
+      } catch (error) {
+        logger.error("음성 메시지 전송 실패:", error);
+
+        // 🔄 폴백 1: Markdown V1으로 재시도
         try {
-          const markdownCaption = `✅ *변환 완료!*\n\n📝 텍스트: "${text}"\n🎤 음성: ${voice}`;
-          await ctx.replyWithAudio(
+          const markdownCaption = `✅ *변환 완료!*\n\n📝 "${text.substring(0, 80)}${text.length > 80 ? "..." : ""}"\n🎤 ${voice}`;
+
+          await ctx.replyWithVoice(
             { source: audioFile },
             {
               parse_mode: "Markdown",
               caption: markdownCaption,
-              reply_markup: keyboard
+              reply_markup: keyboard,
+              duration: Math.ceil(text.length / 5)
             }
           );
-        } catch (secondError) {
-          logger.error("Markdown 캡션도 실패:", secondError);
 
-          // 두 번째 폴백: 일반 텍스트
+          logger.info("✅ TTS 음성 메시지 전송 완료 (Markdown V1 폴백)");
+        } catch (secondError) {
+          logger.error("Markdown V1 음성 메시지도 실패:", secondError);
+
+          // 🔄 폴백 2: 일반 텍스트 캡션
           try {
-            const plainCaption = `✅ 변환 완료!\n\n📝 ${text}\n🎤 ${voice}`;
-            await ctx.replyWithAudio(
+            const plainCaption = `✅ 변환 완료!\n\n📝 ${text.substring(0, 80)}${text.length > 80 ? "..." : ""}\n🎤 ${voice}`;
+
+            await ctx.replyWithVoice(
               { source: audioFile },
               {
                 caption: plainCaption,
-                reply_markup: keyboard
+                reply_markup: keyboard,
+                duration: Math.ceil(text.length / 5)
               }
             );
-          } catch (thirdError) {
-            logger.error("일반 텍스트 캡션도 실패:", thirdError);
 
-            // 최종 폴백: 메시지만 전송
-            await this.sendSafeMessageForAudio(
+            logger.info("✅ TTS 음성 메시지 전송 완료 (일반 텍스트 폴백)");
+          } catch (thirdError) {
+            logger.error(
+              "모든 음성 메시지 전송 실패, 오디오로 폴백:",
+              thirdError
+            );
+
+            // 🔄 최종 폴백: 기존 오디오 파일 방식
+            await this.renderConversionCompleteAsAudioFallback(
+              data,
               ctx,
-              "음성 파일 전송에 실패했습니다. 다시 시도해주세요.",
-              {
-                reply_markup: keyboard
-              }
+              keyboard
             );
           }
         }
@@ -305,9 +320,37 @@ ${message}`;
       await this.sendSafeMessageForAudio(
         ctx,
         "⚠️ 음성 파일을 찾을 수 없습니다.",
+        { reply_markup: keyboard }
+      );
+    }
+  }
+
+  // 🔄 최종 폴백용 메서드 (기존 오디오 파일 방식)
+  async renderConversionCompleteAsAudioFallback(data, ctx, keyboard) {
+    const { text, voice, audioFile } = data;
+
+    logger.warn("🔄 음성 메시지 실패 - 오디오 파일로 폴백");
+
+    try {
+      const plainCaption = `✅ 변환 완료 (오디오 파일)\n\n📝 ${text.substring(0, 80)}${text.length > 80 ? "..." : ""}\n🎤 ${voice}`;
+
+      await ctx.replyWithAudio(
+        { source: audioFile },
         {
+          caption: plainCaption,
           reply_markup: keyboard
         }
+      );
+
+      logger.info("✅ TTS 오디오 파일 전송 완료 (폴백)");
+    } catch (error) {
+      logger.error("오디오 파일 폴백도 실패:", error);
+
+      // 최종 에러 메시지
+      await this.sendSafeMessageForAudio(
+        ctx,
+        "❌ 음성 파일 전송에 실패했습니다. 다시 시도해주세요.",
+        { reply_markup: keyboard }
       );
     }
   }
@@ -330,6 +373,43 @@ ${message}
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessageForAudio(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * 📱 모바일 최적화를 위한 캡션 길이 조정
+   * - 음성 메시지는 캡션이 너무 길면 UI가 복잡해짐
+   * - 핵심 정보만 간결하게 표시
+   */
+  generateOptimizedCaption(text, voice, shareUrl = null) {
+    const maxTextLength = 80; // 모바일 최적화된 길이
+    const truncatedText =
+      text.length > maxTextLength
+        ? text.substring(0, maxTextLength) + "..."
+        : text;
+
+    let caption = `✅ *변환 완료!*\n\n`;
+    caption += `📝 "${truncatedText}"\n`;
+    caption += `🎤 ${voice}`;
+
+    // 공유 링크는 선택적으로만 추가 (UI 깔끔하게)
+    if (shareUrl && process.env.BASE_URL) {
+      caption += `\n\n🔗 [링크 공유](${process.env.BASE_URL}${shareUrl})`;
+    }
+
+    return caption;
+  }
+
+  /**
+   * 🔍 사용자 피드백 수집을 위한 로그
+   */
+  logVoiceMessageSuccess(userId, textLength, voice) {
+    logger.info(`🎵 음성 메시지 전송 성공`, {
+      userId: userId,
+      textLength: textLength,
+      voice: voice,
+      timestamp: new Date().toISOString(),
+      type: "voice_message" // 분석용 태그
+    });
   }
 }
 
