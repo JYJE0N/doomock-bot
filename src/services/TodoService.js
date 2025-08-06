@@ -73,6 +73,32 @@ class TodoService extends BaseService {
     }
   }
 
+  // ===== 가장 가까운 리마인더 조회 메서 ===== //
+  /**
+   * ✨ [신규] 가장 가까운 다음 리마인더 조회
+   */
+  async getNextReminder() {
+    try {
+      if (!this.models.Reminder) return null;
+
+      const now = new Date();
+      // 현재 시간 이후의 가장 빠른 활성 리마인더 1개 조회
+      const nextReminder = await this.models.Reminder.findOne({
+        isActive: true,
+        completed: { $ne: true },
+        reminderTime: { $gt: now }
+      })
+        .sort({ reminderTime: 1 }) // 시간순으로 정렬
+        .limit(1)
+        .lean();
+
+      return nextReminder;
+    } catch (error) {
+      logger.error("다음 리마인더 조회 실패:", error);
+      return null;
+    }
+  }
+
   // ===== 기본 CRUD 메서드 =====
 
   /**
@@ -632,9 +658,19 @@ class TodoService extends BaseService {
         $set: { updatedAt: new Date() }
       });
 
-      logger.info(`🔔 리마인더 생성 성공: ${userId} - todoId: ${todoId}`);
+      // 새 리마인더 생성 후 재예약
+      const savedReminder = await reminder.save();
 
-      return this.createSuccessResponse(reminder, "리마인더가 설정되었습니다.");
+      // ✨ 중요: 새 리마인더 생성 후 스케줄러에게 즉시 재예약 알림
+      // (BotController를 통해 스케줄러 인스턴스에 접근해야 함)
+      // 이 부분은 BotController에서 처리하는 것이 더 적합합니다.
+      // 예시: this.botController.reminderScheduler.scheduleNextCheck();
+
+      logger.info(`🔔 리마인더 생성 성공: ${userId} - todoId: ${todoId}`);
+      return this.createSuccessResponse(
+        savedReminder,
+        "리마인더가 설정되었습니다."
+      );
     } catch (error) {
       logger.error("리마인더 생성 실패:", error);
       return this.createErrorResponse(error, "리마인더 생성 실패");

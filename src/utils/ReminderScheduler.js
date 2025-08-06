@@ -1,18 +1,15 @@
 // src/utils/ReminderScheduler.js - 🔔 리마인더 스케줄링 시스템
-const cron = require("node-cron");
 const logger = require("./Logger");
 
 /**
  * 🔔 ReminderScheduler - 리마인더 자동 발송 시스템
  *
  * 🎯 핵심 기능:
- * - 정기적 리마인더 체크 (매분)
  * - 텔레그램 메시지 발송
  * - 발송 완료 처리
  * - 에러 핸들링 및 재시도
  *
  * ✅ 특징:
- * - node-cron 기반 스케줄링
  * - Railway 환경 최적화
  * - 메모리 효율성
  * - 안전한 에러 처리
@@ -23,12 +20,14 @@ class ReminderScheduler {
     this.bot = options.bot || null;
     this.reminderService = options.reminderService || null;
     this.isRunning = false;
-    this.cronJob = null;
+    this.nextCheckTimeout = null; // cronJob 대신 timeout ID를 관리합니다.
 
     // 설정
     this.config = {
       // 매분 체크 (Railway 환경에서는 부하 고려)
       cronPattern: process.env.REMINDER_CRON_PATTERN || "*/1 * * * *", // 매분
+      fallbackCheckInterval: 5 * 60 * 1000, // 5분 (안전장치)
+
       maxRetries: parseInt(process.env.REMINDER_MAX_RETRIES) || 3,
       retryDelay: parseInt(process.env.REMINDER_RETRY_DELAY) || 30000, // 30초
       batchSize: parseInt(process.env.REMINDER_BATCH_SIZE) || 10, // 한 번에 처리할 개수
@@ -52,7 +51,7 @@ class ReminderScheduler {
   }
 
   /**
-   * 🎯 스케줄러 시작
+   * 🎯 스케줄러 시작 (동적 스케줄링 전용)
    */
   async start() {
     if (this.isRunning) {
@@ -74,34 +73,18 @@ class ReminderScheduler {
     }
 
     try {
-      // Cron 작업 생성
-      this.cronJob = cron.schedule(
-        this.config.cronPattern,
-        async () => {
-          await this.checkAndSendReminders();
-        },
-        {
-          scheduled: false, // 수동 시작
-          timezone: "Asia/Seoul"
-        }
-      );
-
-      // 스케줄러 시작
-      this.cronJob.start();
       this.isRunning = true;
+      logger.success(`✅ ReminderScheduler 시작됨 (동적 스케줄링 모드)`);
 
-      logger.success(
-        `✅ ReminderScheduler 시작됨 (패턴: ${this.config.cronPattern})`
-      );
+      // ✨ cron 관련 코드 모두 제거!
+      // ✨ 동적 스케줄링 첫 실행
+      await this.scheduleNextCheck();
 
-      // Railway 환경에서는 즉시 한 번 체크
-      if (this.isRailway) {
-        setTimeout(() => {
-          this.checkAndSendReminders();
-        }, 5000);
-      }
+      // ✨ Railway 환경 즉시 체크 로직도 더 이상 필요 없습니다.
+      // scheduleNextCheck가 알아서 가장 빠른 다음 작업을 예약합니다.
     } catch (error) {
       logger.error("❌ ReminderScheduler 시작 실패:", error);
+      this.isRunning = false; // 실패 시 상태 롤백
       throw error;
     }
   }
@@ -110,22 +93,57 @@ class ReminderScheduler {
    * 🛑 스케줄러 중지
    */
   async stop() {
-    if (!this.isRunning) {
-      logger.warn("ReminderScheduler가 실행되지 않고 있습니다");
-      return;
+    if (!this.isRunning) return;
+
+    // ✨ 예약된 timeout 취소
+    if (this.nextCheckTimeout) {
+      clearTimeout(this.nextCheckTimeout);
+      this.nextCheckTimeout = null;
+    }
+    this.isRunning = false;
+    logger.info("🛑 ReminderScheduler 중지됨");
+  }
+
+  /**
+   * ✨ 다음 리마인더 체크를 예약하는 핵심 함수
+   */
+  async scheduleNextCheck() {
+    if (!this.isRunning) return;
+
+    // 기존 예약 취소
+    if (this.nextCheckTimeout) {
+      clearTimeout(this.nextCheckTimeout);
     }
 
     try {
-      if (this.cronJob) {
-        this.cronJob.stop();
-        this.cronJob.destroy();
-        this.cronJob = null;
-      }
+      const nextReminder = await this.reminderService.getNextReminder();
 
-      this.isRunning = false;
-      logger.info("🛑 ReminderScheduler 중지됨");
+      if (nextReminder) {
+        const now = Date.now();
+        const delay = new Date(nextReminder.reminderTime).getTime() - now;
+
+        // 딜레이가 너무 길면 fallback 간격으로 체크
+        const finalDelay = Math.max(
+          0,
+          Math.min(delay, this.config.fallbackCheckInterval)
+        );
+
+        logger.info(
+          `🔔 다음 리마인더 예약: ${new Date(now + finalDelay).toLocaleString("ko-KR")} (${(finalDelay / 1000).toFixed(1)}초 후)`
+        );
+
+        this.nextCheckTimeout = setTimeout(async () => {
+          await this.checkAndSendReminders();
+        }, finalDelay);
+      } else {
+        logger.info("📭 예정된 리마인더 없음. 5분 후 다시 확인합니다.");
+        // 예약된 리마인더가 없으면 fallback 간격으로 다시 확인
+        this.nextCheckTimeout = setTimeout(async () => {
+          await this.checkAndSendReminders();
+        }, this.config.fallbackCheckInterval);
+      }
     } catch (error) {
-      logger.error("❌ ReminderScheduler 중지 실패:", error);
+      logger.error("❌ 다음 리마인더 예약 실패:", error);
     }
   }
 
@@ -200,6 +218,11 @@ class ReminderScheduler {
     } catch (error) {
       logger.error("❌ 리마인더 체크 중 오류:", error);
       this.stats.errors++;
+    } finally {
+      // ✨ 중요: 작업 완료 후 다음 스케줄을 다시 잡습니다.
+      if (this.isRunning) {
+        await this.scheduleNextCheck();
+      }
     }
   }
 
