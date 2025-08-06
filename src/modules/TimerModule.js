@@ -733,7 +733,7 @@ class TimerModule extends BaseModule {
    * 네비게이션핸들러 경유
    */
   startLiveUpdateInterval(userId, bot, moduleManager) {
-    // 기존 인터벌 정리
+    // 기존 인터벌이 있으면 정리
     this.stopLiveUpdateInterval(userId);
 
     const timer = this.activeTimers.get(userId);
@@ -742,48 +742,75 @@ class TimerModule extends BaseModule {
     const liveInterval = setInterval(async () => {
       try {
         const currentTimer = this.activeTimers.get(userId);
-        if (!currentTimer || !currentTimer.liveUpdateEnabled) {
+        if (
+          !currentTimer ||
+          currentTimer.isPaused ||
+          !currentTimer.liveUpdate
+        ) {
           this.stopLiveUpdateInterval(userId);
           return;
         }
 
-        // NavigationHandler를 통해 렌더러 접근
-        const renderer =
-          moduleManager?.navigationHandler?.renderers?.get("timer");
+        // 🎯 SoC 준수: 렌더러와 MarkdownHelper 활용
+        if (currentTimer.chatId && currentTimer.lastMessageId) {
+          // 타이머 데이터 준비
+          const timerData = this.generateTimerDisplayData(currentTimer);
+          const motivationData = this.generateMotivationData(currentTimer);
 
-        if (renderer) {
-          // 렌더러의 renderStatus 메서드 직접 호출
-          const ctx = {
-            chat: { id: currentTimer.chatId },
-            message: { message_id: currentTimer.messageId },
-            editMessageText: async (text, options) => {
-              return bot.telegram.editMessageText(
-                currentTimer.chatId,
-                currentTimer.messageId,
-                null,
-                text,
-                options
+          // 렌더러가 있으면 렌더러 사용, 없으면 기본 처리
+          if (this.timerRenderer && this.timerRenderer.renderStatus) {
+            // 렌더러에서 텍스트 생성
+            const messageText = this.timerRenderer.renderStatus(
+              { timer: timerData },
+              motivationData
+            );
+
+            // 렌더러의 버튼 생성 메서드 활용
+            const buttons =
+              this.timerRenderer.buildActiveTimerButtons(timerData);
+            const keyboard = this.timerRenderer.createInlineKeyboard(
+              buttons,
+              this.moduleName
+            );
+
+            // MarkdownHelper를 통한 안전한 메시지 전송
+            if (moduleManager?.markdownHelper) {
+              await moduleManager.markdownHelper.sendSafeMessage(
+                {
+                  telegram: bot,
+                  callbackQuery: {
+                    editMessageText: async (text, options) => {
+                      await bot.editMessageText(text, {
+                        chat_id: currentTimer.chatId,
+                        message_id: currentTimer.lastMessageId,
+                        ...options
+                      });
+                    }
+                  }
+                },
+                messageText,
+                { reply_markup: keyboard }
               );
+            } else {
+              // 폴백: 직접 전송 (마크다운 없이)
+              await bot.editMessageText(this.stripMarkdown(messageText), {
+                chat_id: currentTimer.chatId,
+                message_id: currentTimer.lastMessageId,
+                reply_markup: { inline_keyboard: keyboard.inline_keyboard }
+              });
             }
-          };
-
-          // 타이머 상태 데이터 준비
-          const timerData = {
-            timer: currentTimer,
-            motivationData: this.getMotivationData(currentTimer)
-          };
-
-          // 렌더러를 통해 상태 업데이트
-          const statusText = renderer.renderStatus(timerData);
-          await ctx.editMessageText(statusText, {
-            parse_mode: "MarkdownV2",
-            reply_markup: renderer.buildActiveTimerButtons(currentTimer)
-          });
-        } else {
-          logger.warn("TimerRenderer를 찾을 수 없습니다. 기본 처리 진행.");
+          } else {
+            // 렌더러 없을 때 기본 처리
+            logger.warn("TimerRenderer를 찾을 수 없습니다. 기본 처리 진행.");
+          }
         }
       } catch (error) {
-        logger.error("실시간 업데이트 오류:", error);
+        logger.warn(`실시간 업데이트 실패 (${userId}):`, error.message);
+        const timer = this.activeTimers.get(userId);
+        if (timer) {
+          timer.liveUpdate = false;
+        }
+        this.stopLiveUpdateInterval(userId);
       }
     }, this.config.liveUpdateInterval);
 
