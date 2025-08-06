@@ -537,6 +537,88 @@ class TimerRenderer extends BaseRenderer {
   }
 
   /**
+   * 🎉 타이머 완료 렌더링 (새로 추가!)
+   */
+  async renderCompletion(result, ctx) {
+    try {
+      const { timerType, duration, _completionRate } = result.data;
+
+      // 타입별 완료 메시지
+      const completionMessages = {
+        focus: [
+          `🎉 축하합니다! ${duration}분 집중 시간을 완료했어요!`,
+          `✨ 훌륭해요! ${duration}분 동안 집중하셨네요!`,
+          `🏆 목표 달성! ${duration}분 집중 완료!`
+        ],
+        short: [
+          `☕ 휴식 시간이 끝났어요! 다시 집중할 시간!`,
+          `⏰ ${duration}분 휴식 완료! 준비되셨나요?`,
+          `🔔 짧은 휴식이 끝났습니다!`
+        ],
+        long: [
+          `🌴 긴 휴식이 끝났어요! 새로운 마음으로 시작해봐요!`,
+          `🔔 ${duration}분 휴식 완료! 다시 시작할 준비가 되셨나요?`,
+          `✅ 충분한 휴식을 취하셨네요!`
+        ]
+      };
+
+      // 랜덤 메시지 선택
+      const messages = completionMessages[timerType] || [
+        `⏰ ${duration}분 타이머가 완료되었습니다!`
+      ];
+      const message = messages[Math.floor(Math.random() * messages.length)];
+
+      // 다음 단계 제안 텍스트
+      let suggestion = "";
+      if (timerType === "focus") {
+        suggestion =
+          "\n\n💡 *다음 단계:*\n• ☕ 짧은 휴식 (5분)\n• 🌴 긴 휴식 (15분)\n• 🍅 또 다른 집중 시간";
+      } else {
+        suggestion =
+          "\n\n💡 *다음 단계:*\n• 🍅 새로운 집중 시간 시작하기\n• 📊 오늘의 통계 확인하기";
+      }
+
+      const fullMessage = `${message}${suggestion}\n\n어떻게 하시겠어요?`;
+
+      // 버튼 생성 (BaseRenderer의 메서드 활용)
+      const buttons = [];
+      if (timerType === "focus") {
+        buttons.push([
+          { text: "☕ 짧은 휴식", action: "start", params: "short" },
+          { text: "🌴 긴 휴식", action: "start", params: "long" }
+        ]);
+        buttons.push([
+          { text: "🍅 다시 집중", action: "start", params: "focus" },
+          { text: "📊 통계 보기", action: "stats" }
+        ]);
+      } else {
+        buttons.push([
+          { text: "🍅 집중 시작", action: "start", params: "focus" },
+          { text: "📊 통계 보기", action: "stats" }
+        ]);
+      }
+      buttons.push([
+        { text: "🏠 메인 메뉴", action: "menu", module: "system" }
+      ]);
+
+      const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+
+      // 안전한 메시지 전송 (BaseRenderer의 메서드 활용)
+      await this.sendSafeMessage(ctx, fullMessage, {
+        reply_markup: keyboard
+      });
+
+      logger.info(`🎉 타이머 완료 렌더링 완료`);
+    } catch (error) {
+      logger.error("TimerRenderer.renderCompletion 오류:", error);
+
+      // 에러 시 기본 메시지
+      const fallbackMessage = "⏰ 타이머가 완료되었습니다!";
+      await this.sendSafeMessage(ctx, fallbackMessage);
+    }
+  }
+
+  /**
    * ❓ 도움말 렌더링
    */
   async renderHelp(data, ctx) {

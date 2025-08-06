@@ -1214,27 +1214,27 @@ class TimerModule extends BaseModule {
    * 타이머 인터벌 시작
    */
   startTimerInterval(userId) {
-    // 기존 인터벌 정리
-    this.clearTimerInterval(userId);
+    this.stopTimerInterval(userId); // 기존 인터벌 정리
 
-    const intervalId = setInterval(async () => {
+    const interval = setInterval(() => {
       const timer = this.activeTimers.get(userId);
+      if (!timer || timer.isPaused) return;
 
-      if (!timer || timer.status !== this.constants.TIMER_STATUS.RUNNING) {
-        this.clearTimerInterval(userId);
-        return;
-      }
+      timer.remainingTime--;
 
-      const elapsed = this.calculateElapsedTime(timer);
-      const remaining = timer.duration * 60 * 1000 - elapsed;
+      // 진행률 업데이트 (비즈니스 로직만!)
+      timer.elapsedTime = timer.duration * 60 - timer.remainingTime;
+      timer.progress = Math.round(
+        (timer.elapsedTime / (timer.duration * 60)) * 100
+      );
 
-      // 타이머 완료 체크
-      if (remaining <= 0) {
-        await this.completeTimer(userId);
+      // 타이머 완료 확인
+      if (timer.remainingTime <= 0) {
+        this.completeTimer(userId); // 렌더러가 알림 처리
       }
     }, this.config.updateInterval);
 
-    this.timerIntervals.set(userId, intervalId);
+    this.timerIntervals.set(userId, interval);
   }
 
   /**
@@ -1249,44 +1249,111 @@ class TimerModule extends BaseModule {
   }
 
   /**
-   * 타이머 완료 처리
+   * 타이머 완료 처리 및 알림 발송
    */
   async completeTimer(userId) {
     const timer = this.activeTimers.get(userId);
     if (!timer) return;
 
-    timer.status = this.constants.TIMER_STATUS.COMPLETED;
+    try {
+      // 1. 완료 데이터 준비 (렌더러에 전달할 정보)
+      const completionData = {
+        type: "timer_completed", // 렌더러가 인식할 타입
+        module: "timer",
+        data: {
+          userId,
+          timerType: timer.type,
+          duration: timer.duration,
+          elapsedTime: timer.duration * 60 - timer.remainingTime,
+          completionRate: 100,
+          chatId: timer.chatId,
+          completedAt: new Date(),
+          sessionId: timer.sessionId
+        }
+      };
 
-    // 인터벌 정리
-    this.clearTimerInterval(userId);
+      // 2. 타이머 정리
+      await this.cleanupUserTimer(userId);
 
-    // 알림 전송
-    if (this.config.enableNotifications && this.notificationService) {
-      try {
-        await this.notificationService.sendTimerComplete(userId, timer);
-      } catch (err) {
-        logger.debug("알림 전송 실패:", err.message);
+      // 3. 서비스에 완료 처리
+      await this.timerService.completeSession(timer.sessionId);
+
+      logger.info(`✅ 타이머 완료: ${userId} - ${timer.type}`);
+
+      // 4. 🔔 완료 알림 요청 (렌더러가 처리하도록!)
+      if (timer.chatId && this.bot) {
+        await this.notifyCompletion(completionData);
       }
+    } catch (error) {
+      logger.error(`타이머 완료 처리 실패 (${userId}):`, error);
     }
+  }
 
-    // 서비스에 완료 기록
-    if (this.timerService && this.timerService.completeSession) {
-      try {
-        await this.timerService.completeSession(timer.sessionId);
-      } catch (err) {
-        logger.debug("세션 완료 기록 실패:", err.message);
+  /**
+   * 🔔 완료 알림 요청 (렌더러에게 위임)
+   */
+  async notifyCompletion(completionData) {
+    try {
+      const { chatId, userId } = completionData.data;
+
+      // NavigationHandler/Renderer를 통한 알림 처리
+      if (this.moduleManager?.navigationHandler?.renderers) {
+        const renderer =
+          this.moduleManager.navigationHandler.renderers.get("timer");
+
+        if (renderer && renderer.renderCompletion) {
+          // ctx 객체 생성 (알림용)
+          const ctx = {
+            chat: { id: chatId },
+            from: { id: userId },
+            telegram: this.bot.telegram || this.bot,
+            reply: async (text, options) => {
+              if (this.bot.telegram) {
+                return this.bot.telegram.sendMessage(chatId, text, options);
+              } else if (this.bot.sendMessage) {
+                return this.bot.sendMessage(chatId, text, options);
+              }
+            }
+          };
+
+          // 렌더러에게 완료 렌더링 요청
+          await renderer.renderCompletion(completionData, ctx);
+          logger.info(`🔔 타이머 완료 렌더링 요청: ${userId}`);
+        } else {
+          logger.warn("TimerRenderer.renderCompletion을 찾을 수 없습니다.");
+
+          // 폴백: 최소한의 알림만 전송 (UI 없이)
+          await this.sendMinimalNotification(chatId, completionData.data);
+        }
+      } else {
+        logger.warn("NavigationHandler/Renderer 시스템을 찾을 수 없습니다.");
+
+        // 폴백: 최소한의 알림만 전송
+        await this.sendMinimalNotification(chatId, completionData.data);
       }
+    } catch (error) {
+      logger.error("완료 알림 요청 실패:", error);
     }
+  }
 
-    // 뽀모도로 세트인 경우 다음 타이머 자동 시작
-    if (timer.pomodoroSet) {
-      await this.handlePomodoroTransition(userId);
-    } else {
-      // 일반 타이머 완료
-      this.activeTimers.delete(userId);
+  /**
+   * 📢 최소한의 알림 전송 (폴백용 - UI 없음)
+   */
+  async sendMinimalNotification(chatId, data) {
+    try {
+      // 단순 텍스트 메시지만 (UI 생성 없음!)
+      const message = `⏰ ${data.duration}분 ${data.timerType} 타이머가 완료되었습니다.`;
+
+      if (this.bot.telegram) {
+        await this.bot.telegram.sendMessage(chatId, message);
+      } else if (this.bot.sendMessage) {
+        await this.bot.sendMessage(chatId, message);
+      }
+
+      logger.info("📢 최소 알림 전송 완료");
+    } catch (error) {
+      logger.error("최소 알림 전송 실패:", error);
     }
-
-    logger.info(`✅ 타이머 완료: ${userId}`);
   }
 
   /**
