@@ -41,7 +41,7 @@ class TimerService extends BaseService {
     this.statsCache = new Map();
     this.statsCacheTimeout = 300000; // 5분
 
-    logger.info("🍅 TimerService 생성됨 (SoC 준수 v4.0)");
+    logger.info("🍅 TimerService 생성됨 (최적화 v4.1)");
   }
 
   /**
@@ -86,13 +86,50 @@ class TimerService extends BaseService {
   // ===== 📊 세션 관리 (CRUD) =====
 
   /**
+   * 헬퍼: 사용자 ID로 활성 세션을 찾는 핵심 함수
+   */
+  async findActiveSessionByUserId(userId) {
+    return this.models.Timer.findOne({
+      userId: userId.toString(),
+      status: { $in: ["active", "paused"] },
+      isActive: true
+    }).sort({ startedAt: -1 });
+  }
+
+  /**
+   * 헬퍼: 세션 상태를 업데이트하는 통합 함수
+   */
+  async updateSessionStatus(userId, newStatus, updates = {}) {
+    try {
+      const session = await this.findActiveSessionByUserId(userId);
+      if (!session) {
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "활성 타이머 세션을 찾을 수 없습니다."
+        );
+      }
+
+      session.status = newStatus;
+      Object.assign(session, updates); // 추가 데이터 업데이트
+
+      await session.save();
+      logger.info(`🔄 세션 상태 변경: ${userId} -> ${newStatus}`);
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "세션 상태가 업데이트되었습니다."
+      );
+    } catch (error) {
+      logger.error(`세션 상태 변경 실패 (${newStatus}):`, error);
+      return this.createErrorResponse(error, "세션 상태 변경에 실패했습니다.");
+    }
+  }
+
+  /**
    * ▶️ 세션 시작
    */
   async startSession(userId, sessionData) {
     try {
       const { type, duration, userName } = sessionData;
-
-      // 입력 검증
       if (!type || !duration) {
         return this.createErrorResponse(
           new Error("INVALID_INPUT"),
@@ -100,35 +137,27 @@ class TimerService extends BaseService {
         );
       }
 
-      // 활성 세션 수 확인
       const activeCount = await this.getActiveSessionCount(userId);
       if (activeCount >= this.config.maxActiveSessions) {
         return this.createErrorResponse(
           new Error("MAX_SESSIONS"),
-          "최대 활성 세션 수를 초과했습니다."
+          "이미 실행 중인 타이머가 있습니다."
         );
       }
 
-      // 세션 생성
       const session = new this.models.Timer({
         userId: userId.toString(),
         userName,
         type,
         duration,
-        remainingTime: duration * 60, // 분 → 초
+        remainingTime: duration * 60,
         status: "active",
-        isActive: true,
         startedAt: new Date(),
-        lastProgress: {
-          remainingTime: duration * 60,
-          updatedAt: new Date()
-        }
+        lastProgress: { remainingTime: duration * 60, updatedAt: new Date() }
       });
 
       await session.save();
-
       logger.info(`▶️ 세션 시작: ${userId} - ${type} (${duration}분)`);
-
       return this.createSuccessResponse(
         this.transformSessionData(session),
         "세션이 시작되었습니다."
@@ -137,6 +166,71 @@ class TimerService extends BaseService {
       logger.error("TimerService.startSession 오류:", error);
       return this.createErrorResponse(error, "세션 시작에 실패했습니다.");
     }
+  }
+
+  /**
+   * ⏸️ 세션 일시정지
+   */
+  async pauseSession(userId) {
+    return this.updateSessionStatus(userId, "paused", { pausedAt: new Date() });
+  }
+
+  /**
+   * ▶️ 세션 재개
+   */
+  async resumeSession(userId) {
+    const session = await this.findActiveSessionByUserId(userId);
+    if (!session)
+      return this.createErrorResponse(
+        new Error("SESSION_NOT_FOUND"),
+        "세션을 찾을 수 없습니다."
+      );
+
+    const pauseDuration = session.pausedAt
+      ? Date.now() - session.pausedAt.getTime()
+      : 0;
+    const totalPausedTime = (session.totalPausedTime || 0) + pauseDuration;
+
+    return this.updateSessionStatus(userId, "active", {
+      resumedAt: new Date(),
+      pausedAt: null,
+      totalPausedTime
+    });
+  }
+
+  /**
+   * ⏹️ 세션 중지
+   */
+  async stopSession(userId) {
+    const session = await this.findActiveSessionByUserId(userId);
+    if (!session)
+      return this.createErrorResponse(
+        new Error("SESSION_NOT_FOUND"),
+        "세션을 찾을 수 없습니다."
+      );
+
+    const elapsedTime =
+      Date.now() - session.startedAt.getTime() - (session.totalPausedTime || 0);
+    const completionRate = Math.round(
+      (elapsedTime / (session.duration * 60 * 1000)) * 100
+    );
+
+    return this.updateSessionStatus(userId, "stopped", {
+      isActive: false,
+      stoppedAt: new Date(),
+      completionRate: Math.min(100, completionRate) // 100%를 넘지 않도록
+    });
+  }
+
+  /**
+   * ✅ 세션 완료
+   */
+  async completeSession(userId) {
+    return this.updateSessionStatus(userId, "completed", {
+      isActive: false,
+      completedAt: new Date(),
+      completionRate: 100
+    });
   }
 
   /**
@@ -185,150 +279,6 @@ class TimerService extends BaseService {
     } catch (error) {
       logger.error("TimerService.startPomodoroSet 오류:", error);
       return this.createErrorResponse(error, "뽀모도로 시작에 실패했습니다.");
-    }
-  }
-
-  /**
-   * ⏸️ 세션 일시정지
-   */
-  async pauseSession(userId) {
-    try {
-      const session = await this.findActiveSession(userId);
-      if (!session) {
-        return this.createErrorResponse(
-          new Error("SESSION_NOT_FOUND"),
-          "세션을 찾을 수 없습니다."
-        );
-      }
-
-      session.status = "paused";
-      session.pausedAt = new Date();
-      await session.save();
-
-      return this.createSuccessResponse(
-        this.transformSessionData(session),
-        "세션이 일시정지되었습니다."
-      );
-    } catch (error) {
-      logger.error("TimerService.pauseSession 오류:", error);
-      return this.createErrorResponse(error, "일시정지에 실패했습니다.");
-    }
-  }
-
-  /**
-   * ▶️ 세션 재개
-   */
-  async resumeSession(userId) {
-    try {
-      const session = await this.findActiveSession(userId);
-      if (!session) {
-        return this.createErrorResponse(
-          new Error("SESSION_NOT_FOUND"),
-          "세션을 찾을 수 없습니다."
-        );
-      }
-
-      session.status = "active";
-      session.resumedAt = new Date();
-
-      // 일시정지 시간 계산
-      if (session.pausedAt) {
-        const pauseDuration = Date.now() - session.pausedAt.getTime();
-        session.totalPausedTime =
-          (session.totalPausedTime || 0) + pauseDuration;
-      }
-
-      await session.save();
-
-      return this.createSuccessResponse(
-        this.transformSessionData(session),
-        "세션이 재개되었습니다."
-      );
-    } catch (error) {
-      logger.error("TimerService.resumeSession 오류:", error);
-      return this.createErrorResponse(error, "재개에 실패했습니다.");
-    }
-  }
-
-  /**
-   * ⏹️ 세션 중지
-   */
-  async stopSession(userId) {
-    try {
-      const session = await this.findActiveSession(userId);
-      if (!session) {
-        return this.createErrorResponse(
-          new Error("SESSION_NOT_FOUND"),
-          "세션을 찾을 수 없습니다."
-        );
-      }
-
-      // 완료율 계산
-      const elapsedTime =
-        session.duration * 60 - (session.lastProgress?.remainingTime || 0);
-      const completionRate = Math.round(
-        (elapsedTime / (session.duration * 60)) * 100
-      );
-
-      session.status = "stopped";
-      session.isActive = false;
-      session.stoppedAt = new Date();
-      session.completionRate = completionRate;
-      await session.save();
-
-      // 통계 업데이트
-      if (this.config.enableStats) {
-        await this.updateUserStats(session.userId, session);
-      }
-
-      return this.createSuccessResponse(
-        this.transformSessionData(session),
-        "세션이 중지되었습니다."
-      );
-    } catch (error) {
-      logger.error("TimerService.stopSession 오류:", error);
-      return this.createErrorResponse(error, "중지에 실패했습니다.");
-    }
-  }
-
-  /**
-   * ✅ 세션 완료
-   */
-  async completeSession(userId) {
-    try {
-      const session = await this.findActiveSession(userId);
-      if (!session) {
-        return this.createErrorResponse(
-          new Error("SESSION_NOT_FOUND"),
-          "세션을 찾을 수 없습니다."
-        );
-      }
-
-      session.status = "completed";
-      session.isActive = false;
-      session.completedAt = new Date();
-      session.completionRate = 100;
-      await session.save();
-
-      // 통계 업데이트
-      if (this.config.enableStats) {
-        await this.updateUserStats(session.userId, session);
-      }
-
-      // 뽀모도로 세트 처리
-      if (session.pomodoroSet) {
-        await this.handlePomodoroCompletion(session);
-      }
-
-      logger.info(`✅ 세션 완료: ${session.userId} - ${session.type}`);
-
-      return this.createSuccessResponse(
-        this.transformSessionData(session),
-        "세션이 완료되었습니다."
-      );
-    } catch (error) {
-      logger.error("TimerService.completeSession 오류:", error);
-      return this.createErrorResponse(error, "완료 처리에 실패했습니다.");
     }
   }
 
