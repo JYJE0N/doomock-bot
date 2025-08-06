@@ -385,15 +385,14 @@ class TimerModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
     const timer = this.activeTimers.get(userId);
 
+    if (!timer) {
+      return {
+        type: "error",
+        module: "timer",
+        data: { message: "실행 중인 타이머가 없습니다." }
+      };
+    }
     try {
-      if (!timer) {
-        return {
-          type: "error",
-          module: "timer",
-          data: { message: "실행 중인 타이머가 없습니다." }
-        };
-      }
-
       const elapsedTime = timer.duration - timer.remainingTime;
 
       // 타이머 정리
@@ -427,6 +426,7 @@ class TimerModule extends BaseModule {
       await this.cleanupUserTimer(userId);
     }
   }
+
   /**
    * 📊 타이머 상태 표시 (표준 매개변수)
    */
