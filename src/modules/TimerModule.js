@@ -1249,6 +1249,11 @@ class TimerModule extends BaseModule {
     this.timerIntervals.set(userId, interval);
   }
 
+  // 멈추는 타이머 인터벌
+  stopTimerInterval(userId) {
+    this.clearTimerInterval(userId);
+  }
+
   /**
    * 타이머 인터벌 정리
    */
