@@ -730,7 +730,6 @@ class TimerModule extends BaseModule {
   /**
    * 🔄 실시간 업데이트 인터벌 시작 (개선된 버전)
    * SoC 준수: UI 생성을 렌더러에 위임
-   * 네비게이션핸들러 경유
    */
   startLiveUpdateInterval(userId, bot, moduleManager) {
     // 기존 인터벌이 있으면 정리
