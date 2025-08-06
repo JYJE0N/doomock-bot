@@ -417,31 +417,62 @@ ${this.getNextStepSuggestion(completionRate)}`;
    * 📊 상태 렌더링 (상세한 실시간 정보)
    */
   async renderTimerStatus(data, ctx) {
-    const { timer, motivationData, canEnableLiveUpdate } = data;
+    try {
+      const { timer, motivationData, canEnableLiveUpdate } = data;
 
-    const progressBar = this.createProgressBar(timer);
-    const statusIcon = this.getStatusIcon(timer);
-    const motivationMsg = this.getMotivationMessage(motivationData);
-    const detailedInfo = this.createDetailedTimeInfo(timer);
+      // ✅ 데이터 검증 강화
+      if (!timer) {
+        const text = "❌ 타이머 정보를 찾을 수 없습니다.";
+        const buttons = [
+          [{ text: "🔙 메뉴", action: "menu", module: "system" }]
+        ];
+        const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
-    const text = `${statusIcon} *타이머 상세 상태*
+        await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+        return;
+      }
+
+      // ✅ 안전한 UI 요소 생성
+      const progressBar = this.createProgressBar(timer) || "⬜⬜⬜⬜⬜ 0%";
+      const statusIcon = this.getStatusIcon(timer) || "▶️";
+      const motivationMsg =
+        this.getMotivationMessage(motivationData || {}) || "💪 화이팅하세요!";
+      const detailedInfo =
+        this.createDetailedTimeInfo(timer) || "⏱️ 시간 정보 없음";
+
+      const text = `${statusIcon} *타이머 상세 상태*
 
 ${progressBar}
 
 ${detailedInfo}
 
 🎯 *타입*: ${this.getTimerTypeDisplay(timer.type)}
-📊 *진행률*: ${timer.progress}%
+📊 *진행률*: ${timer.progress || 0}%
 ⏸️ *상태*: ${timer.isPaused ? "일시정지" : "실행중"}
 
 💬 ${motivationMsg}
 
 ${this.getProgressAnalysis(timer)}`;
 
-    const buttons = this.buildStatusButtons(timer, canEnableLiveUpdate);
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+      const buttons = this.buildStatusButtons(timer, canEnableLiveUpdate);
+      const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
 
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    } catch (error) {
+      logger.error("renderTimerStatus 완전 실패:", error);
+
+      // 마지막 폴백: 기본 에러 메시지
+      const text = "❌ 타이머 상태를 표시할 수 없습니다. 다시 시도해주세요.";
+      const buttons = [
+        [
+          { text: "🔄 새로고침", action: "refresh" },
+          { text: "🔙 메뉴", action: "menu", module: "system" }
+        ]
+      ];
+      const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+
+      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+    }
   }
 
   /**
@@ -610,44 +641,72 @@ ${message}
   // ===== 🎨 UI 헬퍼 메서드들 (시각적 요소 생성 전담!) =====
 
   /**
-   * 📊 화려한 진행률 바 생성
+   * 📊 안전한 진행률 바 생성 (보완)
    */
   createProgressBar(timer) {
-    if (!timer) return "";
+    try {
+      if (!timer) return "⬜⬜⬜⬜⬜ 0%";
 
-    const progress = timer.progress || 0;
-    const blocks = Math.floor(progress / this.uiConstants.PROGRESS_BLOCK_SIZE);
-    const emptyBlocks = this.uiConstants.PROGRESS_BAR_LENGTH - blocks;
+      const progress = timer.progress || 0;
+      const blocks = Math.floor(
+        progress / (this.uiConstants?.PROGRESS_BLOCK_SIZE || 5)
+      );
+      const emptyBlocks =
+        (this.uiConstants?.PROGRESS_BAR_LENGTH || 20) - blocks;
 
-    const filledBar = this.uiConstants.FILLED_CHAR.repeat(blocks);
-    const emptyBar = this.uiConstants.EMPTY_CHAR.repeat(emptyBlocks);
+      const filledChar = this.uiConstants?.FILLED_CHAR || "█";
+      const emptyChar = this.uiConstants?.EMPTY_CHAR || "░";
 
-    // 진행률에 따른 아이콘 선택
-    const progressIcon = this.getProgressIcon(timer);
+      const filledBar = filledChar.repeat(Math.max(0, blocks));
+      const emptyBar = emptyChar.repeat(Math.max(0, emptyBlocks));
 
-    return `${progressIcon} ${filledBar}${emptyBar} ${progress}%`;
+      // 진행률에 따른 아이콘 선택 (안전하게)
+      const progressIcon = this.getProgressIcon(timer) || "🍅";
+
+      return `${progressIcon} ${filledBar}${emptyBar} ${progress}%`;
+    } catch (error) {
+      logger.error("createProgressBar 에러:", error);
+      return "🍅 ████░░░░░░ 0%"; // 폴백 진행률 바
+    }
   }
 
   /**
-   * 🎯 진행률 아이콘 선택 (새로운 메서드)
+   * 🎯 안전한 진행률 아이콘 선택
    */
   getProgressIcon(timer) {
-    const { type, progress } = timer;
-    const stage = this.getTimerStage(progress);
+    try {
+      if (!timer) return "🍅";
 
-    // 타입과 단계별 아이콘
-    const typeIcons =
-      this.uiConstants.TYPE_ICONS[type] || this.uiConstants.TYPE_ICONS.focus;
-    return typeIcons[stage] || typeIcons.main;
+      const { type = "focus", progress = 0 } = timer;
+      const stage = this.getTimerStage(progress);
+
+      // 안전한 아이콘 선택
+      const typeIcons =
+        this.uiConstants?.TYPE_ICONS?.[type] ||
+        this.uiConstants?.TYPE_ICONS?.focus ||
+        {};
+
+      return typeIcons[stage] || typeIcons.main || "🍅";
+    } catch (error) {
+      logger.error("getProgressIcon 에러:", error);
+      return "🍅"; // 폴백 아이콘
+    }
   }
 
   /**
-   * 📈 타이머 단계 계산 (헬퍼 메서드)
+   * 📈 안전한 타이머 단계 계산
    */
   getTimerStage(progress) {
-    if (progress < 33) return "early";
-    if (progress < 67) return "middle";
-    return "late";
+    try {
+      const safeProgress = typeof progress === "number" ? progress : 0;
+
+      if (safeProgress < 33) return "early";
+      if (safeProgress < 67) return "middle";
+      return "late";
+    } catch (error) {
+      logger.error("getTimerStage 에러:", error);
+      return "early"; // 폴백 단계
+    }
   }
 
   /**
@@ -721,15 +780,65 @@ ${message}
    * 📈 진행률 분석 생성
    */
   getProgressAnalysis(timer) {
-    const { progressData } = timer;
-    const { stage } = progressData;
+    try {
+      // ✅ 1단계: timer 존재 확인
+      if (!timer) {
+        return "📊 타이머 정보를 확인할 수 없습니다.";
+      }
 
-    if (stage === "early") {
-      return "🚀 좋은 시작입니다! 이 페이스를 유지하세요.";
-    } else if (stage === "middle") {
-      return "💪 중간 지점을 통과했습니다! 계속 집중하세요.";
-    } else {
-      return "🔥 거의 다 왔습니다! 마지막 스퍼트를 내봅시다!";
+      // ✅ 2단계: progress 정보 추출 (여러 방법으로 시도)
+      let progress = 0;
+      let stage = "early";
+
+      // 방법 1: timer.progress 직접 사용
+      if (typeof timer.progress === "number") {
+        progress = timer.progress;
+      }
+      // 방법 2: timer.progressData.progress 사용
+      else if (
+        timer.progressData &&
+        typeof timer.progressData.progress === "number"
+      ) {
+        progress = timer.progressData.progress;
+      }
+      // 방법 3: 직접 계산
+      else if (timer.elapsedTime && timer.duration) {
+        progress = Math.round((timer.elapsedTime / timer.duration) * 100);
+      }
+      // 방법 4: remainingTime으로 계산
+      else if (timer.remainingTime && timer.duration) {
+        progress = Math.round(
+          ((timer.duration - timer.remainingTime) / timer.duration) * 100
+        );
+      }
+
+      // ✅ 3단계: stage 정보 추출 (여러 방법으로 시도)
+      // 방법 1: timer.stage 직접 사용
+      if (timer.stage) {
+        stage = timer.stage;
+      }
+      // 방법 2: timer.progressData.stage 사용
+      else if (timer.progressData && timer.progressData.stage) {
+        stage = timer.progressData.stage;
+      }
+      // 방법 3: progress로 계산
+      else {
+        if (progress < 33) stage = "early";
+        else if (progress < 67) stage = "middle";
+        else stage = "late";
+      }
+
+      // ✅ 4단계: 안전한 분석 메시지 생성
+      const analysisMessages = {
+        early: "🚀 좋은 시작입니다! 이 페이스를 유지하세요.",
+        middle: "💪 중간 지점을 통과했습니다! 계속 집중하세요.",
+        late: "🔥 거의 다 왔습니다! 마지막 스퍼트를 내봅시다!"
+      };
+
+      return analysisMessages[stage] || "💪 계속 화이팅하세요!";
+    } catch (error) {
+      logger.error("getProgressAnalysis 에러:", error);
+      return "💪 계속 화이팅하세요!"; // 폴백 메시지
     }
   }
 
