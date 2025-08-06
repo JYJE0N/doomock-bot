@@ -154,54 +154,27 @@ class TimerModule extends BaseModule {
    * 🎯 액션 등록 (표준 setupActions)
    */
   setupActions() {
-    // BaseModule의 registerActions 사용
-    if (this.registerActions) {
-      this.registerActions({
-        menu: this.showMenu.bind(this),
-        help: this.showHelp.bind(this),
-        start: this.startTimer.bind(this),
-        pause: this.pauseTimer.bind(this),
-        resume: this.resumeTimer.bind(this),
-        stop: this.stopTimer.bind(this),
-        status: this.showStatus.bind(this),
-        refresh: this.refreshStatus.bind(this),
-        pomodoro1: this.startPomodoro1.bind(this),
-        pomodoro2: this.startPomodoro2.bind(this),
-        custom: this.showCustomSetup.bind(this),
-        setCustom: this.setCustomTimer.bind(this),
-        history: this.showHistory.bind(this),
-        stats: this.showWeeklyStats.bind(this),
-        settings: this.showSettings.bind(this),
-        setFocus: this.setFocusDuration.bind(this),
-        setBreak: this.setBreakDuration.bind(this),
-        toggleNotifications: this.toggleNotifications.bind(this)
-      });
-    } else {
-      // 직접 등록 (폴백)
-      this.actionMap.set("menu", this.showMenu.bind(this));
-      this.actionMap.set("help", this.showHelp.bind(this));
-      this.actionMap.set("start", this.startTimer.bind(this));
-      this.actionMap.set("pause", this.pauseTimer.bind(this));
-      this.actionMap.set("resume", this.resumeTimer.bind(this));
-      this.actionMap.set("stop", this.stopTimer.bind(this));
-      this.actionMap.set("status", this.showStatus.bind(this));
-      this.actionMap.set("refresh", this.refreshStatus.bind(this));
-      this.actionMap.set("pomodoro1", this.startPomodoro1.bind(this));
-      this.actionMap.set("pomodoro2", this.startPomodoro2.bind(this));
-      this.actionMap.set("custom", this.showCustomSetup.bind(this));
-      this.actionMap.set("setCustom", this.setCustomTimer.bind(this));
-      this.actionMap.set("history", this.showHistory.bind(this));
-      this.actionMap.set("stats", this.showWeeklyStats.bind(this));
-      this.actionMap.set("settings", this.showSettings.bind(this));
-      this.actionMap.set("setFocus", this.setFocusDuration.bind(this));
-      this.actionMap.set("setBreak", this.setBreakDuration.bind(this));
-      this.actionMap.set(
-        "toggleNotifications",
-        this.toggleNotifications.bind(this)
-      );
-    }
-
-    logger.info(`🍅 TimerModule 액션 등록 완료 (${this.actionMap.size}개)`);
+    // actionMap 직접 설정 (프로젝트 표준 방식)
+    this.registerActions({
+      menu: this.showMenu.bind(this),
+      help: this.showHelp.bind(this),
+      start: this.startTimer.bind(this),
+      pause: this.pauseTimer.bind(this),
+      resume: this.resumeTimer.bind(this),
+      stop: this.stopTimer.bind(this),
+      status: this.showStatus.bind(this),
+      refresh: this.refreshStatus.bind(this),
+      pomodoro1: this.startPomodoro1.bind(this),
+      pomodoro2: this.startPomodoro2.bind(this),
+      custom: this.showCustomSetup.bind(this), // ✅ custom 액션 추가
+      setCustom: this.setCustomTimer.bind(this),
+      history: this.showHistory.bind(this),
+      stats: this.showWeeklyStats.bind(this),
+      settings: this.showSettings.bind(this),
+      setFocus: this.setFocusDuration.bind(this),
+      setBreak: this.setBreakDuration.bind(this),
+      toggleNotifications: this.toggleNotifications.bind(this)
+    });
   }
 
   /**
@@ -834,19 +807,53 @@ class TimerModule extends BaseModule {
     }
   }
 
+  // ===== showCustomSetup 메서드 구현 =====
+
   /**
-   * ⏰ 커스텀 타이머 설정 화면
+   * ⚙️ 커스텀 타이머 설정 화면 (표준 매개변수)
+   * @param {object} bot - 봇 인스턴스
+   * @param {object} callbackQuery - 콜백 쿼리
+   * @param {string} subAction - 서브액션
+   * @param {string} params - 파라미터
+   * @param {object} moduleManager - 모듈 매니저
    */
   async showCustomSetup(bot, callbackQuery, subAction, params, moduleManager) {
-    // 렌더러에서 커스텀 설정 UI 처리
-    return {
-      type: "custom_setup",
-      module: "timer",
-      data: {
-        maxDuration: this.config.maxCustomDuration,
-        presetOptions: [5, 10, 15, 20, 30, 45, 60, 90]
+    try {
+      const userId = getUserId(callbackQuery.from);
+      const userName = getUserName(callbackQuery.from);
+
+      logger.debug(`⚙️ 커스텀 타이머 설정 - 사용자: ${userId}`);
+
+      // 현재 활성 타이머가 있는지 확인
+      const activeTimer = this.activeTimers.get(userId);
+      if (activeTimer) {
+        return {
+          type: "error",
+          module: "timer",
+          data: {
+            message: "이미 실행 중인 타이머가 있습니다.\n먼저 중지해주세요."
+          }
+        };
       }
-    };
+
+      // 순수 데이터만 반환 (SoC 준수)
+      return {
+        type: "custom_setup",
+        module: "timer",
+        data: {
+          userName,
+          maxDuration: this.config.maxCustomDuration,
+          suggestedDurations: [10, 15, 20, 30, 45, 60, 90]
+        }
+      };
+    } catch (error) {
+      logger.error("TimerModule.showCustomSetup 오류:", error);
+      return {
+        type: "error",
+        module: "timer",
+        data: { message: "커스텀 타이머 설정에 실패했습니다." }
+      };
+    }
   }
 
   /**

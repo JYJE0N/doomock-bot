@@ -89,6 +89,8 @@ class TimerRenderer extends BaseRenderer {
           return await this.renderHistory(data, ctx);
         case "no_history":
           return await this.renderNoHistory(data, ctx);
+        case "custom_setup": // ✅ 누락된 케이스 추가
+          return await this.renderCustomSetup(data, ctx);
         case "weekly_stats":
           return await this.renderWeeklyStats(data, ctx);
         case "settings":
@@ -716,6 +718,69 @@ class TimerRenderer extends BaseRenderer {
       return "괜찮아요! 조금씩 나아지고 있어요!";
     } else {
       return "다음에 다시 도전해보세요! 화이팅!";
+    }
+  }
+
+  /**
+   * ⚙️ 커스텀 타이머 설정 화면 렌더링
+   */
+  async renderCustomSetup(data, ctx) {
+    try {
+      const { userName, maxDuration, suggestedDurations } = data;
+
+      // 안전한 텍스트 생성 (마크다운 이스케이프)
+      const safeUserName = this.escapeMarkdown(userName);
+
+      // 메시지 텍스트 (일반 Markdown 사용)
+      let text = `⚙️ *커스텀 타이머 설정*\n\n`;
+      text += `${safeUserName}님, 원하는 시간을 선택하세요!\n\n`;
+      text += `📝 *추천 시간 목록*\n`;
+      text += `최대 ${maxDuration}분까지 설정 가능합니다.\n\n`;
+      text += `💡 _Tip: 집중하기 좋은 시간을 선택하세요!_`;
+
+      // 버튼 생성 (추천 시간들)
+      const buttons = [];
+
+      // 추천 시간 버튼들을 3개씩 그룹화
+      for (let i = 0; i < suggestedDurations.length; i += 3) {
+        const row = [];
+        for (let j = i; j < Math.min(i + 3, suggestedDurations.length); j++) {
+          const duration = suggestedDurations[j];
+          row.push({
+            text: `⏱️ ${duration}분`,
+            action: "start",
+            params: `custom:${duration}`
+          });
+        }
+        buttons.push(row);
+      }
+
+      // 직접 입력 및 뒤로가기 버튼
+      buttons.push([
+        { text: "✏️ 직접 입력", action: "setCustom" },
+        { text: "🔙 뒤로", action: "menu" }
+      ]);
+
+      const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+
+      // 안전한 메시지 전송 (BaseRenderer의 sendSafeMessage 사용)
+      await this.sendSafeMessage(ctx, text, {
+        parse_mode: "Markdown", // 일반 Markdown 사용
+        reply_markup: keyboard
+      });
+
+      // 콜백 쿼리 응답
+      if (ctx.answerCbQuery) {
+        await ctx.answerCbQuery();
+      }
+
+      logger.debug("✅ 커스텀 타이머 설정 화면 렌더링 완료");
+    } catch (error) {
+      logger.error("renderCustomSetup 오류:", error);
+      await this.renderError(
+        { message: "커스텀 타이머 설정 화면을 표시할 수 없습니다." },
+        ctx
+      );
     }
   }
 
