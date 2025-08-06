@@ -837,6 +837,16 @@ class TimerRenderer extends BaseRenderer {
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
+
+  /**
+   * 🔧 마크다운 이스케이프 헬퍼 메서드
+   * BaseRenderer에 추가하거나 TimerRenderer에 추가
+   */
+  escapeMarkdown(text) {
+    if (!text) return "";
+    // Markdown v1 특수문자 이스케이프
+    return text.replace(/[*_`[\]()]/g, "\\$&");
+  }
 }
 
 module.exports = TimerRenderer;
