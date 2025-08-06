@@ -62,6 +62,9 @@ class BotController {
       // 1. 환경변수 검증
       this.validateEnvironment();
 
+      // ✨ Express 서버 초기화 추가!
+      await this.initializeExpressServer();
+
       // 2. 텔레그램 봇 생성
       this.bot = new Telegraf(process.env.BOT_TOKEN);
       logger.info("✅ 텔레그램 봇 인스턴스 생성됨");
@@ -583,9 +586,25 @@ class BotController {
 
       logger.info("🚀 텔레그램 봇 시작 중...");
 
-      await this.bot.launch();
+      // ✨ 웹훅 또는 폴링 방식 분기 처리
+      if (process.env.RAILWAY_PUBLIC_DOMAIN) {
+        // 레일웨이 환경일 경우 웹훅 설정
+        const webhookUrl = `https://${process.env.RAILWAY_PUBLIC_DOMAIN}/telegraf/${this.bot.secretPathComponent()}`;
+        await this.bot.telegram.setWebhook(webhookUrl);
+        logger.info(`✅ 웹훅 설정 완료: ${webhookUrl}`);
 
-      logger.success("✅ 텔레그램 봇이 성공적으로 시작되었습니다!");
+        // Express 앱에 텔레그램 웹훅 리스너 추가
+        this.app.use(
+          this.bot.webhookCallback(
+            `/telegraf/${this.bot.secretPathComponent()}`
+          )
+        );
+      } else {
+        // 로컬 개발 환경일 경우 폴링 시작
+        await this.bot.launch();
+        logger.success("✅ 텔레그램 봇이 폴링 방식으로 시작되었습니다!");
+      }
+
       logger.info(
         `🤖 봇 사용자명: @${this.bot.botInfo?.username || "unknown"}`
       );
