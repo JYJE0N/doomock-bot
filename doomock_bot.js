@@ -6,16 +6,32 @@ const fs = require("fs");
 const NODE_ENV = process.env.NODE_ENV || "development";
 console.log(`🌍 환경: ${NODE_ENV}`);
 
-// 환경별 .env 파일 로드
+// ✅ 수정된 환경변수 로드 순서
+// 1. 먼저 기본 .env 파일 로드
+require("dotenv").config();
+
+// 2. 환경별 .env 파일로 덮어쓰기
 const envFile = `.env.${NODE_ENV}`;
 const envPath = path.resolve(process.cwd(), envFile);
 
 if (fs.existsSync(envPath)) {
   console.log(`📄 환경 파일 로드: ${envFile}`);
-  require("dotenv").config({ path: envPath });
+  // override: true 옵션 추가하여 기존 값 덮어쓰기
+  require("dotenv").config({
+    path: envPath,
+    override: true // ✅ 중요: 기존 환경변수를 덮어쓰도록 설정
+  });
 } else {
-  console.log(`⚠️ ${envFile} 파일이 없습니다. 기본 .env 사용`);
-  require("dotenv").config();
+  console.log(`⚠️ ${envFile} 파일이 없습니다.`);
+}
+
+// 환경변수 확인 (디버깅용)
+if (NODE_ENV === "development") {
+  console.log("\n🔍 타이머 설정값 확인:");
+  console.log(`TIMER_FOCUS_DURATION: ${process.env.TIMER_FOCUS_DURATION}`);
+  console.log(`TIMER_SHORT_BREAK: ${process.env.TIMER_SHORT_BREAK}`);
+  console.log(`TIMER_LONG_BREAK: ${process.env.TIMER_LONG_BREAK}`);
+  console.log("");
 }
 
 // 기본 .env 파일도 로드 (공통 설정용)

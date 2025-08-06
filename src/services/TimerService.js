@@ -31,7 +31,7 @@ class TimerService extends BaseService {
 
     // 🔧 설정
     this.config = {
-      maxActiveSessions: parseInt(process.env.TIMER_MAX_ACTIVE_SESSIONS) || 3,
+      maxActiveSessions: parseInt(process.env.TIMER_MAX_ACTIVE_SESSIONS) || 1,
       sessionTimeout: parseInt(process.env.TIMER_SESSION_TIMEOUT) || 7200000, // 2시간
       enableStats: process.env.TIMER_ENABLE_STATS !== "false",
       ...options.config
@@ -137,8 +137,12 @@ class TimerService extends BaseService {
         );
       }
 
-      const activeCount = await this.getActiveSessionCount(userId);
-      if (activeCount >= this.config.maxActiveSessions) {
+      // 먼저 기존 활성 세션이 있는지 확인
+      const existingSession = await this.findActiveSessionByUserId(userId);
+      if (existingSession) {
+        logger.warn(
+          `사용자 ${userId}에게 이미 활성 세션이 있습니다: ${existingSession._id}`
+        );
         return this.createErrorResponse(
           new Error("MAX_SESSIONS"),
           "이미 실행 중인 타이머가 있습니다."
@@ -152,6 +156,7 @@ class TimerService extends BaseService {
         duration,
         remainingTime: duration * 60,
         status: "active",
+        isActive: true, // ✅ 추가됨
         startedAt: new Date(),
         lastProgress: { remainingTime: duration * 60, updatedAt: new Date() }
       });
@@ -199,38 +204,85 @@ class TimerService extends BaseService {
   }
 
   /**
-   * ⏹️ 세션 중지
+   * ⏹️ 세션 중지 - isActive를 false로 설정
    */
   async stopSession(userId) {
-    const session = await this.findActiveSessionByUserId(userId);
-    if (!session)
-      return this.createErrorResponse(
-        new Error("SESSION_NOT_FOUND"),
-        "세션을 찾을 수 없습니다."
+    try {
+      const session = await this.findActiveSessionByUserId(userId);
+      if (!session) {
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "세션을 찾을 수 없습니다."
+        );
+      }
+
+      const elapsedTime =
+        Date.now() -
+        session.startedAt.getTime() -
+        (session.totalPausedTime || 0);
+      const completionRate = Math.round(
+        (elapsedTime / (session.duration * 60 * 1000)) * 100
       );
 
-    const elapsedTime =
-      Date.now() - session.startedAt.getTime() - (session.totalPausedTime || 0);
-    const completionRate = Math.round(
-      (elapsedTime / (session.duration * 60 * 1000)) * 100
-    );
+      // ✅ isActive를 false로 설정
+      session.status = "stopped";
+      session.isActive = false;
+      session.stoppedAt = new Date();
+      session.completionRate = Math.min(100, completionRate);
 
-    return this.updateSessionStatus(userId, "stopped", {
-      isActive: false,
-      stoppedAt: new Date(),
-      completionRate: Math.min(100, completionRate) // 100%를 넘지 않도록
-    });
+      await session.save();
+
+      logger.info(
+        `⏹️ 세션 중지: ${userId} - 완료율: ${session.completionRate}%`
+      );
+
+      // 통계 업데이트
+      await this.updateUserStats(userId, session);
+
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "세션이 중지되었습니다."
+      );
+    } catch (error) {
+      logger.error("TimerService.stopSession 오류:", error);
+      return this.createErrorResponse(error, "세션 중지에 실패했습니다.");
+    }
   }
 
   /**
-   * ✅ 세션 완료
+   * ✅ 세션 완료 - isActive를 false로 설정
    */
   async completeSession(userId) {
-    return this.updateSessionStatus(userId, "completed", {
-      isActive: false,
-      completedAt: new Date(),
-      completionRate: 100
-    });
+    try {
+      const session = await this.findActiveSessionByUserId(userId);
+      if (!session) {
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "세션을 찾을 수 없습니다."
+        );
+      }
+
+      // ✅ isActive를 false로 설정
+      session.status = "completed";
+      session.isActive = false;
+      session.completedAt = new Date();
+      session.completionRate = 100;
+
+      await session.save();
+
+      logger.info(`✅ 세션 완료: ${userId}`);
+
+      // 통계 업데이트
+      await this.updateUserStats(userId, session);
+
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "세션이 완료되었습니다."
+      );
+    } catch (error) {
+      logger.error("TimerService.completeSession 오류:", error);
+      return this.createErrorResponse(error, "세션 완료 처리에 실패했습니다.");
+    }
   }
 
   /**
@@ -677,6 +729,35 @@ class TimerService extends BaseService {
       }
     } catch (error) {
       logger.error("오래된 세션 정리 실패:", error);
+    }
+  }
+
+  /**
+   * 🧹 봇 시작 시 모든 활성 세션 정리 (추가 메서드)
+   */
+  async cleanupAllActiveSessions() {
+    try {
+      const result = await this.models.Timer.updateMany(
+        {
+          status: { $in: ["active", "paused"] },
+          isActive: true
+        },
+        {
+          $set: {
+            status: "abandoned",
+            isActive: false,
+            abandonedAt: new Date()
+          }
+        }
+      );
+
+      if (result.modifiedCount > 0) {
+        logger.info(
+          `🧹 봇 시작 시 ${result.modifiedCount}개의 활성 세션을 정리했습니다.`
+        );
+      }
+    } catch (error) {
+      logger.error("활성 세션 정리 실패:", error);
     }
   }
 

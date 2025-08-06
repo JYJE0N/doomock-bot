@@ -623,23 +623,28 @@ class TimerRenderer extends BaseRenderer {
   /**
    * ❓ 도움말 렌더링
    */
-  async renderHelp(data, ctx) {
-    const { title, sections } = data;
+  async renderHelp(result, ctx) {
+    const { userName, features, tips } = result.data;
 
-    let text = `${title}\n\n`;
+    let text = `❓ *${this.markdownHelper.escape(userName)}님을 위한 타이머 가이드*\n\n`;
 
-    for (const [_key, section] of Object.entries(sections)) {
-      text += `*${section.title}*\n`;
-      section.items.forEach((item) => {
-        text += `${item}\n`;
-      });
-      text += `\n`;
-    }
+    // 주요 기능 소개
+    text += `*🎯 주요 기능*\n\n`;
+    features.forEach((feature) => {
+      text += `${feature.icon} *${this.markdownHelper.escape(feature.title)}*\n`;
+      text += `   ${this.markdownHelper.escape(feature.description)}\n\n`;
+    });
+
+    // 사용 팁
+    text += `*💡 사용 팁*\n`;
+    tips.forEach((tip) => {
+      text += `${this.markdownHelper.escape(tip)}\n`;
+    });
 
     const buttons = [
       [
-        { text: "🍅 타이머 시작", action: "menu" },
-        { text: "📈 통계 보기", action: "stats" }
+        { text: "🍅 바로 시작하기", action: "menu" },
+        { text: "⚙️ 설정", action: "settings" }
       ],
       [{ text: "🔙 메뉴", action: "menu" }]
     ];
@@ -667,11 +672,14 @@ class TimerRenderer extends BaseRenderer {
    * 📊 미니 바 생성 (통계용)
    */
   createMiniBar(value, maxValue) {
-    const barLength = 5;
-    const percentage = Math.min(100, (value / maxValue) * 100);
-    const filledCount = Math.floor((percentage / 100) * barLength);
+    const barLength = 10;
+    const filledLength = Math.round((value / maxValue) * barLength);
+    const emptyLength = barLength - filledLength;
 
-    return "▰".repeat(filledCount) + "▱".repeat(barLength - filledCount);
+    const filled = "▰".repeat(Math.max(0, filledLength));
+    const empty = "▱".repeat(Math.max(0, emptyLength));
+
+    return filled + empty;
   }
 
   /**
@@ -803,14 +811,13 @@ class TimerRenderer extends BaseRenderer {
   }
 
   /**
-   * 🔔 알림 토글 렌더링
+   * 🔔 알림 토글 결과 렌더링
    */
-  async renderNotificationToggled(data, ctx) {
-    const { enabled, message } = data;
+  async renderNotificationToggled(result, ctx) {
+    const { enabled, message } = result.data;
 
     const text =
-      `${message}\n\n` +
-      `알림 설정이 ${enabled ? "활성화" : "비활성화"}되었습니다.`;
+      `${message}\n\n` + `현재 알림 상태: ${enabled ? "🔔 켜짐" : "🔕 꺼짐"}`;
 
     const buttons = [
       [{ text: "⚙️ 설정으로 돌아가기", action: "settings" }],
