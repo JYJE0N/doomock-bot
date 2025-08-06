@@ -412,7 +412,7 @@ class TimerModule extends BaseModule {
       // 서비스 업데이트
       if (this.timerService && this.timerService.pauseSession) {
         try {
-          await this.timerService.pauseSession(timer.sessionId);
+          await this.timerService.pauseSession(timer.userId);
         } catch (err) {
           logger.debug("서비스 일시정지 실패:", err.message);
         }
@@ -483,7 +483,7 @@ class TimerModule extends BaseModule {
       // 서비스 업데이트
       if (this.timerService && this.timerService.resumeSession) {
         try {
-          await this.timerService.resumeSession(timer.sessionId);
+          await this.timerService.resumeSession(timer.userId);
         } catch (err) {
           logger.debug("서비스 재개 실패:", err.message);
         }
@@ -529,27 +529,29 @@ class TimerModule extends BaseModule {
         };
       }
 
-      // 경과 시간 및 완료율 계산
+      // ✅ 수정된 로직 시작
+      // 1. 서비스에 먼저 중지 요청
+      if (this.timerService && this.timerService.stopSession) {
+        const result = await this.timerService.stopSession(userId);
+
+        // 2. 서비스 처리가 실패하면 오류 반환
+        if (!result.success) {
+          logger.error(`TimerService 중지 실패: ${userId}`, result.message);
+          return {
+            type: "error",
+            module: "timer",
+            data: { message: result.message || "타이머 중지에 실패했습니다." }
+          };
+        }
+      }
+
+      // 3. 서비스 처리가 성공한 후에만 메모리에서 타이머 정리
       const elapsedTime = this.calculateElapsedTime(timer);
       const completionRate = Math.round(
         (elapsedTime / (timer.duration * 60 * 1000)) * 100
       );
 
-      // 타이머 정리
-      this.clearTimerInterval(userId);
-      this.activeTimers.delete(userId);
-
-      // 서비스에 중지 기록
-      if (this.timerService && this.timerService.stopSession) {
-        try {
-          await this.timerService.stopSession(timer.sessionId, {
-            elapsedTime,
-            completionRate
-          });
-        } catch (err) {
-          logger.debug("서비스 중지 실패:", err.message);
-        }
-      }
+      this.cleanupUserTimer(userId); // 인터벌과 메모리 정리
 
       logger.info(`⏹️ 타이머 중지: ${userId} - 완료율: ${completionRate}%`);
 
@@ -562,6 +564,7 @@ class TimerModule extends BaseModule {
           completionRate
         }
       };
+      // ✅ 수정된 로직 끝
     } catch (error) {
       logger.error("TimerModule.stopTimer 오류:", error);
       return {
@@ -1293,7 +1296,7 @@ class TimerModule extends BaseModule {
       await this.cleanupUserTimer(userId);
 
       // 3. 서비스에 완료 처리
-      await this.timerService.completeSession(timer.sessionId);
+      await this.timerService.completeSession(timer.userId);
 
       logger.info(`✅ 타이머 완료: ${userId} - ${timer.type}`);
 

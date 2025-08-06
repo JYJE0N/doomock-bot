@@ -191,9 +191,9 @@ class TimerService extends BaseService {
   /**
    * ⏸️ 세션 일시정지
    */
-  async pauseSession(sessionId) {
+  async pauseSession(userId) {
     try {
-      const session = await this.findActiveSession(sessionId);
+      const session = await this.findActiveSession(userId);
       if (!session) {
         return this.createErrorResponse(
           new Error("SESSION_NOT_FOUND"),
@@ -218,9 +218,9 @@ class TimerService extends BaseService {
   /**
    * ▶️ 세션 재개
    */
-  async resumeSession(sessionId) {
+  async resumeSession(userId) {
     try {
-      const session = await this.findActiveSession(sessionId);
+      const session = await this.findActiveSession(userId);
       if (!session) {
         return this.createErrorResponse(
           new Error("SESSION_NOT_FOUND"),
@@ -253,9 +253,9 @@ class TimerService extends BaseService {
   /**
    * ⏹️ 세션 중지
    */
-  async stopSession(sessionId) {
+  async stopSession(userId) {
     try {
-      const session = await this.findActiveSession(sessionId);
+      const session = await this.findActiveSession(userId);
       if (!session) {
         return this.createErrorResponse(
           new Error("SESSION_NOT_FOUND"),
@@ -294,9 +294,9 @@ class TimerService extends BaseService {
   /**
    * ✅ 세션 완료
    */
-  async completeSession(sessionId) {
+  async completeSession(userId) {
     try {
-      const session = await this.findActiveSession(sessionId);
+      const session = await this.findActiveSession(userId);
       if (!session) {
         return this.createErrorResponse(
           new Error("SESSION_NOT_FOUND"),
@@ -484,10 +484,10 @@ class TimerService extends BaseService {
   /**
    * 🔍 활성 세션 조회
    */
-  async findActiveSession(sessionId) {
+  async findActiveSession(userId) {
     try {
       return await this.models.Timer.findOne({
-        _id: sessionId,
+        _id: userId,
         status: { $in: ["active", "paused"] },
         isActive: true
       });
