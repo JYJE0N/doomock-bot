@@ -99,6 +99,7 @@ class AnimationHelper {
       return null;
     }
   }
+
   /**
    * 🎴 카드 뽑기 애니메이션 (타로 카드용)
    * FortuneModule에서 사용하는 카드 뽑기 애니메이션

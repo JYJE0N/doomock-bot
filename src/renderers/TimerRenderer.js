@@ -1,5 +1,3 @@
-// src/renderers/TimerRenderer.js - 🎨 완전 리팩토링 v2.0
-
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
 

@@ -428,75 +428,51 @@ class TimerModule extends BaseModule {
   }
 
   /**
-   * 📊 타이머 상태 표시 showStatus 안전성 강화
+   * 📊 타이머 상태 표시 (표준 매개변수)
    */
   async showStatus(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
+    const timer = this.activeTimers.get(userId);
 
     try {
-      const timer = this.activeTimers.get(userId);
-
       if (!timer) {
         return {
           type: "no_timer",
           module: "timer",
           data: {
-            message: "🍅 실행 중인 타이머가 없습니다.",
-            suggestion: "새로운 타이머를 시작해보세요!",
-            userName: getUserName(callbackQuery.from)
+            message: "실행 중인 타이머가 없습니다.",
+            suggestion: "새로운 타이머를 시작해보세요!"
           }
         };
-      }
-
-      // ✅ 타이머 상태 실시간 업데이트
-      this.updateTimerState(timer);
-
-      // ✅ 완전한 데이터 검증
-      const displayData = this.generateTimerDisplayData(timer);
-      const motivationData = this.generateMotivationData(timer);
-
-      if (!displayData || !motivationData) {
-        throw new Error("타이머 데이터 생성 실패");
       }
 
       return {
         type: "timer_status",
         module: "timer",
         data: {
-          timer: displayData,
-          motivationData: motivationData,
-          canEnableLiveUpdate: this.config.enableLiveUpdates,
-          lastUpdate: new Date().toLocaleTimeString("ko-KR"),
-          debug: {
-            remainingTime: timer.remainingTime,
-            duration: timer.duration,
-            isPaused: timer.isPaused
-          }
+          timer: this.generateTimerDisplayData(timer),
+          motivationData: this.generateMotivationData(timer),
+          canEnableLiveUpdate: this.config.enableLiveUpdates
         }
       };
     } catch (error) {
-      logger.error("📊 상태확인 실패:", error);
+      logger.error("TimerModule.showStatus 오류:", error);
       return {
         type: "error",
         module: "timer",
-        data: {
-          message: "상태를 조회할 수 없습니다.",
-          detail: error.message,
-          suggestion: "타이머를 다시 시작해보세요."
-        }
+        data: { message: "상태를 조회할 수 없습니다." }
       };
     }
   }
 
   /**
-   * 🔄 실시간 업데이트 작동 안 됨 해결 - toggleLiveUpdate 개선
+   * 🔄 실시간 업데이트 토글 (표준 매개변수)
    */
   async toggleLiveUpdate(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = getUserId(callbackQuery.from);
+    const timer = this.activeTimers.get(userId);
 
     try {
-      const timer = this.activeTimers.get(userId);
-
       if (!timer) {
         return {
           type: "error",
@@ -505,32 +481,22 @@ class TimerModule extends BaseModule {
         };
       }
 
-      // ✅ config 확인을 먼저
       if (!this.config.enableLiveUpdates) {
         return {
           type: "error",
           module: "timer",
-          data: {
-            message: "실시간 업데이트가 시스템에서 비활성화되어 있습니다.",
-            suggestion: "관리자에게 문의하세요."
-          }
+          data: { message: "실시간 업데이트가 비활성화되어 있습니다." }
         };
       }
 
-      // ✅ 토글 로직 개선
-      const wasEnabled = timer.liveUpdate;
+      // 토글
       timer.liveUpdate = !timer.liveUpdate;
 
-      // ✅ 메시지 정보 안전하게 업데이트
-      if (callbackQuery.message) {
-        timer.chatId = callbackQuery.message.chat.id;
-        timer.lastMessageId = callbackQuery.message.message_id;
-      }
+      // 메시지 정보 업데이트
+      timer.chatId = callbackQuery.message.chat.id;
+      timer.lastMessageId = callbackQuery.message.message_id;
 
-      // ✅ 실시간 업데이트 시작/중지
       if (timer.liveUpdate) {
-        // 중복 방지: 기존 인터벌 정리 후 시작
-        this.stopLiveUpdateInterval(userId);
         this.startLiveUpdateInterval(userId, bot, moduleManager);
         logger.info(`🔄 실시간 업데이트 시작: ${userId}`);
       } else {
@@ -544,99 +510,32 @@ class TimerModule extends BaseModule {
         data: {
           timer: this.generateTimerDisplayData(timer),
           enabled: timer.liveUpdate,
-          wasEnabled: wasEnabled,
           message: timer.liveUpdate
             ? "🔄 실시간 업데이트가 활성화되었습니다!"
-            : "⏹️ 실시간 업데이트가 비활성화되었습니다.",
-          interval: this.config.liveUpdateInterval
+            : "⏹️ 실시간 업데이트가 비활성화되었습니다."
         }
       };
     } catch (error) {
-      logger.error("🔄 실시간 업데이트 토글 실패:", error);
+      logger.error("TimerModule.toggleLiveUpdate 오류:", error);
       return {
         type: "error",
         module: "timer",
-        data: {
-          message: "실시간 업데이트 전환에 실패했습니다.",
-          error: error.message
-        }
+        data: { message: "실시간 업데이트 전환에 실패했습니다." }
       };
     }
   }
 
   /**
-   * ⚡ 타이머 상태 업데이트 헬퍼 (새로 추가)
-   * 실시간으로 남은 시간을 정확하게 계산
-   */
-  updateTimerState(timer) {
-    if (!timer || timer.isPaused) return;
-
-    try {
-      const now = Date.now();
-      const elapsedMs = now - timer.startedAt;
-      const elapsedSeconds = Math.floor(elapsedMs / 1000);
-
-      timer.remainingTime = Math.max(0, timer.duration - elapsedSeconds);
-      timer.elapsedTime = elapsedSeconds;
-      timer.progress = Math.min(
-        100,
-        Math.round((elapsedSeconds / timer.duration) * 100)
-      );
-
-      // 완료 체크
-      if (timer.remainingTime <= 0) {
-        this.completeTimer(getUserId(timer));
-      }
-    } catch (error) {
-      logger.error("타이머 상태 업데이트 실패:", error);
-    }
-  }
-
-  /**
-   * 🔄 새로고침 에러 해결 - refreshStatus 강화
+   * 🔄 타이머 새로고침 (표준 매개변수)
    */
   async refreshStatus(bot, callbackQuery, subAction, params, moduleManager) {
-    const userId = getUserId(callbackQuery.from);
-
-    try {
-      // 1️⃣ 타이머 존재 확인을 먼저
-      const timer = this.activeTimers.get(userId);
-
-      if (!timer) {
-        return {
-          type: "no_timer",
-          module: "timer",
-          data: {
-            message: "🍅 실행 중인 타이머가 없습니다.",
-            suggestion: "새로운 타이머를 시작해보세요!",
-            lastRefresh: new Date().toLocaleTimeString("ko-KR")
-          }
-        };
-      }
-
-      // 2️⃣ 타이머 상태 업데이트 (중요!)
-      this.updateTimerState(timer);
-
-      // 3️⃣ 상태 조회로 위임
-      return this.showStatus(
-        bot,
-        callbackQuery,
-        subAction,
-        params,
-        moduleManager
-      );
-    } catch (error) {
-      logger.error("🔄 새로고침 실패:", error);
-      return {
-        type: "error",
-        module: "timer",
-        data: {
-          message: "새로고침에 실패했습니다. 다시 시도해주세요.",
-          error: error.message,
-          canRetry: true
-        }
-      };
-    }
+    return this.showStatus(
+      bot,
+      callbackQuery,
+      subAction,
+      params,
+      moduleManager
+    );
   }
 
   /**
@@ -829,74 +728,83 @@ class TimerModule extends BaseModule {
   }
 
   /**
-   * 🔄 실시간 업데이트 인터벌 시작 (안전성 강화 버전)
+   * 🔄 실시간 업데이트 인터벌 시작 (개선된 버전)
    * SoC 준수: UI 생성을 렌더러에 위임
    */
   startLiveUpdateInterval(userId, bot, moduleManager) {
-    // 1️⃣ 기존 인터벌 확실히 정리
+    // 기존 인터벌이 있으면 정리
     this.stopLiveUpdateInterval(userId);
 
     const timer = this.activeTimers.get(userId);
-    if (!timer || !timer.liveUpdate) {
-      logger.warn(
-        `실시간 업데이트 시작 실패: 타이머 없음 또는 비활성 (${userId})`
-      );
-      return;
-    }
+    if (!timer) return;
 
-    // 2️⃣ 새 인터벌 시작
     const liveInterval = setInterval(async () => {
       try {
         const currentTimer = this.activeTimers.get(userId);
-
-        // ✅ 안전성 검사들
-        if (!currentTimer) {
-          logger.warn(`실시간 업데이트 중지: 타이머 없음 (${userId})`);
+        if (
+          !currentTimer ||
+          currentTimer.isPaused ||
+          !currentTimer.liveUpdate
+        ) {
           this.stopLiveUpdateInterval(userId);
           return;
         }
 
-        if (!currentTimer.liveUpdate) {
-          logger.info(`실시간 업데이트 중지: 비활성화됨 (${userId})`);
-          this.stopLiveUpdateInterval(userId);
-          return;
-        }
+        // 🎯 SoC 준수: 렌더러와 MarkdownHelper 활용
+        if (currentTimer.chatId && currentTimer.lastMessageId) {
+          // 타이머 데이터 준비
+          const timerData = this.generateTimerDisplayData(currentTimer);
+          const motivationData = this.generateMotivationData(currentTimer);
 
-        if (currentTimer.isPaused) {
-          logger.debug(
-            `실시간 업데이트 일시정지: 타이머 일시정지됨 (${userId})`
-          );
-          return; // 인터벌은 유지하되 업데이트만 스킵
-        }
+          // 렌더러가 있으면 렌더러 사용, 없으면 기본 처리
+          if (this.timerRenderer && this.timerRenderer.renderStatus) {
+            // 렌더러에서 텍스트 생성
+            const messageText = this.timerRenderer.renderStatus(
+              { timer: timerData },
+              motivationData
+            );
 
-        // ✅ 상태 업데이트
-        this.updateTimerState(currentTimer);
+            // 렌더러의 버튼 생성 메서드 활용
+            const buttons =
+              this.timerRenderer.buildActiveTimerButtons(timerData);
+            const keyboard = this.timerRenderer.createInlineKeyboard(
+              buttons,
+              this.moduleName
+            );
 
-        // ✅ UI 업데이트 (봇과 메시지 정보가 있을 때만)
-        if (bot && currentTimer.chatId && currentTimer.lastMessageId) {
-          const updateData = {
-            type: "live_update",
-            module: "timer",
-            data: {
-              timer: this.generateTimerDisplayData(currentTimer),
-              motivationData: this.generateMotivationData(currentTimer)
+            // MarkdownHelper를 통한 안전한 메시지 전송
+            if (moduleManager?.markdownHelper) {
+              await moduleManager.markdownHelper.sendSafeMessage(
+                {
+                  telegram: bot,
+                  callbackQuery: {
+                    editMessageText: async (text, options) => {
+                      await bot.editMessageText(text, {
+                        chat_id: currentTimer.chatId,
+                        message_id: currentTimer.lastMessageId,
+                        ...options
+                      });
+                    }
+                  }
+                },
+                messageText,
+                { reply_markup: keyboard }
+              );
+            } else {
+              // 폴백: 직접 전송 (마크다운 없이)
+              await bot.editMessageText(this.stripMarkdown(messageText), {
+                chat_id: currentTimer.chatId,
+                message_id: currentTimer.lastMessageId,
+                reply_markup: { inline_keyboard: keyboard.inline_keyboard }
+              });
             }
-          };
-
-          // ModuleManager를 통해 렌더링 (SoC 준수)
-          if (moduleManager && moduleManager.renderResponse) {
-            await moduleManager.renderResponse(updateData, {
-              bot,
-              chat: { id: currentTimer.chatId },
-              message_id: currentTimer.lastMessageId,
-              isLiveUpdate: true
-            });
+          } else {
+            // 렌더러 없을 때 기본 처리
+            logger.warn("TimerRenderer를 찾을 수 없습니다. 기본 처리 진행.");
           }
         }
       } catch (error) {
         logger.warn(`실시간 업데이트 실패 (${userId}):`, error.message);
-
-        // 에러 발생 시 해당 사용자 실시간 업데이트 비활성화
         const timer = this.activeTimers.get(userId);
         if (timer) {
           timer.liveUpdate = false;
@@ -905,11 +813,7 @@ class TimerModule extends BaseModule {
       }
     }, this.config.liveUpdateInterval);
 
-    // 3️⃣ 인터벌 저장
     this.liveUpdateIntervals.set(userId, liveInterval);
-    logger.info(
-      `🔄 실시간 업데이트 인터벌 시작: ${userId} (${this.config.liveUpdateInterval}ms)`
-    );
   }
 
   /**
