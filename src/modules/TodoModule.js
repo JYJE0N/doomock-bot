@@ -1002,7 +1002,7 @@ class TodoModule extends BaseModule {
    * 사용자 상태 설정
    */
   setUserState(userId, state) {
-    this.userStates.set(userId.toString(), state);
+    this.userStates.set(userId.toString(), { ...state, timestamp: Date.now() });
   }
 
   /**
