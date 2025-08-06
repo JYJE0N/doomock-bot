@@ -103,7 +103,7 @@ class BotController {
   }
 
   /**
-   * 🌐 Express 서버 초기화
+   * 🌐 Express 서버 초기화 - Railway 502 해결 버전
    */
   async initializeExpressServer() {
     try {
@@ -211,10 +211,12 @@ class BotController {
         });
       });
 
-      // 서버 시작
+      // 🚨 핵심 수정: Railway용 서버 시작
       const port = process.env.PORT || 3000;
-      this.server = this.app.listen(port, () => {
-        logger.success(`✅ Express 서버가 포트 ${port}에서 실행 중`);
+      const host = "0.0.0.0"; // 🎯 Railway 필수 설정!
+
+      this.server = this.app.listen(port, host, () => {
+        logger.success(`✅ Express 서버가 ${host}:${port}에서 실행 중`);
 
         // Railway 환경
         if (process.env.RAILWAY_PUBLIC_DOMAIN) {
@@ -230,6 +232,37 @@ class BotController {
         } else {
           logger.info(`🔗 로컬 서버: http://localhost:${port}`);
         }
+      });
+
+      // 🛡️ 서버 에러 핸들링 추가
+      this.server.on("error", (error) => {
+        logger.error("🚨 Express 서버 에러:", error);
+
+        if (error.code === "EADDRINUSE") {
+          logger.error(`❌ 포트 ${port}가 이미 사용 중입니다`);
+        } else if (error.code === "EACCES") {
+          logger.error(`❌ 포트 ${port}에 대한 권한이 없습니다`);
+        }
+
+        throw error;
+      });
+
+      // 🔍 서버 시작 확인을 위한 Promise 래핑
+      return new Promise((resolve, reject) => {
+        const serverStartTimeout = setTimeout(() => {
+          reject(new Error("서버 시작 타임아웃 (30초)"));
+        }, 30000);
+
+        this.server.on("listening", () => {
+          clearTimeout(serverStartTimeout);
+          logger.info(`🎯 서버가 성공적으로 ${host}:${port}에 바인딩됨`);
+          resolve();
+        });
+
+        this.server.on("error", (error) => {
+          clearTimeout(serverStartTimeout);
+          reject(error);
+        });
       });
     } catch (error) {
       logger.error("❌ Express 서버 초기화 실패:", error);
