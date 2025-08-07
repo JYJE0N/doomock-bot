@@ -143,20 +143,16 @@ class TimerModule extends BaseModule {
    * ⏰ 타이머 인터벌 시작
    */
   startTimerInterval(userId) {
-    // 기존 인터벌 정리
     this.clearTimerInterval(userId);
-
     const timer = this.activeTimers.get(userId);
     if (!timer) return;
 
-    // 개발 모드에서는 더 빠른 업데이트
     const updateInterval = this.devMode.enabled
       ? Math.min(100, this.config.updateInterval)
       : this.config.updateInterval;
 
     const intervalId = setInterval(async () => {
       const currentTimer = this.activeTimers.get(userId);
-
       if (!currentTimer || currentTimer.status !== "running") {
         this.clearTimerInterval(userId);
         return;
@@ -165,9 +161,17 @@ class TimerModule extends BaseModule {
       const elapsed = this.calculateElapsedTime(currentTimer);
       const totalDuration = currentTimer.duration * 60 * 1000;
       const remaining = Math.max(0, totalDuration - elapsed);
+
+      // 🚀🚀🚀 핵심 수정 1: 완료 체크를 먼저 수행 🚀🚀🚀
+      if (remaining <= 0) {
+        logger.info(`✅ 타이머 완료: ${userId}`);
+        await this.completeTimer(userId);
+        // completeTimer가 인터벌을 정리하므로, 여기서 즉시 리턴
+        return;
+      }
+
       const remainingSeconds = Math.floor(remaining / 1000);
 
-      // 개발 모드 진행 상황 로깅
       if (this.devMode.enabled && this.devMode.showProgress) {
         const progress = Math.round((elapsed / totalDuration) * 100);
         logger.debug(
@@ -175,21 +179,18 @@ class TimerModule extends BaseModule {
         );
       }
 
-      // 진행률 업데이트
       if (this.timerService && this.timerService.updateProgress) {
         try {
           await this.timerService.updateProgress(userId, remainingSeconds);
         } catch (error) {
-          if (this.devMode.enabled) {
+          if (error.message.includes("SESSION_NOT_FOUND")) {
+            logger.warn(
+              `진행률 업데이트 건너뛰기: ${userId}의 세션이 이미 완료됨`
+            );
+          } else if (this.devMode.enabled) {
             logger.debug("진행 상황 업데이트 실패:", error.message);
           }
         }
-      }
-
-      // 타이머 완료 체크
-      if (remaining <= 0) {
-        logger.info(`✅ 타이머 완료: ${userId}`);
-        await this.completeTimer(userId);
       }
     }, updateInterval);
 
@@ -223,25 +224,38 @@ class TimerModule extends BaseModule {
    * ✅ 타이머 완료 처리
    */
   async completeTimer(userId) {
-    try {
-      const timer = this.activeTimers.get(userId);
-      if (!timer) return;
+    // 🚀🚀🚀 핵심 수정 2: 먼저 메모리에서 타이머를 가져오고 즉시 제거하여 중복 실행 방지
+    const timer = this.activeTimers.get(userId);
+    if (!timer) {
+      logger.debug(
+        `[경쟁 상태 방지] 사용자 ${userId}의 타이머는 이미 처리 중입니다.`
+      );
+      return;
+    }
 
-      // 세션 완료 처리
+    // 인터벌과 메모리를 즉시 정리하여 후속 호출을 막음
+    this.cleanupUserTimer(userId);
+
+    try {
+      // DB 세션 완료 처리
       const result = await this.timerService.completeSession(userId);
+
       if (!result.success) {
-        logger.error("세션 완료 처리 실패:", result.message);
+        // 이미 다른 호출이 DB를 업데이트한 경우, 경고만 기록하고 정상 종료
+        if (result.error === "SESSION_NOT_FOUND") {
+          logger.warn(
+            `세션 완료 처리 건너뛰기: ${userId}의 DB 세션이 이미 완료되었습니다.`
+          );
+        } else {
+          logger.error("세션 완료 처리 DB 오류:", result.message);
+        }
         return;
       }
 
-      // 뽀모도로 세트인 경우 다음 타이머로 전환
+      // 뽀모도로 전환 또는 완료 알림
       if (timer.pomodoroSet) {
         await this.transitionToNextPomodoro(userId, timer);
       } else {
-        // 일반 타이머 완료
-        this.cleanupUserTimer(userId);
-
-        // 완료 알림
         if (timer.chatId) {
           await this.notifyCompletion({
             type: "timer_completed",
@@ -256,8 +270,7 @@ class TimerModule extends BaseModule {
         }
       }
     } catch (error) {
-      logger.error("타이머 완료 처리 중 오류:", error);
-      this.cleanupUserTimer(userId);
+      logger.error("타이머 완료 처리 중 최종 오류:", error);
     }
   }
 
@@ -352,7 +365,6 @@ class TimerModule extends BaseModule {
     const userName = getUserName(callbackQuery.from);
     const timerType = params;
 
-    // 개발 모드에서 타입별 시간 가져오기
     const duration = this.getDurationByType(timerType);
 
     // 🚀 핵심 수정: params가 없는 경우(예: /start) 커스텀 설정으로 유도
