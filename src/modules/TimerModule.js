@@ -141,16 +141,10 @@ class TimerModule extends BaseModule {
     }
 
     // 메모리에 타이머 생성
-    const timer = this.stateManager.createTimer(
-      userId,
-      type,
-      duration,
-      result.data._id,
-      {
-        chatId: callbackQuery.message.chat.id,
-        messageId: callbackQuery.message.message_id
-      }
-    );
+    this.stateManager.createTimer(userId, type, duration, result.data._id, {
+      chatId: callbackQuery.message.chat.id,
+      messageId: callbackQuery.message.message_id
+    });
 
     return {
       type: "timer_started",
@@ -168,7 +162,8 @@ class TimerModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
 
     try {
-      const timer = this.stateManager.pauseTimer(userId);
+      // const timer = 제거
+      this.stateManager.pauseTimer(userId);
       await this.timerService.pauseSession(userId);
 
       return {
@@ -193,7 +188,8 @@ class TimerModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
 
     try {
-      const timer = this.stateManager.resumeTimer(userId);
+      // const timer = 제거
+      this.stateManager.resumeTimer(userId);
       await this.timerService.resumeSession(userId);
 
       return {
@@ -219,7 +215,8 @@ class TimerModule extends BaseModule {
 
     try {
       const stoppedTimer = this.stateManager.stopTimer(userId);
-      const result = await this.timerService.stopSession(userId);
+      // const result = 제거
+      await this.timerService.stopSession(userId);
 
       return {
         type: "timer_stopped",
@@ -362,6 +359,10 @@ class TimerModule extends BaseModule {
       }
     );
 
+    logger.debug(`🍅 뽀모도로 타이머 생성: ${timer.userId}`); // 로깅에 사용
+
+    // ✅ return 문 추가 - timer 변수는 사용하지 않지만,
+    // 나중에 필요할 수 있으므로 그대로 유지
     return {
       type: "pomodoro_started",
       data: {
