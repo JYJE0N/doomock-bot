@@ -356,7 +356,10 @@ class BotController {
       }
 
       // 4. 🚀🚀🚀 핵심 수정: ModuleManager 생성자에 serviceBuilder 전달
-      this.moduleManager = new ModuleManager(this.serviceBuilder);
+      this.moduleManager = new ModuleManager({
+        bot: this.bot,
+        serviceBuilder: this.serviceBuilder
+      });
 
       // 5. NavigationHandler 생성
       this.navigationHandler = new NavigationHandler(
@@ -374,7 +377,7 @@ class BotController {
       logger.success("✅ NavigationHandler 초기화 완료");
 
       // 8. NavigationHandler가 준비된 후, ModuleManager 초기화 (모듈 로드)
-      await this.moduleManager.initialize();
+      await this.moduleManager.initialize(this.bot);
       logger.success("✅ ModuleManager 초기화 완료");
 
       // 9. CommandHandler 초기화
