@@ -235,85 +235,51 @@ class TimerModule extends BaseModule {
    * 🔄 뽀모도로 다음 단계로 전환
    */
   async transitionToNextPomodoro(userId, completedTimer) {
-    const preset = this.config[completedTimer.preset];
+    try {
+      const preset = this.config[completedTimer.preset];
 
-    // Focus 세션이 끝난 경우
-    if (completedTimer.type === "focus") {
-      const isLastCycle =
-        completedTimer.currentCycle >= completedTimer.totalCycles;
+      // 전환 로직을 명확하게 분리
+      let nextType, nextDuration, nextCycle;
+      let shouldComplete = false;
 
-      if (isLastCycle) {
-        // 마지막 사이클이면 긴 휴식
-        const nextType = "longBreak";
-        const nextDuration = preset.longBreak;
+      if (completedTimer.type === "focus") {
+        // Focus가 끝났을 때
+        const isLastCycle =
+          completedTimer.currentCycle >= completedTimer.totalCycles;
 
-        const pomodoroInfo = {
-          ...completedTimer,
-          isLastBreak: true // 마지막 휴식 표시
-        };
-        delete pomodoroInfo.sessionId;
-
-        const mockCallbackQuery = {
-          message: {
-            chat: { id: completedTimer.chatId },
-            message_id: completedTimer.messageId
-          }
-        };
-
-        await this._startNewTimer(
-          userId,
-          getUserName({ id: userId }),
-          nextType,
-          nextDuration,
-          mockCallbackQuery,
-          pomodoroInfo
-        );
-
-        const newTimer = this.activeTimers.get(userId);
-        if (newTimer) await this.notifyTransition(newTimer);
-      } else {
-        // 일반 짧은 휴식
-        const nextType = "shortBreak";
-        const nextDuration = preset.shortBreak;
-
-        const pomodoroInfo = { ...completedTimer };
-        delete pomodoroInfo.sessionId;
-
-        const mockCallbackQuery = {
-          message: {
-            chat: { id: completedTimer.chatId },
-            message_id: completedTimer.messageId
-          }
-        };
-
-        await this._startNewTimer(
-          userId,
-          getUserName({ id: userId }),
-          nextType,
-          nextDuration,
-          mockCallbackQuery,
-          pomodoroInfo
-        );
-
-        const newTimer = this.activeTimers.get(userId);
-        if (newTimer) await this.notifyTransition(newTimer);
+        if (isLastCycle) {
+          // 마지막 사이클 -> Long Break
+          nextType = "longBreak";
+          nextDuration = preset.longBreak;
+          nextCycle = completedTimer.currentCycle; // 사이클 유지
+        } else {
+          // 일반 사이클 -> Short Break
+          nextType = "shortBreak";
+          nextDuration = preset.shortBreak;
+          nextCycle = completedTimer.currentCycle; // 사이클 유지
+        }
+      } else if (completedTimer.type === "shortBreak") {
+        // Short Break가 끝났을 때 -> 다음 Focus
+        nextType = "focus";
+        nextDuration = preset.focus;
+        nextCycle = completedTimer.currentCycle + 1; // 사이클 증가!
+      } else if (completedTimer.type === "longBreak") {
+        // Long Break가 끝났을 때 -> 전체 완료
+        shouldComplete = true;
       }
-    } else {
-      // 휴식이 끝난 경우
 
-      // Long Break가 끝났으면 전체 세트 완료
-      if (completedTimer.isLastBreak || completedTimer.type === "longBreak") {
+      // 완료 처리
+      if (shouldComplete) {
         return await this.notifyPomodoroSetCompletion(completedTimer);
       }
 
-      // Short Break가 끝났으면 다음 Focus 시작
-      const nextCycle = completedTimer.currentCycle + 1;
+      // 다음 타이머 시작
       const pomodoroInfo = {
-        ...completedTimer,
-        currentCycle: nextCycle
+        isPomodoro: true,
+        currentCycle: nextCycle,
+        totalCycles: completedTimer.totalCycles,
+        preset: completedTimer.preset
       };
-      delete pomodoroInfo.sessionId;
-      delete pomodoroInfo.isLastBreak;
 
       const mockCallbackQuery = {
         message: {
@@ -325,14 +291,19 @@ class TimerModule extends BaseModule {
       await this._startNewTimer(
         userId,
         getUserName({ id: userId }),
-        "focus",
-        preset.focus,
+        nextType,
+        nextDuration,
         mockCallbackQuery,
         pomodoroInfo
       );
 
+      // 전환 알림
       const newTimer = this.activeTimers.get(userId);
-      if (newTimer) await this.notifyTransition(newTimer);
+      if (newTimer) {
+        await this.notifyTransition(newTimer);
+      }
+    } catch (error) {
+      logger.error("뽀모도로 전환 실패:", error);
     }
   }
 
@@ -371,17 +342,15 @@ class TimerModule extends BaseModule {
 
   async notifyTransition(timer) {
     try {
-      // 렌더러에게 전달할 데이터만 준비
       const result = {
-        type: "timer_transition",
+        type: "timer_status",
         data: {
           timer: this.generateTimerData(timer),
-          isTransition: true,
-          message: `🔄 ${this.getTypeDisplay(timer.type)} 세션이 시작되었습니다`
+          isRefresh: false,
+          canRefresh: true
         }
       };
 
-      // 렌더러 찾기
       const renderer =
         this.moduleManager?.navigationHandler?.renderers?.get("timer");
       if (!renderer) {
@@ -389,7 +358,7 @@ class TimerModule extends BaseModule {
         return;
       }
 
-      // ctx 생성 (editMessageText 지원)
+      // editMessageText를 지원하는 ctx 생성
       const ctx = {
         from: { id: timer.userId },
         chat: { id: timer.chatId },
@@ -400,23 +369,27 @@ class TimerModule extends BaseModule {
           }
         },
         editMessageText: async (text, options) => {
-          return this.bot.telegram.editMessageText(
-            timer.chatId,
-            timer.messageId,
-            null,
-            text,
-            options
-          );
+          try {
+            return await this.bot.telegram.editMessageText(
+              timer.chatId,
+              timer.messageId,
+              null,
+              text,
+              options
+            );
+          } catch (error) {
+            // "message is not modified" 에러는 무시
+            if (!error.message?.includes("message is not modified")) {
+              throw error;
+            }
+          }
         },
         answerCbQuery: async () => Promise.resolve()
       };
 
       await renderer.render(result, ctx);
     } catch (error) {
-      // 메시지 수정 실패는 무시 (이미 같은 내용일 수 있음)
-      if (!error.message?.includes("message is not modified")) {
-        logger.error("뽀모도로 전환 알림 실패:", error.message);
-      }
+      logger.error("뽀모도로 전환 알림 실패:", error.message);
     }
   }
 

@@ -390,13 +390,17 @@ class TimerRenderer extends BaseRenderer {
    * 📊 타이머 상태 렌더링
    */
   async renderTimerStatus(data, ctx) {
-    const { timer, canRefresh, isRefresh, _refreshedAt } = data;
+    const { timer, isRefresh, canRefresh = true } = data;
 
-    const progressBar = this.createProgressBar(timer.progress);
+    // 진행률 바 생성
+    const progressBar = this.createProgressBar(timer.progress || 0);
+
+    // 상태 아이콘
     const statusIcon = timer.isPaused
       ? this.ui.icons.paused
       : this.ui.icons.running;
 
+    // 텍스트 생성 - 마크다운 이스케이프 필요!
     let text = `${statusIcon} *타이머 현재 상태*\n\n`;
 
     if (isRefresh) {
@@ -405,18 +409,20 @@ class TimerRenderer extends BaseRenderer {
 
     text +=
       `${progressBar}\n\n` +
-      `⏱️ *남은 시간*: ${timer.remainingFormatted}\n` +
-      `⏳ *경과 시간*: ${timer.elapsedFormatted}\n` +
+      `⏱️ *남은 시간*: ${this.escapeMarkdown(timer.remainingFormatted)}\n` +
+      `⏳ *경과 시간*: ${this.escapeMarkdown(timer.elapsedFormatted)}\n` +
       `📊 *진행률*: ${timer.progress}%\n` +
-      `🎯 *타입*: ${timer.typeDisplay}\n` +
-      `📌 *상태*: ${timer.statusDisplay}\n\n`;
+      `🎯 *타입*: ${this.escapeMarkdown(timer.typeDisplay)}\n` +
+      `📌 *상태*: ${this.escapeMarkdown(timer.statusDisplay)}\n\n`;
 
-    if (timer.pomodoroSet) {
+    // 뽀모도로인 경우 사이클 표시
+    if (timer.totalCycles) {
       text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n\n`;
     }
 
     text += this.getProgressMessage(timer.progress);
 
+    // 버튼 생성
     const buttons = [];
 
     if (canRefresh) {
@@ -878,8 +884,8 @@ class TimerRenderer extends BaseRenderer {
    */
   escapeMarkdown(text) {
     if (!text) return "";
-    // Markdown v1 특수문자 이스케이프
-    return text.replace(/[*_`[\]()]/g, "\\$&");
+    // Markdown 특수문자 이스케이프
+    return text.toString().replace(/[*_`[\]()]/g, "\\$&");
   }
 }
 
