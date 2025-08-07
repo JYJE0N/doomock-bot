@@ -44,11 +44,12 @@ class TimerModule extends BaseModule {
         };
       },
       get pomodoro2() {
+        // 🚀 pomodoro2도 개발 모드 시간을 참조하도록 수정
         return {
-          focus: 50, // pomodoro2는 다른 시간을 사용하므로 그대로 두거나, 별도 설정 추가
-          shortBreak: 10,
+          focus: this.focusDuration * 2,
+          shortBreak: this.shortBreak * 2,
           cycles: 2,
-          longBreak: 30
+          longBreak: this.longBreak * 2
         };
       },
       enableNotifications: process.env.TIMER_ENABLE_NOTIFICATIONS !== "false",
@@ -569,13 +570,7 @@ class TimerModule extends BaseModule {
 
     if (!timer || timer.status !== "paused") {
       return {
-        type: "no_timer",
-        module: "timer",
-        data: {
-          message: timer
-            ? "일시정지 상태가 아닙니다."
-            : "실행 중인 타이머가 없습니다."
-        }
+        /* ... */
       };
     }
 
@@ -611,7 +606,7 @@ class TimerModule extends BaseModule {
   async stopTimer(bot, callbackQuery) {
     const userId = getUserId(callbackQuery.from);
 
-    // 🚀 1. 메모리에서 타이머를 먼저 가져옵니다.
+    // 1. 메모리에서 타이머를 먼저 가져옵니다.
     const timer = this.activeTimers.get(userId);
 
     if (!timer) {
@@ -622,14 +617,13 @@ class TimerModule extends BaseModule {
       };
     }
 
-    // 🚀 2. 경쟁 상태를 막기 위해 인터벌과 메모리를 즉시 정리합니다.
+    // 2. 경쟁 상태를 막기 위해 인터벌과 메모리를 즉시 정리합니다.
     this.cleanupUserTimer(userId);
 
-    // 🚀 3. 메모리에서 정리된 타이머 정보를 바탕으로 DB 업데이트를 요청합니다.
+    // 3. DB 업데이트를 요청합니다.
     const result = await this.timerService.stopSession(userId);
 
     if (!result.success) {
-      // DB 업데이트에 실패하더라도, 메모리에서는 이미 타이머가 중지되었으므로 사용자에게는 오류를 안내합니다.
       return {
         type: "error",
         module: "timer",
@@ -637,19 +631,19 @@ class TimerModule extends BaseModule {
       };
     }
 
-    // 🚀 4. DB 업데이트 결과를 바탕으로 사용자에게 성공 메시지를 보냅니다.
     logger.info(
       `⏹️ 세션 중지 완료: ${userId} - 완료율: ${result.data.completionRate}%`
     );
 
+    // 4. DB 결과를 바탕으로 사용자에게 성공 메시지를 보냅니다.
     return {
       type: "timer_stopped",
       module: "timer",
       data: {
         message: "⏹️ 타이머를 중지했습니다.",
         elapsedTime: this.formatTime(
-          Math.floor(result.data.actualDuration * 60)
-        ), // 분을 초로 변환
+          Math.round(result.data.actualDuration * 60)
+        ),
         completionRate: result.data.completionRate
       }
     };

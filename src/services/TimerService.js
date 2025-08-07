@@ -203,7 +203,6 @@ class TimerService extends BaseService {
       ? Date.now() - session.pausedAt.getTime()
       : 0;
 
-    // 🚀 totalPausedTime -> totalPausedDuration
     const totalPausedDuration =
       (session.totalPausedDuration || 0) + pauseDuration;
 
@@ -230,16 +229,17 @@ class TimerService extends BaseService {
       const elapsedTime =
         Date.now() -
         session.startedAt.getTime() -
-        (session.totalPausedTime || 0);
+        (session.totalPausedDuration || 0); // 🚀 오타 수정: totalPausedTime -> totalPausedDuration
+
       const completionRate = Math.round(
         (elapsedTime / (session.duration * 60 * 1000)) * 100
       );
 
-      // ✅ isActive를 false로 설정
       session.status = "stopped";
       session.isActive = false;
       session.stoppedAt = new Date();
       session.completionRate = Math.min(100, completionRate);
+      session.actualDuration = Math.round(elapsedTime / 60000); // 분 단위로 저장
 
       await session.save();
 
@@ -247,7 +247,6 @@ class TimerService extends BaseService {
         `⏹️ 세션 중지: ${userId} - 완료율: ${session.completionRate}%`
       );
 
-      // 통계 업데이트
       await this.updateUserStats(userId, session);
 
       return this.createSuccessResponse(
