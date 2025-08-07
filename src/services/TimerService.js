@@ -334,6 +334,37 @@ class TimerService extends BaseService {
     }
   }
 
+  /**
+   * 📊 타이머 진행률 업데이트 (누락된 메서드)
+   * @param {string} userId - 사용자 ID
+   * @param {number} remainingTime - 남은 시간 (초)
+   * @returns {Promise<Object>} 업데이트 결과
+   */
+  async updateProgress(userId, remainingTime) {
+    try {
+      // 활성 세션 찾기
+      const session = await this.findActiveSessionByUserId(userId);
+
+      if (!session) {
+        return this.createErrorResponse(
+          new Error("SESSION_NOT_FOUND"),
+          "활성 타이머 세션을 찾을 수 없습니다."
+        );
+      }
+
+      // Timer 모델의 updateProgress 메서드 호출
+      await session.updateProgress(remainingTime);
+
+      return this.createSuccessResponse(
+        this.transformSessionData(session),
+        "진행률이 업데이트되었습니다."
+      );
+    } catch (error) {
+      logger.error(`❌ 진행률 업데이트 실패 (${userId}):`, error);
+      return this.createErrorResponse(error, "진행률 업데이트에 실패했습니다.");
+    }
+  }
+
   // ===== 📊 조회 메서드 =====
 
   /**
