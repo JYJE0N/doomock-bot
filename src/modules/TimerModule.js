@@ -76,7 +76,7 @@ class TimerModule extends BaseModule {
   }
 
   /**
-   * 🕹️ 액션 매핑 설정 (TodoModule 표준)
+   * 🕹️ 액션 매핑 설정
    */
   setupActions() {
     this.registerActions({
@@ -92,14 +92,12 @@ class TimerModule extends BaseModule {
     });
   }
 
-  // ===== 🚀 핵심 로직 (리팩토링) =====
+  // ===== 🚀 핵심 핸들러 메서드 🚀 =====
 
   async showMenu(bot, callbackQuery) {
     const userId = getUserId(callbackQuery.from);
     const timer = this.activeTimers.get(userId);
-    if (timer) {
-      return this.refresh(bot, callbackQuery);
-    }
+    if (timer) return this.refresh(bot, callbackQuery);
     return {
       type: "menu",
       data: { userName: getUserName(callbackQuery.from) }
@@ -112,37 +110,24 @@ class TimerModule extends BaseModule {
   async start(bot, callbackQuery, subAction, params) {
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery.from);
+    let timerType = params,
+      duration;
 
-    let timerType = params;
-    let duration;
-
-    // 1. 커스텀 타이머 파라미터 파싱
-    if (params && params.startsWith("custom:")) {
-      const parts = params.split(":");
-      timerType = parts[0]; // "custom"
-      duration = parseInt(parts[1], 10);
-
-      if (
-        isNaN(duration) ||
-        duration <= 0 ||
-        duration > this.config.maxCustomDuration
-      ) {
+    if (params?.startsWith("custom:")) {
+      [, duration] = params.split(":");
+      timerType = "custom";
+      duration = parseInt(duration, 10);
+      if (isNaN(duration) || duration <= 0)
         return {
           type: "error",
-          data: {
-            message: `1분에서 ${this.config.maxCustomDuration}분 사이의 시간을 입력해주세요.`
-          }
+          data: { message: "올바른 시간을 입력해주세요." }
         };
-      }
     } else {
       duration = this.getDurationByType(timerType);
     }
 
-    if (!duration) {
+    if (!duration)
       return { type: "error", data: { message: "잘못된 타이머 타입입니다." } };
-    }
-
-    // 2. _startNewTimer 호출
     return this._startNewTimer(
       userId,
       userName,
@@ -159,14 +144,12 @@ class TimerModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery.from);
     const preset = this.config[presetKey];
-
     const pomodoroInfo = {
       isPomodoro: true,
       currentCycle: 1,
       totalCycles: preset.cycles,
       preset: presetKey
     };
-
     return this._startNewTimer(
       userId,
       userName,
@@ -180,6 +163,8 @@ class TimerModule extends BaseModule {
   /**
    * 🌟 모든 타이머를 생성하는 단일 메서드 (리팩토링)
    */
+  // ===== 🌸 뽀모도로 및 완료 로직 🌸 =====
+
   async _startNewTimer(
     userId,
     userName,
@@ -188,21 +173,14 @@ class TimerModule extends BaseModule {
     callbackQuery,
     pomodoroInfo = {}
   ) {
-    if (this.activeTimers.has(userId)) {
+    if (this.activeTimers.has(userId))
       return {
         type: "error",
         data: { message: "⚠️ 이미 실행 중인 타이머가 있습니다!" }
       };
-    }
 
     const dbDuration =
       this.devMode.enabled && actualDuration < 1 ? 1 : actualDuration;
-    if (this.devMode.enabled && actualDuration < 1) {
-      logger.info(
-        `🔧 개발 모드: ${actualDuration}분 타이머 -> DB에는 ${dbDuration}분으로 저장`
-      );
-    }
-
     const sessionData = {
       type,
       duration: dbDuration,
@@ -211,25 +189,21 @@ class TimerModule extends BaseModule {
     };
     const result = await this.timerService.startSession(userId, sessionData);
 
-    if (!result.success) {
+    if (!result.success)
       return { type: "error", data: { message: result.message } };
-    }
 
-    const session = result.data;
     const timer = this.createTimer(
-      session._id,
+      result.data._id,
       type,
       actualDuration,
       userId,
       callbackQuery,
       pomodoroInfo
     );
-
     this.activeTimers.set(userId, timer);
     this.startTimerInterval(userId);
 
     logger.info(`▶️ 세션 시작: ${userId} - ${type} (${actualDuration}분)`);
-
     return {
       type: pomodoroInfo.isPomodoro ? "pomodoro_started" : "timer_started",
       data: { timer: this.generateTimerData(timer) }
@@ -242,22 +216,17 @@ class TimerModule extends BaseModule {
   async completeTimer(userId) {
     const timer = this.activeTimers.get(userId);
     if (!timer) return;
-
     this.cleanupUserTimer(userId);
-    const result = await this.timerService.completeSession(userId);
-    if (!result.success) {
-      logger.warn(
-        `세션 완료 처리 건너뛰기: ${userId}의 DB 세션이 이미 완료/정리됨.`
-      );
-      return;
-    }
-    logger.info(`✅ 세션 완료: ${userId}`);
 
-    if (timer.isPomodoro) {
-      await this.transitionToNextPomodoro(userId, timer);
-    } else {
-      await this.notifyCompletion(timer);
-    }
+    const result = await this.timerService.completeSession(userId);
+    if (!result.success)
+      return logger.warn(
+        `세션 완료 처리 건너뛰기: ${userId}의 DB 세션이 이미 정리됨.`
+      );
+
+    logger.info(`✅ 세션 완료: ${userId}`);
+    if (timer.isPomodoro) await this.transitionToNextPomodoro(userId, timer);
+    else await this.notifyCompletion(timer);
   }
 
   /**
@@ -267,56 +236,59 @@ class TimerModule extends BaseModule {
     const preset = this.config[completedTimer.preset];
     const isLastFocus =
       completedTimer.currentCycle >= completedTimer.totalCycles;
-
-    let nextType, nextDuration;
     const nextCycle =
       completedTimer.type === "focus"
         ? completedTimer.currentCycle
         : completedTimer.currentCycle + 1;
+    let nextType, nextDuration;
 
     if (completedTimer.type === "focus") {
       nextType = isLastFocus ? "longBreak" : "shortBreak";
       nextDuration = isLastFocus ? preset.longBreak : preset.shortBreak;
     } else {
-      if (isLastFocus) {
-        // 긴 휴식 또는 마지막 짧은 휴식 후 종료
-        await this.notifyPomodoroSetCompletion(completedTimer);
-        return;
-      }
+      if (isLastFocus)
+        return await this.notifyPomodoroSetCompletion(completedTimer);
       nextType = "focus";
       nextDuration = preset.focus;
     }
 
     const userName = getUserName({ id: userId, first_name: "Pomodoro" });
     const pomodoroInfo = { ...completedTimer, currentCycle: nextCycle };
+    delete pomodoroInfo.sessionId; // 이전 세션 ID는 제거
 
-    // 새 타이머 시작
+    const mockCallbackQuery = {
+      message: {
+        chat: { id: completedTimer.chatId },
+        message_id: completedTimer.messageId
+      }
+    };
     await this._startNewTimer(
       userId,
       userName,
       nextType,
       nextDuration,
-      {
-        message: {
-          chat: { id: completedTimer.chatId },
-          message_id: completedTimer.messageId
-        }
-      },
+      mockCallbackQuery,
       pomodoroInfo
     );
 
-    // 알림은 새 타이머 정보를 가져와서 전송
     const newTimer = this.activeTimers.get(userId);
-    if (newTimer) {
-      await this.notifyTransition(newTimer);
-    }
+    if (newTimer) await this.notifyTransition(newTimer);
   }
 
-  // ===== 헬퍼 및 알림 메서드 (리팩토링) =====
+  // ===== 개발자모드 메서드 =====
 
-  /**
-   * 🔔 일반 타이머 완료 알림 (리팩토링)
-   */
+  parseDevDuration(envValue, defaultValue) {
+    if (this.devMode.enabled) {
+      const value = parseFloat(envValue);
+      if (!isNaN(value)) {
+        return value;
+      }
+    }
+    return defaultValue;
+  }
+
+  // ===== 🔔 알림 메서드 🔔 =====
+
   async notifyCompletion(timer) {
     try {
       const text = `🎉 *타이머 완료!*\n\n*${this.getTypeDisplay(timer.type)}*(${timer.duration}분) 타이머가 종료되었습니다. 수고하셨습니다!`;
@@ -336,9 +308,6 @@ class TimerModule extends BaseModule {
     }
   }
 
-  /**
-   * 🔔 뽀모도로 전환 알림 (리팩토링)
-   */
   async notifyTransition(timer) {
     try {
       const result = {
@@ -358,9 +327,6 @@ class TimerModule extends BaseModule {
     }
   }
 
-  /**
-   * 🎉 뽀모도로 세트 완료 알림 (리팩토링)
-   */
   async notifyPomodoroSetCompletion(timer) {
     try {
       const result = {
@@ -384,11 +350,103 @@ class TimerModule extends BaseModule {
     }
   }
 
-  // ===== 기존 코드 (일부 수정) =====
+  // ===== 기존 코드 =====
 
-  // (menu, pauseTimer, resumeTimer, stopTimer, refresh, showCustomSetup 등 기존 핸들러 메서드들은 그대로 유지)
-  // ...
-  // pomodoro1, pomodoro2 핸들러 수정
+  // 일시 정지
+  async pauseTimer(bot, callbackQuery) {
+    const userId = getUserId(callbackQuery.from);
+    const timer = this.activeTimers.get(userId);
+    if (!timer || timer.status !== "running")
+      return {
+        type: "error",
+        data: { message: "실행 중인 타이머가 없거나 이미 일시정지 상태입니다." }
+      };
+
+    this.clearTimerInterval(userId);
+    timer.status = "paused";
+    timer.pausedAt = Date.now();
+
+    await this.timerService.pauseSession(userId);
+    return {
+      type: "timer_paused",
+      data: { timer: this.generateTimerData(timer) }
+    };
+  }
+
+  // 재개
+  async resumeTimer(bot, callbackQuery) {
+    const userId = getUserId(callbackQuery.from);
+    const timer = this.activeTimers.get(userId);
+    if (!timer || timer.status !== "paused")
+      return {
+        type: "error",
+        data: { message: "일시정지 상태인 타이머가 없습니다." }
+      };
+
+    const result = await this.timerService.resumeSession(userId);
+    if (!result.success)
+      return { type: "error", data: { message: result.message } };
+
+    timer.totalPausedDuration += Date.now() - timer.pausedAt;
+    timer.status = "running";
+    timer.pausedAt = null;
+    this.startTimerInterval(userId);
+
+    return {
+      type: "timer_resumed",
+      data: { timer: this.generateTimerData(timer) }
+    };
+  }
+
+  // 중단
+  async stopTimer(bot, callbackQuery) {
+    const userId = getUserId(callbackQuery.from);
+    const timer = this.activeTimers.get(userId);
+    if (!timer)
+      return {
+        type: "no_timer",
+        data: { message: "실행 중인 타이머가 없습니다." }
+      };
+
+    this.cleanupUserTimer(userId);
+    const result = await this.timerService.stopSession(userId);
+    if (!result.success)
+      return { type: "error", data: { message: result.message } };
+
+    logger.info(
+      `⏹️ 세션 중지 완료: ${userId} - 완료율: ${result.data.completionRate}%`
+    );
+    return {
+      type: "timer_stopped",
+      data: {
+        ...result.data,
+        elapsedTime: this.formatTime(
+          Math.round(result.data.actualDuration * 60)
+        )
+      }
+    };
+  }
+
+  // 커스텀 타이머
+  async showCustomSetup(bot, callbackQuery) {
+    return { type: "custom_setup", data: {} };
+  }
+
+  // 새로고침
+  async refresh(bot, callbackQuery) {
+    const userId = getUserId(callbackQuery.from);
+    const timer = this.activeTimers.get(userId);
+    if (!timer)
+      return {
+        type: "no_timer",
+        data: { message: "실행 중인 타이머가 없습니다." }
+      };
+    return {
+      type: "timer_status",
+      data: { timer: this.generateTimerData(timer), isRefresh: true }
+    };
+  }
+
   async pomodoro1(bot, callbackQuery) {
     return this.startPomodoro(bot, callbackQuery, "pomodoro1");
   }
@@ -413,6 +471,58 @@ class TimerModule extends BaseModule {
   }
 
   // ===== 헬퍼 메서드들 =====
+
+  startTimerInterval(userId) {
+    this.clearTimerInterval(userId);
+    const timer = this.activeTimers.get(userId);
+    if (!timer) return;
+
+    const updateInterval = this.devMode.enabled
+      ? Math.min(100, this.config.updateInterval)
+      : this.config.updateInterval;
+
+    const intervalId = setInterval(async () => {
+      const currentTimer = this.activeTimers.get(userId);
+      if (!currentTimer || currentTimer.status !== "running") {
+        this.clearTimerInterval(userId);
+        return;
+      }
+
+      const elapsed = this.calculateElapsedTime(currentTimer);
+      const totalDuration = currentTimer.duration * 60 * 1000;
+      const remaining = Math.max(0, totalDuration - elapsed);
+
+      if (remaining <= 0) {
+        logger.info(`✅ 타이머 완료: ${userId}`);
+        await this.completeTimer(userId);
+        return;
+      }
+      // (진행률 DB 업데이트 로직은 선택적으로 추가 가능)
+    }, updateInterval);
+
+    this.timerIntervals.set(userId, intervalId);
+    if (this.devMode.enabled)
+      logger.debug(`⚡ 타이머 인터벌 시작 (${updateInterval}ms 간격)`);
+  }
+
+  /**
+   * 🧹 특정 사용자의 타이머와 인터벌 정리 (추가된 메서드)
+   */
+  cleanupUserTimer(userId) {
+    this.clearTimerInterval(userId);
+    this.activeTimers.delete(userId);
+    logger.debug(`🧹 사용자 ${userId}의 타이머 메모리 정리 완료`);
+  }
+
+  /**
+   * 🛑 인터벌 정리 (추가된 메서드)
+   */
+  clearTimerInterval(userId) {
+    if (this.timerIntervals.has(userId)) {
+      clearInterval(this.timerIntervals.get(userId));
+      this.timerIntervals.delete(userId);
+    }
+  }
 
   createTimer(sessionId, type, duration, userId, callbackQuery, pomodoroInfo) {
     return {
@@ -453,27 +563,15 @@ class TimerModule extends BaseModule {
 
   calculateElapsedTime(timer) {
     if (timer.status === "paused") {
-      return timer.pausedAt - timer.startTime - timer.totalPausedDuration; // 🚀 totalPausedTime -> totalPausedDuration
+      return timer.pausedAt - timer.startTime - timer.totalPausedDuration;
     }
-    return Date.now() - timer.startTime - timer.totalPausedDuration; // 🚀 totalPausedTime -> totalPausedDuration
+    return Date.now() - timer.startTime - timer.totalPausedDuration;
   }
 
   formatTime(seconds) {
-    if (this.devMode.enabled && seconds < 60) {
-      return `${seconds}초`;
-    }
-
-    const hours = Math.floor(seconds / 3600);
-    const minutes = Math.floor((seconds % 3600) / 60);
+    const minutes = Math.floor(seconds / 60);
     const secs = seconds % 60;
-
-    if (hours > 0) {
-      return `${hours}시간 ${minutes}분`;
-    } else if (minutes > 0) {
-      return `${minutes}분 ${secs}초`;
-    } else {
-      return `${secs}초`;
-    }
+    return `${minutes.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
   }
 
   getTypeDisplay(type) {
@@ -496,38 +594,24 @@ class TimerModule extends BaseModule {
     return displays[status] || status;
   }
 
-  calculateBadge(totalSessions) {
-    for (const [_key, badge] of Object.entries(
-      this.constants.BADGES
-    ).reverse()) {
-      if (totalSessions >= badge.threshold) {
-        return badge;
-      }
-    }
-    return null;
-  }
+  // ===== 유틸리티 메서드들 =====
 
-  getDefaultStats() {
+  /**
+   * 📊 모듈의 현재 상태를 반환합니다.
+   */
+  getStatus() {
     return {
-      totalSessions: 0,
-      totalFocusTime: 0,
-      totalBreakTime: 0,
-      completionRate: 0,
-      dailyActivity: [
-        { name: "월", sessions: 0 },
-        { name: "화", sessions: 0 },
-        { name: "수", sessions: 0 },
-        { name: "목", sessions: 0 },
-        { name: "금", sessions: 0 },
-        { name: "토", sessions: 0 },
-        { name: "일", sessions: 0 }
-      ]
+      activeTimers: this.activeTimers.size
     };
   }
 
-  async cleanup() {
+  /**
+   * 🧹 봇 종료 시 모듈을 안전하게 정리합니다. (BaseModule 표준)
+   */
+  async onCleanup() {
     try {
-      for (const userId of this.activeTimers.keys()) {
+      // 모든 활성 타이머의 인터벌을 정리합니다.
+      for (const userId of this.timerIntervals.keys()) {
         this.clearTimerInterval(userId);
       }
       this.activeTimers.clear();
