@@ -8,7 +8,35 @@ const _TimeHelper = require("../utils/TimeHelper");
 class TimerModule extends BaseModule {
   constructor(moduleName, options = {}) {
     super(moduleName, options);
+    this.serviceBuilder = options.serviceBuilder || null;
 
+    this.timerService = null;
+    this.activeTimers = new Map();
+    this.timerIntervals = new Map();
+  }
+
+  /**
+   * 🚀 모듈 초기화
+   */
+  async onInitialize() {
+    try {
+      this.timerService = await this.serviceBuilder.getOrCreate("timer");
+      if (!this.timerService) {
+        throw new Error("TimerService를 찾을 수 없습니다.");
+      }
+      this.setupConfig();
+      this.setupActions(); // 액션 등록
+      logger.success("🍅 TimerModule 초기화 완료");
+    } catch (error) {
+      logger.error("❌ TimerModule 초기화 실패:", error);
+      throw error;
+    }
+  }
+
+  /**
+   * ⚙️ 설정 초기화
+   */
+  setupConfig() {
     const isDevelopment = process.env.NODE_ENV === "development";
     const isDevMode = process.env.TIMER_DEV_MODE === "true";
 
@@ -17,9 +45,7 @@ class TimerModule extends BaseModule {
       showProgress: process.env.TIMER_DEV_PROGRESS === "true"
     };
 
-    if (this.devMode.enabled) {
-      logger.warn("⚡ 타이머 개발 모드 활성화!");
-    }
+    if (this.devMode.enabled) logger.warn("⚡ 타이머 개발 모드 활성화!");
 
     this.config = {
       focusDuration: this.parseDevDuration(
@@ -28,7 +54,6 @@ class TimerModule extends BaseModule {
       ),
       shortBreak: this.parseDevDuration(process.env.TIMER_SHORT_BREAK, 5),
       longBreak: this.parseDevDuration(process.env.TIMER_LONG_BREAK, 15),
-      maxCustomDuration: parseInt(process.env.TIMER_MAX_CUSTOM) || 120,
       updateInterval: parseInt(process.env.TIMER_UPDATE_INTERVAL) || 1000,
       get pomodoro1() {
         return {
@@ -39,38 +64,47 @@ class TimerModule extends BaseModule {
         };
       },
       get pomodoro2() {
-        return {
-          focus: 50,
-          shortBreak: 10,
-          cycles: 2,
-          longBreak: 30
-        };
-      },
-      ...options.config
+        return { focus: 50, shortBreak: 10, cycles: 2, longBreak: 30 };
+      }
     };
 
-    logger.info("⏱️ 실제 시간 설정:");
-    logger.info(`   - 집중: ${this.config.focusDuration}분`);
-    logger.info(`   - 짧은 휴식: ${this.config.shortBreak}분`);
-    logger.info(`   - 긴 휴식: ${this.config.longBreak}분`);
-
-    this.activeTimers = new Map();
-    this.timerIntervals = new Map();
-    this.timerService = null;
-    this.reminderService = null;
+    logger.info("⏱️ 타이머 시간 설정 (분):", {
+      focus: this.config.focusDuration,
+      short: this.config.shortBreak,
+      long: this.config.longBreak
+    });
   }
 
-  async initialize(bot, moduleManager) {
-    super.initialize(bot, moduleManager);
-    this.timerService = await this.services.get("timer");
-    this.reminderService = await this.services.get("reminder");
-    if (this.reminderService) {
-      logger.info("✅ ReminderService (알림) 연결됨");
-    }
-    return true;
+  /**
+   * 🕹️ 액션 매핑 설정 (TodoModule 표준)
+   */
+  setupActions() {
+    this.registerActions({
+      menu: this.showMenu,
+      start: this.start,
+      custom: this.showCustomSetup,
+      pomodoro1: (bot, ctx) => this.startPomodoro(bot, ctx, "pomodoro1"),
+      pomodoro2: (bot, ctx) => this.startPomodoro(bot, ctx, "pomodoro2"),
+      pause: this.pauseTimer,
+      resume: this.resumeTimer,
+      stop: this.stopTimer,
+      refresh: this.refresh
+    });
   }
 
   // ===== 🚀 핵심 로직 (리팩토링) =====
+
+  async showMenu(bot, callbackQuery) {
+    const userId = getUserId(callbackQuery.from);
+    const timer = this.activeTimers.get(userId);
+    if (timer) {
+      return this.refresh(bot, callbackQuery);
+    }
+    return {
+      type: "menu",
+      data: { userName: getUserName(callbackQuery.from) }
+    };
+  }
 
   /**
    * 🎛️ 모든 타이머 시작의 관문 (리팩토링)
