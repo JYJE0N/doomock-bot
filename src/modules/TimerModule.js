@@ -343,8 +343,8 @@ class TimerModule extends BaseModule {
       };
     }
 
-    // 메모리에 타이머 생성
-    const timer = this.stateManager.createTimer(
+    // 메모리에 타이머 생성 (const timer = 제거)
+    this.stateManager.createTimer(
       userId,
       "focus",
       preset.focus,
@@ -359,10 +359,10 @@ class TimerModule extends BaseModule {
       }
     );
 
-    logger.debug(`🍅 뽀모도로 타이머 생성: ${timer.userId}`); // 로깅에 사용
+    // ✅ 디버깅용 로그 추가
+    logger.debug(`🍅 뽀모도로 타이머 생성: ${userId}`);
 
-    // ✅ return 문 추가 - timer 변수는 사용하지 않지만,
-    // 나중에 필요할 수 있으므로 그대로 유지
+    // ✅ return 문 추가!
     return {
       type: "pomodoro_started",
       data: {
