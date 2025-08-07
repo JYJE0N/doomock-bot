@@ -322,54 +322,43 @@ class BotController {
    */
   async initializeHandlers() {
     try {
-      logger.info("🎮 핸들러 및 매니저 초기화 중...");
+      // 1. 기본 핸들러 생성
+      this.errorHandler = new ErrorHandler(this.bot);
+      this.markdownHelper = new MarkdownHelper(this.bot);
+      logger.info("🚨 ErrorHandler 초기화 완료");
+      logger.info("🎯 스마트 MarkdownV2 시스템 초기화 완료");
 
-      // 헬퍼 컴포넌트 중앙 생성
-      this.errorHandler = new ErrorHandler();
-      this.markdownHelper = new MarkdownHelper();
-      await this.errorHandler.initialize(this.bot);
-      await this.markdownHelper.initialize();
-
-      // 1. ServiceBuilder 생성 (Mongoose 전용)
+      // 2. ServiceBuilder 초기화
       this.serviceBuilder = createServiceBuilder(this.bot);
       this.serviceBuilder.setMongooseManager(this.mongooseManager);
 
-      // 2. ServiceBuilder 초기화
       await this.serviceBuilder.initialize();
+      logger.success("✅ ServiceBuilder 초기화 완료");
 
-      // 3. 필수 서비스들 미리 생성
-      logger.info("📦 필수 서비스 초기화 중...");
+      // 3. 필수 서비스 사전 로드 (fortune 추가!)
       const requiredServices = [
         "todo",
         "timer",
         "worktime",
         "leave",
         "weather",
-        "tts",
-        "fortune"
+        "fortune",
+        "tts"
       ];
-
+      logger.info("📦 필수 서비스 초기화 중...");
       for (const serviceName of requiredServices) {
         try {
-          const serviceInstance =
-            await this.serviceBuilder.getOrCreate(serviceName);
+          await this.serviceBuilder.getOrCreate(serviceName);
           logger.success(`✅ ${serviceName} 서비스 초기화 완료`);
-
-          // 🚀 타이머 서비스가 생성된 직후 정리 작업 수행
-          if (
-            serviceName === "timer" &&
-            serviceInstance.cleanupAllActiveSessions
-          ) {
-            await serviceInstance.cleanupAllActiveSessions();
-          }
         } catch (error) {
           logger.warn(`⚠️ ${serviceName} 서비스 초기화 실패:`, error.message);
         }
       }
 
-      // 4. 🚀🚀🚀 순서 변경 🚀🚀🚀
-      // ModuleManager와 NavigationHandler를 먼저 생성합니다.
+      // 4. 🚀🚀🚀 핵심 수정: ModuleManager 생성자에 serviceBuilder 전달
       this.moduleManager = new ModuleManager(this.serviceBuilder);
+
+      // 5. NavigationHandler 생성
       this.navigationHandler = new NavigationHandler(
         this.bot,
         this.moduleManager,
@@ -377,17 +366,18 @@ class BotController {
         this.markdownHelper
       );
 
-      // 5. 🚀🚀🚀 핵심: ModuleManager에 NavigationHandler를 연결합니다.
+      // 6. 🔗 두 핸들러 연결
       this.moduleManager.setNavigationHandler(this.navigationHandler);
 
-      // 6. 🚀🚀🚀 두 부품이 연결된 후, 각각 초기화합니다.
+      // 7. NavigationHandler 초기화 (렌더러 로드)
       await this.navigationHandler.initialize();
       logger.success("✅ NavigationHandler 초기화 완료");
 
-      await this.moduleManager.initialize(); // 이제 모듈들이 로드됩니다.
+      // 8. NavigationHandler가 준비된 후, ModuleManager 초기화 (모듈 로드)
+      await this.moduleManager.initialize();
       logger.success("✅ ModuleManager 초기화 완료");
 
-      // 7. CommandHandler 초기화
+      // 9. CommandHandler 초기화
       this.commandHandler = new CommandHandler({
         moduleManager: this.moduleManager,
         navigationHandler: this.navigationHandler
