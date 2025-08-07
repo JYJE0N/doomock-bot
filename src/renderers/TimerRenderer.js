@@ -99,6 +99,8 @@ class TimerRenderer extends BaseRenderer {
           return await this.renderSettings(data, ctx);
         case "notification_toggled":
           return await this.renderNotificationToggled(data, ctx);
+        case "stats":
+          return await this.renderStats(data, ctx);
         case "help":
           return await this.renderHelp(data, ctx);
         case "error":
@@ -475,18 +477,53 @@ class TimerRenderer extends BaseRenderer {
    * 📜 기록 렌더링
    */
   async renderHistory(data, ctx) {
-    const { sessions, userName } = data;
+    const { sessions, stats, days } = data;
 
-    let text = `📜 *${this.markdownHelper.escape(userName)}님의 최근 기록*\n\n`;
+    let text = `📜 *최근 ${days}일 타이머 기록*\n\n`;
 
-    sessions.forEach((session, index) => {
-      const emoji = this.getTypeEmoji(session.type);
-      const status = session.status === "completed" ? "✅" : "⏹️";
+    if (!sessions || sessions.length === 0) {
+      text += "_아직 기록이 없습니다. 타이머를 시작해보세요!_";
+    } else {
+      sessions.forEach((session, index) => {
+        // 완료 상태에 따른 이모지
+        const statusEmoji = session.wasCompleted ? "✅" : "⏹️";
 
-      text += `${index + 1}. ${emoji} ${session.typeDisplay} (${session.durationDisplay})\n`;
-      text += `   ${status} ${session.completedAt || session.stoppedAt}\n`;
-      text += `   📊 완료율: ${session.completionRate || 0}%\n\n`;
-    });
+        // 타입 표시
+        const typeDisplay =
+          session.typeDisplay || this.getTypeDisplay(session.type);
+
+        // 시간 표시
+        const timeDisplay = session.completedAt
+          ? new Date(session.completedAt).toLocaleString("ko-KR", {
+              month: "numeric",
+              day: "numeric",
+              hour: "2-digit",
+              minute: "2-digit"
+            })
+          : session.stoppedAt
+            ? new Date(session.stoppedAt).toLocaleString("ko-KR", {
+                month: "numeric",
+                day: "numeric",
+                hour: "2-digit",
+                minute: "2-digit"
+              })
+            : "";
+
+        text += `${index + 1}. ${statusEmoji} ${typeDisplay}\n`;
+        text += `   ⏱️ ${session.durationDisplay || session.duration + "분"}\n`;
+        text += `   📅 ${timeDisplay}\n`;
+        text += `   📊 완료율: ${session.completionRate}%\n\n`;
+      });
+
+      // 통계 요약
+      if (stats && stats.total) {
+        text += `*📊 요약*\n`;
+        text += `• 총 세션: ${stats.total.sessions}회\n`;
+        text += `• 완료된 세션: ${stats.total.completed}회\n`;
+        text += `• 총 시간: ${stats.total.minutes}분\n`;
+        text += `• 평균 완료율: ${stats.total.avgCompletionRate}%\n`;
+      }
+    }
 
     const buttons = [
       [
@@ -891,6 +928,70 @@ class TimerRenderer extends BaseRenderer {
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * 📊 통계 렌더링
+   */
+  async renderStats(data, ctx) {
+    const { userName, weekly, allTime, recentCount } = data;
+
+    let text = `📊 *${this.markdownHelper.escape(userName)}님의 타이머 통계*\n\n`;
+
+    // 주간 통계
+    if (weekly) {
+      text += `*📅 이번 주 통계*\n`;
+      text += `• 총 세션: ${weekly.totalSessions}회\n`;
+      text += `• 완료된 세션: ${weekly.completedSessions}회\n`;
+      text += `• 집중 시간: ${weekly.totalFocusTime}분\n`;
+      text += `• 휴식 시간: ${weekly.totalBreakTime}분\n`;
+      text += `• 완료율: ${weekly.completionRate || 0}%\n\n`;
+    }
+
+    // 전체 통계 (최근 30개 세션 기준)
+    if (allTime) {
+      text += `*📈 전체 통계* (최근 ${recentCount}개 세션)\n`;
+      text += `• 총 세션: ${allTime.totalSessions}회\n`;
+      text += `• 완료된 세션: ${allTime.completedSessions}회\n`;
+      text += `• 총 시간: ${allTime.totalMinutes}분\n`;
+
+      if (allTime.totalSessions > 0) {
+        const avgCompletionRate = Math.round(
+          (allTime.completedSessions / allTime.totalSessions) * 100
+        );
+        text += `• 평균 완료율: ${avgCompletionRate}%\n`;
+      }
+
+      text += `\n*타입별 분석*\n`;
+      for (const [type, stats] of Object.entries(allTime.byType)) {
+        const typeDisplay = this.getTypeDisplay(type);
+        text += `${typeDisplay}: ${stats.count}회 (${stats.minutes}분)\n`;
+      }
+    }
+
+    const buttons = [
+      [
+        { text: "📜 최근 기록", action: "history" },
+        { text: "🍅 새 타이머", action: "menu" }
+      ],
+      [{ text: "🔙 메뉴", action: "menu" }]
+    ];
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * 타입 표시명 가져오기
+   */
+  getTypeDisplay(type) {
+    const displays = {
+      focus: "🎯 집중",
+      shortBreak: "☕ 짧은 휴식",
+      longBreak: "🌴 긴 휴식",
+      custom: "⏰ 커스텀"
+    };
+    return displays[type] || type;
   }
 
   /**

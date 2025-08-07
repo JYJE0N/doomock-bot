@@ -1,7 +1,7 @@
 // src/services/TimerService.js - 🍅 SoC 완전 준수 리팩토링 v4.0
 
 const BaseService = require("./BaseService");
-const TimeHelper = require("../utils/TimeHelper");
+
 const logger = require("../utils/Logger");
 
 /**
@@ -705,12 +705,21 @@ class TimerService extends BaseService {
 
     return {
       ...obj,
-      _id: obj._id.toString(),
-      startedAt: TimeHelper.safeDisplayTime(obj.startedAt),
-      completedAt: TimeHelper.safeDisplayTime(obj.completedAt),
-      stoppedAt: TimeHelper.safeDisplayTime(obj.stoppedAt),
-      pausedAt: TimeHelper.safeDisplayTime(obj.pausedAt),
-      resumedAt: TimeHelper.safeDisplayTime(obj.resumedAt),
+      _id: obj._id?.toString() || obj._id,
+      // 원본 날짜 필드는 그대로 유지
+      userId: obj.userId,
+      userName: obj.userName || "Unknown",
+      type: obj.type,
+      duration: obj.duration,
+      status: obj.status,
+      completionRate: obj.completionRate || 0,
+      wasCompleted: obj.wasCompleted || false,
+      actualDuration: obj.actualDuration || obj.totalDurationMinutes || 0,
+      // 날짜 원본 유지
+      startedAt: obj.startedAt,
+      completedAt: obj.completedAt,
+      stoppedAt: obj.stoppedAt,
+      // 표시용 필드 추가
       durationDisplay: `${obj.duration}분`,
       typeDisplay: this.getTypeDisplay(obj.type),
       statusDisplay: this.getStatusDisplay(obj.status)

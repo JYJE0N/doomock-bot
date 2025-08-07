@@ -1,6 +1,7 @@
 // src/modules/TimerModule.js - 리팩토링 v6.0
 
 const BaseModule = require("../core/BaseModule");
+const TimeHelper = require("../utils/TimeHelper");
 const { getUserId, getUserName } = require("../utils/UserHelper");
 const { getInstance: getStateManager } = require("../utils/TimerStateManager");
 const logger = require("../utils/Logger");
@@ -59,7 +60,8 @@ class TimerModule extends BaseModule {
       pomodoro2: this.startPomodoro2,
       custom: this.showCustomSetup,
       reset: this.resetTimer,
-      stats: this.showStats
+      stats: this.showStats,
+      history: this.showHistory
     });
   }
 
@@ -381,15 +383,187 @@ class TimerModule extends BaseModule {
   async showStats(bot, callbackQuery) {
     const userId = getUserId(callbackQuery.from);
 
-    const stats = await this.timerService.getUserStats(userId);
+    try {
+      // 주간 통계 조회
+      const weeklyStatsResponse =
+        await this.timerService.getWeeklyStats(userId);
 
-    return {
-      type: "stats",
-      data: {
-        userName: getUserName(callbackQuery.from),
-        stats: stats.data
+      if (!weeklyStatsResponse.success) {
+        return {
+          type: "error",
+          data: {
+            message: weeklyStatsResponse.message || "통계를 불러올 수 없습니다."
+          }
+        };
       }
-    };
+
+      // 최근 세션 조회 (통계용)
+      const recentSessionsResponse = await this.timerService.getRecentSessions(
+        userId,
+        30
+      );
+
+      const recentSessions = recentSessionsResponse.success
+        ? recentSessionsResponse.data
+        : [];
+
+      // 전체 통계 계산
+      const allTimeStats = recentSessions.reduce(
+        (acc, session) => {
+          acc.totalSessions++;
+          if (session.wasCompleted) {
+            acc.completedSessions++;
+          }
+          acc.totalMinutes += session.duration;
+
+          if (!acc.byType[session.type]) {
+            acc.byType[session.type] = {
+              count: 0,
+              minutes: 0,
+              completed: 0
+            };
+          }
+
+          acc.byType[session.type].count++;
+          acc.byType[session.type].minutes += session.duration;
+          if (session.wasCompleted) {
+            acc.byType[session.type].completed++;
+          }
+
+          return acc;
+        },
+        {
+          totalSessions: 0,
+          completedSessions: 0,
+          totalMinutes: 0,
+          byType: {}
+        }
+      );
+
+      return {
+        type: "stats",
+        data: {
+          userName: getUserName(callbackQuery.from),
+          weekly: weeklyStatsResponse.data,
+          allTime: allTimeStats,
+          recentCount: recentSessions.length
+        }
+      };
+    } catch (error) {
+      logger.error("타이머 통계 조회 실패:", error);
+      return {
+        type: "error",
+        data: {
+          message: "통계를 불러올 수 없습니다.",
+          error: error.message
+        }
+      };
+    }
+  }
+
+  /**
+   * 타이머 사용 이력 표시
+   */
+  async showHistory(bot, callbackQuery, subAction, params) {
+    const userId = getUserId(callbackQuery.from);
+    const days = parseInt(params) || 7; // 기본 7일
+
+    try {
+      // 최근 타이머 세션 조회 (TimerService는 응답 객체를 반환)
+      const response = await this.timerService.getRecentSessions(userId, days);
+
+      if (!response.success) {
+        return {
+          type: "error",
+          data: {
+            message: response.message || "타이머 이력을 불러올 수 없습니다."
+          }
+        };
+      }
+
+      const history = response.data;
+
+      if (!history || history.length === 0) {
+        return {
+          type: "no_history",
+          data: {
+            message: "최근 타이머 기록이 없습니다.",
+            days: days
+          }
+        };
+      }
+
+      // 타입별 통계 계산
+      const typeStats = history.reduce((acc, session) => {
+        const type = session.type;
+        if (!acc[type]) {
+          acc[type] = {
+            count: 0,
+            totalMinutes: 0,
+            completedCount: 0
+          };
+        }
+
+        acc[type].count++;
+        acc[type].totalMinutes += session.duration;
+        if (session.wasCompleted) {
+          acc[type].completedCount++;
+        }
+
+        return acc;
+      }, {});
+
+      // 전체 통계
+      const totalSessions = history.length;
+      const completedSessions = history.filter((s) => s.wasCompleted).length;
+      const totalMinutes = history.reduce((sum, s) => sum + s.duration, 0);
+      const avgCompletionRate =
+        history.reduce((sum, s) => sum + (s.completionRate || 0), 0) /
+        totalSessions;
+
+      return {
+        type: "history",
+        data: {
+          days: days,
+          sessions: history.map((session) => ({
+            id: session._id,
+            type: session.type,
+            typeDisplay: this.stateManager.getTypeDisplay(session.type),
+            duration: session.duration,
+            durationDisplay: `${session.duration}분`,
+            // 날짜 포맷팅을 여기서 처리
+            timeDisplay: session.completedAt
+              ? TimeHelper.format(session.completedAt, "short")
+              : session.stoppedAt
+                ? TimeHelper.format(session.stoppedAt, "short")
+                : TimeHelper.format(session.startedAt, "short"),
+            status: session.status,
+            statusDisplay: this.stateManager.getStatusDisplay(session.status),
+            completionRate: session.completionRate || 0,
+            wasCompleted: session.wasCompleted || false,
+            userName: session.userName || getUserName(callbackQuery.from)
+          })),
+          stats: {
+            total: {
+              sessions: totalSessions,
+              completed: completedSessions,
+              minutes: totalMinutes,
+              avgCompletionRate: Math.round(avgCompletionRate)
+            },
+            byType: typeStats
+          }
+        }
+      };
+    } catch (error) {
+      logger.error("타이머 이력 조회 실패:", error);
+      return {
+        type: "error",
+        data: {
+          message: "타이머 이력을 불러올 수 없습니다.",
+          error: error.message
+        }
+      };
+    }
   }
 
   // ===== 🔄 타이머 완료 처리 =====
