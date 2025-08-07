@@ -191,15 +191,26 @@ class TimerService extends BaseService {
         "세션을 찾을 수 없습니다."
       );
 
+    // 🚀 추가: 일시정지 상태가 아니면 재개할 수 없습니다.
+    if (session.status !== "paused") {
+      return this.createErrorResponse(
+        new Error("NOT_PAUSED"),
+        "일시정지 상태인 타이머만 재개할 수 있습니다."
+      );
+    }
+
     const pauseDuration = session.pausedAt
       ? Date.now() - session.pausedAt.getTime()
       : 0;
-    const totalPausedTime = (session.totalPausedTime || 0) + pauseDuration;
+
+    // 🚀 totalPausedTime -> totalPausedDuration
+    const totalPausedDuration =
+      (session.totalPausedDuration || 0) + pauseDuration;
 
     return this.updateSessionStatus(userId, "active", {
       resumedAt: new Date(),
       pausedAt: null,
-      totalPausedTime
+      totalPausedDuration // 🚀 totalPausedTime -> totalPausedDuration
     });
   }
 

@@ -574,12 +574,24 @@ class TimerModule extends BaseModule {
       };
     }
 
-    timer.totalPausedTime += Date.now() - timer.pausedAt;
+    // 🚀 1. DB를 먼저 업데이트하고 결과를 기다립니다.
+    const result = await this.timerService.resumeSession(userId);
+
+    if (!result.success) {
+      return {
+        type: "error",
+        module: "timer",
+        data: { message: result.message || "타이머 재개에 실패했습니다." }
+      };
+    }
+
+    // 🚀 2. DB 업데이트 성공 후, 인메모리 상태를 변경합니다.
+    timer.totalPausedDuration += Date.now() - timer.pausedAt;
     timer.status = "running";
     timer.pausedAt = null;
-    this.startTimerInterval(userId);
 
-    await this.timerService.resumeSession(userId);
+    // 🚀 3. 마지막으로 인터벌을 시작합니다.
+    this.startTimerInterval(userId);
 
     return {
       type: "timer_resumed",
@@ -763,7 +775,7 @@ class TimerModule extends BaseModule {
       remainingTime: duration * 60,
       status: "running",
       pausedAt: null,
-      totalPausedTime: 0,
+      totalPausedDuration: 0, // 🚀 totalPausedTime -> totalPausedDuration
       devMode: this.devMode.enabled
     };
   }
@@ -791,9 +803,9 @@ class TimerModule extends BaseModule {
 
   calculateElapsedTime(timer) {
     if (timer.status === "paused") {
-      return timer.pausedAt - timer.startTime - timer.totalPausedTime;
+      return timer.pausedAt - timer.startTime - timer.totalPausedDuration; // 🚀 totalPausedTime -> totalPausedDuration
     }
-    return Date.now() - timer.startTime - timer.totalPausedTime;
+    return Date.now() - timer.startTime - timer.totalPausedDuration; // 🚀 totalPausedTime -> totalPausedDuration
   }
 
   formatTime(seconds) {
