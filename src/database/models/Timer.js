@@ -35,42 +35,35 @@ const timerSchema = new mongoose.Schema(
       trim: true
     },
 
-    // 세션 정보
-    type: {
-      type: String,
-      enum: ["focus", "shortBreak", "longBreak"],
-      default: "focus",
-      required: true
-    },
-    duration: { type: Number, required: true, default: 25 }, // 분 단위
-
-    // 🍅 타이머 설정
+    // 🍅 타이머 설정 (여기로 통합 및 수정)
     type: {
       type: String,
       enum: {
-        values: ["focus", "shortBreak", "longBreak"],
-        message: "타이머 타입은 focus, shortBreak, longBreak 중 하나여야 합니다"
+        values: ["focus", "shortBreak", "longBreak", "custom"], // custom 추가
+        message:
+          "타이머 타입은 focus, shortBreak, longBreak, custom 중 하나여야 합니다."
       },
       default: "focus",
-      required: [true, "타이머 타입은 필수입니다"],
+      required: [true, "타이머 타입은 필수입니다."],
       index: true
     },
     duration: {
       type: Number,
-      required: [true, "타이머 지속시간은 필수입니다"],
-      min: [1, "타이머는 최소 1분 이상이어야 합니다"],
-      max: [180, "타이머는 최대 180분(3시간)까지 가능합니다"]
+      required: [true, "타이머 지속시간은 필수입니다."],
+      min: [1, "타이머는 최소 1분 이상이어야 합니다."],
+      max: [180, "타이머는 최대 180분(3시간)까지 가능합니다."]
     },
 
     // 📊 상태 관리
     status: {
       type: String,
       enum: {
-        values: ["active", "paused", "completed", "stopped"],
-        message: "상태는 active, paused, completed, stopped 중 하나여야 합니다"
+        values: ["active", "paused", "completed", "stopped", "abandoned"], // 'abandoned' 추가
+        message:
+          "상태는 active, paused, completed, stopped, abandoned 중 하나여야 합니다."
       },
       default: "active",
-      required: [true, "상태는 필수입니다"],
+      required: [true, "상태는 필수입니다."],
       index: true
     },
 

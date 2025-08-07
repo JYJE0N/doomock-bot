@@ -775,9 +775,9 @@ class TimerService extends BaseService {
         },
         {
           $set: {
-            status: "abandoned",
+            status: "abandoned", // '중단됨' 상태로 변경
             isActive: false,
-            abandonedAt: new Date()
+            stoppedAt: new Date() // 중지 시간 기록
           }
         }
       );

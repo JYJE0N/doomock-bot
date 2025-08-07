@@ -351,8 +351,17 @@ class BotController {
 
       for (const serviceName of requiredServices) {
         try {
-          await this.serviceBuilder.getOrCreate(serviceName);
+          const serviceInstance =
+            await this.serviceBuilder.getOrCreate(serviceName);
           logger.success(`✅ ${serviceName} 서비스 초기화 완료`);
+
+          // 🚀 타이머 서비스가 생성된 직후 정리 작업 수행
+          if (
+            serviceName === "timer" &&
+            serviceInstance.cleanupAllActiveSessions
+          ) {
+            await serviceInstance.cleanupAllActiveSessions();
+          }
         } catch (error) {
           logger.warn(`⚠️ ${serviceName} 서비스 초기화 실패:`, error.message);
         }
