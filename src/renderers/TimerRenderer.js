@@ -869,7 +869,8 @@ class TimerRenderer extends BaseRenderer {
 
     const progressBar = this.createProgressBar(0);
 
-    let text = // const → let으로 변경
+    // const를 let으로 변경!
+    let text =
       `${message}\n\n` +
       `${progressBar}\n\n` +
       `⏱️ *남은 시간*: ${this.escapeMarkdown(timer.remainingFormatted)}\n` +
@@ -877,7 +878,7 @@ class TimerRenderer extends BaseRenderer {
       `📊 *상태*: ${this.escapeMarkdown(timer.statusDisplay)}\n`;
 
     if (timer.totalCycles) {
-      text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n`; // 이제 가능!
+      text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n`;
     }
 
     const buttons = [
