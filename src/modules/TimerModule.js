@@ -312,14 +312,35 @@ class TimerModule extends BaseModule {
 
   async notifyTransition(timer) {
     try {
-      // ctx를 직접 만들지 말고, bot.telegram API 직접 사용
-      const text = this.generateTransitionMessage(timer);
-      const keyboard = this.generateTransitionKeyboard(timer);
+      // Telegraf는 bot.telegram.editMessageText를 사용합니다
+      const timerData = this.generateTimerData(timer);
+      const progressBar =
+        "▓".repeat(Math.floor(timerData.progress / 10)) +
+        "░".repeat(10 - Math.floor(timerData.progress / 10));
 
+      const text =
+        `🔄 *자동 전환됨*\n\n` +
+        `${progressBar}\n\n` +
+        `⏱️ *남은 시간*: ${timerData.remainingFormatted}\n` +
+        `🎯 *타입*: ${timerData.typeDisplay}\n` +
+        `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n\n` +
+        `자동으로 다음 세션이 시작되었습니다!`;
+
+      const keyboard = {
+        inline_keyboard: [
+          [
+            { text: "⏸️ 일시정지", callback_data: "timer:pause" },
+            { text: "⏹️ 중지", callback_data: "timer:stop" }
+          ],
+          [{ text: "🔄 새로고침", callback_data: "timer:refresh" }]
+        ]
+      };
+
+      // Telegraf API 사용
       await this.bot.telegram.editMessageText(
         timer.chatId,
         timer.messageId,
-        null,
+        null, // inline_message_id (우리는 사용하지 않음)
         text,
         {
           reply_markup: keyboard,
@@ -327,6 +348,25 @@ class TimerModule extends BaseModule {
         }
       );
     } catch (error) {
+      // 메시지 수정 실패 시 새 메시지 전송
+      if (
+        error.message?.includes("message is not modified") ||
+        error.message?.includes("message to edit not found")
+      ) {
+        try {
+          const timerData = this.generateTimerData(timer);
+          const text =
+            `🔄 타이머가 자동으로 전환되었습니다!\n` +
+            `현재: ${timerData.typeDisplay} (${timer.duration}분)`;
+
+          // Telegraf의 sendMessage 사용
+          await this.bot.telegram.sendMessage(timer.chatId, text, {
+            parse_mode: "Markdown"
+          });
+        } catch (sendError) {
+          logger.error("전환 알림 새 메시지 전송도 실패:", sendError.message);
+        }
+      }
       logger.error("뽀모도로 전환 알림 실패:", error.message);
     }
   }
