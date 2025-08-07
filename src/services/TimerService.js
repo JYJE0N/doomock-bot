@@ -530,7 +530,7 @@ class TimerService extends BaseService {
   async findActiveSession(userId) {
     try {
       return await this.models.Timer.findOne({
-        _id: userId,
+        userId: userId.toString(), // ✅ userId 필드로 검색해야 함!
         status: { $in: ["active", "paused"] },
         isActive: true
       });
