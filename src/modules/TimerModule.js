@@ -232,49 +232,108 @@ class TimerModule extends BaseModule {
   }
 
   /**
-   * 🔄 뽀모도로 다음 단계로 전환 (리팩토링)
+   * 🔄 뽀모도로 다음 단계로 전환
    */
   async transitionToNextPomodoro(userId, completedTimer) {
     const preset = this.config[completedTimer.preset];
-    const isLastFocus =
-      completedTimer.currentCycle >= completedTimer.totalCycles;
-    const nextCycle =
-      completedTimer.type === "focus"
-        ? completedTimer.currentCycle
-        : completedTimer.currentCycle + 1;
-    let nextType, nextDuration;
 
+    // Focus 세션이 끝난 경우
     if (completedTimer.type === "focus") {
-      nextType = isLastFocus ? "longBreak" : "shortBreak";
-      nextDuration = isLastFocus ? preset.longBreak : preset.shortBreak;
-    } else {
-      if (isLastFocus)
-        return await this.notifyPomodoroSetCompletion(completedTimer);
-      nextType = "focus";
-      nextDuration = preset.focus;
-    }
+      const isLastCycle =
+        completedTimer.currentCycle >= completedTimer.totalCycles;
 
-    const userName = getUserName({ id: userId, first_name: "Pomodoro" });
-    const pomodoroInfo = { ...completedTimer, currentCycle: nextCycle };
-    delete pomodoroInfo.sessionId; // 이전 세션 ID는 제거
+      if (isLastCycle) {
+        // 마지막 사이클이면 긴 휴식
+        const nextType = "longBreak";
+        const nextDuration = preset.longBreak;
 
-    const mockCallbackQuery = {
-      message: {
-        chat: { id: completedTimer.chatId },
-        message_id: completedTimer.messageId
+        const pomodoroInfo = {
+          ...completedTimer,
+          isLastBreak: true // 마지막 휴식 표시
+        };
+        delete pomodoroInfo.sessionId;
+
+        const mockCallbackQuery = {
+          message: {
+            chat: { id: completedTimer.chatId },
+            message_id: completedTimer.messageId
+          }
+        };
+
+        await this._startNewTimer(
+          userId,
+          getUserName({ id: userId }),
+          nextType,
+          nextDuration,
+          mockCallbackQuery,
+          pomodoroInfo
+        );
+
+        const newTimer = this.activeTimers.get(userId);
+        if (newTimer) await this.notifyTransition(newTimer);
+      } else {
+        // 일반 짧은 휴식
+        const nextType = "shortBreak";
+        const nextDuration = preset.shortBreak;
+
+        const pomodoroInfo = { ...completedTimer };
+        delete pomodoroInfo.sessionId;
+
+        const mockCallbackQuery = {
+          message: {
+            chat: { id: completedTimer.chatId },
+            message_id: completedTimer.messageId
+          }
+        };
+
+        await this._startNewTimer(
+          userId,
+          getUserName({ id: userId }),
+          nextType,
+          nextDuration,
+          mockCallbackQuery,
+          pomodoroInfo
+        );
+
+        const newTimer = this.activeTimers.get(userId);
+        if (newTimer) await this.notifyTransition(newTimer);
       }
-    };
-    await this._startNewTimer(
-      userId,
-      userName,
-      nextType,
-      nextDuration,
-      mockCallbackQuery,
-      pomodoroInfo
-    );
+    } else {
+      // 휴식이 끝난 경우
 
-    const newTimer = this.activeTimers.get(userId);
-    if (newTimer) await this.notifyTransition(newTimer);
+      // Long Break가 끝났으면 전체 세트 완료
+      if (completedTimer.isLastBreak || completedTimer.type === "longBreak") {
+        return await this.notifyPomodoroSetCompletion(completedTimer);
+      }
+
+      // Short Break가 끝났으면 다음 Focus 시작
+      const nextCycle = completedTimer.currentCycle + 1;
+      const pomodoroInfo = {
+        ...completedTimer,
+        currentCycle: nextCycle
+      };
+      delete pomodoroInfo.sessionId;
+      delete pomodoroInfo.isLastBreak;
+
+      const mockCallbackQuery = {
+        message: {
+          chat: { id: completedTimer.chatId },
+          message_id: completedTimer.messageId
+        }
+      };
+
+      await this._startNewTimer(
+        userId,
+        getUserName({ id: userId }),
+        "focus",
+        preset.focus,
+        mockCallbackQuery,
+        pomodoroInfo
+      );
+
+      const newTimer = this.activeTimers.get(userId);
+      if (newTimer) await this.notifyTransition(newTimer);
+    }
   }
 
   // ===== 개발자모드 메서드 =====
@@ -312,62 +371,52 @@ class TimerModule extends BaseModule {
 
   async notifyTransition(timer) {
     try {
-      // Telegraf는 bot.telegram.editMessageText를 사용합니다
-      const timerData = this.generateTimerData(timer);
-      const progressBar =
-        "▓".repeat(Math.floor(timerData.progress / 10)) +
-        "░".repeat(10 - Math.floor(timerData.progress / 10));
-
-      const text =
-        `🔄 *자동 전환됨*\n\n` +
-        `${progressBar}\n\n` +
-        `⏱️ *남은 시간*: ${timerData.remainingFormatted}\n` +
-        `🎯 *타입*: ${timerData.typeDisplay}\n` +
-        `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n\n` +
-        `자동으로 다음 세션이 시작되었습니다!`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "⏸️ 일시정지", callback_data: "timer:pause" },
-            { text: "⏹️ 중지", callback_data: "timer:stop" }
-          ],
-          [{ text: "🔄 새로고침", callback_data: "timer:refresh" }]
-        ]
+      // 렌더러에게 전달할 데이터만 준비
+      const result = {
+        type: "timer_transition",
+        data: {
+          timer: this.generateTimerData(timer),
+          isTransition: true,
+          message: `🔄 ${this.getTypeDisplay(timer.type)} 세션이 시작되었습니다`
+        }
       };
 
-      // Telegraf API 사용
-      await this.bot.telegram.editMessageText(
-        timer.chatId,
-        timer.messageId,
-        null, // inline_message_id (우리는 사용하지 않음)
-        text,
-        {
-          reply_markup: keyboard,
-          parse_mode: "Markdown"
-        }
-      );
-    } catch (error) {
-      // 메시지 수정 실패 시 새 메시지 전송
-      if (
-        error.message?.includes("message is not modified") ||
-        error.message?.includes("message to edit not found")
-      ) {
-        try {
-          const timerData = this.generateTimerData(timer);
-          const text =
-            `🔄 타이머가 자동으로 전환되었습니다!\n` +
-            `현재: ${timerData.typeDisplay} (${timer.duration}분)`;
-
-          // Telegraf의 sendMessage 사용
-          await this.bot.telegram.sendMessage(timer.chatId, text, {
-            parse_mode: "Markdown"
-          });
-        } catch (sendError) {
-          logger.error("전환 알림 새 메시지 전송도 실패:", sendError.message);
-        }
+      // 렌더러 찾기
+      const renderer =
+        this.moduleManager?.navigationHandler?.renderers?.get("timer");
+      if (!renderer) {
+        logger.error("TimerRenderer를 찾을 수 없습니다");
+        return;
       }
-      logger.error("뽀모도로 전환 알림 실패:", error.message);
+
+      // ctx 생성 (editMessageText 지원)
+      const ctx = {
+        from: { id: timer.userId },
+        chat: { id: timer.chatId },
+        callbackQuery: {
+          message: {
+            message_id: timer.messageId,
+            chat: { id: timer.chatId }
+          }
+        },
+        editMessageText: async (text, options) => {
+          return this.bot.telegram.editMessageText(
+            timer.chatId,
+            timer.messageId,
+            null,
+            text,
+            options
+          );
+        },
+        answerCbQuery: async () => Promise.resolve()
+      };
+
+      await renderer.render(result, ctx);
+    } catch (error) {
+      // 메시지 수정 실패는 무시 (이미 같은 내용일 수 있음)
+      if (!error.message?.includes("message is not modified")) {
+        logger.error("뽀모도로 전환 알림 실패:", error.message);
+      }
     }
   }
 
