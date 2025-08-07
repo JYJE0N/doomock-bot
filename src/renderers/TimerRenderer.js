@@ -862,6 +862,60 @@ class TimerRenderer extends BaseRenderer {
   }
 
   /**
+   * 타이머 전환 렌더링
+   */
+  async renderTimerTransition(data, ctx) {
+    const { timer, message } = data;
+
+    const progressBar = this.createProgressBar(0);
+
+    const text =
+      `${message}\n\n` +
+      `${progressBar}\n\n` +
+      `⏱️ *남은 시간*: ${this.escapeMarkdown(timer.remainingFormatted)}\n` +
+      `🎯 *타입*: ${this.escapeMarkdown(timer.typeDisplay)}\n` +
+      `📊 *상태*: ${this.escapeMarkdown(timer.statusDisplay)}\n`;
+
+    if (timer.totalCycles) {
+      text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n`;
+    }
+
+    const buttons = [
+      [
+        { text: "⏸️ 일시정지", action: "pause" },
+        { text: "⏹️ 중지", action: "stop" }
+      ],
+      [{ text: "🔄 새로고침", action: "refresh" }]
+    ];
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * 타이머 완료 렌더링
+   */
+  async renderTimerCompleted(data, ctx) {
+    const { type, duration } = data;
+
+    const text =
+      `🎉 *타이머 완료!*\n\n` +
+      `${this.escapeMarkdown(this.getTypeDisplay(type))} (${duration}분) 타이머가 완료되었습니다.\n\n` +
+      `수고하셨습니다! 💪`;
+
+    const buttons = [
+      [
+        { text: "🍅 뽀모도로 시작", action: "pomodoro1" },
+        { text: "⏱️ 새 타이머", action: "menu" }
+      ],
+      [{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]
+    ];
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
    * ❌ 에러 렌더링
    */
   async renderError(data, ctx) {
