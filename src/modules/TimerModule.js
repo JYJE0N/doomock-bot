@@ -355,7 +355,8 @@ class TimerModule extends BaseModule {
     // 개발 모드에서 타입별 시간 가져오기
     const duration = this.getDurationByType(timerType);
 
-    if (!duration) {
+    if (!duration && timerType) {
+      // timerType이 있을 때만 오류 처리
       return {
         type: "error",
         module: "timer",
@@ -363,26 +364,27 @@ class TimerModule extends BaseModule {
       };
     }
 
-    logger.debug(`타이머 타입 ${timerType}의 시간: ${duration}분`);
-
-    // 개발 모드에서 DB 저장용 시간 조정
+    // 🚀 핵심 수정: DB 저장용 시간과 실제 동작 시간 분리
     let dbDuration = duration;
+    // 개발 모드이고 설정된 시간이 1분 미만일 경우
     if (this.devMode.enabled && duration < 1) {
-      // DB는 최소 1분으로 저장
-      dbDuration = Math.max(1, Math.ceil(duration));
+      dbDuration = 1; // DB에는 최소 1분으로 저장
       logger.info(
         `🔧 개발 모드: ${duration}분 타이머 -> DB에는 ${dbDuration}분으로 저장`
       );
+    } else if (!duration) {
+      // params가 없는 경우 (예: 'start'만 호출) 커스텀 설정으로 유도
+      return this.showCustomSetup(bot, callbackQuery);
     }
 
     return this._startNewTimer(
       userId,
       userName,
       timerType,
-      dbDuration, // DB 저장용
+      dbDuration, // DB 저장용 시간
       callbackQuery,
       null,
-      duration // 실제 동작용
+      duration // 실제 타이머 동작 시간
     );
   }
 
@@ -390,10 +392,10 @@ class TimerModule extends BaseModule {
     userId,
     userName,
     type,
-    duration,
+    duration, // 이 값은 DB 저장용 (dbDuration)
     callbackQuery,
     pomodoroInfo = null,
-    actualDuration = null // 개발 모드용 실제 시간
+    actualDuration = null // 이 값은 실제 타이머 동작용
   ) {
     try {
       if (this.activeTimers.has(userId)) {
@@ -404,6 +406,7 @@ class TimerModule extends BaseModule {
         };
       }
 
+      // DB에는 'duration' 변수(dbDuration)를 사용해 세션 생성
       const sessionData = { type, duration, userName, ...pomodoroInfo };
       const result = await this.timerService.startSession(userId, sessionData);
 
@@ -417,8 +420,9 @@ class TimerModule extends BaseModule {
 
       const session = result.data;
 
-      // 실제 동작할 시간 (개발 모드에서는 actualDuration 사용)
-      const timerDuration = actualDuration || duration;
+      // 🚀 핵심 수정: 실제 타이머 동작 시간 결정
+      // actualDuration이 있으면 그 값을 사용, 없으면 dbDuration 사용
+      const timerDuration = actualDuration !== null ? actualDuration : duration;
 
       const timer = this.createTimer(session._id, type, timerDuration, userId);
       timer.chatId = callbackQuery.message.chat.id;
@@ -431,7 +435,8 @@ class TimerModule extends BaseModule {
       this.activeTimers.set(userId, timer);
       this.startTimerInterval(userId);
 
-      logger.info(`▶️ 세션 시작: ${userId} - ${type} (${duration}분)`);
+      // 사용자에게는 실제 동작 시간을 기준으로 안내
+      logger.info(`▶️ 세션 시작: ${userId} - ${type} (${timerDuration}분)`);
 
       return {
         type: pomodoroInfo ? "pomodoro_started" : "timer_started",
