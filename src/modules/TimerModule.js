@@ -217,14 +217,21 @@ class TimerModule extends BaseModule {
 
     try {
       const stoppedTimer = this.stateManager.stopTimer(userId);
-      // const result = 제거
-      await this.timerService.stopSession(userId);
+      await this.timerService.stopSession(userId); // result 변수 제거
+
+      // 경과 시간 포맷팅 (분 단위를 MM:SS 형식으로)
+      const elapsedMinutes = Math.floor(stoppedTimer.actualDuration);
+      const elapsedSeconds = Math.round(
+        (stoppedTimer.actualDuration - elapsedMinutes) * 60
+      );
+      const elapsedTime = `${elapsedMinutes}분 ${elapsedSeconds}초`;
 
       return {
         type: "timer_stopped",
         data: {
           completionRate: stoppedTimer.completionRate,
           actualDuration: stoppedTimer.actualDuration,
+          elapsedTime: elapsedTime,
           message: `⏹️ 타이머를 중지했습니다. (완료율: ${stoppedTimer.completionRate}%)`
         }
       };

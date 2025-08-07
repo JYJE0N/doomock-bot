@@ -174,6 +174,21 @@ class TimerStateManager {
     logger.debug(`🧹 타이머 정리: ${userId}`);
   }
 
+  /**
+   * 분 단위 시간을 MM:SS 형식으로 포맷팅
+   */
+  formatMinutes(minutes) {
+    const totalSeconds = Math.round(minutes * 60);
+    const mins = Math.floor(totalSeconds / 60);
+    const secs = totalSeconds % 60;
+
+    if (mins > 0) {
+      return `${mins}분 ${secs}초`;
+    } else {
+      return `${secs}초`;
+    }
+  }
+
   // ===== ⏰ 인터벌 관리 =====
 
   /**
