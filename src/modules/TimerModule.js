@@ -34,17 +34,22 @@ class TimerModule extends BaseModule {
       longBreak: this.parseDevDuration(process.env.TIMER_LONG_BREAK, 15),
       maxCustomDuration: parseInt(process.env.TIMER_MAX_CUSTOM) || 120,
       updateInterval: parseInt(process.env.TIMER_UPDATE_INTERVAL) || 1000,
-      pomodoro1: {
-        focus: 25,
-        shortBreak: 5,
-        cycles: 4,
-        longBreak: 15
+      // pomodoro1과 pomodoro2가 this.config의 다른 값을 참조하도록 변경
+      get pomodoro1() {
+        return {
+          focus: this.focusDuration,
+          shortBreak: this.shortBreak,
+          cycles: 4,
+          longBreak: this.longBreak
+        };
       },
-      pomodoro2: {
-        focus: 50,
-        shortBreak: 10,
-        cycles: 2,
-        longBreak: 30
+      get pomodoro2() {
+        return {
+          focus: 50, // pomodoro2는 다른 시간을 사용하므로 그대로 두거나, 별도 설정 추가
+          shortBreak: 10,
+          cycles: 2,
+          longBreak: 30
+        };
       },
       enableNotifications: process.env.TIMER_ENABLE_NOTIFICATIONS !== "false",
       enableBadges: process.env.TIMER_ENABLE_BADGES !== "false",
@@ -605,6 +610,8 @@ class TimerModule extends BaseModule {
 
   async stopTimer(bot, callbackQuery) {
     const userId = getUserId(callbackQuery.from);
+
+    // 🚀 1. 메모리에서 타이머를 먼저 가져옵니다.
     const timer = this.activeTimers.get(userId);
 
     if (!timer) {
@@ -615,32 +622,35 @@ class TimerModule extends BaseModule {
       };
     }
 
-    const elapsedTime = this.calculateElapsedTime(timer);
-    const completionRate = Math.min(
-      100,
-      Math.round((elapsedTime / (timer.duration * 60 * 1000)) * 100)
-    );
+    // 🚀 2. 경쟁 상태를 막기 위해 인터벌과 메모리를 즉시 정리합니다.
+    this.cleanupUserTimer(userId);
 
+    // 🚀 3. 메모리에서 정리된 타이머 정보를 바탕으로 DB 업데이트를 요청합니다.
     const result = await this.timerService.stopSession(userId);
+
     if (!result.success) {
+      // DB 업데이트에 실패하더라도, 메모리에서는 이미 타이머가 중지되었으므로 사용자에게는 오류를 안내합니다.
       return {
         type: "error",
         module: "timer",
-        data: { message: result.message }
+        data: { message: result.message || "타이머 중지에 실패했습니다." }
       };
     }
 
-    this.cleanupUserTimer(userId);
-
-    logger.info(`⏹️ 세션 중지: ${userId} - 완료율: ${completionRate}%`);
+    // 🚀 4. DB 업데이트 결과를 바탕으로 사용자에게 성공 메시지를 보냅니다.
+    logger.info(
+      `⏹️ 세션 중지 완료: ${userId} - 완료율: ${result.data.completionRate}%`
+    );
 
     return {
       type: "timer_stopped",
       module: "timer",
       data: {
         message: "⏹️ 타이머를 중지했습니다.",
-        elapsedTime: this.formatTime(Math.floor(elapsedTime / 1000)),
-        completionRate
+        elapsedTime: this.formatTime(
+          Math.floor(result.data.actualDuration * 60)
+        ), // 분을 초로 변환
+        completionRate: result.data.completionRate
       }
     };
   }
