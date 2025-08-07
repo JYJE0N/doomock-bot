@@ -283,11 +283,15 @@ class TimerModule extends BaseModule {
   /**
    * 🔄 뽀모도로 다음 단계로 전환
    */
+  /**
+   * 🔄 뽀모도로 다음 단계로 전환 (수정된 최종 버전)
+   */
   async transitionToNextPomodoro(userId, completedTimer) {
     const preset = this.config[completedTimer.preset];
     if (!preset) return;
 
-    let nextType, nextActualDuration;
+    let nextType;
+    let nextActualDuration;
     const nextCycle =
       completedTimer.type === "focus"
         ? completedTimer.currentCycle
@@ -321,55 +325,49 @@ class TimerModule extends BaseModule {
     const dbDuration =
       this.devMode.enabled && nextActualDuration < 1 ? 1 : nextActualDuration;
 
-    // 1. 다음 세션을 DB에 새로 생성합니다.
-    const sessionData = {
-      type: nextType,
-      duration: dbDuration,
-      userName: getUserName({ from: { id: userId, first_name: "Pomodoro" } }),
-      pomodoroSet: {
-        // 뽀모도로 정보도 함께 저장
-        preset: completedTimer.preset,
-        currentCycle: nextCycle,
-        totalCycles: completedTimer.totalCycles
+    // 다음 세션을 시작하기 위한 정보 구성
+    const userName = getUserName({
+      from: { id: userId, first_name: "Pomodoro" }
+    });
+    const mockCallbackQuery = {
+      message: {
+        chat: { id: completedTimer.chatId },
+        message_id: completedTimer.messageId
       }
     };
-    const result = await this.timerService.startSession(userId, sessionData);
+    const pomodoroInfo = {
+      pomodoroSet: true,
+      currentCycle: nextCycle,
+      totalCycles: completedTimer.totalCycles,
+      preset: completedTimer.preset
+    };
 
-    if (!result.success) {
-      logger.error("뽀모도로 전환 중 새 세션 시작 실패:", result.message);
-      await this.bot.telegram.sendMessage(
-        completedTimer.chatId,
-        "다음 뽀모도로 세션을 시작하지 못했습니다."
-      );
-      return;
-    }
+    logger.info(`🔄 뽀모도로 전환: ${userId} - ${nextType} 타이머 시작`);
 
-    // 2. 새로운 DB 세션 정보로 인메모리 타이머를 생성합니다.
-    const newSession = result.data;
-    const timer = this.createTimer(
-      newSession._id,
+    // 🚀 _startNewTimer를 호출하여 DB에 새 세션 생성 및 새 타이머 시작
+    const result = await this._startNewTimer(
+      userId,
+      userName,
       nextType,
-      nextActualDuration,
-      userId
-    );
-    timer.chatId = completedTimer.chatId;
-    timer.messageId = completedTimer.messageId; // 이전 메시지 ID를 일단 저장
-    timer.pomodoroSet = true;
-    timer.currentCycle = nextCycle;
-    timer.totalCycles = completedTimer.totalCycles;
-    timer.preset = completedTimer.preset;
-
-    this.activeTimers.set(userId, timer);
-    this.startTimerInterval(userId);
-
-    // 3. 사용자에게 새로운 메시지로 전환을 알립니다.
-    await this.notifyTransition(
-      completedTimer.chatId,
-      nextType,
+      dbDuration,
+      mockCallbackQuery,
+      pomodoroInfo,
       nextActualDuration
     );
 
-    logger.info(`🔄 뽀모도로 전환 완료: ${userId} - ${nextType} 타이머 시작됨`);
+    // 🚀 전환 결과를 사용자에게 새 메시지로 알림
+    if (result && result.type !== "error") {
+      await this.notifyTransition(
+        completedTimer.chatId,
+        nextType,
+        nextActualDuration
+      );
+    } else if (result) {
+      await this.bot.telegram.sendMessage(
+        completedTimer.chatId,
+        `다음 뽀모도로 세션(${nextType})을 시작하는데 실패했습니다: ${result.data.message}`
+      );
+    }
   }
 
   /**
