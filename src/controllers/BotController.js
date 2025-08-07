@@ -389,6 +389,9 @@ class BotController {
       await this.navigationHandler.initialize();
       logger.success("✅ NavigationHandler 초기화 완료");
 
+      // // 🚀🚀🚀 타이머랑 직접 연결해 주세요! 🚀🚀🚀
+      // this.moduleManager.setNavigationHandler(this.navigationHandler);
+
       // 6. 🆕 CommandHandler 초기화 (자연어 명령어 지원)
       this.commandHandler = new CommandHandler({
         moduleManager: this.moduleManager,
@@ -467,51 +470,6 @@ class BotController {
     }
   }
 
-  /**
-   * /menu 명령어 처리
-   
-  async handleMenuCommand(ctx) {
-    try {
-      this.stats.messagesProcessed++;
-      await this.navigationHandler.showMainMenu(ctx);
-    } catch (error) {
-      logger.error("menu 명령 처리 오류:", error);
-      await ctx.reply("메뉴 표시 중 오류가 발생했습니다.");
-    }
-  }
-
-  /**
-   * /status 명령어 처리
-   
-  async handleStatusCommand(ctx) {
-    try {
-      this.stats.messagesProcessed++;
-
-      const uptime = Math.floor((Date.now() - this.stats.startTime) / 1000);
-      const hours = Math.floor(uptime / 3600);
-      const minutes = Math.floor((uptime % 3600) / 60);
-      const seconds = uptime % 60;
-
-      const statusText = `🤖 *봇 상태*
-
-⏱️ *가동 시간*: ${hours}시간 ${minutes}분 ${seconds}초
-📊 *처리 통계*:
-• 메시지: ${this.stats.messagesProcessed}개
-• 콜백: ${this.stats.callbacksProcessed}개
-• 오류: ${this.stats.errorsCount}개
-
-📦 *모듈*: ${this.moduleManager?.modules?.size || 0}개 로드됨
-🗄️ *DB*: ${this.mongooseManager?.isConnected() ? "연결됨 ✅" : "연결 안됨 ❌"}
-
-✅ 모든 시스템 정상 작동 중`;
-
-      await ctx.replyWithMarkdown(statusText);
-    } catch (error) {
-      logger.error("status 명령 처리 오류:", error);
-      await ctx.reply("상태 확인 중 오류가 발생했습니다.");
-    }
-  }
-*/
   /**
    * 🔘 콜백 쿼리 처리
    */
