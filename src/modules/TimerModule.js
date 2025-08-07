@@ -402,11 +402,13 @@ class TimerModule extends BaseModule {
       const timer = this.stateManager.completeTimer(userId);
       if (!timer) return;
 
-      // DB 세션 완료 처리
+      // DB 세션 완료 처리 (isActive를 false로 설정)
       await this.timerService.completeSession(userId);
 
       // 뽀모도로인 경우 다음 세션으로 전환
       if (timer.isPomodoro) {
+        // 잠시 대기 (DB 처리 완료 보장)
+        await new Promise((resolve) => setTimeout(resolve, 100));
         await this.handlePomodoroTransition(userId, timer);
       } else {
         await this.notifyCompletion(timer);
@@ -556,7 +558,8 @@ class TimerModule extends BaseModule {
       // DB 정리
       const existingSession = await this.timerService.findActiveSession(userId);
       if (existingSession) {
-        await this.timerService.forceStopSession(userId);
+        // forceStopSession이 없으므로 stopSession 사용
+        await this.timerService.stopSession(userId);
       }
     } catch (error) {
       logger.warn("기존 세션 정리 실패:", error.message);
