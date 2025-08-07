@@ -367,32 +367,27 @@ class BotController {
         }
       }
 
-      // 4. ModuleManager 초기화
-      this.moduleManager = new ModuleManager({
-        bot: this.bot,
-        serviceBuilder: this.serviceBuilder
-      });
-
-      await this.moduleManager.initialize(this.bot, {
-        mongooseManager: this.mongooseManager
-      });
-
-      logger.success("✅ ModuleManager 초기화 완료");
-
-      // 5. NavigationHandler 초기화
+      // 4. 🚀🚀🚀 순서 변경 🚀🚀🚀
+      // ModuleManager와 NavigationHandler를 먼저 생성합니다.
+      this.moduleManager = new ModuleManager(this.serviceBuilder);
       this.navigationHandler = new NavigationHandler(
         this.bot,
         this.moduleManager,
-        this.errorHandler, // 주입!
-        this.markdownHelper // 주입!
+        this.errorHandler,
+        this.markdownHelper
       );
+
+      // 5. 🚀🚀🚀 핵심: ModuleManager에 NavigationHandler를 연결합니다.
+      this.moduleManager.setNavigationHandler(this.navigationHandler);
+
+      // 6. 🚀🚀🚀 두 부품이 연결된 후, 각각 초기화합니다.
       await this.navigationHandler.initialize();
       logger.success("✅ NavigationHandler 초기화 완료");
 
-      // // 🚀🚀🚀 타이머랑 직접 연결해 주세요! 🚀🚀🚀
-      // this.moduleManager.setNavigationHandler(this.navigationHandler);
+      await this.moduleManager.initialize(); // 이제 모듈들이 로드됩니다.
+      logger.success("✅ ModuleManager 초기화 완료");
 
-      // 6. 🆕 CommandHandler 초기화 (자연어 명령어 지원)
+      // 7. CommandHandler 초기화
       this.commandHandler = new CommandHandler({
         moduleManager: this.moduleManager,
         navigationHandler: this.navigationHandler
