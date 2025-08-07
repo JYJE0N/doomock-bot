@@ -461,6 +461,11 @@ class TimerModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery.from);
     const preset = this.config.pomodoro1;
+
+    // 🚀 핵심 수정: DB 저장용 시간과 실제 동작 시간 분리
+    const actualDuration = preset.focus; // 개발 모드 시간이 적용된 실제 동작 시간
+    const dbDuration = this.devMode.enabled ? 1 : actualDuration; // DB에는 최소 1분 저장
+
     const pomodoroInfo = {
       pomodoroSet: true,
       currentCycle: 1,
@@ -471,9 +476,10 @@ class TimerModule extends BaseModule {
       userId,
       userName,
       "focus",
-      preset.focus,
+      dbDuration, // DB 저장용 시간
       callbackQuery,
-      pomodoroInfo
+      pomodoroInfo,
+      actualDuration // 실제 타이머 동작 시간
     );
   }
 
@@ -481,6 +487,11 @@ class TimerModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery.from);
     const preset = this.config.pomodoro2;
+
+    // 🚀 핵심 수정: DB 저장용 시간과 실제 동작 시간 분리
+    const actualDuration = preset.focus; // 개발 모드 시간이 적용된 실제 동작 시간
+    const dbDuration = this.devMode.enabled ? 1 : actualDuration; // DB에는 최소 1분 저장
+
     const pomodoroInfo = {
       pomodoroSet: true,
       currentCycle: 1,
@@ -491,9 +502,10 @@ class TimerModule extends BaseModule {
       userId,
       userName,
       "focus",
-      preset.focus,
+      dbDuration, // DB 저장용 시간
       callbackQuery,
-      pomodoroInfo
+      pomodoroInfo,
+      actualDuration // 실제 타이머 동작 시간
     );
   }
 
