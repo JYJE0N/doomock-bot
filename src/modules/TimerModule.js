@@ -55,6 +55,7 @@ class TimerModule extends BaseModule {
       shortBreak: this.parseDevDuration(process.env.TIMER_SHORT_BREAK, 5),
       longBreak: this.parseDevDuration(process.env.TIMER_LONG_BREAK, 15),
       updateInterval: parseInt(process.env.TIMER_UPDATE_INTERVAL) || 1000,
+
       get pomodoro1() {
         return {
           focus: this.focusDuration,
@@ -63,6 +64,7 @@ class TimerModule extends BaseModule {
           longBreak: this.longBreak
         };
       },
+
       get pomodoro2() {
         return { focus: 50, shortBreak: 10, cycles: 2, longBreak: 30 };
       }
@@ -310,18 +312,20 @@ class TimerModule extends BaseModule {
 
   async notifyTransition(timer) {
     try {
-      const result = {
-        type: "timer_status",
-        data: { timer: this.generateTimerData(timer), isRefresh: true }
-      };
-      const renderer =
-        this.moduleManager.navigationHandler.renderers.get("timer");
-      const ctx = {
-        from: { id: timer.userId },
-        chat: { id: timer.chatId },
-        callbackQuery: { message: { message_id: timer.messageId } }
-      };
-      await renderer.render(result, ctx);
+      // ctx를 직접 만들지 말고, bot.telegram API 직접 사용
+      const text = this.generateTransitionMessage(timer);
+      const keyboard = this.generateTransitionKeyboard(timer);
+
+      await this.bot.telegram.editMessageText(
+        timer.chatId,
+        timer.messageId,
+        null,
+        text,
+        {
+          reply_markup: keyboard,
+          parse_mode: "Markdown"
+        }
+      );
     } catch (error) {
       logger.error("뽀모도로 전환 알림 실패:", error.message);
     }
@@ -524,18 +528,29 @@ class TimerModule extends BaseModule {
     }
   }
 
-  createTimer(sessionId, type, duration, userId, callbackQuery, pomodoroInfo) {
+  createTimer(
+    sessionId,
+    type,
+    duration,
+    userId,
+    callbackQuery,
+    pomodoroInfo = {}
+  ) {
+    const actualDuration = this.devMode.enabled
+      ? Math.max(0.05, duration) // 최소 3초
+      : duration;
     return {
       sessionId,
       type,
-      duration,
+      duration: actualDuration,
+
       userId,
       startTime: Date.now(),
       status: "running",
       pausedAt: null,
       totalPausedDuration: 0,
-      chatId: callbackQuery.message.chat.id,
-      messageId: callbackQuery.message.message_id,
+      chatId: callbackQuery.message?.chat?.id || callbackQuery.chat?.id,
+      messageId: callbackQuery.message?.message_id,
       ...pomodoroInfo
     };
   }
