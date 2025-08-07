@@ -81,6 +81,8 @@ class TimerRenderer extends BaseRenderer {
           return await this.renderTimerResumed(data, ctx);
         case "timer_stopped":
           return await this.renderTimerStopped(data, ctx);
+        case "pomodoro_set_completed": // 🚀🚀🚀 이 부분을 추가합니다!
+          return await this.renderPomodoroSetCompleted(data, ctx);
         case "timer_status":
           return await this.renderTimerStatus(data, ctx);
         case "no_timer":
@@ -191,6 +193,31 @@ class TimerRenderer extends BaseRenderer {
       { text: "❓ 도움말", action: "help" }
     ]);
     buttons.push([{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]);
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * 🎉 뽀모도로 세트 완료 렌더링 (새로운 메서드)
+   */
+  async renderPomodoroSetCompleted(data, ctx) {
+    const { userName, totalCycles, preset } = data;
+
+    const text = `🎉 *뽀모도로 세트 완료!*
+
+*${this.markdownHelper.escape(userName)}*님, 정말 대단해요!
+총 *${totalCycles}* 사이클의 집중과 휴식을 모두 마치셨습니다.
+
+충분한 휴식을 취하고 다음 작업을 준비하세요. 😊`;
+
+    const buttons = [
+      [
+        { text: "🍅 새 뽀모도로 시작", action: preset },
+        { text: "📈 주간 통계", action: "stats" }
+      ],
+      [{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]
+    ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });

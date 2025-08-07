@@ -290,106 +290,110 @@ class TimerModule extends BaseModule {
     const preset = this.config[completedTimer.preset];
     if (!preset) return;
 
+    const isLastFocus =
+      completedTimer.currentCycle >= completedTimer.totalCycles;
     let nextType;
     let nextActualDuration;
+    // 다음 사이클 번호 계산 (휴식이 끝나야 사이클이 증가)
     const nextCycle =
       completedTimer.type === "focus"
         ? completedTimer.currentCycle
         : completedTimer.currentCycle + 1;
 
     if (completedTimer.type === "focus") {
-      // 집중 -> 휴식
-      if (completedTimer.currentCycle >= completedTimer.totalCycles) {
-        nextType = "longBreak";
-        nextActualDuration = preset.longBreak;
-      } else {
-        nextType = "shortBreak";
-        nextActualDuration = preset.shortBreak;
-      }
+      // 집중 -> 휴식 전환
+      nextType = isLastFocus ? "longBreak" : "shortBreak";
+      nextActualDuration = isLastFocus ? preset.longBreak : preset.shortBreak;
     } else {
-      // 휴식 -> 집중
+      // 휴식 -> 집중 전환 (단, 마지막 사이클의 긴 휴식이 끝난 경우는 제외)
+      if (completedTimer.type === "longBreak" && isLastFocus) {
+        // 🎉 모든 세트가 끝났습니다!
+        return this.notifyPomodoroSetCompletion(completedTimer);
+      }
       nextType = "focus";
       nextActualDuration = preset.focus;
-    }
-
-    // 🚀 뽀모도로 세트 전체가 완료되었는지 확인
-    if (
-      completedTimer.type !== "focus" &&
-      completedTimer.currentCycle >= completedTimer.totalCycles
-    ) {
-      await this.notifyPomodoroSetCompletion(completedTimer);
-      return; // 세트가 끝났으므로 여기서 종료
     }
 
     // 개발 모드 시간 처리
     const dbDuration =
       this.devMode.enabled && nextActualDuration < 1 ? 1 : nextActualDuration;
 
-    // 다음 세션을 시작하기 위한 정보 구성
+    // 1. 다음 세션을 DB에 새로 생성합니다.
     const userName = getUserName({
       from: { id: userId, first_name: "Pomodoro" }
     });
-    const mockCallbackQuery = {
-      message: {
-        chat: { id: completedTimer.chatId },
-        message_id: completedTimer.messageId
+    const sessionData = {
+      type: nextType,
+      duration: dbDuration,
+      userName,
+      pomodoroSet: {
+        preset: completedTimer.preset,
+        currentCycle: nextCycle,
+        totalCycles: completedTimer.totalCycles
       }
     };
-    const pomodoroInfo = {
-      pomodoroSet: true,
-      currentCycle: nextCycle,
-      totalCycles: completedTimer.totalCycles,
-      preset: completedTimer.preset
-    };
+    const result = await this.timerService.startSession(userId, sessionData);
 
-    logger.info(`🔄 뽀모도로 전환: ${userId} - ${nextType} 타이머 시작`);
-
-    // 🚀 _startNewTimer를 호출하여 DB에 새 세션 생성 및 새 타이머 시작
-    const result = await this._startNewTimer(
-      userId,
-      userName,
-      nextType,
-      dbDuration,
-      mockCallbackQuery,
-      pomodoroInfo,
-      nextActualDuration
-    );
-
-    // 🚀 전환 결과를 사용자에게 새 메시지로 알림
-    if (result && result.type !== "error") {
-      await this.notifyTransition(
-        completedTimer.chatId,
-        nextType,
-        nextActualDuration
-      );
-    } else if (result) {
+    if (!result.success) {
+      logger.error("뽀모도로 전환 중 새 세션 시작 실패:", result.message);
       await this.bot.telegram.sendMessage(
         completedTimer.chatId,
-        `다음 뽀모도로 세션(${nextType})을 시작하는데 실패했습니다: ${result.data.message}`
+        "다음 뽀모도로 세션을 시작하지 못했습니다."
       );
+      return;
     }
+
+    // 2. 새로운 DB 세션 정보로 인메모리 타이머를 생성합니다.
+    const newSession = result.data;
+    const timer = this.createTimer(
+      newSession._id,
+      nextType,
+      nextActualDuration,
+      userId
+    );
+    timer.chatId = completedTimer.chatId;
+    timer.messageId = completedTimer.messageId;
+    timer.pomodoroSet = true;
+    timer.currentCycle = nextCycle;
+    timer.totalCycles = completedTimer.totalCycles;
+    timer.preset = completedTimer.preset;
+
+    this.activeTimers.set(userId, timer);
+    this.startTimerInterval(userId);
+
+    // 3. 사용자에게 메시지를 수정하여 전환을 알립니다.
+    await this.notifyTransition(timer); // timer 객체를 통째로 전달
+
+    logger.info(`🔄 뽀모도로 전환 완료: ${userId} - ${nextType} 타이머 시작됨`);
   }
 
   /**
    * 🔔 뽀모도로 전환 알림 (새로운 메서드)
    */
-  async notifyTransition(chatId, nextType, duration) {
+  async notifyTransition(timer) {
     try {
-      const typeDisplay = this.getTypeDisplay(nextType);
-      const durationDisplay =
-        this.devMode.enabled && duration < 1
-          ? `${Math.round(duration * 60)}초`
-          : `${duration}분`;
-
-      const message = `✅ 이전 세션 완료!\n\n다음 세션인 *${typeDisplay}*(${durationDisplay}) 타이머를 시작합니다.`;
-
-      if (this.bot && this.bot.telegram) {
-        await this.bot.telegram.sendMessage(chatId, message, {
-          parse_mode: "Markdown"
-        });
+      const result = {
+        type: "timer_status",
+        module: "timer",
+        data: {
+          timer: this.generateTimerData(timer),
+          canRefresh: true,
+          isRefresh: true // 전환되었음을 알림
+        }
+      };
+      const renderer =
+        this.moduleManager.navigationHandler.renderers.get("timer");
+      if (renderer && timer.chatId && timer.messageId) {
+        const ctx = {
+          chat: { id: timer.chatId },
+          callbackQuery: {
+            message: { chat: { id: timer.chatId }, message_id: timer.messageId }
+          }
+        };
+        await renderer.render(result, ctx);
       }
     } catch (error) {
-      logger.error("뽀모도로 전환 알림 전송 실패:", error);
+      logger.error("뽀모도로 전환 알림 실패:", error);
     }
   }
 
@@ -398,12 +402,28 @@ class TimerModule extends BaseModule {
    */
   async notifyPomodoroSetCompletion(completedTimer) {
     try {
-      const message = `🎉 *뽀모도로 세트 완료!*\n\n총 ${completedTimer.totalCycles} 사이클을 모두 마치셨습니다! 정말 대단해요! 푹 쉬세요. 😊`;
-
-      if (this.bot && this.bot.telegram) {
-        await this.bot.telegram.sendMessage(completedTimer.chatId, message, {
-          parse_mode: "Markdown"
-        });
+      const result = {
+        type: "pomodoro_set_completed",
+        module: "timer",
+        data: {
+          userName: getUserName({ from: { id: completedTimer.userId } }),
+          preset: completedTimer.preset,
+          totalCycles: completedTimer.totalCycles
+        }
+      };
+      const renderer =
+        this.moduleManager.navigationHandler.renderers.get("timer");
+      if (renderer && completedTimer.chatId && completedTimer.messageId) {
+        const ctx = {
+          chat: { id: completedTimer.chatId },
+          callbackQuery: {
+            message: {
+              chat: { id: completedTimer.chatId },
+              message_id: completedTimer.messageId
+            }
+          }
+        };
+        await renderer.render(result, ctx);
       }
     } catch (error) {
       logger.error("뽀모도로 세트 완료 알림 실패:", error);
