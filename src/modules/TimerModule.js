@@ -355,14 +355,22 @@ class TimerModule extends BaseModule {
     // 개발 모드에서 타입별 시간 가져오기
     const duration = this.getDurationByType(timerType);
 
-    if (!duration && timerType) {
-      // timerType이 있을 때만 오류 처리
-      return {
-        type: "error",
-        module: "timer",
-        data: { message: "잘못된 타이머 타입입니다." }
-      };
+    // 🚀 핵심 수정: params가 없는 경우(예: /start) 커스텀 설정으로 유도
+    if (!duration) {
+      if (timerType) {
+        // 잘못된 타입이 명시된 경우
+        return {
+          type: "error",
+          module: "timer",
+          data: { message: "잘못된 타이머 타입입니다." }
+        };
+      } else {
+        // 타입 없이 호출된 경우
+        return this.showCustomSetup(bot, callbackQuery);
+      }
     }
+
+    logger.debug(`타이머 타입 ${timerType}의 시간: ${duration}분`);
 
     // 🚀 핵심 수정: DB 저장용 시간과 실제 동작 시간 분리
     let dbDuration = duration;
@@ -372,9 +380,6 @@ class TimerModule extends BaseModule {
       logger.info(
         `🔧 개발 모드: ${duration}분 타이머 -> DB에는 ${dbDuration}분으로 저장`
       );
-    } else if (!duration) {
-      // params가 없는 경우 (예: 'start'만 호출) 커스텀 설정으로 유도
-      return this.showCustomSetup(bot, callbackQuery);
     }
 
     return this._startNewTimer(
