@@ -583,15 +583,47 @@ class TimerModule extends BaseModule {
       const timer = this.stateManager.completeTimer(userId);
       if (!timer) return;
 
-      // DB 세션 완료 처리 (isActive를 false로 설정)
+      // DB 세션 완료 처리
       await this.timerService.completeSession(userId);
 
       // 뽀모도로인 경우 다음 세션으로 전환
       if (timer.isPomodoro) {
-        // 잠시 대기 (DB 처리 완료 보장)
-        await new Promise((resolve) => setTimeout(resolve, 100));
-        await this.handlePomodoroTransition(userId, timer);
+        const nextSession = this.stateManager.getNextPomodoroSession(timer);
+
+        if (nextSession) {
+          // 다음 세션 시작
+          const result = await this.timerService.startSession(userId, {
+            userName: timer.userName || "User",
+            type: nextSession.type,
+            duration: nextSession.duration
+          });
+
+          if (result.success) {
+            // 새 타이머 생성
+            this.stateManager.createTimer(
+              userId,
+              nextSession.type,
+              nextSession.duration,
+              result.data._id,
+              {
+                isPomodoro: true,
+                preset: timer.preset,
+                currentCycle: nextSession.currentCycle,
+                totalCycles: timer.totalCycles,
+                chatId: timer.chatId,
+                messageId: timer.messageId
+              }
+            );
+
+            // 전환 알림
+            await this.notifyTransition(userId);
+          }
+        } else {
+          // 뽀모도로 세트 완료
+          await this.notifyPomodoroSetCompletion(timer);
+        }
       } else {
+        // 일반 타이머 완료 알림
         await this.notifyCompletion(timer);
       }
     } catch (error) {

@@ -81,7 +81,11 @@ class TimerRenderer extends BaseRenderer {
           return await this.renderTimerResumed(data, ctx);
         case "timer_stopped":
           return await this.renderTimerStopped(data, ctx);
-        case "pomodoro_set_completed": // 🚀🚀🚀 이 부분을 추가합니다!
+        case "timer_completed": // 추가
+          return await this.renderTimerCompleted(data, ctx);
+        case "timer_transition": // 추가
+          return await this.renderTimerTransition(data, ctx);
+        case "pomodoro_set_completed":
           return await this.renderPomodoroSetCompleted(data, ctx);
         case "timer_status":
           return await this.renderTimerStatus(data, ctx);
@@ -91,16 +95,16 @@ class TimerRenderer extends BaseRenderer {
           return await this.renderHistory(data, ctx);
         case "no_history":
           return await this.renderNoHistory(data, ctx);
-        case "custom_setup": // ✅ 누락된 케이스 추가
+        case "custom_setup":
           return await this.renderCustomSetup(data, ctx);
         case "weekly_stats":
           return await this.renderWeeklyStats(data, ctx);
+        case "stats": // stats 케이스도 추가
+          return await this.renderStats(data, ctx);
         case "settings":
           return await this.renderSettings(data, ctx);
         case "notification_toggled":
           return await this.renderNotificationToggled(data, ctx);
-        case "stats":
-          return await this.renderStats(data, ctx);
         case "help":
           return await this.renderHelp(data, ctx);
         case "error":
@@ -394,15 +398,11 @@ class TimerRenderer extends BaseRenderer {
   async renderTimerStatus(data, ctx) {
     const { timer, isRefresh, canRefresh = true } = data;
 
-    // 진행률 바 생성
     const progressBar = this.createProgressBar(timer.progress || 0);
-
-    // 상태 아이콘
     const statusIcon = timer.isPaused
       ? this.ui.icons.paused
       : this.ui.icons.running;
 
-    // 텍스트 생성 - 마크다운 이스케이프 필요!
     let text = `${statusIcon} *타이머 현재 상태*\n\n`;
 
     if (isRefresh) {
@@ -411,13 +411,12 @@ class TimerRenderer extends BaseRenderer {
 
     text +=
       `${progressBar}\n\n` +
-      `⏱️ *남은 시간*: ${this.escapeMarkdown(timer.remainingFormatted)}\n` +
-      `⏳ *경과 시간*: ${this.escapeMarkdown(timer.elapsedFormatted)}\n` +
+      `⏱️ *남은 시간*: ${this.markdownHelper.escape(timer.remainingFormatted)}\n` +
+      `⏳ *경과 시간*: ${this.markdownHelper.escape(timer.elapsedFormatted)}\n` +
       `📊 *진행률*: ${timer.progress}%\n` +
-      `🎯 *타입*: ${this.escapeMarkdown(timer.typeDisplay)}\n` +
-      `📌 *상태*: ${this.escapeMarkdown(timer.statusDisplay)}\n\n`;
+      `🎯 *타입*: ${this.markdownHelper.escape(timer.typeDisplay)}\n` +
+      `📌 *상태*: ${this.markdownHelper.escape(timer.statusDisplay)}\n\n`;
 
-    // 뽀모도로인 경우 사이클 표시
     if (timer.totalCycles) {
       text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n\n`;
     }
@@ -906,13 +905,12 @@ class TimerRenderer extends BaseRenderer {
 
     const progressBar = this.createProgressBar(0);
 
-    // const를 let으로 변경!
-    let text =
-      `${message}\n\n` +
-      `${progressBar}\n\n` +
-      `⏱️ *남은 시간*: ${this.escapeMarkdown(timer.remainingFormatted)}\n` +
-      `🎯 *타입*: ${this.escapeMarkdown(timer.typeDisplay)}\n` +
-      `📊 *상태*: ${this.escapeMarkdown(timer.statusDisplay)}\n`;
+    // this.escapeMarkdown → this.markdownHelper.escape로 변경
+    let text = `${message}\n\n`;
+    text += `${progressBar}\n\n`;
+    text += `⏱️ *남은 시간*: ${this.markdownHelper.escape(timer.remainingFormatted || "계산중")}\n`;
+    text += `🎯 *타입*: ${this.markdownHelper.escape(timer.typeDisplay || timer.type)}\n`;
+    text += `📊 *상태*: ${this.markdownHelper.escape(timer.statusDisplay || "실행중")}\n`;
 
     if (timer.totalCycles) {
       text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n`;
@@ -1002,7 +1000,7 @@ class TimerRenderer extends BaseRenderer {
 
     const text =
       `🎉 *타이머 완료!*\n\n` +
-      `${this.escapeMarkdown(this.getTypeDisplay(type))} (${duration}분) 타이머가 완료되었습니다.\n\n` +
+      `${this.markdownHelper.escape(this.getTypeDisplay(type))} (${duration}분) 타이머가 완료되었습니다.\n\n` +
       `수고하셨습니다! 💪`;
 
     const buttons = [
@@ -1032,16 +1030,6 @@ class TimerRenderer extends BaseRenderer {
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  /**
-   * 🔧 마크다운 이스케이프 헬퍼 메서드
-   * BaseRenderer에 추가하거나 TimerRenderer에 추가
-   */
-  escapeMarkdown(text) {
-    if (!text) return "";
-    // Markdown 특수문자 이스케이프
-    return text.toString().replace(/[*_`[\]()]/g, "\\$&");
   }
 }
 

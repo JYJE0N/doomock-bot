@@ -384,7 +384,8 @@ class TimerStateManager {
       longBreak: "🌴 긴 휴식",
       custom: "⏰ 커스텀"
     };
-    return displays[type] || type;
+    // undefined 방지
+    return displays[type] || type || "알 수 없음";
   }
 
   /**
