@@ -50,7 +50,6 @@ class TimerStateManager {
    * 타이머 생성 및 시작
    */
   createTimer(userId, type, duration, sessionId, metadata = {}) {
-    // 기존 타이머 정리
     this.cleanupTimer(userId);
 
     const actualDuration = this.devMode.enabled
@@ -85,7 +84,9 @@ class TimerStateManager {
     this.activeTimers.set(userId, timer);
     this.startInterval(userId);
 
-    logger.info(`⏱️ 타이머 생성: ${userId} - ${type} (${actualDuration}분)`);
+    logger.info(
+      `⏱️ 타이머 생성: ${userId} (${timer.userName || "Unknown"}) - ${type} (${actualDuration}분)`
+    );
     return timer;
   }
 
