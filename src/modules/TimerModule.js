@@ -610,6 +610,7 @@ class TimerModule extends BaseModule {
                 preset: timer.preset,
                 currentCycle: nextSession.currentCycle,
                 totalCycles: timer.totalCycles,
+                userName: timer.userName,
                 chatId: timer.chatId,
                 messageId: timer.messageId
               }
@@ -654,7 +655,7 @@ class TimerModule extends BaseModule {
 
     // 다음 세션 시작
     const result = await this.timerService.startSession(userId, {
-      userName, // ✅ 올바른 사용자 이름 전달
+      userName: completedTimer.userName || `User#${userId}`,
       type: nextSession.type,
       duration: nextSession.duration,
       pomodoroInfo: {
@@ -677,7 +678,7 @@ class TimerModule extends BaseModule {
           preset: completedTimer.preset,
           currentCycle: nextSession.currentCycle,
           totalCycles: completedTimer.totalCycles,
-          userName, // ✅ 사용자 이름도 메모리에 전달
+          userName: completedTimer.userName || `User#${userId}`,
           chatId: completedTimer.chatId,
           messageId: completedTimer.messageId
         }
