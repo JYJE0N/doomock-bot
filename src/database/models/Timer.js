@@ -250,7 +250,6 @@ timerSchema.virtual("statusDisplay").get(function () {
  * 🏷️ 타입 표시명
  */
 timerSchema.virtual("typeDisplay").get(function () {
-  const TimeHelper = require("../../utils/TimeHelper");
   return TimeHelper.getTimerTypeDisplay(this.type, "with-emoji");
 });
 

@@ -383,7 +383,6 @@ class TimerStateManager {
    * 타입 표시명
    */
   getTypeDisplay(type) {
-    const TimeHelper = require("../utils/TimeHelper");
     return TimeHelper.getTimerTypeDisplay(type, "with-emoji");
   }
 
