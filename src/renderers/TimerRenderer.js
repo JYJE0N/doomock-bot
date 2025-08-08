@@ -2,6 +2,7 @@
 
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 
 /**
  * 🎨 TimerRenderer - 타이머 UI 렌더링 (SoC 완전 준수)
@@ -905,17 +906,9 @@ class TimerRenderer extends BaseRenderer {
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
 
-  /**
-   * 타입 표시명 가져오기
-   */
+  // getTypeDisplay 메서드 수정
   getTypeDisplay(type) {
-    const displays = {
-      focus: "🎯 집중",
-      shortBreak: "☕ 짧은 휴식",
-      longBreak: "🌴 긴 휴식",
-      custom: "⏰ 커스텀"
-    };
-    return displays[type] || type;
+    return TimeHelper.getTimerTypeDisplay(type, true); // 이모지 포함
   }
 
   /**

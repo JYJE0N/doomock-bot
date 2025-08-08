@@ -1,4 +1,5 @@
 const logger = require("./Logger");
+const TimeHelper = require("./TimeHelper");
 
 /**
  * 🎯 TimerStateManager - 타이머 상태 관리 전담
@@ -382,14 +383,7 @@ class TimerStateManager {
    * 타입 표시명
    */
   getTypeDisplay(type) {
-    const displays = {
-      focus: "🎯 집중",
-      shortBreak: "☕ 짧은 휴식",
-      longBreak: "🌴 긴 휴식",
-      custom: "⏰ 커스텀"
-    };
-    // undefined 방지
-    return displays[type] || type || "알 수 없음";
+    return TimeHelper.getTimerTypeDisplay(type, true); // 이모지 포함
   }
 
   /**

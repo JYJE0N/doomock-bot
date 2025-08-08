@@ -144,6 +144,39 @@ class TimeHelper {
   }
 
   /**
+   * 🏷️ 타이머 상태 표시명 (통일된 형식)
+   * @param {string} status - 타이머 상태
+   * @param {boolean} withEmoji - 이모지 포함 여부 (기본값: true)
+   * @returns {string} 표시명
+   */
+  static getTimerStatusDisplay(status, withEmoji = true) {
+    const displays = {
+      active: withEmoji ? "▶️ 실행중" : "실행중",
+      running: withEmoji ? "▶️ 실행 중" : "실행 중",
+      paused: withEmoji ? "⏸️ 일시정지" : "일시정지",
+      stopped: withEmoji ? "⏹️ 중지됨" : "중지됨",
+      completed: withEmoji ? "✅ 완료" : "완료"
+    };
+    return displays[status] || status || "알 수 없음";
+  }
+
+  /**
+   * 🏷️ 타이머 타입 표시명 (통일된 형식)
+   * @param {string} type - 타이머 타입
+   * @param {boolean} withEmoji - 이모지 포함 여부 (기본값: true)
+   * @returns {string} 표시명
+   */
+  static getTimerTypeDisplay(type, withEmoji = true) {
+    const displays = {
+      focus: withEmoji ? "🎯 집중" : "집중",
+      shortBreak: withEmoji ? "☕ 짧은 휴식" : "짧은 휴식",
+      longBreak: withEmoji ? "🌴 긴 휴식" : "긴 휴식",
+      custom: withEmoji ? "⏰ 커스텀" : "커스텀"
+    };
+    return displays[type] || type || "알 수 없음";
+  }
+
+  /**
    * 🔍 시간 데이터 유효성 검사
    * @param {any} input - 검사할 값
    * @returns {boolean} 유효한 시간 데이터면 true
