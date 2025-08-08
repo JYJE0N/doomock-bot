@@ -23,8 +23,15 @@ const logger = require("./Logger");
  */
 function getUserName(input) {
   try {
+    // === 🔍 디버깅 코드 추가 ===
+    console.log("🔍 getUserName 디버깅:");
+    console.log("  입력 타입:", typeof input);
+    console.log("  입력 객체 키들:", Object.keys(input || {}));
+    console.log("  전체 구조:", JSON.stringify(input, null, 2));
+
     // null/undefined 체크
     if (!input) {
+      console.log("❌ input이 null/undefined");
       return "알 수 없는 사용자";
     }
 
@@ -33,25 +40,46 @@ function getUserName(input) {
 
     // 1) callbackQuery.from (콜백에서)
     if (input.from) {
+      console.log("✅ input.from 발견:", input.from);
       user = input.from;
     }
     // 2) msg.from (일반 메시지에서)
     else if (input.message && input.message.from) {
+      console.log("✅ input.message.from 발견:", input.message.from);
       user = input.message.from;
     }
     // 3) msg 자체가 user 객체인 경우
     else if (input.id && (input.first_name || input.username)) {
+      console.log("✅ input 자체가 user 객체:", input);
       user = input;
+    }
+
+    // 🔍 추가 탐색: 다른 가능한 구조들
+    else if (input.user) {
+      console.log("✅ input.user 발견:", input.user);
+      user = input.user;
+    } else if (input.callback_query && input.callback_query.from) {
+      console.log(
+        "✅ input.callback_query.from 발견:",
+        input.callback_query.from
+      );
+      user = input.callback_query.from;
     }
 
     // 사용자 객체가 없으면
     if (!user) {
+      console.log("❌ 사용자 객체를 찾을 수 없음");
+      console.log("   가능한 모든 경로 시도했지만 실패");
       return "알 수 없는 사용자";
     }
 
+    console.log("✅ 최종 user 객체:", user);
+
     // 봇인 경우 특별 처리
     if (user.is_bot) {
-      return `[봇] ${user.first_name || user.username || `Bot#${user.id}`}`;
+      const botName = `[봇] ${user.first_name || user.username || `Bot#${user.id}`}`;
+      console.log("🤖 봇 사용자:", botName);
+      return botName;
     }
 
     // 이름 우선순위: first_name + last_name > username > ID
@@ -60,16 +88,22 @@ function getUserName(input) {
       if (user.last_name) {
         name += ` ${user.last_name}`;
       }
+      console.log("👤 이름으로 식별:", name);
       return name;
     }
 
     if (user.username) {
-      return `@${user.username}`;
+      const username = `@${user.username}`;
+      console.log("👤 사용자명으로 식별:", username);
+      return username;
     }
 
-    return `User#${user.id}`;
+    const userId = `User#${user.id}`;
+    console.log("👤 ID로 식별:", userId);
+    return userId;
   } catch (error) {
-    logger.warn("getUserName 오류:", error.message);
+    console.log("❌ getUserName 오류:", error.message);
+    console.log("   오류 스택:", error.stack);
     return "알 수 없는 사용자";
   }
 }

@@ -132,8 +132,14 @@ class TimerRenderer extends BaseRenderer {
   async renderMenu(data, ctx) {
     const { userName, activeTimer, recentSessions, _presets } = data;
 
+    // ✅ 사용자 이름 안전하게 처리
+    const displayName =
+      userName && userName !== "알 수 없는 사용자"
+        ? this.markdownHelper.escape(userName)
+        : "사용자";
+
     let text = `🍅 *타이머 메뉴*\n\n`;
-    text += `안녕하세요, ${this.markdownHelper.escape(userName)}님!\n\n`;
+    text += `안녕하세요, ${displayName}님!\n\n`;
 
     // 활성 타이머가 있는 경우
     if (activeTimer) {
@@ -266,6 +272,12 @@ class TimerRenderer extends BaseRenderer {
   async renderPomodoroStarted(data, ctx) {
     const { timer, preset, message } = data;
 
+    // ✅ 사용자 이름 안전하게 처리
+    const displayName =
+      timer.userName && timer.userName !== "알 수 없는 사용자"
+        ? this.markdownHelper.escape(timer.userName)
+        : "사용자";
+
     const progressBar = this.createProgressBar(0);
 
     // preset에 따른 설명 추가
@@ -275,6 +287,7 @@ class TimerRenderer extends BaseRenderer {
         : "(50분 집중 → 10분 휴식 x2회)";
 
     const text =
+      `🍅 **${displayName}의 뽀모도로**\n\n` + // ✅ 사용자 이름 추가
       `${message}\n` +
       `${presetInfo}\n\n` +
       `${progressBar}\n\n` +
@@ -395,15 +408,25 @@ class TimerRenderer extends BaseRenderer {
   /**
    * 📊 타이머 상태 렌더링
    */
-  async renderTimerStatus(data, ctx) {
-    const { timer, isRefresh, canRefresh = true } = data;
+  async renderTimerStatus(data, ctx, isRefresh = false, canRefresh = true) {
+    const { timer, userName } = data;
 
-    const progressBar = this.createProgressBar(timer.progress || 0);
+    const progressBar = this.createProgressBar(timer.progress);
+
     const statusIcon = timer.isPaused
       ? this.ui.icons.paused
       : this.ui.icons.running;
 
-    let text = `${statusIcon} *타이머 현재 상태*\n\n`;
+    // ✅ 사용자 이름 안전하게 처리
+    const displayName =
+      userName && userName !== "알 수 없는 사용자"
+        ? this.markdownHelper.escape(userName)
+        : timer.userName && timer.userName !== "알 수 없는 사용자"
+          ? this.markdownHelper.escape(timer.userName)
+          : "사용자";
+
+    // 텍스트 생성 - 사용자 이름 포함
+    let text = `${statusIcon} *${displayName}의 타이머 현재 상태*\n\n`;
 
     if (isRefresh) {
       text += `🔄 _새로고침됨_\n\n`;
@@ -411,12 +434,13 @@ class TimerRenderer extends BaseRenderer {
 
     text +=
       `${progressBar}\n\n` +
-      `⏱️ *남은 시간*: ${this.markdownHelper.escape(timer.remainingFormatted)}\n` +
-      `⏳ *경과 시간*: ${this.markdownHelper.escape(timer.elapsedFormatted)}\n` +
+      `⏱️ *남은 시간*: ${this.escapeMarkdown(timer.remainingFormatted)}\n` +
+      `⏳ *경과 시간*: ${this.escapeMarkdown(timer.elapsedFormatted)}\n` +
       `📊 *진행률*: ${timer.progress}%\n` +
-      `🎯 *타입*: ${this.markdownHelper.escape(timer.typeDisplay)}\n` +
-      `📌 *상태*: ${this.markdownHelper.escape(timer.statusDisplay)}\n\n`;
+      `🎯 *타입*: ${this.escapeMarkdown(timer.typeDisplay)}\n` +
+      `📌 *상태*: ${this.escapeMarkdown(timer.statusDisplay)}\n\n`;
 
+    // 뽀모도로인 경우 사이클 표시
     if (timer.totalCycles) {
       text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n\n`;
     }

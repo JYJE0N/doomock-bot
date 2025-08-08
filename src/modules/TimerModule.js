@@ -320,24 +320,30 @@ class TimerModule extends BaseModule {
   /**
    * 뽀모도로 시작 (공통)
    */
-  async startPomodoro(bot, callbackQuery, presetKey) {
+  async startPomodoro(bot, callbackQuery, params) {
     const userId = getUserId(callbackQuery.from);
-    const userName = getUserName(callbackQuery.from);
 
-    // 기존 세션 정리
-    await this.cleanupExistingSession(userId);
+    // ✅ 사용자 정보 확실하게 가져오기 (수정된 부분)
+    const userName = getUserName(callbackQuery); // callbackQuery.from이 아닌 callbackQuery 전체를 전달
 
+    console.log("🔍 TimerModule 디버깅:");
+    console.log("  userId:", userId);
+    console.log("  userName:", userName);
+    console.log("  callbackQuery.from:", callbackQuery.from);
+
+    const presetKey = params;
     const preset = this.stateManager.presets[presetKey];
+
     if (!preset) {
       return {
         type: "error",
-        data: { message: "잘못된 뽀모도로 프리셋입니다." }
+        data: { message: "알 수 없는 뽀모도로 설정입니다." }
       };
     }
 
     // DB에 뽀모도로 세션 생성
     const result = await this.timerService.startPomodoroSet(userId, {
-      userName,
+      userName, // ✅ 확실한 사용자 이름 전달
       preset: presetKey,
       focusDuration: preset.focus,
       shortBreak: preset.shortBreak,

@@ -463,28 +463,36 @@ class BotController {
    */
   async handleCallbackQuery(ctx) {
     let answered = false;
+    const callbackId = ctx.callbackQuery.id;
 
     try {
       this.stats.callbacksProcessed++;
-      await this.navigationHandler.handleCallback(ctx);
 
-      // 응답하지 않았다면 응답
-      if (!answered) {
-        await ctx.answerCbQuery();
+      // ✅ 즉시 로딩 응답으로 타임아웃 방지
+      try {
+        await ctx.answerCbQuery("⏳ 처리 중...");
         answered = true;
+        logger.debug(`✅ 콜백 ${callbackId} 즉시 응답 완료`);
+      } catch (quickResponseError) {
+        // 이미 응답된 경우 등은 무시
+        if (!quickResponseError.message?.includes("query is too old")) {
+          logger.warn("즉시 응답 실패:", quickResponseError.message);
+        }
       }
+
+      // 실제 로직 처리
+      await this.navigationHandler.handleCallback(ctx);
     } catch (error) {
       logger.error("콜백 쿼리 처리 오류:", error);
 
-      // 에러가 "query is too old"가 아닌 경우에만 응답
-      if (!error.message?.includes("query is too old") && !answered) {
+      // 아직 응답하지 않았고, 타임아웃 에러가 아닌 경우에만 에러 응답
+      if (!answered && !error.message?.includes("query is too old")) {
         try {
-          await ctx.answerCbQuery("처리 중 오류가 발생했습니다.", {
+          await ctx.answerCbQuery("❌ 처리 중 오류가 발생했습니다.", {
             show_alert: true
           });
         } catch (answerError) {
-          // 응답 실패는 무시
-          logger.debug("콜백 응답 실패 (이미 응답됨):", answerError.message);
+          logger.debug("에러 응답 실패 (무시):", answerError.message);
         }
       }
     }

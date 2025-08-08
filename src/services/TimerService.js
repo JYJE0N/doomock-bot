@@ -303,13 +303,23 @@ class TimerService extends BaseService {
       const { preset, focusDuration, shortBreak, longBreak, cycles, userName } =
         pomodoroData;
 
+      // ✅ userName 검증 및 기본값 설정
+      const validUserName =
+        userName && userName !== "알 수 없는 사용자"
+          ? userName
+          : `User#${userId}`;
+
+      console.log("🔍 TimerService 디버깅:");
+      console.log("  원본 userName:", userName);
+      console.log("  검증된 userName:", validUserName);
+
       // 뽀모도로 세트 생성
       const setId = `pomodoro_${userId}_${Date.now()}`;
 
       // 첫 번째 집중 세션 생성
       const session = new this.models.Timer({
         userId: userId.toString(),
-        userName,
+        userName: validUserName, // ✅ 검증된 사용자 이름 사용
         type: "focus",
         duration: focusDuration,
         remainingTime: focusDuration * 60,
@@ -329,7 +339,9 @@ class TimerService extends BaseService {
 
       await session.save();
 
-      logger.info(`🍅 뽀모도로 세트 시작: ${userId} - ${preset}`);
+      logger.info(
+        `🍅 뽀모도로 세트 시작: ${userId} (${validUserName}) - ${preset}`
+      );
 
       return this.createSuccessResponse(
         {
