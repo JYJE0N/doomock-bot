@@ -908,7 +908,7 @@ class TimerRenderer extends BaseRenderer {
 
   // getTypeDisplay 메서드 수정
   getTypeDisplay(type) {
-    return TimeHelper.getTimerTypeDisplay(type, "with-emoji");
+    return TimeHelper.getTimerTypeDisplay(type, true);
   }
 
   /**

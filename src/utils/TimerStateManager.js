@@ -383,7 +383,7 @@ class TimerStateManager {
    * 타입 표시명
    */
   getTypeDisplay(type) {
-    return TimeHelper.getTimerTypeDisplay(type, "with-emoji");
+    return TimeHelper.getTimerTypeDisplay(type, true); // 이모지 포함
   }
 
   /**
