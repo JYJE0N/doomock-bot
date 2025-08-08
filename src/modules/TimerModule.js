@@ -320,28 +320,24 @@ class TimerModule extends BaseModule {
   /**
    * 뽀모도로 시작 (공통)
    */
-  async startPomodoro(bot, callbackQuery, params) {
+  async startPomodoro(bot, callbackQuery, presetKey) {
     const userId = getUserId(callbackQuery.from);
-    const userName = getUserName(callbackQuery);
+    const userName = getUserName(callbackQuery); // ✅ 전체 callbackQuery 전달
 
-    console.log("🔍 TimerModule 디버깅:");
-    console.log("  userId:", userId);
-    console.log("  userName:", userName);
-    console.log("  callbackQuery.from:", callbackQuery.from);
+    // 기존 세션 정리
+    await this.cleanupExistingSession(userId);
 
-    const presetKey = params;
     const preset = this.stateManager.presets[presetKey];
-
     if (!preset) {
       return {
         type: "error",
-        data: { message: "알 수 없는 뽀모도로 설정입니다." }
+        data: { message: "잘못된 뽀모도로 프리셋입니다." }
       };
     }
 
     // DB에 뽀모도로 세션 생성
     const result = await this.timerService.startPomodoroSet(userId, {
-      userName, // ✅ 확실한 사용자 이름 전달
+      userName, // ✅ 사용자 이름 전달
       preset: presetKey,
       focusDuration: preset.focus,
       shortBreak: preset.shortBreak,
@@ -356,7 +352,7 @@ class TimerModule extends BaseModule {
       };
     }
 
-    // 메모리에 타이머 생성 (const timer = 제거)
+    // 메모리에 타이머 생성
     this.stateManager.createTimer(
       userId,
       "focus",
@@ -367,16 +363,12 @@ class TimerModule extends BaseModule {
         preset: presetKey,
         currentCycle: 1,
         totalCycles: preset.cycles,
-        userName,
+        userName, // ✅ 사용자 이름도 메모리에 전달
         chatId: callbackQuery.message.chat.id,
         messageId: callbackQuery.message.message_id
       }
     );
 
-    // ✅ 디버깅용 로그 추가
-    logger.debug(`🍅 뽀모도로 타이머 생성: ${userId}`);
-
-    // ✅ return 문 추가!
     return {
       type: "pomodoro_started",
       data: {
@@ -655,7 +647,7 @@ class TimerModule extends BaseModule {
 
     // 다음 세션 시작
     const result = await this.timerService.startSession(userId, {
-      userName, // ✅ 기존 타이머의 사용자 이름 사용
+      userName, // ✅ 올바른 사용자 이름 전달
       type: nextSession.type,
       duration: nextSession.duration,
       pomodoroInfo: {
@@ -678,7 +670,7 @@ class TimerModule extends BaseModule {
           preset: completedTimer.preset,
           currentCycle: nextSession.currentCycle,
           totalCycles: completedTimer.totalCycles,
-          userName, // ✅ 사용자 이름 전달
+          userName, // ✅ 사용자 이름도 메모리에 전달
           chatId: completedTimer.chatId,
           messageId: completedTimer.messageId
         }
@@ -749,13 +741,13 @@ class TimerModule extends BaseModule {
       const renderer = this.getRenderer();
       if (!renderer) return;
 
-      // ✅ 올바른 수정: 타이머 객체에서 직접 사용자 이름 가져오기
+      // ✅ 타이머 객체에서 직접 사용자 이름 가져오기
       const userName = timer.userName || `User#${timer.userId}`;
 
       const result = {
         type: "pomodoro_set_completed",
         data: {
-          userName, // ✅ 직접 전달 (getUserName 호출 제거)
+          userName, // ✅ 직접 전달
           totalCycles: timer.totalCycles,
           preset: timer.preset
         }
