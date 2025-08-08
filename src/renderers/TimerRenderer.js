@@ -406,73 +406,6 @@ class TimerRenderer extends BaseRenderer {
   }
 
   /**
-   * 📊 타이머 상태 렌더링
-   */
-  async renderTimerStatus(data, ctx, isRefresh = false, canRefresh = true) {
-    const { timer, userName } = data;
-
-    const progressBar = this.createProgressBar(timer.progress);
-
-    const statusIcon = timer.isPaused
-      ? this.ui.icons.paused
-      : this.ui.icons.running;
-
-    // ✅ 사용자 이름 안전하게 처리
-    const displayName =
-      userName && userName !== "알 수 없는 사용자"
-        ? this.markdownHelper.escape(userName)
-        : timer.userName && timer.userName !== "알 수 없는 사용자"
-          ? this.markdownHelper.escape(timer.userName)
-          : "사용자";
-
-    // 텍스트 생성 - 사용자 이름 포함
-    let text = `${statusIcon} *${displayName}의 타이머 현재 상태*\n\n`;
-
-    if (isRefresh) {
-      text += `🔄 _새로고침됨_\n\n`;
-    }
-
-    text +=
-      `${progressBar}\n\n` +
-      `⏱️ *남은 시간*: ${this.escapeMarkdown(timer.remainingFormatted)}\n` +
-      `⏳ *경과 시간*: ${this.escapeMarkdown(timer.elapsedFormatted)}\n` +
-      `📊 *진행률*: ${timer.progress}%\n` +
-      `🎯 *타입*: ${this.escapeMarkdown(timer.typeDisplay)}\n` +
-      `📌 *상태*: ${this.escapeMarkdown(timer.statusDisplay)}\n\n`;
-
-    // 뽀모도로인 경우 사이클 표시
-    if (timer.totalCycles) {
-      text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n\n`;
-    }
-
-    text += this.getProgressMessage(timer.progress);
-
-    // 버튼 생성
-    const buttons = [];
-
-    if (canRefresh) {
-      buttons.push([{ text: "🔄 새로고침", action: "refresh" }]);
-    }
-
-    if (timer.isPaused) {
-      buttons.push([
-        { text: "▶️ 재개", action: "resume" },
-        { text: "⏹️ 중지", action: "stop" }
-      ]);
-    } else {
-      buttons.push([
-        { text: "⏸️ 일시정지", action: "pause" },
-        { text: "⏹️ 중지", action: "stop" }
-      ]);
-    }
-
-    buttons.push([{ text: "🔙 메뉴", action: "menu" }]);
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  /**
    * 🚫 타이머 없음 렌더링
    */
   async renderNoTimer(data, ctx) {
@@ -922,37 +855,6 @@ class TimerRenderer extends BaseRenderer {
   }
 
   /**
-   * 타이머 전환 렌더링
-   */
-  async renderTimerTransition(data, ctx) {
-    const { timer, message } = data;
-
-    const progressBar = this.createProgressBar(0);
-
-    // this.escapeMarkdown → this.markdownHelper.escape로 변경
-    let text = `${message}\n\n`;
-    text += `${progressBar}\n\n`;
-    text += `⏱️ *남은 시간*: ${this.markdownHelper.escape(timer.remainingFormatted || "계산중")}\n`;
-    text += `🎯 *타입*: ${this.markdownHelper.escape(timer.typeDisplay || timer.type)}\n`;
-    text += `📊 *상태*: ${this.markdownHelper.escape(timer.statusDisplay || "실행중")}\n`;
-
-    if (timer.totalCycles) {
-      text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n`;
-    }
-
-    const buttons = [
-      [
-        { text: "⏸️ 일시정지", action: "pause" },
-        { text: "⏹️ 중지", action: "stop" }
-      ],
-      [{ text: "🔄 새로고침", action: "refresh" }]
-    ];
-
-    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
-    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-  }
-
-  /**
    * 📊 통계 렌더링
    */
   async renderStats(data, ctx) {
@@ -1050,6 +952,148 @@ class TimerRenderer extends BaseRenderer {
     const buttons = [
       [{ text: "🔄 다시 시도", action: "menu" }],
       [{ text: "🔙 메인 메뉴", action: "menu", module: "system" }]
+    ];
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  /**
+   * 🔧 마크다운 이스케이프 헬퍼 메서드
+   * MarkdownHelper의 escape 메서드를 호출하거나, 없으면 직접 처리
+   */
+  escapeMarkdown(text) {
+    if (!text) return "";
+
+    // MarkdownHelper가 있으면 사용
+    if (
+      this.markdownHelper &&
+      typeof this.markdownHelper.escape === "function"
+    ) {
+      return this.markdownHelper.escape(text);
+    }
+
+    // 없으면 직접 처리
+    return text.toString().replace(/[*_`[\]()~>#+=|{}.!-]/g, "\\$&");
+  }
+
+  // 또는 더 안전한 방법으로 renderTimerStatus 메서드 수정:
+
+  async renderTimerStatus(data, ctx, isRefresh = false, canRefresh = true) {
+    const { timer, userName } = data;
+
+    const progressBar = this.createProgressBar(timer.progress);
+
+    const statusIcon = timer.isPaused
+      ? this.ui.icons.paused
+      : this.ui.icons.running;
+
+    // ✅ 사용자 이름 안전하게 처리
+    const displayName =
+      userName && userName !== "알 수 없는 사용자"
+        ? this.markdownHelper
+          ? this.markdownHelper.escape(userName)
+          : userName
+        : timer.userName && timer.userName !== "알 수 없는 사용자"
+          ? this.markdownHelper
+            ? this.markdownHelper.escape(timer.userName)
+            : timer.userName
+          : "사용자";
+
+    // 텍스트 생성 - 안전한 이스케이프 처리
+    let text = `${statusIcon} *${displayName}의 타이머 현재 상태*\n\n`;
+
+    if (isRefresh) {
+      text += `🔄 _새로고침됨_\n\n`;
+    }
+
+    // ✅ 안전한 이스케이프 처리 (markdownHelper 사용 또는 직접 처리)
+    const safeEscape = (str) => {
+      if (!str) return "";
+      if (
+        this.markdownHelper &&
+        typeof this.markdownHelper.escape === "function"
+      ) {
+        return this.markdownHelper.escape(str);
+      }
+      return str.toString().replace(/[*_`[\]()~>#+=|{}.!-]/g, "\\$&");
+    };
+
+    text +=
+      `${progressBar}\n\n` +
+      `⏱️ *남은 시간*: ${safeEscape(timer.remainingFormatted)}\n` +
+      `⏳ *경과 시간*: ${safeEscape(timer.elapsedFormatted)}\n` +
+      `📊 *진행률*: ${timer.progress}%\n` +
+      `🎯 *타입*: ${safeEscape(timer.typeDisplay)}\n` +
+      `📌 *상태*: ${safeEscape(timer.statusDisplay)}\n\n`;
+
+    // 뽀모도로인 경우 사이클 표시
+    if (timer.totalCycles) {
+      text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n\n`;
+    }
+
+    text += this.getProgressMessage(timer.progress);
+
+    // 버튼 생성
+    const buttons = [];
+
+    if (canRefresh) {
+      buttons.push([{ text: "🔄 새로고침", action: "refresh" }]);
+    }
+
+    if (timer.isPaused) {
+      buttons.push([
+        { text: "▶️ 재개", action: "resume" },
+        { text: "⏹️ 중지", action: "stop" }
+      ]);
+    } else {
+      buttons.push([
+        { text: "⏸️ 일시정지", action: "pause" },
+        { text: "⏹️ 중지", action: "stop" }
+      ]);
+    }
+
+    buttons.push([{ text: "🔙 메뉴", action: "menu" }]);
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
+
+  // renderTimerTransition과 renderTimerCompleted도 동일하게 수정
+  async renderTimerTransition(data, ctx) {
+    const { timer, message } = data;
+
+    const progressBar = this.createProgressBar(0);
+
+    // 안전한 이스케이프 처리
+    const safeEscape = (str) => {
+      if (!str) return "";
+      if (
+        this.markdownHelper &&
+        typeof this.markdownHelper.escape === "function"
+      ) {
+        return this.markdownHelper.escape(str);
+      }
+      return str.toString().replace(/[*_`[\]()~>#+=|{}.!-]/g, "\\$&");
+    };
+
+    let text =
+      `${message}\n\n` +
+      `${progressBar}\n\n` +
+      `⏱️ *남은 시간*: ${safeEscape(timer.remainingFormatted)}\n` +
+      `🎯 *타입*: ${safeEscape(timer.typeDisplay)}\n` +
+      `📊 *상태*: ${safeEscape(timer.statusDisplay)}\n`;
+
+    if (timer.totalCycles) {
+      text += `🔄 *사이클*: ${timer.currentCycle}/${timer.totalCycles}\n`;
+    }
+
+    const buttons = [
+      [
+        { text: "⏸️ 일시정지", action: "pause" },
+        { text: "⏹️ 중지", action: "stop" }
+      ],
+      [{ text: "🔄 새로고침", action: "refresh" }]
     ];
 
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
