@@ -328,7 +328,7 @@ class TimerStateManager {
       progress,
       elapsedFormatted: this.formatTime(Math.floor(elapsed / 1000)),
       remainingFormatted: this.formatTime(Math.floor(remaining / 1000)),
-      typeDisplay: this.getTypeDisplay(timer.type),
+      typeDisplay: TimeHelper.getTimerTypeDisplay(timer.type, "with-emoji"),
       statusDisplay: this.getStatusDisplay(timer.status),
       isPaused: timer.status === "paused",
       isRunning: timer.status === "running"
@@ -383,7 +383,8 @@ class TimerStateManager {
    * 타입 표시명
    */
   getTypeDisplay(type) {
-    return TimeHelper.getTimerTypeDisplay(type, true); // 이모지 포함
+    const TimeHelper = require("../utils/TimeHelper");
+    return TimeHelper.getTimerTypeDisplay(type, "with-emoji");
   }
 
   /**

@@ -733,7 +733,6 @@ class TimerService extends BaseService {
       stoppedAt: obj.stoppedAt,
       // 표시용 필드 추가
       durationDisplay: `${obj.duration}분`,
-      typeDisplay: this.getTypeDisplay(obj.type),
       statusDisplay: this.getStatusDisplay(obj.status)
     };
   }

@@ -161,19 +161,44 @@ class TimeHelper {
   }
 
   /**
-   * 🏷️ 타이머 타입 표시명 (통일된 형식)
-   * @param {string} type - 타이머 타입
-   * @param {boolean} withEmoji - 이모지 포함 여부 (기본값: true)
-   * @returns {string} 표시명
+   * 🏷️ 타이머 타입 표시명 (통일된 단일 소스)
    */
-  static getTimerTypeDisplay(type, withEmoji = true) {
+  static getTimerTypeDisplay(type, format = "with-emoji") {
     const displays = {
-      focus: withEmoji ? "🎯 집중" : "집중",
-      shortBreak: withEmoji ? "☕ 짧은 휴식" : "짧은 휴식",
-      longBreak: withEmoji ? "🌴 긴 휴식" : "긴 휴식",
-      custom: withEmoji ? "⏰ 커스텀" : "커스텀"
+      focus: {
+        simple: "집중",
+        withEmoji: "🎯 집중",
+        full: "🍅 집중 시간"
+      },
+      shortBreak: {
+        simple: "짧은 휴식",
+        withEmoji: "☕ 짧은 휴식",
+        full: "☕ 짧은 휴식"
+      },
+      longBreak: {
+        simple: "긴 휴식",
+        withEmoji: "🌴 긴 휴식",
+        full: "🌴 긴 휴식"
+      },
+      custom: {
+        simple: "커스텀",
+        withEmoji: "⏰ 커스텀",
+        full: "⏰ 커스텀 타이머"
+      }
     };
-    return displays[type] || type || "알 수 없음";
+
+    const typeData = displays[type];
+    if (!typeData) return type || "알 수 없음";
+
+    switch (format) {
+      case "simple":
+        return typeData.simple;
+      case "full":
+        return typeData.full;
+      case "with-emoji":
+      default:
+        return typeData.withEmoji;
+    }
   }
 
   /**

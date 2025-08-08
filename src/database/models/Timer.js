@@ -250,12 +250,8 @@ timerSchema.virtual("statusDisplay").get(function () {
  * 🏷️ 타입 표시명
  */
 timerSchema.virtual("typeDisplay").get(function () {
-  const typeMap = {
-    focus: "🍅 집중 시간",
-    shortBreak: "☕ 짧은 휴식",
-    longBreak: "🌴 긴 휴식"
-  };
-  return typeMap[this.type] || "⏰ 커스텀";
+  const TimeHelper = require("../../utils/TimeHelper");
+  return TimeHelper.getTimerTypeDisplay(this.type, "with-emoji");
 });
 
 /**
