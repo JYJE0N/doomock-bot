@@ -74,6 +74,9 @@ class TimerStateManager {
       currentCycle: metadata.currentCycle || 1,
       totalCycles: metadata.totalCycles || 1,
 
+      // ✅ 사용자 이름 정보 추가
+      userName: metadata.userName || null,
+
       // UI 정보
       chatId: metadata.chatId,
       messageId: metadata.messageId

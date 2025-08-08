@@ -322,9 +322,7 @@ class TimerModule extends BaseModule {
    */
   async startPomodoro(bot, callbackQuery, params) {
     const userId = getUserId(callbackQuery.from);
-
-    // ✅ 사용자 정보 확실하게 가져오기 (수정된 부분)
-    const userName = getUserName(callbackQuery); // callbackQuery.from이 아닌 callbackQuery 전체를 전달
+    const userName = getUserName(callbackQuery);
 
     console.log("🔍 TimerModule 디버깅:");
     console.log("  userId:", userId);
@@ -369,6 +367,7 @@ class TimerModule extends BaseModule {
         preset: presetKey,
         currentCycle: 1,
         totalCycles: preset.cycles,
+        userName,
         chatId: callbackQuery.message.chat.id,
         messageId: callbackQuery.message.message_id
       }
@@ -651,9 +650,11 @@ class TimerModule extends BaseModule {
       return;
     }
 
+    const userName = completedTimer.userName || `User#${userId}`;
+
     // 다음 세션 시작
     const result = await this.timerService.startSession(userId, {
-      userName: getUserName({ id: userId }),
+      userName,
       type: nextSession.type,
       duration: nextSession.duration,
       pomodoroInfo: {
@@ -746,10 +747,12 @@ class TimerModule extends BaseModule {
       const renderer = this.getRenderer();
       if (!renderer) return;
 
+      const userName = timer.userName || `User#${timer.userId}`;
+
       const result = {
         type: "pomodoro_set_completed",
         data: {
-          userName: getUserName({ id: timer.userId }),
+          userName,
           totalCycles: timer.totalCycles,
           preset: timer.preset
         }
