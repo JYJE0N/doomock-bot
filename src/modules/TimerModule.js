@@ -324,6 +324,9 @@ class TimerModule extends BaseModule {
     const userId = getUserId(callbackQuery.from);
     const userName = getUserName(callbackQuery); // ✅ 전체 callbackQuery 전달
 
+    console.log("🔍 startPomodoro 디버깅:");
+    console.log("  getUserName 결과:", userName);
+
     // 기존 세션 정리
     await this.cleanupExistingSession(userId);
 
@@ -642,8 +645,12 @@ class TimerModule extends BaseModule {
       return;
     }
 
-    // ✅ 완료된 타이머에서 사용자 이름 가져오기
+    // ✅ 완료된 타이머에서 사용자 이름 가져오기 (이것이 핵심!)
     const userName = completedTimer.userName || `User#${userId}`;
+
+    console.log("🔍 handlePomodoroTransition 디버깅:");
+    console.log("  completedTimer.userName:", completedTimer.userName);
+    console.log("  사용할 userName:", userName);
 
     // 다음 세션 시작
     const result = await this.timerService.startSession(userId, {
@@ -743,6 +750,10 @@ class TimerModule extends BaseModule {
 
       // ✅ 타이머 객체에서 직접 사용자 이름 가져오기
       const userName = timer.userName || `User#${timer.userId}`;
+
+      console.log("🔍 notifyPomodoroSetCompletion 디버깅:");
+      console.log("  timer.userName:", timer.userName);
+      console.log("  사용할 userName:", userName);
 
       const result = {
         type: "pomodoro_set_completed",
