@@ -116,8 +116,11 @@ class TTSModuleV2 {
       'menu': () => this.showMenu(userId, chatId),
       'convert': () => this.handleTTSConvert(userId, chatId, params),
       'settings': () => this.showSettings(userId, chatId),
+      'voice': () => this.handleVoiceSelect(userId, chatId, params),
       'voice_select': () => this.handleVoiceSelect(userId, chatId, params),
-      'language_select': () => this.handleLanguageSelect(userId, chatId, params)
+      'language_select': () => this.handleLanguageSelect(userId, chatId, params),
+      'share': () => this.handleTTSShare(userId, chatId, params),
+      'cancel': () => this.showMenu(userId, chatId)
     };
     
     const handler = actionMap[subAction];
@@ -793,23 +796,23 @@ class TTSModuleV2 {
    * 🎹 키보드 생성 메서드들 (더미)
    */
   createMenuKeyboard() {
-    return { inline_keyboard: [[{ text: "🎵 텍스트 변환", callback_data: "tts_convert" }]] };
+    return { inline_keyboard: [[{ text: "🎵 텍스트 변환", callback_data: "tts:convert" }]] };
   }
 
   createConversionResultKeyboard(conversionData) {
-    return { inline_keyboard: [[{ text: "🔗 공유", callback_data: `tts_share_${conversionData.shareUrl}` }]] };
+    return { inline_keyboard: [[{ text: "🔗 공유", callback_data: `tts:share_${conversionData.shareUrl}` }]] };
   }
 
   createVoiceSelectionKeyboard(voices) {
-    return { inline_keyboard: voices.map(v => [{ text: v.name, callback_data: `tts_voice_${v.code}` }]) };
+    return { inline_keyboard: voices.map(v => [{ text: v.name, callback_data: `tts:voice_${v.code}` }]) };
   }
 
   createBackToMenuKeyboard() {
-    return { inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts_menu" }]] };
+    return { inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts:menu" }]] };
   }
 
   createTextInputKeyboard() {
-    return { inline_keyboard: [[{ text: "❌ 취소", callback_data: "tts_cancel" }]] };
+    return { inline_keyboard: [[{ text: "❌ 취소", callback_data: "tts:cancel" }]] };
   }
 
   createShareKeyboard(shareUrl) {
@@ -817,11 +820,11 @@ class TTSModuleV2 {
   }
 
   createSettingsKeyboard() {
-    return { inline_keyboard: [[{ text: "🎤 음성 변경", callback_data: "tts_voices" }]] };
+    return { inline_keyboard: [[{ text: "🎤 음성 변경", callback_data: "tts:voices" }]] };
   }
 
   createHelpKeyboard() {
-    return { inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts_menu" }]] };
+    return { inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts:menu" }]] };
   }
 
   /**

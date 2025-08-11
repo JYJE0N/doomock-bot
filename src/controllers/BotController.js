@@ -405,24 +405,16 @@ class BotController {
     // RENDER.MESSAGE_REQUEST 이벤트 처리
     this.eventBus.subscribe("RENDER.MESSAGE_REQUEST", async (payload) => {
       try {
-        const { chatId, renderType, data, options = {} } = payload;
+        const { chatId, text, options = {} } = payload;
         
-        // chatId로 컨텍스트 복원
-        const ctx = {
-          chat: { id: chatId },
-          reply: (text, opts) => this.bot.telegram.sendMessage(chatId, text, opts),
-          editMessageText: (text, opts) => this.bot.telegram.editMessageText(chatId, options.messageId, null, text, opts),
-          answerCbQuery: (text) => options.callbackQueryId ? this.bot.telegram.answerCbQuery(options.callbackQueryId, text) : Promise.resolve()
-        };
-
-        // NavigationHandler를 통해 렌더링
-        await this.navigationHandler.renderModuleResponse(ctx, {
-          type: renderType,
-          data: data,
-          options: options
+        // 직접 텔레그램 메시지 전송 (더 단순한 방식)
+        await this.bot.telegram.sendMessage(chatId, text, {
+          parse_mode: options.parse_mode || 'Markdown',
+          reply_markup: options.reply_markup,
+          ...options
         });
 
-        logger.debug(`✅ RENDER.MESSAGE_REQUEST 처리 완료: ${renderType}`);
+        logger.debug(`✅ RENDER.MESSAGE_REQUEST 처리 완료: chatId=${chatId}`);
       } catch (error) {
         logger.error("❌ RENDER.MESSAGE_REQUEST 처리 실패:", error);
       }

@@ -194,6 +194,7 @@ class WeatherModuleV2 {
       'forecast': () => this.publishForecastRequest(userId, chatId, params),
       'city': () => this.publishCityRequest(userId, chatId, params),
       'cities': () => this.publishCitiesRequest(userId, chatId),
+      'setdefault': () => this.setDefaultCity(userId, params[0]),
       'help': () => this.publishHelpRequest(userId, chatId)
     };
     

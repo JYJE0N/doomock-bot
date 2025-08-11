@@ -236,9 +236,13 @@ class LeaveModuleV2 {
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
       'menu': () => this.showMenu(userId, chatId),
-      'monthly': () => this.publishMonthlyRequest(userId, chatId, params),
-      'use_form': () => this.publishUseFormRequest(userId, chatId),
+      'monthly': () => this.publishMonthlyRequest(userId, chatId, params[0]),
+      'use': () => this.publishUseFormRequest(userId, chatId),
+      'add': () => this.publishUseRequest(userId, chatId, params[0], params[1]),
+      'custom': () => this.publishCustomInputStart(userId, chatId),
       'settings': () => this.publishSettingsRequest(userId, chatId),
+      'joindate': () => this.handleJoinDateStart(userId, chatId),
+      'config': () => this.publishSettingsRequest(userId, chatId),
       'balance': () => this.publishBalanceRequest(userId, chatId),
       'history': () => this.publishHistoryRequest(userId, chatId)
     };
@@ -264,6 +268,29 @@ class LeaveModuleV2 {
   /**
    * 🏠 메뉴 표시 (V2 렌더러 방식)
    */
+  /**
+   * 📅 입사일 설정 시작 (레거시 콜백용)
+   */
+  async handleJoinDateStart(userId, chatId) {
+    // 입력 상태 설정
+    this.setUserInputState(userId, {
+      state: this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT,
+      chatId,
+      startTime: Date.now()
+    });
+
+    await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+      chatId,
+      text: '📅 입사일을 입력하세요 (형식: YYYY-MM-DD)\n예: 2023-01-15',
+      options: {
+        reply_markup: this.createCancelKeyboard(),
+        parse_mode: 'Markdown'
+      }
+    });
+
+    return { success: true };
+  }
+
   /**
    * 💰 잔여 연차 조회 (레거시 콜백용)
    */
@@ -628,6 +655,38 @@ class LeaveModuleV2 {
           chatId,
           leaveType: 'custom',
           customAmount: amount
+        });
+      } else if (inputState.state === this.constants.INPUT_STATES.WAITING_JOIN_DATE_INPUT) {
+        // 날짜 형식 검증 (YYYY-MM-DD)
+        const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+        if (!dateRegex.test(text)) {
+          await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+            chatId,
+            text: '❌ 올바른 날짜 형식이 아닙니다. YYYY-MM-DD 형식으로 입력하세요.\n예: 2023-01-15',
+            options: { parse_mode: 'Markdown' }
+          });
+          return;
+        }
+
+        // 날짜 유효성 검증
+        const inputDate = new Date(text);
+        if (isNaN(inputDate.getTime())) {
+          await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+            chatId,
+            text: '❌ 유효하지 않은 날짜입니다. 다시 입력하세요.',
+            options: { parse_mode: 'Markdown' }
+          });
+          return;
+        }
+
+        // 입력 상태 정리
+        this.clearUserInputState(userId);
+
+        // 입사일 설정 요청 발행
+        await this.eventBus.publish(EVENTS.LEAVE.JOIN_DATE_SET, {
+          userId,
+          chatId,
+          joinDate: text
         });
       }
 

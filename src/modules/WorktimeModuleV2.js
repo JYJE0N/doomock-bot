@@ -249,7 +249,13 @@ class WorktimeModuleV2 {
       'status': () => this.publishStatusRequest(userId, chatId),
       'weekly': () => this.publishWeeklyRequest(userId, chatId),
       'monthly': () => this.publishMonthlyRequest(userId, chatId),
-      'stats': () => this.publishStatsRequest(userId, chatId)
+      'stats': () => this.publishStatsRequest(userId, chatId),
+      'history': () => this.publishHistoryRequest(userId, chatId),
+      'settings': () => this.publishSettingsRequest(userId, chatId),
+      'break_start': () => this.publishBreakStartRequest(userId, chatId),
+      'break_end': () => this.publishBreakEndRequest(userId, chatId),
+      'lunch_start': () => this.publishLunchStartRequest(userId, chatId),
+      'lunch_end': () => this.publishLunchEndRequest(userId, chatId)
     };
     
     const handler = actionMap[subAction];
@@ -1662,6 +1668,75 @@ class WorktimeModuleV2 {
         ]
       ]
     };
+  }
+
+  // === 누락된 메서드들 ===
+
+  /**
+   * 📤 히스토리 요청 발행 (레거시 콜백용)
+   */
+  async publishHistoryRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.HISTORY_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 설정 요청 발행 (레거시 콜백용)
+   */
+  async publishSettingsRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.SETTINGS_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 휴식 시작 요청 발행 (레거시 콜백용)
+   */
+  async publishBreakStartRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.BREAK_START, {
+      userId,
+      chatId,
+      breakType: 'short'
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 휴식 종료 요청 발행 (레거시 콜백용)
+   */
+  async publishBreakEndRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.BREAK_END, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 점심 시작 요청 발행 (레거시 콜백용)
+   */
+  async publishLunchStartRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.LUNCH_START, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 점심 종료 요청 발행 (레거시 콜백용)
+   */
+  async publishLunchEndRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.LUNCH_END, {
+      userId,
+      chatId
+    });
+    return { success: true };
   }
 
   // === 정리 ===

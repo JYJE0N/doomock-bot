@@ -109,6 +109,7 @@ class FortuneModuleV2 {
       'single': () => this.handleSingleCard(userId, chatId),
       'triple': () => this.handleTripleCard(userId, chatId),
       'celtic': () => this.handleCelticCross(userId, chatId),
+      'detail': () => this.handleCelticDetail(userId, chatId),
       'stats': () => this.showStats(userId, chatId),
       'history': () => this.showHistory(userId, chatId)
     };
@@ -1006,9 +1007,9 @@ class FortuneModuleV2 {
   createMenuKeyboard(todayInfo, isDeveloper) {
     return { 
       inline_keyboard: [
-        [{ text: "🃏 싱글카드", callback_data: "fortune_single" }],
-        [{ text: "🔮 트리플카드", callback_data: "fortune_triple" }],
-        [{ text: "✨ 캘틱 크로스", callback_data: "fortune_celtic" }]
+        [{ text: "🃏 싱글카드", callback_data: "fortune:single" }],
+        [{ text: "🔮 트리플카드", callback_data: "fortune:triple" }],
+        [{ text: "✨ 캘틱 크로스", callback_data: "fortune:celtic" }]
       ] 
     };
   }
@@ -1016,7 +1017,7 @@ class FortuneModuleV2 {
   createDrawResultKeyboard() {
     return { 
       inline_keyboard: [
-        [{ text: "🔙 메뉴로", callback_data: "fortune_menu" }]
+        [{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]
       ] 
     };
   }
@@ -1024,7 +1025,7 @@ class FortuneModuleV2 {
   createQuestionKeyboard() {
     return { 
       inline_keyboard: [
-        [{ text: "❌ 취소", callback_data: "fortune_cancel" }]
+        [{ text: "❌ 취소", callback_data: "fortune:menu" }]
       ] 
     };
   }
@@ -1032,8 +1033,8 @@ class FortuneModuleV2 {
   createCelticResultKeyboard() {
     return { 
       inline_keyboard: [
-        [{ text: "🔍 상세보기", callback_data: "fortune_detail" }],
-        [{ text: "🔙 메뉴로", callback_data: "fortune_menu" }]
+        [{ text: "🔍 상세보기", callback_data: "fortune:detail" }],
+        [{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]
       ] 
     };
   }
@@ -1041,7 +1042,7 @@ class FortuneModuleV2 {
   createBackToMenuKeyboard() {
     return { 
       inline_keyboard: [
-        [{ text: "🔙 메뉴로", callback_data: "fortune_menu" }]
+        [{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]
       ] 
     };
   }
@@ -1178,6 +1179,17 @@ class FortuneModuleV2 {
         userId: userId
       }
     };
+  }
+
+  /**
+   * 🔍 캘틱크로스 상세보기 (레거시 콜백용)
+   */
+  async handleCelticDetail(userId, chatId) {
+    this.eventBus.publish(EVENTS.FORTUNE.CELTIC_DETAIL_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
   }
 
   async showMenu(userId, chatId) {
