@@ -1,7 +1,7 @@
 // src/modules/TodoModule.js - 비즈니스 로직만 담당
 const BaseModule = require("../core/BaseModule");
-const logger = require("../utils/Logger");
-const { getUserId } = require("../utils/UserHelper");
+const logger = require('../utils/core/Logger');
+const { getUserId } = require('../utils/helpers/UserHelper');
 
 /**
  * 📋 TodoModule - 순수한 비즈니스 로직만 처리
@@ -898,7 +898,7 @@ class TodoModule extends BaseModule {
       }
 
       // 🎯 성공 응답 - 자동 목록 새로고침으로 변경
-      const TimeHelper = require("../utils/TimeHelper");
+      const TimeHelper = require('../utils/formatting/TimeHelper');
       const formattedTime = TimeHelper.format(remindAt, "full");
 
       return {

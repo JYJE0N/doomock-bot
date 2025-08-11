@@ -1,7 +1,7 @@
 // src/renderers/LeaveRenderer.js - 개인용 연차 관리 시스템
 const BaseRenderer = require("./BaseRenderer");
-const TimeHelper = require("../utils/TimeHelper");
-const logger = require("../utils/Logger");
+const TimeHelper = require('../utils/formatting/TimeHelper');
+const logger = require('../utils/core/Logger');
 
 /**
  * 🏖️ LeaveRenderer - 개인용 연차 관리 시스템

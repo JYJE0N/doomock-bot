@@ -1,5 +1,5 @@
 const BaseRenderer = require("./BaseRenderer");
-const _logger = require("../utils/Logger");
+const _logger = require('../utils/core/Logger');
 
 /**
  * 🔮 FortuneRenderer - 타로 카드 UI 렌더링 (콜백 버튼 수정)

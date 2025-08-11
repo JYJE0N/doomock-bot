@@ -283,7 +283,7 @@ reminderSchema.virtual("minutesUntilReminder").get(function () {
 reminderSchema.virtual("readableTime").get(function () {
   if (!this.reminderTime) return null;
 
-  const TimeHelper = require("../../utils/TimeHelper");
+  const TimeHelper = require('../../utils/formatting/TimeHelper');
   return TimeHelper.format(this.reminderTime, "full");
 });
 

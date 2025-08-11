@@ -1,6 +1,6 @@
 // src/database/MongooseManager.js - isConnected() 메서드 추가 수정
 const mongoose = require("mongoose");
-const logger = require("../utils/Logger");
+const logger = require('../utils/core/Logger');
 
 let instance = null;
 

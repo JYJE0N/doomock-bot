@@ -1,8 +1,8 @@
 // src/renderers/TimerRenderer.js - 🎨 SoC 완전 준수 리팩토링 v4.0
 
 const BaseRenderer = require("./BaseRenderer");
-const logger = require("../utils/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const logger = require('../utils/core/Logger');
+const TimeHelper = require('../utils/formatting/TimeHelper');
 
 /**
  * 🎨 TimerRenderer - 타이머 UI 렌더링 (SoC 완전 준수)

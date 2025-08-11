@@ -1,9 +1,9 @@
 // src/modules/FortuneModule.js
 
 const BaseModule = require("../core/BaseModule");
-const logger = require("../utils/Logger");
+const logger = require('../utils/core/Logger');
 const AnimationHelper = require("../utils/AnimationHelper");
-const { getUserId, getUserName, isDeveloper } = require("../utils/UserHelper");
+const { getUserId, getUserName, isDeveloper } = require('../utils/helpers/UserHelper');
 const KoreanPostpositionHelper = require("../utils/KoreanPostpositionHelper");
 
 class FortuneModule extends BaseModule {

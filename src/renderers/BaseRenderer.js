@@ -1,6 +1,6 @@
 // src/renderers/BaseRenderer.js - 속도 제한 처리가 추가된 버전
 
-const logger = require("../utils/Logger");
+const logger = require('../utils/core/Logger');
 
 class BaseRenderer {
   constructor(bot, navigationHandler, markdownHelper) {

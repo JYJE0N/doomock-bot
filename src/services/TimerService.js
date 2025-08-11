@@ -1,8 +1,8 @@
 // src/services/TimerService.js - 🍅 SoC 완전 준수 리팩토링 v4.0
 
 const BaseService = require("./BaseService");
-const TimeHelper = require("../utils/TimeHelper");
-const logger = require("../utils/Logger");
+const TimeHelper = require('../utils/formatting/TimeHelper');
+const logger = require('../utils/core/Logger');
 
 /**
  * 🍅 TimerService - 타이머 데이터 서비스 (SoC 완전 준수)

@@ -15,6 +15,7 @@ logs/
 *.bak.js
 *.js.bak
 *.backup.js
+*_bak/
 _bak/
 
 # docs

@@ -1,6 +1,6 @@
 // src/core/BaseModule.js
-const logger = require("../utils/Logger");
-const MessageHelper = require("../utils/MessageHelper");
+const logger = require('../utils/core/Logger');
+const MessageHelper = require('../utils/formatting/MessageHelper');
 
 /**
  * 🏗️ BaseModule - 모든 모듈의 부모 클래스 (MessageHelper 통합)
