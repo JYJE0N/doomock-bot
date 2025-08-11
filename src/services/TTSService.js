@@ -12,6 +12,7 @@ class TTSService extends BaseService {
     this.client = null;
     this.fileHelper = new TTSFileHelper();
     this.voiceConfig = new TTSVoiceConfig();
+    this.isTestMode = false;
 
     this.userVoices = new Map();
   }
@@ -28,7 +29,10 @@ class TTSService extends BaseService {
       const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
       if (!projectId || !clientEmail || !privateKey) {
-        throw new Error("Google Cloud TTS 인증 정보가 부족합니다.");
+        logger.warn("⚠️ Google Cloud TTS 인증 정보가 부족함 - 테스트 모드로 동작");
+        this.isTestMode = true;
+        await this.fileHelper.initialize();
+        return;
       }
 
       // 최소한의 credentials 객체 생성
