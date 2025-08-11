@@ -366,7 +366,7 @@ class FortuneModule extends BaseModule {
     return await this.performDraw(user, fortuneType);
   }
 
-  // 질문 프롬프트에 대한 메시지 ID를 저장
+  // 캘틱크로스 프롬프트 질문
   async askQuestion(bot, callbackQuery, subAction, params) {
     const userId = getUserId(callbackQuery.from);
 
@@ -376,7 +376,7 @@ class FortuneModule extends BaseModule {
       fortuneType: params || "celtic"
     });
 
-    // 상태 저장
+    // 🔥 중요: 무조건 먼저 상태 저장!
     const state = {
       type: "waiting_question",
       fortuneType: params || "celtic",
@@ -401,21 +401,43 @@ class FortuneModule extends BaseModule {
       }
     };
 
-    // ✅ 수정된 ctx 객체 생성
+    // 렌더러를 통해 메시지 전송 (수정된 부분)
     const renderer =
       this.moduleManager?.navigationHandler?.renderers?.get("fortune");
     if (renderer) {
-      // BaseModule의 createCtx 사용 (권장)
-      const ctx = this.createCtx(callbackQuery);
+      // ✅ 올바른 ctx 객체 생성 - chat 정보 포함!
+      const ctx = {
+        // 🔥 핵심: chat 정보 추가
+        chat: callbackQuery.message.chat,
+        message: callbackQuery.message,
+        from: callbackQuery.from,
+        callbackQuery: callbackQuery,
+        update: callbackQuery,
+        editMessageText: async (text, extra) => {
+          // 🔥 핵심: chat_id 파라미터 순서 수정
+          const sentMessage = await bot.telegram.editMessageText(
+            text, // text가 첫 번째
+            {
+              chat_id: callbackQuery.message.chat.id, // options에 chat_id 포함
+              message_id: callbackQuery.message.message_id,
+              ...extra
+            }
+          );
+          return sentMessage;
+        },
+        answerCbQuery: async () => {
+          return await bot.telegram.answerCbQuery(callbackQuery.id);
+        }
+      };
 
       await renderer.render(result, ctx);
 
-      // 상태 업데이트
+      // 상태에 메시지 ID 저장 (중복이지만 안전성을 위해)
       this.userStates.set(userId, {
         type: "waiting_question",
         fortuneType: params || "celtic",
         timestamp: Date.now(),
-        promptMessageId: callbackQuery.message.message_id
+        promptMessageId: callbackQuery.message.message_id // 🔥 중요
       });
     }
 
