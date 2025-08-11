@@ -1,5 +1,5 @@
 // ===== 3. src/database/DatabaseManager.js - 간결한 연결 관리자 =====
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 const { MongoClient } = require("mongodb");
 
 // 🌍 싱글톤 인스턴스

@@ -1,7 +1,7 @@
 // src/core/ServiceBuilder.js - Mongoose 지원 버전
 const path = require("path");
 const fs = require("fs");
-const logger = require('../../utils/core/Logger');
+const logger = require("../../utils/Logger");
 
 class ServiceBuilder {
   constructor() {
@@ -87,14 +87,14 @@ class ServiceBuilder {
     if (mongooseServices.includes(serviceName)) {
       // Mongoose 서비스는 별도 설정 불필요
       instance = new ServiceClass({
-        config: {},
+        config: {}
       });
     } else {
       // 기존 MongoDB Native 서비스들 (나중에 마이그레이션)
       instance = new ServiceClass({
         db: this.dbManager?.getDb(),
         dbManager: this.dbManager,
-        config: {},
+        config: {}
       });
     }
 
@@ -129,7 +129,7 @@ class ServiceBuilder {
         status[name] = {
           serviceName: name,
           isReady: true,
-          message: "Status method not implemented",
+          message: "Status method not implemented"
         };
       }
     }

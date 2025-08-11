@@ -1,5 +1,5 @@
 // ===== 2. src/database/schemas/StandardSchema.js - 느슨한 결합 스키마 시스템 =====
-const logger = require('../../utils/core/Logger');
+const logger = require("../../utils/Logger");
 const { ObjectId } = require("mongodb");
 
 /**
@@ -40,9 +40,9 @@ const BaseDocumentTemplate = {
   environment: {
     type: "string",
     required: true,
-    default: () => process.env.NODE_ENV || "development",
+    default: () => process.env.NODE_ENV || "development"
   },
-  timezone: { type: "string", required: true, default: "Asia/Seoul" },
+  timezone: { type: "string", required: true, default: "Asia/Seoul" }
 };
 
 /**
@@ -59,7 +59,7 @@ const SchemaDefinitions = {
       type: "string",
       required: false,
       maxLength: 1000,
-      trim: true,
+      trim: true
     },
 
     // 완료 상태
@@ -72,7 +72,7 @@ const SchemaDefinitions = {
       type: "string",
       required: false,
       default: "일반",
-      maxLength: 20,
+      maxLength: 20
     },
     tags: { type: "array", required: false, default: [], maxItems: 10 },
 
@@ -82,7 +82,7 @@ const SchemaDefinitions = {
 
     // 통계
     estimatedMinutes: { type: "number", required: false, min: 1 },
-    actualMinutes: { type: "number", required: false, min: 1 },
+    actualMinutes: { type: "number", required: false, min: 1 }
   },
 
   // ⏰ 타이머 컬렉션
@@ -93,7 +93,7 @@ const SchemaDefinitions = {
     type: {
       type: "string",
       required: true,
-      enum: ["pomodoro", "work", "break", "custom"],
+      enum: ["pomodoro", "work", "break", "custom"]
     },
     name: { type: "string", required: true, maxLength: 100, trim: true },
 
@@ -105,14 +105,14 @@ const SchemaDefinitions = {
     status: {
       type: "string",
       required: true,
-      enum: ["running", "paused", "completed", "stopped"],
+      enum: ["running", "paused", "completed", "stopped"]
     },
     startedAt: { type: "date", required: false },
     pausedAt: { type: "date", required: false },
     completedAt: { type: "date", required: false },
 
     // 연결
-    linkedTodoId: { type: "ObjectId", required: false },
+    linkedTodoId: { type: "ObjectId", required: false }
   },
 
   // 👤 사용자 설정 컬렉션
@@ -125,7 +125,7 @@ const SchemaDefinitions = {
       type: "string",
       required: true,
       default: "ko",
-      enum: ["ko", "en"],
+      enum: ["ko", "en"]
     },
 
     // 알림 설정 (중첩 객체)
@@ -135,10 +135,10 @@ const SchemaDefinitions = {
       properties: {
         enabled: { type: "boolean", default: true },
         sound: { type: "boolean", default: true },
-        vibration: { type: "boolean", default: true },
-      },
-    },
-  },
+        vibration: { type: "boolean", default: true }
+      }
+    }
+  }
 };
 
 /**
@@ -150,19 +150,19 @@ const IndexDefinitions = {
     { fields: { userId: 1, completed: 1 }, background: true },
     { fields: { text: "text", description: "text" }, background: true }, // 텍스트 검색
     { fields: { dueDate: 1 }, background: true, sparse: true },
-    { fields: { priority: -1 }, background: true },
+    { fields: { priority: -1 }, background: true }
   ],
 
   timers: [
     { fields: { userId: 1, createdAt: -1 }, background: true },
     { fields: { userId: 1, status: 1 }, background: true },
-    { fields: { type: 1 }, background: true },
+    { fields: { type: 1 }, background: true }
   ],
 
   user_settings: [
     { fields: { userId: 1 }, unique: true },
-    { fields: { updatedAt: -1 }, background: true },
-  ],
+    { fields: { updatedAt: -1 }, background: true }
+  ]
 };
 
 /**
@@ -175,7 +175,7 @@ class SchemaManager {
       autoIndexCreation: config.autoIndexCreation !== false,
       cacheValidation: config.cacheValidation !== false,
       strictMode: config.strictMode === true,
-      ...config,
+      ...config
     };
 
     // 캐시
@@ -184,7 +184,7 @@ class SchemaManager {
 
     logger.debug("🗄️ SchemaManager 초기화됨", {
       validationEnabled: this.config.validationEnabled,
-      autoIndexCreation: this.config.autoIndexCreation,
+      autoIndexCreation: this.config.autoIndexCreation
     });
   }
 
@@ -236,7 +236,7 @@ class SchemaManager {
       return {
         isValid: false,
         errors: [`검증 중 오류: ${error.message}`],
-        document,
+        document
       };
     }
   }
@@ -281,7 +281,7 @@ class SchemaManager {
     return {
       isValid: errors.length === 0,
       errors,
-      document: transformedDoc,
+      document: transformedDoc
     };
   }
 
@@ -384,7 +384,7 @@ class SchemaManager {
     const keyData = {
       collection: collectionName,
       fields: Object.keys(document).sort(),
-      hash: this.simpleHash(JSON.stringify(document)),
+      hash: this.simpleHash(JSON.stringify(document))
     };
     return JSON.stringify(keyData);
   }
@@ -419,7 +419,7 @@ class SchemaManager {
       config: this.config,
       cacheSize: this.validationCache.size,
       availableSchemas: Object.keys(SchemaDefinitions),
-      indexDefinitions: Object.keys(IndexDefinitions),
+      indexDefinitions: Object.keys(IndexDefinitions)
     };
   }
 }
@@ -428,5 +428,5 @@ module.exports = {
   SchemaDefinitions,
   IndexDefinitions,
   BaseDocumentTemplate,
-  SchemaManager,
+  SchemaManager
 };

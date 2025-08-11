@@ -1,8 +1,8 @@
 // src/database/models/Timer.js - 🍅 완전 리팩토링 v2.0
 
 const mongoose = require("mongoose");
-const TimeHelper = require('../../utils/formatting/TimeHelper');
-const logger = require('../../utils/core/Logger');
+const TimeHelper = require("../../utils/formatting/TimeHelper");
+const logger = require("../../utils/Logger");
 
 /**
  * 🍅 Timer Mongoose 스키마 - 뽀모도로 타이머 세션 (완전 표준 준수)
@@ -250,7 +250,7 @@ timerSchema.virtual("statusDisplay").get(function () {
  * 🏷️ 타입 표시명
  */
 timerSchema.virtual("typeDisplay").get(function () {
-  const TimeHelper = require('../../utils/formatting/TimeHelper');
+  const TimeHelper = require("../../utils/formatting/TimeHelper");
   return TimeHelper.getTimerTypeDisplay(this.type, true);
 });
 
