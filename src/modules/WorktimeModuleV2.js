@@ -271,6 +271,83 @@ class WorktimeModuleV2 {
   }
 
   /**
+   * 📤 체크인 요청 발행 (레거시 콜백용)
+   */
+  async publishCheckinRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.CHECKIN_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 체크아웃 요청 발행 (레거시 콜백용)
+   */
+  async publishCheckoutRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.CHECKOUT_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 오늘 근무 현황 요청 발행 (레거시 콜백용)
+   */
+  async publishTodayRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.TODAY_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 상태 요청 발행 (레거시 콜백용)
+   */
+  async publishStatusRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.STATUS_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 주간 통계 요청 발행 (레거시 콜백용)
+   */
+  async publishWeeklyRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.WEEKLY_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 월간 통계 요청 발행 (레거시 콜백용)
+   */
+  async publishMonthlyRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.MONTHLY_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📤 통계 요청 발행 (레거시 콜백용)
+   */
+  async publishStatsRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WORKTIME.STATS_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
    * 🏠 메뉴 표시 (V2 렌더러 방식)
    */
   async showMenu(userId, chatId) {

@@ -180,6 +180,9 @@ class TimerModuleV2 {
       'reset': () => this.handleTimerReset(userId, chatId),
       'refresh': () => this.handleTimerRefresh(userId, chatId),
       'pomodoro_start': () => this.handlePomodoroStart(userId, chatId, params),
+      'pomodoro1': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro1'),
+      'pomodoro2': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro2'),
+      'pomodoro3': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro3'),
       'custom_setup': () => this.handleCustomSetup(userId, chatId),
       'stats': () => this.showStats(userId, chatId)
     };
@@ -504,6 +507,69 @@ class TimerModuleV2 {
         chatId: event.payload.chatId,
         error: '타이머 상태를 불러올 수 없습니다.'
       });
+    }
+  }
+
+  /**
+   * 🍅 뽀모도로 프리셋 선택 처리 (레거시 콜백용)
+   */
+  async handlePomodoroPreset(userId, chatId, presetKey) {
+    try {
+      const preset = this.pomodoroPresets[presetKey];
+      if (!preset) {
+        throw new Error('잘못된 뽀모도로 프리셋입니다.');
+      }
+
+      // 기존 타이머 정리
+      await this.cleanupExistingTimer(userId);
+
+      // 뽀모도로 타이머 생성
+      const timer = this.createTimer(userId, {
+        type: 'focus',
+        duration: preset.focus,
+        chatId,
+        isPomodoro: true,
+        pomodoroData: {
+          preset: presetKey,
+          currentCycle: 1,
+          totalCycles: preset.cycles,
+          currentPhase: 'focus'
+        }
+      });
+
+      // DB에 세션 저장
+      if (this.timerService) {
+        try {
+          await this.timerService.startPomodoroSet(userId, {
+            preset: presetKey,
+            focusDuration: preset.focus,
+            shortBreakDuration: preset.shortBreak,
+            longBreakDuration: preset.longBreak,
+            totalCycles: preset.cycles
+          });
+        } catch (error) {
+          logger.warn('뽀모도로 세트 DB 저장 실패:', error.message);
+        }
+      }
+
+      this.activeTimers.set(userId, timer);
+      this.startTimerTick(timer);
+
+      return {
+        type: 'pomodoro_started',
+        module: 'timer',
+        data: {
+          preset: preset.name,
+          timerData: this.getTimerDisplayData(timer)
+        }
+      };
+    } catch (error) {
+      logger.error('뽀모도로 프리셋 시작 실패:', error);
+      return {
+        type: 'error',
+        module: 'timer',
+        error: error.message
+      };
     }
   }
 
