@@ -5,15 +5,18 @@
 
 const { EVENTS } = require("../events/index");
 const logger = require("../utils/core/Logger");
-const BaseModule = require("../core/BaseModule");
 // const { getUserId } = require("../utils/core/UserHelper");
 
-class TodoModuleV2 extends BaseModule {
+class TodoModuleV2 {
   constructor(moduleName = "todo", options = {}) {
-    super(moduleName, options);
+    this.moduleName = moduleName;
     
     // EventBus는 ModuleManager에서 주입받거나 글로벌 인스턴스 사용
     this.eventBus = options.eventBus || require('../core/EventBus').getInstance();
+    
+    // V2 모듈 필수 속성들
+    this.isInitialized = false;
+    this.serviceBuilder = options.serviceBuilder || null;
     
     // 서비스 인스턴스
     this.todoService = null;
@@ -61,9 +64,9 @@ class TodoModuleV2 extends BaseModule {
   }
 
   /**
-   * 🎯 BaseModule 초기화 오버라이드
+   * 🎯 V2 모듈 초기화
    */
-  async onInitialize() {
+  async initialize() {
     try {
       // ServiceBuilder를 통해 TodoService 가져오기
       if (this.serviceBuilder) {
@@ -76,6 +79,9 @@ class TodoModuleV2 extends BaseModule {
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
+      
+      // 초기화 완료 표시
+      this.isInitialized = true;
       
       logger.success("📝 TodoModuleV2 초기화 완료 (EventBus 기반)");
       return true;
@@ -175,7 +181,11 @@ class TodoModuleV2 extends BaseModule {
     
     const handler = actionMap[subAction];
     if (handler) {
-      await handler();
+      const result = await handler();
+      // menu 액션은 렌더러용 결과를 반환
+      if (subAction === 'menu' && result) {
+        return result;
+      }
       return {
         type: subAction,
         module: 'todo',
@@ -424,32 +434,42 @@ class TodoModuleV2 extends BaseModule {
   }
 
   /**
-   * 📝 메뉴 표시
+   * 📝 메뉴 표시 (V2 렌더러 방식)
    */
   async showMenu(userId, chatId) {
     try {
-      const stats = await this.todoService.getStats(userId);
+      const statsResult = await this.todoService.getStats(userId);
       
-      const menuText = [
-        '📝 *할일 관리*\n',
-        `📊 전체: ${stats.total}개`,
-        `⏳ 대기: ${stats.pending}개`,
-        `✅ 완료: ${stats.completed}개`,
-        `🏆 완료율: ${stats.completionRate}%`
-      ].join('\n');
+      if (!statsResult.success) {
+        logger.error('통계 조회 실패:', statsResult.error);
+        await this.publishError(new Error(statsResult.message), { payload: { chatId } });
+        return;
+      }
 
-      await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
-        chatId,
-        text: menuText,
-        options: {
-          reply_markup: this.createMenuKeyboard(),
-          parse_mode: 'Markdown'
+      // 렌더러에게 전달할 데이터 구성
+      return {
+        success: true,
+        result: {
+          type: 'menu',
+          data: {
+            title: '📝 *할일 관리*',
+            stats: statsResult.data,
+            enableReminders: !!this.models.Reminder,
+            userId: userId
+          }
         }
-      });
+      };
 
     } catch (error) {
       logger.error('📝 메뉴 표시 실패:', error);
       await this.publishError(error, { payload: { chatId } });
+      return {
+        success: false,
+        result: {
+          type: 'error',
+          data: { message: '메뉴 로딩 중 오류가 발생했습니다.' }
+        }
+      };
     }
   }
 

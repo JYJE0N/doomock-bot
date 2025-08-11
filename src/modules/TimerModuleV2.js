@@ -10,6 +10,7 @@
 
 const { EVENTS } = require('../events/EventRegistry');
 const logger = require('../utils/core/Logger');
+const StateCleanupHelper = require('../utils/core/StateCleanupHelper');
 
 class TimerModuleV2 {
   constructor(moduleName = 'timer', options = {}) {
@@ -21,6 +22,12 @@ class TimerModuleV2 {
     this.activeTimers = new Map(); // userId -> timer state
     this.userStates = new Map(); // userId -> user interaction state
     this.subscriptions = [];
+    
+    // 초기화 상태
+    this.isInitialized = false;
+    
+    // 상태 정리 인터벌
+    this.cleanupInterval = null;
     
     // 뽀모도로 프리셋 설정
     this.pomodoroPresets = {
@@ -68,8 +75,19 @@ class TimerModuleV2 {
       // EventBus 리스너 설정
       this.setupEventListeners();
       
-      // 정리 작업 스케줄링
-      this.startCleanupInterval();
+      // 자동 상태 정리 설정
+      this.cleanupInterval = StateCleanupHelper.setupAutoCleanup(
+        this.userStates, 
+        this.moduleName,
+        {
+          cleanupInterval: 60000, // 1분마다
+          timeout: 300000,        // 5분 후 만료
+          maxSize: 500           // 최대 500개 상태
+        }
+      );
+
+      // 초기화 완료 표시
+      this.isInitialized = true;
 
       logger.success('⏰ TimerModuleV2 초기화 완료 (테스트 모드, EventBus 기반)');
     } catch (error) {
@@ -962,17 +980,14 @@ class TimerModuleV2 {
   }
 
   /**
-   * 🧹 정리 인터벌 시작
+   * 완료된 타이머 정리 (1분마다 실행)
    */
-  startCleanupInterval() {
-    // 1분마다 완료된 타이머 체크 및 정리
-    setInterval(() => {
-      for (const [userId, timer] of this.activeTimers.entries()) {
-        if (this.isTimerCompleted(timer)) {
-          this.handleTimerCompletion(userId, timer);
-        }
+  cleanupCompletedTimers() {
+    for (const [userId, timer] of this.activeTimers.entries()) {
+      if (this.isTimerCompleted(timer)) {
+        this.handleTimerCompletion(userId, timer);
       }
-    }, 60000); // 1분
+    }
   }
 
   /**
@@ -992,9 +1007,11 @@ class TimerModuleV2 {
       });
       this.subscriptions.length = 0;
 
+      // StateCleanupHelper를 사용한 정리
+      StateCleanupHelper.cleanup(this.cleanupInterval, this.userStates, this.moduleName);
+      
       // 활성 타이머 정리
       this.activeTimers.clear();
-      this.userStates.clear();
 
       logger.success('✅ TimerModuleV2 정리 완료');
     } catch (error) {

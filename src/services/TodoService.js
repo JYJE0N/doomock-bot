@@ -486,6 +486,13 @@ class TodoService extends BaseService {
   // ===== 통계 및 분석 메서드 =====
 
   /**
+   * 할일 통계 (wrapper for backward compatibility)
+   */
+  async getStats(userId) {
+    return await this.getTodoStats(userId);
+  }
+
+  /**
    * 할일 통계
    */
   async getTodoStats(userId) {

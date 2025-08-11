@@ -24,6 +24,9 @@ class TTSModuleV2 {
     // TTS 서비스 (있으면 실제 기능, 없으면 테스트 모드)
     this.ttsService = null;
     
+    // 초기화 상태
+    this.isInitialized = false;
+    
     // 사용자 상태 관리 (메모리 기반)
     this.userStates = new Map();
     
@@ -84,6 +87,9 @@ class TTSModuleV2 {
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
+      
+      // 초기화 완료 표시
+      this.isInitialized = true;
       
       const mode = this.ttsService ? "프로덕션" : "테스트";
       logger.success(`🔊 TTSModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`);

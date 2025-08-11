@@ -18,6 +18,9 @@ class WorktimeModuleV2 {
     // 서비스 인스턴스
     this.worktimeService = null;
     
+    // 초기화 상태
+    this.isInitialized = false;
+    
     // 모듈 설정
     this.config = {
       workStartTime: process.env.WORK_START_TIME || "09:00",
@@ -82,6 +85,9 @@ class WorktimeModuleV2 {
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
+      
+      // 초기화 완료 표시
+      this.isInitialized = true;
       
       const mode = this.worktimeService ? "프로덕션" : "테스트";
       logger.success(`💼 WorktimeModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`);

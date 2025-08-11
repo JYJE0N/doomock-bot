@@ -18,6 +18,9 @@ class LeaveModuleV2 {
     // 서비스 인스턴스
     this.leaveService = null;
     
+    // 초기화 상태
+    this.isInitialized = false;
+    
     // 모듈 설정
     this.config = {
       maxLeavePerDay: 1,
@@ -81,6 +84,9 @@ class LeaveModuleV2 {
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
+      
+      // 초기화 완료 표시
+      this.isInitialized = true;
       
       logger.success("🏖️ LeaveModuleV2 초기화 완료 (EventBus 기반)");
       return true;

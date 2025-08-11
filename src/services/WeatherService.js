@@ -3,6 +3,7 @@
 
 const BaseService = require("./BaseService");
 const logger = require("../utils/core/Logger");
+const CacheManager = require("../utils/core/CacheManager");
 const axios = require("axios");
 
 /**
@@ -26,9 +27,8 @@ class WeatherService extends BaseService {
       ...config
     };
 
-    // 캐시 저장소
-    this.weatherCache = new Map();
-    this.dustCache = new Map();
+    // 통합 캐시 매니저 사용
+    this.cache = CacheManager.getInstance();
 
     // API 키 검증
     if (!this.config.apiKey) {
@@ -57,7 +57,7 @@ class WeatherService extends BaseService {
   async getCurrentWeather(location) {
     try {
       // 1. 캐시 확인
-      const cached = this.getCached(this.weatherCache, location);
+      const cached = this.cache.get('weather', location);
       if (cached) {
         logger.debug(`📦 캐시된 날씨 데이터 반환: ${location}`);
         return this.createSuccessResponse(cached, "캐시된 데이터");
@@ -82,7 +82,7 @@ class WeatherService extends BaseService {
             cloudiness: 20,
             timestamp: new Date().toISOString()
           };
-          this.setCached(this.weatherCache, location, testData);
+          this.cache.set('weather', location, testData, this.config.cacheTimeout);
           return this.createSuccessResponse(testData, "⚠️ 테스트 데이터입니다");
         }
         throw new Error("날씨 API 키가 설정되지 않았습니다");
@@ -95,7 +95,7 @@ class WeatherService extends BaseService {
       const weatherData = this.transformWeatherData(apiData, location);
 
       // 5. 캐시 저장
-      this.setCached(this.weatherCache, location, weatherData);
+      this.cache.set('weather', location, weatherData, this.config.cacheTimeout);
 
       return this.createSuccessResponse(weatherData);
     } catch (error) {
@@ -110,7 +110,7 @@ class WeatherService extends BaseService {
   async getDustInfo(location) {
     try {
       // 캐시 확인
-      const cached = this.getCached(this.dustCache, location);
+      const cached = this.cache.get('dust', location);
       if (cached) {
         return this.createSuccessResponse(cached, "캐시된 데이터");
       }
@@ -127,7 +127,7 @@ class WeatherService extends BaseService {
       const dustData = this.transformDustData(apiData, location);
 
       // 캐시 저장
-      this.setCached(this.dustCache, location, dustData);
+      this.cache.set('dust', location, dustData, this.config.cacheTimeout);
 
       return this.createSuccessResponse(dustData);
     } catch (error) {
@@ -508,38 +508,17 @@ class WeatherService extends BaseService {
   }
 
   /**
-   * 캐시 조회
-   */
-  getCached(cache, key) {
-    const item = cache.get(key);
-    if (item && Date.now() - item.timestamp < this.config.cacheTimeout) {
-      return item.data;
-    }
-    cache.delete(key);
-    return null;
-  }
-
-  /**
-   * 캐시 저장
-   */
-  setCached(cache, key, data) {
-    cache.set(key, {
-      data,
-      timestamp: Date.now()
-    });
-  }
-
-  /**
    * 서비스 상태
    */
   getStatus() {
+    const cacheStats = this.cache.getStats();
     return {
       ...super.getStatus(),
       hasApiKey: !!this.config.apiKey,
       hasDustApiKey: !!this.config.dustApiKey,
-      cacheSize: {
-        weather: this.weatherCache.size,
-        dust: this.dustCache.size
+      cacheStats: {
+        weather: cacheStats.namespaces.weather || { entries: 0, hitRate: 0 },
+        dust: cacheStats.namespaces.dust || { entries: 0, hitRate: 0 }
       }
     };
   }
@@ -548,8 +527,8 @@ class WeatherService extends BaseService {
    * 정리
    */
   async cleanup() {
-    this.weatherCache.clear();
-    this.dustCache.clear();
+    this.cache.clearNamespace('weather');
+    this.cache.clearNamespace('dust');
     await super.cleanup();
   }
 }

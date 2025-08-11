@@ -1,6 +1,7 @@
 // src/services/TimerService.js - 🍅 SoC 완전 준수 리팩토링 v4.0
 
 const BaseService = require("./BaseService");
+const CacheManager = require("../utils/core/CacheManager");
 const Utils = require("../utils");
 const logger = require("../utils/core/Logger");
 
@@ -37,9 +38,8 @@ class TimerService extends BaseService {
       ...options.config
     };
 
-    // 📊 캐시 설정
-    this.statsCache = new Map();
-    this.statsCacheTimeout = 300000; // 5분
+    // 📊 통합 캐시 매니저 사용
+    this.cache = CacheManager.getInstance();
 
     logger.info("🍅 TimerService 생성됨 (최적화 v4.1)");
   }
@@ -74,7 +74,7 @@ class TimerService extends BaseService {
       await this.cleanupOldSessions();
 
       // 통계 캐시 정리 스케줄
-      this.startCacheCleanup();
+      // CacheManager가 자동으로 정리함
 
       logger.success("🍅 TimerService 초기화 완료");
     } catch (error) {
@@ -423,11 +423,9 @@ class TimerService extends BaseService {
     try {
       // 캐시 확인
       const cacheKey = `weekly_${userId}`;
-      if (this.statsCache.has(cacheKey)) {
-        const cached = this.statsCache.get(cacheKey);
-        if (Date.now() - cached.timestamp < this.statsCacheTimeout) {
-          return this.createSuccessResponse(cached.data, "캐시된 주간 통계");
-        }
+      const cached = this.cache.get('timer_stats', cacheKey);
+      if (cached) {
+        return this.createSuccessResponse(cached, "캐시된 주간 통계");
       }
 
       // 주간 시작/종료 시간
@@ -450,10 +448,7 @@ class TimerService extends BaseService {
       const stats = this.calculateWeeklyStats(sessions, weekStart);
 
       // 캐시 저장
-      this.statsCache.set(cacheKey, {
-        data: stats,
-        timestamp: Date.now()
-      });
+      this.cache.set('timer_stats', cacheKey, stats, 300000); // 5분
 
       return this.createSuccessResponse(stats, "주간 통계를 조회했습니다.");
     } catch (error) {
@@ -847,17 +842,11 @@ class TimerService extends BaseService {
   }
 
   /**
-   * 🧹 캐시 정리 시작
+   * 서비스 정리
    */
-  startCacheCleanup() {
-    setInterval(() => {
-      const now = Date.now();
-      for (const [key, value] of this.statsCache.entries()) {
-        if (now - value.timestamp > this.statsCacheTimeout) {
-          this.statsCache.delete(key);
-        }
-      }
-    }, this.statsCacheTimeout);
+  async cleanup() {
+    this.cache.clearNamespace('timer_stats');
+    await super.cleanup();
   }
 }
 

@@ -120,6 +120,16 @@ class TodoRenderer extends BaseRenderer {
    * 📋 메뉴 렌더링
    */
   async renderMenu(data, ctx) {
+    // 안전한 destructuring
+    if (!data) {
+      logger.warn('TodoRenderer.renderMenu: data가 undefined입니다.');
+      data = {
+        title: '📝 *할일 관리*',
+        stats: { total: 0, pending: 0, completed: 0, completionRate: 0 },
+        enableReminders: false
+      };
+    }
+    
     const { title, stats, enableReminders } = data;
 
     let text = `${title}\n\n`;

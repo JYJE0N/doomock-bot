@@ -148,7 +148,7 @@ class ModuleManager {
       this.stats.eventsProcessed++;
       this.stats.lastActivity = new Date();
 
-      const { data, userId, chatId, messageId } = event.payload;
+      const { data, userId, messageId } = event.payload;
       
       // 콜백 데이터 파싱: module:action:params
       const [moduleKey, subAction, ...params] = data.split(':');
@@ -243,7 +243,7 @@ class ModuleManager {
   async handleSystemError(event) {
     try {
       this.stats.errorsCount++;
-      const { error, module, timestamp } = event.payload;
+      const { error, module } = event.payload;
       
       logger.error(`⚠️ 시스템 에러 감지: ${error} (모듈: ${module || 'unknown'})`);
       
@@ -269,17 +269,23 @@ class ModuleManager {
         userId: callbackQuery.from.id
       });
 
-      // 1. 모듈 찾기
-      const moduleInstance = this.modules.get(moduleKey);
+      // 1. 모듈 찾기 (온디맨드 로딩 지원)
+      let moduleInstance = this.modules.get(moduleKey);
       if (!moduleInstance) {
-        logger.warn(`❓ 모듈을 찾을 수 없음: ${moduleKey}`);
-        return {
-          success: false,
-          error: "module_not_found",
-          message: `${moduleKey} 모듈을 찾을 수 없습니다.`,
-          module: moduleKey,
-          type: "error"
-        };
+        // 지연 로딩된 모듈인지 확인하고 로딩 시도
+        try {
+          logger.debug(`🔄 모듈 온디맨드 로딩 시도: ${moduleKey}`);
+          moduleInstance = await this.loadModuleOnDemand(moduleKey);
+        } catch (loadError) {
+          logger.warn(`❓ 모듈을 찾을 수 없음: ${moduleKey}`, loadError.message);
+          return {
+            success: false,
+            error: "module_not_found",
+            message: `${moduleKey} 모듈을 찾을 수 없습니다.`,
+            module: moduleKey,
+            type: "error"
+          };
+        }
       }
 
       // 2. 모듈이 초기화되었는지 확인
@@ -351,37 +357,120 @@ class ModuleManager {
   }
 
   /**
-   * 🎯 모듈 로드
+   * 🎯 모듈 로드 (지연 로딩 지원)
    */
   async loadModules(bot) {
+    const ModuleLoader = require('./ModuleLoader');
+    this.moduleLoader = ModuleLoader.getInstance();
+    
     const enabledModules = getAllEnabledModules();
+    
+    // 자동 정리 시작
+    this.moduleLoader.startAutoCleanup();
 
-    for (const config of enabledModules) {
+    // 핵심 모듈만 즉시 로딩 (system 모듈)
+    const coreModules = enabledModules.filter(config => config.key === 'system');
+    const lazyModules = enabledModules.filter(config => config.key !== 'system');
+
+    // 1. 핵심 모듈 즉시 로딩
+    for (const config of coreModules) {
       try {
-        logger.info(`📦 [${config.key}] 모듈 로드 시작...`);
+        logger.info(`🚀 [${config.key}] 핵심 모듈 즉시 로딩...`);
+        
+        const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key);
+        const initializedModule = await this.moduleLoader.initializeModule(
+          moduleInstance, 
+          config.key, 
+          this.serviceBuilder
+        );
+        
+        // ModuleManager 옵션 전달
+        if (initializedModule.setOptions) {
+          initializedModule.setOptions({
+            bot: bot,
+            moduleManager: this,
+            serviceBuilder: this.serviceBuilder,
+            config: config.config || {}
+          });
+        }
+        
+        this.modules.set(config.key, initializedModule);
+        logger.success(`✅ [${config.key}] 핵심 모듈 로딩 완료`);
+        
+      } catch (error) {
+        logger.error(`💥 [${config.key}] 핵심 모듈 로드 실패:`, error);
+        // 핵심 모듈은 실패하면 전체 실패
+        throw error;
+      }
+    }
 
-        const ModuleClass = require(config.path);
+    // 2. 나머지 모듈들은 지연 로딩 등록만
+    for (const config of lazyModules) {
+      // 모듈 설정만 저장해두고 실제 로딩은 필요할 때
+      this.registerLazyModule(config.key, config);
+      logger.debug(`📝 [${config.key}] 지연 로딩 등록`);
+    }
 
-        const moduleInstance = new ModuleClass(config.key, {
-          bot: bot,
+    this.stats.modulesLoaded = this.modules.size; // 즉시 로딩된 모듈만 카운트
+    logger.success(`✅ ${this.modules.size}개 핵심 모듈 즉시 로딩, ${lazyModules.length}개 지연 로딩 등록`);
+  }
+
+  /**
+   * 🔄 지연 모듈 등록
+   */
+  registerLazyModule(moduleKey, config) {
+    if (!this.lazyModules) {
+      this.lazyModules = new Map();
+    }
+    this.lazyModules.set(moduleKey, config);
+  }
+
+  /**
+   * 📦 모듈 온디맨드 로딩
+   */
+  async loadModuleOnDemand(moduleKey) {
+    try {
+      // 이미 로딩된 모듈인지 확인
+      if (this.modules.has(moduleKey)) {
+        return this.modules.get(moduleKey);
+      }
+
+      // 지연 모듈 설정 확인
+      if (!this.lazyModules || !this.lazyModules.has(moduleKey)) {
+        throw new Error(`지연 로딩 모듈을 찾을 수 없습니다: ${moduleKey}`);
+      }
+
+      const config = this.lazyModules.get(moduleKey);
+      
+      logger.info(`🔄 [${moduleKey}] 온디맨드 모듈 로딩...`);
+      
+      const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key);
+      const initializedModule = await this.moduleLoader.initializeModule(
+        moduleInstance,
+        config.key,
+        this.serviceBuilder
+      );
+      
+      // ModuleManager 옵션 전달
+      if (initializedModule.setOptions) {
+        initializedModule.setOptions({
+          bot: this.bot,
           moduleManager: this,
           serviceBuilder: this.serviceBuilder,
           config: config.config || {}
         });
-
-        await moduleInstance.initialize();
-        this.modules.set(config.key, moduleInstance);
-
-        logger.success(`✅ [${config.key}] 모듈 로드 완료`);
-      } catch (error) {
-        logger.error(`💥 [${config.key}] 모듈 로드 실패:`, error);
-        logger.warn(`⚠️ ${config.key} 모듈 로드 실패했지만 계속 진행합니다`);
-        continue;
       }
+      
+      this.modules.set(moduleKey, initializedModule);
+      this.stats.modulesLoaded++;
+      
+      logger.success(`✅ [${moduleKey}] 온디맨드 로딩 완료`);
+      return initializedModule;
+      
+    } catch (error) {
+      logger.error(`❌ [${moduleKey}] 온디맨드 로딩 실패:`, error);
+      throw error;
     }
-
-    this.stats.modulesLoaded = this.modules.size;
-    logger.success(`✅ ${this.modules.size}개 모듈 로드 완료`);
   }
 
   /**
@@ -393,10 +482,22 @@ class ModuleManager {
   }
 
   /**
-   * 특정 모듈 가져오기
+   * 특정 모듈 가져오기 (온디맨드 로딩 지원)
    */
-  getModule(moduleKey) {
-    return this.modules.get(moduleKey);
+  async getModule(moduleKey) {
+    let moduleInstance = this.modules.get(moduleKey);
+    
+    // 모듈이 없으면 온디맨드 로딩 시도
+    if (!moduleInstance) {
+      try {
+        moduleInstance = await this.loadModuleOnDemand(moduleKey);
+      } catch (error) {
+        logger.debug(`모듈 온디맨드 로딩 실패: ${moduleKey}`, error.message);
+        return null;
+      }
+    }
+    
+    return moduleInstance;
   }
 
   /**
@@ -447,6 +548,7 @@ class ModuleManager {
    */
   getStats() {
     const eventBusHealth = this.eventBus.getHealthStatus();
+    const moduleLoaderStats = this.moduleLoader ? this.moduleLoader.getStats() : null;
     
     return {
       ...this.stats,
@@ -459,8 +561,10 @@ class ModuleManager {
       },
       modules: {
         loaded: this.modules.size,
-        active: Array.from(this.modules.values()).filter(m => m.isInitialized).length
-      }
+        active: Array.from(this.modules.values()).filter(m => m.isInitialized).length,
+        lazy: this.lazyModules ? this.lazyModules.size : 0
+      },
+      moduleLoader: moduleLoaderStats
     };
   }
 
@@ -509,6 +613,11 @@ class ModuleManager {
         }
       }
       this.modules.clear();
+      
+      // ModuleLoader 정리
+      if (this.moduleLoader) {
+        await this.moduleLoader.unloadAllModules();
+      }
 
       logger.success('✅ ModuleManager 종료 완료');
     } catch (error) {

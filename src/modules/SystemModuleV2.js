@@ -5,7 +5,6 @@
 
 const { EVENTS } = require("../events/index");
 const logger = require("../utils/core/Logger");
-const BaseModule = require("../core/BaseModule");
 
 // 🔧 강화된 헬퍼들 import (기존과 동일)
 const {
@@ -17,12 +16,16 @@ const {
 
 // const { StatusHelper } = require("../utils/StatusHelper");
 
-class SystemModuleV2 extends BaseModule {
+class SystemModuleV2 {
   constructor(moduleName = "system", options = {}) {
-    super(moduleName, options);
+    this.moduleName = moduleName;
     
     // EventBus는 ModuleManager에서 주입받거나 글로벌 인스턴스 사용
     this.eventBus = options.eventBus || require('../core/EventBus').getInstance();
+    
+    // V2 모듈 필수 속성들
+    this.isInitialized = false;
+    this.serviceBuilder = options.serviceBuilder || null;
 
     this.config = {
       maxLogLines: 50,
@@ -102,9 +105,9 @@ class SystemModuleV2 extends BaseModule {
   }
 
   /**
-   * 🎯 BaseModule 초기화 오버라이드
+   * 🎯 V2 모듈 초기화
    */
-  async onInitialize() {
+  async initialize() {
     try {
       // 이벤트 리스너 설정
       this.setupEventListeners();
@@ -117,6 +120,9 @@ class SystemModuleV2 extends BaseModule {
         health: initialSnapshot.health?.overall?.score
       });
 
+      // 초기화 완료 표시
+      this.isInitialized = true;
+      
       logger.success("🚇 SystemModuleV2 초기화 완료 (EventBus 기반)");
       return true;
     } catch (error) {

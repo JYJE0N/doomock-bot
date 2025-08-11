@@ -234,6 +234,13 @@ function getModuleInfo(moduleKey) {
 }
 
 /**
+ * 🔧 모듈 설정 조회 (ModuleLoader에서 사용)
+ */
+function getModuleConfig(moduleKey) {
+  return UNIFIED_MODULES.find(module => module.key === moduleKey);
+}
+
+/**
  * 🔍 모듈 key로 검색
  */
 function findModuleByKey(key) {
@@ -356,6 +363,7 @@ module.exports = {
   // ✅ 유틸리티 함수들
   getModulesByCategory,
   getModuleInfo,
+  getModuleConfig, // ModuleLoader용 추가
   findModuleByKey,
   getModuleStats,
   validateModuleDependencies,
