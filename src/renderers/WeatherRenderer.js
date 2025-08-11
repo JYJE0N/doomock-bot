@@ -3,7 +3,7 @@
 
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/core/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 
 /**
  * WeatherRenderer - SoC 원칙 준수
@@ -225,7 +225,7 @@ PM2.5: ${dust.pm25}㎍/㎥
       const dayName = this.getDayName(date, index);
       const icon = this.getWeatherIcon(day.iconCode);
 
-      text += `*${dayName}* (${TimeHelper.format(date, "MM/DD")})\n`;
+      text += `*${dayName}* (${Utils.format(date, "MM/DD")})\n`;
       text += `${icon} ${day.description}\n`;
       text += `🌡️ ${day.tempMin}°C - ${day.tempMax}°C\n`;
       text += `💧 습도: ${day.avgHumidity}%\n\n`;

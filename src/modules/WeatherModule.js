@@ -4,7 +4,7 @@
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/core/Logger");
 const { getUserId, getUserName } = require("../utils/core/UserHelper");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 
 /**
  * WeatherModule - SoC 원칙 준수
@@ -283,7 +283,7 @@ class WeatherModule extends BaseModule {
           data: {
             city,
             forecast: forecastResult.data,
-            timestamp: TimeHelper.format(TimeHelper.now(), "full")
+            timestamp: Utils.format(Utils.now(), "full")
           }
         };
       } else {
@@ -355,7 +355,7 @@ class WeatherModule extends BaseModule {
       city,
       weather: weatherResult.data,
       dust: dustResult?.success ? dustResult.data : null,
-      timestamp: TimeHelper.format(TimeHelper.now(), "full")
+      timestamp: Utils.format(Utils.now(), "full")
     };
   }
 

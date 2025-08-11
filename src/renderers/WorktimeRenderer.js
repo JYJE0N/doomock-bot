@@ -1,13 +1,13 @@
 // src/renderers/WorktimeRenderer.js - 시간 표시 개선 버전
 const logger = require("../utils/core/Logger");
 const BaseRenderer = require("./BaseRenderer");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 
 /**
  * 🏢 WorktimeRenderer - 근무시간 UI 렌더링 (시간 표시 개선)
  *
  * 🎯 핵심 개선사항:
- * - TimeHelper.safeDisplayTime() 사용으로 undefined 방지
+ * - Utils.safeDisplayTime() 사용으로 undefined 방지
  * - null/undefined 값에 대한 안전한 처리
  * - 일관된 시간 표시 형식
  */
@@ -61,8 +61,8 @@ class WorktimeRenderer extends BaseRenderer {
    * @returns {string} 안전한 시간 문자열
    */
   safeTimeDisplay(timeData, format = "timeOnly") {
-    // TimeHelper의 안전한 시간 표시 사용
-    return TimeHelper.safeDisplayTime(timeData, format);
+    // Utils의 안전한 시간 표시 사용
+    return Utils.safeDisplayTime(timeData, format);
   }
 
   /**
@@ -484,8 +484,8 @@ ${achievement.emoji} ${achievement.txt}`;
 
     // 🔍 디버깅용 (개발 중에만 사용) - 실제로는 주석 처리하거나 제거
     // console.log("🔍 오늘 근무 데이터 디버깅:", {
-    //   checkInTime: TimeHelper.debugTime(record.checkInTime),
-    //   checkOutTime: TimeHelper.debugTime(record.checkOutTime),
+    //   checkInTime: Utils.debugTime(record.checkInTime),
+    //   checkOutTime: Utils.debugTime(record.checkOutTime),
     // });
 
     const statusEmoji = isWorking

@@ -2,7 +2,7 @@
 
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/core/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 
 /**
  * 🎨 TimerRenderer - 타이머 UI 렌더링 (SoC 완전 준수)
@@ -908,7 +908,7 @@ class TimerRenderer extends BaseRenderer {
 
   // getTypeDisplay 메서드 수정
   getTypeDisplay(type) {
-    return TimeHelper.getTimerTypeDisplay(type, true);
+    return Utils.getTimerTypeDisplay(type, true);
   }
 
   /**

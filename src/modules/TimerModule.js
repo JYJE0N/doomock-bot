@@ -1,9 +1,9 @@
 // src/modules/TimerModule.js - 리팩토링 v6.0
 
 const BaseModule = require("../core/BaseModule");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 const { getUserId, getUserName } = require("../utils/core/UserHelper");
-const { getInstance: getStateManager } = require("../utils/TimerStateManager");
+const { getInstance: getStateManager } = require("../utils/core/StatusHelper");
 const logger = require("../utils/core/Logger");
 
 /**
@@ -540,10 +540,10 @@ class TimerModule extends BaseModule {
             durationDisplay: `${session.duration}분`,
             // 날짜 포맷팅을 여기서 처리
             timeDisplay: session.completedAt
-              ? TimeHelper.format(session.completedAt, "short")
+              ? Utils.format(session.completedAt, "short")
               : session.stoppedAt
-                ? TimeHelper.format(session.stoppedAt, "short")
-                : TimeHelper.format(session.startedAt, "short"),
+                ? Utils.format(session.stoppedAt, "short")
+                : Utils.format(session.startedAt, "short"),
             status: session.status,
             statusDisplay: this.stateManager.getStatusDisplay(session.status),
             completionRate: session.completionRate || 0,

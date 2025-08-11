@@ -2,7 +2,7 @@
 const BaseModule = require("../core/BaseModule");
 const logger = require("../utils/core/Logger"); // ✅ 이미 있음
 const { getUserId, getUserName } = require("../utils/core/UserHelper");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 
 class WorktimeModule extends BaseModule {
   constructor(moduleName, options = {}) {
@@ -472,8 +472,8 @@ class WorktimeModule extends BaseModule {
       logger.warn("WorktimeService 없음 또는 데이터 없음 - 기본값 반환");
 
       return {
-        weekStart: TimeHelper.format(TimeHelper.getWeekStart(), "date"),
-        weekEnd: TimeHelper.format(TimeHelper.getWeekEnd(), "date"),
+        weekStart: Utils.format(Utils.getWeekStart(), "date"),
+        weekEnd: Utils.format(Utils.getWeekEnd(), "date"),
         workDays: 0, // ✅ 0으로 시작 (실제 데이터 반영)
         totalHours: 0, // ✅ 0으로 시작
         avgDailyHours: 0, // ✅ 0으로 시작
@@ -485,8 +485,8 @@ class WorktimeModule extends BaseModule {
 
       // 에러 시에도 안전한 기본값
       return {
-        weekStart: TimeHelper.format(TimeHelper.getWeekStart(), "date"),
-        weekEnd: TimeHelper.format(TimeHelper.getWeekEnd(), "date"),
+        weekStart: Utils.format(Utils.getWeekStart(), "date"),
+        weekEnd: Utils.format(Utils.getWeekEnd(), "date"),
         workDays: 0,
         totalHours: 0,
         avgDailyHours: 0,
@@ -506,8 +506,8 @@ class WorktimeModule extends BaseModule {
 
       // 🔥 더미 데이터에 필요한 필드 추가!
       return {
-        monthStart: TimeHelper.format(TimeHelper.getMonthStart(), "date"),
-        monthEnd: TimeHelper.format(TimeHelper.getMonthEnd(), "date"),
+        monthStart: Utils.format(Utils.getMonthStart(), "date"),
+        monthEnd: Utils.format(Utils.getMonthEnd(), "date"),
         workDays: 20,
         totalHours: 160,
         averageHours: 8,
@@ -524,8 +524,8 @@ class WorktimeModule extends BaseModule {
       logger.error("월간 통계 조회 실패:", error);
 
       return {
-        monthStart: TimeHelper.format(TimeHelper.getMonthStart(), "date"),
-        monthEnd: TimeHelper.format(TimeHelper.getMonthEnd(), "date"),
+        monthStart: Utils.format(Utils.getMonthStart(), "date"),
+        monthEnd: Utils.format(Utils.getMonthEnd(), "date"),
         workDays: 0,
         totalHours: 0,
         avgDailyHours: 0,
@@ -551,8 +551,8 @@ class WorktimeModule extends BaseModule {
         longestDay: 10,
         shortestDay: 6,
         // 추가 통계 정보
-        firstWorkDate: TimeHelper.format(new Date(2024, 0, 1), "date"),
-        lastWorkDate: TimeHelper.format(new Date(), "date"),
+        firstWorkDate: Utils.format(new Date(2024, 0, 1), "date"),
+        lastWorkDate: Utils.format(new Date(), "date"),
         currentStreak: 5,
         longestStreak: 15,
         monthlyAverage: 160
@@ -584,9 +584,9 @@ class WorktimeModule extends BaseModule {
       }
 
       // 날짜 범위 계산
-      const endDate = TimeHelper.getTodayDateString();
-      const startDate = TimeHelper.format(
-        TimeHelper.now().subtract(days - 1, "days"),
+      const endDate = Utils.getTodayDateString();
+      const startDate = Utils.format(
+        Utils.now().subtract(days - 1, "days"),
         "date"
       );
 

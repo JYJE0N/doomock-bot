@@ -1,7 +1,7 @@
 // src/renderers/TodoRenderer.js - UI 생성만 담당
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/core/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 
 /**
  * 🎨 TodoRenderer - UI 렌더링만 담당
@@ -587,7 +587,7 @@ class TodoRenderer extends BaseRenderer {
     const { report } = data;
 
     let text = `📈 *주간 리포트*\n`;
-    text += `${TimeHelper.format(report.period.start, "date")} ~ ${TimeHelper.format(report.period.end, "date")}\n\n`;
+    text += `${Utils.format(report.period.start, "date")} ~ ${Utils.format(report.period.end, "date")}\n\n`;
 
     text += `${this.styles.title} 이번 주 성과\n`;
     text += `${this.styles.bullet} 추가된 할일: ${report.totalAdded}개\n`;
@@ -599,7 +599,7 @@ class TodoRenderer extends BaseRenderer {
     if (report.dailyStats && report.dailyStats.length > 0) {
       text += `${this.styles.title} 일별 완료 현황\n`;
       report.dailyStats.forEach((stat) => {
-        const date = TimeHelper.format(new Date(stat._id), "short");
+        const date = Utils.format(new Date(stat._id), "short");
         const bar = this.createMiniBar(stat.count, report.totalCompleted);
         text += `${date}: ${bar} ${stat.count}개\n`;
       });
@@ -654,7 +654,7 @@ class TodoRenderer extends BaseRenderer {
     } else {
       reminders.forEach((reminder, index) => {
         const todoText = reminder.todoId?.text || reminder.text; // message → text
-        const remindTime = TimeHelper.format(reminder.reminderTime, "full"); // remindAt → reminderTime
+        const remindTime = Utils.format(reminder.reminderTime, "full"); // remindAt → reminderTime
 
         text += `${index + 1}. ${this.emojis.bell} ${todoText}\n`;
         text += `   ${this.styles.bullet} 알림: ${remindTime}\n`;

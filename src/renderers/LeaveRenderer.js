@@ -1,6 +1,6 @@
 // src/renderers/LeaveRenderer.js - 개인용 연차 관리 시스템
 const BaseRenderer = require("./BaseRenderer");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 const logger = require("../utils/core/Logger");
 
 /**
@@ -301,7 +301,7 @@ ${message}
         type = "연차",
         amount = 1,
         remainingLeave = 0,
-        date = TimeHelper.format(new Date(), "YYYY-MM-DD"),
+        date = Utils.format(new Date(), "YYYY-MM-DD"),
         leaveType = null // ✅ 추가: 표시용 타입
       } = data;
 

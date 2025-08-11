@@ -1,11 +1,9 @@
 // ========================================
 // 🔧 src/config/ConfigManager.js v4.0.1
 // ========================================
-// LoggerEnhancer 알록달록 + Railway 환경변수 중앙 관리
-// ========================================
 
 const logger = require("../utils/core/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 
 /**
  * 🔧 ConfigManager v4.0.1 - 알록달록 설정 관리자
@@ -510,7 +508,7 @@ class ConfigManager {
       issues: issues,
       warnings: warnings,
       errors: issues.filter((i) => !i.includes("권장")),
-      timestamp: TimeHelper.getLogTimeString()
+      timestamp: Utils.getLogTimeString()
     };
 
     // 🎉 검증 결과 표시
@@ -646,7 +644,7 @@ class ConfigManager {
     return {
       ...this.config,
       validation: this.validationResult,
-      timestamp: TimeHelper.getLogTimeString(),
+      timestamp: Utils.getLogTimeString(),
       version: "4.0.1"
     };
   }

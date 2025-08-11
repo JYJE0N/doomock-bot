@@ -1,7 +1,7 @@
 // src/services/TimerService.js - 🍅 SoC 완전 준수 리팩토링 v4.0
 
 const BaseService = require("./BaseService");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 const logger = require("../utils/core/Logger");
 
 /**
@@ -741,7 +741,7 @@ class TimerService extends BaseService {
    * 🏷️ 타입 표시명
    */
   getTypeDisplay(type) {
-    return TimeHelper.getTimerTypeDisplay(type, false); // 이모지 없이
+    return Utils.getTimerTypeDisplay(type, false); // 이모지 없이
   }
 
   /**

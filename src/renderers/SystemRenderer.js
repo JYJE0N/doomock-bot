@@ -1,6 +1,6 @@
 const BaseRenderer = require("./BaseRenderer");
 const logger = require("../utils/core/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 const { StatusHelper } = require("../utils/core/StatusHelper");
 
 class SystemRenderer extends BaseRenderer {
@@ -206,7 +206,7 @@ class SystemRenderer extends BaseRenderer {
     }
 
     if (lastHealthCheck) {
-      text += `🔍 *마지막 체크*: ${TimeHelper.format(new Date(lastHealthCheck), "HH:mm")}\n\n`;
+      text += `🔍 *마지막 체크*: ${Utils.format(new Date(lastHealthCheck), "HH:mm")}\n\n`;
     }
 
     text += `시스템 진단이 완료되었습니다! 🎯`;

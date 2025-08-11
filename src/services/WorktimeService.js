@@ -1,7 +1,7 @@
 // src/services/WorktimeService.js - 데이터 처리 개선 버전
 
 const BaseService = require("./BaseService");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 const logger = require("../utils/core/Logger");
 
 /**
@@ -70,16 +70,16 @@ class WorktimeService extends BaseService {
       updatedAt: this.safeDateFromDB(record.updatedAt),
 
       // 표시용 시간 문자열 추가
-      checkInDisplay: TimeHelper.safeDisplayTime(record.checkInTime),
-      checkOutDisplay: TimeHelper.safeDisplayTime(record.checkOutTime),
+      checkInDisplay: Utils.safeDisplayTime(record.checkInTime),
+      checkOutDisplay: Utils.safeDisplayTime(record.checkOutTime),
 
       // 날짜 문자열 (정렬용)
-      dateString: record.date || TimeHelper.format(record.createdAt, "date")
+      dateString: record.date || Utils.format(record.createdAt, "date")
     };
 
     // 근무시간 계산 (안전하게)
     if (transformed.checkInTime && transformed.checkOutTime) {
-      const duration = TimeHelper.diffMinutes(
+      const duration = Utils.diffMinutes(
         transformed.checkInTime,
         transformed.checkOutTime
       );
@@ -94,8 +94,8 @@ class WorktimeService extends BaseService {
     try {
       const now = new Date();
 
-      // 🎯 TimeHelper 그대로 사용! (이제 안전함)
-      const today = TimeHelper.getTodayDateString(); // 이제 확실히 "YYYY-MM-DD" 반환
+      // 🎯 Utils 그대로 사용! (이제 안전함)
+      const today = Utils.getTodayDateString(); // 이제 확실히 "YYYY-MM-DD" 반환
 
       logger.debug(`🏢 출근 처리: ${userId}, 날짜: ${today}`);
 
@@ -114,7 +114,7 @@ class WorktimeService extends BaseService {
       // 새 출근 기록 생성
       const record = await this.models.Worktime.create({
         userId: userId,
-        date: today, // TimeHelper로 생성된 안전한 날짜
+        date: today, // Utils로 생성된 안전한 날짜
         checkInTime: now,
         status: "working",
         isActive: true
@@ -152,7 +152,7 @@ class WorktimeService extends BaseService {
       record.status = "completed";
 
       // 🔥 근무시간 계산 (자정 넘어도 정확히 계산)
-      const workDuration = TimeHelper.diffMinutes(record.checkInTime, now);
+      const workDuration = Utils.diffMinutes(record.checkInTime, now);
       record.workDuration = workDuration;
 
       // 🔥 야간근무 체크 (22시~06시)
@@ -192,7 +192,7 @@ class WorktimeService extends BaseService {
    */
   async getTodayRecord(userId) {
     try {
-      const today = TimeHelper.getTodayDateString();
+      const today = Utils.getTodayDateString();
 
       // 🔥 먼저 현재 근무 중인지 확인 (날짜 무관)
       const workingRecord = await this.models.Worktime.findOne({
@@ -255,14 +255,14 @@ class WorktimeService extends BaseService {
    */
   async getWeekStats(userId) {
     try {
-      const weekStart = TimeHelper.getWeekStart();
-      const weekEnd = TimeHelper.getWeekEnd();
+      const weekStart = Utils.getWeekStart();
+      const weekEnd = Utils.getWeekEnd();
 
       const records = await this.models.Worktime.find({
         userId: userId,
         date: {
-          $gte: TimeHelper.format(weekStart, "date"),
-          $lte: TimeHelper.format(weekEnd, "date")
+          $gte: Utils.format(weekStart, "date"),
+          $lte: Utils.format(weekEnd, "date")
         },
         isActive: true,
         // ✅ 수정: checkOutTime 필터 완화 (출근만 있어도 표시)
@@ -280,8 +280,8 @@ class WorktimeService extends BaseService {
       const stats = this.calculateWeeklyStats(safeRecords);
 
       return {
-        weekStart: TimeHelper.format(weekStart, "date"),
-        weekEnd: TimeHelper.format(weekEnd, "date"),
+        weekStart: Utils.format(weekStart, "date"),
+        weekEnd: Utils.format(weekEnd, "date"),
         workDays: safeRecords.length,
         totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
@@ -304,14 +304,14 @@ class WorktimeService extends BaseService {
    */
   async getMonthStats(userId) {
     try {
-      const monthStart = TimeHelper.getMonthStart();
-      const monthEnd = TimeHelper.getMonthEnd();
+      const monthStart = Utils.getMonthStart();
+      const monthEnd = Utils.getMonthEnd();
 
       const records = await this.models.Worktime.find({
         userId: userId,
         date: {
-          $gte: TimeHelper.format(monthStart, "date"),
-          $lte: TimeHelper.format(monthEnd, "date")
+          $gte: Utils.format(monthStart, "date"),
+          $lte: Utils.format(monthEnd, "date")
         },
         isActive: true,
         // ✅ 수정: 필터링 완화
@@ -329,8 +329,8 @@ class WorktimeService extends BaseService {
       const stats = this.calculateMonthlyStats(safeRecords);
 
       return {
-        month: TimeHelper.format(monthStart, "MM"),
-        year: TimeHelper.format(monthStart, "YYYY"),
+        month: Utils.format(monthStart, "MM"),
+        year: Utils.format(monthStart, "YYYY"),
         workDays: safeRecords.length,
         totalHours: Math.round((stats.totalMinutes / 60) * 10) / 10,
         overtimeHours: Math.round((stats.overtimeMinutes / 60) * 10) / 10,
@@ -363,7 +363,7 @@ class WorktimeService extends BaseService {
 
     if (!safeCheckIn || !safeCurrentTime) return 0;
 
-    return Math.max(0, TimeHelper.diffMinutes(safeCheckIn, safeCurrentTime));
+    return Math.max(0, Utils.diffMinutes(safeCheckIn, safeCurrentTime));
   }
 
   /**

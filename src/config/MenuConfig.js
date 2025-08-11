@@ -1,7 +1,7 @@
 // src/config/MenuConfig.js - 근본 해결: 중복 제거 및 통합
 
 const logger = require("../utils/core/Logger");
-const TimeHelper = require("../utils/TimeHelper");
+const Utils = require("../utils");
 // ✅ 통합 레지스트리 사용
 const { getEnabledModules, getModuleStats } = require("./ModuleRegistry");
 
@@ -91,7 +91,7 @@ class MenuBuilder {
    * 🏠 메인 메뉴 텍스트 생성 (통합 데이터 사용)
    */
   buildMainMenuText(userName = "사용자", additionalInfo = {}) {
-    const currentTime = TimeHelper.format(new Date(), "time");
+    const currentTime = Utils.format(new Date(), "time");
     const timeTheme = this.getTimeBasedTheme();
 
     // ✅ 통합 레지스트리에서 실제 데이터 가져오기
@@ -117,7 +117,7 @@ class MenuBuilder {
     menuText += `\n💡 _원하는 기능을 선택해주세요!_`;
 
     this.stats.menusGenerated++;
-    this.stats.lastGenerated = TimeHelper.getLogTimeString();
+    this.stats.lastGenerated = Utils.getLogTimeString();
 
     return menuText;
   }
