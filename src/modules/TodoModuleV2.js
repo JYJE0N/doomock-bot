@@ -458,7 +458,7 @@ class TodoModuleV2 {
           data: {
             title: '📝 *할일 관리*',
             stats: statsResult.data,
-            enableReminders: !!this.models.Reminder,
+            enableReminders: this.config.enableReminders,
             userId: userId
           }
         }
