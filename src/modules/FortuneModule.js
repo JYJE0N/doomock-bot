@@ -376,7 +376,7 @@ class FortuneModule extends BaseModule {
       fortuneType: params || "celtic"
     });
 
-    // 🔥 중요: 무조건 먼저 상태 저장!
+    // 상태 저장
     const state = {
       type: "waiting_question",
       fortuneType: params || "celtic",
@@ -401,33 +401,21 @@ class FortuneModule extends BaseModule {
       }
     };
 
-    // 렌더러를 통해 메시지 전송 (이전 코드 그대로)
+    // ✅ 수정된 ctx 객체 생성
     const renderer =
       this.moduleManager?.navigationHandler?.renderers?.get("fortune");
     if (renderer) {
-      const ctx = {
-        message: callbackQuery.message,
-        update: callbackQuery,
-        editMessageText: async (text, extra) => {
-          const sentMessage = await bot.telegram.editMessageText(
-            callbackQuery.message.chat.id,
-            callbackQuery.message.message_id,
-            null,
-            text,
-            extra
-          );
-          return sentMessage;
-        }
-      };
+      // BaseModule의 createCtx 사용 (권장)
+      const ctx = this.createCtx(callbackQuery);
 
       await renderer.render(result, ctx);
 
-      // 상태에 메시지 ID 저장
+      // 상태 업데이트
       this.userStates.set(userId, {
         type: "waiting_question",
         fortuneType: params || "celtic",
         timestamp: Date.now(),
-        promptMessageId: callbackQuery.message.message_id // 🔥 중요
+        promptMessageId: callbackQuery.message.message_id
       });
     }
 
