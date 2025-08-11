@@ -56,14 +56,46 @@ const EVENTS = {
 
   // 💼 근무시간 이벤트
   WORKTIME: {
-    CLOCK_IN_REQUEST: "worktime:clock_in:request",
-    CLOCKED_IN: "worktime:clocked_in",
-    CLOCK_OUT_REQUEST: "worktime:clock_out:request", 
-    CLOCKED_OUT: "worktime:clocked_out",
+    // 메뉴 관련
+    MENU_REQUEST: "worktime:menu:request",
+    MENU_READY: "worktime:menu:ready",
+    
+    // 출퇴근 관련
+    CHECK_IN_REQUEST: "worktime:checkin:request",
+    CHECKED_IN: "worktime:checked_in", 
+    CHECK_IN_ERROR: "worktime:checkin:error",
+    CHECK_OUT_REQUEST: "worktime:checkout:request",
+    CHECKED_OUT: "worktime:checked_out",
+    CHECK_OUT_ERROR: "worktime:checkout:error",
+    
+    // 상태 조회 관련
+    TODAY_REQUEST: "worktime:today:request",
+    TODAY_READY: "worktime:today:ready",
+    STATUS_REQUEST: "worktime:status:request", 
+    STATUS_READY: "worktime:status:ready",
+    
+    // 통계 관련
+    WEEKLY_REQUEST: "worktime:weekly:request",
+    WEEKLY_READY: "worktime:weekly:ready",
+    MONTHLY_REQUEST: "worktime:monthly:request",
+    MONTHLY_READY: "worktime:monthly:ready",
+    STATS_REQUEST: "worktime:stats:request",
+    STATS_READY: "worktime:stats:ready",
+    
+    // 이력 관련
+    HISTORY_REQUEST: "worktime:history:request",
+    HISTORY_READY: "worktime:history:ready",
+    
+    // 설정 관련
+    SETTINGS_REQUEST: "worktime:settings:request",
+    SETTINGS_READY: "worktime:settings:ready",
+    WORK_TIME_SET: "worktime:work_time:set",
+    
+    // 휴식/점심 관련
     BREAK_START: "worktime:break:start",
     BREAK_END: "worktime:break:end",
-    STATS_REQUEST: "worktime:stats:request",
-    STATS_READY: "worktime:stats:ready"
+    LUNCH_START: "worktime:lunch:start",
+    LUNCH_END: "worktime:lunch:end"
   },
 
   // 🏖️ 휴가 관리 이벤트
@@ -132,20 +164,100 @@ const EVENTS = {
 
   // 🔮 운세 이벤트
   FORTUNE: {
+    // 메뉴 관련
+    MENU_REQUEST: "fortune:menu:request",
+    MENU_READY: "fortune:menu:ready",
+    
+    // 카드 뽑기 관련
+    DRAW_REQUEST: "fortune:draw:request",
+    DRAW_READY: "fortune:draw:ready",
+    DRAW_ERROR: "fortune:draw:error",
+    
+    // 운세 타입별
+    SINGLE_CARD_REQUEST: "fortune:single:request",
+    SINGLE_CARD_READY: "fortune:single:ready",
+    TRIPLE_CARD_REQUEST: "fortune:triple:request", 
+    TRIPLE_CARD_READY: "fortune:triple:ready",
+    CELTIC_CROSS_REQUEST: "fortune:celtic:request",
+    CELTIC_CROSS_READY: "fortune:celtic:ready",
+    
+    // 질문 입력 관련 (캘틱 크로스용)
+    QUESTION_REQUEST: "fortune:question:request",
+    QUESTION_RECEIVED: "fortune:question:received",
+    QUESTION_CANCEL: "fortune:question:cancel",
+    QUESTION_TIMEOUT: "fortune:question:timeout",
+    QUESTION_INVALID: "fortune:question:invalid",
+    
+    // 카드 섞기
+    SHUFFLE_REQUEST: "fortune:shuffle:request",
+    SHUFFLE_READY: "fortune:shuffle:ready",
+    
+    // 통계 및 이력
+    STATS_REQUEST: "fortune:stats:request",
+    STATS_READY: "fortune:stats:ready",
+    HISTORY_REQUEST: "fortune:history:request",
+    HISTORY_READY: "fortune:history:ready",
+    
+    // 캘틱 상세보기
+    CELTIC_DETAIL_REQUEST: "fortune:celtic:detail:request",
+    CELTIC_DETAIL_READY: "fortune:celtic:detail:ready",
+    
+    // 일일 제한
+    DAILY_LIMIT_CHECK: "fortune:daily:limit:check",
+    DAILY_LIMIT_EXCEEDED: "fortune:daily:limit:exceeded",
+    DAILY_LIMIT_RESET: "fortune:daily:limit:reset",
+    
+    // 일반 이벤트
     REQUEST: "fortune:request",
     READY: "fortune:ready",
-    DAILY_REQUEST: "fortune:daily:request",
-    DAILY_READY: "fortune:daily:ready",
-    TAROT_REQUEST: "fortune:tarot:request",
-    TAROT_READY: "fortune:tarot:ready"
+    ERROR: "fortune:error"
   },
 
   // 🔊 TTS 이벤트
   TTS: {
+    // 메뉴 관련
+    MENU_REQUEST: "tts:menu:request",
+    MENU_READY: "tts:menu:ready",
+    
+    // 텍스트 변환 관련
     CONVERT_REQUEST: "tts:convert:request",
-    CONVERTED: "tts:converted", 
+    CONVERTED: "tts:converted",
+    CONVERT_ERROR: "tts:convert:error",
+    
+    // 음성 설정 관련
+    VOICE_LIST_REQUEST: "tts:voice:list:request",
+    VOICE_LIST_READY: "tts:voice:list:ready", 
+    VOICE_SELECT_REQUEST: "tts:voice:select:request",
+    VOICE_SELECTED: "tts:voice:selected",
+    VOICE_CHANGE_REQUEST: "tts:voice:change:request",
+    VOICE_CHANGED: "tts:voice:changed",
+    
+    // 텍스트 입력 관련
+    TEXT_INPUT_START: "tts:text:input:start",
+    TEXT_INPUT_RECEIVED: "tts:text:input:received",
+    TEXT_INPUT_CANCEL: "tts:text:input:cancel",
+    TEXT_INPUT_TIMEOUT: "tts:text:input:timeout",
+    
+    // 오디오 재생 관련
     PLAY_REQUEST: "tts:play:request",
     PLAYED: "tts:played",
+    PLAY_ERROR: "tts:play:error",
+    
+    // 공유 관련
+    SHARE_REQUEST: "tts:share:request",
+    SHARE_READY: "tts:share:ready",
+    SHARE_ERROR: "tts:share:error",
+    
+    // 설정 관련
+    SETTINGS_REQUEST: "tts:settings:request",
+    SETTINGS_READY: "tts:settings:ready",
+    LANGUAGE_CHANGE: "tts:language:change",
+    
+    // 도움말
+    HELP_REQUEST: "tts:help:request",
+    HELP_READY: "tts:help:ready",
+    
+    // 일반 오류
     ERROR: "tts:error"
   },
 
