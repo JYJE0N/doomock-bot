@@ -898,7 +898,7 @@ class TodoModule extends BaseModule {
       }
 
       // 🎯 성공 응답 - 자동 목록 새로고침으로 변경
-      const TimeHelper = require("../utils/formatting/TimeHelper");
+      const TimeHelper = require("../utils/TimeHelper");
       const formattedTime = TimeHelper.format(remindAt, "full");
 
       return {

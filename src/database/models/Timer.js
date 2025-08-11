@@ -1,7 +1,7 @@
 // src/database/models/Timer.js - 🍅 완전 리팩토링 v2.0
 
 const mongoose = require("mongoose");
-const TimeHelper = require("../../utils/formatting/TimeHelper");
+const TimeHelper = require("../../utils/TimeHelper");
 const logger = require("../../utils/Logger");
 
 /**
@@ -250,7 +250,7 @@ timerSchema.virtual("statusDisplay").get(function () {
  * 🏷️ 타입 표시명
  */
 timerSchema.virtual("typeDisplay").get(function () {
-  const TimeHelper = require("../../utils/formatting/TimeHelper");
+  const TimeHelper = require("../../utils/TimeHelper");
   return TimeHelper.getTimerTypeDisplay(this.type, true);
 });
 
