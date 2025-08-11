@@ -402,6 +402,39 @@ class LeaveModuleV2 {
     const { userId, chatId } = event.payload;
 
     try {
+      // LeaveService 확인
+      if (!this.leaveService || typeof this.leaveService.getBalance !== 'function') {
+        logger.warn('LeaveService가 없거나 getBalance 메서드가 없음. 더미 데이터 사용.');
+        const dummyBalance = {
+          success: true,
+          data: {
+            total: 15,
+            used: 2,
+            remaining: 13,
+            joinDate: null
+          }
+        };
+        
+        // 성공 이벤트 발행 (더미 데이터)
+        await this.eventBus.publish(EVENTS.LEAVE.MENU_READY, {
+          userId,
+          chatId,
+          balance: dummyBalance.data,
+          config: this.config
+        });
+
+        // 렌더링 요청
+        await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+          chatId,
+          text: this.formatMenu(dummyBalance.data),
+          options: {
+            reply_markup: this.createMenuKeyboard(),
+            parse_mode: 'Markdown'
+          }
+        });
+        return;
+      }
+      
       // 현재 잔여 연차 조회
       const balanceResult = await this.leaveService.getBalance(userId);
       

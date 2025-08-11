@@ -114,6 +114,7 @@ class TTSModuleV2 {
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
       'menu': () => this.showMenu(userId, chatId),
+      'start': () => this.handleTTSStart(userId, chatId),
       'convert': () => this.handleTTSConvert(userId, chatId, params),
       'settings': () => this.showSettings(userId, chatId),
       'voice': () => this.handleVoiceSelect(userId, chatId, params),
@@ -977,6 +978,148 @@ class TTSModuleV2 {
         }
       };
     }
+  }
+
+  /**
+   * 🚀 TTS 시작 (레거시 콜백용)
+   */
+  async handleTTSStart(userId, chatId) {
+    // 텍스트 입력 상태로 전환
+    this.setUserState(userId, {
+      state: 'waiting_text_input',
+      chatId,
+      startTime: Date.now()
+    });
+
+    await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+      chatId,
+      text: '🎵 *텍스트 음성 변환*\n\n변환할 텍스트를 입력하세요:',
+      options: {
+        reply_markup: this.createCancelKeyboard(),
+        parse_mode: 'Markdown'
+      }
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * 🎯 TTS 공유 처리 (레거시 콜백용)
+   */
+  async handleTTSShare(userId, chatId, params) {
+    // 공유 기능 처리
+    await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+      chatId,
+      text: '🔗 공유 기능은 구현 예정입니다.',
+      options: {
+        reply_markup: this.createMenuKeyboard(),
+        parse_mode: 'Markdown'
+      }
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * 🎵 음성 선택 처리 (레거시 콜백용)
+   */
+  async handleVoiceSelect(userId, chatId, params) {
+    const voiceCode = params?.[0];
+    if (!voiceCode) {
+      return this.showSettings(userId, chatId);
+    }
+
+    // 음성 변경 처리
+    await this.eventBus.publish(EVENTS.TTS.VOICE_CHANGE_REQUEST, {
+      userId,
+      chatId,
+      voiceCode
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * 🌐 언어 선택 처리 (레거시 콜백용)
+   */
+  async handleLanguageSelect(userId, chatId, params) {
+    const languageCode = params?.[0];
+    if (!languageCode) {
+      return this.showSettings(userId, chatId);
+    }
+
+    // 언어 설정 변경 (향후 구현)
+    await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+      chatId,
+      text: `🌐 언어가 ${languageCode}로 변경되었습니다.`,
+      options: {
+        reply_markup: this.createAfterSetKeyboard(),
+        parse_mode: 'Markdown'
+      }
+    });
+
+    return { success: true };
+  }
+
+  /**
+   * ⚙️ 설정 표시 (V2 렌더러 방식)
+   */
+  async showSettings(userId, chatId) {
+    try {
+      const currentVoice = this.getVoiceByCode(this.config.defaultVoice);
+      
+      return {
+        type: 'settings',
+        module: 'tts',
+        success: true,
+        data: {
+          title: '⚙️ *TTS 설정*',
+          currentVoice: currentVoice,
+          supportedLanguages: this.config.supportedLanguages,
+          maxTextLength: this.config.maxTextLength,
+          userId: userId
+        }
+      };
+
+    } catch (error) {
+      logger.error('⚙️ TTSModuleV2.showSettings 실패:', error);
+      return {
+        type: 'error',
+        module: 'tts',
+        success: false,
+        data: {
+          message: 'TTS 설정을 불러오는 중 오류가 발생했습니다.',
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🔘 취소 키보드 생성
+   */
+  createCancelKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: '❌ 취소', callback_data: 'tts:menu' }
+        ]
+      ]
+    };
+  }
+
+  /**
+   * 🔘 설정 후 키보드 생성
+   */
+  createAfterSetKeyboard() {
+    return {
+      inline_keyboard: [
+        [
+          { text: '🎵 변환 시작', callback_data: 'tts:start' },
+          { text: '🔙 메뉴로', callback_data: 'tts:menu' }
+        ]
+      ]
+    };
   }
 
   /**

@@ -137,6 +137,8 @@ class SystemRenderer extends BaseRenderer {
    * 📊 시스템 상태 렌더링 (완전 강화!)
    */
   async renderStatus(data, ctx) {
+    // 안전한 데이터 추출
+    const safeData = data || {};
     const {
       system = {},
       memory = {},
@@ -145,42 +147,56 @@ class SystemRenderer extends BaseRenderer {
       _uptime,
       status,
       lastHealthCheck
-    } = data;
+    } = safeData;
+
+    // system 객체 안전성 확인
+    if (!system || typeof system !== 'object') {
+      logger.warn('SystemRenderer: system 데이터가 유효하지 않음', { data: safeData });
+      const errorMessage = '⚠️ 시스템 상태 정보를 가져올 수 없습니다.';
+      return await this.sendMessage(ctx, errorMessage, {
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '🔄 새로고침', callback_data: 'system:status' },
+            { text: '🏠 메인 메뉴', callback_data: 'navigation:main_menu' }
+          ]]
+        }
+      });
+    }
 
     let text = `📊 *시스템 진단*\n${this.ui.separators.main}\n\n`;
 
     // 🏥 전체 건강도 표시
-    const healthIcon = this.getHealthIcon(system.healthStatus || status);
-    const healthScore = system.overallHealthScore || 0;
-    text += `${healthIcon} *전체 상태*: ${this.getStatusText(system.healthStatus || status)} (${healthScore}점)\n\n`;
+    const healthIcon = this.getHealthIcon(system?.healthStatus || status);
+    const healthScore = system?.overallHealthScore || 0;
+    text += `${healthIcon} *전체 상태*: ${this.getStatusText(system?.healthStatus || status)} (${healthScore}점)\n\n`;
 
     // 🖥️ 하드웨어 정보
     text += `${this.ui.icons.system} *하드웨어 정보*\n`;
-    text += `${this.ui.separators.dot}플랫폼: ${system.platform || "알 수 없음"}\n`;
-    text += `${this.ui.separators.dot}CPU: ${system.cpuModel || "알 수 없음"} (${system.cpuCores || 0}코어)\n`;
-    text += `${this.ui.separators.dot}CPU 사용률: ${system.cpuUsage || 0}%\n`;
-    text += `${this.ui.separators.dot}Node.js: ${system.nodeVersion || "알 수 없음"}\n`;
-    text += `${this.ui.separators.dot}아키텍처: ${system.arch || "알 수 없음"}\n\n`;
+    text += `${this.ui.separators.dot}플랫폼: ${system?.platform || "알 수 없음"}\n`;
+    text += `${this.ui.separators.dot}CPU: ${system?.cpuModel || "알 수 없음"} (${system?.cpuCores || 0}코어)\n`;
+    text += `${this.ui.separators.dot}CPU 사용률: ${system?.cpuUsage || 0}%\n`;
+    text += `${this.ui.separators.dot}Node.js: ${system?.nodeVersion || "알 수 없음"}\n`;
+    text += `${this.ui.separators.dot}아키텍처: ${system?.arch || "알 수 없음"}\n\n`;
 
     // 💾 메모리 상세 정보
     text += `${this.ui.icons.memory} *메모리 상태*\n`;
-    if (memory.process) {
+    if (memory?.process) {
       text += `${this.ui.separators.dot}프로세스: ${memory.process.heapUsed}MB / ${memory.process.heapTotal}MB\n`;
       text += `${this.ui.separators.dot}사용률: ${memory.process.percentage}%\n`;
     }
-    if (memory.system) {
+    if (memory?.system) {
       text += `${this.ui.separators.dot}시스템: ${memory.system.used}GB / ${memory.system.total}GB\n`;
     }
     text += `\n`;
 
     // 🌐 환경 정보
     text += `🌍 *환경 정보*\n`;
-    text += `${this.ui.separators.dot}환경: ${system.environment || "알 수 없음"}\n`;
-    text += `${this.ui.separators.dot}클라우드: ${system.cloudProvider || "Local"}\n`;
-    if (system.isDocker) {
+    text += `${this.ui.separators.dot}환경: ${system?.environment || "알 수 없음"}\n`;
+    text += `${this.ui.separators.dot}클라우드: ${system?.cloudProvider || "Local"}\n`;
+    if (system?.isDocker) {
       text += `${this.ui.separators.dot}🐳 Docker 환경\n`;
     }
-    text += `${this.ui.separators.dot}네트워크: ${system.networkInterfaces || 0}개 인터페이스\n\n`;
+    text += `${this.ui.separators.dot}네트워크: ${system?.networkInterfaces || 0}개 인터페이스\n\n`;
 
     // 📦 모듈 상태 (StatusHelper 데이터 활용)
     if (modules.length > 0) {
@@ -197,7 +213,7 @@ class SystemRenderer extends BaseRenderer {
     }
 
     // 💡 추천사항
-    if (system.recommendations && system.recommendations.length > 0) {
+    if (system?.recommendations && system.recommendations.length > 0) {
       text += `💡 *추천사항*\n`;
       system.recommendations.forEach((rec) => {
         text += `${this.ui.separators.dot}${rec}\n`;
