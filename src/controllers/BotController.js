@@ -397,9 +397,72 @@ class BotController {
   }
 
   /**
+   * 🌉 EventBus 렌더링 브릿지 설정
+   */
+  setupEventBusRenderingBridge() {
+    logger.info("🌉 EventBus 렌더링 브릿지 설정 중...");
+
+    // RENDER.MESSAGE_REQUEST 이벤트 처리
+    this.eventBus.subscribe("RENDER.MESSAGE_REQUEST", async (payload) => {
+      try {
+        const { chatId, renderType, data, options = {} } = payload;
+        
+        // chatId로 컨텍스트 복원
+        const ctx = {
+          chat: { id: chatId },
+          reply: (text, opts) => this.bot.telegram.sendMessage(chatId, text, opts),
+          editMessageText: (text, opts) => this.bot.telegram.editMessageText(chatId, options.messageId, null, text, opts),
+          answerCbQuery: (text) => options.callbackQueryId ? this.bot.telegram.answerCbQuery(options.callbackQueryId, text) : Promise.resolve()
+        };
+
+        // NavigationHandler를 통해 렌더링
+        await this.navigationHandler.renderModuleResponse(ctx, {
+          type: renderType,
+          data: data,
+          options: options
+        });
+
+        logger.debug(`✅ RENDER.MESSAGE_REQUEST 처리 완료: ${renderType}`);
+      } catch (error) {
+        logger.error("❌ RENDER.MESSAGE_REQUEST 처리 실패:", error);
+      }
+    });
+
+    // RENDER.UPDATE_REQUEST 이벤트 처리
+    this.eventBus.subscribe("RENDER.UPDATE_REQUEST", async (payload) => {
+      try {
+        const { chatId, messageId, renderType, data, options = {} } = payload;
+        
+        // 메시지 업데이트를 위한 컨텍스트
+        const ctx = {
+          chat: { id: chatId },
+          editMessageText: (text, opts) => this.bot.telegram.editMessageText(chatId, messageId, null, text, opts),
+          answerCbQuery: (text) => options.callbackQueryId ? this.bot.telegram.answerCbQuery(options.callbackQueryId, text) : Promise.resolve()
+        };
+
+        // NavigationHandler를 통해 렌더링
+        await this.navigationHandler.renderModuleResponse(ctx, {
+          type: renderType,
+          data: data,
+          options: { ...options, messageId }
+        });
+
+        logger.debug(`✅ RENDER.UPDATE_REQUEST 처리 완료: ${renderType}`);
+      } catch (error) {
+        logger.error("❌ RENDER.UPDATE_REQUEST 처리 실패:", error);
+      }
+    });
+
+    logger.success("✅ EventBus 렌더링 브릿지 설정 완료");
+  }
+
+  /**
    * 🔌 미들웨어 설정 (수정된 버전 - 불필요한 명령어 제거)
    */
   setupMiddlewares() {
+    // EventBus 렌더링 브릿지 먼저 설정
+    this.setupEventBusRenderingBridge();
+
     // 에러 핸들링
     this.bot.catch((error, ctx) => {
       logger.error("봇 에러:", error);

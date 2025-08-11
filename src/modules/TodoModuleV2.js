@@ -186,10 +186,11 @@ class TodoModuleV2 {
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
-      // menu와 list 액션은 렌더러용 결과를 반환
-      if ((subAction === 'menu' || subAction === 'list') && result) {
+      // 모든 액션의 결과를 반환 (렌더러가 처리할 수 있도록)
+      if (result) {
         return result;
       }
+      // 결과가 없으면 기본 응답 반환
       return {
         type: subAction,
         module: 'todo',
@@ -487,6 +488,70 @@ class TodoModuleV2 {
         parse_mode: 'Markdown'
       }
     });
+
+    // TodoRenderer가 처리할 수 있도록 결과 반환
+    return {
+      type: 'input_request',
+      module: 'todo',
+      success: true,
+      data: {
+        prompt: '📝 추가할 할일을 입력해주세요:',
+        type: 'add_todo',
+        canCancel: true
+      }
+    };
+  }
+
+  /**
+   * ✏️ 할일 수정 플로우 시작
+   */
+  async startEditFlow(userId, chatId, params) {
+    const todoId = params[0];
+    
+    if (!todoId) {
+      return {
+        type: 'error',
+        module: 'todo',
+        success: false,
+        data: {
+          message: '수정할 할일을 선택해주세요.',
+          canRetry: true
+        }
+      };
+    }
+
+    // 입력 대기 상태 설정
+    this.setUserState(userId, {
+      state: this.constants.INPUT_STATES.WAITING_EDIT_INPUT,
+      todoId: todoId,
+      timestamp: Date.now()
+    });
+
+    await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
+      chatId,
+      text: '✏️ 새로운 내용을 입력해주세요:',
+      options: {
+        reply_markup: { 
+          inline_keyboard: [[
+            { text: '❌ 취소', callback_data: 'todo:menu' }
+          ]]
+        },
+        parse_mode: 'Markdown'
+      }
+    });
+
+    // TodoRenderer가 처리할 수 있도록 결과 반환
+    return {
+      type: 'input_request',
+      module: 'todo',
+      success: true,
+      data: {
+        prompt: '✏️ 새로운 내용을 입력해주세요:',
+        type: 'edit_todo',
+        todoId: todoId,
+        canCancel: true
+      }
+    };
   }
 
   /**
@@ -539,20 +604,60 @@ class TodoModuleV2 {
     });
   }
 
-  async publishCompleteRequest(userId, chatId, todoId) {
+  async publishCompleteRequest(userId, chatId, params) {
+    const todoId = params && params[0];
+    
+    if (!todoId) {
+      return {
+        type: 'error',
+        module: 'todo',
+        success: false,
+        data: {
+          message: '완료할 할일을 선택해주세요.',
+          canRetry: true
+        }
+      };
+    }
+    
     await this.eventBus.publish(EVENTS.TODO.COMPLETE_REQUEST, {
       userId,
       chatId,
       todoId
     });
+    
+    return {
+      type: 'success',
+      module: 'todo',
+      success: true
+    };
   }
 
-  async publishDeleteRequest(userId, chatId, todoId) {
+  async publishDeleteRequest(userId, chatId, params) {
+    const todoId = params && params[0];
+    
+    if (!todoId) {
+      return {
+        type: 'error',
+        module: 'todo',
+        success: false,
+        data: {
+          message: '삭제할 할일을 선택해주세요.',
+          canRetry: true
+        }
+      };
+    }
+    
     await this.eventBus.publish(EVENTS.TODO.DELETE_REQUEST, {
       userId,
       chatId,
       todoId
     });
+    
+    return {
+      type: 'success',
+      module: 'todo',
+      success: true
+    };
   }
 
   async publishError(error, originalEvent) {
