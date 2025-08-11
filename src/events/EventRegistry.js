@@ -82,11 +82,34 @@ const EVENTS = {
 
   // 🌤️ 날씨 이벤트  
   WEATHER: {
+    // 현재 날씨 관련
     CURRENT_REQUEST: "weather:current:request",
     CURRENT_READY: "weather:current:ready",
+    CURRENT_ERROR: "weather:current:error",
+    
+    // 예보 관련
     FORECAST_REQUEST: "weather:forecast:request", 
     FORECAST_READY: "weather:forecast:ready",
-    LOCATION_SET: "weather:location:set"
+    FORECAST_ERROR: "weather:forecast:error",
+    
+    // 도시별 날씨 관련
+    CITY_REQUEST: "weather:city:request",
+    CITY_READY: "weather:city:ready",
+    CITY_LIST_REQUEST: "weather:city:list:request",
+    CITY_LIST_READY: "weather:city:list:ready",
+    
+    // 설정 관련
+    DEFAULT_CITY_SET: "weather:default:city:set",
+    DEFAULT_CITY_REQUEST: "weather:default:city:request",
+    LOCATION_SET: "weather:location:set",
+    
+    // 메뉴 관련
+    MENU_REQUEST: "weather:menu:request",
+    MENU_READY: "weather:menu:ready",
+    
+    // 도움말
+    HELP_REQUEST: "weather:help:request",
+    HELP_READY: "weather:help:ready"
   },
 
   // 🔮 운세 이벤트
@@ -229,6 +252,58 @@ const EVENT_SCHEMAS = {
     menuType: { type: "string", required: true },
     data: { type: "object", required: false },
     options: { type: "object", required: false }
+  },
+
+  // === 날씨 이벤트 스키마 ===
+  
+  // 현재 날씨 요청
+  [EVENTS.WEATHER.CURRENT_REQUEST]: {
+    userId: { type: "number", required: true },
+    chatId: { type: "number", required: true },
+    cityId: { type: "string", required: false },
+    cityName: { type: "string", required: false }
+  },
+
+  // 현재 날씨 응답
+  [EVENTS.WEATHER.CURRENT_READY]: {
+    userId: { type: "number", required: true },
+    chatId: { type: "number", required: true },
+    weather: { type: "object", required: true },
+    cityInfo: { type: "object", required: true }
+  },
+
+  // 예보 요청
+  [EVENTS.WEATHER.FORECAST_REQUEST]: {
+    userId: { type: "number", required: true },
+    chatId: { type: "number", required: true },
+    cityId: { type: "string", required: false },
+    days: { type: "number", required: false }
+  },
+
+  // 도시별 날씨 요청
+  [EVENTS.WEATHER.CITY_REQUEST]: {
+    userId: { type: "number", required: true },
+    chatId: { type: "number", required: true },
+    cityId: { type: "string", required: true }
+  },
+
+  // 도시 목록 요청
+  [EVENTS.WEATHER.CITY_LIST_REQUEST]: {
+    userId: { type: "number", required: true },
+    chatId: { type: "number", required: true }
+  },
+
+  // 기본 도시 설정
+  [EVENTS.WEATHER.DEFAULT_CITY_SET]: {
+    userId: { type: "number", required: true },
+    cityId: { type: "string", required: true },
+    cityName: { type: "string", required: true }
+  },
+
+  // 날씨 메뉴 요청
+  [EVENTS.WEATHER.MENU_REQUEST]: {
+    userId: { type: "number", required: true },
+    chatId: { type: "number", required: true }
   },
 
   // 시스템 에러
