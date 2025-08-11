@@ -45,7 +45,7 @@ class WeatherService extends BaseService {
     if (this.config.dustApiKey) {
       logger.debug("🔑 미세먼지 API 키 정보:", {
         length: this.config.dustApiKey.length,
-        hasSpecialChars: /[\/+=]/.test(this.config.dustApiKey),
+        hasSpecialChars: /[/+=]/.test(this.config.dustApiKey),
         isEncoded: this.config.dustApiKey.includes("%")
       });
     }
