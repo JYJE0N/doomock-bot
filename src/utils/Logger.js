@@ -314,8 +314,15 @@ class HybridLogger {
     this.log("info", message, meta);
   }
 
+  // 수정된 success 메서드
   success(message, meta = null) {
-    this.log("success", message, meta);
+    if (this.environment.useLogger === "winston" && this.winston) {
+      // Winston에서는 info 레벨로 처리
+      this.winston.info(`✅ ${message}`, meta);
+    } else {
+      // Chalk에서는 기존대로
+      this.logWithChalk("success", message, meta);
+    }
   }
 
   warn(message, meta = null) {
