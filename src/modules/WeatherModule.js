@@ -2,9 +2,9 @@
 // ⚙️ Weather 모듈 - 순수 비즈니스 로직만!
 
 const BaseModule = require("../core/BaseModule");
-const logger = require('../utils/core/Logger');
-const { getUserId, getUserName } = require('../utils/helpers/UserHelper');
-const TimeHelper = require('../utils/formatting/TimeHelper');
+const logger = require("../utils/Logger");
+const { getUserId, getUserName } = require("../utils/UserHelper");
+const TimeHelper = require("../utils/TimeHelper");
 
 /**
  * WeatherModule - SoC 원칙 준수

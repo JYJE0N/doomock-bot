@@ -1,5 +1,5 @@
 // src/config/ModuleRegistry.js - 완전히 새로 작성 (근본 해결)
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 const path = require("path");
 
 /**

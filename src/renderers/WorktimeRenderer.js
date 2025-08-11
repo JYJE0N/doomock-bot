@@ -1,7 +1,7 @@
 // src/renderers/WorktimeRenderer.js - 시간 표시 개선 버전
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 const BaseRenderer = require("./BaseRenderer");
-const TimeHelper = require('../utils/formatting/TimeHelper');
+const TimeHelper = require("../utils/TimeHelper");
 
 /**
  * 🏢 WorktimeRenderer - 근무시간 UI 렌더링 (시간 표시 개선)

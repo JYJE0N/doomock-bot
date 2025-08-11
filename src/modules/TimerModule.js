@@ -1,10 +1,10 @@
 // src/modules/TimerModule.js - 리팩토링 v6.0
 
 const BaseModule = require("../core/BaseModule");
-const TimeHelper = require('../utils/formatting/TimeHelper');
-const { getUserId, getUserName } = require('../utils/helpers/UserHelper');
+const TimeHelper = require("../utils/TimeHelper");
+const { getUserId, getUserName } = require("../utils/UserHelper");
 const { getInstance: getStateManager } = require("../utils/TimerStateManager");
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 
 /**
  * 🍅 TimerModule - 타이머 비즈니스 로직

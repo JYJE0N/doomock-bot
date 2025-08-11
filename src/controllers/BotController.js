@@ -3,7 +3,7 @@
 const { Telegraf } = require("telegraf");
 const express = require("express");
 const path = require("path");
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 const {
   getInstance: getMongooseManager
 } = require("../database/MongooseManager");
@@ -13,7 +13,7 @@ const NavigationHandler = require("../handlers/NavigationHandler");
 
 // 🎯 관심사 분리 - 전문 컴포넌트 import
 const ErrorHandler = require("../handlers/ErrorHandler");
-const MarkdownHelper = require('../utils/formatting/MarkdownHelper');
+const MarkdownHelper = require("../utils/MarkdownHelper");
 const CommandHandler = require("../handlers/CommandHandler");
 
 /**

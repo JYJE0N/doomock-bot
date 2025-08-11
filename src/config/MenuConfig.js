@@ -1,7 +1,7 @@
 // src/config/MenuConfig.js - 근본 해결: 중복 제거 및 통합
 
-const logger = require('../utils/core/Logger');
-const TimeHelper = require('../utils/formatting/TimeHelper');
+const logger = require("../utils/Logger");
+const TimeHelper = require("../utils/TimeHelper");
 // ✅ 통합 레지스트리 사용
 const { getEnabledModules, getModuleStats } = require("./ModuleRegistry");
 

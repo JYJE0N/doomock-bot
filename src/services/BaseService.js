@@ -1,4 +1,4 @@
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 
 /**
  * 🏗️ BaseService - 모든 서비스의 부모 (심플 버전)

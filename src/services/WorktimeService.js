@@ -1,8 +1,8 @@
 // src/services/WorktimeService.js - 데이터 처리 개선 버전
 
 const BaseService = require("./BaseService");
-const TimeHelper = require('../utils/formatting/TimeHelper');
-const logger = require('../utils/core/Logger');
+const TimeHelper = require("../utils/TimeHelper");
+const logger = require("../utils/Logger");
 
 /**
  * 🏢 WorktimeService - 근무시간 데이터 관리 (데이터 처리 개선)

@@ -1,5 +1,5 @@
 // src/core/ModuleManager.js - 매개변수 전달 수정 버전
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 const { getAllEnabledModules } = require("../config/ModuleRegistry");
 
 class ModuleManager {

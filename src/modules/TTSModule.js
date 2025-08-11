@@ -1,7 +1,7 @@
 // src/modules/TTSModule.js
 const BaseModule = require("../core/BaseModule");
-const logger = require('../utils/core/Logger');
-const { getUserId, getUserName } = require('../utils/helpers/UserHelper');
+const logger = require("../utils/Logger");
+const { getUserId, getUserName } = require("../utils/UserHelper");
 const TTSStateHelper = require("../utils/TTSStateHelper");
 const TTSVoiceConfig = require("../config/TTSVoiceConfig");
 

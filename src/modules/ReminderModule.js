@@ -1,7 +1,7 @@
 // src/modules/ReminderModule.js - ⏰ 리마인더 모듈 (순수 비즈니스 로직)
 const BaseModule = require("../core/BaseModule");
-const logger = require('../utils/core/Logger');
-const { getUserId, getUserName } = require('../utils/helpers/UserHelper');
+const logger = require("../utils/Logger");
+const { getUserId, getUserName } = require("../utils/UserHelper");
 
 /**
  * ⏰ ReminderModule - 리마인더/알림 모듈

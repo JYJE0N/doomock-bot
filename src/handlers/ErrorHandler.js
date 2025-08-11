@@ -1,6 +1,6 @@
 // src/handlers/ErrorHandler.js - 🚨 전담 에러 처리 컴포넌트
 
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 
 /**
  * 🚨 ErrorHandler - 모든 에러 처리 전담 (SoC 원칙)

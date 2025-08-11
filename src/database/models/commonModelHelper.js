@@ -1,5 +1,5 @@
 // src/database/models/commonModelHelper.js
-const mongoose = require("mongoose");
+const _mongoose = require("mongoose");
 
 /**
  * 🛠️ 모델 공통 헬퍼

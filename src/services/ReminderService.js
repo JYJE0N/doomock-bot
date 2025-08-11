@@ -1,7 +1,7 @@
 // src/services/ReminderService.js - Mongoose 전용 버전
 
 const BaseService = require("./BaseService");
-const logger = require('../utils/core/Logger');
+const logger = require("../utils/Logger");
 
 /**
  * 🔔 ReminderService - 리마인더 서비스 (Mongoose 버전)
