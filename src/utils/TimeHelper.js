@@ -7,6 +7,11 @@ class TimeHelper {
     return kst.toISOString().split('T')[0];
   }
 
+  // 호환성을 위한 별칭
+  static getKSTDate() {
+    return this.getKoreanDate();
+  }
+
   static getKoreanDateTime() {
     const now = new Date();
     const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));

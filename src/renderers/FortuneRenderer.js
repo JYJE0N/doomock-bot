@@ -419,6 +419,24 @@ class FortuneRenderer extends BaseRenderer {
     const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
     await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
   }
+
+  async renderError(data, ctx) {
+    const { message = "알 수 없는 오류가 발생했습니다." } = data;
+    
+    const text = `❌ *오류 발생*
+
+${message}
+
+다시 시도해주세요.`;
+
+    const buttons = [
+      [{ text: "🔄 다시 시도", action: "menu" }],
+      [{ text: "🔙 메인으로", action: "menu", module: "system" }]
+    ];
+
+    const keyboard = this.createInlineKeyboard(buttons, this.moduleName);
+    await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
+  }
 }
 
 module.exports = FortuneRenderer;

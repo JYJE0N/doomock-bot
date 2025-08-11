@@ -1074,6 +1074,41 @@ class TimerModuleV2 {
   }
 
   /**
+   * ▶️ 타이머 틱 시작 (주기적 업데이트)
+   */
+  startTimerTick(timer) {
+    // 기존 타이머가 있다면 정리
+    if (timer.tickInterval) {
+      clearInterval(timer.tickInterval);
+    }
+
+    // 1초마다 타이머 상태 체크
+    timer.tickInterval = setInterval(() => {
+      if (this.isTimerCompleted(timer)) {
+        // 타이머 완료
+        clearInterval(timer.tickInterval);
+        this.handleTimerCompletion(timer.userId, timer);
+      } else {
+        // 진행 상황 업데이트 (필요시)
+        // 여기에 실시간 진행률 업데이트 로직 추가 가능
+      }
+    }, 1000);
+
+    logger.debug(`⏰ 타이머 틱 시작: ${timer.type} (${timer.duration}분)`);
+  }
+
+  /**
+   * ⏹️ 타이머 틱 정지
+   */
+  stopTimerTick(timer) {
+    if (timer.tickInterval) {
+      clearInterval(timer.tickInterval);
+      timer.tickInterval = null;
+      logger.debug(`⏹️ 타이머 틱 정지: ${timer.type}`);
+    }
+  }
+
+  /**
    * ⏰ 경과 시간 계산
    */
   calculateElapsed(timer) {

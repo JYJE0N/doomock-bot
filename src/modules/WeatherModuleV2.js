@@ -193,6 +193,7 @@ class WeatherModuleV2 {
       'current': () => this.publishCurrentRequest(userId, chatId, params),
       'forecast': () => this.publishForecastRequest(userId, chatId, params),
       'city': () => this.publishCityRequest(userId, chatId, params),
+      'cities': () => this.publishCitiesRequest(userId, chatId),
       'help': () => this.publishHelpRequest(userId, chatId)
     };
     
@@ -249,6 +250,17 @@ class WeatherModuleV2 {
       userId,
       chatId,
       city
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🏙️ 도시 목록 요청 (레거시 콜백용)
+   */
+  async publishCitiesRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WEATHER.CITY_LIST_REQUEST, {
+      userId,
+      chatId
     });
     return { success: true };
   }
