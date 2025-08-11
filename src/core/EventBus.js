@@ -189,26 +189,38 @@ class EventBus extends EventEmitter {
   }
 
   checkCircularReference(eventName, eventId) {
-    // 순환 참조 방지 로직 (간단한 버전)
+    // 개선된 순환 참조 방지 로직
     const key = eventName;
     const now = Date.now();
 
     if (!this.circuitBreaker.has(key)) {
-      this.circuitBreaker.set(key, { count: 1, lastTime: now });
+      this.circuitBreaker.set(key, { count: 1, lastTime: now, eventIds: [eventId] });
       return false;
     }
 
     const info = this.circuitBreaker.get(key);
 
-    // 1초 내에 같은 이벤트가 10번 이상 발생하면 순환 의심
-    if (now - info.lastTime < 1000) {
+    // 100ms 내에 같은 이벤트ID가 발생하면 진짜 순환
+    if (now - info.lastTime < 100 && info.eventIds.includes(eventId)) {
+      return true;
+    }
+
+    // 500ms 내에 같은 이벤트가 20번 이상 발생하면 순환 의심 
+    if (now - info.lastTime < 500) {
       info.count++;
-      if (info.count > 10) {
+      info.eventIds.push(eventId);
+      // eventIds 배열이 너무 커지지 않도록 제한
+      if (info.eventIds.length > 20) {
+        info.eventIds = info.eventIds.slice(-10);
+      }
+      if (info.count > 20) {
         return true;
       }
     } else {
+      // 시간이 많이 지났으면 리셋
       info.count = 1;
       info.lastTime = now;
+      info.eventIds = [eventId];
     }
 
     return false;
