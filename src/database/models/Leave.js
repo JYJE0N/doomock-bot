@@ -1,5 +1,6 @@
 // src/database/models/Leave.js - 개인용 연차 관리 모델
 const mongoose = require("mongoose");
+const logger = require("../../utils/core/Logger");
 
 /**
  * 🏖️ Leave - 개인용 연차 사용 기록 모델
@@ -191,7 +192,7 @@ leaveSchema.statics.getMonthlyUsage = async function (userId, year = null) {
 
     return result;
   } catch (error) {
-    console.error("월별 사용량 조회 실패:", error);
+    logger.error("월별 사용량 조회 실패:", error);
     throw error;
   }
 };

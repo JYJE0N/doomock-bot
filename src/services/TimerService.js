@@ -309,9 +309,10 @@ class TimerService extends BaseService {
           ? userName
           : `User#${userId}`;
 
-      console.log("🔍 TimerService 디버깅:");
-      console.log("  원본 userName:", userName);
-      console.log("  검증된 userName:", validUserName);
+      logger.debug("🔍 TimerService 디버깅:", {
+        원본_userName: userName,
+        검증된_userName: validUserName
+      });
 
       // 뽀모도로 세트 생성
       const setId = `pomodoro_${userId}_${Date.now()}`;

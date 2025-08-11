@@ -3,6 +3,7 @@
 // ================================================
 
 const { EVENTS } = require("../events/catalog");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🔌 Legacy 어댑터
@@ -17,7 +18,7 @@ class LegacyAdapter {
     this.bot = bot;
     this.moduleName = legacyModule.moduleName || "unknown";
 
-    console.log(`🔌 Legacy 어댑터 연결: ${this.moduleName}`);
+    logger.info(`🔌 Legacy 어댑터 연결: ${this.moduleName}`);
 
     this.setupBridge();
   }
@@ -59,7 +60,7 @@ class LegacyAdapter {
         return; // 다른 모듈의 콜백
       }
 
-      console.log(`🔄 Legacy 콜백 처리: ${this.moduleName}:${action}`);
+      logger.debug(`🔄 Legacy 콜백 처리: ${this.moduleName}:${action}`);
 
       // 기존 모듈의 콜백 메서드 호출
       try {
@@ -78,7 +79,7 @@ class LegacyAdapter {
           userId
         });
       } catch (error) {
-        console.error(`❌ Legacy 콜백 에러: ${this.moduleName}`, error);
+        logger.error(`❌ Legacy 콜백 에러: ${this.moduleName}`, error);
 
         this.eventBus.publish(EVENTS.MODULE.ERROR, {
           module: this.moduleName,
@@ -104,7 +105,7 @@ class LegacyAdapter {
         return; // 다른 모듈의 명령어
       }
 
-      console.log(`🔄 Legacy 명령어 처리: ${command}`);
+      logger.debug(`🔄 Legacy 명령어 처리: ${command}`);
 
       try {
         const result = await this.legacyModule.handleCommand(
@@ -128,7 +129,7 @@ class LegacyAdapter {
           userId
         });
       } catch (error) {
-        console.error(`❌ Legacy 명령어 에러: ${command}`, error);
+        logger.error(`❌ Legacy 명령어 에러: ${command}`, error);
 
         this.eventBus.publish(EVENTS.MODULE.ERROR, {
           module: this.moduleName,
@@ -148,7 +149,7 @@ class LegacyAdapter {
     this.eventBus.subscribe(EVENTS.USER.MESSAGE, async (event) => {
       const { text, userId, chat, messageId } = event.payload;
 
-      console.log(`🔄 Legacy 메시지 처리: ${this.moduleName}`);
+      logger.debug(`🔄 Legacy 메시지 처리: ${this.moduleName}`);
 
       try {
         const result = await this.legacyModule.handleMessage(this.bot, {
@@ -169,7 +170,7 @@ class LegacyAdapter {
           });
         }
       } catch (error) {
-        console.error(`❌ Legacy 메시지 에러: ${this.moduleName}`, error);
+        logger.error(`❌ Legacy 메시지 에러: ${this.moduleName}`, error);
 
         this.eventBus.publish(EVENTS.MODULE.ERROR, {
           module: this.moduleName,
@@ -209,7 +210,7 @@ class LegacyAdapter {
     this.eventBus.subscribe(EVENTS.TODO.CREATE, async (event) => {
       const { text, userId } = event.payload;
 
-      console.log(`🔄 Legacy Todo 생성: ${text}`);
+      logger.debug(`🔄 Legacy Todo 생성: ${text}`);
 
       if (this.legacyModule.createTodo) {
         const todo = await this.legacyModule.createTodo(userId, text);
@@ -272,7 +273,7 @@ class LegacyAdapter {
   bridgeSystemEvents() {
     // 헬스체크
     this.eventBus.subscribe(EVENTS.SYSTEM.HEALTH_CHECK, async (event) => {
-      console.log(`🔄 Legacy 헬스체크`);
+      logger.debug(`🔄 Legacy 헬스체크`);
 
       if (this.legacyModule.healthCheck) {
         const status = await this.legacyModule.healthCheck();
@@ -290,7 +291,7 @@ class LegacyAdapter {
    * 어댑터 해제
    */
   disconnect() {
-    console.log(`🔌 Legacy 어댑터 해제: ${this.moduleName}`);
+    logger.info(`🔌 Legacy 어댑터 해제: ${this.moduleName}`);
     // 필요시 구독 해제 로직 추가
   }
 }

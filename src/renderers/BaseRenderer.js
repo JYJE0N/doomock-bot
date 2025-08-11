@@ -213,13 +213,13 @@ class BaseRenderer {
 
     // callback_data가 직접 지정된 경우 (레거시 지원)
     if (callback_data) {
-      console.warn(`직접 callback_data 사용 발견: ${callback_data}`);
+      logger.warn(`직접 callback_data 사용 발견: ${callback_data}`);
       return { text, callback_data };
     }
 
     // action이 없으면 에러
     if (!action) {
-      console.error(`버튼에 action이 없음: ${text}`);
+      logger.error(`버튼에 action이 없음: ${text}`);
       return { text, callback_data: `${defaultModule}:error:no_action` };
     }
 

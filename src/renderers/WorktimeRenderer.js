@@ -482,11 +482,6 @@ ${achievement.emoji} ${achievement.txt}`;
     const recommendations = data.recommendations || [];
     const timestamp = data.timestamp || new Date();
 
-    // 🔍 디버깅용 (개발 중에만 사용) - 실제로는 주석 처리하거나 제거
-    // console.log("🔍 오늘 근무 데이터 디버깅:", {
-    //   checkInTime: Utils.debugTime(record.checkInTime),
-    //   checkOutTime: Utils.debugTime(record.checkOutTime),
-    // });
 
     const statusEmoji = isWorking
       ? this.statusEmojis.working

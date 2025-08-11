@@ -475,13 +475,12 @@ class FortuneService extends BaseService {
       "**캘틱 크로스 - 10장의 카드가 보여주는 전체 상황**\n\n";
 
     // 각 카드가 올바른 position을 가지고 있는지 디버깅
-    console.log(
-      "Celtic cards positions:",
-      cards.map((c) => ({
+    logger.debug("Celtic cards positions:", {
+      cards: cards.map((c) => ({
         position: c.position,
         name: c.korean
       }))
-    );
+    });
 
     const areas = {
       center: ["present", "challenge"],

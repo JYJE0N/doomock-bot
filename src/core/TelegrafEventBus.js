@@ -188,11 +188,6 @@ class TelegrafEventBus extends EventEmitter {
    * 텍스트 메시지 핸들러
    */
   onText(pattern, eventName) {
-    // const handler =
-    //   pattern instanceof RegExp
-    //     ? (text) => pattern.test(text)
-    //     : (text) => text.includes(pattern);
-
     this.bot.hears(pattern, async (ctx) => {
       this.stats.messages++;
 
@@ -303,90 +298,5 @@ class TelegrafEventBus extends EventEmitter {
   }
 }
 
-// ================================================
-// 사용 예제
-// ================================================
-
-/*
-async function _example() {
-  // 1. TelegrafEventBus 생성
-  const bot = new TelegrafEventBus(process.env.BOT_TOKEN, {
-    enableLogging: true
-  });
-
-  // 2. 이벤트 기반 명령어 등록
-  bot.onCommand("start", "user:start");
-  bot.onCommand("help", "user:help");
-  bot.onCommand("todo", "todo:command");
-
-  // 3. 이벤트 리스너 등록
-  bot.on("user:start", async (event) => {
-    const { context, payload } = event;
-
-    await context.reply(
-      `
-👋 안녕하세요 ${payload.firstName}님!
-EventBus 기반 봇입니다.
-    
-/help - 도움말
-/todo - 할일 관리
-    `,
-      {
-        reply_markup: {
-          inline_keyboard: [
-            [
-              { text: "📝 할일 추가", callback_data: "todo:add" },
-              { text: "📋 목록 보기", callback_data: "todo:list" }
-            ]
-          ]
-        }
-      }
-    );
-  });
-
-  // 4. 동적 콜백 핸들러
-  // bot.onDynamicAction regex example commented out
-
-  // bot.on("todo:action", async (event) => {
-  //   const { context, payload } = event;
-  //   const { subAction, params } = payload;
-  // 
-  //   switch (subAction) {
-  //     case "add":
-  //       await context.reply("할일을 입력해주세요:");
-  //       // Scene으로 전환하거나 상태 관리
-  //       break;
-  // 
-  //     case "list":
-  //       await context.reply("📋 할일 목록:\n1. EventBus 구현\n2. 테스트 작성");
-  //       break;
-  // 
-  //     case "complete": {
-  //       const todoId = params[0];
-  //       await context.editMessageText(`✅ 할일 #${todoId} 완료!`);
-  //       break;
-  //     }
-  // });
-
-  // 5. 텍스트 패턴 매칭
-  // bot.onText(/^할일 (.+)/, "todo:quick_add");
-  // 
-  // bot.on("todo:quick_add", async (event) => {
-  //   const { context, payload } = event;
-  //   const todoText = payload.match[1];
-  // 
-  //   await context.reply(`✅ 할일 추가됨: ${todoText}`);
-  // });
-
-  // 6. 에러 핸들링
-  // bot.on("bot:error", (event) => {
-  //   console.error("봇 에러:", event.error);
-  //   // 에러 로깅, 알림 등
-  // });
-  // 
-  // // 7. 봇 시작
-  // await bot.start();
-}
-*/
 
 module.exports = TelegrafEventBus;
