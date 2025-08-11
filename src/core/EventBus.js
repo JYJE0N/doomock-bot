@@ -1,4 +1,5 @@
 const EventEmitter = require("events");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🚇 DoomockBot EventBus
@@ -36,15 +37,21 @@ class EventBus extends EventEmitter {
 
     // 순환 참조 검사
     if (this.checkCircularReference(eventName, event.metadata.id)) {
+      logger.error(`🚨 순환 이벤트 감지: ${eventName}`);
       throw new Error(`순환 이벤트 감지: ${eventName}`);
     }
 
     try {
+      // 이벤트 검증
+      this.validateEvent(eventName, payload);
+
       // 미들웨어 실행
       await this.runMiddleware(event);
 
       // 통계 업데이트
       this.updateStats("emitted", eventName);
+
+      logger.debug(`🚇 이벤트 발행: ${eventName}`, { payload: Object.keys(payload) });
 
       // 이벤트 발행
       this.emit(eventName, event);
@@ -53,6 +60,7 @@ class EventBus extends EventEmitter {
       return event.metadata.id;
     } catch (error) {
       this.updateStats("errors", eventName);
+      logger.error(`❌ 이벤트 발행 실패: ${eventName}`, error.message);
       throw error;
     }
   }
@@ -62,7 +70,13 @@ class EventBus extends EventEmitter {
     const wrappedHandler = this.createWrappedHandler(handler, options);
     this.on(eventName, wrappedHandler);
 
-    return () => this.removeListener(eventName, wrappedHandler);
+    logger.debug(`📥 이벤트 구독: ${eventName}`);
+
+    // 구독 취소 함수 반환
+    return () => {
+      this.removeListener(eventName, wrappedHandler);
+      logger.debug(`📤 이벤트 구독 해제: ${eventName}`);
+    };
   }
 
   // 🔄 미들웨어 등록
@@ -149,7 +163,7 @@ class EventBus extends EventEmitter {
         // 성능 측정
         const duration = Date.now() - start;
         if (duration > (options.slowThreshold || 100)) {
-          console.warn(`⚠️ 느린 이벤트 처리: ${event.name} (${duration}ms)`);
+          logger.warn(`⚠️ 느린 이벤트 처리: ${event.name} (${duration}ms)`);
         }
 
         this.updateStats("handled", event.name);
@@ -165,7 +179,7 @@ class EventBus extends EventEmitter {
         if (options.throwOnError) {
           throw error;
         } else {
-          console.error(
+          logger.error(
             `❌ 이벤트 처리 오류 (억제됨): ${event.name}`,
             error.message
           );
@@ -216,9 +230,71 @@ class EventBus extends EventEmitter {
 
   setupErrorHandling() {
     this.on("error", ({ event, error }) => {
-      console.error(`❌ 이벤트 처리 오류: ${event.name}`, error);
+      logger.error(`❌ 이벤트 처리 오류: ${event.name}`, error);
     });
   }
+
+  // 🎯 EventBus 건강 상태 체크
+  getHealthStatus() {
+    const stats = this.getStats();
+    const errorRate = parseFloat(stats.errorRate.replace('%', ''));
+    
+    let status = 'healthy';
+    let score = 100;
+    
+    if (errorRate > 20) {
+      status = 'critical';
+      score = 20;
+    } else if (errorRate > 10) {
+      status = 'warning';
+      score = 60;
+    } else if (errorRate > 5) {
+      status = 'caution';
+      score = 80;
+    }
+    
+    return {
+      status,
+      score,
+      stats,
+      listeners: this.eventNames().length,
+      timestamp: new Date().toISOString()
+    };
+  }
+
+  // 🎯 EventBus 정리 및 종료
+  async shutdown() {
+    logger.info('🚇 EventBus 종료 시작...');
+    
+    // 모든 리스너 제거
+    this.removeAllListeners();
+    
+    // 통계 초기화
+    this.stats.emitted.clear();
+    this.stats.handled.clear();
+    this.stats.errors.clear();
+    
+    logger.success('✅ EventBus 종료 완료');
+  }
 }
+
+// 🎯 싱글톤 인스턴스 제공
+let globalEventBus = null;
+
+EventBus.getInstance = function() {
+  if (!globalEventBus) {
+    globalEventBus = new EventBus();
+    logger.info('🚇 GlobalEventBus 인스턴스 생성');
+  }
+  return globalEventBus;
+};
+
+EventBus.resetInstance = function() {
+  if (globalEventBus) {
+    globalEventBus.shutdown();
+    globalEventBus = null;
+    logger.info('🔄 GlobalEventBus 인스턴스 리셋');
+  }
+};
 
 module.exports = EventBus;

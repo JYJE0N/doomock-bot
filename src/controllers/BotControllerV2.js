@@ -1,4 +1,12 @@
 // src/controllers/BotControllerV2.js
+// This file contains experimental EventBus-based controller
+// Commented out to fix lint errors as it's not currently used
+
+/*
+const EventBus = require('../core/EventBus');
+const { Telegraf } = require('telegraf');
+const logger = require('../utils/core/Logger');
+
 class BotControllerV2 {
   constructor() {
     this.eventBus = new EventBus();
@@ -112,3 +120,6 @@ class BotControllerV2 {
     // 점진적으로 다른 모듈도 추가...
   }
 }
+
+module.exports = BotControllerV2;
+*/

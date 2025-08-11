@@ -24,8 +24,14 @@ docs/
 # temp
 temp/
 
-# test results
+# test results and files
 tests/
+test-*.js
+*-test.js
+*.test.js
+test-eventbus-local.js
+coverage/
+.nyc_output/
 
 # mp3
 .cache/
@@ -46,3 +52,7 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Claude Code settings
+CLAUDE.md
+.Claude/
