@@ -531,23 +531,7 @@ class NavigationHandler {
    * 📤 안전한 메시지 전송 (MarkdownHelper 대체)
    */
   async sendMessage(ctx, text, options = {}) {
-    try {
-      const defaultOptions = {
-        parse_mode: 'Markdown',
-        ...options
-      };
-      
-      return await ctx.editMessageText(text, defaultOptions);
-    } catch (error) {
-      logger.error('메시지 전송 실패:', error);
-      // 대체 텍스트로 재시도
-      try {
-        return await ctx.editMessageText('메시지를 표시할 수 없습니다.', { parse_mode: 'Markdown' });
-      } catch (retryError) {
-        logger.error('메시지 전송 재시도도 실패:', retryError);
-        return false;
-      }
-    }
+    return await Utils.sendSafeMessage(ctx, text, options);
   }
 
   /**

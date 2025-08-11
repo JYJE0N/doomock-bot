@@ -113,6 +113,60 @@ class Utils {
     return `\`${text}\``;
   }
 
+  /**
+   * 모든 마크업 제거 (TTS용)
+   * @param {string} text 텍스트
+   * @returns {string}
+   */
+  static stripAllMarkup(text) {
+    if (!text || typeof text !== 'string') return '';
+    return text
+      .replace(/\*\*(.*?)\*\*/g, '$1')  // **bold**
+      .replace(/\*(.*?)\*/g, '$1')      // *italic*
+      .replace(/_(.*?)_/g, '$1')        // _italic_
+      .replace(/`(.*?)`/g, '$1')        // `code`
+      .replace(/\[(.*?)\]\(.*?\)/g, '$1') // [link](url)
+      .replace(/\\(.)/g, '$1')          // escaped chars
+      .trim();
+  }
+
+  /**
+   * 안전한 메시지 전송
+   * @param {Object} ctx Telegram context
+   * @param {string} text 메시지 텍스트
+   * @param {Object} options 전송 옵션
+   * @returns {Promise<boolean>}
+   */
+  static async sendSafeMessage(ctx, text, options = {}) {
+    try {
+      const defaultOptions = {
+        parse_mode: 'Markdown',
+        ...options
+      };
+      
+      await ctx.editMessageText(text, defaultOptions);
+      return true;
+    } catch (error) {
+      // 마크다운 오류 시 플레인 텍스트로 재시도
+      try {
+        const plainText = this.stripAllMarkup(text);
+        await ctx.editMessageText(plainText, { 
+          ...options, 
+          parse_mode: undefined 
+        });
+        return true;
+      } catch (retryError) {
+        // 최후의 수단
+        try {
+          await ctx.editMessageText('메시지를 표시할 수 없습니다.');
+          return false;
+        } catch (finalError) {
+          return false;
+        }
+      }
+    }
+  }
+
   // === 검증 ===
   
   /**

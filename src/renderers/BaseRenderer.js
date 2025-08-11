@@ -1,9 +1,10 @@
 // src/renderers/BaseRenderer.js - 속도 제한 처리가 추가된 버전
 
 const logger = require("../utils/core/Logger");
+const Utils = require("../utils");
 
 class BaseRenderer {
-  constructor(bot, navigationHandler, markdownHelper) {
+  constructor(bot, navigationHandler, markdownHelper = null) {
     this.bot = bot;
     this.navigationHandler = navigationHandler;
     this._markdownHelper = markdownHelper;
@@ -41,7 +42,12 @@ class BaseRenderer {
   }
 
   get markdownHelper() {
-    return this._markdownHelper || this.navigationHandler?.markdownHelper;
+    // Utils로 대체된 MarkdownHelper 기능 제공
+    return {
+      escape: Utils.escape.bind(Utils),
+      stripAllMarkup: Utils.stripAllMarkup.bind(Utils),
+      sendSafeMessage: Utils.sendSafeMessage.bind(Utils)
+    };
   }
 
   // ===== 🎯 핵심 추상 메서드 =====
