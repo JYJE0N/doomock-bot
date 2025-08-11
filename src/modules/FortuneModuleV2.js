@@ -103,6 +103,13 @@ class FortuneModuleV2 {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
     
+    logger.debug(`🔮 FortuneModuleV2.handleCallback 호출됨:`, {
+      subAction,
+      params,
+      userId,
+      chatId
+    });
+    
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
       'menu': () => this.showMenu(userId, chatId),

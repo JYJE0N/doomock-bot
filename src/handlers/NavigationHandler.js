@@ -290,6 +290,13 @@ class NavigationHandler {
       const { moduleKey, subAction, params } = this.parseCallbackData(data);
 
       logger.debug(`🎯 파싱 완료: ${moduleKey}.${subAction}(${params})`);
+      logger.debug(`📞 ModuleManager.handleCallback 호출 시작:`, {
+        moduleKey,
+        subAction, 
+        params,
+        userId: callbackQuery.from.id,
+        chatId: callbackQuery.message.chat.id
+      });
 
       // ✅ 추가: system 모듈의 menu 액션도 메인 메뉴로 처리
       if (moduleKey === "system") {

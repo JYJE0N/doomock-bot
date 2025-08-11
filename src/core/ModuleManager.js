@@ -434,17 +434,31 @@ class ModuleManager {
    */
   async loadModuleOnDemand(moduleKey) {
     try {
+      logger.debug(`🔄 온디맨드 로딩 요청: ${moduleKey}`);
+      
       // 이미 로딩된 모듈인지 확인
       if (this.modules.has(moduleKey)) {
+        logger.debug(`✅ 이미 로딩된 모듈: ${moduleKey}`);
         return this.modules.get(moduleKey);
       }
 
       // 지연 모듈 설정 확인
-      if (!this.lazyModules || !this.lazyModules.has(moduleKey)) {
+      if (!this.lazyModules) {
+        logger.debug(`❌ lazyModules Map이 없습니다`);
+        throw new Error(`lazyModules가 초기화되지 않았습니다`);
+      }
+
+      if (!this.lazyModules.has(moduleKey)) {
+        logger.debug(`❌ ${moduleKey} 모듈이 lazyModules에 등록되지 않음. 등록된 모듈:`, Array.from(this.lazyModules.keys()));
         throw new Error(`지연 로딩 모듈을 찾을 수 없습니다: ${moduleKey}`);
       }
 
       const config = this.lazyModules.get(moduleKey);
+      logger.debug(`📋 ${moduleKey} 모듈 설정:`, {
+        path: config.path,
+        enabled: config.enabled,
+        key: config.key
+      });
       
       logger.info(`🔄 [${moduleKey}] 온디맨드 모듈 로딩...`);
       
