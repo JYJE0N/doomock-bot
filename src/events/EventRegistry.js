@@ -42,16 +42,58 @@ const EVENTS = {
 
   // ⏰ 타이머 이벤트
   TIMER: {
+    // 메뉴 관련
+    MENU_REQUEST: "timer:menu:request",
+    MENU_READY: "timer:menu:ready",
+    
+    // 일반 타이머 관련
     START_REQUEST: "timer:start:request",
     STARTED: "timer:started",
-    TICK: "timer:tick",
     PAUSE_REQUEST: "timer:pause:request", 
     PAUSED: "timer:paused",
     RESUME_REQUEST: "timer:resume:request",
     RESUMED: "timer:resumed", 
     STOP_REQUEST: "timer:stop:request",
     STOPPED: "timer:stopped",
-    COMPLETED: "timer:completed"
+    RESET_REQUEST: "timer:reset:request",
+    RESET_COMPLETE: "timer:reset:complete",
+    
+    // 타이머 상태 관련
+    REFRESH_REQUEST: "timer:refresh:request",
+    STATUS_UPDATE: "timer:status:update",
+    TICK: "timer:tick",
+    COMPLETED: "timer:completed",
+    
+    // 뽀모도로 관련
+    POMODORO_START_REQUEST: "timer:pomodoro:start:request",
+    POMODORO_STARTED: "timer:pomodoro:started",
+    POMODORO_CYCLE_COMPLETE: "timer:pomodoro:cycle:complete",
+    POMODORO_SET_COMPLETE: "timer:pomodoro:set:complete",
+    POMODORO_TRANSITION: "timer:pomodoro:transition",
+    
+    // 커스텀 타이머 관련
+    CUSTOM_SETUP_REQUEST: "timer:custom:setup:request",
+    CUSTOM_SETUP_READY: "timer:custom:setup:ready",
+    CUSTOM_START_REQUEST: "timer:custom:start:request",
+    
+    // 통계 관련
+    STATS_REQUEST: "timer:stats:request",
+    STATS_READY: "timer:stats:ready",
+    WEEKLY_STATS_REQUEST: "timer:weekly:stats:request",
+    WEEKLY_STATS_READY: "timer:weekly:stats:ready",
+    
+    // 히스토리 관련
+    HISTORY_REQUEST: "timer:history:request",
+    HISTORY_READY: "timer:history:ready",
+    
+    // 알림 관련
+    NOTIFICATION_SENT: "timer:notification:sent",
+    COMPLETION_ALERT: "timer:completion:alert",
+    TRANSITION_ALERT: "timer:transition:alert",
+    
+    // 오류 처리
+    ERROR: "timer:error",
+    SESSION_CLEANUP: "timer:session:cleanup"
   },
 
   // 💼 근무시간 이벤트
