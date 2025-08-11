@@ -2,6 +2,7 @@
 const BaseModule = require("../core/BaseModule");
 const { getUserId, getUserName } = require("../utils/core/UserHelper");
 const logger = require("../utils/core/Logger");
+const Utils = require("../utils");
 
 /**
  * 🏖️ LeaveModule - 개인용 연차 관리 모듈 (완전 표준화)
@@ -809,7 +810,7 @@ class LeaveModule extends BaseModule {
           parse_mode: "Markdown"
         });
       } else if (bot.sendMessage) {
-        await MessageHelper.sendMessage(bot, msg.chat.id, message);
+        await bot.sendMessage || bot.telegram.sendMessage(bot, msg.chat.id, message);
       } else {
         logger.error("❌ Bot API를 찾을 수 없습니다");
       }
@@ -826,9 +827,9 @@ class LeaveModule extends BaseModule {
       const fallbackText = "요청이 처리되었습니다. 다시 시도해주세요.";
 
       if (bot.telegram) {
-        await MessageHelper.sendMessage(bot, msg.chat.id, fallbackText);
+        await bot.sendMessage || bot.telegram.sendMessage(bot, msg.chat.id, fallbackText);
       } else if (bot.sendMessage) {
-        await MessageHelper.sendMessage(bot, msg.chat.id, fallbackText);
+        await bot.sendMessage || bot.telegram.sendMessage(bot, msg.chat.id, fallbackText);
       } else {
         logger.error("❌ Fallback: Bot API를 찾을 수 없습니다");
       }

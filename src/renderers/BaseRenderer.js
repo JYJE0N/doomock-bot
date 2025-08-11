@@ -45,6 +45,7 @@ class BaseRenderer {
     // Utils로 대체된 MarkdownHelper 기능 제공
     return {
       escape: Utils.escape.bind(Utils),
+      escapeMarkdownV2: Utils.escapeMarkdownV2.bind(Utils),
       stripAllMarkup: Utils.stripAllMarkup.bind(Utils),
       sendSafeMessage: Utils.sendSafeMessage.bind(Utils)
     };

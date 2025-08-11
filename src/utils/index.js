@@ -77,13 +77,24 @@ class Utils {
   // === 텍스트 처리 ===
   
   /**
-   * 마크다운 특수문자 이스케이프
+   * 마크다운 특수문자 이스케이프 (기본 Markdown)
    * @param {string} text 텍스트
    * @returns {string}
    */
   static escape(text) {
     if (!text || typeof text !== 'string') return '';
     return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+  }
+
+  /**
+   * MarkdownV2 특수문자 이스케이프 (더 엄격한 규칙)
+   * @param {string} text 텍스트
+   * @returns {string}
+   */
+  static escapeMarkdownV2(text) {
+    if (!text || typeof text !== 'string') return '';
+    // MarkdownV2에서 이스케이프가 필요한 모든 문자 (백슬래시 포함)
+    return text.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&');
   }
 
   /**
@@ -131,7 +142,7 @@ class Utils {
   }
 
   /**
-   * 안전한 메시지 전송
+   * 안전한 메시지 전송 (Markdown & MarkdownV2 지원)
    * @param {Object} ctx Telegram context
    * @param {string} text 메시지 텍스트
    * @param {Object} options 전송 옵션
@@ -147,6 +158,17 @@ class Utils {
       await ctx.editMessageText(text, defaultOptions);
       return true;
     } catch (error) {
+      // MarkdownV2로 재시도 (더 엄격한 파싱)
+      if (options.parse_mode !== 'MarkdownV2') {
+        try {
+          const v2Options = { ...options, parse_mode: 'MarkdownV2' };
+          await ctx.editMessageText(text, v2Options);
+          return true;
+        } catch (v2Error) {
+          // MarkdownV2도 실패하면 계속 진행
+        }
+      }
+
       // 마크다운 오류 시 플레인 텍스트로 재시도
       try {
         const plainText = this.stripAllMarkup(text);
@@ -248,6 +270,34 @@ class Utils {
    */
   static log(level, message, data) {
     Logger[level](message, data);
+  }
+
+  // === 배너 및 UI ===
+
+  /**
+   * DooMock 봇 시작 배너 표시
+   */
+  static async showDoomockBanner() {
+    const banner = `
+🤖 ========================================
+     ____              __  __            _    
+    |  _ \\  ___   ___  |  \\/  | ___   ___| | __
+    | | | |/ _ \\ / _ \\ | |\\/| |/ _ \\ / __| |/ /
+    | |_| | (_) | (_) || |  | | (_) | (__|   < 
+    |____/ \\___/ \\___/ |_|  |_|\\___/ \\___|_|\\_\\
+    
+    🎯 한국형 생산성 텔레그램 봇 v4.0.1
+    🚀 EventBus 기반 모듈 아키텍처
+    ⚡ Production Ready
+========================================== 🤖`;
+
+    console.log(banner);
+    
+    // 시스템 정보
+    console.log(`📅 시작 시간: ${this.now()}`);
+    console.log(`💻 Node.js: ${process.version}`);
+    console.log(`🧠 메모리: ${this.getMemoryUsage().rss}`);
+    console.log('');
   }
 }
 

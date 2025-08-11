@@ -6,7 +6,7 @@
 const { EVENTS } = require("../events/index");
 const logger = require("../utils/core/Logger");
 const BaseModule = require("../core/BaseModule");
-const { getUserId } = require("../utils/core/UserHelper");
+// const { getUserId } = require("../utils/core/UserHelper");
 
 class TodoModuleV2 extends BaseModule {
   constructor(moduleName = "todo", options = {}) {

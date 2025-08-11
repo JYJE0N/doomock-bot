@@ -39,7 +39,7 @@ require("dotenv").config();
 
 const logger = require("./src/utils/core/Logger");
 const BotController = require("./src/controllers/BotController");
-const { showDoomockBanner } = require("./src/utils/FancyBanner");
+const Utils = require("./src/utils");
 
 console.log(`🤖 봇 토큰: ${process.env.BOT_TOKEN ? "✅ 설정됨" : "❌ 없음"}`);
 console.log(`🗄️ DB: ${process.env.MONGO_URL ? "✅ 설정됨" : "❌ 없음"}`);
@@ -143,7 +143,7 @@ class DooMockBot {
    */
   async start() {
     // 화려한 배너 표시 ㅋㅋ
-    await showDoomockBanner();
+    await Utils.showDoomockBanner();
 
     if (this.isInitialized) {
       logger.warn("⚠️ 이미 초기화된 애플리케이션");

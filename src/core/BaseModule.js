@@ -1,9 +1,9 @@
 // src/core/BaseModule.js
 const logger = require("../utils/core/Logger");
-const MessageHelper = require("../utils/MessageHelper");
+const Utils = require("../utils");
 
 /**
- * 🏗️ BaseModule - 모든 모듈의 부모 클래스 (MessageHelper 통합)
+ * 🏗️ BaseModule - 모든 모듈의 부모 클래스 (Utils 통합)
  */
 class BaseModule {
   constructor(moduleName, options = {}) {
@@ -139,28 +139,28 @@ class BaseModule {
   }
 
   // ============================================
-  // 🚀 MessageHelper 통합 메서드들 (새로 추가)
+  // 🚀 Utils 통합 메서드들 (새로 추가)
   // ============================================
 
   /**
    * 메시지 전송 (자동 Markdown 파싱)
    */
   async sendMessage(chatId, text, options = {}) {
-    return await MessageHelper.sendMessage(this.bot, chatId, text, options);
+    return await Utils.sendMessage(this.bot, chatId, text, options);
   }
 
   /**
    * ctx로 메시지 전송
    */
   async send(ctx, text, options = {}) {
-    return await MessageHelper.send(ctx, text, options);
+    return await Utils.send(ctx, text, options);
   }
 
   /**
    * 콜백쿼리에서 메시지 편집
    */
   async editMessage(callbackQuery, text, options = {}) {
-    const ctx = MessageHelper.createCtx(this.bot, callbackQuery);
+    const ctx = Utils.createCtx(this.bot, callbackQuery);
     return await ctx.editMessageText(text, {
       parse_mode: "Markdown",
       ...options
@@ -171,34 +171,34 @@ class BaseModule {
    * 메시지 응답 (일반 메시지용)
    */
   async reply(msg, text, options = {}) {
-    const ctx = MessageHelper.createCtx(this.bot, msg);
-    return await MessageHelper.send(ctx, text, options);
+    const ctx = Utils.createCtx(this.bot, msg);
+    return await Utils.send(ctx, text, options);
   }
 
   /**
    * ctx 생성 헬퍼
    */
   createCtx(msgOrCallback) {
-    return MessageHelper.createCtx(this.bot, msgOrCallback);
+    return Utils.createCtx(this.bot, msgOrCallback);
   }
 
   /**
    * 텍스트 스타일링 헬퍼들
    */
   bold(text) {
-    return MessageHelper.bold(text);
+    return Utils.bold(text);
   }
 
   italic(text) {
-    return MessageHelper.italic(text);
+    return Utils.italic(text);
   }
 
   code(text) {
-    return MessageHelper.code(text);
+    return Utils.code(text);
   }
 
   escape(text) {
-    return MessageHelper.escape(text);
+    return Utils.escape(text);
   }
 
   /**
