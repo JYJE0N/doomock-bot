@@ -149,7 +149,7 @@ class ModuleManager {
       this.stats.eventsProcessed++;
       this.stats.lastActivity = new Date();
 
-      const { data, userId, messageId } = event.payload;
+      const { data, userId, messageId, chatId } = event.payload;
       
       // 콜백 데이터 파싱: module:action:params
       const [moduleKey, subAction, ...params] = data.split(':');
@@ -158,7 +158,8 @@ class ModuleManager {
         moduleKey,
         subAction, 
         params,
-        userId
+        userId,
+        chatId
       });
 
       // 모듈 찾기 및 처리
@@ -203,7 +204,7 @@ class ModuleManager {
       this.stats.eventsProcessed++;
       this.stats.lastActivity = new Date();
 
-      const { command, userId, chatId } = event.payload;
+      const { command, userId, chatId: _chatId } = event.payload; // eslint-disable-line no-unused-vars
       
       logger.debug(`💬 EventBus 명령어 처리: /${command}`, { userId });
 

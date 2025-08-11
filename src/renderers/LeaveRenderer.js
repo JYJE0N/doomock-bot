@@ -91,7 +91,7 @@ class LeaveRenderer extends BaseRenderer {
   async renderMainMenu(data, ctx) {
     try {
       const {
-        totalLeave = 15,
+        totalLeave: _totalLeave = 15, // eslint-disable-line no-unused-vars
         usedLeave = 0,
         remainingLeave = 15,
         currentYear = new Date().getFullYear(),
@@ -583,35 +583,6 @@ ${data.message}
     }
   }
 
-  /**
-   * ❌ 에러 렌더링
-   */
-  async renderError(data, ctx) {
-    try {
-      const { message = "알 수 없는 오류가 발생했습니다." } = data;
-
-      const text = `❌ *오류 발생*
-
-${message}
-
-다시 시도해주세요.`;
-
-      const keyboard = {
-        inline_keyboard: [
-          [
-            { text: "🔄 다시 시도", callback_data: "leave:menu" },
-            { text: "🔙 메인으로", callback_data: "system:menu" }
-          ]
-        ]
-      };
-
-      await this.sendSafeMessage(ctx, text, { reply_markup: keyboard });
-      return { success: true, type: "error_rendered" };
-    } catch (error) {
-      logger.error("LeaveRenderer.renderError 실패:", error);
-      return { success: false, error: error.message };
-    }
-  }
 
   // ===== 🔧 헬퍼 메서드들 =====
 

@@ -215,10 +215,64 @@ class WeatherModuleV2 {
   }
 
   /**
+   * 🌤️ 현재 날씨 요청 (레거시 콜백용)
+   */
+  async publishCurrentRequest(userId, chatId, params) {
+    const city = params?.[0] || '서울';
+    this.eventBus.publish(EVENTS.WEATHER.CURRENT_WEATHER_REQUEST, {
+      userId,
+      chatId,
+      city
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📅 날씨 예보 요청 (레거시 콜백용)
+   */
+  async publishForecastRequest(userId, chatId, params) {
+    const city = params?.[0] || '서울';
+    this.eventBus.publish(EVENTS.WEATHER.FORECAST_REQUEST, {
+      userId,
+      chatId,
+      city
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🏙️ 도시별 날씨 요청 (레거시 콜백용)
+   */
+  async publishCityRequest(userId, chatId, params) {
+    const city = params?.[0] || '서울';
+    this.eventBus.publish(EVENTS.WEATHER.CITY_WEATHER_REQUEST, {
+      userId,
+      chatId,
+      city
+    });
+    return { success: true };
+  }
+
+  /**
+   * ❓ 도움말 요청 (레거시 콜백용)
+   */
+  async publishHelpRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.WEATHER.HELP_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
    * 🏠 메뉴 표시 (V2 렌더러 방식)
    */
   async showMenu(userId, chatId) {
     try {
+      const userName = "사용자"; // 기본 사용자명
+      const defaultCity = '서울'; // 기본 도시
+      const majorCities = ['서울', '부산', '대구', '인천', '광주', '대전', '울산'];
+
       // 렌더러에게 전달할 데이터 구성
       return {
         type: 'menu',
@@ -226,8 +280,14 @@ class WeatherModuleV2 {
         success: true,
         data: {
           title: '🌤️ *날씨 정보*',
-          defaultCity: '서울', // 기본 도시
-          supportedCities: ['서울', '부산', '대구', '인천', '광주', '대전', '울산'],
+          userName: userName,
+          defaultCity: defaultCity,
+          majorCities: majorCities,
+          supportedCities: majorCities, // 호환성을 위해 유지
+          config: {
+            enableDustInfo: this.config.enableDustInfo || false,
+            enableForecast: this.config.enableForecast || true
+          },
           userId: userId
         }
       };

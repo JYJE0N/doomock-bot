@@ -264,18 +264,54 @@ class LeaveModuleV2 {
   /**
    * 🏠 메뉴 표시 (V2 렌더러 방식)
    */
+  /**
+   * 💰 잔여 연차 조회 (레거시 콜백용)
+   */
+  async publishBalanceRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.LEAVE.BALANCE_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📜 휴가 히스토리 조회 (레거시 콜백용)
+   */
+  async publishHistoryRequest(userId, chatId) {
+    this.eventBus.publish(EVENTS.LEAVE.HISTORY_REQUEST, {
+      userId,
+      chatId,
+      limit: 10
+    });
+    return { success: true };
+  }
+
   async showMenu(userId, chatId) {
     try {
-      // 렌더러에게 전달할 데이터 구성
+      const currentYear = new Date().getFullYear();
+      const totalLeave = 15; // 기본 연차
+      const usedLeave = 0;   // 사용한 연차 (실제로는 DB에서 조회)
+      const remainingLeave = totalLeave - usedLeave;
+      const workYears = 1;   // 근무 년수 (실제로는 입사일 기준 계산)
+
+      // 렌더러에게 전달할 데이터 구성  
       return {
         type: 'menu',
         module: 'leave',
         success: true,
         data: {
           title: '🏖️ *휴가 관리*',
-          totalDays: 15, // 기본 연차 일수
-          usedDays: 0,
-          remainingDays: 15,
+          totalLeave: totalLeave,
+          usedLeave: usedLeave,
+          remainingLeave: remainingLeave,
+          currentYear: currentYear,
+          joinDate: null, // 입사일 정보 (실제로는 DB에서 조회)
+          workYears: workYears,
+          // 호환성을 위해 기존 필드들도 유지
+          totalDays: totalLeave,
+          usedDays: usedLeave,
+          remainingDays: remainingLeave,
           userId: userId
         }
       };

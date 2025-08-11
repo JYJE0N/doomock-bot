@@ -13,7 +13,7 @@
 
 const { EVENTS } = require('../events/EventRegistry');
 const logger = require('../utils/core/Logger');
-const Utils = require('../utils');
+// const Utils = require('../utils'); // unused
 
 class FortuneModuleV2 {
   constructor(moduleName = "fortune", options = {}) {
@@ -1109,8 +1109,84 @@ class FortuneModuleV2 {
   /**
    * 🏠 메뉴 표시 (V2 렌더러 방식)
    */
+  /**
+   * 🎴 싱글카드 뽑기 (레거시 콜백용)
+   */
+  async handleSingleCard(userId, chatId) {
+    this.eventBus.publish(EVENTS.FORTUNE.SINGLE_CARD_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🃏 트리플카드 뽑기 (레거시 콜백용)  
+   */
+  async handleTripleCard(userId, chatId) {
+    this.eventBus.publish(EVENTS.FORTUNE.TRIPLE_CARD_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * ✨ 캘틱크로스 뽑기 (레거시 콜백용)
+   */
+  async handleCelticCross(userId, chatId) {
+    this.eventBus.publish(EVENTS.FORTUNE.CELTIC_CROSS_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 📊 통계 보기 (레거시 콜백용)
+   */
+  async showStats(userId, chatId) {
+    this.eventBus.publish(EVENTS.FORTUNE.STATS_REQUEST, {
+      userId,
+      chatId
+    });
+    return {
+      type: 'stats',
+      module: 'fortune',
+      success: true,
+      data: {
+        title: '🔮 *타로카드 통계*',
+        userId: userId
+      }
+    };
+  }
+
+  /**
+   * 📜 히스토리 보기 (레거시 콜백용)
+   */
+  async showHistory(userId, chatId) {
+    this.eventBus.publish(EVENTS.FORTUNE.HISTORY_REQUEST, {
+      userId,
+      chatId
+    });
+    return {
+      type: 'history',
+      module: 'fortune',
+      success: true,
+      data: {
+        title: '🔮 *타로카드 이력*',
+        userId: userId
+      }
+    };
+  }
+
   async showMenu(userId, chatId) {
     try {
+      // 오늘 뽑기 정보 조회
+      const todayInfo = await this.getTodayDrawInfo(userId);
+      const isDeveloper = await this.checkDeveloperStatus(userId);
+      const userName = "사용자"; // 기본 사용자명 (실제로는 사용자 정보에서 가져와야 함)
+
       // 렌더러에게 전달할 데이터 구성
       return {
         type: 'menu',
@@ -1118,8 +1194,13 @@ class FortuneModuleV2 {
         success: true,
         data: {
           title: '🔮 *타로카드 운세*',
-          fortuneTypes: this.config.fortuneTypes,
+          userName: userName,
+          todayCount: todayInfo.todayCount,
           maxDrawsPerDay: this.config.maxDrawsPerDay,
+          canDraw: isDeveloper || todayInfo.remainingDraws > 0,
+          fortuneTypes: this.config.fortuneTypes,
+          isDeveloper: isDeveloper,
+          remainingDraws: todayInfo.remainingDraws,
           hasService: !!this.fortuneService,
           userId: userId
         }

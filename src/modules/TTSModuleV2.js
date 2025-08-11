@@ -13,7 +13,7 @@
 
 const { EVENTS } = require('../events/EventRegistry');
 const logger = require('../utils/core/Logger');
-const Utils = require('../utils');
+// const Utils = require('../utils'); // unused
 
 class TTSModuleV2 {
   constructor(moduleName = "tts", options = {}) {
@@ -880,8 +880,70 @@ class TTSModuleV2 {
   /**
    * 🏠 메뉴 표시 (V2 렌더러 방식)
    */
+  /**
+   * 🎵 TTS 변환 요청 (레거시 콜백용)
+   */
+  async handleTTSConvert(userId, chatId, params) {
+    const text = params?.[0] || '';
+    this.eventBus.publish(EVENTS.TTS.CONVERT_REQUEST, {
+      userId,
+      chatId,
+      text
+    });
+    return { success: true };
+  }
+
+  /**
+   * ⚙️ TTS 설정 보기 (레거시 콜백용)
+   */
+  async showSettings(userId, chatId) {
+    this.eventBus.publish(EVENTS.TTS.SETTINGS_REQUEST, {
+      userId,
+      chatId
+    });
+    return {
+      type: 'settings',
+      module: 'tts',
+      success: true,
+      data: {
+        title: '🔊 *TTS 설정*',
+        supportedLanguages: this.config.supportedLanguages,
+        userId: userId
+      }
+    };
+  }
+
+  /**
+   * 🗣️ 음성 선택 (레거시 콜백용)
+   */
+  async handleVoiceSelect(userId, chatId, params) {
+    const voice = params?.[0] || this.config.defaultVoice;
+    this.eventBus.publish(EVENTS.TTS.VOICE_CHANGE_REQUEST, {
+      userId,
+      chatId,
+      voice
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🌍 언어 선택 (레거시 콜백용)
+   */
+  async handleLanguageSelect(userId, chatId, params) {
+    const language = params?.[0] || this.config.defaultLanguage;
+    this.eventBus.publish(EVENTS.TTS.LANGUAGE_CHANGE_REQUEST, {
+      userId,
+      chatId,
+      language
+    });
+    return { success: true };
+  }
+
   async showMenu(userId, chatId) {
     try {
+      const userName = "사용자"; // 기본 사용자명
+      const currentVoice = { name: "기본 음성" }; // 기본 음성 정보
+
       // 렌더러에게 전달할 데이터 구성
       return {
         type: 'menu',
@@ -889,9 +951,12 @@ class TTSModuleV2 {
         success: true,
         data: {
           title: '🔊 *음성 변환 서비스*',
-          supportedLanguages: this.config.supportedLanguages,
-          defaultLanguage: this.config.defaultLanguage,
-          maxTextLength: this.config.maxTextLength,
+          userName: userName,
+          currentVoice: currentVoice,
+          languages: this.config.supportedLanguages || [],
+          supportedLanguages: this.config.supportedLanguages || [],
+          defaultLanguage: this.config.defaultLanguage || 'ko-KR',
+          maxTextLength: this.config.maxTextLength || 200,
           hasService: !!this.ttsService,
           userId: userId
         }

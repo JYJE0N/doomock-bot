@@ -73,16 +73,15 @@ class FortuneRenderer extends BaseRenderer {
       const typeEntries = Object.entries(fortuneTypes);
       for (let i = 0; i < typeEntries.length; i += 2) {
         const row = [];
+        // 첫 번째 버튼: fortuneType 키를 액션으로 사용 (single, triple, celtic)
         row.push({
           text: `${typeEntries[i][1].emoji} ${typeEntries[i][1].label}`,
-          action: "draw",
-          params: typeEntries[i][0]
+          action: typeEntries[i][0] // single, triple, celtic
         });
         if (i + 1 < typeEntries.length) {
           row.push({
             text: `${typeEntries[i + 1][1].emoji} ${typeEntries[i + 1][1].label}`,
-            action: "draw",
-            params: typeEntries[i + 1][0]
+            action: typeEntries[i + 1][0] // single, triple, celtic
           });
         }
         buttons.push(row);

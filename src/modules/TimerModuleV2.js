@@ -574,6 +574,98 @@ class TimerModuleV2 {
   }
 
   /**
+   * 🟢 타이머 시작 (레거시 콜백용)
+   */
+  async handleTimerStart(userId, chatId, params) {
+    this.eventBus.publish(EVENTS.TIMER.START_REQUEST, {
+      userId,
+      chatId,
+      timerType: params?.[0] || 'focus',
+      duration: params?.[1] ? parseInt(params[1]) : 25
+    });
+    return { success: true };
+  }
+
+  /**
+   * ⏸️ 타이머 일시정지 (레거시 콜백용)
+   */
+  async handleTimerPause(userId, chatId) {
+    this.eventBus.publish(EVENTS.TIMER.PAUSE_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * ▶️ 타이머 재개 (레거시 콜백용)
+   */
+  async handleTimerResume(userId, chatId) {
+    this.eventBus.publish(EVENTS.TIMER.RESUME_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🛑 타이머 정지 (레거시 콜백용)
+   */
+  async handleTimerStop(userId, chatId) {
+    this.eventBus.publish(EVENTS.TIMER.STOP_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🔄 타이머 리셋 (레거시 콜백용)
+   */
+  async handleTimerReset(userId, chatId) {
+    this.eventBus.publish(EVENTS.TIMER.RESET_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🔄 타이머 새로고침 (레거시 콜백용)
+   */
+  async handleTimerRefresh(userId, chatId) {
+    this.eventBus.publish(EVENTS.TIMER.REFRESH_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
+   * 🍅 뽀모도로 시작 (레거시 콜백용)
+   */
+  async handlePomodoroStart(userId, chatId, params) {
+    const presetKey = params?.[0] || 'pomodoro1';
+    this.eventBus.publish(EVENTS.TIMER.POMODORO_START_REQUEST, {
+      userId,
+      chatId,
+      presetKey
+    });
+    return { success: true };
+  }
+
+  /**
+   * ⚙️ 커스텀 설정 (레거시 콜백용)
+   */
+  async handleCustomSetup(userId, chatId) {
+    this.eventBus.publish(EVENTS.TIMER.CUSTOM_SETUP_REQUEST, {
+      userId,
+      chatId
+    });
+    return { success: true };
+  }
+
+  /**
    * 🍅 뽀모도로 시작 요청 처리
    */
   async handlePomodoroStartRequest(event) {
@@ -1106,6 +1198,7 @@ class TimerModuleV2 {
     try {
       // 활성 타이머가 있는지 확인
       const activeTimer = this.activeTimers.get(userId);
+      const userName = "사용자"; // 기본 사용자명
       
       // 렌더러에게 전달할 데이터 구성
       return {
@@ -1114,9 +1207,11 @@ class TimerModuleV2 {
         success: true,
         data: {
           title: '⏰ *타이머 관리*',
-          activeTimer: activeTimer ? this.getTimerStatus(activeTimer) : null,
+          userName: userName,
+          activeTimer: activeTimer ? this.getTimerDisplayData(activeTimer) : null,
           hasActiveTimer: !!activeTimer,
-          presets: Object.keys(this.pomodoroPresets),
+          recentSessions: [], // 최근 세션 정보 (향후 구현)
+          presets: this.pomodoroPresets, // 전체 preset 객체 전달
           userId: userId
         }
       };

@@ -1136,24 +1136,6 @@ class WorktimeModuleV2 {
     await this.eventBus.publish(EVENTS.WORKTIME.CHECK_OUT_REQUEST, { userId, chatId });
   }
 
-  async publishTodayRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WORKTIME.TODAY_REQUEST, { userId, chatId });
-  }
-
-  async publishWeeklyRequest(userId, chatId, weekOffset = 0) {
-    await this.eventBus.publish(EVENTS.WORKTIME.WEEKLY_REQUEST, { userId, chatId, weekOffset });
-  }
-
-  async publishMonthlyRequest(userId, chatId, year = null, month = null) {
-    const payload = { userId, chatId };
-    if (year) payload.year = year;
-    if (month) payload.month = month;
-    await this.eventBus.publish(EVENTS.WORKTIME.MONTHLY_REQUEST, payload);
-  }
-
-  async publishStatsRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WORKTIME.STATS_REQUEST, { userId, chatId });
-  }
 
   async publishHistoryRequest(userId, chatId, limit = 10, offset = 0) {
     await this.eventBus.publish(EVENTS.WORKTIME.HISTORY_REQUEST, { userId, chatId, limit, offset });

@@ -1,7 +1,7 @@
 // src/database/models/Timer.js - 🍅 완전 리팩토링 v2.0
 
 const mongoose = require("mongoose");
-const Utils = require("../../utils");
+// const Utils = require("../../utils"); // unused
 const logger = require("../../utils/core/Logger");
 
 /**
