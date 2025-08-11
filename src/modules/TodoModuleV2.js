@@ -157,45 +157,34 @@ class TodoModuleV2 extends BaseModule {
   }
 
   /**
-   * 🎯 콜백 처리 (레거시 호환)
+   * 🎯 콜백 처리 (레거시 호환) - ModuleManager에서 호출
    */
-  async handleCallback(event) {
-    if (!event?.payload) {
-      logger.error("handleCallback: event.payload가 undefined");
-      return;
-    }
-    const { data, userId, chatId } = event.payload;
-    const [module, action, ...params] = data.split(':');
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = callbackQuery.from.id;
+    const chatId = callbackQuery.message.chat.id;
     
-    if (module !== 'todo') return;
-
-    try {
-      switch (action) {
-        case 'menu':
-          await this.showMenu(userId, chatId);
-          break;
-        case 'list':
-          await this.publishListRequest(userId, chatId, params[0]);
-          break;
-        case 'add':
-          await this.startAddFlow(userId, chatId);
-          break;
-        case 'complete':
-          await this.publishCompleteRequest(userId, chatId, params[0]);
-          break;
-        case 'delete':
-          await this.publishDeleteRequest(userId, chatId, params[0]);
-          break;
-        case 'edit':
-          await this.startEditFlow(userId, chatId, params[0]);
-          break;
-        default:
-          logger.debug(`📝 알 수 없는 액션: ${action}`);
-      }
-    } catch (error) {
-      logger.error(`📝 콜백 처리 오류: ${action}`, error);
-      await this.publishError(error, event);
+    // 레거시 콜백을 처리하는 맵
+    const actionMap = {
+      'menu': () => this.showMenu(userId, chatId),
+      'list': () => this.publishListRequest(userId, chatId, params),
+      'add': () => this.startAddFlow(userId, chatId),
+      'complete': () => this.publishCompleteRequest(userId, chatId, params),
+      'delete': () => this.publishDeleteRequest(userId, chatId, params),
+      'edit': () => this.startEditFlow(userId, chatId, params)
+    };
+    
+    const handler = actionMap[subAction];
+    if (handler) {
+      await handler();
+      return {
+        type: subAction,
+        module: 'todo',
+        success: true
+      };
     }
+    
+    logger.debug(`TodoModuleV2: 알 수 없는 액션 - ${subAction}`);
+    return null;
   }
 
   /**

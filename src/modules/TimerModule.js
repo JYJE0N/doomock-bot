@@ -35,9 +35,6 @@ class TimerModule extends BaseModule {
       // 상태 관리자 콜백 설정
       this.stateManager.onTimerComplete = this.handleTimerComplete.bind(this);
 
-      // 액션 등록
-      this.setupActions();
-
       logger.success("🍅 TimerModule 초기화 완료 (리팩토링 v6.0)");
     } catch (error) {
       logger.error("❌ TimerModule 초기화 실패:", error);

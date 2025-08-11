@@ -24,7 +24,7 @@ const UNIFIED_MODULES = [
     displayName: "시스템 관리",
     description: "시스템 핵심 기능",
     icon: "🖥️",
-    path: path.join(__dirname, "../modules/SystemModuleV2.js"),
+    path: path.join(__dirname, "../modules/SystemModule.js"),
     enabled: true,
     showInMenu: false, // ✅ 중요: 메인 메뉴에 표시 안함
     priority: 0,
@@ -78,7 +78,7 @@ const UNIFIED_MODULES = [
     displayName: "근무시간 관리",
     description: "출퇴근 및 근무시간 추적",
     icon: "🏢",
-    path: path.join(__dirname, "../modules/WorktimeModuleV2.js"),
+    path: path.join(__dirname, "../modules/WorktimeModule.js"),
     enabled: true,
     showInMenu: true,
     priority: 3,

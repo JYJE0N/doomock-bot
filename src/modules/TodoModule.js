@@ -77,9 +77,6 @@ class TodoModule extends BaseModule {
         throw new Error("TodoService 생성에 실패했습니다");
       }
 
-      // 액션 등록
-      this.setupActions();
-
       logger.success("📋 TodoModule 초기화 완료");
     } catch (error) {
       logger.error("❌ TodoModule 초기화 실패:", error);
