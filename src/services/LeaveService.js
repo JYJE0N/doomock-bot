@@ -44,9 +44,23 @@ class LeaveService extends BaseService {
     try {
       const currentYear = year || new Date().getFullYear();
 
+      // 디버그 로그 추가
+      logger.debug(`LeaveService.getLeaveStatus 호출됨:`, {
+        userId,
+        year,
+        modelsKeys: Object.keys(this.models),
+        hasLeaveModel: !!this.models.Leave,
+        hasUserLeaveSettingModel: !!this.models.UserLeaveSetting,
+        isInitialized: this.isInitialized
+      });
+
       // 사용자 설정 조회/생성
       const Leave = this.models.Leave;
       const UserLeaveSetting = this.models.UserLeaveSetting;
+
+      if (!Leave || !UserLeaveSetting) {
+        throw new Error(`모델이 초기화되지 않음: Leave=${!!Leave}, UserLeaveSetting=${!!UserLeaveSetting}`);
+      }
 
       const userSetting = await UserLeaveSetting.getOrCreate(
         userId,

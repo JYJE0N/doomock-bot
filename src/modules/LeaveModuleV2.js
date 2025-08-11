@@ -213,6 +213,26 @@ class LeaveModuleV2 {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
     
+    // 디버그 로그 추가
+    logger.debug(`LeaveModuleV2.handleCallback 호출됨:`, {
+      subAction,
+      params,
+      hasLeaveService: !!this.leaveService,
+      isInitialized: this.isInitialized,
+      hasServiceBuilder: !!this.serviceBuilder
+    });
+    
+    // LeaveService 확인
+    if (!this.leaveService) {
+      logger.error('LeaveService가 초기화되지 않음. 재시도...');
+      if (this.serviceBuilder) {
+        this.leaveService = await this.serviceBuilder.getOrCreate("leave");
+      }
+      if (!this.leaveService) {
+        throw new Error('LeaveService를 초기화할 수 없습니다');
+      }
+    }
+    
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
       'menu': () => this.showMenu(userId, chatId),
