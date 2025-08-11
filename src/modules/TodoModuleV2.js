@@ -160,6 +160,10 @@ class TodoModuleV2 extends BaseModule {
    * 🎯 콜백 처리 (레거시 호환)
    */
   async handleCallback(event) {
+    if (!event?.payload) {
+      logger.error("handleCallback: event.payload가 undefined");
+      return;
+    }
     const { data, userId, chatId } = event.payload;
     const [module, action, ...params] = data.split(':');
     
