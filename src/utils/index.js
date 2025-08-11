@@ -83,7 +83,7 @@ class Utils {
    */
   static escape(text) {
     if (!text || typeof text !== 'string') return '';
-    return text.replace(/[_*\[\]()~`>#+=|{}.!-]/g, '\\$&');
+    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
   }
 
   /**

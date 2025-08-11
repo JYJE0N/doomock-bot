@@ -13,7 +13,6 @@ const NavigationHandler = require("../handlers/NavigationHandler");
 
 // 🎯 관심사 분리 - 전문 컴포넌트 import
 const ErrorHandler = require("../handlers/ErrorHandler");
-const MarkdownHelper = require("../utils/MarkdownHelper");
 const CommandHandler = require("../handlers/CommandHandler");
 
 /**
@@ -34,7 +33,6 @@ class BotController {
     this.isInitialized = false;
     this.cleanupInProgress = false;
     this.errorHandler = null;
-    this.markdownHelper = null;
     this.commandHandler = null;
 
     // Express 서버 추가
@@ -324,7 +322,7 @@ class BotController {
     try {
       // 1. 기본 핸들러 생성
       this.errorHandler = new ErrorHandler(this.bot);
-      this.markdownHelper = new MarkdownHelper(this.bot);
+      // MarkdownHelper는 Utils로 대체됨
       logger.info("🚨 ErrorHandler 초기화 완료");
       logger.info("🎯 스마트 MarkdownV2 시스템 초기화 완료");
 
@@ -365,8 +363,7 @@ class BotController {
       this.navigationHandler = new NavigationHandler(
         this.bot,
         this.moduleManager,
-        this.errorHandler,
-        this.markdownHelper
+        this.errorHandler
       );
 
       // 6. 🔗 두 핸들러 연결

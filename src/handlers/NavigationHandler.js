@@ -4,6 +4,7 @@ const logger = require("../utils/core/Logger");
 const { getUserName } = require("../utils/core/UserHelper");
 const { getEnabledModules } = require("../config/ModuleRegistry");
 const { buildNavigationKeyboard } = require("../config/ModuleRegistry");
+const Utils = require("../utils");
 
 /**
  * 🎹 NavigationHandler - SoC 원칙 적용 버전
@@ -19,14 +20,13 @@ const { buildNavigationKeyboard } = require("../config/ModuleRegistry");
  * - 약사(MarkdownHelper): 처방전 안전 관리
  */
 class NavigationHandler {
-  constructor(bot, moduleManager, errorHandler, markdownHelper) {
+  constructor(bot, moduleManager, errorHandler) {
     this.bot = bot; // 👈 null로 덮어쓰는 대신, 전달받은 bot 객체를 바로 할당합니다.
     this.moduleManager = moduleManager;
     this.renderers = new Map();
 
     // 직접 생성하는 대신, 주입받은 객체 사용
     this.errorHandler = errorHandler;
-    this.markdownHelper = markdownHelper;
 
     // 📊 통계
     this.stats = {
@@ -54,7 +54,7 @@ class NavigationHandler {
 
     // 전문 컴포넌트들 초기화
     await this.errorHandler.initialize(this.bot);
-    await this.markdownHelper.initialize();
+    // Utils는 정적 메서드를 사용하므로 초기화 불필요
 
     this.registerRenderers();
     this.stats.lastActivity = new Date();
@@ -76,7 +76,7 @@ class NavigationHandler {
         new (require("../renderers/FortuneRenderer"))(
           this.bot,
           this, // NavigationHandler를 통해 ErrorHandler 접근
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ],
       [
@@ -84,7 +84,7 @@ class NavigationHandler {
         new (require("../renderers/TodoRenderer"))(
           this.bot,
           this,
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ],
       [
@@ -92,7 +92,7 @@ class NavigationHandler {
         new (require("../renderers/SystemRenderer"))(
           this.bot,
           this,
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ],
       [
@@ -100,7 +100,7 @@ class NavigationHandler {
         new (require("../renderers/TTSRenderer"))(
           this.bot,
           this,
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ],
       [
@@ -108,7 +108,7 @@ class NavigationHandler {
         new (require("../renderers/WeatherRenderer"))(
           this.bot,
           this,
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ],
       [
@@ -116,7 +116,7 @@ class NavigationHandler {
         new (require("../renderers/TimerRenderer"))(
           this.bot,
           this,
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ],
       [
@@ -124,7 +124,7 @@ class NavigationHandler {
         new (require("../renderers/LeaveRenderer"))(
           this.bot,
           this,
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ],
       [
@@ -132,7 +132,7 @@ class NavigationHandler {
         new (require("../renderers/WorktimeRenderer"))(
           this.bot,
           this, // ✅ NavigationHandler 전달 (ErrorHandler는 내부에서 접근)
-          this.markdownHelper
+          // markdownHelper 제거됨
         )
       ]
     ];
@@ -182,14 +182,14 @@ class NavigationHandler {
       }
 
       // MarkdownV2 형식에 맞게 사용자 이름 이스케이프
-      const safeUserName = this.markdownHelper.escapeMarkdownV2(userName);
+      const safeUserName = Utils.escape(userName);
       const text = `🏠 *메인 메뉴*\n\n안녕하세요, ${safeUserName}님\\!`;
 
       // 키보드 생성
       const keyboard = buildNavigationKeyboard();
 
       // 메시지 전송
-      const success = await this.markdownHelper.sendSafeMessage(ctx, text, {
+      const success = await this.sendMessage(ctx, text, {
         reply_markup: keyboard
       });
 
@@ -528,6 +528,29 @@ class NavigationHandler {
   }
 
   /**
+   * 📤 안전한 메시지 전송 (MarkdownHelper 대체)
+   */
+  async sendMessage(ctx, text, options = {}) {
+    try {
+      const defaultOptions = {
+        parse_mode: 'Markdown',
+        ...options
+      };
+      
+      return await ctx.editMessageText(text, defaultOptions);
+    } catch (error) {
+      logger.error('메시지 전송 실패:', error);
+      // 대체 텍스트로 재시도
+      try {
+        return await ctx.editMessageText('메시지를 표시할 수 없습니다.', { parse_mode: 'Markdown' });
+      } catch (retryError) {
+        logger.error('메시지 전송 재시도도 실패:', retryError);
+        return false;
+      }
+    }
+  }
+
+  /**
    * 📊 상태 정보
    */
   getStatus() {
@@ -554,7 +577,7 @@ class NavigationHandler {
       rendererCount: this.renderers.size,
       registeredRenderers: Array.from(this.renderers.keys()),
       errorHandler: this.errorHandler?.getStatus() || null,
-      markdownHelper: this.markdownHelper?.getStatus() || null
+      utils: "Utils 정적 클래스 사용"
     };
   }
 
@@ -570,7 +593,7 @@ class NavigationHandler {
       }
 
       const userName = getUserName(from);
-      const safeUserName = this.markdownHelper.escapeMarkdownV2(userName);
+      const safeUserName = Utils.escape(userName);
 
       let text = `❓ *도움말*\n━━━━━━━━━━━━━━━━━━\n\n`;
       text += `안녕하세요, ${safeUserName}님\\!\n\n`;
@@ -594,7 +617,7 @@ class NavigationHandler {
         );
 
         visibleModules.forEach((module) => {
-          text += `• ${module.icon} *${module.displayName}* \\- ${this.markdownHelper.escapeMarkdownV2(module.description)}\n`;
+          text += `• ${module.icon} *${module.displayName}* \\- ${Utils.escape(module.description)}\n`;
         });
       } catch (moduleError) {
         text += `• 📝 할일 관리\n`;
@@ -618,7 +641,7 @@ class NavigationHandler {
       };
 
       // 메시지 전송
-      const success = await this.markdownHelper.sendSafeMessage(ctx, text, {
+      const success = await this.sendMessage(ctx, text, {
         reply_markup: keyboard,
         parse_mode: "MarkdownV2"
       });
@@ -656,9 +679,7 @@ class NavigationHandler {
       if (this.errorHandler?.cleanup) {
         await this.errorHandler.cleanup();
       }
-      if (this.markdownHelper?.cleanup) {
-        await this.markdownHelper.cleanup();
-      }
+      // Utils는 정적 클래스로 cleanup 불필요
 
       // 렌더러 정리
       for (const [name, renderer] of this.renderers.entries()) {
@@ -676,7 +697,7 @@ class NavigationHandler {
       this.bot = null;
       this.moduleManager = null;
       this.errorHandler = null;
-      this.markdownHelper = null;
+      // markdownHelper 제거됨
 
       logger.info("✅ NavigationHandler 정리 완료");
     } catch (error) {
