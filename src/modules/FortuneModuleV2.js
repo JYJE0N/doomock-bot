@@ -18,7 +18,11 @@ const Utils = require('../utils');
 class FortuneModuleV2 {
   constructor(moduleName = "fortune", options = {}) {
     this.moduleName = moduleName;
-    this.eventBus = options.eventBus || require('../core/EventBus').getInstance();
+    // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
+    if (!options.eventBus) {
+      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+    }
+    this.eventBus = options.eventBus;
     this.serviceBuilder = options.serviceBuilder || null;
     
     // Fortune 서비스 (있으면 실제 기능, 없으면 테스트 모드)

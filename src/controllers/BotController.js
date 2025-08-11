@@ -10,6 +10,7 @@ const {
 const { createServiceBuilder } = require("../core/ServiceBuilder");
 const ModuleManager = require("../core/ModuleManager");
 const NavigationHandler = require("../handlers/NavigationHandler");
+const EventBus = require("../core/EventBus");
 
 // 🎯 관심사 분리 - 전문 컴포넌트 import
 const ErrorHandler = require("../handlers/ErrorHandler");
@@ -30,6 +31,7 @@ class BotController {
     this.navigationHandler = null;
     this.mongooseManager = null;
     this.serviceBuilder = null;
+    this.eventBus = null;
     this.isInitialized = false;
     this.cleanupInProgress = false;
     this.errorHandler = null;
@@ -60,20 +62,24 @@ class BotController {
       // 1. 환경변수 검증
       this.validateEnvironment();
 
-      // ✨ 2. 텔레그램 봇 먼저 생성 (순서 변경)
+      // ✨ 2. EventBus 초기화 (다른 컴포넌트보다 먼저)
+      this.eventBus = EventBus.getInstance();
+      logger.info("✅ EventBus 인스턴스 생성됨");
+
+      // ✨ 3. 텔레그램 봇 생성
       this.bot = new Telegraf(process.env.BOT_TOKEN);
       logger.info("✅ 텔레그램 봇 인스턴스 생성됨");
 
-      // ✨ 3. Express 서버 초기화 (이제 this.bot 접근 가능)
+      // ✨ 4. Express 서버 초기화 (이제 this.bot 접근 가능)
       await this.initializeExpressServer();
 
-      // 4. Mongoose 초기화 (단일 데이터베이스 연결)
+      // 5. Mongoose 초기화 (단일 데이터베이스 연결)
       await this.initializeDatabase();
 
-      // 5. 핸들러와 매니저 초기화
+      // 6. 핸들러와 매니저 초기화
       await this.initializeHandlers();
 
-      // 6. 미들웨어 설정
+      // 7. 미들웨어 설정
       this.setupMiddlewares();
 
       // ReminderScheduler 초기화 (서비스 빌더 이후에 추가)
@@ -353,10 +359,11 @@ class BotController {
         }
       }
 
-      // 4. 🚀🚀🚀 핵심 수정: ModuleManager 생성자에 serviceBuilder 전달
+      // 4. 🚀🚀🚀 핵심 수정: ModuleManager 생성자에 serviceBuilder 및 EventBus 전달
       this.moduleManager = new ModuleManager({
         bot: this.bot,
-        serviceBuilder: this.serviceBuilder
+        serviceBuilder: this.serviceBuilder,
+        eventBus: this.eventBus
       });
 
       // 5. NavigationHandler 생성
@@ -642,10 +649,10 @@ class BotController {
         logger.info("🛑 ReminderScheduler 중지됨");
       }
 
-      // ModuleManager 정리
+      // ModuleManager 정리 (EventBus 정리 포함)
       if (this.moduleManager) {
         try {
-          await this.moduleManager.cleanup();
+          await this.moduleManager.shutdown();
           logger.debug("✅ ModuleManager 정리 완료");
         } catch (error) {
           logger.warn("⚠️ ModuleManager 정리 실패:", error.message);
@@ -690,6 +697,7 @@ class BotController {
       this.navigationHandler = null;
       this.mongooseManager = null;
       this.serviceBuilder = null;
+      this.eventBus = null;
       this.app = null;
       this.server = null;
 

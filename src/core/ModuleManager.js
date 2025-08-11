@@ -3,6 +3,7 @@ const logger = require("../utils/core/Logger");
 const { getAllEnabledModules } = require("../config/ModuleRegistry");
 const EventBus = require('./EventBus');
 const { EVENTS } = require('../events/index');
+const ModuleLoader = require('./ModuleLoader');
 
 class ModuleManager {
   constructor(options = {}) {
@@ -360,7 +361,6 @@ class ModuleManager {
    * 🎯 모듈 로드 (지연 로딩 지원)
    */
   async loadModules(bot) {
-    const ModuleLoader = require('./ModuleLoader');
     this.moduleLoader = ModuleLoader.getInstance();
     
     const enabledModules = getAllEnabledModules();

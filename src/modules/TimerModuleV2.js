@@ -15,7 +15,11 @@ const StateCleanupHelper = require('../utils/core/StateCleanupHelper');
 class TimerModuleV2 {
   constructor(moduleName = 'timer', options = {}) {
     this.moduleName = moduleName;
-    this.eventBus = options.eventBus || require('../core/EventBus').getInstance();
+    // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
+    if (!options.eventBus) {
+      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+    }
+    this.eventBus = options.eventBus;
     this.timerService = null; // 선택적 서비스
     
     // 메모리 기반 타이머 상태 관리

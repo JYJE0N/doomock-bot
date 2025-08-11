@@ -13,7 +13,11 @@ class LeaveModuleV2 {
     this.serviceBuilder = options.serviceBuilder || null;
     
     // EventBus는 ModuleManager에서 주입받거나 글로벌 인스턴스 사용
-    this.eventBus = options.eventBus || require('../core/EventBus').getInstance();
+    // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
+    if (!options.eventBus) {
+      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+    }
+    this.eventBus = options.eventBus;
     
     // 서비스 인스턴스
     this.leaveService = null;

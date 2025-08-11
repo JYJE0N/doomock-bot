@@ -20,8 +20,11 @@ class SystemModuleV2 {
   constructor(moduleName = "system", options = {}) {
     this.moduleName = moduleName;
     
-    // EventBus는 ModuleManager에서 주입받거나 글로벌 인스턴스 사용
-    this.eventBus = options.eventBus || require('../core/EventBus').getInstance();
+    // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
+    if (!options.eventBus) {
+      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+    }
+    this.eventBus = options.eventBus;
     
     // V2 모듈 필수 속성들
     this.isInitialized = false;
@@ -42,6 +45,9 @@ class SystemModuleV2 {
       uniqueUsers: new Set(),
       lastHealthCheck: null
     };
+
+    // 🛑 이벤트 중복 처리 방지 플래그
+    this.isStartupHandled = false;
 
     // 🚇 이벤트 리스너 설정
     this.setupEventListeners();
@@ -397,6 +403,13 @@ class SystemModuleV2 {
    */
   async handleSystemStartup(event) {
     try {
+      // 🛑 중복 처리 방지 - 이미 처리된 이벤트는 무시
+      if (this.isStartupHandled) {
+        logger.debug("🔄 시스템 시작 이벤트 중복 처리 방지 - 무시");
+        return;
+      }
+      
+      this.isStartupHandled = true;
       logger.info("🚀 시스템 시작 이벤트 수신");
 
       // 초기 시스템 스냅샷 수집
@@ -408,7 +421,7 @@ class SystemModuleV2 {
         health: initialSnapshot.health?.overall?.score
       });
 
-      // 시스템 준비 완료 이벤트 발행
+      // ✅ 시스템 준비 완료 이벤트 발행 (한 번만)
       await this.eventBus.publish(EVENTS.SYSTEM.READY, {
         module: "system",
         timestamp: new Date().toISOString(),
