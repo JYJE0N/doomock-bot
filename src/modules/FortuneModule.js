@@ -279,10 +279,11 @@ class FortuneModule extends BaseModule {
   async sendErrorMessage(bot, msg, state, errorMessage) {
     if (state.promptMessageId) {
       try {
+        // ✅ 여기도 올바른 API 호출 방식으로 수정
         await bot.telegram.editMessageText(
           msg.chat.id,
           state.promptMessageId,
-          null,
+          undefined, // inline_message_id
           errorMessage,
           {
             parse_mode: "Markdown",
@@ -401,35 +402,66 @@ class FortuneModule extends BaseModule {
       }
     };
 
-    // 렌더러를 통해 메시지 전송 (수정된 부분)
+    // 렌더러를 통해 메시지 전송 (완전히 수정된 부분)
     const renderer =
       this.moduleManager?.navigationHandler?.renderers?.get("fortune");
     if (renderer) {
-      // ✅ 올바른 ctx 객체 생성 - chat 정보 포함!
+      // ✅ 완전히 수정된 ctx 객체 - Telegraf 표준 방식 사용
       const ctx = {
-        // 🔥 핵심: chat 정보 추가
+        // 기본 정보
         chat: callbackQuery.message.chat,
         message: callbackQuery.message,
         from: callbackQuery.from,
         callbackQuery: callbackQuery,
-        update: callbackQuery,
-        editMessageText: async (text, extra) => {
-          // 🔥 핵심: chat_id 파라미터 순서 수정
-          const sentMessage = await bot.telegram.editMessageText(
-            text, // text가 첫 번째
+
+        // ✅ 핵심 수정: Telegraf 표준 editMessageText 방식 사용
+        editMessageText: async (text, extra = {}) => {
+          try {
+            // Telegraf의 올바른 API 호출 방식
+            return await bot.telegram.editMessageText(
+              callbackQuery.message.chat.id,
+              callbackQuery.message.message_id,
+              undefined, // inline_message_id는 undefined
+              text,
+              {
+                parse_mode: "Markdown",
+                ...extra
+              }
+            );
+          } catch (error) {
+            logger.error("editMessageText 실패:", error);
+            throw error;
+          }
+        },
+
+        // 콜백 쿼리 응답
+        answerCbQuery: async (text = "", showAlert = false) => {
+          try {
+            return await bot.telegram.answerCbQuery(
+              callbackQuery.id,
+              text,
+              showAlert
+            );
+          } catch (error) {
+            logger.error("answerCbQuery 실패:", error);
+            // 에러가 발생해도 진행 계속
+          }
+        },
+
+        // reply 메서드 (혹시 필요할 때)
+        reply: async (text, extra = {}) => {
+          return await bot.telegram.sendMessage(
+            callbackQuery.message.chat.id,
+            text,
             {
-              chat_id: callbackQuery.message.chat.id, // options에 chat_id 포함
-              message_id: callbackQuery.message.message_id,
+              parse_mode: "Markdown",
               ...extra
             }
           );
-          return sentMessage;
-        },
-        answerCbQuery: async () => {
-          return await bot.telegram.answerCbQuery(callbackQuery.id);
         }
       };
 
+      // 렌더러로 전달
       await renderer.render(result, ctx);
 
       // 상태에 메시지 ID 저장 (중복이지만 안전성을 위해)
@@ -437,7 +469,7 @@ class FortuneModule extends BaseModule {
         type: "waiting_question",
         fortuneType: params || "celtic",
         timestamp: Date.now(),
-        promptMessageId: callbackQuery.message.message_id // 🔥 중요
+        promptMessageId: callbackQuery.message.message_id
       });
     }
 
