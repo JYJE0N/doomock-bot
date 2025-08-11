@@ -35,9 +35,9 @@ class ModuleLoader {
   }
 
   /**
-   * 모듈 동적 로딩
+   * 모듈 동적 로딩 - V2 모듈 생성자 옵션 지원
    */
-  async loadModule(modulePath, moduleKey) {
+  async loadModule(modulePath, moduleKey, constructorOptions = {}) {
     try {
       const startTime = Date.now();
       
@@ -58,8 +58,30 @@ class ModuleLoader {
       // 동적 import 사용
       const ModuleClass = require(modulePath);
       
-      // 모듈 인스턴스 생성 (지연 초기화)
-      const moduleInstance = new ModuleClass();
+      // V2 모듈 생성자 옵션 준비
+      const moduleOptions = {
+        ...constructorOptions,
+        // V2 모듈은 첫 번째 인자로 moduleKey를 받음
+        moduleKey: moduleKey
+      };
+      
+      // 모듈 인스턴스 생성
+      let moduleInstance;
+      try {
+        // V2 모듈 방식 (moduleName, options)
+        moduleInstance = new ModuleClass(moduleKey, moduleOptions);
+        logger.debug(`📦 V2 모듈 생성: ${moduleKey}`);
+      } catch (v2Error) {
+        try {
+          // V1 모듈 방식 (options만)
+          moduleInstance = new ModuleClass(moduleOptions);
+          logger.debug(`📦 V1 모듈 생성: ${moduleKey}`);
+        } catch (v1Error) {
+          // 옵션 없는 기본 생성자
+          moduleInstance = new ModuleClass();
+          logger.debug(`📦 기본 모듈 생성: ${moduleKey}`);
+        }
+      }
       
       // 캐시에 저장
       this.loadedModules.set(moduleKey, moduleInstance);
@@ -85,9 +107,9 @@ class ModuleLoader {
   }
 
   /**
-   * 모듈 초기화 (지연 초기화)
+   * 모듈 초기화 (지연 초기화) - 옵션 전달 개선
    */
-  async initializeModule(moduleInstance, moduleKey, serviceBuilder) {
+  async initializeModule(moduleInstance, moduleKey, serviceBuilder, options = {}) {
     try {
       if (moduleInstance.isInitialized) {
         return moduleInstance;
@@ -96,9 +118,34 @@ class ModuleLoader {
       const startTime = Date.now();
       logger.debug(`🎯 모듈 초기화 시작: ${moduleKey}`);
 
-      // ServiceBuilder 연결 (필요한 경우)
-      if (moduleInstance.setServiceBuilder) {
+      // 중요: 모든 V2 모듈에 필요한 옵션들 설정
+      if (moduleInstance.setServiceBuilder && serviceBuilder) {
         moduleInstance.setServiceBuilder(serviceBuilder);
+      }
+
+      // serviceBuilder 직접 할당 (V2 모듈용)
+      if (serviceBuilder && !moduleInstance.serviceBuilder) {
+        moduleInstance.serviceBuilder = serviceBuilder;
+      }
+
+      // bot 인스턴스 설정
+      if (options.bot && !moduleInstance.bot) {
+        moduleInstance.bot = options.bot;
+      }
+
+      // moduleManager 설정
+      if (options.moduleManager && !moduleInstance.moduleManager) {
+        moduleInstance.moduleManager = options.moduleManager;
+      }
+
+      // EventBus 설정 (V2 모듈용)
+      if (options.eventBus && !moduleInstance.eventBus) {
+        moduleInstance.eventBus = options.eventBus;
+      }
+
+      // 설정 객체 병합
+      if (options.config && moduleInstance.config) {
+        moduleInstance.config = { ...moduleInstance.config, ...options.config };
       }
 
       // 초기화 실행
@@ -106,7 +153,10 @@ class ModuleLoader {
         await moduleInstance.initialize();
       }
       
-      moduleInstance.isInitialized = true;
+      // 초기화 상태 확인 및 설정
+      if (!moduleInstance.isInitialized) {
+        moduleInstance.isInitialized = true;
+      }
       
       const initTime = Date.now() - startTime;
       logger.success(`✅ 모듈 초기화 완료: ${moduleKey} (${initTime}ms)`);
@@ -202,7 +252,12 @@ class ModuleLoader {
       
       if (moduleConfig && moduleConfig.enabled) {
         logger.debug(`🔮 예측 로딩 시작: ${moduleKey}`);
-        await this.loadModule(moduleConfig.path, moduleKey);
+        
+        // 예측 로딩은 기본 옵션만 전달 (나중에 온디맨드에서 완전히 초기화)
+        await this.loadModule(moduleConfig.path, moduleKey, {
+          preload: true, // 예측 로딩 표시
+          config: moduleConfig.config || {}
+        });
       }
       
     } catch (error) {

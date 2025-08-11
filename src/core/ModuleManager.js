@@ -377,22 +377,25 @@ class ModuleManager {
       try {
         logger.info(`🚀 [${config.key}] 핵심 모듈 즉시 로딩...`);
         
-        const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key);
+        const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key, {
+          bot: bot,
+          moduleManager: this,
+          serviceBuilder: this.serviceBuilder,
+          eventBus: this.eventBus,
+          config: config.config || {}
+        });
         const initializedModule = await this.moduleLoader.initializeModule(
           moduleInstance, 
           config.key, 
-          this.serviceBuilder
-        );
-        
-        // ModuleManager 옵션 전달
-        if (initializedModule.setOptions) {
-          initializedModule.setOptions({
+          this.serviceBuilder,
+          {
             bot: bot,
             moduleManager: this,
             serviceBuilder: this.serviceBuilder,
+            eventBus: this.eventBus,
             config: config.config || {}
-          });
-        }
+          }
+        );
         
         this.modules.set(config.key, initializedModule);
         logger.success(`✅ [${config.key}] 핵심 모듈 로딩 완료`);
@@ -444,22 +447,25 @@ class ModuleManager {
       
       logger.info(`🔄 [${moduleKey}] 온디맨드 모듈 로딩...`);
       
-      const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key);
+      const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key, {
+        bot: this.bot,
+        moduleManager: this,
+        serviceBuilder: this.serviceBuilder,
+        eventBus: this.eventBus,
+        config: config.config || {}
+      });
       const initializedModule = await this.moduleLoader.initializeModule(
         moduleInstance,
         config.key,
-        this.serviceBuilder
-      );
-      
-      // ModuleManager 옵션 전달
-      if (initializedModule.setOptions) {
-        initializedModule.setOptions({
+        this.serviceBuilder,
+        {
           bot: this.bot,
           moduleManager: this,
           serviceBuilder: this.serviceBuilder,
+          eventBus: this.eventBus,
           config: config.config || {}
-        });
-      }
+        }
+      );
       
       this.modules.set(moduleKey, initializedModule);
       this.stats.modulesLoaded++;
