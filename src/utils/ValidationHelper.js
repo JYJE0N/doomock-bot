@@ -1,5 +1,5 @@
 // src/utils/ValidationHelper.js - v4.0.1 수정된 중앙 검증 시스템
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 
 const TimeHelper = require("./TimeHelper");
 

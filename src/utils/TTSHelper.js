@@ -1,5 +1,5 @@
 // src/utils/TTSHelper.js - Mongoose 버전
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 
 // TTS 관련 기능을 제공하는 클래스
 class TTSService {

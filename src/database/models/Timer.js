@@ -2,7 +2,7 @@
 
 const mongoose = require("mongoose");
 const TimeHelper = require("../../utils/TimeHelper");
-const logger = require("../../utils/Logger");
+const logger = require("../../utils/core/Logger");
 
 /**
  * 🍅 Timer Mongoose 스키마 - 뽀모도로 타이머 세션 (완전 표준 준수)

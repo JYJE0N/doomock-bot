@@ -4,7 +4,7 @@
 // LoggerEnhancer 알록달록 + Railway 환경변수 중앙 관리
 // ========================================
 
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

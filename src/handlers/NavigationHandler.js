@@ -1,7 +1,7 @@
 // src/handlers/NavigationHandler.js - SoC 원칙 적용 버전
 
-const logger = require("../utils/Logger");
-const { getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/core/Logger");
+const { getUserName } = require("../utils/core/UserHelper");
 const { getEnabledModules } = require("../config/ModuleRegistry");
 const { buildNavigationKeyboard } = require("../config/ModuleRegistry");
 

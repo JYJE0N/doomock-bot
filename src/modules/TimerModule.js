@@ -2,9 +2,9 @@
 
 const BaseModule = require("../core/BaseModule");
 const TimeHelper = require("../utils/TimeHelper");
-const { getUserId, getUserName } = require("../utils/UserHelper");
+const { getUserId, getUserName } = require("../utils/core/UserHelper");
 const { getInstance: getStateManager } = require("../utils/TimerStateManager");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🍅 TimerModule - 타이머 비즈니스 로직

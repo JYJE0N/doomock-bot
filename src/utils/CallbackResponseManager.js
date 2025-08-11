@@ -1,5 +1,5 @@
 // src/utils/CallbackResponseManager.js - 중앙 콜백 응답 관리자 v4.0.1
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 
 /**
  * 🎯 CallbackResponseManager - 콜백 응답 중복 방지 시스템

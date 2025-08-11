@@ -1,7 +1,7 @@
 // src/utils/WeatherHelper.js - 조율만 담당 (SoC 준수)
 
 const axios = require("axios");
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 const Weather = require("../database/models/Weather");
 
 /**

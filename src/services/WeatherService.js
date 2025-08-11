@@ -2,7 +2,7 @@
 // 🔧 Weather 서비스 - 데이터 조회 및 가공만!
 
 const BaseService = require("./BaseService");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const axios = require("axios");
 
 /**

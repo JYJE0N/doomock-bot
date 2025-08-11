@@ -1,6 +1,6 @@
 // src/utils/HealthChecker.js - v4.0.2 ES Lint 준수 및 아키텍처 개선
 const TimeHelper = require("./TimeHelper");
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 
 /**
  * 🏥 HealthChecker v4.0.2 - ES Lint 준수 및 아키텍처 개선

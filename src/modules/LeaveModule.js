@@ -1,7 +1,7 @@
 // src/modules/LeaveModule.js - 완전히 표준화된 연차 관리 모듈
 const BaseModule = require("../core/BaseModule");
-const { getUserId, getUserName } = require("../utils/UserHelper");
-const logger = require("../utils/Logger");
+const { getUserId, getUserName } = require("../utils/core/UserHelper");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🏖️ LeaveModule - 개인용 연차 관리 모듈 (완전 표준화)

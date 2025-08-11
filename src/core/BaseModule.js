@@ -1,5 +1,5 @@
 // src/core/BaseModule.js
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const MessageHelper = require("../utils/MessageHelper");
 
 /**

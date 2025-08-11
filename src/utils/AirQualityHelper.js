@@ -1,7 +1,7 @@
 // src/utils/AirQualityHelper.js - 미세먼지 정보 개선
 
 const axios = require("axios");
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 const TimeHelper = require("./TimeHelper");
 
 /**

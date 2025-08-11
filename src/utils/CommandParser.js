@@ -1,5 +1,5 @@
 // src/utils/CommandParser.js - 🆕 새로 생성!
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 
 /**
  * 🎯 CommandParser - 유일무이한 명령어 파싱 시스템

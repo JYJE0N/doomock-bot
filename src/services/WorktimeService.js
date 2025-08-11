@@ -2,7 +2,7 @@
 
 const BaseService = require("./BaseService");
 const TimeHelper = require("../utils/TimeHelper");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🏢 WorktimeService - 근무시간 데이터 관리 (데이터 처리 개선)

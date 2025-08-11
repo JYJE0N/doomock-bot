@@ -1,7 +1,7 @@
 // src/handlers/CommandHandler.js - 🎯 개선된 명령어 핸들러
 
-const logger = require("../utils/Logger");
-const { getUserName, getUserId } = require("../utils/UserHelper");
+const logger = require("../utils/core/Logger");
+const { getUserName, getUserId } = require("../utils/core/UserHelper");
 
 /**
  * ⌨️ CommandHandler - 자연어 명령어 지원 및 불필요한 명령어 정리

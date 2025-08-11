@@ -1,6 +1,6 @@
 // src/renderers/TodoRenderer.js - UI 생성만 담당
 const BaseRenderer = require("./BaseRenderer");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

@@ -1,7 +1,7 @@
 // src/renderers/TimerRenderer.js - 🎨 SoC 완전 준수 리팩토링 v4.0
 
 const BaseRenderer = require("./BaseRenderer");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

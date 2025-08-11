@@ -1,7 +1,7 @@
 // src/modules/TodoModule.js - 비즈니스 로직만 담당
 const BaseModule = require("../core/BaseModule");
-const logger = require("../utils/Logger");
-const { getUserId } = require("../utils/UserHelper");
+const logger = require("../utils/core/Logger");
+const { getUserId } = require("../utils/core/UserHelper");
 
 /**
  * 📋 TodoModule - 순수한 비즈니스 로직만 처리
@@ -828,7 +828,7 @@ class TodoModule extends BaseModule {
   async processReminderTimeInput(userId, text, todoId) {
     try {
       // 🕐 TimeParseHelper로 실제 자연어 파싱
-      const TimeParseHelper = require("../utils/TimeParseHelper");
+      const TimeParseHelper = require("../utils/helper/TimeParseHelper");
       const parseResult = TimeParseHelper.parseTimeText(text);
 
       if (!parseResult.success) {

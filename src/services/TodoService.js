@@ -1,6 +1,6 @@
 // src/services/TodoService.js - 데이터 관리 전담 서비스
 const BaseService = require("./BaseService");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 
 /**
  * 📋 TodoService - 데이터 관리만 담당

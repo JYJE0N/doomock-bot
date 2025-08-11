@@ -1,7 +1,7 @@
 // src/modules/WorktimeModule.js - logger 문제 수정
 const BaseModule = require("../core/BaseModule");
-const logger = require("../utils/Logger"); // ✅ 이미 있음
-const { getUserId, getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/core/Logger"); // ✅ 이미 있음
+const { getUserId, getUserName } = require("../utils/core/UserHelper");
 const TimeHelper = require("../utils/TimeHelper");
 
 class WorktimeModule extends BaseModule {

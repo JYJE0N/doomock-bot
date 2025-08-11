@@ -3,7 +3,7 @@
 const { Telegraf } = require("telegraf");
 const express = require("express");
 const path = require("path");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const {
   getInstance: getMongooseManager
 } = require("../database/MongooseManager");
@@ -80,7 +80,7 @@ class BotController {
 
       // ReminderScheduler 초기화 (서비스 빌더 이후에 추가)
       if (process.env.ENABLE_REMINDER_SCHEDULER !== "false") {
-        const ReminderScheduler = require("../utils/ReminderScheduler");
+        const ReminderScheduler = require("../utils/schedulers/ReminderScheduler");
 
         // 👇 "reminder" 대신 "todo" 서비스를 가져옵니다.
         const todoServiceForScheduler =

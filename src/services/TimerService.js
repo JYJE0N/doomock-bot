@@ -2,7 +2,7 @@
 
 const BaseService = require("./BaseService");
 const TimeHelper = require("../utils/TimeHelper");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🍅 TimerService - 타이머 데이터 서비스 (SoC 완전 준수)

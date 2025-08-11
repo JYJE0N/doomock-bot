@@ -1,6 +1,6 @@
 // src/services/LeaveService.js - 개인용 연차 관리 서비스
 const BaseService = require("./BaseService");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🏖️ LeaveService - 개인용 연차 관리 서비스

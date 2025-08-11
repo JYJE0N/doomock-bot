@@ -2,7 +2,7 @@
 // 🎨 Weather 렌더러 - UI 생성만!
 
 const BaseRenderer = require("./BaseRenderer");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const TimeHelper = require("../utils/TimeHelper");
 
 /**

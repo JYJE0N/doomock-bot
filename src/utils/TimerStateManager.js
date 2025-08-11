@@ -1,4 +1,4 @@
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 const TimeHelper = require("./TimeHelper");
 
 /**

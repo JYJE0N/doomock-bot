@@ -1,7 +1,7 @@
 const BaseRenderer = require("./BaseRenderer");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const { StatusHelper } = require("../utils/StatusHelper");
+const { StatusHelper } = require("../utils/core/StatusHelper");
 
 class SystemRenderer extends BaseRenderer {
   constructor(bot, navigationHandler, markdownHelper) {

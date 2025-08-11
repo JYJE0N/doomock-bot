@@ -1,9 +1,9 @@
 // src/services/FortuneService.js
 
 const BaseService = require("./BaseService");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const { isDeveloper, getUserId, getUserName } = require("../utils/UserHelper");
+const { isDeveloper, getUserId, getUserName } = require("../utils/core/UserHelper");
 
 const {
   FULL_TAROT_DECK,

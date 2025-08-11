@@ -1,5 +1,5 @@
 // src/renderers/TTSRenderer.js
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 const BaseRenderer = require("./BaseRenderer");
 
 class TTSRenderer extends BaseRenderer {

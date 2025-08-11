@@ -1,8 +1,8 @@
 // ===== 🖥️ SystemModule.js - 완전 통합 버전 =====
 
 const BaseModule = require("../core/BaseModule");
-const logger = require("../utils/Logger");
-const { getUserId, getUserName } = require("../utils/UserHelper");
+const logger = require("../utils/core/Logger");
+const { getUserId, getUserName } = require("../utils/core/UserHelper");
 
 // 🔧 강화된 헬퍼들 import
 const {
@@ -10,9 +10,9 @@ const {
   formatMemoryUsage,
   formatUptime,
   _getSystemHealth
-} = require("../utils/SystemHelper");
+} = require("../utils/core/SystemHelper");
 
-const { StatusHelper } = require("../utils/StatusHelper");
+const { StatusHelper } = require("../utils/core/StatusHelper");
 
 class SystemModule extends BaseModule {
   constructor(moduleName, options = {}) {

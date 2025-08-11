@@ -37,7 +37,7 @@ if (NODE_ENV === "development") {
 // 기본 .env 파일도 로드 (공통 설정용)
 require("dotenv").config();
 
-const logger = require("./src/utils/Logger");
+const logger = require("./src/utils/core/Logger");
 const BotController = require("./src/controllers/BotController");
 const { showDoomockBanner } = require("./src/utils/FancyBanner");
 

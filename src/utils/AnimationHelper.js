@@ -1,6 +1,6 @@
 // 🔧 AnimationHelper.js - Bot 객체 검증 로직 수정
 
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 
 /**
  * 🎬 AnimationHelper - 애니메이션 효과 전용 유틸리티 (Bot 호환성 수정)

@@ -1,6 +1,6 @@
 // src/utils/MarkdownHelper.js - 🎯 스마트 MarkdownV2 시스템
 
-const logger = require("./Logger");
+const logger = require("./core/Logger");
 
 /**
  * 🎯 스마트 MarkdownV2 시스템

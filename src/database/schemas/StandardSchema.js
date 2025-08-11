@@ -1,5 +1,5 @@
 // ===== 2. src/database/schemas/StandardSchema.js - 느슨한 결합 스키마 시스템 =====
-const logger = require("../../utils/Logger");
+const logger = require("../../utils/core/Logger");
 const { ObjectId } = require("mongodb");
 
 /**

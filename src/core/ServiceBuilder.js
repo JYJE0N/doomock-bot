@@ -2,7 +2,7 @@
 
 const path = require("path");
 const fs = require("fs");
-const logger = require("../utils/Logger");
+const logger = require("../utils/core/Logger");
 
 /**
  * 🏭 ServiceBuilder - 서비스 팩토리 (Mongoose 전용)
