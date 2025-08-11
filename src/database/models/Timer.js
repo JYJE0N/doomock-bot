@@ -1,7 +1,7 @@
 // src/database/models/Timer.js - 🍅 완전 리팩토링 v2.0
 
 const mongoose = require("mongoose");
-const TimeHelper = require("../../utils/TimeHelper");
+const Utils = require("../../utils");
 const logger = require("../../utils/core/Logger");
 
 /**
@@ -250,22 +250,29 @@ timerSchema.virtual("statusDisplay").get(function () {
  * 🏷️ 타입 표시명
  */
 timerSchema.virtual("typeDisplay").get(function () {
-  const TimeHelper = require("../../utils/TimeHelper");
-  return TimeHelper.getTimerTypeDisplay(this.type, true);
+  const typeMap = {
+    focus: '집중',
+    short: '짧은 휴식',  
+    long: '긴 휴식',
+    custom: '사용자 정의'
+  };
+  return typeMap[this.type] || this.type;
 });
 
 /**
  * ⏰ 시작 시간 표시
  */
 timerSchema.virtual("startedAtDisplay").get(function () {
-  return TimeHelper.safeDisplayTime(this.startedAt);
+  if (!this.startedAt) return '미시작';
+  return new Date(this.startedAt).toLocaleString('ko-KR');
 });
 
 /**
  * ✅ 완료 시간 표시
  */
 timerSchema.virtual("completedAtDisplay").get(function () {
-  return TimeHelper.safeDisplayTime(this.completedAt);
+  if (!this.completedAt) return '미완료';
+  return new Date(this.completedAt).toLocaleString('ko-KR');
 });
 
 // ===== 🎯 인스턴스 메서드들 =====

@@ -68,16 +68,34 @@ const EVENTS = {
 
   // 🏖️ 휴가 관리 이벤트
   LEAVE: {
-    APPLY_REQUEST: "leave:apply:request",
-    APPLIED: "leave:applied",
-    APPROVE_REQUEST: "leave:approve:request", 
-    APPROVED: "leave:approved",
-    REJECT_REQUEST: "leave:reject:request",
-    REJECTED: "leave:rejected",
-    CANCEL_REQUEST: "leave:cancel:request",
-    CANCELLED: "leave:cancelled",
-    LIST_REQUEST: "leave:list:request",
-    LIST_READY: "leave:list:ready"
+    // 메뉴 관련
+    MENU_REQUEST: "leave:menu:request",
+    MENU_READY: "leave:menu:ready",
+    MONTHLY_REQUEST: "leave:monthly:request", 
+    MONTHLY_READY: "leave:monthly:ready",
+    
+    // 연차 사용 관련
+    USE_FORM_REQUEST: "leave:use:form:request",
+    USE_FORM_READY: "leave:use:form:ready",
+    USE_REQUEST: "leave:use:request",
+    USED: "leave:used",
+    USE_ERROR: "leave:use:error",
+    
+    // 사용자 입력 관련  
+    CUSTOM_INPUT_START: "leave:custom:input:start",
+    CUSTOM_INPUT_RECEIVED: "leave:custom:input:received",
+    CUSTOM_INPUT_TIMEOUT: "leave:custom:input:timeout",
+    
+    // 설정 관련
+    SETTINGS_REQUEST: "leave:settings:request", 
+    SETTINGS_READY: "leave:settings:ready",
+    JOIN_DATE_SET: "leave:joindate:set",
+    
+    // 데이터 관련
+    BALANCE_REQUEST: "leave:balance:request",
+    BALANCE_READY: "leave:balance:ready",
+    HISTORY_REQUEST: "leave:history:request",
+    HISTORY_READY: "leave:history:ready"
   },
 
   // 🌤️ 날씨 이벤트  

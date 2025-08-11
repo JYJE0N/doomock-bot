@@ -282,9 +282,11 @@ reminderSchema.virtual("minutesUntilReminder").get(function () {
 // 읽기 쉬운 시간 표시
 reminderSchema.virtual("readableTime").get(function () {
   if (!this.reminderTime) return null;
-
-  const TimeHelper = require("../../utils/TimeHelper");
-  return TimeHelper.format(this.reminderTime, "full");
+  
+  return new Date(this.reminderTime).toLocaleString('ko-KR', {
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit', second: '2-digit'
+  });
 });
 
 // 리마인드 상태
