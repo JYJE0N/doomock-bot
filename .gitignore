@@ -29,7 +29,7 @@ tests/
 test-*.js
 *-test.js
 *.test.js
-test-eventbus-local.js
+test-eventbus.js
 coverage/
 .nyc_output/
 
