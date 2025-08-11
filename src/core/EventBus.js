@@ -155,10 +155,20 @@ class EventBus extends EventEmitter {
         this.updateStats("handled", event.name);
       } catch (error) {
         this.updateStats("errors", event.name);
-        this.emit("error", { event, error });
 
-        if (!options.continueOnError) {
+        // 에러 이벤트 발행 (무한 루프 방지를 위해 조건부)
+        if (event.name !== "error") {
+          this.emit("error", { event, error });
+        }
+
+        // 기본적으로는 에러를 억제하되, 옵션에 따라 다르게 처리
+        if (options.throwOnError) {
           throw error;
+        } else {
+          console.error(
+            `❌ 이벤트 처리 오류 (억제됨): ${event.name}`,
+            error.message
+          );
         }
       }
     };

@@ -61,6 +61,9 @@ async function testEventBus() {
     console.log("✅ 스키마 검증 오류 정상 감지:", error.message);
   }
 
+  // 에러 리스너를 제거하여 프로세스 종료 방지
+  process.removeAllListeners("uncaughtException");
+
   // 4. 통계 확인
   console.log("\n📍 테스트 4: 통계");
 
