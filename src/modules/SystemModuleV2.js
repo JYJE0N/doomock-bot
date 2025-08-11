@@ -154,6 +154,36 @@ class SystemModuleV2 {
   }
 
   /**
+   * 🎯 콜백 처리 (레거시 호환) - ModuleManager에서 호출
+   */
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = callbackQuery.from.id;
+    const chatId = callbackQuery.message.chat.id;
+    
+    // 레거시 콜백을 처리하는 맵 - SystemModuleV2는 이벤트 기반이므로 최소한만 지원
+    const actionMap = {
+      'menu': () => this.showMainMenu(userId, chatId),
+      'help': () => this.showHelp(userId, chatId),
+      'status': () => this.showSystemStatus(userId, chatId),
+      'health': () => this.showSystemHealth(userId, chatId)
+    };
+    
+    const handler = actionMap[subAction];
+    if (handler) {
+      // SystemModuleV2는 이벤트 발행 방식이므로 결과를 반환하지 않음
+      await handler();
+      return {
+        type: subAction,
+        module: 'system',
+        success: true
+      };
+    }
+    
+    logger.debug(`SystemModuleV2: 알 수 없는 액션 - ${subAction}`);
+    return null;
+  }
+
+  /**
    * 🎯 사용자 명령어 처리
    */
   async handleUserCommand(event) {

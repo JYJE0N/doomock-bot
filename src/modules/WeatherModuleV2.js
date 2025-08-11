@@ -181,9 +181,75 @@ class WeatherModuleV2 {
   }
 
   /**
-   * 🎯 콜백 처리 (레거시 호환)
+   * 🎯 콜백 처리 (레거시 호환) - ModuleManager에서 호출
    */
-  async handleCallback(event) {
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = callbackQuery.from.id;
+    const chatId = callbackQuery.message.chat.id;
+    
+    // 레거시 콜백을 처리하는 맵
+    const actionMap = {
+      'menu': () => this.showMenu(userId, chatId),
+      'current': () => this.publishCurrentRequest(userId, chatId, params),
+      'forecast': () => this.publishForecastRequest(userId, chatId, params),
+      'city': () => this.publishCityRequest(userId, chatId, params),
+      'help': () => this.publishHelpRequest(userId, chatId)
+    };
+    
+    const handler = actionMap[subAction];
+    if (handler) {
+      const result = await handler();
+      // menu 액션은 렌더러용 결과를 반환
+      if (subAction === 'menu' && result) {
+        return result;
+      }
+      return {
+        type: subAction,
+        module: 'weather',
+        success: true
+      };
+    }
+    
+    logger.debug(`WeatherModuleV2: 알 수 없는 액션 - ${subAction}`);
+    return null;
+  }
+
+  /**
+   * 🏠 메뉴 표시 (V2 렌더러 방식)
+   */
+  async showMenu(userId, chatId) {
+    try {
+      // 렌더러에게 전달할 데이터 구성
+      return {
+        type: 'menu',
+        module: 'weather',
+        success: true,
+        data: {
+          title: '🌤️ *날씨 정보*',
+          defaultCity: '서울', // 기본 도시
+          supportedCities: ['서울', '부산', '대구', '인천', '광주', '대전', '울산'],
+          userId: userId
+        }
+      };
+
+    } catch (error) {
+      logger.error('🌤️ WeatherModuleV2.showMenu 실패:', error);
+      return {
+        type: 'error',
+        module: 'weather',
+        success: false,
+        data: {
+          message: '날씨 메뉴를 불러오는 중 오류가 발생했습니다.',
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🎯 이벤트 기반 콜백 처리 (구 handleCallback)
+   */
+  async handleCallbackEvent(event) {
     const { data, userId, chatId } = event.payload;
     const [module, action, ...params] = data.split(':');
     

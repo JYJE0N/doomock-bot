@@ -176,7 +176,7 @@ class TodoModuleV2 {
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
       'menu': () => this.showMenu(userId, chatId),
-      'list': () => this.publishListRequest(userId, chatId, params),
+      'list': () => this.showList(userId, chatId, params),
       'add': () => this.startAddFlow(userId, chatId),
       'complete': () => this.publishCompleteRequest(userId, chatId, params),
       'delete': () => this.publishDeleteRequest(userId, chatId, params),
@@ -186,8 +186,8 @@ class TodoModuleV2 {
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
-      // menu 액션은 렌더러용 결과를 반환
-      if (subAction === 'menu' && result) {
+      // menu와 list 액션은 렌더러용 결과를 반환
+      if ((subAction === 'menu' || subAction === 'list') && result) {
         return result;
       }
       return {
@@ -410,6 +410,58 @@ class TodoModuleV2 {
     } catch (error) {
       logger.error('💬 사용자 메시지 처리 실패:', error);
       await this.publishError(error, event);
+    }
+  }
+
+  /**
+   * 📋 할일 목록 표시 (V2 렌더러 방식)
+   */
+  async showList(userId, chatId, page = 1) {
+    try {
+      const pageNum = parseInt(page) || 1;
+      const result = await this.todoService.getTodos(userId, {
+        page: pageNum,
+        limit: this.config.pageSize
+      });
+
+      if (!result.success) {
+        logger.error('TodoModuleV2.showList: 목록 조회 실패:', result.error);
+        return {
+          type: 'error',
+          module: 'todo',
+          success: false,
+          data: {
+            message: '할일 목록을 불러오는 중 오류가 발생했습니다.',
+            canRetry: true
+          }
+        };
+      }
+
+      // 렌더러에게 전달할 데이터 구성
+      return {
+        type: 'list',
+        module: 'todo',
+        success: true,
+        data: {
+          todos: result.data.todos || [],
+          currentPage: pageNum,
+          totalPages: result.data.pagination?.totalPages || 1,
+          totalCount: result.data.pagination?.totalCount || 0,
+          enableReminders: this.config.enableReminders
+        }
+      };
+
+    } catch (error) {
+      logger.error('📋 할일 목록 표시 실패:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        success: false,
+        data: {
+          message: '할일 목록을 불러오는 중 오류가 발생했습니다.',
+          canRetry: true
+        }
+      };
     }
   }
 

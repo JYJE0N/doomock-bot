@@ -234,9 +234,80 @@ class WorktimeModuleV2 {
   }
 
   /**
-   * 🎯 콜백 처리 (레거시 호환)
+   * 🎯 콜백 처리 (레거시 호환) - ModuleManager에서 호출
    */
-  async handleCallback(event) {
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = callbackQuery.from.id;
+    const chatId = callbackQuery.message.chat.id;
+    
+    // 레거시 콜백을 처리하는 맵
+    const actionMap = {
+      'menu': () => this.showMenu(userId, chatId),
+      'checkin': () => this.publishCheckinRequest(userId, chatId),
+      'checkout': () => this.publishCheckoutRequest(userId, chatId),
+      'today': () => this.publishTodayRequest(userId, chatId),
+      'status': () => this.publishStatusRequest(userId, chatId),
+      'weekly': () => this.publishWeeklyRequest(userId, chatId),
+      'monthly': () => this.publishMonthlyRequest(userId, chatId),
+      'stats': () => this.publishStatsRequest(userId, chatId)
+    };
+    
+    const handler = actionMap[subAction];
+    if (handler) {
+      const result = await handler();
+      // menu 액션은 렌더러용 결과를 반환
+      if (subAction === 'menu' && result) {
+        return result;
+      }
+      return {
+        type: subAction,
+        module: 'worktime',
+        success: true
+      };
+    }
+    
+    logger.debug(`WorktimeModuleV2: 알 수 없는 액션 - ${subAction}`);
+    return null;
+  }
+
+  /**
+   * 🏠 메뉴 표시 (V2 렌더러 방식)
+   */
+  async showMenu(userId, chatId) {
+    try {
+      // 렌더러에게 전달할 데이터 구성
+      return {
+        type: 'menu',
+        module: 'worktime',
+        success: true,
+        data: {
+          title: '💼 *근무시간 관리*',
+          isCheckedIn: false, // 기본값
+          todayWorked: '0시간 0분',
+          weeklyWorked: '0시간 0분',
+          monthlyWorked: '0시간 0분',
+          userId: userId
+        }
+      };
+
+    } catch (error) {
+      logger.error('💼 WorktimeModuleV2.showMenu 실패:', error);
+      return {
+        type: 'error',
+        module: 'worktime',
+        success: false,
+        data: {
+          message: '근무시간 메뉴를 불러오는 중 오류가 발생했습니다.',
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 🎯 이벤트 기반 콜백 처리 (구 handleCallback)
+   */
+  async handleCallbackEvent(event) {
     const { data, userId, chatId } = event.payload;
     const [module, action, ...params] = data.split(':');
     

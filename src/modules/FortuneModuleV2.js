@@ -97,6 +97,41 @@ class FortuneModuleV2 {
   }
 
   /**
+   * 🎯 콜백 처리 (레거시 호환) - ModuleManager에서 호출
+   */
+  async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
+    const userId = callbackQuery.from.id;
+    const chatId = callbackQuery.message.chat.id;
+    
+    // 레거시 콜백을 처리하는 맵
+    const actionMap = {
+      'menu': () => this.showMenu(userId, chatId),
+      'single': () => this.handleSingleCard(userId, chatId),
+      'triple': () => this.handleTripleCard(userId, chatId),
+      'celtic': () => this.handleCelticCross(userId, chatId),
+      'stats': () => this.showStats(userId, chatId),
+      'history': () => this.showHistory(userId, chatId)
+    };
+    
+    const handler = actionMap[subAction];
+    if (handler) {
+      const result = await handler();
+      // menu와 stats 액션은 렌더러용 결과를 반환
+      if ((subAction === 'menu' || subAction === 'stats' || subAction === 'history') && result) {
+        return result;
+      }
+      return {
+        type: subAction,
+        module: 'fortune',
+        success: true
+      };
+    }
+    
+    logger.debug(`FortuneModuleV2: 알 수 없는 액션 - ${subAction}`);
+    return null;
+  }
+
+  /**
    * 🎧 EventBus 이벤트 리스너 설정
    */
   setupEventListeners() {
@@ -1068,6 +1103,39 @@ class FortuneModuleV2 {
       logger.success("✅ FortuneModuleV2 정리 완료");
     } catch (error) {
       logger.error("❌ FortuneModuleV2 정리 중 오류:", error);
+    }
+  }
+
+  /**
+   * 🏠 메뉴 표시 (V2 렌더러 방식)
+   */
+  async showMenu(userId, chatId) {
+    try {
+      // 렌더러에게 전달할 데이터 구성
+      return {
+        type: 'menu',
+        module: 'fortune',
+        success: true,
+        data: {
+          title: '🔮 *타로카드 운세*',
+          fortuneTypes: this.config.fortuneTypes,
+          maxDrawsPerDay: this.config.maxDrawsPerDay,
+          hasService: !!this.fortuneService,
+          userId: userId
+        }
+      };
+
+    } catch (error) {
+      logger.error('🔮 FortuneModuleV2.showMenu 실패:', error);
+      return {
+        type: 'error',
+        module: 'fortune',
+        success: false,
+        data: {
+          message: '운세 메뉴를 불러오는 중 오류가 발생했습니다.',
+          canRetry: true
+        }
+      };
     }
   }
 
