@@ -452,15 +452,14 @@ class TodoModuleV2 {
 
       // 렌더러에게 전달할 데이터 구성
       return {
+        type: 'menu',
+        module: 'todo',
         success: true,
-        result: {
-          type: 'menu',
-          data: {
-            title: '📝 *할일 관리*',
-            stats: statsResult.data,
-            enableReminders: this.config.enableReminders,
-            userId: userId
-          }
+        data: {
+          title: '📝 *할일 관리*',
+          stats: statsResult.data,
+          enableReminders: this.config.enableReminders,
+          userId: userId
         }
       };
 
