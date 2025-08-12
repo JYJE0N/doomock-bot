@@ -203,6 +203,200 @@ class TodoModuleV2 {
   }
 
   /**
+   * 📋 메뉴 표시 (레거시 호환)
+   */
+  async showMenu(userId, chatId) {
+    try {
+      // 할일 통계 가져오기
+      const stats = await this.todoService.getTodoStats(userId);
+      
+      return {
+        type: 'menu',
+        module: 'todo',
+        data: {
+          userId,
+          stats: stats.data || { total: 0, completed: 0, pending: 0 }
+        }
+      };
+    } catch (error) {
+      logger.error('📋 할일 메뉴 표시 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '할일 메뉴를 불러오는데 실패했습니다.' }
+      };
+    }
+  }
+
+  /**
+   * ➕ 할일 추가 시작 (입력 대기 상태 설정)
+   */
+  async startAddFlow(userId, chatId) {
+    try {
+      // 사용자 입력 대기 상태 설정
+      this.userStates.set(userId, {
+        awaitingInput: true,
+        action: 'add',
+        chatId: chatId,
+        timestamp: Date.now()
+      });
+
+      logger.debug(`📝 할일 추가 대기 상태 설정: 사용자 ${userId}`);
+
+      return {
+        type: 'input_request',
+        module: 'todo',
+        data: {
+          message: '새로운 할일을 입력해주세요:',
+          placeholder: '예: 프로젝트 문서 작성하기',
+          action: 'add'
+        }
+      };
+    } catch (error) {
+      logger.error('📝 할일 추가 플로우 시작 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '할일 추가를 시작할 수 없습니다.' }
+      };
+    }
+  }
+
+  /**
+   * 📃 할일 목록 표시 (레거시 호환)
+   */
+  async showList(userId, chatId, params) {
+    try {
+      const page = params ? parseInt(params) : 1;
+      const result = await this.todoService.getTodos(userId, { page, limit: 10 });
+      
+      return {
+        type: 'list',
+        module: 'todo',
+        data: {
+          todos: result.data?.todos || [],
+          pagination: result.data?.pagination || { page: 1, totalPages: 1 },
+          stats: result.data?.stats || { total: 0, completed: 0, pending: 0 }
+        }
+      };
+    } catch (error) {
+      logger.error('📃 할일 목록 표시 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '할일 목록을 불러오는데 실패했습니다.' }
+      };
+    }
+  }
+
+  /**
+   * ✅ 할일 완료 요청 발행
+   */
+  async publishCompleteRequest(userId, chatId, params) {
+    try {
+      const todoId = params;
+      if (!todoId) {
+        throw new Error('할일 ID가 필요합니다.');
+      }
+
+      await this.eventBus.publish('todo:complete:request', {
+        userId,
+        chatId,
+        todoId
+      });
+
+      return {
+        type: 'complete',
+        module: 'todo',
+        data: { success: true, todoId }
+      };
+    } catch (error) {
+      logger.error('✅ 할일 완료 요청 발행 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '할일 완료 처리에 실패했습니다.' }
+      };
+    }
+  }
+
+  /**
+   * 🗑️ 할일 삭제 요청 발행
+   */
+  async publishDeleteRequest(userId, chatId, params) {
+    try {
+      const todoId = params;
+      if (!todoId) {
+        throw new Error('할일 ID가 필요합니다.');
+      }
+
+      await this.eventBus.publish('todo:delete:request', {
+        userId,
+        chatId,
+        todoId
+      });
+
+      return {
+        type: 'delete',
+        module: 'todo',
+        data: { success: true, todoId }
+      };
+    } catch (error) {
+      logger.error('🗑️ 할일 삭제 요청 발행 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '할일 삭제 처리에 실패했습니다.' }
+      };
+    }
+  }
+
+  /**
+   * ✏️ 할일 수정 플로우 시작
+   */
+  async startEditFlow(userId, chatId, params) {
+    try {
+      const todoId = params;
+      if (!todoId) {
+        throw new Error('할일 ID가 필요합니다.');
+      }
+
+      // 기존 할일 가져오기
+      const todoResult = await this.todoService.getTodo(userId, todoId);
+      if (!todoResult.success) {
+        throw new Error('할일을 찾을 수 없습니다.');
+      }
+
+      // 사용자 수정 대기 상태 설정
+      this.userStates.set(userId, {
+        awaitingInput: true,
+        action: 'edit',
+        todoId: todoId,
+        chatId: chatId,
+        timestamp: Date.now()
+      });
+
+      return {
+        type: 'input_request',
+        module: 'todo',
+        data: {
+          message: `할일을 수정해주세요:\n\n현재: ${todoResult.data.text}`,
+          placeholder: '수정할 내용을 입력하세요',
+          action: 'edit',
+          todoId: todoId
+        }
+      };
+    } catch (error) {
+      logger.error('✏️ 할일 수정 플로우 시작 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '할일 수정을 시작할 수 없습니다.' }
+      };
+    }
+  }
+
+  /**
    * 📋 할일 목록 표시
    */
   async handleListRequest(event) {
@@ -855,6 +1049,50 @@ class TodoModuleV2 {
   escapeMarkdown(text) {
     if (!text) return '';
     return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+  }
+
+  /**
+   * 💬 텍스트 메시지 처리 (할일 입력용)
+   */
+  async onHandleMessage(bot, message) {
+    try {
+      const userId = message.from.id;
+      const text = message.text?.trim();
+      const chatId = message.chat.id;
+
+      // 할일 입력 대기 상태인지 확인
+      const userState = this.userStates.get(userId);
+      if (userState?.awaitingInput) {
+        logger.debug(`📝 할일 입력 처리: 사용자 ${userId}, 액션: ${userState.action}, 텍스트: "${text}"`);
+        
+        if (userState.action === 'add') {
+          // 할일 생성 이벤트 발행
+          await this.eventBus.publish('todo:create:request', {
+            userId,
+            chatId,
+            text: text
+          });
+        } else if (userState.action === 'edit') {
+          // 할일 수정 이벤트 발행
+          await this.eventBus.publish('todo:update:request', {
+            userId,
+            chatId,
+            todoId: userState.todoId,
+            text: text
+          });
+        }
+
+        // 사용자 상태 초기화
+        this.userStates.delete(userId);
+        
+        return true; // 메시지를 처리했음을 알림
+      }
+
+      return false; // 이 모듈에서 처리하지 않음
+    } catch (error) {
+      logger.error('💬 TodoModule 메시지 처리 오류:', error);
+      return false;
+    }
   }
 
   /**
