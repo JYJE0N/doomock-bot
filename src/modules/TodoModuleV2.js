@@ -180,7 +180,10 @@ class TodoModuleV2 {
       'add': () => this.startAddFlow(userId, chatId),
       'complete': () => this.publishCompleteRequest(userId, chatId, params),
       'delete': () => this.publishDeleteRequest(userId, chatId, params),
-      'edit': () => this.startEditFlow(userId, chatId, params)
+      'edit': () => this.startEditFlow(userId, chatId, params),
+      'stats': () => this.showStats(userId, chatId),
+      'weekly': () => this.showWeekly(userId, chatId),
+      'remind_list': () => this.showRemindList(userId, chatId)
     };
     
     const handler = actionMap[subAction];
@@ -233,15 +236,21 @@ class TodoModuleV2 {
    */
   async startAddFlow(userId, chatId) {
     try {
-      // 사용자 입력 대기 상태 설정
-      this.userStates.set(userId, {
+      // userId를 문자열로 변환하여 일관성 보장
+      const userIdStr = String(userId);
+      
+      // 사용자 입력 대기 상태 설정 (두 가지 방식 모두 지원)
+      this.userStates.set(userIdStr, {
         awaitingInput: true,
         action: 'add',
+        state: this.constants.INPUT_STATES.WAITING_ADD_INPUT,
         chatId: chatId,
         timestamp: Date.now()
       });
 
-      logger.debug(`📝 할일 추가 대기 상태 설정: 사용자 ${userId}`);
+      logger.debug(`📝 할일 추가 대기 상태 설정: 사용자 ${userIdStr}`, {
+        state: this.userStates.get(userIdStr)
+      });
 
       return {
         type: 'input_request',
@@ -1056,23 +1065,32 @@ class TodoModuleV2 {
    */
   async onHandleMessage(bot, message) {
     try {
-      const userId = message.from.id;
+      // userId를 문자열로 변환하여 일관성 보장
+      const userId = String(message.from.id);
       const text = message.text?.trim();
       const chatId = message.chat.id;
 
+      logger.debug(`📝 TodoModule 메시지 수신: 사용자 ${userId}, 텍스트: "${text}"`);
+
       // 할일 입력 대기 상태인지 확인
       const userState = this.userStates.get(userId);
-      if (userState?.awaitingInput) {
-        logger.debug(`📝 할일 입력 처리: 사용자 ${userId}, 액션: ${userState.action}, 텍스트: "${text}"`);
+      logger.debug(`📝 사용자 상태 확인:`, { userId, userState });
+      
+      // awaitingInput 또는 state 기반으로 확인
+      if (userState?.awaitingInput || userState?.state) {
+        logger.debug(`📝 할일 입력 처리: 사용자 ${userId}, 액션: ${userState.action || userState.state}, 텍스트: "${text}"`);
         
-        if (userState.action === 'add') {
+        const action = userState.action || (userState.state === this.constants.INPUT_STATES.WAITING_ADD_INPUT ? 'add' : 
+                      userState.state === this.constants.INPUT_STATES.WAITING_EDIT_INPUT ? 'edit' : null);
+        
+        if (action === 'add' || userState.state === this.constants.INPUT_STATES.WAITING_ADD_INPUT) {
           // 할일 생성 이벤트 발행
           await this.eventBus.publish('todo:create:request', {
             userId,
             chatId,
             text: text
           });
-        } else if (userState.action === 'edit') {
+        } else if (action === 'edit' || userState.state === this.constants.INPUT_STATES.WAITING_EDIT_INPUT) {
           // 할일 수정 이벤트 발행
           await this.eventBus.publish('todo:update:request', {
             userId,
@@ -1092,6 +1110,105 @@ class TodoModuleV2 {
     } catch (error) {
       logger.error('💬 TodoModule 메시지 처리 오류:', error);
       return false;
+    }
+  }
+
+  /**
+   * 📊 할일 통계 표시
+   */
+  async showStats(userId, chatId) {
+    try {
+      const statsResult = await this.todoService.getStats(userId);
+      
+      if (!statsResult.success) {
+        return {
+          type: 'error',
+          module: 'todo',
+          data: { message: '통계 정보를 불러오는데 실패했습니다.' }
+        };
+      }
+
+      return {
+        type: 'stats',
+        module: 'todo',
+        data: {
+          stats: statsResult.data,
+          userId: userId
+        }
+      };
+    } catch (error) {
+      logger.error('📊 할일 통계 표시 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '통계 정보를 불러오는데 실패했습니다.' }
+      };
+    }
+  }
+
+  /**
+   * 📅 주간 할일 표시
+   */
+  async showWeekly(userId, chatId) {
+    try {
+      const weeklyResult = await this.todoService.getWeeklyTodos(userId);
+      
+      if (!weeklyResult.success) {
+        return {
+          type: 'error',
+          module: 'todo',
+          data: { message: '주간 할일 정보를 불러오는데 실패했습니다.' }
+        };
+      }
+
+      return {
+        type: 'weekly',
+        module: 'todo',
+        data: {
+          weeklyTodos: weeklyResult.data,
+          userId: userId
+        }
+      };
+    } catch (error) {
+      logger.error('📅 주간 할일 표시 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '주간 할일 정보를 불러오는데 실패했습니다.' }
+      };
+    }
+  }
+
+  /**
+   * 🔔 알림 목록 표시
+   */
+  async showRemindList(userId, chatId) {
+    try {
+      const reminderResult = await this.todoService.getReminders(userId);
+      
+      if (!reminderResult.success) {
+        return {
+          type: 'error',
+          module: 'todo',
+          data: { message: '알림 목록을 불러오는데 실패했습니다.' }
+        };
+      }
+
+      return {
+        type: 'remind_list',
+        module: 'todo',
+        data: {
+          reminders: reminderResult.data,
+          userId: userId
+        }
+      };
+    } catch (error) {
+      logger.error('🔔 알림 목록 표시 오류:', error);
+      return {
+        type: 'error',
+        module: 'todo',
+        data: { message: '알림 목록을 불러오는데 실패했습니다.' }
+      };
     }
   }
 

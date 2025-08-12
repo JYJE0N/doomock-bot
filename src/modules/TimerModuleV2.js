@@ -184,14 +184,15 @@ class TimerModuleV2 {
       'pomodoro2': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro2'),
       'pomodoro3': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro3'),
       'custom_setup': () => this.handleCustomSetup(userId, chatId),
-      'stats': () => this.showStats(userId, chatId)
+      'stats': () => this.showStats(userId, chatId),
+      'history': () => this.showHistory(userId, chatId)
     };
     
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
-      // menu와 stats 액션은 렌더러용 결과를 반환
-      if ((subAction === 'menu' || subAction === 'stats') && result) {
+      // menu, stats, history 액션은 렌더러용 결과를 반환
+      if (['menu', 'stats', 'history'].includes(subAction) && result) {
         return result;
       }
       return {
@@ -1292,6 +1293,40 @@ class TimerModuleV2 {
         success: false,
         data: {
           message: '통계를 불러오는 중 오류가 발생했습니다.',
+          canRetry: true
+        }
+      };
+    }
+  }
+
+  /**
+   * 📜 히스토리 표시 (V2 렌더러 방식)
+   */
+  async showHistory(userId, chatId) {
+    try {
+      // 더미 히스토리 데이터 사용 (향후 실제 데이터로 교체)
+      const history = this.getDummyHistory(7);
+      
+      return {
+        type: 'history',
+        module: 'timer',
+        success: true,
+        data: {
+          title: '📜 *타이머 히스토리*',
+          history: history,
+          userId: userId,
+          days: 7
+        }
+      };
+
+    } catch (error) {
+      logger.error('📜 TimerModuleV2.showHistory 실패:', error);
+      return {
+        type: 'error',
+        module: 'timer',
+        success: false,
+        data: {
+          message: '히스토리를 불러오는 중 오류가 발생했습니다.',
           canRetry: true
         }
       };
