@@ -19,12 +19,13 @@ class ModuleLoader {
     this.preloadQueue = new Set();
     this.cache = CacheManager.getInstance();
     
-    // 지연 로딩 설정
+    // 지연 로딩 설정 (수정됨)
     this.config = {
-      maxLoadedModules: 5, // 동시 로드 모듈 수 제한
-      preloadThreshold: 3, // n회 사용 후 예측 로딩
-      unloadTimeout: 300000, // 5분 후 미사용 모듈 언로드
-      enablePreloading: true
+      maxLoadedModules: 8, // 동시 로드 모듈 수 제한 (확대)
+      preloadThreshold: 2, // n회 사용 후 예측 로딩 (축소)
+      unloadTimeout: 1800000, // 30분 후 미사용 모듈 언로드 (5분→30분)
+      enablePreloading: true,
+      cleanupInterval: 600000 // 10분마다 정리 체크 (기존 5분)
     };
     
     // 사용 통계 추적
@@ -317,25 +318,40 @@ class ModuleLoader {
    * 미사용 모듈 자동 정리
    */
   startAutoCleanup() {
+    // 🔧 수정: 더 안전한 정리 주기와 로직
     setInterval(async () => {
       const now = Date.now();
       const unloadTargets = [];
       
       for (const [moduleKey, lastAccessTime] of this.lastAccess) {
+        // 핵심 모듈들은 언로드하지 않음 (보호 목록)
+        const protectedModules = ['system', 'navigation', 'error', 'base'];
+        if (protectedModules.includes(moduleKey)) {
+          continue;
+        }
+        
         if (now - lastAccessTime > this.config.unloadTimeout) {
           unloadTargets.push(moduleKey);
         }
       }
       
-      for (const moduleKey of unloadTargets) {
-        await this.unloadModule(moduleKey);
+      // 최대 3개까지만 한 번에 정리 (급격한 정리 방지)
+      const safeUnloadTargets = unloadTargets.slice(0, 3);
+      
+      for (const moduleKey of safeUnloadTargets) {
+        try {
+          await this.unloadModule(moduleKey);
+          logger.debug(`🗑️ 모듈 언로드 완료: ${moduleKey} (${Math.round((now - this.lastAccess.get(moduleKey)) / 60000)}분 미사용)`);
+        } catch (error) {
+          logger.warn(`⚠️ 모듈 언로드 실패: ${moduleKey}`, error.message);
+        }
       }
       
-      if (unloadTargets.length > 0) {
-        logger.info(`🧹 ${unloadTargets.length}개 미사용 모듈 자동 정리`);
+      if (safeUnloadTargets.length > 0) {
+        logger.info(`🧹 ${safeUnloadTargets.length}개 미사용 모듈 자동 정리`);
       }
       
-    }, this.config.unloadTimeout);
+    }, this.config.cleanupInterval); // 10분마다 실행
   }
 
   /**

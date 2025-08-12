@@ -366,8 +366,11 @@ class ModuleManager {
     
     const enabledModules = getAllEnabledModules();
     
-    // 자동 정리 시작
-    this.moduleLoader.startAutoCleanup();
+    // 자동 정리는 안정화 후에 시작 (2분 지연)
+    setTimeout(() => {
+      this.moduleLoader.startAutoCleanup();
+      logger.info("🧹 모듈 자동 정리 시스템 시작 (2분 지연 후)");
+    }, 120000); // 2분 후 시작
 
     // 핵심 모듈만 즉시 로딩 (system 모듈)
     const coreModules = enabledModules.filter(config => config.key === 'system');
