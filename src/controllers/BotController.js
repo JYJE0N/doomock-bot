@@ -82,6 +82,9 @@ class BotController {
       // 7. 미들웨어 설정
       this.setupMiddlewares();
 
+      // 8. 텔레그램 슬래시 명령어 등록
+      await this.setupTelegramCommands();
+
       // ReminderScheduler 초기화 (서비스 빌더 이후에 추가)
       if (process.env.ENABLE_REMINDER_SCHEDULER !== "false") {
         const ReminderScheduler = require("../utils/schedulers/ReminderScheduler");
@@ -480,6 +483,15 @@ class BotController {
     // 🧹 정리된 명령어 핸들러들 (불필요한 것들 제거)
     this.bot.command("start", this.handleStartCommand.bind(this));
     this.bot.command("help", this.handleHelpCommand.bind(this));
+    
+    // 모듈 슬래시 명령어들
+    this.bot.command("todo", this.handleModuleCommand.bind(this, "todo"));
+    this.bot.command("timer", this.handleModuleCommand.bind(this, "timer"));
+    this.bot.command("weather", this.handleModuleCommand.bind(this, "weather"));
+    this.bot.command("fortune", this.handleModuleCommand.bind(this, "fortune"));
+    this.bot.command("worktime", this.handleModuleCommand.bind(this, "worktime"));
+    this.bot.command("leave", this.handleModuleCommand.bind(this, "leave"));
+    this.bot.command("tts", this.handleModuleCommand.bind(this, "tts"));
     // menu, status 명령어 제거 - 자연어로만 접근
 
     // 콜백 쿼리 핸들러
@@ -489,6 +501,58 @@ class BotController {
     this.bot.on("text", this.handleTextMessage.bind(this));
 
     logger.info("✅ 미들웨어 설정 완료 (명령어 간소화 + 자연어 지원)");
+  }
+
+  /**
+   * 📋 텔레그램 슬래시 명령어 등록
+   */
+  async setupTelegramCommands() {
+    try {
+      const commands = [
+        {
+          command: "start",
+          description: "봇 시작 및 메인 메뉴 표시"
+        },
+        {
+          command: "help", 
+          description: "도움말 보기"
+        },
+        {
+          command: "todo",
+          description: "할일 관리"
+        },
+        {
+          command: "timer",
+          description: "타이머 및 뽀모도로"
+        },
+        {
+          command: "weather",
+          description: "날씨 정보"
+        },
+        {
+          command: "fortune",
+          description: "운세 보기"
+        },
+        {
+          command: "worktime",
+          description: "근무시간 관리"
+        },
+        {
+          command: "leave",
+          description: "휴가 관리"
+        },
+        {
+          command: "tts",
+          description: "텍스트 음성변환"
+        }
+      ];
+
+      await this.bot.telegram.setMyCommands(commands);
+      logger.info(`✅ 텔레그램 슬래시 명령어 등록 완료 (${commands.length}개)`);
+    } catch (error) {
+      logger.error("❌ 텔레그램 명령어 등록 실패:", error);
+      // 명령어 등록 실패해도 봇은 계속 작동하도록 함
+    }
   }
 
   // ===== 🎯 명령어 핸들러들 =====
@@ -524,6 +588,46 @@ class BotController {
     } catch (error) {
       logger.error("help 명령 처리 오류:", error);
       await ctx.reply("도움말 표시 중 오류가 발생했습니다.");
+    }
+  }
+
+  /**
+   * 📱 모듈 명령어 처리
+   */
+  async handleModuleCommand(moduleName, ctx) {
+    try {
+      this.stats.messagesProcessed++;
+
+      const moduleInstance = this.moduleManager?.getModule(moduleName);
+      if (!moduleInstance) {
+        await ctx.reply(`❌ ${moduleName} 모듈을 찾을 수 없습니다.`);
+        return;
+      }
+
+      // CommandHandler를 통해 라우팅
+      if (this.commandHandler) {
+        const msg = {
+          ...ctx.message,
+          from: ctx.from,
+          chat: ctx.chat
+        };
+        
+        const handled = await this.commandHandler.handleCommand(
+          this.bot, 
+          msg, 
+          moduleName, 
+          []
+        );
+        
+        if (!handled) {
+          await ctx.reply(`❌ ${moduleName} 명령어 처리에 실패했습니다.`);
+        }
+      } else {
+        await ctx.reply("❌ 명령어 처리기가 초기화되지 않았습니다.");
+      }
+    } catch (error) {
+      logger.error(`${moduleName} 명령 처리 오류:`, error);
+      await ctx.reply(`❌ ${moduleName} 처리 중 오류가 발생했습니다.`);
     }
   }
 
