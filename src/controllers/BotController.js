@@ -500,6 +500,64 @@ class BotController {
       }
     });
 
+    // RENDER.MENU_REQUEST 이벤트 처리
+    this.eventBus.subscribe("RENDER.MENU_REQUEST", async (payload) => {
+      try {
+        const { chatId, menuType, data, options = {} } = payload;
+
+        // NavigationHandler를 통해 메뉴 렌더링
+        const ctx = {
+          chat: { id: chatId },
+          reply: (text, opts) => this.bot.telegram.sendMessage(chatId, text, opts),
+          replyWithMarkdown: (text, opts) =>
+            this.bot.telegram.sendMessage(chatId, text, {
+              parse_mode: "Markdown",
+              ...opts
+            })
+        };
+
+        if (this.navigationHandler && typeof this.navigationHandler.showMainMenu === "function") {
+          await this.navigationHandler.showMainMenu(ctx);
+        } else {
+          // 폴백: 기본 메뉴 메시지
+          await this.bot.telegram.sendMessage(chatId, "🏠 메인 메뉴", {
+            parse_mode: "Markdown"
+          });
+        }
+
+        logger.debug(`✅ RENDER.MENU_REQUEST 처리 완료: ${menuType}`);
+      } catch (error) {
+        logger.error("❌ RENDER.MENU_REQUEST 처리 실패:", {
+          error: error.message,
+          chatId: payload?.chatId,
+          menuType: payload?.menuType,
+          errorCode: error.code
+        });
+      }
+    });
+
+    // RENDER.ERROR_REQUEST 이벤트 처리
+    this.eventBus.subscribe("RENDER.ERROR_REQUEST", async (payload) => {
+      try {
+        const { chatId, error, options = {} } = payload;
+
+        const errorMessage = typeof error === "string" ? error : "오류가 발생했습니다.";
+        
+        await this.bot.telegram.sendMessage(chatId, `❌ ${errorMessage}`, {
+          parse_mode: "Markdown",
+          ...options
+        });
+
+        logger.debug(`✅ RENDER.ERROR_REQUEST 처리 완료: chatId=${chatId}`);
+      } catch (error) {
+        logger.error("❌ RENDER.ERROR_REQUEST 처리 실패:", {
+          error: error.message,
+          chatId: payload?.chatId,
+          errorCode: error.code
+        });
+      }
+    });
+
     logger.success("✅ EventBus 렌더링 브릿지 설정 완료");
   }
 
