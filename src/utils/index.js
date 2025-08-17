@@ -146,6 +146,57 @@ class Utils {
   }
 
   /**
+   * 안전한 시간 표시
+   * @param {Date|string|number} timeData 시간 데이터
+   * @param {string} format 표시 형식 (기본: "timeOnly")
+   * @returns {string} 안전한 시간 문자열
+   */
+  static safeDisplayTime(timeData, format = "timeOnly") {
+    try {
+      if (!timeData) return "미설정";
+      
+      let date;
+      if (timeData instanceof Date) {
+        date = timeData;
+      } else if (typeof timeData === "string" || typeof timeData === "number") {
+        date = new Date(timeData);
+      } else {
+        return "잘못된 시간";
+      }
+      
+      if (isNaN(date.getTime())) {
+        return "잘못된 시간";
+      }
+      
+      switch (format) {
+        case "timeOnly":
+          return date.toLocaleTimeString("ko-KR", {
+            hour: "2-digit",
+            minute: "2-digit"
+          });
+        case "dateOnly":
+          return date.toLocaleDateString("ko-KR");
+        case "full":
+          return date.toLocaleString("ko-KR");
+        case "relative":
+          const now = new Date();
+          const diff = now - date;
+          const minutes = Math.floor(diff / 60000);
+          const hours = Math.floor(minutes / 60);
+          
+          if (minutes < 1) return "방금 전";
+          if (minutes < 60) return `${minutes}분 전`;
+          if (hours < 24) return `${hours}시간 전`;
+          return date.toLocaleDateString("ko-KR");
+        default:
+          return date.toLocaleString("ko-KR");
+      }
+    } catch (error) {
+      return "시간 오류";
+    }
+  }
+
+  /**
    * 안전한 메시지 전송 (Markdown & MarkdownV2 지원)
    * @param {Object} ctx Telegram context
    * @param {string} text 메시지 텍스트
@@ -159,14 +210,25 @@ class Utils {
         ...options
       };
 
-      await ctx.editMessageText(text, defaultOptions);
+      // 새 메시지인지 편집인지 판단
+      if (ctx.callbackQuery && ctx.callbackQuery.message) {
+        // 콜백 쿼리에서 메시지 편집
+        await ctx.editMessageText(text, defaultOptions);
+      } else {
+        // 새 메시지 전송 (명령어, 일반 메시지 등)
+        await ctx.reply(text, defaultOptions);
+      }
       return true;
     } catch (error) {
       // MarkdownV2로 재시도 (더 엄격한 파싱)
       if (options.parse_mode !== "MarkdownV2") {
         try {
           const v2Options = { ...options, parse_mode: "MarkdownV2" };
-          await ctx.editMessageText(text, v2Options);
+          if (ctx.callbackQuery && ctx.callbackQuery.message) {
+            await ctx.editMessageText(text, v2Options);
+          } else {
+            await ctx.reply(text, v2Options);
+          }
           return true;
         } catch (v2Error) {
           // MarkdownV2도 실패하면 계속 진행
@@ -176,15 +238,26 @@ class Utils {
       // 마크다운 오류 시 플레인 텍스트로 재시도
       try {
         const plainText = this.stripAllMarkup(text);
-        await ctx.editMessageText(plainText, {
-          ...options,
-          parse_mode: undefined
-        });
+        if (ctx.callbackQuery && ctx.callbackQuery.message) {
+          await ctx.editMessageText(plainText, {
+            ...options,
+            parse_mode: undefined
+          });
+        } else {
+          await ctx.reply(plainText, {
+            ...options,
+            parse_mode: undefined
+          });
+        }
         return true;
       } catch (retryError) {
         // 최후의 수단
         try {
-          await ctx.editMessageText("메시지를 표시할 수 없습니다.");
+          if (ctx.callbackQuery && ctx.callbackQuery.message) {
+            await ctx.editMessageText("메시지를 표시할 수 없습니다.");
+          } else {
+            await ctx.reply("메시지를 표시할 수 없습니다.");
+          }
           return false;
         } catch (finalError) {
           return false;

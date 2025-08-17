@@ -465,7 +465,7 @@ class TodoModuleV2 {
       }
 
       // 할일 생성
-      const todo = await this.todoService.createTodo(userId, {
+      const todo = await this.todoService.addTodo(userId, {
         text,
         priority,
         status: this.constants.STATUS.PENDING

@@ -568,6 +568,11 @@ class WeatherModuleV2 {
       }
 
       // 현재 날씨 요청으로 위임
+      logger.debug("🔍 이벤트 상수 확인:", {
+        CURRENT_REQUEST: EVENTS.WEATHER.CURRENT_REQUEST,
+        WEATHER_OBJECT: EVENTS.WEATHER,
+        EVENTS_OBJECT: !!EVENTS
+      });
       await this.eventBus.publish(EVENTS.WEATHER.CURRENT_REQUEST, {
         userId,
         chatId,

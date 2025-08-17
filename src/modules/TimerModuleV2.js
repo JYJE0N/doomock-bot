@@ -22,15 +22,18 @@ class TimerModuleV2 {
       );
     }
     this.eventBus = options.eventBus;
-    this.timerService = null; // 선택적 서비스
+    
+    // V2 모듈 필수 속성들
+    this.isInitialized = false;
+    this.serviceBuilder = options.serviceBuilder || null;
+    
+    // 서비스 인스턴스
+    this.timerService = null;
 
     // 메모리 기반 타이머 상태 관리
     this.activeTimers = new Map(); // userId -> timer state
     this.userStates = new Map(); // userId -> user interaction state
     this.subscriptions = [];
-
-    // 초기화 상태
-    this.isInitialized = false;
 
     // 상태 정리 인터벌
     this.cleanupInterval = null;
@@ -298,9 +301,14 @@ class TimerModuleV2 {
       // DB에 세션 저장 (서비스 있을 때만)
       if (this.timerService) {
         try {
+          // userName 제공 및 timerType 검증
+          const validTypes = ["focus", "shortBreak", "longBreak", "custom"];
+          const validatedType = validTypes.includes(timerType) ? timerType : "focus";
+          
           await this.timerService.startSession(userId, {
-            type: timerType,
-            duration: finalDuration
+            type: validatedType,
+            duration: finalDuration,
+            userName: event.payload.userName || "사용자" // 기본값 제공
           });
         } catch (error) {
           logger.warn("DB 세션 저장 실패 (계속 진행):", error.message);
@@ -1187,7 +1195,7 @@ class TimerModuleV2 {
       // DB 정리 (서비스 있을 때만)
       if (this.timerService) {
         try {
-          await this.timerService.forceStopAllSessions(userId);
+          await this.timerService.stopSession(userId);
         } catch (error) {
           logger.warn("DB 세션 정리 실패 (계속 진행):", error.message);
         }
