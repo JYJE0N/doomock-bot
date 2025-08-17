@@ -1,4 +1,3 @@
-const logger = require("./core/Logger");
 
 class TimeHelper {
   static getKoreanDate() {

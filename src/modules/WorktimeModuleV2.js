@@ -1672,27 +1672,6 @@ class WorktimeModuleV2 {
 
   // === 누락된 메서드들 ===
 
-  /**
-   * 📤 히스토리 요청 발행 (레거시 콜백용)
-   */
-  async publishHistoryRequest(userId, chatId) {
-    this.eventBus.publish(EVENTS.WORKTIME.HISTORY_REQUEST, {
-      userId,
-      chatId
-    });
-    return { success: true };
-  }
-
-  /**
-   * 📤 설정 요청 발행 (레거시 콜백용)
-   */
-  async publishSettingsRequest(userId, chatId) {
-    this.eventBus.publish(EVENTS.WORKTIME.SETTINGS_REQUEST, {
-      userId,
-      chatId
-    });
-    return { success: true };
-  }
 
   /**
    * 📤 휴식 시작 요청 발행 (레거시 콜백용)

@@ -220,7 +220,7 @@ class CacheManager {
       logger.warn(`🚨 캐시 메모리 한계 초과: ${memoryMB}MB > ${this.config.maxMemoryMB}MB`);
       
       // 강제 정리 - 각 네임스페이스에서 가장 오래된 25% 제거
-      for (const [namespace, cache] of this.caches.entries()) {
+      for (const [, cache] of this.caches.entries()) {
         const toRemove = Math.floor(cache.data.size * 0.25);
         for (let i = 0; i < toRemove; i++) {
           this.evictLRU(cache);

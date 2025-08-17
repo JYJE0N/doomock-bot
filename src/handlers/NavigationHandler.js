@@ -655,39 +655,6 @@ class NavigationHandler {
     }
   }
 
-  /**
-   * 📤 메시지 전송 (안전한 방식)
-   */
-  async sendMessage(ctx, text, options = {}) {
-    try {
-      // MarkdownV2를 기본 파싱 모드로 사용
-      const sendOptions = {
-        parse_mode: 'MarkdownV2',
-        ...options
-      };
-
-      await ctx.reply(text, sendOptions);
-      return true;
-    } catch (error) {
-      logger.error('📤 메시지 전송 실패:', error);
-      
-      // Markdown 파싱 에러인 경우 일반 텍스트로 재시도
-      if (error.message && error.message.includes('parse_mode')) {
-        try {
-          await ctx.reply(text.replace(/[_*\[\]()~>#+\-=|{}.!\\]/g, ''), {
-            ...options,
-            parse_mode: undefined
-          });
-          return true;
-        } catch (retryError) {
-          logger.error('📤 메시지 재전송도 실패:', retryError);
-          return false;
-        }
-      }
-      
-      return false;
-    }
-  }
 
   /**
    * 🧹 정리 작업

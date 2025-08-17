@@ -683,43 +683,6 @@ class WeatherModuleV2 {
     });
   }
 
-  async publishForecastRequest(userId, chatId, cityId = null, days = 3) {
-    await this.eventBus.publish(EVENTS.WEATHER.FORECAST_REQUEST, {
-      userId,
-      chatId,
-      cityId,
-      days
-    });
-  }
-
-  async publishCityWeatherRequest(userId, chatId, cityId) {
-    await this.eventBus.publish(EVENTS.WEATHER.CITY_REQUEST, {
-      userId,
-      chatId,
-      cityId
-    });
-  }
-
-  async publishCityListRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WEATHER.CITY_LIST_REQUEST, {
-      userId,
-      chatId
-    });
-  }
-
-  async publishMenuRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WEATHER.MENU_REQUEST, {
-      userId,
-      chatId
-    });
-  }
-
-  async publishHelpRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WEATHER.HELP_REQUEST, {
-      userId,
-      chatId
-    });
-  }
 
   async publishError(error, originalEvent) {
     const chatId = originalEvent?.payload?.chatId;

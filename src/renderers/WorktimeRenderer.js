@@ -233,7 +233,7 @@ ${workSummary?.isOvertime ? "🔥 초과근무 " + this.formatDuration(workSumma
    * ✅ 출근 성공 렌더링
    */
   async renderCheckinSuccess(data, ctx) {
-    const { record, checkInTime, message } = data;
+    const { checkInTime } = data;
 
     const text = `✅ *출근 완료!*
 
@@ -267,7 +267,7 @@ ${workSummary?.isOvertime ? "🔥 초과근무 " + this.formatDuration(workSumma
    * ✅ 퇴근 성공 렌더링
    */
   async renderCheckoutSuccess(data, ctx) {
-    const { record, workSummary, message } = data;
+    const { workSummary } = data;
 
     let workStatus = "";
     if (workSummary?.workDuration < 60) {

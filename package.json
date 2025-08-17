@@ -9,10 +9,12 @@
     "staging": "NODE_ENV=staging node doomock_bot.js",
     "prod": "NODE_ENV=production node doomock_bot.js",
     "env:check": "cross-env NODE_ENV=development node -e \"console.log('NODE_ENV:', process.env.NODE_ENV)\"",
-    "env:show": "node -e \"console.log(process.env)\"",
+    "env:validate": "node -e \"require('./src/config/Environment').validate()\"",
     "dev:watch": "NODE_ENV=development nodemon doomock_bot.js",
     "railway": "NODE_ENV=production node --max-old-space-size=450 doomock_bot.js",
     "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
     "lint": "eslint *.js src/",
     "lint:fix": "eslint *.js src/ --fix",
     "format": "prettier --write *.js src/",
@@ -26,7 +28,11 @@
     "restart": "npm run cleanup && sleep 5 && npm start",
     "cleanup:indexes": "node scripts/cleanup-indexes.js",
     "db:check": "node scripts/cleanup-indexes.js --check-only",
-    "db:reset": "node scripts/cleanup-indexes.js --full-reset"
+    "db:reset": "node scripts/cleanup-indexes.js --full-reset",
+    "deps:check": "npm ls",
+    "deps:clean": "npm prune && npm install --package-lock-only",
+    "security:audit": "npm audit",
+    "prestart": "npm run env:validate"
   },
   "keywords": [
     "telegram",

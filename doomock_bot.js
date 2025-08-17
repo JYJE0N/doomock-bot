@@ -37,19 +37,44 @@ if (NODE_ENV === "development") {
 // 기본 .env 파일도 로드 (공통 설정용)
 require("dotenv").config();
 
+// 환경변수 검증 시스템
+const Environment = require("./src/config/Environment");
+
+try {
+  // 환경변수 유효성 검사
+  Environment.validate();
+  
+  // 보안 검사 수행
+  const securityIssues = Environment.securityCheck();
+  if (securityIssues.length > 0) {
+    console.log('\n🚨 보안 이슈 발견:');
+    securityIssues.forEach(issue => console.log(`  - ${issue}`));
+  }
+  
+  // 환경변수 통계 (프로덕션이 아닌 경우에만)
+  if (NODE_ENV !== 'production') {
+    const stats = Environment.getStats();
+    console.log(`\n📊 환경변수 통계: 총 ${stats.total}개, 앱 관련 ${stats.appSpecific}개`);
+  }
+  
+} catch (error) {
+  console.error('❌ 환경변수 검증 실패:', error.message);
+  console.error('💡 .env.example 파일을 참고하여 환경변수를 설정해주세요.');
+  process.exit(1);
+}
+
 const logger = require("./src/utils/core/Logger");
 const BotController = require("./src/controllers/BotController");
 const Utils = require("./src/utils");
 
+// 안전한 환경변수 정보 표시
 console.log(`🤖 봇 토큰: ${process.env.BOT_TOKEN ? "✅ 설정됨" : "❌ 없음"}`);
 console.log(`🗄️ DB: ${process.env.MONGO_URL ? "✅ 설정됨" : "❌ 없음"}`);
 
-// 🔍 환경변수 디버깅 (개발 환경에서만)
+// 🔍 개발 환경 정보 (안전한 정보만)
 if (NODE_ENV === "development") {
   console.log("\n🔍 개발 환경 추가 정보:");
-  console.log(`👑 DEVELOPER_IDS: ${process.env.DEVELOPER_IDS || "설정 안됨"}`);
-  console.log(`👑 ADMIN_IDS: ${process.env.ADMIN_IDS || "설정 안됨"}`);
-
+  
   const developerIds = (
     process.env.DEVELOPER_IDS ||
     process.env.ADMIN_IDS ||
@@ -60,12 +85,14 @@ if (NODE_ENV === "development") {
     .filter((id) => id);
 
   if (developerIds.length > 0) {
-    console.log(`✅ 개발자 모드 활성 - ID: [${developerIds.join(", ")}]`);
+    console.log(`✅ 개발자 모드 활성 - ${developerIds.length}명 등록됨`);
   } else {
-    console.log(
-      `⚠️ 개발자 ID가 설정되지 않았습니다. NODE_ENV=development로 모든 사용자가 개발자 모드 사용 가능`
-    );
+    console.log(`⚠️ 개발자 ID가 설정되지 않았습니다.`);
   }
+  
+  // 안전한 환경변수 정보만 표시
+  const safeInfo = Environment.getSafeInfo();
+  console.log('📋 앱 설정:', JSON.stringify(safeInfo, null, 2));
   console.log("");
 }
 
