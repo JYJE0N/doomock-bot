@@ -410,16 +410,58 @@ class BotController {
       try {
         const { chatId, text, options = {} } = payload;
 
-        // 직접 텔레그램 메시지 전송 (더 단순한 방식)
-        await this.bot.telegram.sendMessage(chatId, text, {
-          parse_mode: options.parse_mode || "Markdown",
-          reply_markup: options.reply_markup,
-          ...options
-        });
+        // 입력 값 검증
+        if (!chatId) {
+          throw new Error("chatId가 필요합니다");
+        }
+        if (!text) {
+          throw new Error("메시지 텍스트가 필요합니다");
+        }
 
-        logger.debug(`✅ RENDER.MESSAGE_REQUEST 처리 완료: chatId=${chatId}`);
+        // 메시지 길이 제한 확인 (텔레그램 한계: 4096자)
+        if (text.length > 4096) {
+          logger.warn(`⚠️ 메시지가 너무 깁니다 (${text.length}자), 잘라서 전송합니다`);
+          const truncatedText = text.substring(0, 4090) + "...";
+          
+          await this.bot.telegram.sendMessage(chatId, truncatedText, {
+            parse_mode: options.parse_mode || "Markdown",
+            reply_markup: options.reply_markup,
+            ...options
+          });
+        } else {
+          // 직접 텔레그램 메시지 전송
+          await this.bot.telegram.sendMessage(chatId, text, {
+            parse_mode: options.parse_mode || "Markdown",
+            reply_markup: options.reply_markup,
+            ...options
+          });
+        }
+
+        logger.debug(`✅ RENDER.MESSAGE_REQUEST 처리 완료: chatId=${chatId}, 길이=${text.length}`);
       } catch (error) {
-        logger.error("❌ RENDER.MESSAGE_REQUEST 처리 실패:", error);
+        logger.error("❌ RENDER.MESSAGE_REQUEST 처리 실패:", {
+          error: error.message,
+          chatId: payload?.chatId,
+          textLength: payload?.text?.length,
+          parseMode: payload?.options?.parse_mode,
+          errorCode: error.code,
+          stack: error.stack
+        });
+        
+        // 특정 오류에 대한 재시도 처리
+        if (error.code === 429) {
+          logger.warn("⚠️ 메시지 전송 속도 제한 - 잠시 후 재시도");
+        } else if (error.code === 400 && error.description?.includes("parse_mode")) {
+          logger.warn("⚠️ Markdown 파싱 오류 - 플레인 텍스트로 재시도");
+          try {
+            await this.bot.telegram.sendMessage(payload.chatId, payload.text, {
+              reply_markup: payload.options?.reply_markup
+            });
+            logger.info("✅ 플레인 텍스트로 메시지 전송 성공");
+          } catch (retryError) {
+            logger.error("❌ 플레인 텍스트 재시도도 실패:", retryError);
+          }
+        }
       }
     });
 
