@@ -3,36 +3,40 @@
  * EventBus 기반 시스템에 필요한 필수 기능만 제공
  */
 
-const Logger = require('./core/Logger');
+const Logger = require("./core/Logger");
 
 /**
  * 간단하고 효율적인 유틸리티 클래스
  */
 class Utils {
   // === 시간 관련 ===
-  
+
   /**
    * 현재 한국 시간
    * @param {string} format 포맷 (기본: full)
    * @returns {string}
    */
-  static now(format = 'full') {
+  static now(format = "full") {
     const date = new Date();
-    
+
     switch (format) {
-      case 'full':
-        return date.toLocaleString('ko-KR', {
-          year: 'numeric', month: '2-digit', day: '2-digit',
-          hour: '2-digit', minute: '2-digit', second: '2-digit'
+      case "full":
+        return date.toLocaleString("ko-KR", {
+          year: "numeric",
+          month: "2-digit",
+          day: "2-digit",
+          hour: "2-digit",
+          minute: "2-digit",
+          second: "2-digit"
         });
-      case 'date':
-        return date.toLocaleDateString('ko-KR');
-      case 'time':
-        return date.toLocaleTimeString('ko-KR');
-      case 'iso':
+      case "date":
+        return date.toLocaleDateString("ko-KR");
+      case "time":
+        return date.toLocaleTimeString("ko-KR");
+      case "iso":
         return date.toISOString();
       default:
-        return date.toLocaleString('ko-KR');
+        return date.toLocaleString("ko-KR");
     }
   }
 
@@ -50,40 +54,40 @@ class Utils {
    * @returns {Promise<void>}
    */
   static delay(ms) {
-    return new Promise(resolve => setTimeout(resolve, ms));
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   // === ID 생성 ===
-  
+
   /**
    * 고유 ID 생성
    * @param {string} prefix 접두사
    * @returns {string}
    */
-  static id(prefix = 'id') {
+  static id(prefix = "id") {
     return `${prefix}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   }
 
   /**
    * 짧은 ID 생성
-   * @param {string} prefix 접두사  
+   * @param {string} prefix 접두사
    * @returns {string}
    */
-  static shortId(prefix = '') {
+  static shortId(prefix = "") {
     const id = Math.random().toString(36).substr(2, 8);
     return prefix ? `${prefix}_${id}` : id;
   }
 
   // === 텍스트 처리 ===
-  
+
   /**
    * 마크다운 특수문자 이스케이프 (기본 Markdown)
    * @param {string} text 텍스트
    * @returns {string}
    */
   static escape(text) {
-    if (!text || typeof text !== 'string') return '';
-    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    if (!text || typeof text !== "string") return "";
+    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
   }
 
   /**
@@ -92,9 +96,9 @@ class Utils {
    * @returns {string}
    */
   static escapeMarkdownV2(text) {
-    if (!text || typeof text !== 'string') return '';
+    if (!text || typeof text !== "string") return "";
     // MarkdownV2에서 이스케이프가 필요한 모든 문자 (백슬래시 포함)
-    return text.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, '\\$&');
+    return text.replace(/[_*[\]()~`>#+=|{}.!\\-]/g, "\\$&");
   }
 
   /**
@@ -107,7 +111,7 @@ class Utils {
   }
 
   /**
-   * 이탤릭 텍스트  
+   * 이탤릭 텍스트
    * @param {string} text 텍스트
    * @returns {string}
    */
@@ -130,14 +134,14 @@ class Utils {
    * @returns {string}
    */
   static stripAllMarkup(text) {
-    if (!text || typeof text !== 'string') return '';
+    if (!text || typeof text !== "string") return "";
     return text
-      .replace(/\*\*(.*?)\*\*/g, '$1')  // **bold**
-      .replace(/\*(.*?)\*/g, '$1')      // *italic*
-      .replace(/_(.*?)_/g, '$1')        // _italic_
-      .replace(/`(.*?)`/g, '$1')        // `code`
-      .replace(/\[(.*?)\]\(.*?\)/g, '$1') // [link](url)
-      .replace(/\\(.)/g, '$1')          // escaped chars
+      .replace(/\*\*(.*?)\*\*/g, "$1") // **bold**
+      .replace(/\*(.*?)\*/g, "$1") // *italic*
+      .replace(/_(.*?)_/g, "$1") // _italic_
+      .replace(/`(.*?)`/g, "$1") // `code`
+      .replace(/\[(.*?)\]\(.*?\)/g, "$1") // [link](url)
+      .replace(/\\(.)/g, "$1") // escaped chars
       .trim();
   }
 
@@ -151,17 +155,17 @@ class Utils {
   static async sendSafeMessage(ctx, text, options = {}) {
     try {
       const defaultOptions = {
-        parse_mode: 'Markdown',
+        parse_mode: "Markdown",
         ...options
       };
-      
+
       await ctx.editMessageText(text, defaultOptions);
       return true;
     } catch (error) {
       // MarkdownV2로 재시도 (더 엄격한 파싱)
-      if (options.parse_mode !== 'MarkdownV2') {
+      if (options.parse_mode !== "MarkdownV2") {
         try {
-          const v2Options = { ...options, parse_mode: 'MarkdownV2' };
+          const v2Options = { ...options, parse_mode: "MarkdownV2" };
           await ctx.editMessageText(text, v2Options);
           return true;
         } catch (v2Error) {
@@ -172,15 +176,15 @@ class Utils {
       // 마크다운 오류 시 플레인 텍스트로 재시도
       try {
         const plainText = this.stripAllMarkup(text);
-        await ctx.editMessageText(plainText, { 
-          ...options, 
-          parse_mode: undefined 
+        await ctx.editMessageText(plainText, {
+          ...options,
+          parse_mode: undefined
         });
         return true;
       } catch (retryError) {
         // 최후의 수단
         try {
-          await ctx.editMessageText('메시지를 표시할 수 없습니다.');
+          await ctx.editMessageText("메시지를 표시할 수 없습니다.");
           return false;
         } catch (finalError) {
           return false;
@@ -190,14 +194,14 @@ class Utils {
   }
 
   // === 검증 ===
-  
+
   /**
    * 빈 값 확인
    * @param {any} value 값
    * @returns {boolean}
    */
   static isEmpty(value) {
-    return value === null || value === undefined || value === '';
+    return value === null || value === undefined || value === "";
   }
 
   /**
@@ -207,7 +211,7 @@ class Utils {
    * @returns {boolean}
    */
   static isValidLength(text, max = 1000) {
-    return typeof text === 'string' && text.length > 0 && text.length <= max;
+    return typeof text === "string" && text.length > 0 && text.length <= max;
   }
 
   /**
@@ -237,7 +241,7 @@ class Utils {
    * @param {string} label 라벨
    * @returns {Promise<any>}
    */
-  static async measure(fn, label = 'Execution') {
+  static async measure(fn, label = "Execution") {
     const start = Date.now();
     const result = await fn();
     const duration = Date.now() - start;
@@ -252,9 +256,9 @@ class Utils {
   static getMemoryUsage() {
     const usage = process.memoryUsage();
     return {
-      rss: Math.round(usage.rss / 1024 / 1024) + 'MB',
-      heapTotal: Math.round(usage.heapTotal / 1024 / 1024) + 'MB',
-      heapUsed: Math.round(usage.heapUsed / 1024 / 1024) + 'MB',
+      rss: Math.round(usage.rss / 1024 / 1024) + "MB",
+      heapTotal: Math.round(usage.heapTotal / 1024 / 1024) + "MB",
+      heapUsed: Math.round(usage.heapUsed / 1024 / 1024) + "MB",
       timestamp: this.now()
     };
   }
@@ -292,12 +296,12 @@ class Utils {
 ========================================== 🤖`;
 
     console.log(banner);
-    
+
     // 시스템 정보
     console.log(`📅 시작 시간: ${this.now()}`);
     console.log(`💻 Node.js: ${process.version}`);
     console.log(`🧠 메모리: ${this.getMemoryUsage().rss}`);
-    console.log('');
+    console.log("");
   }
 }
 

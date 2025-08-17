@@ -406,10 +406,10 @@ class BotController {
     this.eventBus.subscribe("RENDER.MESSAGE_REQUEST", async (payload) => {
       try {
         const { chatId, text, options = {} } = payload;
-        
+
         // 직접 텔레그램 메시지 전송 (더 단순한 방식)
         await this.bot.telegram.sendMessage(chatId, text, {
-          parse_mode: options.parse_mode || 'Markdown',
+          parse_mode: options.parse_mode || "Markdown",
           reply_markup: options.reply_markup,
           ...options
         });
@@ -424,12 +424,22 @@ class BotController {
     this.eventBus.subscribe("RENDER.UPDATE_REQUEST", async (payload) => {
       try {
         const { chatId, messageId, renderType, data, options = {} } = payload;
-        
+
         // 메시지 업데이트를 위한 컨텍스트
         const ctx = {
           chat: { id: chatId },
-          editMessageText: (text, opts) => this.bot.telegram.editMessageText(chatId, messageId, null, text, opts),
-          answerCbQuery: (text) => options.callbackQueryId ? this.bot.telegram.answerCbQuery(options.callbackQueryId, text) : Promise.resolve()
+          editMessageText: (text, opts) =>
+            this.bot.telegram.editMessageText(
+              chatId,
+              messageId,
+              null,
+              text,
+              opts
+            ),
+          answerCbQuery: (text) =>
+            options.callbackQueryId
+              ? this.bot.telegram.answerCbQuery(options.callbackQueryId, text)
+              : Promise.resolve()
         };
 
         // NavigationHandler를 통해 렌더링

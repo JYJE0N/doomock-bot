@@ -10,21 +10,23 @@ const logger = require("../utils/core/Logger");
 class TodoModuleV2 {
   constructor(moduleName = "todo", options = {}) {
     this.moduleName = moduleName;
-    
+
     // EventBus는 ModuleManager에서 주입받거나 글로벌 인스턴스 사용
     // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
     if (!options.eventBus) {
-      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+      throw new Error(
+        `EventBus must be injected via options for module: ${moduleName}`
+      );
     }
     this.eventBus = options.eventBus;
-    
+
     // V2 모듈 필수 속성들
     this.isInitialized = false;
     this.serviceBuilder = options.serviceBuilder || null;
-    
+
     // 서비스 인스턴스
     this.todoService = null;
-    
+
     // 모듈 설정
     this.config = {
       maxTodosPerUser: parseInt(process.env.TODO_MAX_PER_USER) || 50,
@@ -55,10 +57,10 @@ class TodoModuleV2 {
 
     // 사용자 상태 관리
     this.userStates = new Map();
-    
+
     // 이벤트 구독 관리
     this.subscriptions = [];
-    
+
     // 30분마다 만료된 사용자 상태 정리
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredStates();
@@ -83,10 +85,10 @@ class TodoModuleV2 {
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
-      
+
       // 초기화 완료 표시
       this.isInitialized = true;
-      
+
       logger.success("📝 TodoModuleV2 초기화 완료 (EventBus 기반)");
       return true;
     } catch (error) {
@@ -172,20 +174,20 @@ class TodoModuleV2 {
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
-    
+
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
-      'menu': () => this.showMenu(userId, chatId),
-      'list': () => this.showList(userId, chatId, params),
-      'add': () => this.startAddFlow(userId, chatId),
-      'complete': () => this.publishCompleteRequest(userId, chatId, params),
-      'delete': () => this.publishDeleteRequest(userId, chatId, params),
-      'edit': () => this.startEditFlow(userId, chatId, params),
-      'stats': () => this.showStats(userId, chatId),
-      'weekly': () => this.showWeekly(userId, chatId),
-      'remind_list': () => this.showRemindList(userId, chatId)
+      menu: () => this.showMenu(userId, chatId),
+      list: () => this.showList(userId, chatId, params),
+      add: () => this.startAddFlow(userId, chatId),
+      complete: () => this.publishCompleteRequest(userId, chatId, params),
+      delete: () => this.publishDeleteRequest(userId, chatId, params),
+      edit: () => this.startEditFlow(userId, chatId, params),
+      stats: () => this.showStats(userId, chatId),
+      weekly: () => this.showWeekly(userId, chatId),
+      remind_list: () => this.showRemindList(userId, chatId)
     };
-    
+
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
@@ -196,11 +198,11 @@ class TodoModuleV2 {
       // 결과가 없으면 기본 응답 반환
       return {
         type: subAction,
-        module: 'todo',
+        module: "todo",
         success: true
       };
     }
-    
+
     logger.debug(`TodoModuleV2: 알 수 없는 액션 - ${subAction}`);
     return null;
   }
@@ -212,21 +214,21 @@ class TodoModuleV2 {
     try {
       // 할일 통계 가져오기
       const stats = await this.todoService.getTodoStats(userId);
-      
+
       return {
-        type: 'menu',
-        module: 'todo',
+        type: "menu",
+        module: "todo",
         data: {
           userId,
           stats: stats.data || { total: 0, completed: 0, pending: 0 }
         }
       };
     } catch (error) {
-      logger.error('📋 할일 메뉴 표시 오류:', error);
+      logger.error("📋 할일 메뉴 표시 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '할일 메뉴를 불러오는데 실패했습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "할일 메뉴를 불러오는데 실패했습니다." }
       };
     }
   }
@@ -238,11 +240,11 @@ class TodoModuleV2 {
     try {
       // userId를 문자열로 변환하여 일관성 보장
       const userIdStr = String(userId);
-      
+
       // 사용자 입력 대기 상태 설정 (두 가지 방식 모두 지원)
       this.userStates.set(userIdStr, {
         awaitingInput: true,
-        action: 'add',
+        action: "add",
         state: this.constants.INPUT_STATES.WAITING_ADD_INPUT,
         chatId: chatId,
         timestamp: Date.now()
@@ -253,20 +255,20 @@ class TodoModuleV2 {
       });
 
       return {
-        type: 'input_request',
-        module: 'todo',
+        type: "input_request",
+        module: "todo",
         data: {
-          message: '새로운 할일을 입력해주세요:',
-          placeholder: '예: 프로젝트 문서 작성하기',
-          action: 'add'
+          message: "새로운 할일을 입력해주세요:",
+          placeholder: "예: 프로젝트 문서 작성하기",
+          action: "add"
         }
       };
     } catch (error) {
-      logger.error('📝 할일 추가 플로우 시작 오류:', error);
+      logger.error("📝 할일 추가 플로우 시작 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '할일 추가를 시작할 수 없습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "할일 추가를 시작할 수 없습니다." }
       };
     }
   }
@@ -277,11 +279,14 @@ class TodoModuleV2 {
   async showList(userId, chatId, params) {
     try {
       const page = params ? parseInt(params) : 1;
-      const result = await this.todoService.getTodos(userId, { page, limit: 10 });
-      
+      const result = await this.todoService.getTodos(userId, {
+        page,
+        limit: 10
+      });
+
       return {
-        type: 'list',
-        module: 'todo',
+        type: "list",
+        module: "todo",
         data: {
           todos: result.data?.todos || [],
           pagination: result.data?.pagination || { page: 1, totalPages: 1 },
@@ -289,11 +294,11 @@ class TodoModuleV2 {
         }
       };
     } catch (error) {
-      logger.error('📃 할일 목록 표시 오류:', error);
+      logger.error("📃 할일 목록 표시 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '할일 목록을 불러오는데 실패했습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "할일 목록을 불러오는데 실패했습니다." }
       };
     }
   }
@@ -305,26 +310,26 @@ class TodoModuleV2 {
     try {
       const todoId = params;
       if (!todoId) {
-        throw new Error('할일 ID가 필요합니다.');
+        throw new Error("할일 ID가 필요합니다.");
       }
 
-      await this.eventBus.publish('todo:complete:request', {
+      await this.eventBus.publish("todo:complete:request", {
         userId,
         chatId,
         todoId
       });
 
       return {
-        type: 'complete',
-        module: 'todo',
+        type: "complete",
+        module: "todo",
         data: { success: true, todoId }
       };
     } catch (error) {
-      logger.error('✅ 할일 완료 요청 발행 오류:', error);
+      logger.error("✅ 할일 완료 요청 발행 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '할일 완료 처리에 실패했습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "할일 완료 처리에 실패했습니다." }
       };
     }
   }
@@ -336,26 +341,26 @@ class TodoModuleV2 {
     try {
       const todoId = params;
       if (!todoId) {
-        throw new Error('할일 ID가 필요합니다.');
+        throw new Error("할일 ID가 필요합니다.");
       }
 
-      await this.eventBus.publish('todo:delete:request', {
+      await this.eventBus.publish("todo:delete:request", {
         userId,
         chatId,
         todoId
       });
 
       return {
-        type: 'delete',
-        module: 'todo',
+        type: "delete",
+        module: "todo",
         data: { success: true, todoId }
       };
     } catch (error) {
-      logger.error('🗑️ 할일 삭제 요청 발행 오류:', error);
+      logger.error("🗑️ 할일 삭제 요청 발행 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '할일 삭제 처리에 실패했습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "할일 삭제 처리에 실패했습니다." }
       };
     }
   }
@@ -367,40 +372,40 @@ class TodoModuleV2 {
     try {
       const todoId = params;
       if (!todoId) {
-        throw new Error('할일 ID가 필요합니다.');
+        throw new Error("할일 ID가 필요합니다.");
       }
 
       // 기존 할일 가져오기
       const todoResult = await this.todoService.getTodo(userId, todoId);
       if (!todoResult.success) {
-        throw new Error('할일을 찾을 수 없습니다.');
+        throw new Error("할일을 찾을 수 없습니다.");
       }
 
       // 사용자 수정 대기 상태 설정
       this.userStates.set(userId, {
         awaitingInput: true,
-        action: 'edit',
+        action: "edit",
         todoId: todoId,
         chatId: chatId,
         timestamp: Date.now()
       });
 
       return {
-        type: 'input_request',
-        module: 'todo',
+        type: "input_request",
+        module: "todo",
         data: {
           message: `할일을 수정해주세요:\n\n현재: ${todoResult.data.text}`,
-          placeholder: '수정할 내용을 입력하세요',
-          action: 'edit',
+          placeholder: "수정할 내용을 입력하세요",
+          action: "edit",
           todoId: todoId
         }
       };
     } catch (error) {
-      logger.error('✏️ 할일 수정 플로우 시작 오류:', error);
+      logger.error("✏️ 할일 수정 플로우 시작 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '할일 수정을 시작할 수 없습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "할일 수정을 시작할 수 없습니다." }
       };
     }
   }
@@ -432,12 +437,11 @@ class TodoModuleV2 {
         text: this.formatTodoList(result),
         options: {
           reply_markup: this.createListKeyboard(result, page),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('📋 할일 목록 조회 실패:', error);
+      logger.error("📋 할일 목록 조회 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -446,7 +450,7 @@ class TodoModuleV2 {
    * ➕ 할일 생성 요청 처리
    */
   async handleCreateRequest(event) {
-    const { userId, chatId, text, priority = 'medium' } = event.payload;
+    const { userId, chatId, text, priority = "medium" } = event.payload;
 
     try {
       // 최대 개수 체크
@@ -455,7 +459,7 @@ class TodoModuleV2 {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: `❌ 할일은 최대 ${this.config.maxTodosPerUser}개까지만 등록할 수 있습니다.`,
-          options: { parse_mode: 'Markdown' }
+          options: { parse_mode: "Markdown" }
         });
         return;
       }
@@ -482,12 +486,11 @@ class TodoModuleV2 {
         text: `✅ 할일이 추가되었습니다!\n\n📝 *${this.escapeMarkdown(todo.text)}*`,
         options: {
           reply_markup: this.createAfterAddKeyboard(todo._id),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('➕ 할일 생성 실패:', error);
+      logger.error("➕ 할일 생성 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -500,12 +503,12 @@ class TodoModuleV2 {
 
     try {
       const todo = await this.todoService.toggleTodo(userId, todoId);
-      
+
       if (!todo) {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
-          text: '❌ 할일을 찾을 수 없습니다.',
-          options: { parse_mode: 'Markdown' }
+          text: "❌ 할일을 찾을 수 없습니다.",
+          options: { parse_mode: "Markdown" }
         });
         return;
       }
@@ -518,8 +521,8 @@ class TodoModuleV2 {
         completedAt: todo.completedAt
       });
 
-      const statusEmoji = todo.status === 'completed' ? '✅' : '⏸️';
-      const statusText = todo.status === 'completed' ? '완료' : '미완료';
+      const statusEmoji = todo.status === "completed" ? "✅" : "⏸️";
+      const statusText = todo.status === "completed" ? "완료" : "미완료";
 
       // 성공 메시지 렌더링
       await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
@@ -527,12 +530,11 @@ class TodoModuleV2 {
         text: `${statusEmoji} 할일을 ${statusText} 처리했습니다!\n\n📝 *${this.escapeMarkdown(todo.text)}*`,
         options: {
           reply_markup: this.createAfterActionKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('✅ 할일 완료 처리 실패:', error);
+      logger.error("✅ 할일 완료 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -545,12 +547,12 @@ class TodoModuleV2 {
 
     try {
       const result = await this.todoService.deleteTodo(userId, todoId);
-      
+
       if (!result.success) {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
-          text: '❌ 할일을 찾을 수 없습니다.',
-          options: { parse_mode: 'Markdown' }
+          text: "❌ 할일을 찾을 수 없습니다.",
+          options: { parse_mode: "Markdown" }
         });
         return;
       }
@@ -565,15 +567,14 @@ class TodoModuleV2 {
       // 성공 메시지 렌더링
       await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
         chatId,
-        text: '🗑️ 할일이 삭제되었습니다.',
+        text: "🗑️ 할일이 삭제되었습니다.",
         options: {
           reply_markup: this.createAfterActionKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('🗑️ 할일 삭제 실패:', error);
+      logger.error("🗑️ 할일 삭제 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -595,7 +596,7 @@ class TodoModuleV2 {
             userId,
             chatId,
             text,
-            priority: userState.priority || 'medium'
+            priority: userState.priority || "medium"
           });
           this.clearUserState(userId);
           break;
@@ -612,25 +613,24 @@ class TodoModuleV2 {
           break;
       }
     } catch (error) {
-      logger.error('💬 사용자 메시지 처리 실패:', error);
+      logger.error("💬 사용자 메시지 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
 
-
   async publishError(error, originalEvent) {
     const chatId = originalEvent?.payload?.chatId;
-    
+
     if (chatId) {
       await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
         chatId,
-        error: error.message || '처리 중 오류가 발생했습니다.'
+        error: error.message || "처리 중 오류가 발생했습니다."
       });
     }
 
     await this.eventBus.publish(EVENTS.SYSTEM.ERROR, {
       error: error.message,
-      module: 'TodoModuleV2',
+      module: "TodoModuleV2",
       stack: error.stack,
       originalEvent: originalEvent?.name,
       timestamp: new Date().toISOString()
@@ -644,16 +644,14 @@ class TodoModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '📋 목록 보기', callback_data: 'todo:list' },
-          { text: '➕ 추가', callback_data: 'todo:add' }
+          { text: "📋 목록 보기", callback_data: "todo:list" },
+          { text: "➕ 추가", callback_data: "todo:add" }
         ],
         [
-          { text: '📊 통계', callback_data: 'todo:stats' },
-          { text: '🗓️ 오늘 할일', callback_data: 'todo:today' }
+          { text: "📊 통계", callback_data: "todo:stats" },
+          { text: "🗓️ 오늘 할일", callback_data: "todo:today" }
         ],
-        [
-          { text: '🏠 메인 메뉴', callback_data: 'system:menu' }
-        ]
+        [{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]
       ]
     };
   }
@@ -665,22 +663,22 @@ class TodoModuleV2 {
     // 할일 버튼들 (2열로 배치)
     for (let i = 0; i < todos.length; i += 2) {
       const row = [];
-      
+
       const todo1 = todos[i];
-      const emoji1 = todo1.status === 'completed' ? '✅' : '⏸️';
+      const emoji1 = todo1.status === "completed" ? "✅" : "⏸️";
       const text1 = `${emoji1} ${this.truncateText(todo1.text, 20)}`;
-      row.push({ 
-        text: text1, 
-        callback_data: `todo:detail:${todo1._id}` 
+      row.push({
+        text: text1,
+        callback_data: `todo:detail:${todo1._id}`
       });
 
       if (i + 1 < todos.length) {
         const todo2 = todos[i + 1];
-        const emoji2 = todo2.status === 'completed' ? '✅' : '⏸️';
+        const emoji2 = todo2.status === "completed" ? "✅" : "⏸️";
         const text2 = `${emoji2} ${this.truncateText(todo2.text, 20)}`;
-        row.push({ 
-          text: text2, 
-          callback_data: `todo:detail:${todo2._id}` 
+        row.push({
+          text: text2,
+          callback_data: `todo:detail:${todo2._id}`
         });
       }
 
@@ -690,15 +688,15 @@ class TodoModuleV2 {
     // 페이지네이션
     const paginationRow = [];
     if (pagination.hasPrev) {
-      paginationRow.push({ 
-        text: '⬅️ 이전', 
-        callback_data: `todo:list:${currentPage - 1}` 
+      paginationRow.push({
+        text: "⬅️ 이전",
+        callback_data: `todo:list:${currentPage - 1}`
       });
     }
     if (pagination.hasNext) {
-      paginationRow.push({ 
-        text: '다음 ➡️', 
-        callback_data: `todo:list:${currentPage + 1}` 
+      paginationRow.push({
+        text: "다음 ➡️",
+        callback_data: `todo:list:${currentPage + 1}`
       });
     }
     if (paginationRow.length > 0) {
@@ -707,12 +705,10 @@ class TodoModuleV2 {
 
     // 메뉴 버튼
     keyboard.push([
-      { text: '➕ 추가', callback_data: 'todo:add' },
-      { text: '🔄 새로고침', callback_data: `todo:list:${currentPage}` }
+      { text: "➕ 추가", callback_data: "todo:add" },
+      { text: "🔄 새로고침", callback_data: `todo:list:${currentPage}` }
     ]);
-    keyboard.push([
-      { text: '🏠 메뉴', callback_data: 'todo:menu' }
-    ]);
+    keyboard.push([{ text: "🏠 메뉴", callback_data: "todo:menu" }]);
 
     return { inline_keyboard: keyboard };
   }
@@ -721,12 +717,10 @@ class TodoModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '📋 목록 보기', callback_data: 'todo:list' },
-          { text: '➕ 또 추가', callback_data: 'todo:add' }
+          { text: "📋 목록 보기", callback_data: "todo:list" },
+          { text: "➕ 또 추가", callback_data: "todo:add" }
         ],
-        [
-          { text: '🏠 메뉴', callback_data: 'todo:menu' }
-        ]
+        [{ text: "🏠 메뉴", callback_data: "todo:menu" }]
       ]
     };
   }
@@ -735,12 +729,10 @@ class TodoModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '📋 목록 보기', callback_data: 'todo:list' },
-          { text: '➕ 추가', callback_data: 'todo:add' }
+          { text: "📋 목록 보기", callback_data: "todo:list" },
+          { text: "➕ 추가", callback_data: "todo:add" }
         ],
-        [
-          { text: '🏠 메뉴', callback_data: 'todo:menu' }
-        ]
+        [{ text: "🏠 메뉴", callback_data: "todo:menu" }]
       ]
     };
   }
@@ -750,25 +742,27 @@ class TodoModuleV2 {
    */
   formatTodoList(result) {
     const { todos, pagination, stats } = result;
-    
+
     if (todos.length === 0) {
-      return '📭 *할일이 없습니다*\n\n➕ 버튼을 눌러 할일을 추가해보세요!';
+      return "📭 *할일이 없습니다*\n\n➕ 버튼을 눌러 할일을 추가해보세요!";
     }
 
-    const lines = ['📋 *할일 목록*\n'];
-    
+    const lines = ["📋 *할일 목록*\n"];
+
     todos.forEach((todo, index) => {
-      const emoji = todo.status === 'completed' ? '✅' : '⏸️';
+      const emoji = todo.status === "completed" ? "✅" : "⏸️";
       const priority = this.getPriorityEmoji(todo.priority);
       const text = this.escapeMarkdown(todo.text);
-      
+
       lines.push(`${emoji} ${priority} ${text}`);
     });
 
-    lines.push('');
-    lines.push(`📊 ${pagination.page}/${pagination.totalPages} 페이지 | 전체 ${stats.total}개`);
+    lines.push("");
+    lines.push(
+      `📊 ${pagination.page}/${pagination.totalPages} 페이지 | 전체 ${stats.total}개`
+    );
 
-    return lines.join('\n');
+    return lines.join("\n");
   }
 
   /**
@@ -788,7 +782,8 @@ class TodoModuleV2 {
   cleanupExpiredStates() {
     const now = Date.now();
     this.userStates.forEach((state, userId) => {
-      if (now - state.timestamp > 1800000) { // 30분
+      if (now - state.timestamp > 1800000) {
+        // 30분
         this.userStates.delete(userId);
         logger.debug(`🧹 만료된 TodoModuleV2 사용자 상태 정리: ${userId}`);
       }
@@ -797,22 +792,22 @@ class TodoModuleV2 {
 
   getPriorityEmoji(priority) {
     const emojis = {
-      urgent: '🔴',
-      high: '🟠',
-      medium: '🟡',
-      low: '🟢'
+      urgent: "🔴",
+      high: "🟠",
+      medium: "🟡",
+      low: "🟢"
     };
-    return emojis[priority] || '';
+    return emojis[priority] || "";
   }
 
   truncateText(text, maxLength) {
     if (text.length <= maxLength) return text;
-    return text.substring(0, maxLength - 3) + '...';
+    return text.substring(0, maxLength - 3) + "...";
   }
 
   escapeMarkdown(text) {
-    if (!text) return '';
-    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, '\\$&');
+    if (!text) return "";
+    return text.replace(/[_*[\]()~`>#+=|{}.!-]/g, "\\$&");
   }
 
   /**
@@ -825,29 +820,44 @@ class TodoModuleV2 {
       const text = message.text?.trim();
       const chatId = message.chat.id;
 
-      logger.debug(`📝 TodoModule 메시지 수신: 사용자 ${userId}, 텍스트: "${text}"`);
+      logger.debug(
+        `📝 TodoModule 메시지 수신: 사용자 ${userId}, 텍스트: "${text}"`
+      );
 
       // 할일 입력 대기 상태인지 확인
       const userState = this.userStates.get(userId);
       logger.debug(`📝 사용자 상태 확인:`, { userId, userState });
-      
+
       // awaitingInput 또는 state 기반으로 확인
       if (userState?.awaitingInput || userState?.state) {
-        logger.debug(`📝 할일 입력 처리: 사용자 ${userId}, 액션: ${userState.action || userState.state}, 텍스트: "${text}"`);
-        
-        const action = userState.action || (userState.state === this.constants.INPUT_STATES.WAITING_ADD_INPUT ? 'add' : 
-                      userState.state === this.constants.INPUT_STATES.WAITING_EDIT_INPUT ? 'edit' : null);
-        
-        if (action === 'add' || userState.state === this.constants.INPUT_STATES.WAITING_ADD_INPUT) {
+        logger.debug(
+          `📝 할일 입력 처리: 사용자 ${userId}, 액션: ${userState.action || userState.state}, 텍스트: "${text}"`
+        );
+
+        const action =
+          userState.action ||
+          (userState.state === this.constants.INPUT_STATES.WAITING_ADD_INPUT
+            ? "add"
+            : userState.state === this.constants.INPUT_STATES.WAITING_EDIT_INPUT
+              ? "edit"
+              : null);
+
+        if (
+          action === "add" ||
+          userState.state === this.constants.INPUT_STATES.WAITING_ADD_INPUT
+        ) {
           // 할일 생성 이벤트 발행
-          await this.eventBus.publish('todo:create:request', {
+          await this.eventBus.publish("todo:create:request", {
             userId,
             chatId,
             text: text
           });
-        } else if (action === 'edit' || userState.state === this.constants.INPUT_STATES.WAITING_EDIT_INPUT) {
+        } else if (
+          action === "edit" ||
+          userState.state === this.constants.INPUT_STATES.WAITING_EDIT_INPUT
+        ) {
           // 할일 수정 이벤트 발행
-          await this.eventBus.publish('todo:update:request', {
+          await this.eventBus.publish("todo:update:request", {
             userId,
             chatId,
             todoId: userState.todoId,
@@ -857,13 +867,13 @@ class TodoModuleV2 {
 
         // 사용자 상태 초기화
         this.userStates.delete(userId);
-        
+
         return true; // 메시지를 처리했음을 알림
       }
 
       return false; // 이 모듈에서 처리하지 않음
     } catch (error) {
-      logger.error('💬 TodoModule 메시지 처리 오류:', error);
+      logger.error("💬 TodoModule 메시지 처리 오류:", error);
       return false;
     }
   }
@@ -874,29 +884,29 @@ class TodoModuleV2 {
   async showStats(userId, chatId) {
     try {
       const statsResult = await this.todoService.getStats(userId);
-      
+
       if (!statsResult.success) {
         return {
-          type: 'error',
-          module: 'todo',
-          data: { message: '통계 정보를 불러오는데 실패했습니다.' }
+          type: "error",
+          module: "todo",
+          data: { message: "통계 정보를 불러오는데 실패했습니다." }
         };
       }
 
       return {
-        type: 'stats',
-        module: 'todo',
+        type: "stats",
+        module: "todo",
         data: {
           stats: statsResult.data,
           userId: userId
         }
       };
     } catch (error) {
-      logger.error('📊 할일 통계 표시 오류:', error);
+      logger.error("📊 할일 통계 표시 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '통계 정보를 불러오는데 실패했습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "통계 정보를 불러오는데 실패했습니다." }
       };
     }
   }
@@ -907,29 +917,29 @@ class TodoModuleV2 {
   async showWeekly(userId, chatId) {
     try {
       const weeklyResult = await this.todoService.getWeeklyTodos(userId);
-      
+
       if (!weeklyResult.success) {
         return {
-          type: 'error',
-          module: 'todo',
-          data: { message: '주간 할일 정보를 불러오는데 실패했습니다.' }
+          type: "error",
+          module: "todo",
+          data: { message: "주간 할일 정보를 불러오는데 실패했습니다." }
         };
       }
 
       return {
-        type: 'weekly',
-        module: 'todo',
+        type: "weekly",
+        module: "todo",
         data: {
           weeklyTodos: weeklyResult.data,
           userId: userId
         }
       };
     } catch (error) {
-      logger.error('📅 주간 할일 표시 오류:', error);
+      logger.error("📅 주간 할일 표시 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '주간 할일 정보를 불러오는데 실패했습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "주간 할일 정보를 불러오는데 실패했습니다." }
       };
     }
   }
@@ -940,29 +950,29 @@ class TodoModuleV2 {
   async showRemindList(userId, chatId) {
     try {
       const reminderResult = await this.todoService.getReminders(userId);
-      
+
       if (!reminderResult.success) {
         return {
-          type: 'error',
-          module: 'todo',
-          data: { message: '알림 목록을 불러오는데 실패했습니다.' }
+          type: "error",
+          module: "todo",
+          data: { message: "알림 목록을 불러오는데 실패했습니다." }
         };
       }
 
       return {
-        type: 'remind_list',
-        module: 'todo',
+        type: "remind_list",
+        module: "todo",
         data: {
           reminders: reminderResult.data,
           userId: userId
         }
       };
     } catch (error) {
-      logger.error('🔔 알림 목록 표시 오류:', error);
+      logger.error("🔔 알림 목록 표시 오류:", error);
       return {
-        type: 'error',
-        module: 'todo',
-        data: { message: '알림 목록을 불러오는데 실패했습니다.' }
+        type: "error",
+        module: "todo",
+        data: { message: "알림 목록을 불러오는데 실패했습니다." }
       };
     }
   }
@@ -972,26 +982,26 @@ class TodoModuleV2 {
    */
   async cleanup() {
     try {
-      logger.info('🧹 TodoModuleV2 정리 시작...');
-      
+      logger.info("🧹 TodoModuleV2 정리 시작...");
+
       // 인터벌 정리
       if (this.cleanupInterval) {
         clearInterval(this.cleanupInterval);
       }
-      
+
       // 이벤트 구독 해제
-      this.subscriptions.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
+      this.subscriptions.forEach((unsubscribe) => {
+        if (typeof unsubscribe === "function") {
           unsubscribe();
         }
       });
-      
+
       // 사용자 상태 정리
       this.userStates.clear();
-      
-      logger.success('✅ TodoModuleV2 정리 완료');
+
+      logger.success("✅ TodoModuleV2 정리 완료");
     } catch (error) {
-      logger.error('❌ TodoModuleV2 정리 실패:', error);
+      logger.error("❌ TodoModuleV2 정리 실패:", error);
       throw error;
     }
   }

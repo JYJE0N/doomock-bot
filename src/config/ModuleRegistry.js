@@ -237,7 +237,7 @@ function getModuleInfo(moduleKey) {
  * 🔧 모듈 설정 조회 (ModuleLoader에서 사용)
  */
 function getModuleConfig(moduleKey) {
-  return UNIFIED_MODULES.find(module => module.key === moduleKey);
+  return UNIFIED_MODULES.find((module) => module.key === moduleKey);
 }
 
 /**

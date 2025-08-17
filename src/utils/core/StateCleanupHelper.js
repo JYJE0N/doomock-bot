@@ -3,7 +3,7 @@ const logger = require("./Logger");
 
 /**
  * 🧹 StateCleanupHelper - 모듈 상태 자동 정리 유틸리티
- * 
+ *
  * V2 모듈들의 userStates 메모리 누수 방지를 위한 공통 정리 시스템
  */
 class StateCleanupHelper {
@@ -15,25 +15,25 @@ class StateCleanupHelper {
    * @returns {number} 정리된 상태 수
    */
   static cleanupExpiredStates(userStates, moduleName, timeout = 300000) {
-    if (!userStates || typeof userStates.forEach !== 'function') {
+    if (!userStates || typeof userStates.forEach !== "function") {
       return 0;
     }
 
     const now = Date.now();
     const expired = [];
-    
+
     userStates.forEach((state, userId) => {
       const timestamp = state.timestamp || state.createdAt || 0;
       if (now - timestamp > timeout) {
         expired.push(userId);
       }
     });
-    
+
     if (expired.length > 0) {
-      expired.forEach(userId => userStates.delete(userId));
+      expired.forEach((userId) => userStates.delete(userId));
       logger.debug(`🧹 ${moduleName}: ${expired.length}개 만료 상태 정리`);
     }
-    
+
     return expired.length;
   }
 
@@ -75,16 +75,20 @@ class StateCleanupHelper {
   static setupAutoCleanup(userStates, moduleName, options = {}) {
     const {
       cleanupInterval = 60000, // 1분
-      timeout = 300000,        // 5분
-      maxSize = 1000          // 최대 1000개
+      timeout = 300000, // 5분
+      maxSize = 1000 // 최대 1000개
     } = options;
 
     return setInterval(() => {
       try {
         let totalCleaned = 0;
-        totalCleaned += this.cleanupExpiredStates(userStates, moduleName, timeout);
+        totalCleaned += this.cleanupExpiredStates(
+          userStates,
+          moduleName,
+          timeout
+        );
         totalCleaned += this.cleanupBySize(userStates, moduleName, maxSize);
-        
+
         if (totalCleaned > 0) {
           logger.debug(`🧹 ${moduleName}: 총 ${totalCleaned}개 상태 정리 완료`);
         }
@@ -104,7 +108,7 @@ class StateCleanupHelper {
     if (cleanupInterval) {
       clearInterval(cleanupInterval);
     }
-    
+
     if (userStates) {
       const stateCount = userStates.size;
       userStates.clear();

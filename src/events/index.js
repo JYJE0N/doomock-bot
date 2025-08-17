@@ -4,15 +4,15 @@
  */
 
 // 새로운 EventRegistry 사용
-const { 
-  EVENTS, 
-  EVENT_SCHEMAS, 
-  EVENT_PRIORITIES, 
-  EVENT_FLOWS, 
+const {
+  EVENTS,
+  EVENT_SCHEMAS,
+  EVENT_PRIORITIES,
+  EVENT_FLOWS,
   EVENT_COLORS,
   EventRegistry,
-  getEventRegistry 
-} = require('./EventRegistry');
+  getEventRegistry
+} = require("./EventRegistry");
 
 // 레거시 호환성을 위한 내보내기
 module.exports = {

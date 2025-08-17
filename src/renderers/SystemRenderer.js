@@ -150,15 +150,19 @@ class SystemRenderer extends BaseRenderer {
     } = safeData;
 
     // system 객체 안전성 확인
-    if (!system || typeof system !== 'object') {
-      logger.warn('SystemRenderer: system 데이터가 유효하지 않음', { data: safeData });
-      const errorMessage = '⚠️ 시스템 상태 정보를 가져올 수 없습니다.';
+    if (!system || typeof system !== "object") {
+      logger.warn("SystemRenderer: system 데이터가 유효하지 않음", {
+        data: safeData
+      });
+      const errorMessage = "⚠️ 시스템 상태 정보를 가져올 수 없습니다.";
       return await this.sendMessage(ctx, errorMessage, {
         reply_markup: {
-          inline_keyboard: [[
-            { text: '🔄 새로고침', callback_data: 'system:status' },
-            { text: '🏠 메인 메뉴', callback_data: 'navigation:main_menu' }
-          ]]
+          inline_keyboard: [
+            [
+              { text: "🔄 새로고침", callback_data: "system:status" },
+              { text: "🏠 메인 메뉴", callback_data: "navigation:main_menu" }
+            ]
+          ]
         }
       });
     }

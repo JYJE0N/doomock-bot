@@ -298,5 +298,4 @@ class TelegrafEventBus extends EventEmitter {
   }
 }
 
-
 module.exports = TelegrafEventBus;

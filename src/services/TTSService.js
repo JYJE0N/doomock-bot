@@ -29,7 +29,9 @@ class TTSService extends BaseService {
       const privateKey = process.env.GOOGLE_PRIVATE_KEY?.replace(/\\n/g, "\n");
 
       if (!projectId || !clientEmail || !privateKey) {
-        logger.warn("⚠️ Google Cloud TTS 인증 정보가 부족함 - 테스트 모드로 동작");
+        logger.warn(
+          "⚠️ Google Cloud TTS 인증 정보가 부족함 - 테스트 모드로 동작"
+        );
         this.isTestMode = true;
         await this.fileHelper.initialize();
         return;

@@ -423,7 +423,7 @@ class TimerService extends BaseService {
     try {
       // 캐시 확인
       const cacheKey = `weekly_${userId}`;
-      const cached = this.cache.get('timer_stats', cacheKey);
+      const cached = this.cache.get("timer_stats", cacheKey);
       if (cached) {
         return this.createSuccessResponse(cached, "캐시된 주간 통계");
       }
@@ -448,7 +448,7 @@ class TimerService extends BaseService {
       const stats = this.calculateWeeklyStats(sessions, weekStart);
 
       // 캐시 저장
-      this.cache.set('timer_stats', cacheKey, stats, 300000); // 5분
+      this.cache.set("timer_stats", cacheKey, stats, 300000); // 5분
 
       return this.createSuccessResponse(stats, "주간 통계를 조회했습니다.");
     } catch (error) {
@@ -845,7 +845,7 @@ class TimerService extends BaseService {
    * 서비스 정리
    */
   async cleanup() {
-    this.cache.clearNamespace('timer_stats');
+    this.cache.clearNamespace("timer_stats");
     await super.cleanup();
   }
 }

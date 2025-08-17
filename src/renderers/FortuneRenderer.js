@@ -422,7 +422,7 @@ class FortuneRenderer extends BaseRenderer {
 
   async renderError(data, ctx) {
     const { message = "알 수 없는 오류가 발생했습니다." } = data;
-    
+
     const text = `❌ *오류 발생*
 
 ${message}

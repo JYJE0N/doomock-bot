@@ -10,7 +10,7 @@ const EVENTS = {
   // 🚀 시스템 이벤트
   SYSTEM: {
     STARTUP: "system:startup",
-    SHUTDOWN: "system:shutdown", 
+    SHUTDOWN: "system:shutdown",
     READY: "system:ready",
     ERROR: "system:error",
     HEALTH_CHECK: "system:health_check",
@@ -20,17 +20,17 @@ const EVENTS = {
   // 👤 사용자 이벤트
   USER: {
     COMMAND: "user:command",
-    CALLBACK: "user:callback", 
+    CALLBACK: "user:callback",
     MESSAGE: "user:message",
     SESSION_START: "user:session:start",
     SESSION_END: "user:session:end"
   },
 
-  // 📝 할일 관리 이벤트  
+  // 📝 할일 관리 이벤트
   TODO: {
     CREATE_REQUEST: "todo:create:request",
     CREATED: "todo:created",
-    UPDATE_REQUEST: "todo:update:request", 
+    UPDATE_REQUEST: "todo:update:request",
     UPDATED: "todo:updated",
     DELETE_REQUEST: "todo:delete:request",
     DELETED: "todo:deleted",
@@ -45,52 +45,52 @@ const EVENTS = {
     // 메뉴 관련
     MENU_REQUEST: "timer:menu:request",
     MENU_READY: "timer:menu:ready",
-    
+
     // 일반 타이머 관련
     START_REQUEST: "timer:start:request",
     STARTED: "timer:started",
-    PAUSE_REQUEST: "timer:pause:request", 
+    PAUSE_REQUEST: "timer:pause:request",
     PAUSED: "timer:paused",
     RESUME_REQUEST: "timer:resume:request",
-    RESUMED: "timer:resumed", 
+    RESUMED: "timer:resumed",
     STOP_REQUEST: "timer:stop:request",
     STOPPED: "timer:stopped",
     RESET_REQUEST: "timer:reset:request",
     RESET_COMPLETE: "timer:reset:complete",
-    
+
     // 타이머 상태 관련
     REFRESH_REQUEST: "timer:refresh:request",
     STATUS_UPDATE: "timer:status:update",
     TICK: "timer:tick",
     COMPLETED: "timer:completed",
-    
+
     // 뽀모도로 관련
     POMODORO_START_REQUEST: "timer:pomodoro:start:request",
     POMODORO_STARTED: "timer:pomodoro:started",
     POMODORO_CYCLE_COMPLETE: "timer:pomodoro:cycle:complete",
     POMODORO_SET_COMPLETE: "timer:pomodoro:set:complete",
     POMODORO_TRANSITION: "timer:pomodoro:transition",
-    
+
     // 커스텀 타이머 관련
     CUSTOM_SETUP_REQUEST: "timer:custom:setup:request",
     CUSTOM_SETUP_READY: "timer:custom:setup:ready",
     CUSTOM_START_REQUEST: "timer:custom:start:request",
-    
+
     // 통계 관련
     STATS_REQUEST: "timer:stats:request",
     STATS_READY: "timer:stats:ready",
     WEEKLY_STATS_REQUEST: "timer:weekly:stats:request",
     WEEKLY_STATS_READY: "timer:weekly:stats:ready",
-    
+
     // 히스토리 관련
     HISTORY_REQUEST: "timer:history:request",
     HISTORY_READY: "timer:history:ready",
-    
+
     // 알림 관련
     NOTIFICATION_SENT: "timer:notification:sent",
     COMPLETION_ALERT: "timer:completion:alert",
     TRANSITION_ALERT: "timer:transition:alert",
-    
+
     // 오류 처리
     ERROR: "timer:error",
     SESSION_CLEANUP: "timer:session:cleanup"
@@ -101,21 +101,21 @@ const EVENTS = {
     // 메뉴 관련
     MENU_REQUEST: "worktime:menu:request",
     MENU_READY: "worktime:menu:ready",
-    
+
     // 출퇴근 관련
     CHECK_IN_REQUEST: "worktime:checkin:request",
-    CHECKED_IN: "worktime:checked_in", 
+    CHECKED_IN: "worktime:checked_in",
     CHECK_IN_ERROR: "worktime:checkin:error",
     CHECK_OUT_REQUEST: "worktime:checkout:request",
     CHECKED_OUT: "worktime:checked_out",
     CHECK_OUT_ERROR: "worktime:checkout:error",
-    
+
     // 상태 조회 관련
     TODAY_REQUEST: "worktime:today:request",
     TODAY_READY: "worktime:today:ready",
-    STATUS_REQUEST: "worktime:status:request", 
+    STATUS_REQUEST: "worktime:status:request",
     STATUS_READY: "worktime:status:ready",
-    
+
     // 통계 관련
     WEEKLY_REQUEST: "worktime:weekly:request",
     WEEKLY_READY: "worktime:weekly:ready",
@@ -123,16 +123,16 @@ const EVENTS = {
     MONTHLY_READY: "worktime:monthly:ready",
     STATS_REQUEST: "worktime:stats:request",
     STATS_READY: "worktime:stats:ready",
-    
+
     // 이력 관련
     HISTORY_REQUEST: "worktime:history:request",
     HISTORY_READY: "worktime:history:ready",
-    
+
     // 설정 관련
     SETTINGS_REQUEST: "worktime:settings:request",
     SETTINGS_READY: "worktime:settings:ready",
     WORK_TIME_SET: "worktime:work_time:set",
-    
+
     // 휴식/점심 관련
     BREAK_START: "worktime:break:start",
     BREAK_END: "worktime:break:end",
@@ -145,26 +145,26 @@ const EVENTS = {
     // 메뉴 관련
     MENU_REQUEST: "leave:menu:request",
     MENU_READY: "leave:menu:ready",
-    MONTHLY_REQUEST: "leave:monthly:request", 
+    MONTHLY_REQUEST: "leave:monthly:request",
     MONTHLY_READY: "leave:monthly:ready",
-    
+
     // 연차 사용 관련
     USE_FORM_REQUEST: "leave:use:form:request",
     USE_FORM_READY: "leave:use:form:ready",
     USE_REQUEST: "leave:use:request",
     USED: "leave:used",
     USE_ERROR: "leave:use:error",
-    
-    // 사용자 입력 관련  
+
+    // 사용자 입력 관련
     CUSTOM_INPUT_START: "leave:custom:input:start",
     CUSTOM_INPUT_RECEIVED: "leave:custom:input:received",
     CUSTOM_INPUT_TIMEOUT: "leave:custom:input:timeout",
-    
+
     // 설정 관련
-    SETTINGS_REQUEST: "leave:settings:request", 
+    SETTINGS_REQUEST: "leave:settings:request",
     SETTINGS_READY: "leave:settings:ready",
     JOIN_DATE_SET: "leave:joindate:set",
-    
+
     // 데이터 관련
     BALANCE_REQUEST: "leave:balance:request",
     BALANCE_READY: "leave:balance:ready",
@@ -172,33 +172,33 @@ const EVENTS = {
     HISTORY_READY: "leave:history:ready"
   },
 
-  // 🌤️ 날씨 이벤트  
+  // 🌤️ 날씨 이벤트
   WEATHER: {
     // 현재 날씨 관련
     CURRENT_REQUEST: "weather:current:request",
     CURRENT_READY: "weather:current:ready",
     CURRENT_ERROR: "weather:current:error",
-    
+
     // 예보 관련
-    FORECAST_REQUEST: "weather:forecast:request", 
+    FORECAST_REQUEST: "weather:forecast:request",
     FORECAST_READY: "weather:forecast:ready",
     FORECAST_ERROR: "weather:forecast:error",
-    
+
     // 도시별 날씨 관련
     CITY_REQUEST: "weather:city:request",
     CITY_READY: "weather:city:ready",
     CITY_LIST_REQUEST: "weather:city:list:request",
     CITY_LIST_READY: "weather:city:list:ready",
-    
+
     // 설정 관련
     DEFAULT_CITY_SET: "weather:default:city:set",
     DEFAULT_CITY_REQUEST: "weather:default:city:request",
     LOCATION_SET: "weather:location:set",
-    
+
     // 메뉴 관련
     MENU_REQUEST: "weather:menu:request",
     MENU_READY: "weather:menu:ready",
-    
+
     // 도움말
     HELP_REQUEST: "weather:help:request",
     HELP_READY: "weather:help:ready"
@@ -209,46 +209,46 @@ const EVENTS = {
     // 메뉴 관련
     MENU_REQUEST: "fortune:menu:request",
     MENU_READY: "fortune:menu:ready",
-    
+
     // 카드 뽑기 관련
     DRAW_REQUEST: "fortune:draw:request",
     DRAW_READY: "fortune:draw:ready",
     DRAW_ERROR: "fortune:draw:error",
-    
+
     // 운세 타입별
     SINGLE_CARD_REQUEST: "fortune:single:request",
     SINGLE_CARD_READY: "fortune:single:ready",
-    TRIPLE_CARD_REQUEST: "fortune:triple:request", 
+    TRIPLE_CARD_REQUEST: "fortune:triple:request",
     TRIPLE_CARD_READY: "fortune:triple:ready",
     CELTIC_CROSS_REQUEST: "fortune:celtic:request",
     CELTIC_CROSS_READY: "fortune:celtic:ready",
-    
+
     // 질문 입력 관련 (캘틱 크로스용)
     QUESTION_REQUEST: "fortune:question:request",
     QUESTION_RECEIVED: "fortune:question:received",
     QUESTION_CANCEL: "fortune:question:cancel",
     QUESTION_TIMEOUT: "fortune:question:timeout",
     QUESTION_INVALID: "fortune:question:invalid",
-    
+
     // 카드 섞기
     SHUFFLE_REQUEST: "fortune:shuffle:request",
     SHUFFLE_READY: "fortune:shuffle:ready",
-    
+
     // 통계 및 이력
     STATS_REQUEST: "fortune:stats:request",
     STATS_READY: "fortune:stats:ready",
     HISTORY_REQUEST: "fortune:history:request",
     HISTORY_READY: "fortune:history:ready",
-    
+
     // 캘틱 상세보기
     CELTIC_DETAIL_REQUEST: "fortune:celtic:detail:request",
     CELTIC_DETAIL_READY: "fortune:celtic:detail:ready",
-    
+
     // 일일 제한
     DAILY_LIMIT_CHECK: "fortune:daily:limit:check",
     DAILY_LIMIT_EXCEEDED: "fortune:daily:limit:exceeded",
     DAILY_LIMIT_RESET: "fortune:daily:limit:reset",
-    
+
     // 일반 이벤트
     REQUEST: "fortune:request",
     READY: "fortune:ready",
@@ -260,45 +260,45 @@ const EVENTS = {
     // 메뉴 관련
     MENU_REQUEST: "tts:menu:request",
     MENU_READY: "tts:menu:ready",
-    
+
     // 텍스트 변환 관련
     CONVERT_REQUEST: "tts:convert:request",
     CONVERTED: "tts:converted",
     CONVERT_ERROR: "tts:convert:error",
-    
+
     // 음성 설정 관련
     VOICE_LIST_REQUEST: "tts:voice:list:request",
-    VOICE_LIST_READY: "tts:voice:list:ready", 
+    VOICE_LIST_READY: "tts:voice:list:ready",
     VOICE_SELECT_REQUEST: "tts:voice:select:request",
     VOICE_SELECTED: "tts:voice:selected",
     VOICE_CHANGE_REQUEST: "tts:voice:change:request",
     VOICE_CHANGED: "tts:voice:changed",
-    
+
     // 텍스트 입력 관련
     TEXT_INPUT_START: "tts:text:input:start",
     TEXT_INPUT_RECEIVED: "tts:text:input:received",
     TEXT_INPUT_CANCEL: "tts:text:input:cancel",
     TEXT_INPUT_TIMEOUT: "tts:text:input:timeout",
-    
+
     // 오디오 재생 관련
     PLAY_REQUEST: "tts:play:request",
     PLAYED: "tts:played",
     PLAY_ERROR: "tts:play:error",
-    
+
     // 공유 관련
     SHARE_REQUEST: "tts:share:request",
     SHARE_READY: "tts:share:ready",
     SHARE_ERROR: "tts:share:error",
-    
+
     // 설정 관련
     SETTINGS_REQUEST: "tts:settings:request",
     SETTINGS_READY: "tts:settings:ready",
     LANGUAGE_CHANGE: "tts:language:change",
-    
+
     // 도움말
     HELP_REQUEST: "tts:help:request",
     HELP_READY: "tts:help:ready",
-    
+
     // 일반 오류
     ERROR: "tts:error"
   },
@@ -306,7 +306,7 @@ const EVENTS = {
   // 🎨 렌더링 이벤트
   RENDER: {
     MESSAGE_REQUEST: "render:message:request",
-    MESSAGE_SENT: "render:message:sent", 
+    MESSAGE_SENT: "render:message:sent",
     MENU_REQUEST: "render:menu:request",
     MENU_SENT: "render:menu:sent",
     ERROR_REQUEST: "render:error:request",
@@ -318,7 +318,7 @@ const EVENTS = {
   // 🗺️ 네비게이션 이벤트
   NAVIGATION: {
     MODULE_SELECT: "navigation:module:select",
-    MENU_SHOW: "navigation:menu:show", 
+    MENU_SHOW: "navigation:menu:show",
     BACK_REQUEST: "navigation:back:request",
     HOME_REQUEST: "navigation:home:request",
     BREADCRUMB_UPDATE: "navigation:breadcrumb:update"
@@ -329,7 +329,7 @@ const EVENTS = {
     CONNECT: "database:connect",
     CONNECTED: "database:connected",
     DISCONNECT: "database:disconnect",
-    QUERY: "database:query", 
+    QUERY: "database:query",
     QUERY_SUCCESS: "database:query:success",
     QUERY_ERROR: "database:query:error",
     TRANSACTION_START: "database:transaction:start",
@@ -342,7 +342,7 @@ const EVENTS = {
   MODULE: {
     LOAD_REQUEST: "module:load:request",
     LOADED: "module:loaded",
-    UNLOAD_REQUEST: "module:unload:request", 
+    UNLOAD_REQUEST: "module:unload:request",
     UNLOADED: "module:unloaded",
     INITIALIZE: "module:initialize",
     INITIALIZED: "module:initialized",
@@ -381,11 +381,15 @@ const EVENT_SCHEMAS = {
   [EVENTS.TODO.CREATE_REQUEST]: {
     text: { type: "string", required: true },
     userId: { type: "number", required: true },
-    priority: { type: "string", required: false, enum: ["high", "medium", "low"] },
+    priority: {
+      type: "string",
+      required: false,
+      enum: ["high", "medium", "low"]
+    },
     dueDate: { type: "string", required: false }
   },
 
-  // 할일 생성 완료 
+  // 할일 생성 완료
   [EVENTS.TODO.CREATED]: {
     id: { type: "string", required: true },
     text: { type: "string", required: true },
@@ -396,7 +400,11 @@ const EVENT_SCHEMAS = {
 
   // 타이머 시작 요청
   [EVENTS.TIMER.START_REQUEST]: {
-    type: { type: "string", required: true, enum: ["focus", "short", "long", "custom"] },
+    type: {
+      type: "string",
+      required: true,
+      enum: ["focus", "short", "long", "custom"]
+    },
     duration: { type: "number", required: true },
     userId: { type: "number", required: true },
     chatId: { type: "number", required: true }
@@ -427,7 +435,7 @@ const EVENT_SCHEMAS = {
   },
 
   // === 날씨 이벤트 스키마 ===
-  
+
   // 현재 날씨 요청
   [EVENTS.WEATHER.CURRENT_REQUEST]: {
     userId: { type: "number", required: true },
@@ -511,7 +519,7 @@ const EVENT_FLOWS = {
 
   [EVENTS.TODO.CREATE_REQUEST]: [
     EVENTS.DATABASE.QUERY,
-    EVENTS.TODO.CREATED, 
+    EVENTS.TODO.CREATED,
     EVENTS.RENDER.MESSAGE_REQUEST
   ],
 
@@ -520,9 +528,7 @@ const EVENT_FLOWS = {
     EVENTS.RENDER.MESSAGE_REQUEST
   ],
 
-  [EVENTS.SYSTEM.ERROR]: [
-    EVENTS.RENDER.ERROR_REQUEST
-  ]
+  [EVENTS.SYSTEM.ERROR]: [EVENTS.RENDER.ERROR_REQUEST]
 };
 
 // 🎨 이벤트 카테고리별 색상/아이콘
@@ -562,10 +568,10 @@ class EventRegistry {
   // 📋 모든 이벤트 목록 가져오기
   getAllEvents() {
     const allEvents = [];
-    
-    Object.values(this.events).forEach(category => {
-      if (typeof category === 'object') {
-        Object.values(category).forEach(event => {
+
+    Object.values(this.events).forEach((category) => {
+      if (typeof category === "object") {
+        Object.values(category).forEach((event) => {
           allEvents.push(event);
         });
       }
@@ -591,7 +597,7 @@ class EventRegistry {
 
   // 🎨 이벤트 색상 정보 가져오기
   getEventColor(eventName) {
-    const category = eventName.split(':')[0].toUpperCase();
+    const category = eventName.split(":")[0].toUpperCase();
     return this.colors[category] || { icon: "⚪", color: "white" };
   }
 
@@ -620,7 +626,9 @@ class EventRegistry {
   // 🔍 카테고리별 이벤트 목록
   getEventsByCategory(category) {
     const upperCategory = category.toUpperCase();
-    return this.events[upperCategory] ? Object.values(this.events[upperCategory]) : [];
+    return this.events[upperCategory]
+      ? Object.values(this.events[upperCategory])
+      : [];
   }
 
   // ✅ 이벤트 검증
@@ -654,13 +662,15 @@ class EventRegistry {
 
         // enum 검증
         if (rules.enum && !rules.enum.includes(value)) {
-          errors.push(`잘못된 값: ${field}는 [${rules.enum.join(', ')}] 중 하나여야 함`);
+          errors.push(
+            `잘못된 값: ${field}는 [${rules.enum.join(", ")}] 중 하나여야 함`
+          );
         }
       }
     }
 
     if (errors.length > 0) {
-      throw new Error(`이벤트 검증 실패 (${eventName}): ${errors.join(', ')}`);
+      throw new Error(`이벤트 검증 실패 (${eventName}): ${errors.join(", ")}`);
     }
 
     return true;
@@ -669,12 +679,14 @@ class EventRegistry {
   // 📋 이벤트 정보 로그 출력
   logEventInfo() {
     const stats = this.getStats();
-    
+
     logger.info("🎫 EventRegistry 통계:");
     logger.info(`  📊 카테고리: ${stats.categories}개`);
     logger.info(`  🎯 전체 이벤트: ${stats.totalEvents}개`);
     logger.info(`  🏷️ 스키마: ${stats.schemas}개 (${stats.coverage.schemas}%)`);
-    logger.info(`  ⏳ 우선순위: ${stats.priorities}개 (${stats.coverage.priorities}%)`);
+    logger.info(
+      `  ⏳ 우선순위: ${stats.priorities}개 (${stats.coverage.priorities}%)`
+    );
     logger.info(`  🔄 플로우: ${stats.flows}개 (${stats.coverage.flows}%)`);
   }
 }
@@ -692,7 +704,7 @@ function getEventRegistry() {
 module.exports = {
   EVENTS,
   EVENT_SCHEMAS,
-  EVENT_PRIORITIES, 
+  EVENT_PRIORITIES,
   EVENT_FLOWS,
   EVENT_COLORS,
   EventRegistry,

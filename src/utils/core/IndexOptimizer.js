@@ -3,7 +3,7 @@ const logger = require("./Logger");
 
 /**
  * 📊 IndexOptimizer - 데이터베이스 인덱스 성능 최적화 도구
- * 
+ *
  * 특징:
  * - 쿼리 패턴 분석
  * - 인덱스 사용률 모니터링
@@ -15,7 +15,7 @@ class IndexOptimizer {
     this.queryStats = new Map();
     this.indexStats = new Map();
     this.slowQueries = [];
-    
+
     logger.info("📊 IndexOptimizer 초기화 완료");
   }
 
@@ -24,7 +24,7 @@ class IndexOptimizer {
    */
   trackQuery(collection, query, executionTime, indexUsed = null) {
     const queryKey = this.generateQueryKey(collection, query);
-    
+
     if (!this.queryStats.has(queryKey)) {
       this.queryStats.set(queryKey, {
         collection,
@@ -41,7 +41,7 @@ class IndexOptimizer {
     stats.count++;
     stats.totalTime += executionTime;
     stats.avgTime = stats.totalTime / stats.count;
-    
+
     if (indexUsed) {
       stats.indexesUsed.add(indexUsed);
     }
@@ -83,11 +83,11 @@ class IndexOptimizer {
       if (Array.isArray(obj)) {
         return obj.map(normalize);
       }
-      
-      if (obj && typeof obj === 'object') {
+
+      if (obj && typeof obj === "object") {
         const normalized = {};
         for (const [key, value] of Object.entries(obj)) {
-          if (typeof value === 'object' && value !== null) {
+          if (typeof value === "object" && value !== null) {
             normalized[key] = normalize(value);
           } else {
             normalized[key] = typeof value; // 값 대신 타입만 저장
@@ -95,7 +95,7 @@ class IndexOptimizer {
         }
         return normalized;
       }
-      
+
       return typeof obj;
     };
 
@@ -109,15 +109,15 @@ class IndexOptimizer {
     try {
       const db = mongoose.connection.db;
       const collections = await db.listCollections().toArray();
-      
+
       for (const collInfo of collections) {
         const collection = db.collection(collInfo.name);
-        
+
         try {
           // 인덱스 통계 조회
-          const indexStats = await collection.aggregate([
-            { $indexStats: {} }
-          ]).toArray();
+          const indexStats = await collection
+            .aggregate([{ $indexStats: {} }])
+            .toArray();
 
           // 컬렉션 통계 조회
           const collStats = await collection.stats();
@@ -128,15 +128,16 @@ class IndexOptimizer {
             avgDocSize: collStats.avgObjSize || 0,
             totalSize: collStats.size || 0
           });
-
         } catch (error) {
-          logger.debug(`인덱스 통계 조회 실패: ${collInfo.name}`, error.message);
+          logger.debug(
+            `인덱스 통계 조회 실패: ${collInfo.name}`,
+            error.message
+          );
         }
       }
 
       logger.info("📊 인덱스 사용률 분석 완료");
       return this.generateIndexReport();
-
     } catch (error) {
       logger.error("인덱스 분석 실패:", error);
       return null;
@@ -149,7 +150,10 @@ class IndexOptimizer {
   generateIndexReport() {
     const report = {
       summary: {
-        totalQueries: Array.from(this.queryStats.values()).reduce((sum, stat) => sum + stat.count, 0),
+        totalQueries: Array.from(this.queryStats.values()).reduce(
+          (sum, stat) => sum + stat.count,
+          0
+        ),
         slowQueries: this.slowQueries.length,
         avgQueryTime: this.calculateOverallAvgTime(),
         collections: this.indexStats.size
@@ -180,7 +184,7 @@ class IndexOptimizer {
     return this.slowQueries
       .sort((a, b) => b.executionTime - a.executionTime)
       .slice(0, limit)
-      .map(query => ({
+      .map((query) => ({
         collection: query.collection,
         executionTime: query.executionTime,
         query: query.query,
@@ -196,7 +200,7 @@ class IndexOptimizer {
     return Array.from(this.queryStats.values())
       .sort((a, b) => b.count - a.count)
       .slice(0, limit)
-      .map(stat => ({
+      .map((stat) => ({
         collection: stat.collection,
         query: stat.query,
         count: stat.count,
@@ -214,15 +218,15 @@ class IndexOptimizer {
 
     // 느린 쿼리 기반 권장사항
     for (const query of this.slowQueries) {
-      if (!query.indexUsed || query.indexUsed === 'COLLSCAN') {
+      if (!query.indexUsed || query.indexUsed === "COLLSCAN") {
         const queryFields = this.extractQueryFields(query.query);
         if (queryFields.length > 0) {
           recommendations.push({
-            type: 'create_index',
+            type: "create_index",
             collection: query.collection,
             fields: queryFields,
             reason: `느린 쿼리 최적화 (${query.executionTime}ms)`,
-            priority: query.executionTime > 500 ? 'high' : 'medium'
+            priority: query.executionTime > 500 ? "high" : "medium"
           });
         }
       }
@@ -234,11 +238,11 @@ class IndexOptimizer {
         const queryFields = this.extractQueryFields(stat.query);
         if (queryFields.length > 0) {
           recommendations.push({
-            type: 'optimize_index',
+            type: "optimize_index",
             collection: stat.collection,
             fields: queryFields,
             reason: `빈번한 쿼리 최적화 (${stat.count}회 실행)`,
-            priority: stat.count > 1000 ? 'high' : 'medium'
+            priority: stat.count > 1000 ? "high" : "medium"
           });
         }
       }
@@ -252,14 +256,18 @@ class IndexOptimizer {
    */
   extractQueryFields(query) {
     const fields = [];
-    
-    const extractFromObject = (obj, prefix = '') => {
+
+    const extractFromObject = (obj, prefix = "") => {
       for (const [key, value] of Object.entries(obj)) {
-        if (key.startsWith('$')) continue; // 연산자 제외
-        
+        if (key.startsWith("$")) continue; // 연산자 제외
+
         const fieldName = prefix ? `${prefix}.${key}` : key;
-        
-        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+
+        if (
+          typeof value === "object" &&
+          value !== null &&
+          !Array.isArray(value)
+        ) {
           extractFromObject(value, fieldName);
         } else {
           fields.push(fieldName);
@@ -267,11 +275,13 @@ class IndexOptimizer {
       }
     };
 
-    if (typeof query === 'object' && query !== null) {
+    if (typeof query === "object" && query !== null) {
       extractFromObject(query);
     }
 
-    return fields.filter((field, index, array) => array.indexOf(field) === index);
+    return fields.filter(
+      (field, index, array) => array.indexOf(field) === index
+    );
   }
 
   /**
@@ -279,8 +289,8 @@ class IndexOptimizer {
    */
   deduplicateRecommendations(recommendations) {
     const seen = new Set();
-    return recommendations.filter(rec => {
-      const key = `${rec.collection}:${rec.fields.join(',')}`;
+    return recommendations.filter((rec) => {
+      const key = `${rec.collection}:${rec.fields.join(",")}`;
       if (seen.has(key)) return false;
       seen.add(key);
       return true;
@@ -295,7 +305,7 @@ class IndexOptimizer {
 
     for (const [collection, stats] of this.indexStats.entries()) {
       for (const index of stats.indexes) {
-        if (index.accesses?.ops === 0 && index.name !== '_id_') {
+        if (index.accesses?.ops === 0 && index.name !== "_id_") {
           unused.push({
             collection,
             indexName: index.name,
@@ -325,7 +335,10 @@ class IndexOptimizer {
   getStats() {
     return {
       queryCount: this.queryStats.size,
-      totalExecutions: Array.from(this.queryStats.values()).reduce((sum, stat) => sum + stat.count, 0),
+      totalExecutions: Array.from(this.queryStats.values()).reduce(
+        (sum, stat) => sum + stat.count,
+        0
+      ),
       slowQueryCount: this.slowQueries.length,
       avgQueryTime: this.calculateOverallAvgTime(),
       collectionsAnalyzed: this.indexStats.size

@@ -1,9 +1,9 @@
 // src/core/ModuleManager.js - EventBus 통합 버전
 const logger = require("../utils/core/Logger");
 const { getAllEnabledModules } = require("../config/ModuleRegistry");
-const EventBus = require('./EventBus');
-const { EVENTS } = require('../events/index');
-const ModuleLoader = require('./ModuleLoader');
+const EventBus = require("./EventBus");
+const { EVENTS } = require("../events/index");
+const ModuleLoader = require("./ModuleLoader");
 
 class ModuleManager {
   constructor(options = {}) {
@@ -11,7 +11,7 @@ class ModuleManager {
     this.serviceBuilder = options.serviceBuilder;
     this.modules = new Map();
     this.navigationHandler = null; // 중복 제거를 위해 하나만
-    
+
     // EventBus 통합
     this.eventBus = options.eventBus || EventBus.getInstance();
     this.eventSubscriptions = new Map(); // 이벤트 구독 관리
@@ -36,28 +36,32 @@ class ModuleManager {
    */
   setupEventListeners() {
     // 모듈 로드 요청 이벤트
-    this.eventSubscriptions.set('module_load', 
+    this.eventSubscriptions.set(
+      "module_load",
       this.eventBus.subscribe(EVENTS.MODULE.LOAD_REQUEST, async (event) => {
         await this.handleModuleLoadRequest(event);
       })
     );
 
     // 사용자 콜백 이벤트 (기존 콜백 처리를 이벤트로 전환)
-    this.eventSubscriptions.set('user_callback', 
+    this.eventSubscriptions.set(
+      "user_callback",
       this.eventBus.subscribe(EVENTS.USER.CALLBACK, async (event) => {
         await this.handleCallbackEvent(event);
       })
     );
 
     // 사용자 명령어 이벤트
-    this.eventSubscriptions.set('user_command', 
+    this.eventSubscriptions.set(
+      "user_command",
       this.eventBus.subscribe(EVENTS.USER.COMMAND, async (event) => {
         await this.handleCommandEvent(event);
       })
     );
 
     // 시스템 에러 이벤트
-    this.eventSubscriptions.set('system_error', 
+    this.eventSubscriptions.set(
+      "system_error",
       this.eventBus.subscribe(EVENTS.SYSTEM.ERROR, async (event) => {
         await this.handleSystemError(event);
       })
@@ -89,7 +93,7 @@ class ModuleManager {
 
       // EventBus 시스템 시작 이벤트 발행
       await this.eventBus.publish(EVENTS.SYSTEM.STARTUP, {
-        component: 'ModuleManager',
+        component: "ModuleManager",
         timestamp: new Date().toISOString()
       });
 
@@ -98,7 +102,7 @@ class ModuleManager {
 
       // ModuleManager 준비 완료 이벤트 발행
       await this.eventBus.publish(EVENTS.SYSTEM.READY, {
-        component: 'ModuleManager',
+        component: "ModuleManager",
         modulesLoaded: this.stats.modulesLoaded,
         timestamp: new Date().toISOString()
       });
@@ -121,7 +125,7 @@ class ModuleManager {
     try {
       const { moduleName, moduleKey } = event.payload;
       logger.info(`📦 모듈 로드 요청: ${moduleName || moduleKey}`);
-      
+
       // 실제 모듈 로드 로직 (기존 loadModules에서 추출)
       // 여기서는 이벤트 발행만
       await this.eventBus.publish(EVENTS.MODULE.LOADED, {
@@ -130,9 +134,8 @@ class ModuleManager {
         success: true,
         timestamp: new Date().toISOString()
       });
-      
     } catch (error) {
-      logger.error('📦 모듈 로드 실패:', error);
+      logger.error("📦 모듈 로드 실패:", error);
       await this.eventBus.publish(EVENTS.MODULE.ERROR, {
         error: error.message,
         module: event.payload.moduleKey,
@@ -150,13 +153,13 @@ class ModuleManager {
       this.stats.lastActivity = new Date();
 
       const { data, userId, messageId, chatId } = event.payload;
-      
+
       // 콜백 데이터 파싱: module:action:params
-      const [moduleKey, subAction, ...params] = data.split(':');
+      const [moduleKey, subAction, ...params] = data.split(":");
 
       logger.debug(`🎯 EventBus 콜백 처리:`, {
         moduleKey,
-        subAction, 
+        subAction,
         params,
         userId,
         chatId
@@ -182,15 +185,20 @@ class ModuleManager {
           from: { id: userId },
           message: { message_id: messageId, chat: { id: chatId } }
         };
-        await moduleInstance.handleCallback(this.bot, callbackQuery, subAction, params, this);
+        await moduleInstance.handleCallback(
+          this.bot,
+          callbackQuery,
+          subAction,
+          params,
+          this
+        );
       }
-
     } catch (error) {
-      logger.error('🎯 콜백 이벤트 처리 실패:', error);
+      logger.error("🎯 콜백 이벤트 처리 실패:", error);
       await this.eventBus.publish(EVENTS.SYSTEM.ERROR, {
         error: error.message,
-        module: 'ModuleManager',
-        event: 'handleCallbackEvent',
+        module: "ModuleManager",
+        event: "handleCallbackEvent",
         timestamp: new Date().toISOString()
       });
     }
@@ -205,12 +213,12 @@ class ModuleManager {
       this.stats.lastActivity = new Date();
 
       const { command, userId, chatId: _chatId } = event.payload; // eslint-disable-line no-unused-vars
-      
+
       logger.debug(`💬 EventBus 명령어 처리: /${command}`, { userId });
 
       // 시스템 명령어는 SystemModule에서 처리
-      if (['start', 'help', 'status', 'menu'].includes(command)) {
-        const systemModule = this.modules.get('system');
+      if (["start", "help", "status", "menu"].includes(command)) {
+        const systemModule = this.modules.get("system");
         if (systemModule && systemModule.handleEvent) {
           await systemModule.handleEvent(EVENTS.USER.COMMAND, event);
         }
@@ -222,18 +230,19 @@ class ModuleManager {
             try {
               await moduleInstance.handleEvent(EVENTS.USER.COMMAND, event);
             } catch (err) {
-              logger.debug(`${moduleKey} 모듈에서 명령어 처리 건너뜀: ${err.message}`);
+              logger.debug(
+                `${moduleKey} 모듈에서 명령어 처리 건너뜀: ${err.message}`
+              );
             }
           }
         }
       }
-
     } catch (error) {
-      logger.error('💬 명령어 이벤트 처리 실패:', error);
+      logger.error("💬 명령어 이벤트 처리 실패:", error);
       await this.eventBus.publish(EVENTS.SYSTEM.ERROR, {
         error: error.message,
-        module: 'ModuleManager',
-        event: 'handleCommandEvent',
+        module: "ModuleManager",
+        event: "handleCommandEvent",
         timestamp: new Date().toISOString()
       });
     }
@@ -246,13 +255,14 @@ class ModuleManager {
     try {
       this.stats.errorsCount++;
       const { error, module } = event.payload;
-      
-      logger.error(`⚠️ 시스템 에러 감지: ${error} (모듈: ${module || 'unknown'})`);
-      
+
+      logger.error(
+        `⚠️ 시스템 에러 감지: ${error} (모듈: ${module || "unknown"})`
+      );
+
       // 필요시 에러 알림 등 추가 처리
-      
     } catch (err) {
-      logger.error('⚠️ 시스템 에러 처리 중 오류:', err);
+      logger.error("⚠️ 시스템 에러 처리 중 오류:", err);
     }
   }
 
@@ -279,7 +289,10 @@ class ModuleManager {
           logger.debug(`🔄 모듈 온디맨드 로딩 시도: ${moduleKey}`);
           moduleInstance = await this.loadModuleOnDemand(moduleKey);
         } catch (loadError) {
-          logger.warn(`❓ 모듈을 찾을 수 없음: ${moduleKey}`, loadError.message);
+          logger.warn(
+            `❓ 모듈을 찾을 수 없음: ${moduleKey}`,
+            loadError.message
+          );
           return {
             success: false,
             error: "module_not_found",
@@ -363,9 +376,9 @@ class ModuleManager {
    */
   async loadModules(bot) {
     this.moduleLoader = ModuleLoader.getInstance();
-    
+
     const enabledModules = getAllEnabledModules();
-    
+
     // 자동 정리는 안정화 후에 시작 (2분 지연)
     setTimeout(() => {
       this.moduleLoader.startAutoCleanup();
@@ -373,24 +386,32 @@ class ModuleManager {
     }, 120000); // 2분 후 시작
 
     // 핵심 모듈만 즉시 로딩 (system 모듈)
-    const coreModules = enabledModules.filter(config => config.key === 'system');
-    const lazyModules = enabledModules.filter(config => config.key !== 'system');
+    const coreModules = enabledModules.filter(
+      (config) => config.key === "system"
+    );
+    const lazyModules = enabledModules.filter(
+      (config) => config.key !== "system"
+    );
 
     // 1. 핵심 모듈 즉시 로딩
     for (const config of coreModules) {
       try {
         logger.info(`🚀 [${config.key}] 핵심 모듈 즉시 로딩...`);
-        
-        const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key, {
-          bot: bot,
-          moduleManager: this,
-          serviceBuilder: this.serviceBuilder,
-          eventBus: this.eventBus,
-          config: config.config || {}
-        });
+
+        const moduleInstance = await this.moduleLoader.loadModule(
+          config.path,
+          config.key,
+          {
+            bot: bot,
+            moduleManager: this,
+            serviceBuilder: this.serviceBuilder,
+            eventBus: this.eventBus,
+            config: config.config || {}
+          }
+        );
         const initializedModule = await this.moduleLoader.initializeModule(
-          moduleInstance, 
-          config.key, 
+          moduleInstance,
+          config.key,
           this.serviceBuilder,
           {
             bot: bot,
@@ -400,10 +421,9 @@ class ModuleManager {
             config: config.config || {}
           }
         );
-        
+
         this.modules.set(config.key, initializedModule);
         logger.success(`✅ [${config.key}] 핵심 모듈 로딩 완료`);
-        
       } catch (error) {
         logger.error(`💥 [${config.key}] 핵심 모듈 로드 실패:`, error);
         // 핵심 모듈은 실패하면 전체 실패
@@ -419,7 +439,9 @@ class ModuleManager {
     }
 
     this.stats.modulesLoaded = this.modules.size; // 즉시 로딩된 모듈만 카운트
-    logger.success(`✅ ${this.modules.size}개 핵심 모듈 즉시 로딩, ${lazyModules.length}개 지연 로딩 등록`);
+    logger.success(
+      `✅ ${this.modules.size}개 핵심 모듈 즉시 로딩, ${lazyModules.length}개 지연 로딩 등록`
+    );
   }
 
   /**
@@ -438,7 +460,7 @@ class ModuleManager {
   async loadModuleOnDemand(moduleKey) {
     try {
       logger.debug(`🔄 온디맨드 로딩 요청: ${moduleKey}`);
-      
+
       // 이미 로딩된 모듈인지 확인
       if (this.modules.has(moduleKey)) {
         logger.debug(`✅ 이미 로딩된 모듈: ${moduleKey}`);
@@ -452,7 +474,10 @@ class ModuleManager {
       }
 
       if (!this.lazyModules.has(moduleKey)) {
-        logger.debug(`❌ ${moduleKey} 모듈이 lazyModules에 등록되지 않음. 등록된 모듈:`, Array.from(this.lazyModules.keys()));
+        logger.debug(
+          `❌ ${moduleKey} 모듈이 lazyModules에 등록되지 않음. 등록된 모듈:`,
+          Array.from(this.lazyModules.keys())
+        );
         throw new Error(`지연 로딩 모듈을 찾을 수 없습니다: ${moduleKey}`);
       }
 
@@ -462,16 +487,20 @@ class ModuleManager {
         enabled: config.enabled,
         key: config.key
       });
-      
+
       logger.info(`🔄 [${moduleKey}] 온디맨드 모듈 로딩...`);
-      
-      const moduleInstance = await this.moduleLoader.loadModule(config.path, config.key, {
-        bot: this.bot,
-        moduleManager: this,
-        serviceBuilder: this.serviceBuilder,
-        eventBus: this.eventBus,
-        config: config.config || {}
-      });
+
+      const moduleInstance = await this.moduleLoader.loadModule(
+        config.path,
+        config.key,
+        {
+          bot: this.bot,
+          moduleManager: this,
+          serviceBuilder: this.serviceBuilder,
+          eventBus: this.eventBus,
+          config: config.config || {}
+        }
+      );
       const initializedModule = await this.moduleLoader.initializeModule(
         moduleInstance,
         config.key,
@@ -484,13 +513,12 @@ class ModuleManager {
           config: config.config || {}
         }
       );
-      
+
       this.modules.set(moduleKey, initializedModule);
       this.stats.modulesLoaded++;
-      
+
       logger.success(`✅ [${moduleKey}] 온디맨드 로딩 완료`);
       return initializedModule;
-      
     } catch (error) {
       logger.error(`❌ [${moduleKey}] 온디맨드 로딩 실패:`, error);
       throw error;
@@ -510,7 +538,7 @@ class ModuleManager {
    */
   async getModule(moduleKey) {
     let moduleInstance = this.modules.get(moduleKey);
-    
+
     // 모듈이 없으면 온디맨드 로딩 시도
     if (!moduleInstance) {
       try {
@@ -520,7 +548,7 @@ class ModuleManager {
         return null;
       }
     }
-    
+
     return moduleInstance;
   }
 
@@ -572,8 +600,10 @@ class ModuleManager {
    */
   getStats() {
     const eventBusHealth = this.eventBus.getHealthStatus();
-    const moduleLoaderStats = this.moduleLoader ? this.moduleLoader.getStats() : null;
-    
+    const moduleLoaderStats = this.moduleLoader
+      ? this.moduleLoader.getStats()
+      : null;
+
     return {
       ...this.stats,
       eventBus: {
@@ -585,7 +615,8 @@ class ModuleManager {
       },
       modules: {
         loaded: this.modules.size,
-        active: Array.from(this.modules.values()).filter(m => m.isInitialized).length,
+        active: Array.from(this.modules.values()).filter((m) => m.isInitialized)
+          .length,
         lazy: this.lazyModules ? this.lazyModules.size : 0
       },
       moduleLoader: moduleLoaderStats
@@ -598,7 +629,7 @@ class ModuleManager {
   async publishEvent(eventName, payload, metadata = {}) {
     try {
       return await this.eventBus.publish(eventName, payload, {
-        source: 'ModuleManager',
+        source: "ModuleManager",
         ...metadata
       });
     } catch (error) {
@@ -612,17 +643,17 @@ class ModuleManager {
    */
   async shutdown() {
     try {
-      logger.info('🚇 ModuleManager 종료 시작...');
+      logger.info("🚇 ModuleManager 종료 시작...");
 
       // 시스템 종료 이벤트 발행
       await this.eventBus.publish(EVENTS.SYSTEM.SHUTDOWN, {
-        component: 'ModuleManager',
+        component: "ModuleManager",
         timestamp: new Date().toISOString()
       });
 
       // 모든 이벤트 구독 해제
       for (const [name, unsubscribe] of this.eventSubscriptions) {
-        if (typeof unsubscribe === 'function') {
+        if (typeof unsubscribe === "function") {
           unsubscribe();
           logger.debug(`📤 EventBus 구독 해제: ${name}`);
         }
@@ -631,21 +662,21 @@ class ModuleManager {
 
       // 모듈들 정리
       for (const [key, module] of this.modules) {
-        if (typeof module.cleanup === 'function') {
+        if (typeof module.cleanup === "function") {
           await module.cleanup();
           logger.debug(`🧹 모듈 정리 완료: ${key}`);
         }
       }
       this.modules.clear();
-      
+
       // ModuleLoader 정리
       if (this.moduleLoader) {
         await this.moduleLoader.unloadAllModules();
       }
 
-      logger.success('✅ ModuleManager 종료 완료');
+      logger.success("✅ ModuleManager 종료 완료");
     } catch (error) {
-      logger.error('❌ ModuleManager 종료 중 오류:', error);
+      logger.error("❌ ModuleManager 종료 중 오류:", error);
       throw error;
     }
   }

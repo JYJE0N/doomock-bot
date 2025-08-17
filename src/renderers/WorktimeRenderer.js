@@ -482,7 +482,6 @@ ${achievement.emoji} ${achievement.txt}`;
     const recommendations = data.recommendations || [];
     const timestamp = data.timestamp || new Date();
 
-
     const statusEmoji = isWorking
       ? this.statusEmojis.working
       : this.statusEmojis.completed;

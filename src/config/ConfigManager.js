@@ -3,7 +3,7 @@ const logger = require("../utils/core/Logger");
 
 /**
  * 🔧 ConfigManager - 단순화된 설정 관리자
- * 
+ *
  * 핵심 기능만 유지:
  * - 환경 감지 (development, production, staging, railway)
  * - 필수 환경변수 검증
@@ -89,15 +89,28 @@ class ConfigManager {
    */
   validateRequired() {
     const required = [
-      { key: 'BOT_TOKEN', value: this.telegram.token, name: 'Telegram Bot Token' },
-      { key: 'MONGO_URL', value: this.database.mongodb.url, name: 'MongoDB URL' }
+      {
+        key: "BOT_TOKEN",
+        value: this.telegram.token,
+        name: "Telegram Bot Token"
+      },
+      {
+        key: "MONGO_URL",
+        value: this.database.mongodb.url,
+        name: "MongoDB URL"
+      }
     ];
 
-    const missing = required.filter(config => !config.value);
-    
+    const missing = required.filter((config) => !config.value);
+
     if (missing.length > 0) {
-      logger.error("❌ 필수 환경변수 누락:", missing.map(m => m.name));
-      throw new Error(`필수 환경변수 누락: ${missing.map(m => m.key).join(', ')}`);
+      logger.error(
+        "❌ 필수 환경변수 누락:",
+        missing.map((m) => m.name)
+      );
+      throw new Error(
+        `필수 환경변수 누락: ${missing.map((m) => m.key).join(", ")}`
+      );
     }
 
     logger.debug("✅ 필수 환경변수 검증 완료");

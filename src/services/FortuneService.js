@@ -3,7 +3,11 @@
 const BaseService = require("./BaseService");
 const logger = require("../utils/core/Logger");
 const TimeHelper = require("../utils/TimeHelper");
-const { isDeveloper, getUserId, getUserName } = require("../utils/core/UserHelper");
+const {
+  isDeveloper,
+  getUserId,
+  getUserName
+} = require("../utils/core/UserHelper");
 
 const {
   FULL_TAROT_DECK,

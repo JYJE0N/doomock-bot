@@ -1,8 +1,8 @@
 /**
  * 🔊 TTSModuleV2 - EventBus 기반 텍스트 음성 변환 모듈
- * 
+ *
  * EventBus를 사용한 완전히 분리된 아키텍처로 TTS 기능을 제공합니다.
- * 
+ *
  * 🎯 주요 기능:
  * - 텍스트 → 음성 변환
  * - 다국어 지원 (한국어, 영어)
@@ -11,8 +11,8 @@
  * - 사용자 설정 관리
  */
 
-const { EVENTS } = require('../events/EventRegistry');
-const logger = require('../utils/core/Logger');
+const { EVENTS } = require("../events/EventRegistry");
+const logger = require("../utils/core/Logger");
 // const Utils = require('../utils'); // unused
 
 class TTSModuleV2 {
@@ -20,20 +20,22 @@ class TTSModuleV2 {
     this.moduleName = moduleName;
     // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
     if (!options.eventBus) {
-      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+      throw new Error(
+        `EventBus must be injected via options for module: ${moduleName}`
+      );
     }
     this.eventBus = options.eventBus;
     this.serviceBuilder = options.serviceBuilder || null;
-    
+
     // TTS 서비스 (있으면 실제 기능, 없으면 테스트 모드)
     this.ttsService = null;
-    
+
     // 초기화 상태
     this.isInitialized = false;
-    
+
     // 사용자 상태 관리 (메모리 기반)
     this.userStates = new Map();
-    
+
     // 모듈 설정
     this.config = {
       maxTextLength: 500,
@@ -43,7 +45,7 @@ class TTSModuleV2 {
       timeout: 300000, // 5분 입력 타임아웃
       ...options.config
     };
-    
+
     // 음성 설정 (더미 데이터)
     this.voiceConfig = {
       "ko-KR": [
@@ -53,16 +55,24 @@ class TTSModuleV2 {
         { code: "ko-KR-Standard-D", name: "한국어 남성 2", gender: "male" }
       ],
       "en-US": [
-        { code: "en-US-Standard-A", name: "English Female 1", gender: "female" },
+        {
+          code: "en-US-Standard-A",
+          name: "English Female 1",
+          gender: "female"
+        },
         { code: "en-US-Standard-B", name: "English Male 1", gender: "male" },
-        { code: "en-US-Standard-C", name: "English Female 2", gender: "female" },
+        {
+          code: "en-US-Standard-C",
+          name: "English Female 2",
+          gender: "female"
+        },
         { code: "en-US-Standard-D", name: "English Male 2", gender: "male" }
       ]
     };
-    
+
     // EventBus 구독 배열 (정리용)
     this.subscriptions = [];
-    
+
     // 상태 정리 타이머
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredStates();
@@ -84,19 +94,24 @@ class TTSModuleV2 {
           });
           logger.info("🔊 TTSService 연결 완료");
         } catch (serviceError) {
-          logger.warn("⚠️ TTSService 연결 실패 - 테스트 모드로 동작:", serviceError.message);
+          logger.warn(
+            "⚠️ TTSService 연결 실패 - 테스트 모드로 동작:",
+            serviceError.message
+          );
           this.ttsService = null;
         }
       }
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
-      
+
       // 초기화 완료 표시
       this.isInitialized = true;
-      
+
       const mode = this.ttsService ? "프로덕션" : "테스트";
-      logger.success(`🔊 TTSModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`);
+      logger.success(
+        `🔊 TTSModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`
+      );
       return true;
     } catch (error) {
       logger.error("❌ TTSModuleV2 초기화 실패:", error);
@@ -110,34 +125,34 @@ class TTSModuleV2 {
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
-    
+
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
-      'menu': () => this.showMenu(userId, chatId),
-      'start': () => this.handleTTSStart(userId, chatId),
-      'convert': () => this.handleTTSConvert(userId, chatId, params),
-      'settings': () => this.showSettings(userId, chatId),
-      'voice': () => this.handleVoiceSelect(userId, chatId, params),
-      'voice_select': () => this.handleVoiceSelect(userId, chatId, params),
-      'language_select': () => this.handleLanguageSelect(userId, chatId, params),
-      'share': () => this.handleTTSShare(userId, chatId, params),
-      'cancel': () => this.showMenu(userId, chatId)
+      menu: () => this.showMenu(userId, chatId),
+      start: () => this.handleTTSStart(userId, chatId),
+      convert: () => this.handleTTSConvert(userId, chatId, params),
+      settings: () => this.showSettings(userId, chatId),
+      voice: () => this.handleVoiceSelect(userId, chatId, params),
+      voice_select: () => this.handleVoiceSelect(userId, chatId, params),
+      language_select: () => this.handleLanguageSelect(userId, chatId, params),
+      share: () => this.handleTTSShare(userId, chatId, params),
+      cancel: () => this.showMenu(userId, chatId)
     };
-    
+
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
       // menu와 settings 액션은 렌더러용 결과를 반환
-      if ((subAction === 'menu' || subAction === 'settings') && result) {
+      if ((subAction === "menu" || subAction === "settings") && result) {
         return result;
       }
       return {
         type: subAction,
-        module: 'tts',
+        module: "tts",
         success: true
       };
     }
-    
+
     logger.debug(`TTSModuleV2: 알 수 없는 액션 - ${subAction}`);
     return null;
   }
@@ -168,9 +183,12 @@ class TTSModuleV2 {
     );
 
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.TTS.VOICE_CHANGE_REQUEST, async (event) => {
-        await this.handleVoiceChangeRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.TTS.VOICE_CHANGE_REQUEST,
+        async (event) => {
+          await this.handleVoiceChangeRequest(event);
+        }
+      )
     );
 
     // 텍스트 입력 관련
@@ -219,7 +237,7 @@ class TTSModuleV2 {
     try {
       // 사용자 음성 설정 조회 (Service가 있으면 실제 데이터, 없으면 기본값)
       let userVoice = this.config.defaultVoice;
-      
+
       if (this.ttsService) {
         try {
           const voiceResult = await this.ttsService.getUserVoice(userId);
@@ -246,19 +264,18 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatMenu(currentVoice),
           options: {
             reply_markup: this.createMenuKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🔊 메뉴 요청 처리 실패:', error);
+      logger.error("🔊 메뉴 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -267,7 +284,12 @@ class TTSModuleV2 {
    * 🎵 텍스트 변환 요청 처리
    */
   async handleConvertRequest(event) {
-    const { userId, chatId, text, language = this.config.defaultLanguage } = event.payload;
+    const {
+      userId,
+      chatId,
+      text,
+      language = this.config.defaultLanguage
+    } = event.payload;
 
     try {
       // 텍스트 길이 검증
@@ -291,7 +313,7 @@ class TTSModuleV2 {
 
       // TTS 변환 처리 (Service가 있으면 실제 변환, 없으면 더미 응답)
       let conversionResult;
-      
+
       if (this.ttsService) {
         conversionResult = await this.ttsService.convertTextToSpeech(userId, {
           text: text.trim(),
@@ -331,19 +353,20 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatConversionSuccess(conversionResult.data),
           options: {
-            reply_markup: this.createConversionResultKeyboard(conversionResult.data),
-            parse_mode: 'Markdown'
+            reply_markup: this.createConversionResultKeyboard(
+              conversionResult.data
+            ),
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🎵 텍스트 변환 처리 실패:', error);
+      logger.error("🎵 텍스트 변환 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -352,7 +375,11 @@ class TTSModuleV2 {
    * 🎤 음성 목록 요청 처리
    */
   async handleVoiceListRequest(event) {
-    const { userId, chatId, language = this.config.defaultLanguage } = event.payload;
+    const {
+      userId,
+      chatId,
+      language = this.config.defaultLanguage
+    } = event.payload;
 
     try {
       const voices = this.getVoices(language);
@@ -368,19 +395,18 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatVoiceList(language, voices),
           options: {
             reply_markup: this.createVoiceSelectionKeyboard(voices),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🎤 음성 목록 요청 처리 실패:', error);
+      logger.error("🎤 음성 목록 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -405,7 +431,7 @@ class TTSModuleV2 {
 
       // 음성 변경 처리 (Service가 있으면 실제 저장, 없으면 임시 저장)
       let changeResult;
-      
+
       if (this.ttsService) {
         changeResult = await this.ttsService.setUserVoice(userId, voiceCode);
       } else {
@@ -436,19 +462,18 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatVoiceChanged(voice),
           options: {
             reply_markup: this.createBackToMenuKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🔧 음성 변경 요청 처리 실패:', error);
+      logger.error("🔧 음성 변경 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -457,12 +482,16 @@ class TTSModuleV2 {
    * ✏️ 텍스트 입력 시작 처리
    */
   async handleTextInputStart(event) {
-    const { userId, chatId, language = this.config.defaultLanguage } = event.payload;
+    const {
+      userId,
+      chatId,
+      language = this.config.defaultLanguage
+    } = event.payload;
 
     try {
       // 사용자 입력 상태 설정
       this.setUserInputState(userId, {
-        state: 'waiting_text_input',
+        state: "waiting_text_input",
         language,
         chatId,
         startTime: Date.now()
@@ -480,19 +509,18 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatTextInputPrompt(language),
           options: {
             reply_markup: this.createTextInputKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('✏️ 텍스트 입력 시작 처리 실패:', error);
+      logger.error("✏️ 텍스트 입력 시작 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -506,7 +534,7 @@ class TTSModuleV2 {
     try {
       // 입력 상태 확인
       const inputState = this.getUserInputState(userId);
-      if (!inputState || inputState.state !== 'waiting_text_input') {
+      if (!inputState || inputState.state !== "waiting_text_input") {
         return; // 입력 대기 상태가 아니면 무시
       }
 
@@ -520,9 +548,8 @@ class TTSModuleV2 {
         text,
         language: inputState.language
       });
-
     } catch (error) {
-      logger.error('📨 텍스트 입력 수신 처리 실패:', error);
+      logger.error("📨 텍스트 입력 수신 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -560,19 +587,18 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatShareReady(fullUrl),
           options: {
             reply_markup: this.createShareKeyboard(fullUrl),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🔗 공유 요청 처리 실패:', error);
+      logger.error("🔗 공유 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -613,19 +639,18 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatSettings(userSettings),
           options: {
             reply_markup: this.createSettingsKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('⚙️ 설정 요청 처리 실패:', error);
+      logger.error("⚙️ 설정 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -664,19 +689,18 @@ class TTSModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatHelp(helpData),
           options: {
             reply_markup: this.createHelpKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('❓ 도움말 요청 처리 실패:', error);
+      logger.error("❓ 도움말 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -688,7 +712,9 @@ class TTSModuleV2 {
   // 음성 코드로 음성 정보 조회
   getVoiceByCode(voiceCode) {
     for (const language in this.voiceConfig) {
-      const voice = this.voiceConfig[language].find(v => v.code === voiceCode);
+      const voice = this.voiceConfig[language].find(
+        (v) => v.code === voiceCode
+      );
       if (voice) {
         return { ...voice, language };
       }
@@ -730,7 +756,7 @@ class TTSModuleV2 {
       }
     }
 
-    expiredUsers.forEach(userId => {
+    expiredUsers.forEach((userId) => {
       this.userStates.delete(userId);
       logger.debug(`🧹 만료된 TTS 상태 정리: ${userId}`);
     });
@@ -740,80 +766,122 @@ class TTSModuleV2 {
    * 📝 메시지 포맷팅 메서드들
    */
   formatMenu(currentVoice) {
-    return `🔊 **TTS (텍스트 음성 변환)**\n\n` +
-           `현재 음성: *${currentVoice.name}*\n` +
-           `언어: ${currentVoice.language}\n\n` +
-           `텍스트를 입력하여 음성으로 변환하세요.`;
+    return (
+      `🔊 **TTS (텍스트 음성 변환)**\n\n` +
+      `현재 음성: *${currentVoice.name}*\n` +
+      `언어: ${currentVoice.language}\n\n` +
+      `텍스트를 입력하여 음성으로 변환하세요.`
+    );
   }
 
   formatConversionSuccess(conversionData) {
-    return `✅ **변환 완료!**\n\n` +
-           `텍스트: *${conversionData.text}*\n` +
-           `음성: ${conversionData.voice.name}\n` +
-           `길이: ${conversionData.duration}초`;
+    return (
+      `✅ **변환 완료!**\n\n` +
+      `텍스트: *${conversionData.text}*\n` +
+      `음성: ${conversionData.voice.name}\n` +
+      `길이: ${conversionData.duration}초`
+    );
   }
 
   formatVoiceList(language, voices) {
-    return `🎤 **${language} 음성 선택**\n\n` +
-           voices.map((voice, i) => `${i+1}. ${voice.name} (${voice.gender})`).join('\n');
+    return (
+      `🎤 **${language} 음성 선택**\n\n` +
+      voices
+        .map((voice, i) => `${i + 1}. ${voice.name} (${voice.gender})`)
+        .join("\n")
+    );
   }
 
   formatVoiceChanged(voice) {
-    return `✅ **음성이 변경되었습니다**\n\n` +
-           `새 음성: *${voice.name}*\n` +
-           `언어: ${voice.language}`;
+    return (
+      `✅ **음성이 변경되었습니다**\n\n` +
+      `새 음성: *${voice.name}*\n` +
+      `언어: ${voice.language}`
+    );
   }
 
   formatTextInputPrompt(language) {
-    return `✏️ **텍스트 입력**\n\n` +
-           `변환할 텍스트를 입력하세요.\n` +
-           `언어: ${language}\n` +
-           `최대 길이: ${this.config.maxTextLength}자`;
+    return (
+      `✏️ **텍스트 입력**\n\n` +
+      `변환할 텍스트를 입력하세요.\n` +
+      `언어: ${language}\n` +
+      `최대 길이: ${this.config.maxTextLength}자`
+    );
   }
 
   formatShareReady(shareUrl) {
-    return `🔗 **공유 링크가 준비되었습니다**\n\n` +
-           `링크: ${shareUrl}\n\n` +
-           `링크를 복사해서 공유하세요!`;
+    return (
+      `🔗 **공유 링크가 준비되었습니다**\n\n` +
+      `링크: ${shareUrl}\n\n` +
+      `링크를 복사해서 공유하세요!`
+    );
   }
 
   formatSettings(userSettings) {
     const voice = this.getVoiceByCode(userSettings.voiceCode);
-    return `⚙️ **TTS 설정**\n\n` +
-           `현재 음성: *${voice.name}*\n` +
-           `언어: ${userSettings.language}\n` +
-           `최대 텍스트: ${this.config.maxTextLength}자`;
+    return (
+      `⚙️ **TTS 설정**\n\n` +
+      `현재 음성: *${voice.name}*\n` +
+      `언어: ${userSettings.language}\n` +
+      `최대 텍스트: ${this.config.maxTextLength}자`
+    );
   }
 
   formatHelp(helpData) {
-    return `❓ **TTS 도움말**\n\n` +
-           `**주요 기능:**\n` +
-           helpData.features.map(f => `• ${f}`).join('\n') + '\n\n' +
-           `**사용법:**\n` +
-           helpData.commands.map(c => `• ${c.command}: ${c.description}`).join('\n');
+    return (
+      `❓ **TTS 도움말**\n\n` +
+      `**주요 기능:**\n` +
+      helpData.features.map((f) => `• ${f}`).join("\n") +
+      "\n\n" +
+      `**사용법:**\n` +
+      helpData.commands
+        .map((c) => `• ${c.command}: ${c.description}`)
+        .join("\n")
+    );
   }
 
   /**
    * 🎹 키보드 생성 메서드들 (더미)
    */
   createMenuKeyboard() {
-    return { inline_keyboard: [[{ text: "🎵 텍스트 변환", callback_data: "tts:convert" }]] };
+    return {
+      inline_keyboard: [
+        [{ text: "🎵 텍스트 변환", callback_data: "tts:convert" }]
+      ]
+    };
   }
 
   createConversionResultKeyboard(conversionData) {
-    return { inline_keyboard: [[{ text: "🔗 공유", callback_data: `tts:share_${conversionData.shareUrl}` }]] };
+    return {
+      inline_keyboard: [
+        [
+          {
+            text: "🔗 공유",
+            callback_data: `tts:share_${conversionData.shareUrl}`
+          }
+        ]
+      ]
+    };
   }
 
   createVoiceSelectionKeyboard(voices) {
-    return { inline_keyboard: voices.map(v => [{ text: v.name, callback_data: `tts:voice_${v.code}` }]) };
+    return {
+      inline_keyboard: voices.map((v) => [
+        { text: v.name, callback_data: `tts:voice_${v.code}` }
+      ])
+    };
   }
 
   createBackToMenuKeyboard() {
-    return { inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts:menu" }]] };
+    return {
+      inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts:menu" }]]
+    };
   }
 
   createTextInputKeyboard() {
-    return { inline_keyboard: [[{ text: "❌ 취소", callback_data: "tts:cancel" }]] };
+    return {
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "tts:cancel" }]]
+    };
   }
 
   createShareKeyboard(shareUrl) {
@@ -821,11 +889,15 @@ class TTSModuleV2 {
   }
 
   createSettingsKeyboard() {
-    return { inline_keyboard: [[{ text: "🎤 음성 변경", callback_data: "tts:voices" }]] };
+    return {
+      inline_keyboard: [[{ text: "🎤 음성 변경", callback_data: "tts:voices" }]]
+    };
   }
 
   createHelpKeyboard() {
-    return { inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts:menu" }]] };
+    return {
+      inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "tts:menu" }]]
+    };
   }
 
   /**
@@ -859,8 +931,10 @@ class TTSModuleV2 {
       }
 
       // EventBus 구독 해제
-      this.subscriptions.forEach(subscription => {
-        logger.debug(`📤 이벤트 구독 해제: ${subscription.eventName || 'unknown'}`);
+      this.subscriptions.forEach((subscription) => {
+        logger.debug(
+          `📤 이벤트 구독 해제: ${subscription.eventName || "unknown"}`
+        );
         if (subscription.unsubscribe) {
           subscription.unsubscribe();
         }
@@ -871,7 +945,7 @@ class TTSModuleV2 {
       this.userStates.clear();
 
       // 서비스 정리
-      if (this.ttsService && typeof this.ttsService.cleanup === 'function') {
+      if (this.ttsService && typeof this.ttsService.cleanup === "function") {
         await this.ttsService.cleanup();
       }
 
@@ -888,7 +962,7 @@ class TTSModuleV2 {
    * 🎵 TTS 변환 요청 (레거시 콜백용)
    */
   async handleTTSConvert(userId, chatId, params) {
-    const text = params?.[0] || '';
+    const text = params?.[0] || "";
     this.eventBus.publish(EVENTS.TTS.CONVERT_REQUEST, {
       userId,
       chatId,
@@ -906,11 +980,11 @@ class TTSModuleV2 {
       chatId
     });
     return {
-      type: 'settings',
-      module: 'tts',
+      type: "settings",
+      module: "tts",
       success: true,
       data: {
-        title: '🔊 *TTS 설정*',
+        title: "🔊 *TTS 설정*",
         supportedLanguages: this.config.supportedLanguages,
         userId: userId
       }
@@ -950,30 +1024,29 @@ class TTSModuleV2 {
 
       // 렌더러에게 전달할 데이터 구성
       return {
-        type: 'menu',
-        module: 'tts',
+        type: "menu",
+        module: "tts",
         success: true,
         data: {
-          title: '🔊 *음성 변환 서비스*',
+          title: "🔊 *음성 변환 서비스*",
           userName: userName,
           currentVoice: currentVoice,
           languages: this.config.supportedLanguages || [],
           supportedLanguages: this.config.supportedLanguages || [],
-          defaultLanguage: this.config.defaultLanguage || 'ko-KR',
+          defaultLanguage: this.config.defaultLanguage || "ko-KR",
           maxTextLength: this.config.maxTextLength || 200,
           hasService: !!this.ttsService,
           userId: userId
         }
       };
-
     } catch (error) {
-      logger.error('🔊 TTSModuleV2.showMenu 실패:', error);
+      logger.error("🔊 TTSModuleV2.showMenu 실패:", error);
       return {
-        type: 'error',
-        module: 'tts',
+        type: "error",
+        module: "tts",
         success: false,
         data: {
-          message: 'TTS 메뉴를 불러오는 중 오류가 발생했습니다.',
+          message: "TTS 메뉴를 불러오는 중 오류가 발생했습니다.",
           canRetry: true
         }
       };
@@ -986,17 +1059,17 @@ class TTSModuleV2 {
   async handleTTSStart(userId, chatId) {
     // 텍스트 입력 상태로 전환
     this.setUserState(userId, {
-      state: 'waiting_text_input',
+      state: "waiting_text_input",
       chatId,
       startTime: Date.now()
     });
 
     await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
       chatId,
-      text: '🎵 *텍스트 음성 변환*\n\n변환할 텍스트를 입력하세요:',
+      text: "🎵 *텍스트 음성 변환*\n\n변환할 텍스트를 입력하세요:",
       options: {
         reply_markup: this.createCancelKeyboard(),
-        parse_mode: 'Markdown'
+        parse_mode: "Markdown"
       }
     });
 
@@ -1010,27 +1083,22 @@ class TTSModuleV2 {
     // 공유 기능 처리
     await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
       chatId,
-      text: '🔗 공유 기능은 구현 예정입니다.',
+      text: "🔗 공유 기능은 구현 예정입니다.",
       options: {
         reply_markup: this.createMenuKeyboard(),
-        parse_mode: 'Markdown'
+        parse_mode: "Markdown"
       }
     });
 
     return { success: true };
   }
 
-
   /**
    * 🔘 취소 키보드 생성
    */
   createCancelKeyboard() {
     return {
-      inline_keyboard: [
-        [
-          { text: '❌ 취소', callback_data: 'tts:menu' }
-        ]
-      ]
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "tts:menu" }]]
     };
   }
 
@@ -1041,8 +1109,8 @@ class TTSModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '🎵 변환 시작', callback_data: 'tts:start' },
-          { text: '🔙 메뉴로', callback_data: 'tts:menu' }
+          { text: "🎵 변환 시작", callback_data: "tts:start" },
+          { text: "🔙 메뉴로", callback_data: "tts:menu" }
         ]
       ]
     };

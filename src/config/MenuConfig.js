@@ -4,7 +4,7 @@ const { getEnabledModules } = require("./ModuleRegistry");
 
 /**
  * 🎨 MenuConfig - 메뉴 생성 및 관리
- * 
+ *
  * 핵심 기능:
  * - 메인 메뉴 생성
  * - 모듈별 키보드 생성
@@ -28,8 +28,10 @@ class MenuConfig {
     this.stats.menusGenerated++;
     this.stats.lastGenerated = new Date().toISOString();
 
-    const enabledModules = getEnabledModules().filter(module => module.showInMenu);
-    
+    const enabledModules = getEnabledModules().filter(
+      (module) => module.showInMenu
+    );
+
     // 2열 그리드로 배치
     const buttons = [];
     for (let i = 0; i < enabledModules.length; i += 2) {
@@ -38,13 +40,13 @@ class MenuConfig {
       const module2 = enabledModules[i + 1];
 
       row.push({
-        text: `${module1.emoji || '📱'} ${module1.displayName}`,
+        text: `${module1.emoji || "📱"} ${module1.displayName}`,
         callback_data: `${module1.key}:menu`
       });
 
       if (module2) {
         row.push({
-          text: `${module2.emoji || '📱'} ${module2.displayName}`,
+          text: `${module2.emoji || "📱"} ${module2.displayName}`,
           callback_data: `${module2.key}:menu`
         });
       }
@@ -66,7 +68,7 @@ class MenuConfig {
   getWelcomeMessage() {
     const hour = new Date().getHours();
     let greeting = "안녕하세요";
-    
+
     if (hour < 12) greeting = "좋은 아침입니다";
     else if (hour < 18) greeting = "안녕하세요";
     else greeting = "좋은 저녁입니다";
@@ -81,16 +83,12 @@ class MenuConfig {
     this.stats.keyboardsCreated++;
 
     const buttons = [];
-    
+
     if (moduleKey) {
-      buttons.push([
-        { text: "🔙 메뉴", callback_data: `${moduleKey}:menu` }
-      ]);
+      buttons.push([{ text: "🔙 메뉴", callback_data: `${moduleKey}:menu` }]);
     }
-    
-    buttons.push([
-      { text: "🏠 메인 메뉴", callback_data: "system:menu" }
-    ]);
+
+    buttons.push([{ text: "🏠 메인 메뉴", callback_data: "system:menu" }]);
 
     return {
       inline_keyboard: buttons

@@ -6,7 +6,7 @@ class ReminderScheduler {
     this.reminderService = options.reminderService;
     this.isRunning = false;
     this.intervalId = null;
-    
+
     logger.info("📅 ReminderScheduler 생성됨");
   }
 
@@ -18,10 +18,10 @@ class ReminderScheduler {
 
     try {
       this.isRunning = true;
-      
+
       // 30초마다 체크 (나중에 설정 가능하도록)
       this.intervalId = setInterval(() => {
-        this.checkReminders().catch(error => {
+        this.checkReminders().catch((error) => {
           logger.error("ReminderScheduler 체크 실패:", error);
         });
       }, 30000);
@@ -55,7 +55,7 @@ class ReminderScheduler {
 
     try {
       this.isRunning = false;
-      
+
       if (this.intervalId) {
         clearInterval(this.intervalId);
         this.intervalId = null;

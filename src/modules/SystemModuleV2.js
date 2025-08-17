@@ -19,13 +19,15 @@ const {
 class SystemModuleV2 {
   constructor(moduleName = "system", options = {}) {
     this.moduleName = moduleName;
-    
+
     // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
     if (!options.eventBus) {
-      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+      throw new Error(
+        `EventBus must be injected via options for module: ${moduleName}`
+      );
     }
     this.eventBus = options.eventBus;
-    
+
     // V2 모듈 필수 속성들
     this.isInitialized = false;
     this.serviceBuilder = options.serviceBuilder || null;
@@ -105,7 +107,9 @@ class SystemModuleV2 {
         await this.handleHealthCheck(event);
         break;
       default:
-        logger.debug(`🚇 SystemModuleV2에서 처리하지 않는 이벤트: ${eventName}`);
+        logger.debug(
+          `🚇 SystemModuleV2에서 처리하지 않는 이벤트: ${eventName}`
+        );
         break;
     }
   }
@@ -117,7 +121,7 @@ class SystemModuleV2 {
     try {
       // 이벤트 리스너 설정
       this.setupEventListeners();
-      
+
       // 초기 시스템 스냅샷 수집
       const initialSnapshot = getCompleteSystemSnapshot();
       logger.info("🖥️ SystemModuleV2 초기화 - 시스템 스냅샷:", {
@@ -128,7 +132,7 @@ class SystemModuleV2 {
 
       // 초기화 완료 표시
       this.isInitialized = true;
-      
+
       logger.success("🚇 SystemModuleV2 초기화 완료 (EventBus 기반)");
       return true;
     } catch (error) {
@@ -143,9 +147,9 @@ class SystemModuleV2 {
   async cleanup() {
     try {
       logger.info("🧹 SystemModuleV2 정리 시작...");
-      
+
       // 필요시 이벤트 구독 해제나 정리 작업
-      
+
       logger.success("✅ SystemModuleV2 정리 완료");
     } catch (error) {
       logger.error("❌ SystemModuleV2 정리 실패:", error);
@@ -159,26 +163,26 @@ class SystemModuleV2 {
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
-    
+
     // 레거시 콜백을 처리하는 맵 - SystemModuleV2는 이벤트 기반이므로 최소한만 지원
     const actionMap = {
-      'menu': () => this.showMainMenu(userId, chatId),
-      'help': () => this.showHelp(userId, chatId),
-      'status': () => this.showSystemStatus(userId, chatId),
-      'health': () => this.showSystemHealth(userId, chatId)
+      menu: () => this.showMainMenu(userId, chatId),
+      help: () => this.showHelp(userId, chatId),
+      status: () => this.showSystemStatus(userId, chatId),
+      health: () => this.showSystemHealth(userId, chatId)
     };
-    
+
     const handler = actionMap[subAction];
     if (handler) {
       // SystemModuleV2는 이벤트 발행 방식이므로 결과를 반환하지 않음
       await handler();
       return {
         type: subAction,
-        module: 'system',
+        module: "system",
         success: true
       };
     }
-    
+
     logger.debug(`SystemModuleV2: 알 수 없는 액션 - ${subAction}`);
     return null;
   }
@@ -438,7 +442,7 @@ class SystemModuleV2 {
         logger.debug("🔄 시스템 시작 이벤트 중복 처리 방지 - 무시");
         return;
       }
-      
+
       this.isStartupHandled = true;
       logger.info("🚀 시스템 시작 이벤트 수신");
 

@@ -43,23 +43,24 @@ const Environment = require("./src/config/Environment");
 try {
   // 환경변수 유효성 검사
   Environment.validate();
-  
+
   // 보안 검사 수행
   const securityIssues = Environment.securityCheck();
   if (securityIssues.length > 0) {
-    console.log('\n🚨 보안 이슈 발견:');
-    securityIssues.forEach(issue => console.log(`  - ${issue}`));
+    console.log("\n🚨 보안 이슈 발견:");
+    securityIssues.forEach((issue) => console.log(`  - ${issue}`));
   }
-  
+
   // 환경변수 통계 (프로덕션이 아닌 경우에만)
-  if (NODE_ENV !== 'production') {
+  if (NODE_ENV !== "production") {
     const stats = Environment.getStats();
-    console.log(`\n📊 환경변수 통계: 총 ${stats.total}개, 앱 관련 ${stats.appSpecific}개`);
+    console.log(
+      `\n📊 환경변수 통계: 총 ${stats.total}개, 앱 관련 ${stats.appSpecific}개`
+    );
   }
-  
 } catch (error) {
-  console.error('❌ 환경변수 검증 실패:', error.message);
-  console.error('💡 .env.example 파일을 참고하여 환경변수를 설정해주세요.');
+  console.error("❌ 환경변수 검증 실패:", error.message);
+  console.error("💡 .env.example 파일을 참고하여 환경변수를 설정해주세요.");
   process.exit(1);
 }
 
@@ -74,7 +75,7 @@ console.log(`🗄️ DB: ${process.env.MONGO_URL ? "✅ 설정됨" : "❌ 없음
 // 🔍 개발 환경 정보 (안전한 정보만)
 if (NODE_ENV === "development") {
   console.log("\n🔍 개발 환경 추가 정보:");
-  
+
   const developerIds = (
     process.env.DEVELOPER_IDS ||
     process.env.ADMIN_IDS ||
@@ -89,10 +90,10 @@ if (NODE_ENV === "development") {
   } else {
     console.log(`⚠️ 개발자 ID가 설정되지 않았습니다.`);
   }
-  
+
   // 안전한 환경변수 정보만 표시
   const safeInfo = Environment.getSafeInfo();
-  console.log('📋 앱 설정:', JSON.stringify(safeInfo, null, 2));
+  console.log("📋 앱 설정:", JSON.stringify(safeInfo, null, 2));
   console.log("");
 }
 

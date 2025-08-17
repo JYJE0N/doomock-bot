@@ -38,20 +38,20 @@ class MongooseManager {
       // Mongoose 옵션 (Railway 환경 고려)
       const options = {
         // 연결 풀링 최적화
-        maxPoolSize: this.isRailway ? 5 : 10,    // Railway에서는 연결 수 제한
-        minPoolSize: this.isRailway ? 1 : 2,     // 최소 연결 유지
-        maxIdleTimeMS: 30000,                     // 유휴 연결 타임아웃
-        
+        maxPoolSize: this.isRailway ? 5 : 10, // Railway에서는 연결 수 제한
+        minPoolSize: this.isRailway ? 1 : 2, // 최소 연결 유지
+        maxIdleTimeMS: 30000, // 유휴 연결 타임아웃
+
         // 타임아웃 최적화
         serverSelectionTimeoutMS: this.isRailway ? 10000 : 5000,
         socketTimeoutMS: this.isRailway ? 45000 : 30000,
         connectTimeoutMS: this.isRailway ? 10000 : 5000,
-        
+
         // 재연결 및 안정성 (Mongoose 6+ 호환)
-        heartbeatFrequencyMS: 10000,              // 하트비트 빈도
-        
+        heartbeatFrequencyMS: 10000, // 하트비트 빈도
+
         // 네트워크 최적화 (Mongoose 호환)
-        family: 4                                 // IPv4 강제
+        family: 4 // IPv4 강제
       };
 
       await mongoose.connect(mongoUrl, options);

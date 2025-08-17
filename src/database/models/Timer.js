@@ -251,10 +251,10 @@ timerSchema.virtual("statusDisplay").get(function () {
  */
 timerSchema.virtual("typeDisplay").get(function () {
   const typeMap = {
-    focus: '집중',
-    short: '짧은 휴식',  
-    long: '긴 휴식',
-    custom: '사용자 정의'
+    focus: "집중",
+    short: "짧은 휴식",
+    long: "긴 휴식",
+    custom: "사용자 정의"
   };
   return typeMap[this.type] || this.type;
 });
@@ -263,16 +263,16 @@ timerSchema.virtual("typeDisplay").get(function () {
  * ⏰ 시작 시간 표시
  */
 timerSchema.virtual("startedAtDisplay").get(function () {
-  if (!this.startedAt) return '미시작';
-  return new Date(this.startedAt).toLocaleString('ko-KR');
+  if (!this.startedAt) return "미시작";
+  return new Date(this.startedAt).toLocaleString("ko-KR");
 });
 
 /**
  * ✅ 완료 시간 표시
  */
 timerSchema.virtual("completedAtDisplay").get(function () {
-  if (!this.completedAt) return '미완료';
-  return new Date(this.completedAt).toLocaleString('ko-KR');
+  if (!this.completedAt) return "미완료";
+  return new Date(this.completedAt).toLocaleString("ko-KR");
 });
 
 // ===== 🎯 인스턴스 메서드들 =====

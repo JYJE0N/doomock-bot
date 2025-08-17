@@ -11,25 +11,27 @@ class WorktimeModuleV2 {
   constructor(moduleName = "worktime", options = {}) {
     this.moduleName = moduleName;
     this.serviceBuilder = options.serviceBuilder || null;
-    
+
     // EventBus는 ModuleManager에서 주입받거나 글로벌 인스턴스 사용
     // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
     if (!options.eventBus) {
-      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+      throw new Error(
+        `EventBus must be injected via options for module: ${moduleName}`
+      );
     }
     this.eventBus = options.eventBus;
-    
+
     // 서비스 인스턴스
     this.worktimeService = null;
-    
+
     // 초기화 상태
     this.isInitialized = false;
-    
+
     // 모듈 설정
     this.config = {
       workStartTime: process.env.WORK_START_TIME || "09:00",
       workEndTime: process.env.WORK_END_TIME || "18:00",
-      lunchStartTime: process.env.LUNCH_START_TIME || "12:00", 
+      lunchStartTime: process.env.LUNCH_START_TIME || "12:00",
       lunchEndTime: process.env.LUNCH_END_TIME || "13:00",
       overtimeThreshold: parseInt(process.env.OVERTIME_THRESHOLD) || 480,
       enableReminders: true,
@@ -43,7 +45,7 @@ class WorktimeModuleV2 {
     this.constants = {
       WORK_STATUS: {
         NOT_STARTED: "not_started",
-        WORKING: "working", 
+        WORKING: "working",
         LUNCH: "lunch",
         BREAK: "break",
         FINISHED: "finished"
@@ -57,10 +59,10 @@ class WorktimeModuleV2 {
 
     // 사용자별 임시 상태 (메모리 캐시)
     this.userStates = new Map();
-    
+
     // 이벤트 구독 관리
     this.subscriptions = [];
-    
+
     // 자동 정리 인터벌 (10분마다)
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredStates();
@@ -77,24 +79,32 @@ class WorktimeModuleV2 {
       // ServiceBuilder를 통해 WorktimeService 가져오기 (선택적)
       if (this.serviceBuilder) {
         try {
-          this.worktimeService = await this.serviceBuilder.getOrCreate("worktime", {
-            config: this.config
-          });
+          this.worktimeService = await this.serviceBuilder.getOrCreate(
+            "worktime",
+            {
+              config: this.config
+            }
+          );
           logger.info("💼 WorktimeService 연결 완료");
         } catch (serviceError) {
-          logger.warn("⚠️ WorktimeService 연결 실패 - 테스트 모드로 동작:", serviceError.message);
+          logger.warn(
+            "⚠️ WorktimeService 연결 실패 - 테스트 모드로 동작:",
+            serviceError.message
+          );
           this.worktimeService = null;
         }
       }
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
-      
+
       // 초기화 완료 표시
       this.isInitialized = true;
-      
+
       const mode = this.worktimeService ? "프로덕션" : "테스트";
-      logger.success(`💼 WorktimeModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`);
+      logger.success(
+        `💼 WorktimeModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`
+      );
       return true;
     } catch (error) {
       logger.error("❌ WorktimeModuleV2 초기화 실패:", error);
@@ -115,16 +125,22 @@ class WorktimeModuleV2 {
 
     // 출근 처리
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.WORKTIME.CHECK_IN_REQUEST, async (event) => {
-        await this.handleCheckInRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.WORKTIME.CHECK_IN_REQUEST,
+        async (event) => {
+          await this.handleCheckInRequest(event);
+        }
+      )
     );
 
     // 퇴근 처리
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.WORKTIME.CHECK_OUT_REQUEST, async (event) => {
-        await this.handleCheckOutRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.WORKTIME.CHECK_OUT_REQUEST,
+        async (event) => {
+          await this.handleCheckOutRequest(event);
+        }
+      )
     );
 
     // 오늘 현황 조회
@@ -150,9 +166,12 @@ class WorktimeModuleV2 {
 
     // 월간 통계
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.WORKTIME.MONTHLY_REQUEST, async (event) => {
-        await this.handleMonthlyRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.WORKTIME.MONTHLY_REQUEST,
+        async (event) => {
+          await this.handleMonthlyRequest(event);
+        }
+      )
     );
 
     // 전체 통계
@@ -164,16 +183,22 @@ class WorktimeModuleV2 {
 
     // 이력 조회
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.WORKTIME.HISTORY_REQUEST, async (event) => {
-        await this.handleHistoryRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.WORKTIME.HISTORY_REQUEST,
+        async (event) => {
+          await this.handleHistoryRequest(event);
+        }
+      )
     );
 
     // 설정 관리
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.WORKTIME.SETTINGS_REQUEST, async (event) => {
-        await this.handleSettingsRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.WORKTIME.SETTINGS_REQUEST,
+        async (event) => {
+          await this.handleSettingsRequest(event);
+        }
+      )
     );
 
     // 근무시간 설정
@@ -190,7 +215,7 @@ class WorktimeModuleV2 {
       })
     );
 
-    // 휴식 종료  
+    // 휴식 종료
     this.subscriptions.push(
       this.eventBus.subscribe(EVENTS.WORKTIME.BREAK_END, async (event) => {
         await this.handleBreakEnd(event);
@@ -239,39 +264,39 @@ class WorktimeModuleV2 {
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
-    
+
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
-      'menu': () => this.showMenu(userId, chatId),
-      'checkin': () => this.publishCheckinRequest(userId, chatId),
-      'checkout': () => this.publishCheckoutRequest(userId, chatId),
-      'today': () => this.publishTodayRequest(userId, chatId),
-      'status': () => this.publishStatusRequest(userId, chatId),
-      'weekly': () => this.publishWeeklyRequest(userId, chatId),
-      'monthly': () => this.publishMonthlyRequest(userId, chatId),
-      'stats': () => this.publishStatsRequest(userId, chatId),
-      'history': () => this.publishHistoryRequest(userId, chatId),
-      'settings': () => this.publishSettingsRequest(userId, chatId),
-      'break_start': () => this.publishBreakStartRequest(userId, chatId),
-      'break_end': () => this.publishBreakEndRequest(userId, chatId),
-      'lunch_start': () => this.publishLunchStartRequest(userId, chatId),
-      'lunch_end': () => this.publishLunchEndRequest(userId, chatId)
+      menu: () => this.showMenu(userId, chatId),
+      checkin: () => this.publishCheckinRequest(userId, chatId),
+      checkout: () => this.publishCheckoutRequest(userId, chatId),
+      today: () => this.publishTodayRequest(userId, chatId),
+      status: () => this.publishStatusRequest(userId, chatId),
+      weekly: () => this.publishWeeklyRequest(userId, chatId),
+      monthly: () => this.publishMonthlyRequest(userId, chatId),
+      stats: () => this.publishStatsRequest(userId, chatId),
+      history: () => this.publishHistoryRequest(userId, chatId),
+      settings: () => this.publishSettingsRequest(userId, chatId),
+      break_start: () => this.publishBreakStartRequest(userId, chatId),
+      break_end: () => this.publishBreakEndRequest(userId, chatId),
+      lunch_start: () => this.publishLunchStartRequest(userId, chatId),
+      lunch_end: () => this.publishLunchEndRequest(userId, chatId)
     };
-    
+
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
       // menu 액션은 렌더러용 결과를 반환
-      if (subAction === 'menu' && result) {
+      if (subAction === "menu" && result) {
         return result;
       }
       return {
         type: subAction,
-        module: 'worktime',
+        module: "worktime",
         success: true
       };
     }
-    
+
     logger.debug(`WorktimeModuleV2: 알 수 없는 액션 - ${subAction}`);
     return null;
   }
@@ -360,27 +385,26 @@ class WorktimeModuleV2 {
     try {
       // 렌더러에게 전달할 데이터 구성
       return {
-        type: 'menu',
-        module: 'worktime',
+        type: "menu",
+        module: "worktime",
         success: true,
         data: {
-          title: '💼 *근무시간 관리*',
+          title: "💼 *근무시간 관리*",
           isCheckedIn: false, // 기본값
-          todayWorked: '0시간 0분',
-          weeklyWorked: '0시간 0분',
-          monthlyWorked: '0시간 0분',
+          todayWorked: "0시간 0분",
+          weeklyWorked: "0시간 0분",
+          monthlyWorked: "0시간 0분",
           userId: userId
         }
       };
-
     } catch (error) {
-      logger.error('💼 WorktimeModuleV2.showMenu 실패:', error);
+      logger.error("💼 WorktimeModuleV2.showMenu 실패:", error);
       return {
-        type: 'error',
-        module: 'worktime',
+        type: "error",
+        module: "worktime",
         success: false,
         data: {
-          message: '근무시간 메뉴를 불러오는 중 오류가 발생했습니다.',
+          message: "근무시간 메뉴를 불러오는 중 오류가 발생했습니다.",
           canRetry: true
         }
       };
@@ -392,43 +416,43 @@ class WorktimeModuleV2 {
    */
   async handleCallbackEvent(event) {
     const { data, userId, chatId } = event.payload;
-    const [module, action, ...params] = data.split(':');
-    
-    if (module !== 'worktime') return;
+    const [module, action, ...params] = data.split(":");
+
+    if (module !== "worktime") return;
 
     try {
       switch (action) {
-        case 'menu':
+        case "menu":
           await this.publishMenuRequest(userId, chatId);
           break;
-        case 'checkin':
+        case "checkin":
           await this.publishCheckInRequest(userId, chatId);
           break;
-        case 'checkout':
+        case "checkout":
           await this.publishCheckOutRequest(userId, chatId);
           break;
-        case 'today':
+        case "today":
           await this.publishTodayRequest(userId, chatId);
           break;
-        case 'week':
+        case "week":
           await this.publishWeeklyRequest(userId, chatId);
           break;
-        case 'month':
+        case "month":
           await this.publishMonthlyRequest(userId, chatId);
           break;
-        case 'stats':
+        case "stats":
           await this.publishStatsRequest(userId, chatId);
           break;
-        case 'history':
+        case "history":
           await this.publishHistoryRequest(userId, chatId);
           break;
-        case 'settings':
+        case "settings":
           await this.publishSettingsRequest(userId, chatId);
           break;
-        case 'break':
-          await this.publishBreakStart(userId, chatId, params[0] || 'short');
+        case "break":
+          await this.publishBreakStart(userId, chatId, params[0] || "short");
           break;
-        case 'lunch':
+        case "lunch":
           await this.publishLunchStart(userId, chatId);
           break;
         default:
@@ -449,10 +473,10 @@ class WorktimeModuleV2 {
     try {
       // 오늘 근무 상태 조회 (Service가 있으면 실제 데이터, 없으면 더미 데이터)
       let todayStatus;
-      
+
       if (this.worktimeService) {
         todayStatus = await this.worktimeService.getTodayStatus(userId);
-        
+
         if (!todayStatus.success) {
           await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
             chatId,
@@ -465,7 +489,7 @@ class WorktimeModuleV2 {
         todayStatus = {
           success: true,
           data: {
-            status: 'not_working',
+            status: "not_working",
             checkInTime: null,
             workingHours: 0,
             isWorking: false
@@ -484,19 +508,20 @@ class WorktimeModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatMenu(menuData),
           options: {
-            reply_markup: this.createMenuKeyboard(menuData.status || 'not_working'),
-            parse_mode: 'Markdown'
+            reply_markup: this.createMenuKeyboard(
+              menuData.status || "not_working"
+            ),
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('📝 메뉴 요청 처리 실패:', error);
+      logger.error("📝 메뉴 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -510,10 +535,10 @@ class WorktimeModuleV2 {
     try {
       // 출근 처리 (Service가 있으면 실제 처리, 없으면 더미 응답)
       let checkInResult;
-      
+
       if (this.worktimeService) {
         checkInResult = await this.worktimeService.checkIn(userId);
-        
+
         if (!checkInResult.success) {
           await this.eventBus.publish(EVENTS.WORKTIME.CHECK_IN_ERROR, {
             userId,
@@ -531,7 +556,7 @@ class WorktimeModuleV2 {
             record: {
               userId,
               checkInTime: new Date(),
-              date: new Date().toISOString().split('T')[0]
+              date: new Date().toISOString().split("T")[0]
             }
           }
         };
@@ -546,19 +571,18 @@ class WorktimeModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatCheckInSuccess(checkInResult.data),
           options: {
             reply_markup: this.createAfterCheckInKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🏢 출근 요청 처리 실패:', error);
+      logger.error("🏢 출근 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -573,7 +597,7 @@ class WorktimeModuleV2 {
       // 퇴근 처리
       // 퇴근 처리 (Service가 있으면 실제 처리, 없으면 더미 응답)
       let checkOutResult;
-      
+
       if (this.worktimeService) {
         checkOutResult = await this.worktimeService.checkOut(userId);
       } else {
@@ -591,7 +615,7 @@ class WorktimeModuleV2 {
           }
         };
       }
-      
+
       if (!checkOutResult.success) {
         await this.eventBus.publish(EVENTS.WORKTIME.CHECK_OUT_ERROR, {
           userId,
@@ -616,12 +640,11 @@ class WorktimeModuleV2 {
         text: this.formatCheckOutSuccess(checkOutResult.data),
         options: {
           reply_markup: this.createAfterCheckOutKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('🏠 퇴근 요청 처리 실패:', error);
+      logger.error("🏠 퇴근 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -634,10 +657,10 @@ class WorktimeModuleV2 {
 
     try {
       let todayStatus;
-      
+
       if (this.worktimeService) {
         todayStatus = await this.worktimeService.getTodayStatus(userId);
-        
+
         if (!todayStatus.success) {
           await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
             chatId,
@@ -653,7 +676,7 @@ class WorktimeModuleV2 {
             isWorking: false,
             checkInTime: null,
             workDuration: 0,
-            status: 'not_working'
+            status: "not_working"
           }
         };
       }
@@ -671,12 +694,11 @@ class WorktimeModuleV2 {
         text: this.formatTodayStatus(todayStatus.data),
         options: {
           reply_markup: this.createTodayKeyboard(todayStatus.data.status),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('📅 오늘 현황 요청 실패:', error);
+      logger.error("📅 오늘 현황 요청 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -689,7 +711,7 @@ class WorktimeModuleV2 {
 
     try {
       const statusResult = await this.worktimeService.getStatus(userId);
-      
+
       if (!statusResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -704,9 +726,8 @@ class WorktimeModuleV2 {
         chatId,
         status: statusResult.data
       });
-
     } catch (error) {
-      logger.error('ℹ️ 상태 조회 실패:', error);
+      logger.error("ℹ️ 상태 조회 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -719,9 +740,12 @@ class WorktimeModuleV2 {
 
     try {
       let weeklyResult;
-      
+
       if (this.worktimeService) {
-        weeklyResult = await this.worktimeService.getWeeklyStats(userId, weekOffset);
+        weeklyResult = await this.worktimeService.getWeeklyStats(
+          userId,
+          weekOffset
+        );
       } else {
         // 테스트 모드: 더미 주간 통계
         weeklyResult = {
@@ -737,7 +761,7 @@ class WorktimeModuleV2 {
           }
         };
       }
-      
+
       if (!weeklyResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -760,12 +784,11 @@ class WorktimeModuleV2 {
         text: this.formatWeeklyStats(weeklyResult.data),
         options: {
           reply_markup: this.createWeeklyKeyboard(weekOffset),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('📊 주간 통계 요청 실패:', error);
+      logger.error("📊 주간 통계 요청 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -781,9 +804,13 @@ class WorktimeModuleV2 {
       const targetMonth = month || new Date().getMonth() + 1;
 
       let monthlyResult;
-      
+
       if (this.worktimeService) {
-        monthlyResult = await this.worktimeService.getMonthlyStats(userId, targetYear, targetMonth);
+        monthlyResult = await this.worktimeService.getMonthlyStats(
+          userId,
+          targetYear,
+          targetMonth
+        );
       } else {
         // 테스트 모드: 더미 월간 통계
         monthlyResult = {
@@ -799,7 +826,7 @@ class WorktimeModuleV2 {
           }
         };
       }
-      
+
       if (!monthlyResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -820,15 +847,18 @@ class WorktimeModuleV2 {
       // 렌더링 요청
       await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
         chatId,
-        text: this.formatMonthlyStats(monthlyResult.data, targetYear, targetMonth),
+        text: this.formatMonthlyStats(
+          monthlyResult.data,
+          targetYear,
+          targetMonth
+        ),
         options: {
           reply_markup: this.createMonthlyKeyboard(targetYear, targetMonth),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('📈 월간 통계 요청 실패:', error);
+      logger.error("📈 월간 통계 요청 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -841,7 +871,7 @@ class WorktimeModuleV2 {
 
     try {
       const statsResult = await this.worktimeService.getOverallStats(userId);
-      
+
       if (!statsResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -863,12 +893,11 @@ class WorktimeModuleV2 {
         text: this.formatOverallStats(statsResult.data),
         options: {
           reply_markup: this.createStatsKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('📊 전체 통계 요청 실패:', error);
+      logger.error("📊 전체 통계 요청 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -881,9 +910,13 @@ class WorktimeModuleV2 {
 
     try {
       let historyResult;
-      
+
       if (this.worktimeService) {
-        historyResult = await this.worktimeService.getHistory(userId, limit, offset);
+        historyResult = await this.worktimeService.getHistory(
+          userId,
+          limit,
+          offset
+        );
       } else {
         // 테스트 모드: 더미 이력 데이터
         historyResult = {
@@ -895,7 +928,7 @@ class WorktimeModuleV2 {
           }
         };
       }
-      
+
       if (!historyResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -919,12 +952,11 @@ class WorktimeModuleV2 {
         text: this.formatHistory(historyResult.data),
         options: {
           reply_markup: this.createHistoryKeyboard(limit, offset),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('📋 이력 조회 실패:', error);
+      logger.error("📋 이력 조회 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -938,7 +970,7 @@ class WorktimeModuleV2 {
     try {
       // 사용자 설정 조회
       const settingsResult = await this.worktimeService.getUserSettings(userId);
-      
+
       // 성공 이벤트 발행
       await this.eventBus.publish(EVENTS.WORKTIME.SETTINGS_READY, {
         userId,
@@ -950,15 +982,16 @@ class WorktimeModuleV2 {
       // 렌더링 요청
       await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
         chatId,
-        text: this.formatSettings(settingsResult.success ? settingsResult.data : {}),
+        text: this.formatSettings(
+          settingsResult.success ? settingsResult.data : {}
+        ),
         options: {
           reply_markup: this.createSettingsKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('⚙️ 설정 요청 실패:', error);
+      logger.error("⚙️ 설정 요청 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -970,8 +1003,12 @@ class WorktimeModuleV2 {
     const { userId, chatId, workStartTime, workEndTime } = event.payload;
 
     try {
-      const updateResult = await this.worktimeService.setWorkTime(userId, workStartTime, workEndTime);
-      
+      const updateResult = await this.worktimeService.setWorkTime(
+        userId,
+        workStartTime,
+        workEndTime
+      );
+
       if (!updateResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -986,12 +1023,11 @@ class WorktimeModuleV2 {
         text: `✅ 근무시간이 *${workStartTime} ~ ${workEndTime}*로 설정되었습니다.`,
         options: {
           reply_markup: this.createAfterSetKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('🕘 근무시간 설정 실패:', error);
+      logger.error("🕘 근무시간 설정 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -1000,11 +1036,14 @@ class WorktimeModuleV2 {
    * ☕ 휴식 시작 처리
    */
   async handleBreakStart(event) {
-    const { userId, chatId, breakType = 'short' } = event.payload;
+    const { userId, chatId, breakType = "short" } = event.payload;
 
     try {
-      const breakResult = await this.worktimeService.startBreak(userId, breakType);
-      
+      const breakResult = await this.worktimeService.startBreak(
+        userId,
+        breakType
+      );
+
       if (!breakResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -1019,12 +1058,11 @@ class WorktimeModuleV2 {
         text: this.formatBreakStart(breakType),
         options: {
           reply_markup: this.createBreakKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('☕ 휴식 시작 처리 실패:', error);
+      logger.error("☕ 휴식 시작 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -1037,7 +1075,7 @@ class WorktimeModuleV2 {
 
     try {
       const endResult = await this.worktimeService.endBreak(userId);
-      
+
       if (!endResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -1052,12 +1090,11 @@ class WorktimeModuleV2 {
         text: this.formatBreakEnd(endResult.data),
         options: {
           reply_markup: this.createAfterBreakKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('🔚 휴식 종료 처리 실패:', error);
+      logger.error("🔚 휴식 종료 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -1070,7 +1107,7 @@ class WorktimeModuleV2 {
 
     try {
       const lunchResult = await this.worktimeService.startLunch(userId);
-      
+
       if (!lunchResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -1085,12 +1122,11 @@ class WorktimeModuleV2 {
         text: this.formatLunchStart(),
         options: {
           reply_markup: this.createLunchKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('🍽️ 점심 시작 처리 실패:', error);
+      logger.error("🍽️ 점심 시작 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -1103,7 +1139,7 @@ class WorktimeModuleV2 {
 
     try {
       const endResult = await this.worktimeService.endLunch(userId);
-      
+
       if (!endResult.success) {
         await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
           chatId,
@@ -1118,12 +1154,11 @@ class WorktimeModuleV2 {
         text: this.formatLunchEnd(endResult.data),
         options: {
           reply_markup: this.createAfterLunchKeyboard(),
-          parse_mode: 'Markdown'
+          parse_mode: "Markdown"
         }
       });
-
     } catch (error) {
-      logger.error('🔚 점심 종료 처리 실패:', error);
+      logger.error("🔚 점심 종료 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -1131,47 +1166,70 @@ class WorktimeModuleV2 {
   // === 이벤트 발행 헬퍼 메서드들 ===
 
   async publishMenuRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WORKTIME.MENU_REQUEST, { userId, chatId });
+    await this.eventBus.publish(EVENTS.WORKTIME.MENU_REQUEST, {
+      userId,
+      chatId
+    });
   }
 
   async publishCheckInRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WORKTIME.CHECK_IN_REQUEST, { userId, chatId });
+    await this.eventBus.publish(EVENTS.WORKTIME.CHECK_IN_REQUEST, {
+      userId,
+      chatId
+    });
   }
 
   async publishCheckOutRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WORKTIME.CHECK_OUT_REQUEST, { userId, chatId });
+    await this.eventBus.publish(EVENTS.WORKTIME.CHECK_OUT_REQUEST, {
+      userId,
+      chatId
+    });
   }
 
-
   async publishHistoryRequest(userId, chatId, limit = 10, offset = 0) {
-    await this.eventBus.publish(EVENTS.WORKTIME.HISTORY_REQUEST, { userId, chatId, limit, offset });
+    await this.eventBus.publish(EVENTS.WORKTIME.HISTORY_REQUEST, {
+      userId,
+      chatId,
+      limit,
+      offset
+    });
   }
 
   async publishSettingsRequest(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WORKTIME.SETTINGS_REQUEST, { userId, chatId });
+    await this.eventBus.publish(EVENTS.WORKTIME.SETTINGS_REQUEST, {
+      userId,
+      chatId
+    });
   }
 
-  async publishBreakStart(userId, chatId, breakType = 'short') {
-    await this.eventBus.publish(EVENTS.WORKTIME.BREAK_START, { userId, chatId, breakType });
+  async publishBreakStart(userId, chatId, breakType = "short") {
+    await this.eventBus.publish(EVENTS.WORKTIME.BREAK_START, {
+      userId,
+      chatId,
+      breakType
+    });
   }
 
   async publishLunchStart(userId, chatId) {
-    await this.eventBus.publish(EVENTS.WORKTIME.LUNCH_START, { userId, chatId });
+    await this.eventBus.publish(EVENTS.WORKTIME.LUNCH_START, {
+      userId,
+      chatId
+    });
   }
 
   async publishError(error, originalEvent) {
     const chatId = originalEvent?.payload?.chatId;
-    
+
     if (chatId) {
       await this.eventBus.publish(EVENTS.RENDER.ERROR_REQUEST, {
         chatId,
-        error: error.message || '근무시간 처리 중 오류가 발생했습니다.'
+        error: error.message || "근무시간 처리 중 오류가 발생했습니다."
       });
     }
 
     await this.eventBus.publish(EVENTS.SYSTEM.ERROR, {
       error: error.message,
-      module: 'WorktimeModuleV2',
+      module: "WorktimeModuleV2",
       stack: error.stack,
       originalEvent: originalEvent?.name,
       timestamp: Utils.timestamp()
@@ -1195,14 +1253,15 @@ class WorktimeModuleV2 {
   cleanupExpiredStates() {
     const now = Date.now();
     const expired = [];
-    
+
     this.userStates.forEach((state, userId) => {
-      if (now - state.lastUpdate > 3600000) { // 1시간
+      if (now - state.lastUpdate > 3600000) {
+        // 1시간
         expired.push(userId);
       }
     });
 
-    expired.forEach(userId => {
+    expired.forEach((userId) => {
       this.clearUserState(userId);
     });
 
@@ -1215,76 +1274,87 @@ class WorktimeModuleV2 {
 
   formatMenu(todayStatus) {
     const lines = [
-      '💼 *근무시간 관리*\\n',
+      "💼 *근무시간 관리*\\n",
       `📊 **현재 상태**: ${this.getStatusDisplay(todayStatus.status)}`
     ];
 
     if (todayStatus.checkInTime) {
-      lines.push(`🏢 **출근시간**: ${this.formatTime(todayStatus.checkInTime)}`);
+      lines.push(
+        `🏢 **출근시간**: ${this.formatTime(todayStatus.checkInTime)}`
+      );
     }
 
     if (todayStatus.checkOutTime) {
-      lines.push(`🏠 **퇴근시간**: ${this.formatTime(todayStatus.checkOutTime)}`);
+      lines.push(
+        `🏠 **퇴근시간**: ${this.formatTime(todayStatus.checkOutTime)}`
+      );
     }
 
     if (todayStatus.workDuration) {
-      lines.push(`⏰ **근무시간**: ${this.formatDuration(todayStatus.workDuration)}`);
+      lines.push(
+        `⏰ **근무시간**: ${this.formatDuration(todayStatus.workDuration)}`
+      );
     }
 
-    lines.push('\\n아래 버튼을 눌러 원하는 기능을 선택하세요:');
+    lines.push("\\n아래 버튼을 눌러 원하는 기능을 선택하세요:");
 
-    return lines.join('\\n');
+    return lines.join("\\n");
   }
 
   formatCheckInSuccess(data) {
     return [
-      '🏢 *출근 완료!*\\n',
+      "🏢 *출근 완료!*\\n",
       `⏰ **출근시간**: ${this.formatTime(data.checkInTime)}`,
-      `📅 **날짜**: ${Utils.now('date')}`,
-      '\\n오늘도 화이팅! 💪'
-    ].join('\\n');
+      `📅 **날짜**: ${Utils.now("date")}`,
+      "\\n오늘도 화이팅! 💪"
+    ].join("\\n");
   }
 
   formatCheckOutSuccess(data) {
     return [
-      '🏠 *퇴근 완료!*\\n',
+      "🏠 *퇴근 완료!*\\n",
       `⏰ **퇴근시간**: ${this.formatTime(data.checkOutTime)}`,
       `📊 **오늘 근무시간**: ${this.formatDuration(data.workDuration)}`,
-      `📅 **날짜**: ${Utils.now('date')}`,
-      '\\n오늘도 고생하셨습니다! 😊'
-    ].join('\\n');
+      `📅 **날짜**: ${Utils.now("date")}`,
+      "\\n오늘도 고생하셨습니다! 😊"
+    ].join("\\n");
   }
 
   formatTodayStatus(todayStatus) {
     const lines = [
-      `📅 *${Utils.now('date')} 근무 현황*\\n`,
+      `📅 *${Utils.now("date")} 근무 현황*\\n`,
       `📊 **현재 상태**: ${this.getStatusDisplay(todayStatus.status)}`
     ];
 
     if (todayStatus.checkInTime) {
       lines.push(`🏢 **출근**: ${this.formatTime(todayStatus.checkInTime)}`);
-      
+
       if (!todayStatus.checkOutTime) {
-        const workingTime = Date.now() - new Date(todayStatus.checkInTime).getTime();
+        const workingTime =
+          Date.now() - new Date(todayStatus.checkInTime).getTime();
         lines.push(`⏰ **현재 근무시간**: ${this.formatDuration(workingTime)}`);
       }
     }
 
     if (todayStatus.checkOutTime) {
       lines.push(`🏠 **퇴근**: ${this.formatTime(todayStatus.checkOutTime)}`);
-      lines.push(`📊 **총 근무시간**: ${this.formatDuration(todayStatus.workDuration)}`);
+      lines.push(
+        `📊 **총 근무시간**: ${this.formatDuration(todayStatus.workDuration)}`
+      );
     }
 
     if (todayStatus.breakTime) {
-      lines.push(`☕ **휴식시간**: ${this.formatDuration(todayStatus.breakTime)}`);
+      lines.push(
+        `☕ **휴식시간**: ${this.formatDuration(todayStatus.breakTime)}`
+      );
     }
 
-    return lines.join('\\n');
+    return lines.join("\\n");
   }
 
   formatWeeklyStats(weeklyStats) {
     const lines = [
-      '📊 *주간 근무 통계*\\n',
+      "📊 *주간 근무 통계*\\n",
       `📅 **기간**: ${weeklyStats.startDate} ~ ${weeklyStats.endDate}`,
       `📈 **총 근무시간**: ${this.formatDuration(weeklyStats.totalWorkTime)}`,
       `📊 **평균 근무시간**: ${this.formatDuration(weeklyStats.averageWorkTime)}`,
@@ -1292,10 +1362,12 @@ class WorktimeModuleV2 {
     ];
 
     if (weeklyStats.overtimeHours > 0) {
-      lines.push(`⏰ **초과근무**: ${this.formatDuration(weeklyStats.overtimeHours)}`);
+      lines.push(
+        `⏰ **초과근무**: ${this.formatDuration(weeklyStats.overtimeHours)}`
+      );
     }
 
-    return lines.join('\\n');
+    return lines.join("\\n");
   }
 
   formatMonthlyStats(monthlyStats, year, month) {
@@ -1307,127 +1379,133 @@ class WorktimeModuleV2 {
     ];
 
     if (monthlyStats.overtimeHours > 0) {
-      lines.push(`⏰ **초과근무**: ${this.formatDuration(monthlyStats.overtimeHours)}`);
+      lines.push(
+        `⏰ **초과근무**: ${this.formatDuration(monthlyStats.overtimeHours)}`
+      );
     }
 
     if (monthlyStats.lateCount > 0) {
       lines.push(`⏰ **지각횟수**: ${monthlyStats.lateCount}회`);
     }
 
-    return lines.join('\\n');
+    return lines.join("\\n");
   }
 
   formatOverallStats(stats) {
     return [
-      '📊 *전체 근무 통계*\\n',
+      "📊 *전체 근무 통계*\\n",
       `📈 **총 근무시간**: ${this.formatDuration(stats.totalWorkTime)}`,
       `📋 **총 출근일수**: ${stats.totalWorkDays}일`,
       `📊 **평균 근무시간**: ${this.formatDuration(stats.averageWorkTime)}`,
       `⏰ **총 초과근무**: ${this.formatDuration(stats.totalOvertime)}`,
-      `📅 **첫 출근일**: ${stats.firstWorkDate || '정보 없음'}`
-    ].join('\\n');
+      `📅 **첫 출근일**: ${stats.firstWorkDate || "정보 없음"}`
+    ].join("\\n");
   }
 
   formatHistory(history) {
-    const lines = [
-      '📋 *근무 기록*\\n'
-    ];
+    const lines = ["📋 *근무 기록*\\n"];
 
     if (!history || history.length === 0) {
-      lines.push('아직 근무 기록이 없습니다.');
+      lines.push("아직 근무 기록이 없습니다.");
     } else {
       history.forEach((record, index) => {
-        const date = new Date(record.date).toLocaleDateString('ko-KR');
-        const checkIn = record.checkInTime ? this.formatTime(record.checkInTime) : '미출근';
-        const checkOut = record.checkOutTime ? this.formatTime(record.checkOutTime) : '미퇴근';
-        const duration = record.workDuration ? this.formatDuration(record.workDuration) : '-';
-        
+        const date = new Date(record.date).toLocaleDateString("ko-KR");
+        const checkIn = record.checkInTime
+          ? this.formatTime(record.checkInTime)
+          : "미출근";
+        const checkOut = record.checkOutTime
+          ? this.formatTime(record.checkOutTime)
+          : "미퇴근";
+        const duration = record.workDuration
+          ? this.formatDuration(record.workDuration)
+          : "-";
+
         lines.push(`${index + 1}. **${date}**`);
         lines.push(`   🏢 ${checkIn} → 🏠 ${checkOut} (${duration})`);
       });
     }
 
-    return lines.join('\\n');
+    return lines.join("\\n");
   }
 
   formatSettings(settings) {
     return [
-      '⚙️ *근무시간 설정*\\n',
+      "⚙️ *근무시간 설정*\\n",
       `🏢 **출근시간**: ${settings.workStartTime || this.config.workStartTime}`,
       `🏠 **퇴근시간**: ${settings.workEndTime || this.config.workEndTime}`,
       `🍽️ **점심시간**: ${this.config.lunchStartTime} ~ ${this.config.lunchEndTime}`,
       `⏰ **초과근무 기준**: ${Math.floor(this.config.overtimeThreshold / 60)}시간`,
-      `🔔 **알림**: ${this.config.enableReminders ? '활성화' : '비활성화'}`
-    ].join('\\n');
+      `🔔 **알림**: ${this.config.enableReminders ? "활성화" : "비활성화"}`
+    ].join("\\n");
   }
 
   formatBreakStart(breakType) {
     const typeMap = {
-      short: '짧은 휴식',
-      long: '긴 휴식', 
-      custom: '사용자 정의 휴식'
+      short: "짧은 휴식",
+      long: "긴 휴식",
+      custom: "사용자 정의 휴식"
     };
 
     return [
-      `☕ *${typeMap[breakType] || '휴식'} 시작*\\n`,
-      `⏰ **시작시간**: ${Utils.now('time')}`,
-      '\\n충분한 휴식을 취하세요! 😊'
-    ].join('\\n');
+      `☕ *${typeMap[breakType] || "휴식"} 시작*\\n`,
+      `⏰ **시작시간**: ${Utils.now("time")}`,
+      "\\n충분한 휴식을 취하세요! 😊"
+    ].join("\\n");
   }
 
   formatBreakEnd(data) {
     return [
-      '🔚 *휴식 종료*\\n',
-      `⏰ **종료시간**: ${Utils.now('time')}`,
+      "🔚 *휴식 종료*\\n",
+      `⏰ **종료시간**: ${Utils.now("time")}`,
       `📊 **휴식시간**: ${this.formatDuration(data.breakDuration)}`,
-      '\\n업무를 계속하세요! 💪'
-    ].join('\\n');
+      "\\n업무를 계속하세요! 💪"
+    ].join("\\n");
   }
 
   formatLunchStart() {
     return [
-      '🍽️ *점심시간 시작*\\n',
-      `⏰ **시작시간**: ${Utils.now('time')}`,
-      '\\n맛있는 점심 드세요! 😋'
-    ].join('\\n');
+      "🍽️ *점심시간 시작*\\n",
+      `⏰ **시작시간**: ${Utils.now("time")}`,
+      "\\n맛있는 점심 드세요! 😋"
+    ].join("\\n");
   }
 
   formatLunchEnd(data) {
     return [
-      '🔚 *점심시간 종료*\\n',
-      `⏰ **종료시간**: ${Utils.now('time')}`,
+      "🔚 *점심시간 종료*\\n",
+      `⏰ **종료시간**: ${Utils.now("time")}`,
       `📊 **점심시간**: ${this.formatDuration(data.lunchDuration)}`,
-      '\\n오후 업무 화이팅! 💪'
-    ].join('\\n');
+      "\\n오후 업무 화이팅! 💪"
+    ].join("\\n");
   }
 
   // === 헬퍼 메서드들 ===
 
   getStatusDisplay(status) {
     const statusMap = {
-      not_started: '미출근',
-      working: '근무중 💼',
-      lunch: '점심시간 🍽️', 
-      break: '휴식시간 ☕',
-      finished: '퇴근완료 ✅'
+      not_started: "미출근",
+      working: "근무중 💼",
+      lunch: "점심시간 🍽️",
+      break: "휴식시간 ☕",
+      finished: "퇴근완료 ✅"
     };
     return statusMap[status] || status;
   }
 
   formatTime(timeStr) {
-    if (!timeStr) return '-';
-    return new Date(timeStr).toLocaleTimeString('ko-KR', {
-      hour: '2-digit',
-      minute: '2-digit'
+    if (!timeStr) return "-";
+    return new Date(timeStr).toLocaleTimeString("ko-KR", {
+      hour: "2-digit",
+      minute: "2-digit"
     });
   }
 
   formatDuration(milliseconds) {
-    if (!milliseconds || milliseconds === 0) return '0분';
-    
+    if (!milliseconds || milliseconds === 0) return "0분";
+
     const hours = Math.floor(milliseconds / (1000 * 60 * 60));
     const minutes = Math.floor((milliseconds % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (hours > 0) {
       return minutes > 0 ? `${hours}시간 ${minutes}분` : `${hours}시간`;
     }
@@ -1441,33 +1519,29 @@ class WorktimeModuleV2 {
 
     // 출퇴근 버튼 (상태에 따라)
     if (status === this.constants.WORK_STATUS.NOT_STARTED) {
-      buttons.push([
-        { text: '🏢 출근', callback_data: 'worktime:checkin' }
-      ]);
+      buttons.push([{ text: "🏢 출근", callback_data: "worktime:checkin" }]);
     } else if (status === this.constants.WORK_STATUS.WORKING) {
       buttons.push([
-        { text: '🏠 퇴근', callback_data: 'worktime:checkout' },
-        { text: '☕ 휴식', callback_data: 'worktime:break:short' }
+        { text: "🏠 퇴근", callback_data: "worktime:checkout" },
+        { text: "☕ 휴식", callback_data: "worktime:break:short" }
       ]);
-      buttons.push([
-        { text: '🍽️ 점심', callback_data: 'worktime:lunch' }
-      ]);
+      buttons.push([{ text: "🍽️ 점심", callback_data: "worktime:lunch" }]);
     }
 
     // 공통 버튼들
     buttons.push([
-      { text: '📅 오늘 현황', callback_data: 'worktime:today' },
-      { text: '📊 주간 통계', callback_data: 'worktime:week' }
+      { text: "📅 오늘 현황", callback_data: "worktime:today" },
+      { text: "📊 주간 통계", callback_data: "worktime:week" }
     ]);
 
     buttons.push([
-      { text: '📈 월간 통계', callback_data: 'worktime:month' },
-      { text: '📋 근무 기록', callback_data: 'worktime:history' }
+      { text: "📈 월간 통계", callback_data: "worktime:month" },
+      { text: "📋 근무 기록", callback_data: "worktime:history" }
     ]);
 
     buttons.push([
-      { text: '⚙️ 설정', callback_data: 'worktime:settings' },
-      { text: '🏠 메인 메뉴', callback_data: 'system:menu' }
+      { text: "⚙️ 설정", callback_data: "worktime:settings" },
+      { text: "🏠 메인 메뉴", callback_data: "system:menu" }
     ]);
 
     return { inline_keyboard: buttons };
@@ -1477,12 +1551,12 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '📅 오늘 현황', callback_data: 'worktime:today' },
-          { text: '☕ 휴식', callback_data: 'worktime:break:short' }
+          { text: "📅 오늘 현황", callback_data: "worktime:today" },
+          { text: "☕ 휴식", callback_data: "worktime:break:short" }
         ],
         [
-          { text: '🍽️ 점심', callback_data: 'worktime:lunch' },
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
+          { text: "🍽️ 점심", callback_data: "worktime:lunch" },
+          { text: "🔙 메뉴로", callback_data: "worktime:menu" }
         ]
       ]
     };
@@ -1492,12 +1566,10 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '📊 오늘 통계', callback_data: 'worktime:today' },
-          { text: '📈 주간 통계', callback_data: 'worktime:week' }
+          { text: "📊 오늘 통계", callback_data: "worktime:today" },
+          { text: "📈 주간 통계", callback_data: "worktime:week" }
         ],
-        [
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
-        ]
+        [{ text: "🔙 메뉴로", callback_data: "worktime:menu" }]
       ]
     };
   }
@@ -1507,14 +1579,14 @@ class WorktimeModuleV2 {
 
     if (status === this.constants.WORK_STATUS.WORKING) {
       buttons.push([
-        { text: '🏠 퇴근', callback_data: 'worktime:checkout' },
-        { text: '☕ 휴식', callback_data: 'worktime:break:short' }
+        { text: "🏠 퇴근", callback_data: "worktime:checkout" },
+        { text: "☕ 휴식", callback_data: "worktime:break:short" }
       ]);
     }
 
     buttons.push([
-      { text: '📊 주간 통계', callback_data: 'worktime:week' },
-      { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
+      { text: "📊 주간 통계", callback_data: "worktime:week" },
+      { text: "🔙 메뉴로", callback_data: "worktime:menu" }
     ]);
 
     return { inline_keyboard: buttons };
@@ -1524,12 +1596,18 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '◀️ 이전주', callback_data: `worktime:week:${weekOffset - 1}` },
-          { text: '다음주 ▶️', callback_data: `worktime:week:${weekOffset + 1}` }
+          {
+            text: "◀️ 이전주",
+            callback_data: `worktime:week:${weekOffset - 1}`
+          },
+          {
+            text: "다음주 ▶️",
+            callback_data: `worktime:week:${weekOffset + 1}`
+          }
         ],
         [
-          { text: '📈 월간 통계', callback_data: 'worktime:month' },
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
+          { text: "📈 월간 통계", callback_data: "worktime:month" },
+          { text: "🔙 메뉴로", callback_data: "worktime:menu" }
         ]
       ]
     };
@@ -1544,12 +1622,18 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '◀️ 이전달', callback_data: `worktime:month:${prevYear}-${prevMonth}` },
-          { text: '다음달 ▶️', callback_data: `worktime:month:${nextYear}-${nextMonth}` }
+          {
+            text: "◀️ 이전달",
+            callback_data: `worktime:month:${prevYear}-${prevMonth}`
+          },
+          {
+            text: "다음달 ▶️",
+            callback_data: `worktime:month:${nextYear}-${nextMonth}`
+          }
         ],
         [
-          { text: '📊 주간 통계', callback_data: 'worktime:week' },
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
+          { text: "📊 주간 통계", callback_data: "worktime:week" },
+          { text: "🔙 메뉴로", callback_data: "worktime:menu" }
         ]
       ]
     };
@@ -1559,12 +1643,10 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '📊 주간 통계', callback_data: 'worktime:week' },
-          { text: '📈 월간 통계', callback_data: 'worktime:month' }
+          { text: "📊 주간 통계", callback_data: "worktime:week" },
+          { text: "📈 월간 통계", callback_data: "worktime:month" }
         ],
-        [
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
-        ]
+        [{ text: "🔙 메뉴로", callback_data: "worktime:menu" }]
       ]
     };
   }
@@ -1574,17 +1656,18 @@ class WorktimeModuleV2 {
 
     if (offset > 0) {
       buttons.push([
-        { text: '◀️ 이전', callback_data: `worktime:history:${Math.max(0, offset - limit)}` }
+        {
+          text: "◀️ 이전",
+          callback_data: `worktime:history:${Math.max(0, offset - limit)}`
+        }
       ]);
     }
 
     buttons.push([
-      { text: '더보기 ▶️', callback_data: `worktime:history:${offset + limit}` }
+      { text: "더보기 ▶️", callback_data: `worktime:history:${offset + limit}` }
     ]);
 
-    buttons.push([
-      { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
-    ]);
+    buttons.push([{ text: "🔙 메뉴로", callback_data: "worktime:menu" }]);
 
     return { inline_keyboard: buttons };
   }
@@ -1593,12 +1676,10 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '🕘 근무시간 설정', callback_data: 'worktime:worktime:set' },
-          { text: '🔔 알림 설정', callback_data: 'worktime:reminder:set' }
+          { text: "🕘 근무시간 설정", callback_data: "worktime:worktime:set" },
+          { text: "🔔 알림 설정", callback_data: "worktime:reminder:set" }
         ],
-        [
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
-        ]
+        [{ text: "🔙 메뉴로", callback_data: "worktime:menu" }]
       ]
     };
   }
@@ -1606,12 +1687,8 @@ class WorktimeModuleV2 {
   createBreakKeyboard() {
     return {
       inline_keyboard: [
-        [
-          { text: '🔚 휴식 종료', callback_data: 'worktime:break:end' }
-        ],
-        [
-          { text: '📅 오늘 현황', callback_data: 'worktime:today' }
-        ]
+        [{ text: "🔚 휴식 종료", callback_data: "worktime:break:end" }],
+        [{ text: "📅 오늘 현황", callback_data: "worktime:today" }]
       ]
     };
   }
@@ -1619,12 +1696,8 @@ class WorktimeModuleV2 {
   createLunchKeyboard() {
     return {
       inline_keyboard: [
-        [
-          { text: '🔚 점심 종료', callback_data: 'worktime:lunch:end' }
-        ],
-        [
-          { text: '📅 오늘 현황', callback_data: 'worktime:today' }
-        ]
+        [{ text: "🔚 점심 종료", callback_data: "worktime:lunch:end" }],
+        [{ text: "📅 오늘 현황", callback_data: "worktime:today" }]
       ]
     };
   }
@@ -1633,12 +1706,12 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '🏠 퇴근', callback_data: 'worktime:checkout' },
-          { text: '🍽️ 점심', callback_data: 'worktime:lunch' }
+          { text: "🏠 퇴근", callback_data: "worktime:checkout" },
+          { text: "🍽️ 점심", callback_data: "worktime:lunch" }
         ],
         [
-          { text: '📅 오늘 현황', callback_data: 'worktime:today' },
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
+          { text: "📅 오늘 현황", callback_data: "worktime:today" },
+          { text: "🔙 메뉴로", callback_data: "worktime:menu" }
         ]
       ]
     };
@@ -1648,12 +1721,12 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '🏠 퇴근', callback_data: 'worktime:checkout' },
-          { text: '☕ 휴식', callback_data: 'worktime:break:short' }
+          { text: "🏠 퇴근", callback_data: "worktime:checkout" },
+          { text: "☕ 휴식", callback_data: "worktime:break:short" }
         ],
         [
-          { text: '📅 오늘 현황', callback_data: 'worktime:today' },
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
+          { text: "📅 오늘 현황", callback_data: "worktime:today" },
+          { text: "🔙 메뉴로", callback_data: "worktime:menu" }
         ]
       ]
     };
@@ -1663,15 +1736,14 @@ class WorktimeModuleV2 {
     return {
       inline_keyboard: [
         [
-          { text: '📅 오늘 현황', callback_data: 'worktime:today' },
-          { text: '🔙 메뉴로', callback_data: 'worktime:menu' }
+          { text: "📅 오늘 현황", callback_data: "worktime:today" },
+          { text: "🔙 메뉴로", callback_data: "worktime:menu" }
         ]
       ]
     };
   }
 
   // === 누락된 메서드들 ===
-
 
   /**
    * 📤 휴식 시작 요청 발행 (레거시 콜백용)
@@ -1680,7 +1752,7 @@ class WorktimeModuleV2 {
     this.eventBus.publish(EVENTS.WORKTIME.BREAK_START, {
       userId,
       chatId,
-      breakType: 'short'
+      breakType: "short"
     });
     return { success: true };
   }
@@ -1722,26 +1794,26 @@ class WorktimeModuleV2 {
 
   async cleanup() {
     try {
-      logger.info('🧹 WorktimeModuleV2 정리 시작...');
-      
+      logger.info("🧹 WorktimeModuleV2 정리 시작...");
+
       // 인터벌 정리
       if (this.cleanupInterval) {
         clearInterval(this.cleanupInterval);
       }
-      
+
       // 이벤트 구독 해제
-      this.subscriptions.forEach(unsubscribe => {
-        if (typeof unsubscribe === 'function') {
+      this.subscriptions.forEach((unsubscribe) => {
+        if (typeof unsubscribe === "function") {
           unsubscribe();
         }
       });
-      
+
       // 사용자 상태 정리
       this.userStates.clear();
-      
-      logger.success('✅ WorktimeModuleV2 정리 완료');
+
+      logger.success("✅ WorktimeModuleV2 정리 완료");
     } catch (error) {
-      logger.error('❌ WorktimeModuleV2 정리 실패:', error);
+      logger.error("❌ WorktimeModuleV2 정리 실패:", error);
       throw error;
     }
   }

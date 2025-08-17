@@ -57,7 +57,7 @@ class WeatherService extends BaseService {
   async getCurrentWeather(location) {
     try {
       // 1. 캐시 확인
-      const cached = this.cache.get('weather', location);
+      const cached = this.cache.get("weather", location);
       if (cached) {
         logger.debug(`📦 캐시된 날씨 데이터 반환: ${location}`);
         return this.createSuccessResponse(cached, "캐시된 데이터");
@@ -82,7 +82,12 @@ class WeatherService extends BaseService {
             cloudiness: 20,
             timestamp: new Date().toISOString()
           };
-          this.cache.set('weather', location, testData, this.config.cacheTimeout);
+          this.cache.set(
+            "weather",
+            location,
+            testData,
+            this.config.cacheTimeout
+          );
           return this.createSuccessResponse(testData, "⚠️ 테스트 데이터입니다");
         }
         throw new Error("날씨 API 키가 설정되지 않았습니다");
@@ -95,7 +100,12 @@ class WeatherService extends BaseService {
       const weatherData = this.transformWeatherData(apiData, location);
 
       // 5. 캐시 저장
-      this.cache.set('weather', location, weatherData, this.config.cacheTimeout);
+      this.cache.set(
+        "weather",
+        location,
+        weatherData,
+        this.config.cacheTimeout
+      );
 
       return this.createSuccessResponse(weatherData);
     } catch (error) {
@@ -110,7 +120,7 @@ class WeatherService extends BaseService {
   async getDustInfo(location) {
     try {
       // 캐시 확인
-      const cached = this.cache.get('dust', location);
+      const cached = this.cache.get("dust", location);
       if (cached) {
         return this.createSuccessResponse(cached, "캐시된 데이터");
       }
@@ -127,7 +137,7 @@ class WeatherService extends BaseService {
       const dustData = this.transformDustData(apiData, location);
 
       // 캐시 저장
-      this.cache.set('dust', location, dustData, this.config.cacheTimeout);
+      this.cache.set("dust", location, dustData, this.config.cacheTimeout);
 
       return this.createSuccessResponse(dustData);
     } catch (error) {
@@ -527,8 +537,8 @@ class WeatherService extends BaseService {
    * 정리
    */
   async cleanup() {
-    this.cache.clearNamespace('weather');
-    this.cache.clearNamespace('dust');
+    this.cache.clearNamespace("weather");
+    this.cache.clearNamespace("dust");
     await super.cleanup();
   }
 }

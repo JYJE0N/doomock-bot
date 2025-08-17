@@ -59,7 +59,9 @@ class LeaveService extends BaseService {
       const UserLeaveSetting = this.models.UserLeaveSetting;
 
       if (!Leave || !UserLeaveSetting) {
-        throw new Error(`모델이 초기화되지 않음: Leave=${!!Leave}, UserLeaveSetting=${!!UserLeaveSetting}`);
+        throw new Error(
+          `모델이 초기화되지 않음: Leave=${!!Leave}, UserLeaveSetting=${!!UserLeaveSetting}`
+        );
       }
 
       const userSetting = await UserLeaveSetting.getOrCreate(

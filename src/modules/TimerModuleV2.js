@@ -1,6 +1,6 @@
 /**
  * ⏰ TimerModuleV2 - EventBus 기반 타이머 모듈
- * 
+ *
  * EventBus를 통한 완전한 이벤트 기반 아키텍처
  * - 뽀모도로 타이머 지원
  * - 일시정지/재개 기능
@@ -8,31 +8,33 @@
  * - 실시간 상태 업데이트
  */
 
-const { EVENTS } = require('../events/EventRegistry');
-const logger = require('../utils/core/Logger');
-const StateCleanupHelper = require('../utils/core/StateCleanupHelper');
+const { EVENTS } = require("../events/EventRegistry");
+const logger = require("../utils/core/Logger");
+const StateCleanupHelper = require("../utils/core/StateCleanupHelper");
 
 class TimerModuleV2 {
-  constructor(moduleName = 'timer', options = {}) {
+  constructor(moduleName = "timer", options = {}) {
     this.moduleName = moduleName;
     // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
     if (!options.eventBus) {
-      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+      throw new Error(
+        `EventBus must be injected via options for module: ${moduleName}`
+      );
     }
     this.eventBus = options.eventBus;
     this.timerService = null; // 선택적 서비스
-    
+
     // 메모리 기반 타이머 상태 관리
     this.activeTimers = new Map(); // userId -> timer state
     this.userStates = new Map(); // userId -> user interaction state
     this.subscriptions = [];
-    
+
     // 초기화 상태
     this.isInitialized = false;
-    
+
     // 상태 정리 인터벌
     this.cleanupInterval = null;
-    
+
     // 뽀모도로 프리셋 설정
     this.pomodoroPresets = {
       pomodoro1: {
@@ -50,7 +52,7 @@ class TimerModuleV2 {
         cycles: 3
       }
     };
-    
+
     // 타이머 타입별 기본 설정
     this.timerDefaults = {
       focus: { duration: 25, display: "집중" },
@@ -59,7 +61,7 @@ class TimerModuleV2 {
       custom: { duration: 30, display: "커스텀" }
     };
 
-    logger.info('⏰ TimerModuleV2 생성됨 (EventBus 기반)');
+    logger.info("⏰ TimerModuleV2 생성됨 (EventBus 기반)");
   }
 
   /**
@@ -68,34 +70,39 @@ class TimerModuleV2 {
   async initialize() {
     try {
       // 서비스는 선택적으로 사용 (테스트 모드에서는 null 가능)
-      if (!process.env.NODE_ENV || process.env.NODE_ENV !== 'test') {
+      if (!process.env.NODE_ENV || process.env.NODE_ENV !== "test") {
         try {
-          this.timerService = await this.serviceBuilder?.getOrCreate?.('timer');
+          this.timerService = await this.serviceBuilder?.getOrCreate?.("timer");
         } catch (error) {
-          logger.warn('TimerService 로드 실패, 테스트 모드로 동작:', error.message);
+          logger.warn(
+            "TimerService 로드 실패, 테스트 모드로 동작:",
+            error.message
+          );
         }
       }
 
       // EventBus 리스너 설정
       this.setupEventListeners();
-      
+
       // 자동 상태 정리 설정
       this.cleanupInterval = StateCleanupHelper.setupAutoCleanup(
-        this.userStates, 
+        this.userStates,
         this.moduleName,
         {
           cleanupInterval: 60000, // 1분마다
-          timeout: 300000,        // 5분 후 만료
-          maxSize: 500           // 최대 500개 상태
+          timeout: 300000, // 5분 후 만료
+          maxSize: 500 // 최대 500개 상태
         }
       );
 
       // 초기화 완료 표시
       this.isInitialized = true;
 
-      logger.success('⏰ TimerModuleV2 초기화 완료 (테스트 모드, EventBus 기반)');
+      logger.success(
+        "⏰ TimerModuleV2 초기화 완료 (테스트 모드, EventBus 기반)"
+      );
     } catch (error) {
-      logger.error('TimerModuleV2 초기화 실패:', error);
+      logger.error("TimerModuleV2 초기화 실패:", error);
       throw error;
     }
   }
@@ -135,19 +142,28 @@ class TimerModuleV2 {
 
     // 뽀모도로 관련
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.TIMER.POMODORO_START_REQUEST, async (event) => {
-        await this.handlePomodoroStartRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.TIMER.POMODORO_START_REQUEST,
+        async (event) => {
+          await this.handlePomodoroStartRequest(event);
+        }
+      )
     );
 
     // 커스텀 타이머 관련
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.TIMER.CUSTOM_SETUP_REQUEST, async (event) => {
-        await this.handleCustomSetupRequest(event);
-      }),
-      this.eventBus.subscribe(EVENTS.TIMER.CUSTOM_START_REQUEST, async (event) => {
-        await this.handleCustomStartRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.TIMER.CUSTOM_SETUP_REQUEST,
+        async (event) => {
+          await this.handleCustomSetupRequest(event);
+        }
+      ),
+      this.eventBus.subscribe(
+        EVENTS.TIMER.CUSTOM_START_REQUEST,
+        async (event) => {
+          await this.handleCustomStartRequest(event);
+        }
+      )
     );
 
     // 통계 관련
@@ -160,7 +176,7 @@ class TimerModuleV2 {
       })
     );
 
-    logger.debug('🎧 TimerModuleV2 EventBus 리스너 설정 완료');
+    logger.debug("🎧 TimerModuleV2 EventBus 리스너 설정 완료");
   }
 
   /**
@@ -169,39 +185,39 @@ class TimerModuleV2 {
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
-    
+
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
-      'menu': () => this.showMenu(userId, chatId),
-      'start': () => this.handleTimerStart(userId, chatId, params),
-      'pause': () => this.handleTimerPause(userId, chatId),
-      'resume': () => this.handleTimerResume(userId, chatId),
-      'stop': () => this.handleTimerStop(userId, chatId),
-      'reset': () => this.handleTimerReset(userId, chatId),
-      'refresh': () => this.handleTimerRefresh(userId, chatId),
-      'pomodoro_start': () => this.handlePomodoroStart(userId, chatId, params),
-      'pomodoro1': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro1'),
-      'pomodoro2': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro2'),
-      'pomodoro3': () => this.handlePomodoroPreset(userId, chatId, 'pomodoro3'),
-      'custom_setup': () => this.handleCustomSetup(userId, chatId),
-      'stats': () => this.showStats(userId, chatId),
-      'history': () => this.showHistory(userId, chatId)
+      menu: () => this.showMenu(userId, chatId),
+      start: () => this.handleTimerStart(userId, chatId, params),
+      pause: () => this.handleTimerPause(userId, chatId),
+      resume: () => this.handleTimerResume(userId, chatId),
+      stop: () => this.handleTimerStop(userId, chatId),
+      reset: () => this.handleTimerReset(userId, chatId),
+      refresh: () => this.handleTimerRefresh(userId, chatId),
+      pomodoro_start: () => this.handlePomodoroStart(userId, chatId, params),
+      pomodoro1: () => this.handlePomodoroPreset(userId, chatId, "pomodoro1"),
+      pomodoro2: () => this.handlePomodoroPreset(userId, chatId, "pomodoro2"),
+      pomodoro3: () => this.handlePomodoroPreset(userId, chatId, "pomodoro3"),
+      custom_setup: () => this.handleCustomSetup(userId, chatId),
+      stats: () => this.showStats(userId, chatId),
+      history: () => this.showHistory(userId, chatId)
     };
-    
+
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
       // menu, stats, history 액션은 렌더러용 결과를 반환
-      if (['menu', 'stats', 'history'].includes(subAction) && result) {
+      if (["menu", "stats", "history"].includes(subAction) && result) {
         return result;
       }
       return {
         type: subAction,
-        module: 'timer',
+        module: "timer",
         success: true
       };
     }
-    
+
     logger.debug(`TimerModuleV2: 알 수 없는 액션 - ${subAction}`);
     return null;
   }
@@ -212,10 +228,10 @@ class TimerModuleV2 {
   async handleMenuRequest(event) {
     try {
       const { userId, chatId } = event.payload;
-      
+
       // 활성 타이머가 있는지 확인
       const activeTimer = this.activeTimers.get(userId);
-      
+
       if (activeTimer) {
         // 활성 타이머가 있으면 상태 정보와 함께 메뉴 전송
         this.eventBus.publish(EVENTS.TIMER.MENU_READY, {
@@ -241,11 +257,11 @@ class TimerModuleV2 {
         });
       }
     } catch (error) {
-      logger.error('타이머 메뉴 요청 처리 실패:', error);
+      logger.error("타이머 메뉴 요청 처리 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
-        error: '메뉴를 불러올 수 없습니다.'
+        error: "메뉴를 불러올 수 없습니다."
       });
     }
   }
@@ -255,7 +271,8 @@ class TimerModuleV2 {
    */
   async handleStartRequest(event) {
     try {
-      const { userId, chatId, timerType, duration, customDuration } = event.payload;
+      const { userId, chatId, timerType, duration, customDuration } =
+        event.payload;
 
       // 기존 타이머 정리
       await this.cleanupExistingTimer(userId);
@@ -286,7 +303,7 @@ class TimerModuleV2 {
             duration: finalDuration
           });
         } catch (error) {
-          logger.warn('DB 세션 저장 실패 (계속 진행):', error.message);
+          logger.warn("DB 세션 저장 실패 (계속 진행):", error.message);
         }
       }
 
@@ -294,15 +311,14 @@ class TimerModuleV2 {
         userId,
         chatId,
         timerData: this.getTimerDisplayData(timer),
-        message: `⏱️ ${this.timerDefaults[timerType]?.display || '타이머'}가 시작되었습니다! (${finalDuration}분)`
+        message: `⏱️ ${this.timerDefaults[timerType]?.display || "타이머"}가 시작되었습니다! (${finalDuration}분)`
       });
-
     } catch (error) {
-      logger.error('타이머 시작 실패:', error);
+      logger.error("타이머 시작 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
-        error: '타이머 시작에 실패했습니다.'
+        error: "타이머 시작에 실패했습니다."
       });
     }
   }
@@ -313,22 +329,22 @@ class TimerModuleV2 {
   async handlePauseRequest(event) {
     try {
       const { userId, chatId } = event.payload;
-      
+
       const timer = this.activeTimers.get(userId);
-      if (!timer || timer.status !== 'running') {
-        throw new Error('실행 중인 타이머가 없습니다.');
+      if (!timer || timer.status !== "running") {
+        throw new Error("실행 중인 타이머가 없습니다.");
       }
 
       // 타이머 일시정지
-      timer.status = 'paused';
+      timer.status = "paused";
       timer.pausedAt = Date.now();
-      
+
       // DB 업데이트 (서비스 있을 때만)
       if (this.timerService) {
         try {
           await this.timerService.pauseSession(userId);
         } catch (error) {
-          logger.warn('DB 세션 일시정지 실패 (계속 진행):', error.message);
+          logger.warn("DB 세션 일시정지 실패 (계속 진행):", error.message);
         }
       }
 
@@ -336,11 +352,10 @@ class TimerModuleV2 {
         userId,
         chatId,
         timerData: this.getTimerDisplayData(timer),
-        message: '⏸️ 타이머가 일시정지되었습니다.'
+        message: "⏸️ 타이머가 일시정지되었습니다."
       });
-
     } catch (error) {
-      logger.error('타이머 일시정지 실패:', error);
+      logger.error("타이머 일시정지 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
@@ -355,16 +370,16 @@ class TimerModuleV2 {
   async handleResumeRequest(event) {
     try {
       const { userId, chatId } = event.payload;
-      
+
       const timer = this.activeTimers.get(userId);
-      if (!timer || timer.status !== 'paused') {
-        throw new Error('일시정지된 타이머가 없습니다.');
+      if (!timer || timer.status !== "paused") {
+        throw new Error("일시정지된 타이머가 없습니다.");
       }
 
       // 일시정지된 시간만큼 시작 시간 조정
       const pausedDuration = Date.now() - timer.pausedAt;
       timer.startedAt += pausedDuration;
-      timer.status = 'running';
+      timer.status = "running";
       delete timer.pausedAt;
 
       // DB 업데이트 (서비스 있을 때만)
@@ -372,7 +387,7 @@ class TimerModuleV2 {
         try {
           await this.timerService.resumeSession(userId);
         } catch (error) {
-          logger.warn('DB 세션 재개 실패 (계속 진행):', error.message);
+          logger.warn("DB 세션 재개 실패 (계속 진행):", error.message);
         }
       }
 
@@ -380,11 +395,10 @@ class TimerModuleV2 {
         userId,
         chatId,
         timerData: this.getTimerDisplayData(timer),
-        message: '▶️ 타이머가 재개되었습니다.'
+        message: "▶️ 타이머가 재개되었습니다."
       });
-
     } catch (error) {
-      logger.error('타이머 재개 실패:', error);
+      logger.error("타이머 재개 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
@@ -399,15 +413,17 @@ class TimerModuleV2 {
   async handleStopRequest(event) {
     try {
       const { userId, chatId } = event.payload;
-      
+
       const timer = this.activeTimers.get(userId);
       if (!timer) {
-        throw new Error('실행 중인 타이머가 없습니다.');
+        throw new Error("실행 중인 타이머가 없습니다.");
       }
 
       // 완료율 계산
       const elapsed = this.calculateElapsed(timer);
-      const completionRate = Math.round((elapsed / (timer.duration * 60 * 1000)) * 100);
+      const completionRate = Math.round(
+        (elapsed / (timer.duration * 60 * 1000)) * 100
+      );
 
       // 타이머 정리
       this.activeTimers.delete(userId);
@@ -417,7 +433,7 @@ class TimerModuleV2 {
         try {
           await this.timerService.stopSession(userId);
         } catch (error) {
-          logger.warn('DB 세션 중지 실패 (계속 진행):', error.message);
+          logger.warn("DB 세션 중지 실패 (계속 진행):", error.message);
         }
       }
 
@@ -430,9 +446,8 @@ class TimerModuleV2 {
           message: `⏹️ 타이머를 중지했습니다. (완료율: ${completionRate}%)`
         }
       });
-
     } catch (error) {
-      logger.error('타이머 중지 실패:', error);
+      logger.error("타이머 중지 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
@@ -447,22 +462,21 @@ class TimerModuleV2 {
   async handleResetRequest(event) {
     try {
       const { userId, chatId } = event.payload;
-      
+
       // 모든 타이머 정리
       await this.cleanupExistingTimer(userId);
 
       this.eventBus.publish(EVENTS.TIMER.RESET_COMPLETE, {
         userId,
         chatId,
-        message: '✅ 타이머가 초기화되었습니다.'
+        message: "✅ 타이머가 초기화되었습니다."
       });
-
     } catch (error) {
-      logger.error('타이머 리셋 실패:', error);
+      logger.error("타이머 리셋 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
-        error: '타이머 초기화에 실패했습니다.'
+        error: "타이머 초기화에 실패했습니다."
       });
     }
   }
@@ -473,7 +487,7 @@ class TimerModuleV2 {
   async handleRefreshRequest(event) {
     try {
       const { userId, chatId } = event.payload;
-      
+
       const timer = this.activeTimers.get(userId);
       if (!timer) {
         this.eventBus.publish(EVENTS.TIMER.MENU_READY, {
@@ -500,13 +514,12 @@ class TimerModuleV2 {
         timerData: this.getTimerDisplayData(timer),
         isRefresh: true
       });
-
     } catch (error) {
-      logger.error('타이머 새로고침 실패:', error);
+      logger.error("타이머 새로고침 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
-        error: '타이머 상태를 불러올 수 없습니다.'
+        error: "타이머 상태를 불러올 수 없습니다."
       });
     }
   }
@@ -518,7 +531,7 @@ class TimerModuleV2 {
     try {
       const preset = this.pomodoroPresets[presetKey];
       if (!preset) {
-        throw new Error('잘못된 뽀모도로 프리셋입니다.');
+        throw new Error("잘못된 뽀모도로 프리셋입니다.");
       }
 
       // 기존 타이머 정리
@@ -526,7 +539,7 @@ class TimerModuleV2 {
 
       // 뽀모도로 타이머 생성
       const timer = this.createTimer(userId, {
-        type: 'focus',
+        type: "focus",
         duration: preset.focus,
         chatId,
         isPomodoro: true,
@@ -534,7 +547,7 @@ class TimerModuleV2 {
           preset: presetKey,
           currentCycle: 1,
           totalCycles: preset.cycles,
-          currentPhase: 'focus'
+          currentPhase: "focus"
         }
       });
 
@@ -549,7 +562,7 @@ class TimerModuleV2 {
             totalCycles: preset.cycles
           });
         } catch (error) {
-          logger.warn('뽀모도로 세트 DB 저장 실패:', error.message);
+          logger.warn("뽀모도로 세트 DB 저장 실패:", error.message);
         }
       }
 
@@ -557,18 +570,18 @@ class TimerModuleV2 {
       this.startTimerTick(timer);
 
       return {
-        type: 'pomodoro_started',
-        module: 'timer',
+        type: "pomodoro_started",
+        module: "timer",
         data: {
           preset: preset.name,
           timerData: this.getTimerDisplayData(timer)
         }
       };
     } catch (error) {
-      logger.error('뽀모도로 프리셋 시작 실패:', error);
+      logger.error("뽀모도로 프리셋 시작 실패:", error);
       return {
-        type: 'error',
-        module: 'timer',
+        type: "error",
+        module: "timer",
         error: error.message
       };
     }
@@ -581,7 +594,7 @@ class TimerModuleV2 {
     this.eventBus.publish(EVENTS.TIMER.START_REQUEST, {
       userId,
       chatId,
-      timerType: params?.[0] || 'focus',
+      timerType: params?.[0] || "focus",
       duration: params?.[1] ? parseInt(params[1]) : 25
     });
     return { success: true };
@@ -646,7 +659,7 @@ class TimerModuleV2 {
    * 🍅 뽀모도로 시작 (레거시 콜백용)
    */
   async handlePomodoroStart(userId, chatId, params) {
-    const presetKey = params?.[0] || 'pomodoro1';
+    const presetKey = params?.[0] || "pomodoro1";
     this.eventBus.publish(EVENTS.TIMER.POMODORO_START_REQUEST, {
       userId,
       chatId,
@@ -675,7 +688,7 @@ class TimerModuleV2 {
 
       const preset = this.pomodoroPresets[presetKey];
       if (!preset) {
-        throw new Error('잘못된 뽀모도로 프리셋입니다.');
+        throw new Error("잘못된 뽀모도로 프리셋입니다.");
       }
 
       // 기존 타이머 정리
@@ -683,7 +696,7 @@ class TimerModuleV2 {
 
       // 뽀모도로 타이머 생성
       const timer = this.createTimer(userId, {
-        type: 'focus',
+        type: "focus",
         duration: preset.focus,
         chatId,
         isPomodoro: true,
@@ -691,7 +704,7 @@ class TimerModuleV2 {
           preset: presetKey,
           currentCycle: 1,
           totalCycles: preset.cycles,
-          currentPhase: 'focus' // focus, shortBreak, longBreak
+          currentPhase: "focus" // focus, shortBreak, longBreak
         }
       });
 
@@ -706,7 +719,7 @@ class TimerModuleV2 {
             cycles: preset.cycles
           });
         } catch (error) {
-          logger.warn('DB 뽀모도로 세트 저장 실패 (계속 진행):', error.message);
+          logger.warn("DB 뽀모도로 세트 저장 실패 (계속 진행):", error.message);
         }
       }
 
@@ -718,13 +731,12 @@ class TimerModuleV2 {
           presetName: preset.name,
           currentCycle: 1,
           totalCycles: preset.cycles,
-          currentPhase: 'focus'
+          currentPhase: "focus"
         },
         message: `🍅 ${preset.name} 시작! (1/${preset.cycles} 사이클)`
       });
-
     } catch (error) {
-      logger.error('뽀모도로 시작 실패:', error);
+      logger.error("뽀모도로 시작 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
@@ -747,16 +759,15 @@ class TimerModuleV2 {
           minDuration: 1,
           maxDuration: 180, // 3시간
           defaultDuration: 30,
-          availableTypes: ['focus', 'break', 'work', 'study']
+          availableTypes: ["focus", "break", "work", "study"]
         }
       });
-
     } catch (error) {
-      logger.error('커스텀 설정 요청 실패:', error);
+      logger.error("커스텀 설정 요청 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
-        error: '커스텀 설정을 불러올 수 없습니다.'
+        error: "커스텀 설정을 불러올 수 없습니다."
       });
     }
   }
@@ -769,7 +780,7 @@ class TimerModuleV2 {
       const { userId, chatId, duration, label } = event.payload;
 
       if (!duration || duration < 1 || duration > 180) {
-        throw new Error('시간은 1분에서 180분 사이로 설정해주세요.');
+        throw new Error("시간은 1분에서 180분 사이로 설정해주세요.");
       }
 
       // 기존 타이머 정리
@@ -777,22 +788,21 @@ class TimerModuleV2 {
 
       // 커스텀 타이머 생성
       const timer = this.createTimer(userId, {
-        type: 'custom',
+        type: "custom",
         duration: duration,
         chatId,
         isPomodoro: false,
-        customLabel: label || '커스텀 타이머'
+        customLabel: label || "커스텀 타이머"
       });
 
       this.eventBus.publish(EVENTS.TIMER.STARTED, {
         userId,
         chatId,
         timerData: this.getTimerDisplayData(timer),
-        message: `⏱️ ${label || '커스텀 타이머'}가 시작되었습니다! (${duration}분)`
+        message: `⏱️ ${label || "커스텀 타이머"}가 시작되었습니다! (${duration}분)`
       });
-
     } catch (error) {
-      logger.error('커스텀 타이머 시작 실패:', error);
+      logger.error("커스텀 타이머 시작 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
@@ -814,15 +824,20 @@ class TimerModuleV2 {
         try {
           // 실제 서비스에서 통계 가져오기
           const weeklyStats = await this.timerService.getWeeklyStats(userId);
-          const recentSessions = await this.timerService.getRecentSessions(userId, 30);
-          
+          const recentSessions = await this.timerService.getRecentSessions(
+            userId,
+            30
+          );
+
           statsData = {
             weekly: weeklyStats.success ? weeklyStats.data : {},
             recent: recentSessions.success ? recentSessions.data : [],
-            totalSessions: recentSessions.success ? recentSessions.data.length : 0
+            totalSessions: recentSessions.success
+              ? recentSessions.data.length
+              : 0
           };
         } catch (error) {
-          logger.warn('실제 통계 조회 실패, 더미 데이터 사용:', error.message);
+          logger.warn("실제 통계 조회 실패, 더미 데이터 사용:", error.message);
           statsData = this.getDummyStats();
         }
       } else {
@@ -835,13 +850,12 @@ class TimerModuleV2 {
         chatId,
         statsData
       });
-
     } catch (error) {
-      logger.error('통계 요청 실패:', error);
+      logger.error("통계 요청 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
-        error: '통계를 불러올 수 없습니다.'
+        error: "통계를 불러올 수 없습니다."
       });
     }
   }
@@ -858,14 +872,20 @@ class TimerModuleV2 {
       if (this.timerService) {
         try {
           // 실제 서비스에서 히스토리 가져오기
-          const response = await this.timerService.getRecentSessions(userId, days);
+          const response = await this.timerService.getRecentSessions(
+            userId,
+            days
+          );
           historyData = {
             sessions: response.success ? response.data : [],
             days: days,
             isEmpty: !response.success || response.data.length === 0
           };
         } catch (error) {
-          logger.warn('실제 히스토리 조회 실패, 더미 데이터 사용:', error.message);
+          logger.warn(
+            "실제 히스토리 조회 실패, 더미 데이터 사용:",
+            error.message
+          );
           historyData = this.getDummyHistory(days);
         }
       } else {
@@ -878,13 +898,12 @@ class TimerModuleV2 {
         chatId,
         historyData
       });
-
     } catch (error) {
-      logger.error('히스토리 요청 실패:', error);
+      logger.error("히스토리 요청 실패:", error);
       this.eventBus.publish(EVENTS.TIMER.ERROR, {
         userId: event.payload.userId,
         chatId: event.payload.chatId,
-        error: '히스토리를 불러올 수 없습니다.'
+        error: "히스토리를 불러올 수 없습니다."
       });
     }
   }
@@ -899,7 +918,7 @@ class TimerModuleV2 {
       duration: config.duration, // 분 단위
       chatId: config.chatId,
       startedAt: Date.now(),
-      status: 'running', // running, paused, completed
+      status: "running", // running, paused, completed
       isPomodoro: config.isPomodoro || false,
       customLabel: config.customLabel,
       pomodoroData: config.pomodoroData || null
@@ -928,7 +947,7 @@ class TimerModuleV2 {
         try {
           await this.timerService.completeSession(userId);
         } catch (error) {
-          logger.warn('DB 세션 완료 실패 (계속 진행):', error.message);
+          logger.warn("DB 세션 완료 실패 (계속 진행):", error.message);
         }
       }
 
@@ -937,7 +956,7 @@ class TimerModuleV2 {
       } else {
         // 일반 타이머 완료
         this.activeTimers.delete(userId);
-        
+
         this.eventBus.publish(EVENTS.TIMER.COMPLETED, {
           userId,
           chatId: timer.chatId,
@@ -945,13 +964,12 @@ class TimerModuleV2 {
             type: timer.type,
             duration: timer.duration,
             completedAt: Date.now(),
-            message: `🎉 ${timer.customLabel || this.timerDefaults[timer.type]?.display || '타이머'}가 완료되었습니다!`
+            message: `🎉 ${timer.customLabel || this.timerDefaults[timer.type]?.display || "타이머"}가 완료되었습니다!`
           }
         });
       }
-
     } catch (error) {
-      logger.error('타이머 완료 처리 실패:', error);
+      logger.error("타이머 완료 처리 실패:", error);
     }
   }
 
@@ -979,22 +997,22 @@ class TimerModuleV2 {
       let nextDuration = 0;
       let nextCycle = pomodoroData.currentCycle;
 
-      if (pomodoroData.currentPhase === 'focus') {
+      if (pomodoroData.currentPhase === "focus") {
         // 집중 세션 완료 -> 휴식
         if (pomodoroData.currentCycle === pomodoroData.totalCycles) {
           // 마지막 사이클이면 긴 휴식
-          nextPhase = 'longBreak';
+          nextPhase = "longBreak";
           nextDuration = preset.longBreak;
         } else {
           // 일반 휴식
-          nextPhase = 'shortBreak';
+          nextPhase = "shortBreak";
           nextDuration = preset.shortBreak;
         }
       } else {
         // 휴식 세션 완료
         if (pomodoroData.currentCycle < pomodoroData.totalCycles) {
           // 다음 사이클의 집중 세션
-          nextPhase = 'focus';
+          nextPhase = "focus";
           nextDuration = preset.focus;
           nextCycle += 1;
         }
@@ -1027,11 +1045,10 @@ class TimerModuleV2 {
           },
           message: `🔄 ${this.getPhaseDisplay(nextPhase)} 세션이 시작되었습니다! (${nextCycle}/${pomodoroData.totalCycles} 사이클)`
         });
-
       } else {
         // 뽀모도로 세트 완료
         this.activeTimers.delete(userId);
-        
+
         this.eventBus.publish(EVENTS.TIMER.POMODORO_SET_COMPLETE, {
           userId,
           chatId: timer.chatId,
@@ -1044,9 +1061,8 @@ class TimerModuleV2 {
           message: `🎊 ${preset.name} 세트 완료! 총 ${pomodoroData.totalCycles}사이클을 완주했습니다!`
         });
       }
-
     } catch (error) {
-      logger.error('뽀모도로 완료 처리 실패:', error);
+      logger.error("뽀모도로 완료 처리 실패:", error);
     }
   }
 
@@ -1057,7 +1073,7 @@ class TimerModuleV2 {
     const elapsed = this.calculateElapsed(timer);
     const totalDuration = timer.duration * 60 * 1000;
     const remaining = Math.max(0, totalDuration - elapsed);
-    
+
     return {
       type: timer.type,
       typeDisplay: timer.customLabel || this.getPhaseDisplay(timer.type),
@@ -1114,12 +1130,12 @@ class TimerModuleV2 {
    */
   calculateElapsed(timer) {
     let elapsed = Date.now() - timer.startedAt;
-    
+
     // 일시정지 상태면 일시정지된 시점까지만 계산
-    if (timer.status === 'paused' && timer.pausedAt) {
+    if (timer.status === "paused" && timer.pausedAt) {
       elapsed = timer.pausedAt - timer.startedAt;
     }
-    
+
     return Math.max(0, elapsed);
   }
 
@@ -1130,7 +1146,7 @@ class TimerModuleV2 {
     const totalSeconds = Math.floor(milliseconds / 1000);
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   }
 
   /**
@@ -1138,10 +1154,10 @@ class TimerModuleV2 {
    */
   getPhaseDisplay(phase) {
     const displays = {
-      focus: '집중',
-      shortBreak: '짧은 휴식',
-      longBreak: '긴 휴식',
-      custom: '커스텀'
+      focus: "집중",
+      shortBreak: "짧은 휴식",
+      longBreak: "긴 휴식",
+      custom: "커스텀"
     };
     return displays[phase] || phase;
   }
@@ -1151,9 +1167,9 @@ class TimerModuleV2 {
    */
   getStatusDisplay(status) {
     const displays = {
-      running: '실행 중',
-      paused: '일시정지',
-      completed: '완료'
+      running: "실행 중",
+      paused: "일시정지",
+      completed: "완료"
     };
     return displays[status] || status;
   }
@@ -1173,12 +1189,11 @@ class TimerModuleV2 {
         try {
           await this.timerService.forceStopAllSessions(userId);
         } catch (error) {
-          logger.warn('DB 세션 정리 실패 (계속 진행):', error.message);
+          logger.warn("DB 세션 정리 실패 (계속 진행):", error.message);
         }
       }
-
     } catch (error) {
-      logger.warn('타이머 정리 중 오류:', error.message);
+      logger.warn("타이머 정리 중 오류:", error.message);
     }
   }
 
@@ -1235,31 +1250,32 @@ class TimerModuleV2 {
       // 활성 타이머가 있는지 확인
       const activeTimer = this.activeTimers.get(userId);
       const userName = "사용자"; // 기본 사용자명
-      
+
       // 렌더러에게 전달할 데이터 구성
       return {
-        type: 'menu',
-        module: 'timer',
+        type: "menu",
+        module: "timer",
         success: true,
         data: {
-          title: '⏰ *타이머 관리*',
+          title: "⏰ *타이머 관리*",
           userName: userName,
-          activeTimer: activeTimer ? this.getTimerDisplayData(activeTimer) : null,
+          activeTimer: activeTimer
+            ? this.getTimerDisplayData(activeTimer)
+            : null,
           hasActiveTimer: !!activeTimer,
           recentSessions: [], // 최근 세션 정보 (향후 구현)
           presets: this.pomodoroPresets, // 전체 preset 객체 전달
           userId: userId
         }
       };
-
     } catch (error) {
-      logger.error('⏰ TimerModuleV2.showMenu 실패:', error);
+      logger.error("⏰ TimerModuleV2.showMenu 실패:", error);
       return {
-        type: 'error',
-        module: 'timer',
+        type: "error",
+        module: "timer",
         success: false,
         data: {
-          message: '타이머 메뉴를 불러오는 중 오류가 발생했습니다.',
+          message: "타이머 메뉴를 불러오는 중 오류가 발생했습니다.",
           canRetry: true
         }
       };
@@ -1273,26 +1289,25 @@ class TimerModuleV2 {
     try {
       // 더미 통계 데이터 사용 (향후 실제 데이터로 교체)
       const stats = this.getDummyStats();
-      
+
       return {
-        type: 'stats',
-        module: 'timer',
+        type: "stats",
+        module: "timer",
         success: true,
         data: {
-          title: '📊 *타이머 통계*',
+          title: "📊 *타이머 통계*",
           stats: stats,
           userId: userId
         }
       };
-
     } catch (error) {
-      logger.error('📊 TimerModuleV2.showStats 실패:', error);
+      logger.error("📊 TimerModuleV2.showStats 실패:", error);
       return {
-        type: 'error',
-        module: 'timer',
+        type: "error",
+        module: "timer",
         success: false,
         data: {
-          message: '통계를 불러오는 중 오류가 발생했습니다.',
+          message: "통계를 불러오는 중 오류가 발생했습니다.",
           canRetry: true
         }
       };
@@ -1306,27 +1321,26 @@ class TimerModuleV2 {
     try {
       // 더미 히스토리 데이터 사용 (향후 실제 데이터로 교체)
       const history = this.getDummyHistory(7);
-      
+
       return {
-        type: 'history',
-        module: 'timer',
+        type: "history",
+        module: "timer",
         success: true,
         data: {
-          title: '📜 *타이머 히스토리*',
+          title: "📜 *타이머 히스토리*",
           history: history,
           userId: userId,
           days: 7
         }
       };
-
     } catch (error) {
-      logger.error('📜 TimerModuleV2.showHistory 실패:', error);
+      logger.error("📜 TimerModuleV2.showHistory 실패:", error);
       return {
-        type: 'error',
-        module: 'timer',
+        type: "error",
+        module: "timer",
         success: false,
         data: {
-          message: '히스토리를 불러오는 중 오류가 발생했습니다.',
+          message: "히스토리를 불러오는 중 오류가 발생했습니다.",
           canRetry: true
         }
       };
@@ -1338,27 +1352,31 @@ class TimerModuleV2 {
    */
   async cleanup() {
     try {
-      logger.info('🧹 TimerModuleV2 정리 시작...');
+      logger.info("🧹 TimerModuleV2 정리 시작...");
 
       // EventBus 구독 해제
-      this.subscriptions.forEach(unsubscribe => {
+      this.subscriptions.forEach((unsubscribe) => {
         try {
           unsubscribe();
         } catch (error) {
-          logger.debug('구독 해제 실패:', error.message);
+          logger.debug("구독 해제 실패:", error.message);
         }
       });
       this.subscriptions.length = 0;
 
       // StateCleanupHelper를 사용한 정리
-      StateCleanupHelper.cleanup(this.cleanupInterval, this.userStates, this.moduleName);
-      
+      StateCleanupHelper.cleanup(
+        this.cleanupInterval,
+        this.userStates,
+        this.moduleName
+      );
+
       // 활성 타이머 정리
       this.activeTimers.clear();
 
-      logger.success('✅ TimerModuleV2 정리 완료');
+      logger.success("✅ TimerModuleV2 정리 완료");
     } catch (error) {
-      logger.error('TimerModuleV2 정리 실패:', error);
+      logger.error("TimerModuleV2 정리 실패:", error);
     }
   }
 }

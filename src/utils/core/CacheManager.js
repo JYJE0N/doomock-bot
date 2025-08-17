@@ -3,7 +3,7 @@ const logger = require("./Logger");
 
 /**
  * 🗄️ CacheManager - 통합 메모리 캐시 관리 시스템
- * 
+ *
  * 특징:
  * - LRU (Least Recently Used) 정책
  * - TTL (Time To Live) 지원
@@ -15,8 +15,8 @@ class CacheManager {
   constructor(options = {}) {
     this.caches = new Map(); // namespace -> cache data
     this.config = {
-      maxMemoryMB: options.maxMemoryMB || 50,           // 최대 50MB
-      defaultTTL: options.defaultTTL || 300000,         // 기본 5분
+      maxMemoryMB: options.maxMemoryMB || 50, // 최대 50MB
+      defaultTTL: options.defaultTTL || 300000, // 기본 5분
       cleanupInterval: options.cleanupInterval || 60000, // 1분마다 정리
       maxEntriesPerNamespace: options.maxEntriesPerNamespace || 1000
     };
@@ -32,7 +32,7 @@ class CacheManager {
 
     // 자동 정리 시작
     this.startCleanupInterval();
-    
+
     logger.info("🗄️ CacheManager 초기화 완료", {
       maxMemoryMB: this.config.maxMemoryMB,
       defaultTTL: this.config.defaultTTL
@@ -47,7 +47,7 @@ class CacheManager {
       this.caches.set(namespace, {
         data: new Map(),
         accessTimes: new Map(), // LRU를 위한 접근 시간
-        ttls: new Map(),        // TTL 관리
+        ttls: new Map(), // TTL 관리
         stats: { hits: 0, misses: 0, sets: 0 }
       });
     }
@@ -71,7 +71,7 @@ class CacheManager {
     cache.accessTimes.set(key, now);
     cache.ttls.set(key, now + finalTTL);
     cache.stats.sets++;
-    
+
     this.stats.sets++;
     this.updateMemoryStats();
 
@@ -83,7 +83,7 @@ class CacheManager {
    */
   get(namespace, key) {
     const cache = this.getNamespace(namespace);
-    
+
     if (!cache.data.has(key)) {
       cache.stats.misses++;
       this.stats.misses++;
@@ -115,16 +115,16 @@ class CacheManager {
    */
   delete(namespace, key) {
     const cache = this.getNamespace(namespace);
-    
+
     const deleted = cache.data.delete(key);
     cache.accessTimes.delete(key);
     cache.ttls.delete(key);
-    
+
     if (deleted) {
       this.stats.deletes++;
       logger.debug(`🗄️ 캐시 삭제: ${namespace}:${key}`);
     }
-    
+
     this.updateMemoryStats();
     return deleted;
   }
@@ -175,7 +175,7 @@ class CacheManager {
 
     for (const [namespace, cache] of this.caches.entries()) {
       let namespaceCleaned = 0;
-      
+
       for (const [key, ttl] of cache.ttls.entries()) {
         if (now > ttl) {
           cache.data.delete(key);
@@ -184,7 +184,7 @@ class CacheManager {
           namespaceCleaned++;
         }
       }
-      
+
       if (namespaceCleaned > 0) {
         logger.debug(`🧹 ${namespace}: ${namespaceCleaned}개 만료 캐시 정리`);
         totalCleaned += namespaceCleaned;
@@ -215,10 +215,12 @@ class CacheManager {
    */
   checkMemoryUsage() {
     const memoryMB = this.getMemoryUsageMB();
-    
+
     if (memoryMB > this.config.maxMemoryMB) {
-      logger.warn(`🚨 캐시 메모리 한계 초과: ${memoryMB}MB > ${this.config.maxMemoryMB}MB`);
-      
+      logger.warn(
+        `🚨 캐시 메모리 한계 초과: ${memoryMB}MB > ${this.config.maxMemoryMB}MB`
+      );
+
       // 강제 정리 - 각 네임스페이스에서 가장 오래된 25% 제거
       for (const [, cache] of this.caches.entries()) {
         const toRemove = Math.floor(cache.data.size * 0.25);
@@ -226,7 +228,7 @@ class CacheManager {
           this.evictLRU(cache);
         }
       }
-      
+
       logger.info(`🧹 메모리 정리 완료: ${this.getMemoryUsageMB()}MB`);
     }
   }
@@ -239,7 +241,7 @@ class CacheManager {
     for (const cache of this.caches.values()) {
       totalEntries += cache.data.size;
     }
-    
+
     // 대략적인 계산: 각 캐시 항목당 평균 1KB
     const estimatedMB = (totalEntries * 1024) / (1024 * 1024);
     this.stats.memoryUsage = estimatedMB;
@@ -284,12 +286,14 @@ class CacheManager {
     if (this.cleanupInterval) {
       clearInterval(this.cleanupInterval);
     }
-    
-    const totalEntries = Array.from(this.caches.values())
-      .reduce((sum, cache) => sum + cache.data.size, 0);
-    
+
+    const totalEntries = Array.from(this.caches.values()).reduce(
+      (sum, cache) => sum + cache.data.size,
+      0
+    );
+
     this.caches.clear();
-    
+
     logger.info(`🗄️ CacheManager 정리 완료 (${totalEntries}개 항목)`);
   }
 

@@ -75,7 +75,7 @@ class NavigationHandler {
         "fortune",
         new (require("../renderers/FortuneRenderer"))(
           this.bot,
-          this, // NavigationHandler를 통해 ErrorHandler 접근
+          this // NavigationHandler를 통해 ErrorHandler 접근
           // markdownHelper 제거됨
         )
       ],
@@ -83,7 +83,7 @@ class NavigationHandler {
         "todo",
         new (require("../renderers/TodoRenderer"))(
           this.bot,
-          this,
+          this
           // markdownHelper 제거됨
         )
       ],
@@ -91,7 +91,7 @@ class NavigationHandler {
         "system",
         new (require("../renderers/SystemRenderer"))(
           this.bot,
-          this,
+          this
           // markdownHelper 제거됨
         )
       ],
@@ -99,7 +99,7 @@ class NavigationHandler {
         "tts",
         new (require("../renderers/TTSRenderer"))(
           this.bot,
-          this,
+          this
           // markdownHelper 제거됨
         )
       ],
@@ -107,7 +107,7 @@ class NavigationHandler {
         "weather",
         new (require("../renderers/WeatherRenderer"))(
           this.bot,
-          this,
+          this
           // markdownHelper 제거됨
         )
       ],
@@ -115,7 +115,7 @@ class NavigationHandler {
         "timer",
         new (require("../renderers/TimerRenderer"))(
           this.bot,
-          this,
+          this
           // markdownHelper 제거됨
         )
       ],
@@ -123,7 +123,7 @@ class NavigationHandler {
         "leave",
         new (require("../renderers/LeaveRenderer"))(
           this.bot,
-          this,
+          this
           // markdownHelper 제거됨
         )
       ],
@@ -131,7 +131,7 @@ class NavigationHandler {
         "worktime",
         new (require("../renderers/WorktimeRenderer"))(
           this.bot,
-          this, // ✅ NavigationHandler 전달 (ErrorHandler는 내부에서 접근)
+          this // ✅ NavigationHandler 전달 (ErrorHandler는 내부에서 접근)
           // markdownHelper 제거됨
         )
       ]
@@ -292,7 +292,7 @@ class NavigationHandler {
       logger.debug(`🎯 파싱 완료: ${moduleKey}.${subAction}(${params})`);
       logger.debug(`📞 ModuleManager.handleCallback 호출 시작:`, {
         moduleKey,
-        subAction, 
+        subAction,
         params,
         userId: callbackQuery.from.id,
         chatId: callbackQuery.message.chat.id
@@ -654,7 +654,6 @@ class NavigationHandler {
       );
     }
   }
-
 
   /**
    * 🧹 정리 작업

@@ -1,9 +1,8 @@
-
 class TimeHelper {
   static getKoreanDate() {
     const now = new Date();
-    const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000)); // UTC+9
-    return kst.toISOString().split('T')[0];
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000); // UTC+9
+    return kst.toISOString().split("T")[0];
   }
 
   // 호환성을 위한 별칭
@@ -13,13 +12,13 @@ class TimeHelper {
 
   static getKoreanDateTime() {
     const now = new Date();
-    const kst = new Date(now.getTime() + (9 * 60 * 60 * 1000));
-    return kst.toISOString().replace('T', ' ').split('.')[0];
+    const kst = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    return kst.toISOString().replace("T", " ").split(".")[0];
   }
 
   static formatTime(date) {
-    if (!date) return '';
-    return new Date(date).toLocaleString('ko-KR');
+    if (!date) return "";
+    return new Date(date).toLocaleString("ko-KR");
   }
 
   static getToday() {

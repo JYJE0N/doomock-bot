@@ -4,7 +4,7 @@ const logger = require("../utils/core/Logger");
 /**
  * 🚇 DoomockBot EventBus - Performance Enhanced v2.0
  * 지하철 시스템처럼 모든 모듈이 이벤트로 소통하는 핵심 클래스
- * 
+ *
  * v2.0 개선사항:
  * - 비동기 큐 처리로 성능 향상
  * - 백프레셔(backpressure) 제어
@@ -16,19 +16,19 @@ class EventBus extends EventEmitter {
   constructor() {
     super();
     this.setMaxListeners(200); // 더 많은 리스너 허용
-    
+
     // 기존 기능들
     this.middleware = [];
     this.eventSchemas = new Map();
     this.circuitBreaker = new Map();
-    
+
     // v2.0 성능 개선 기능들
     this.eventQueue = []; // 이벤트 처리 큐
     this.priorityQueue = []; // 우선순위 이벤트 큐
     this.batchQueue = []; // 배치 처리 큐
     this.isProcessing = false;
     this.processingStats = new Map();
-    
+
     // 성능 설정
     this.config = {
       maxQueueSize: 1000,
@@ -38,7 +38,7 @@ class EventBus extends EventEmitter {
       enableBackpressure: true,
       slowEventThreshold: 100
     };
-    
+
     // 통계 개선
     this.stats = {
       emitted: new Map(),
@@ -51,14 +51,14 @@ class EventBus extends EventEmitter {
       avgProcessingTime: 0,
       startTime: Date.now()
     };
-    
+
     // 백프레셔 제어
     this.backpressure = {
       isActive: false,
       droppedEvents: 0,
       lastDropTime: 0
     };
-    
+
     this.setupErrorHandling();
     this.startBatchProcessor();
     this.startQueueProcessor();
@@ -73,7 +73,7 @@ class EventBus extends EventEmitter {
         timestamp: new Date(),
         id: this.generateEventId(),
         source: metadata.source || "unknown",
-        priority: metadata.priority || 'normal', // 우선순위 추가
+        priority: metadata.priority || "normal", // 우선순위 추가
         batch: metadata.batch || false, // 배치 처리 가능 여부
         ...metadata
       }
@@ -97,14 +97,14 @@ class EventBus extends EventEmitter {
       // 통계 업데이트
       this.updateStats("emitted", eventName);
 
-      logger.debug(`🚇 이벤트 발행: ${eventName}`, { 
+      logger.debug(`🚇 이벤트 발행: ${eventName}`, {
         payload: Object.keys(payload),
         priority: event.metadata.priority,
         queueSize: this.eventQueue.length
       });
 
       // v2.0: 큐 기반 처리
-      if (event.metadata.priority === 'high') {
+      if (event.metadata.priority === "high") {
         this.priorityQueue.push(event);
       } else if (event.metadata.batch) {
         this.batchQueue.push(event);
@@ -115,7 +115,6 @@ class EventBus extends EventEmitter {
       this.stats.queued++;
 
       return event.metadata.id;
-      
     } catch (error) {
       this.updateStats("errors", eventName);
       logger.error(`❌ 이벤트 발행 실패: ${eventName}`, error.message);
@@ -164,21 +163,21 @@ class EventBus extends EventEmitter {
           : "0%",
       topEvents: this.getTopEvents(5),
       listenerCount: this.eventNames().length,
-      
+
       // v2.0 새로운 통계들
       performance: {
         queued: this.stats.queued,
         processed: this.stats.processed,
         batched: this.stats.batched,
         dropped: this.stats.dropped,
-        avgProcessingTime: Math.round(this.stats.avgProcessingTime) + 'ms',
+        avgProcessingTime: Math.round(this.stats.avgProcessingTime) + "ms",
         queueSizes: {
           normal: this.eventQueue.length,
           priority: this.priorityQueue.length,
           batch: this.batchQueue.length
         }
       },
-      
+
       backpressure: {
         isActive: this.backpressure.isActive,
         droppedEvents: this.backpressure.droppedEvents,
@@ -272,7 +271,11 @@ class EventBus extends EventEmitter {
     const now = Date.now();
 
     if (!this.circuitBreaker.has(key)) {
-      this.circuitBreaker.set(key, { count: 1, lastTime: now, eventIds: [eventId] });
+      this.circuitBreaker.set(key, {
+        count: 1,
+        lastTime: now,
+        eventIds: [eventId]
+      });
       return false;
     }
 
@@ -283,7 +286,7 @@ class EventBus extends EventEmitter {
       return true;
     }
 
-    // 500ms 내에 같은 이벤트가 20번 이상 발생하면 순환 의심 
+    // 500ms 내에 같은 이벤트가 20번 이상 발생하면 순환 의심
     if (now - info.lastTime < 500) {
       info.count++;
       info.eventIds.push(eventId);
@@ -327,22 +330,22 @@ class EventBus extends EventEmitter {
   // 🎯 EventBus 건강 상태 체크
   getHealthStatus() {
     const stats = this.getStats();
-    const errorRate = parseFloat(stats.errorRate.replace('%', ''));
-    
-    let status = 'healthy';
+    const errorRate = parseFloat(stats.errorRate.replace("%", ""));
+
+    let status = "healthy";
     let score = 100;
-    
+
     if (errorRate > 20) {
-      status = 'critical';
+      status = "critical";
       score = 20;
     } else if (errorRate > 10) {
-      status = 'warning';
+      status = "warning";
       score = 60;
     } else if (errorRate > 5) {
-      status = 'caution';
+      status = "caution";
       score = 80;
     }
-    
+
     return {
       status,
       score,
@@ -353,7 +356,7 @@ class EventBus extends EventEmitter {
   }
 
   // v2.0 성능 개선 메서드들
-  
+
   /**
    * 🔄 큐 프로세서 시작
    */
@@ -387,14 +390,20 @@ class EventBus extends EventEmitter {
       let processedCount = 0;
 
       // 1. 우선순위 큐 먼저 처리
-      while (this.priorityQueue.length > 0 && processedCount < this.config.maxConcurrentEvents) {
+      while (
+        this.priorityQueue.length > 0 &&
+        processedCount < this.config.maxConcurrentEvents
+      ) {
         const event = this.priorityQueue.shift();
         await this.processEvent(event);
         processedCount++;
       }
 
       // 2. 일반 큐 처리
-      while (this.eventQueue.length > 0 && processedCount < this.config.maxConcurrentEvents) {
+      while (
+        this.eventQueue.length > 0 &&
+        processedCount < this.config.maxConcurrentEvents
+      ) {
         const event = this.eventQueue.shift();
         await this.processEvent(event);
         processedCount++;
@@ -406,7 +415,6 @@ class EventBus extends EventEmitter {
         this.updateAvgProcessingTime(processingTime);
         this.stats.processed += processedCount;
       }
-
     } finally {
       this.isProcessing = false;
     }
@@ -420,17 +428,17 @@ class EventBus extends EventEmitter {
 
     const batchSize = Math.min(this.config.batchSize, this.batchQueue.length);
     const batch = this.batchQueue.splice(0, batchSize);
-    
+
     logger.debug(`📦 배치 처리: ${batch.length}개 이벤트`);
 
     // 배치를 병렬로 처리
-    const promises = batch.map(event => this.processEvent(event));
-    
+    const promises = batch.map((event) => this.processEvent(event));
+
     try {
       await Promise.allSettled(promises);
       this.stats.batched += batch.length;
     } catch (error) {
-      logger.error('배치 처리 오류:', error);
+      logger.error("배치 처리 오류:", error);
     }
   }
 
@@ -453,7 +461,6 @@ class EventBus extends EventEmitter {
       if (duration > this.config.slowEventThreshold) {
         logger.warn(`⚠️ 느린 이벤트: ${event.name} (${duration}ms)`);
       }
-
     } catch (error) {
       this.updateStats("errors", event.name);
       logger.error(`❌ 이벤트 처리 실패: ${event.name}`, error);
@@ -464,7 +471,10 @@ class EventBus extends EventEmitter {
    * 💪 백프레셔 제어
    */
   shouldApplyBackpressure() {
-    const totalQueueSize = this.eventQueue.length + this.priorityQueue.length + this.batchQueue.length;
+    const totalQueueSize =
+      this.eventQueue.length +
+      this.priorityQueue.length +
+      this.batchQueue.length;
     return totalQueueSize > this.config.maxQueueSize;
   }
 
@@ -473,7 +483,10 @@ class EventBus extends EventEmitter {
    */
   handleBackpressure(event) {
     // 중요한 이벤트는 드롭하지 않음
-    if (event.metadata.priority === 'high' || event.name.startsWith('system.')) {
+    if (
+      event.metadata.priority === "high" ||
+      event.name.startsWith("system.")
+    ) {
       this.priorityQueue.push(event);
       return event.metadata.id;
     }
@@ -483,9 +496,11 @@ class EventBus extends EventEmitter {
     this.backpressure.droppedEvents++;
     this.backpressure.lastDropTime = Date.now();
     this.stats.dropped++;
-    
-    logger.warn(`🚫 백프레셔: 이벤트 드롭됨 ${event.name} (큐 크기: ${this.eventQueue.length})`);
-    
+
+    logger.warn(
+      `🚫 백프레셔: 이벤트 드롭됨 ${event.name} (큐 크기: ${this.eventQueue.length})`
+    );
+
     // 백프레셔 완화 시도
     setTimeout(() => {
       this.backpressure.isActive = false;
@@ -502,61 +517,64 @@ class EventBus extends EventEmitter {
       this.stats.avgProcessingTime = newTime;
     } else {
       // 이동 평균 (가중치 0.1)
-      this.stats.avgProcessingTime = (this.stats.avgProcessingTime * 0.9) + (newTime * 0.1);
+      this.stats.avgProcessingTime =
+        this.stats.avgProcessingTime * 0.9 + newTime * 0.1;
     }
   }
 
   // 🎯 EventBus 정리 및 종료
   async shutdown() {
-    logger.info('🚇 EventBus 종료 시작...');
-    
+    logger.info("🚇 EventBus 종료 시작...");
+
     this.isShuttingDown = true;
-    
+
     // 배치 프로세서 중지
     if (this.batchInterval) {
       clearInterval(this.batchInterval);
     }
-    
+
     // 큐 비우기 (처리 안 된 이벤트들 처리)
-    logger.info(`🔄 미처리 이벤트 처리 중... (${this.eventQueue.length + this.priorityQueue.length + this.batchQueue.length}개)`);
-    
+    logger.info(
+      `🔄 미처리 이벤트 처리 중... (${this.eventQueue.length + this.priorityQueue.length + this.batchQueue.length}개)`
+    );
+
     while (this.eventQueue.length > 0 || this.priorityQueue.length > 0) {
       await this.processQueues();
     }
-    
+
     // 모든 리스너 제거
     this.removeAllListeners();
-    
+
     // 큐들 정리
     this.eventQueue.length = 0;
     this.priorityQueue.length = 0;
     this.batchQueue.length = 0;
-    
+
     // 통계 초기화
     this.stats.emitted.clear();
     this.stats.handled.clear();
     this.stats.errors.clear();
-    
-    logger.success('✅ EventBus 종료 완료');
+
+    logger.success("✅ EventBus 종료 완료");
   }
 }
 
 // 🎯 싱글톤 인스턴스 제공
 let globalEventBus = null;
 
-EventBus.getInstance = function() {
+EventBus.getInstance = function () {
   if (!globalEventBus) {
     globalEventBus = new EventBus();
-    logger.info('🚇 GlobalEventBus 인스턴스 생성');
+    logger.info("🚇 GlobalEventBus 인스턴스 생성");
   }
   return globalEventBus;
 };
 
-EventBus.resetInstance = function() {
+EventBus.resetInstance = function () {
   if (globalEventBus) {
     globalEventBus.shutdown();
     globalEventBus = null;
-    logger.info('🔄 GlobalEventBus 인스턴스 리셋');
+    logger.info("🔄 GlobalEventBus 인스턴스 리셋");
   }
 };
 

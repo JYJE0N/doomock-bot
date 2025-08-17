@@ -5,7 +5,7 @@ const CacheManager = require("../utils/core/CacheManager");
 
 /**
  * 🚀 ModuleLoader - 모듈 지연 로딩 및 코드 분할 시스템
- * 
+ *
  * 특징:
  * - 동적 모듈 로딩
  * - 메모리 효율성 최적화
@@ -18,7 +18,7 @@ class ModuleLoader {
     this.moduleStats = new Map();
     this.preloadQueue = new Set();
     this.cache = CacheManager.getInstance();
-    
+
     // 지연 로딩 설정 (수정됨)
     this.config = {
       maxLoadedModules: 8, // 동시 로드 모듈 수 제한 (확대)
@@ -27,11 +27,11 @@ class ModuleLoader {
       enablePreloading: true,
       cleanupInterval: 600000 // 10분마다 정리 체크 (기존 5분)
     };
-    
+
     // 사용 통계 추적
     this.usageStats = new Map();
     this.lastAccess = new Map();
-    
+
     logger.info("🚀 ModuleLoader 초기화 완료");
   }
 
@@ -41,7 +41,7 @@ class ModuleLoader {
   async loadModule(modulePath, moduleKey, constructorOptions = {}) {
     try {
       const startTime = Date.now();
-      
+
       // 이미 로드된 모듈 확인
       if (this.loadedModules.has(moduleKey)) {
         this.updateAccessTime(moduleKey);
@@ -55,17 +55,17 @@ class ModuleLoader {
       }
 
       logger.debug(`🔄 모듈 동적 로딩 시작: ${moduleKey}`);
-      
+
       // 동적 import 사용
       const ModuleClass = require(modulePath);
-      
+
       // V2 모듈 생성자 옵션 준비
       const moduleOptions = {
         ...constructorOptions,
         // V2 모듈은 첫 번째 인자로 moduleKey를 받음
         moduleKey: moduleKey
       };
-      
+
       // 모듈 인스턴스 생성
       let moduleInstance;
       try {
@@ -83,24 +83,23 @@ class ModuleLoader {
           logger.debug(`📦 기본 모듈 생성: ${moduleKey}`);
         }
       }
-      
+
       // 캐시에 저장
       this.loadedModules.set(moduleKey, moduleInstance);
-      
+
       // 통계 업데이트
       const loadTime = Date.now() - startTime;
       this.updateModuleStats(moduleKey, loadTime);
       this.updateAccessTime(moduleKey);
-      
+
       logger.success(`✅ 모듈 로딩 완료: ${moduleKey} (${loadTime}ms)`);
-      
+
       // 사용 패턴 기반 예측 로딩
       if (this.config.enablePreloading) {
         this.schedulePreloading(moduleKey);
       }
-      
+
       return moduleInstance;
-      
     } catch (error) {
       logger.error(`❌ 모듈 로딩 실패: ${moduleKey}`, error);
       throw new Error(`모듈 로딩 실패: ${moduleKey} - ${error.message}`);
@@ -110,7 +109,12 @@ class ModuleLoader {
   /**
    * 모듈 초기화 (지연 초기화) - 옵션 전달 개선
    */
-  async initializeModule(moduleInstance, moduleKey, serviceBuilder, options = {}) {
+  async initializeModule(
+    moduleInstance,
+    moduleKey,
+    serviceBuilder,
+    options = {}
+  ) {
     try {
       if (moduleInstance.isInitialized) {
         return moduleInstance;
@@ -150,20 +154,19 @@ class ModuleLoader {
       }
 
       // 초기화 실행
-      if (typeof moduleInstance.initialize === 'function') {
+      if (typeof moduleInstance.initialize === "function") {
         await moduleInstance.initialize();
       }
-      
+
       // 초기화 상태 확인 및 설정
       if (!moduleInstance.isInitialized) {
         moduleInstance.isInitialized = true;
       }
-      
+
       const initTime = Date.now() - startTime;
       logger.success(`✅ 모듈 초기화 완료: ${moduleKey} (${initTime}ms)`);
-      
+
       return moduleInstance;
-      
     } catch (error) {
       logger.error(`❌ 모듈 초기화 실패: ${moduleKey}`, error);
       throw error;
@@ -198,19 +201,18 @@ class ModuleLoader {
   async unloadModule(moduleKey) {
     try {
       const moduleInstance = this.loadedModules.get(moduleKey);
-      
+
       if (moduleInstance) {
         // 정리 작업 실행
-        if (typeof moduleInstance.cleanup === 'function') {
+        if (typeof moduleInstance.cleanup === "function") {
           await moduleInstance.cleanup();
         }
-        
+
         this.loadedModules.delete(moduleKey);
         this.lastAccess.delete(moduleKey);
-        
+
         logger.info(`🗑️ 모듈 언로드 완료: ${moduleKey}`);
       }
-      
     } catch (error) {
       logger.error(`❌ 모듈 언로드 실패: ${moduleKey}`, error);
     }
@@ -220,16 +222,22 @@ class ModuleLoader {
    * 사용 패턴 기반 예측 로딩
    */
   schedulePreloading(currentModule) {
-    const usage = this.usageStats.get(currentModule) || { count: 0, related: new Set() };
-    
+    const usage = this.usageStats.get(currentModule) || {
+      count: 0,
+      related: new Set()
+    };
+
     // 사용 빈도가 임계값을 넘으면 관련 모듈 예측 로딩
     if (usage.count >= this.config.preloadThreshold) {
       const relatedModules = this.getRelatedModules(currentModule);
-      
-      relatedModules.forEach(moduleKey => {
-        if (!this.loadedModules.has(moduleKey) && !this.preloadQueue.has(moduleKey)) {
+
+      relatedModules.forEach((moduleKey) => {
+        if (
+          !this.loadedModules.has(moduleKey) &&
+          !this.preloadQueue.has(moduleKey)
+        ) {
           this.preloadQueue.add(moduleKey);
-          
+
           // 비동기로 예측 로딩
           setImmediate(() => {
             this.preloadModule(moduleKey);
@@ -250,17 +258,16 @@ class ModuleLoader {
 
       const moduleRegistry = require("../config/ModuleRegistry");
       const moduleConfig = moduleRegistry.getModuleConfig(moduleKey);
-      
+
       if (moduleConfig && moduleConfig.enabled) {
         logger.debug(`🔮 예측 로딩 시작: ${moduleKey}`);
-        
+
         // 예측 로딩은 기본 옵션만 전달 (나중에 온디맨드에서 완전히 초기화)
         await this.loadModule(moduleConfig.path, moduleKey, {
           preload: true, // 예측 로딩 표시
           config: moduleConfig.config || {}
         });
       }
-      
     } catch (error) {
       logger.debug(`예측 로딩 실패 (무시): ${moduleKey}`, error.message);
     } finally {
@@ -273,14 +280,14 @@ class ModuleLoader {
    */
   getRelatedModules(moduleKey) {
     const relationMap = {
-      'timer': ['worktime'],
-      'worktime': ['timer', 'leave'],
-      'leave': ['worktime'],
-      'todo': ['timer'],
-      'weather': ['fortune'],
-      'fortune': ['weather']
+      timer: ["worktime"],
+      worktime: ["timer", "leave"],
+      leave: ["worktime"],
+      todo: ["timer"],
+      weather: ["fortune"],
+      fortune: ["weather"]
     };
-    
+
     return relationMap[moduleKey] || [];
   }
 
@@ -289,9 +296,12 @@ class ModuleLoader {
    */
   updateAccessTime(moduleKey) {
     this.lastAccess.set(moduleKey, Date.now());
-    
+
     // 사용 통계 업데이트
-    const usage = this.usageStats.get(moduleKey) || { count: 0, lastUsed: Date.now() };
+    const usage = this.usageStats.get(moduleKey) || {
+      count: 0,
+      lastUsed: Date.now()
+    };
     usage.count++;
     usage.lastUsed = Date.now();
     this.usageStats.set(moduleKey, usage);
@@ -306,11 +316,11 @@ class ModuleLoader {
       totalLoadTime: 0,
       avgLoadTime: 0
     };
-    
+
     stats.loadCount++;
     stats.totalLoadTime += loadTime;
     stats.avgLoadTime = Math.round(stats.totalLoadTime / stats.loadCount);
-    
+
     this.moduleStats.set(moduleKey, stats);
   }
 
@@ -322,35 +332,36 @@ class ModuleLoader {
     setInterval(async () => {
       const now = Date.now();
       const unloadTargets = [];
-      
+
       for (const [moduleKey, lastAccessTime] of this.lastAccess) {
         // 핵심 모듈들은 언로드하지 않음 (보호 목록)
-        const protectedModules = ['system', 'navigation', 'error', 'base'];
+        const protectedModules = ["system", "navigation", "error", "base"];
         if (protectedModules.includes(moduleKey)) {
           continue;
         }
-        
+
         if (now - lastAccessTime > this.config.unloadTimeout) {
           unloadTargets.push(moduleKey);
         }
       }
-      
+
       // 최대 3개까지만 한 번에 정리 (급격한 정리 방지)
       const safeUnloadTargets = unloadTargets.slice(0, 3);
-      
+
       for (const moduleKey of safeUnloadTargets) {
         try {
           await this.unloadModule(moduleKey);
-          logger.debug(`🗑️ 모듈 언로드 완료: ${moduleKey} (${Math.round((now - this.lastAccess.get(moduleKey)) / 60000)}분 미사용)`);
+          logger.debug(
+            `🗑️ 모듈 언로드 완료: ${moduleKey} (${Math.round((now - this.lastAccess.get(moduleKey)) / 60000)}분 미사용)`
+          );
         } catch (error) {
           logger.warn(`⚠️ 모듈 언로드 실패: ${moduleKey}`, error.message);
         }
       }
-      
+
       if (safeUnloadTargets.length > 0) {
         logger.info(`🧹 ${safeUnloadTargets.length}개 미사용 모듈 자동 정리`);
       }
-      
     }, this.config.cleanupInterval); // 10분마다 실행
   }
 
@@ -359,11 +370,11 @@ class ModuleLoader {
    */
   async unloadAllModules() {
     const moduleKeys = Array.from(this.loadedModules.keys());
-    
+
     for (const moduleKey of moduleKeys) {
       await this.unloadModule(moduleKey);
     }
-    
+
     logger.info(`🧹 전체 모듈 언로드 완료 (${moduleKeys.length}개)`);
   }
 
@@ -372,9 +383,11 @@ class ModuleLoader {
    */
   getStats() {
     const loadedModulesList = Array.from(this.loadedModules.keys());
-    const totalUsage = Array.from(this.usageStats.values())
-      .reduce((sum, stats) => sum + stats.count, 0);
-    
+    const totalUsage = Array.from(this.usageStats.values()).reduce(
+      (sum, stats) => sum + stats.count,
+      0
+    );
+
     return {
       loadedModules: {
         count: this.loadedModules.size,
@@ -401,7 +414,7 @@ class ModuleLoader {
   getAverageLoadTime() {
     const stats = Array.from(this.moduleStats.values());
     if (stats.length === 0) return 0;
-    
+
     const totalAvg = stats.reduce((sum, stat) => sum + stat.avgLoadTime, 0);
     return Math.round(totalAvg / stats.length);
   }

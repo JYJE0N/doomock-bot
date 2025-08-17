@@ -1,8 +1,8 @@
 /**
  * 🔮 FortuneModuleV2 - EventBus 기반 타로카드 운세 모듈
- * 
+ *
  * EventBus를 사용한 완전히 분리된 아키텍처로 타로카드 운세 기능을 제공합니다.
- * 
+ *
  * 🎯 주요 기능:
  * - 싱글카드, 트리플카드, 캘틱 크로스 뽑기
  * - 질문 기반 타로카드 해석
@@ -11,8 +11,8 @@
  * - 카드 섞기 애니메이션
  */
 
-const { EVENTS } = require('../events/EventRegistry');
-const logger = require('../utils/core/Logger');
+const { EVENTS } = require("../events/EventRegistry");
+const logger = require("../utils/core/Logger");
 // const Utils = require('../utils'); // unused
 
 class FortuneModuleV2 {
@@ -20,38 +20,56 @@ class FortuneModuleV2 {
     this.moduleName = moduleName;
     // ✅ EventBus 강제 주입 - fallback 제거로 중복 인스턴스 방지
     if (!options.eventBus) {
-      throw new Error(`EventBus must be injected via options for module: ${moduleName}`);
+      throw new Error(
+        `EventBus must be injected via options for module: ${moduleName}`
+      );
     }
     this.eventBus = options.eventBus;
     this.serviceBuilder = options.serviceBuilder || null;
-    
+
     // Fortune 서비스 (있으면 실제 기능, 없으면 테스트 모드)
     this.fortuneService = null;
-    
+
     // 초기화 상태
     this.isInitialized = false;
-    
+
     // 사용자 상태 관리 (질문 입력 대기 등)
     this.userStates = new Map();
-    
+
     // 캘틱 크로스 결과 임시 저장
     this.lastCelticResults = new Map();
-    
+
     // 모듈 설정
     this.config = {
       maxDrawsPerDay: 3,
       questionTimeout: 300000, // 5분 질문 입력 타임아웃
       fortuneTypes: {
-        single: { label: "싱글카드 🃏", emoji: "🃏", cost: 1, description: "하나의 카드로 간단한 운세를 봅니다" },
-        triple: { label: "트리플카드 🔮", emoji: "🔮", cost: 1, description: "과거-현재-미래의 흐름을 봅니다" },
-        celtic: { label: "캘틱 크로스 ✨", emoji: "✨", cost: 2, special: true, description: "10장 카드로 상세한 해석을 제공합니다" }
+        single: {
+          label: "싱글카드 🃏",
+          emoji: "🃏",
+          cost: 1,
+          description: "하나의 카드로 간단한 운세를 봅니다"
+        },
+        triple: {
+          label: "트리플카드 🔮",
+          emoji: "🔮",
+          cost: 1,
+          description: "과거-현재-미래의 흐름을 봅니다"
+        },
+        celtic: {
+          label: "캘틱 크로스 ✨",
+          emoji: "✨",
+          cost: 2,
+          special: true,
+          description: "10장 카드로 상세한 해석을 제공합니다"
+        }
       },
       ...options.config
     };
-    
+
     // EventBus 구독 배열 (정리용)
     this.subscriptions = [];
-    
+
     // 상태 정리 타이머
     this.cleanupInterval = setInterval(() => {
       this.cleanupExpiredStates();
@@ -71,24 +89,32 @@ class FortuneModuleV2 {
       // ServiceBuilder를 통해 FortuneService 가져오기 (선택적)
       if (this.serviceBuilder) {
         try {
-          this.fortuneService = await this.serviceBuilder.getOrCreate("fortune", {
-            config: this.config
-          });
+          this.fortuneService = await this.serviceBuilder.getOrCreate(
+            "fortune",
+            {
+              config: this.config
+            }
+          );
           logger.info("🔮 FortuneService 연결 완료");
         } catch (serviceError) {
-          logger.warn("⚠️ FortuneService 연결 실패 - 테스트 모드로 동작:", serviceError.message);
+          logger.warn(
+            "⚠️ FortuneService 연결 실패 - 테스트 모드로 동작:",
+            serviceError.message
+          );
           this.fortuneService = null;
         }
       }
 
       // 이벤트 리스너 설정
       this.setupEventListeners();
-      
+
       // 초기화 완료 표시
       this.isInitialized = true;
-      
+
       const mode = this.fortuneService ? "프로덕션" : "테스트";
-      logger.success(`🔮 FortuneModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`);
+      logger.success(
+        `🔮 FortuneModuleV2 초기화 완료 (${mode} 모드, EventBus 기반)`
+      );
       return true;
     } catch (error) {
       logger.error("❌ FortuneModuleV2 초기화 실패:", error);
@@ -102,39 +128,44 @@ class FortuneModuleV2 {
   async handleCallback(bot, callbackQuery, subAction, params, moduleManager) {
     const userId = callbackQuery.from.id;
     const chatId = callbackQuery.message.chat.id;
-    
+
     logger.debug(`🔮 FortuneModuleV2.handleCallback 호출됨:`, {
       subAction,
       params,
       userId,
       chatId
     });
-    
+
     // 레거시 콜백을 처리하는 맵
     const actionMap = {
-      'menu': () => this.showMenu(userId, chatId),
-      'single': () => this.handleSingleCard(userId, chatId),
-      'triple': () => this.handleTripleCard(userId, chatId),
-      'celtic': () => this.handleCelticCross(userId, chatId),
-      'detail': () => this.handleCelticDetail(userId, chatId),
-      'stats': () => this.showStats(userId, chatId),
-      'history': () => this.showHistory(userId, chatId)
+      menu: () => this.showMenu(userId, chatId),
+      single: () => this.handleSingleCard(userId, chatId),
+      triple: () => this.handleTripleCard(userId, chatId),
+      celtic: () => this.handleCelticCross(userId, chatId),
+      detail: () => this.handleCelticDetail(userId, chatId),
+      stats: () => this.showStats(userId, chatId),
+      history: () => this.showHistory(userId, chatId)
     };
-    
+
     const handler = actionMap[subAction];
     if (handler) {
       const result = await handler();
       // menu와 stats 액션은 렌더러용 결과를 반환
-      if ((subAction === 'menu' || subAction === 'stats' || subAction === 'history') && result) {
+      if (
+        (subAction === "menu" ||
+          subAction === "stats" ||
+          subAction === "history") &&
+        result
+      ) {
         return result;
       }
       return {
         type: subAction,
-        module: 'fortune',
+        module: "fortune",
         success: true
       };
     }
-    
+
     logger.debug(`FortuneModuleV2: 알 수 없는 액션 - ${subAction}`);
     return null;
   }
@@ -152,34 +183,49 @@ class FortuneModuleV2 {
 
     // 카드 뽑기 관련
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.FORTUNE.SINGLE_CARD_REQUEST, async (event) => {
-        await this.handleSingleCardRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.FORTUNE.SINGLE_CARD_REQUEST,
+        async (event) => {
+          await this.handleSingleCardRequest(event);
+        }
+      )
     );
 
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.FORTUNE.TRIPLE_CARD_REQUEST, async (event) => {
-        await this.handleTripleCardRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.FORTUNE.TRIPLE_CARD_REQUEST,
+        async (event) => {
+          await this.handleTripleCardRequest(event);
+        }
+      )
     );
 
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.FORTUNE.CELTIC_CROSS_REQUEST, async (event) => {
-        await this.handleCelticCrossRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.FORTUNE.CELTIC_CROSS_REQUEST,
+        async (event) => {
+          await this.handleCelticCrossRequest(event);
+        }
+      )
     );
 
     // 질문 입력 관련
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.FORTUNE.QUESTION_REQUEST, async (event) => {
-        await this.handleQuestionRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.FORTUNE.QUESTION_REQUEST,
+        async (event) => {
+          await this.handleQuestionRequest(event);
+        }
+      )
     );
 
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.FORTUNE.QUESTION_RECEIVED, async (event) => {
-        await this.handleQuestionReceived(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.FORTUNE.QUESTION_RECEIVED,
+        async (event) => {
+          await this.handleQuestionReceived(event);
+        }
+      )
     );
 
     this.subscriptions.push(
@@ -210,16 +256,22 @@ class FortuneModuleV2 {
 
     // 캘틱 상세보기
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.FORTUNE.CELTIC_DETAIL_REQUEST, async (event) => {
-        await this.handleCelticDetailRequest(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.FORTUNE.CELTIC_DETAIL_REQUEST,
+        async (event) => {
+          await this.handleCelticDetailRequest(event);
+        }
+      )
     );
 
     // 일일 제한 리셋 (개발자용)
     this.subscriptions.push(
-      this.eventBus.subscribe(EVENTS.FORTUNE.DAILY_LIMIT_RESET, async (event) => {
-        await this.handleDailyLimitReset(event);
-      })
+      this.eventBus.subscribe(
+        EVENTS.FORTUNE.DAILY_LIMIT_RESET,
+        async (event) => {
+          await this.handleDailyLimitReset(event);
+        }
+      )
     );
 
     logger.debug("🎧 FortuneModuleV2 EventBus 리스너 설정 완료");
@@ -251,19 +303,18 @@ class FortuneModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatMenu(todayInfo, isDeveloper),
           options: {
             reply_markup: this.createMenuKeyboard(todayInfo, isDeveloper),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🔮 메뉴 요청 처리 실패:', error);
+      logger.error("🔮 메뉴 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -287,7 +338,7 @@ class FortuneModuleV2 {
       }
 
       // 싱글카드 뽑기 수행
-      const drawResult = await this.performDraw(userId, 'single');
+      const drawResult = await this.performDraw(userId, "single");
 
       // 성공 이벤트 발행
       await this.eventBus.publish(EVENTS.FORTUNE.SINGLE_CARD_READY, {
@@ -297,19 +348,18 @@ class FortuneModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
-          text: this.formatDrawResult(drawResult, 'single'),
+          text: this.formatDrawResult(drawResult, "single"),
           options: {
             reply_markup: this.createDrawResultKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🃏 싱글카드 요청 처리 실패:', error);
+      logger.error("🃏 싱글카드 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -333,7 +383,7 @@ class FortuneModuleV2 {
       }
 
       // 트리플카드 뽑기 수행
-      const drawResult = await this.performDraw(userId, 'triple');
+      const drawResult = await this.performDraw(userId, "triple");
 
       // 성공 이벤트 발행
       await this.eventBus.publish(EVENTS.FORTUNE.TRIPLE_CARD_READY, {
@@ -343,19 +393,18 @@ class FortuneModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
-          text: this.formatDrawResult(drawResult, 'triple'),
+          text: this.formatDrawResult(drawResult, "triple"),
           options: {
             reply_markup: this.createDrawResultKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🔮 트리플카드 요청 처리 실패:', error);
+      logger.error("🔮 트리플카드 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -382,11 +431,10 @@ class FortuneModuleV2 {
       await this.eventBus.publish(EVENTS.FORTUNE.QUESTION_REQUEST, {
         userId,
         chatId,
-        fortuneType: 'celtic'
+        fortuneType: "celtic"
       });
-
     } catch (error) {
-      logger.error('✨ 캘틱 크로스 요청 처리 실패:', error);
+      logger.error("✨ 캘틱 크로스 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -395,31 +443,30 @@ class FortuneModuleV2 {
    * 💬 질문 요청 처리 (질문 입력 프롬프트)
    */
   async handleQuestionRequest(event) {
-    const { userId, chatId, fortuneType = 'celtic' } = event.payload;
+    const { userId, chatId, fortuneType = "celtic" } = event.payload;
 
     try {
       // 사용자 질문 입력 상태 설정
       this.setUserQuestionState(userId, {
-        state: 'waiting_question',
+        state: "waiting_question",
         fortuneType,
         chatId,
         startTime: Date.now()
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatQuestionPrompt(fortuneType),
           options: {
             reply_markup: this.createQuestionKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('💬 질문 요청 처리 실패:', error);
+      logger.error("💬 질문 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -433,7 +480,7 @@ class FortuneModuleV2 {
     try {
       // 질문 입력 상태 확인
       const questionState = this.getUserQuestionState(userId);
-      if (!questionState || questionState.state !== 'waiting_question') {
+      if (!questionState || questionState.state !== "waiting_question") {
         return; // 질문 대기 상태가 아니면 무시
       }
 
@@ -452,10 +499,14 @@ class FortuneModuleV2 {
       this.clearUserQuestionState(userId);
 
       // 캘틱 크로스 뽑기 수행
-      const drawResult = await this.performDraw(userId, questionState.fortuneType, question);
+      const drawResult = await this.performDraw(
+        userId,
+        questionState.fortuneType,
+        question
+      );
 
       // 결과를 임시 저장 (상세보기용)
-      if (questionState.fortuneType === 'celtic') {
+      if (questionState.fortuneType === "celtic") {
         this.lastCelticResults.set(userId, {
           ...drawResult,
           timestamp: Date.now()
@@ -471,19 +522,18 @@ class FortuneModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
-          text: this.formatDrawResult(drawResult, 'celtic'),
+          text: this.formatDrawResult(drawResult, "celtic"),
           options: {
             reply_markup: this.createCelticResultKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('📨 질문 수신 처리 실패:', error);
+      logger.error("📨 질문 수신 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -503,9 +553,8 @@ class FortuneModuleV2 {
         userId,
         chatId
       });
-
     } catch (error) {
-      logger.error('❌ 질문 취소 처리 실패:', error);
+      logger.error("❌ 질문 취소 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -519,7 +568,7 @@ class FortuneModuleV2 {
     try {
       // 카드 섞기 수행 (Service가 있으면 실제 처리, 없으면 더미)
       let shuffleResult;
-      
+
       if (this.fortuneService) {
         shuffleResult = await this.fortuneService.shuffleDeck(userId);
       } else {
@@ -538,22 +587,21 @@ class FortuneModuleV2 {
       });
 
       // 애니메이션 및 렌더링 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         // 섞기 애니메이션 표시
         await this.performShuffleAnimation(chatId);
-        
+
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatShuffleResult(shuffleResult),
           options: {
             reply_markup: this.createBackToMenuKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🃏 카드 섞기 요청 처리 실패:', error);
+      logger.error("🃏 카드 섞기 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -567,7 +615,7 @@ class FortuneModuleV2 {
     try {
       // 사용자 통계 조회
       let statsData;
-      
+
       if (this.fortuneService) {
         const statsResult = await this.fortuneService.getUserStats(userId);
         statsData = statsResult.data || this.getDefaultStats();
@@ -584,19 +632,18 @@ class FortuneModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatStats(statsData),
           options: {
             reply_markup: this.createBackToMenuKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('📊 통계 요청 처리 실패:', error);
+      logger.error("📊 통계 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -610,9 +657,12 @@ class FortuneModuleV2 {
     try {
       // 사용자 이력 조회
       let historyData;
-      
+
       if (this.fortuneService) {
-        const historyResult = await this.fortuneService.getDrawHistory(userId, limit);
+        const historyResult = await this.fortuneService.getDrawHistory(
+          userId,
+          limit
+        );
         historyData = historyResult.data || { records: [], total: 0 };
       } else {
         // 테스트 모드: 더미 이력
@@ -630,19 +680,18 @@ class FortuneModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatHistory(historyData),
           options: {
             reply_markup: this.createBackToMenuKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('📋 이력 요청 처리 실패:', error);
+      logger.error("📋 이력 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -656,7 +705,7 @@ class FortuneModuleV2 {
     try {
       // 저장된 캘틱 결과 조회
       const cachedResult = this.lastCelticResults.get(userId);
-      
+
       if (!cachedResult || !cachedResult.cards) {
         await this.eventBus.publish(EVENTS.FORTUNE.ERROR, {
           userId,
@@ -667,7 +716,8 @@ class FortuneModuleV2 {
       }
 
       // 상세 해석 생성
-      const detailedInterpretation = this.generateDetailedCelticInterpretation(cachedResult);
+      const detailedInterpretation =
+        this.generateDetailedCelticInterpretation(cachedResult);
 
       // 성공 이벤트 발행
       await this.eventBus.publish(EVENTS.FORTUNE.CELTIC_DETAIL_READY, {
@@ -680,19 +730,18 @@ class FortuneModuleV2 {
       });
 
       // 렌더링 요청 (테스트에서는 스킵)
-      if (process.env.NODE_ENV !== 'test') {
+      if (process.env.NODE_ENV !== "test") {
         await this.eventBus.publish(EVENTS.RENDER.MESSAGE_REQUEST, {
           chatId,
           text: this.formatCelticDetail(cachedResult, detailedInterpretation),
           options: {
             reply_markup: this.createBackToMenuKeyboard(),
-            parse_mode: 'Markdown'
+            parse_mode: "Markdown"
           }
         });
       }
-
     } catch (error) {
-      logger.error('🔍 캘틱 상세보기 요청 처리 실패:', error);
+      logger.error("🔍 캘틱 상세보기 요청 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -705,7 +754,7 @@ class FortuneModuleV2 {
 
     try {
       const isDeveloper = await this.checkDeveloperStatus(userId);
-      
+
       if (!isDeveloper) {
         await this.eventBus.publish(EVENTS.FORTUNE.ERROR, {
           userId,
@@ -726,9 +775,8 @@ class FortuneModuleV2 {
         userId,
         chatId
       });
-
     } catch (error) {
-      logger.error('🔄 일일 제한 리셋 처리 실패:', error);
+      logger.error("🔄 일일 제한 리셋 처리 실패:", error);
       await this.publishError(error, event);
     }
   }
@@ -740,23 +788,26 @@ class FortuneModuleV2 {
   // 오늘 뽑기 정보 조회
   async getTodayDrawInfo(userId) {
     if (!this.fortuneService) {
-      return { 
-        todayCount: 0, 
-        remainingDraws: this.config.maxDrawsPerDay 
+      return {
+        todayCount: 0,
+        remainingDraws: this.config.maxDrawsPerDay
       };
     }
 
     try {
-      const limitCheck = await this.fortuneService.checkDailyLimit(userId, this.config.maxDrawsPerDay);
+      const limitCheck = await this.fortuneService.checkDailyLimit(
+        userId,
+        this.config.maxDrawsPerDay
+      );
       return {
         todayCount: limitCheck.todayCount || 0,
         remainingDraws: limitCheck.remainingDraws || this.config.maxDrawsPerDay
       };
     } catch (error) {
       logger.warn("오늘 뽑기 정보 조회 실패:", error.message);
-      return { 
-        todayCount: 0, 
-        remainingDraws: this.config.maxDrawsPerDay 
+      return {
+        todayCount: 0,
+        remainingDraws: this.config.maxDrawsPerDay
       };
     }
   }
@@ -764,7 +815,7 @@ class FortuneModuleV2 {
   // 일일 제한 확인
   async checkDailyLimit(userId, cost = 1) {
     const isDeveloper = await this.checkDeveloperStatus(userId);
-    
+
     if (isDeveloper) {
       return { canDraw: true, isDeveloper: true };
     }
@@ -782,7 +833,9 @@ class FortuneModuleV2 {
   // 개발자 상태 확인
   async checkDeveloperStatus(userId) {
     // 간단한 더미 구현 (실제로는 환경변수나 DB에서 확인)
-    const developerIds = process.env.DEVELOPER_IDS ? process.env.DEVELOPER_IDS.split(',') : [];
+    const developerIds = process.env.DEVELOPER_IDS
+      ? process.env.DEVELOPER_IDS.split(",")
+      : [];
     return developerIds.includes(userId.toString());
   }
 
@@ -794,7 +847,7 @@ class FortuneModuleV2 {
         type: fortuneType,
         question
       });
-      
+
       if (result.success) {
         return result.data;
       } else {
@@ -808,11 +861,13 @@ class FortuneModuleV2 {
 
   // 더미 카드 뽑기 결과 생성
   generateDummyDrawResult(fortuneType, question = null) {
-    const cardCount = fortuneType === 'single' ? 1 : fortuneType === 'triple' ? 3 : 10;
+    const cardCount =
+      fortuneType === "single" ? 1 : fortuneType === "triple" ? 3 : 10;
     const cards = [];
-    
+
     for (let i = 0; i < cardCount; i++) {
-      const randomCard = this.dummyCards[Math.floor(Math.random() * this.dummyCards.length)];
+      const randomCard =
+        this.dummyCards[Math.floor(Math.random() * this.dummyCards.length)];
       cards.push({
         ...randomCard,
         isReversed: Math.random() < 0.3, // 30% 확률로 역방향
@@ -833,28 +888,160 @@ class FortuneModuleV2 {
   // 더미 카드 데이터 생성
   generateDummyCards() {
     return [
-      { name: "The Fool", korean: "바보", emoji: "🃏", arcana: "major", number: 0 },
-      { name: "The Magician", korean: "마법사", emoji: "🎩", arcana: "major", number: 1 },
-      { name: "The High Priestess", korean: "여교황", emoji: "🔮", arcana: "major", number: 2 },
-      { name: "The Empress", korean: "황후", emoji: "👑", arcana: "major", number: 3 },
-      { name: "The Emperor", korean: "황제", emoji: "🏛️", arcana: "major", number: 4 },
-      { name: "The Hierophant", korean: "교황", emoji: "⛪", arcana: "major", number: 5 },
-      { name: "The Lovers", korean: "연인", emoji: "💕", arcana: "major", number: 6 },
-      { name: "The Chariot", korean: "전차", emoji: "🏎️", arcana: "major", number: 7 },
-      { name: "Strength", korean: "힘", emoji: "💪", arcana: "major", number: 8 },
-      { name: "The Hermit", korean: "은둔자", emoji: "🕯️", arcana: "major", number: 9 },
-      { name: "Wheel of Fortune", korean: "운명의 수레바퀴", emoji: "🎡", arcana: "major", number: 10 },
-      { name: "Justice", korean: "정의", emoji: "⚖️", arcana: "major", number: 11 },
-      { name: "The Hanged Man", korean: "매달린 사람", emoji: "🤸", arcana: "major", number: 12 },
-      { name: "Death", korean: "죽음", emoji: "💀", arcana: "major", number: 13 },
-      { name: "Temperance", korean: "절제", emoji: "🍷", arcana: "major", number: 14 },
-      { name: "The Devil", korean: "악마", emoji: "😈", arcana: "major", number: 15 },
-      { name: "The Tower", korean: "탑", emoji: "🗼", arcana: "major", number: 16 },
-      { name: "The Star", korean: "별", emoji: "⭐", arcana: "major", number: 17 },
-      { name: "The Moon", korean: "달", emoji: "🌙", arcana: "major", number: 18 },
-      { name: "The Sun", korean: "태양", emoji: "☀️", arcana: "major", number: 19 },
-      { name: "Judgement", korean: "심판", emoji: "📯", arcana: "major", number: 20 },
-      { name: "The World", korean: "세계", emoji: "🌍", arcana: "major", number: 21 }
+      {
+        name: "The Fool",
+        korean: "바보",
+        emoji: "🃏",
+        arcana: "major",
+        number: 0
+      },
+      {
+        name: "The Magician",
+        korean: "마법사",
+        emoji: "🎩",
+        arcana: "major",
+        number: 1
+      },
+      {
+        name: "The High Priestess",
+        korean: "여교황",
+        emoji: "🔮",
+        arcana: "major",
+        number: 2
+      },
+      {
+        name: "The Empress",
+        korean: "황후",
+        emoji: "👑",
+        arcana: "major",
+        number: 3
+      },
+      {
+        name: "The Emperor",
+        korean: "황제",
+        emoji: "🏛️",
+        arcana: "major",
+        number: 4
+      },
+      {
+        name: "The Hierophant",
+        korean: "교황",
+        emoji: "⛪",
+        arcana: "major",
+        number: 5
+      },
+      {
+        name: "The Lovers",
+        korean: "연인",
+        emoji: "💕",
+        arcana: "major",
+        number: 6
+      },
+      {
+        name: "The Chariot",
+        korean: "전차",
+        emoji: "🏎️",
+        arcana: "major",
+        number: 7
+      },
+      {
+        name: "Strength",
+        korean: "힘",
+        emoji: "💪",
+        arcana: "major",
+        number: 8
+      },
+      {
+        name: "The Hermit",
+        korean: "은둔자",
+        emoji: "🕯️",
+        arcana: "major",
+        number: 9
+      },
+      {
+        name: "Wheel of Fortune",
+        korean: "운명의 수레바퀴",
+        emoji: "🎡",
+        arcana: "major",
+        number: 10
+      },
+      {
+        name: "Justice",
+        korean: "정의",
+        emoji: "⚖️",
+        arcana: "major",
+        number: 11
+      },
+      {
+        name: "The Hanged Man",
+        korean: "매달린 사람",
+        emoji: "🤸",
+        arcana: "major",
+        number: 12
+      },
+      {
+        name: "Death",
+        korean: "죽음",
+        emoji: "💀",
+        arcana: "major",
+        number: 13
+      },
+      {
+        name: "Temperance",
+        korean: "절제",
+        emoji: "🍷",
+        arcana: "major",
+        number: 14
+      },
+      {
+        name: "The Devil",
+        korean: "악마",
+        emoji: "😈",
+        arcana: "major",
+        number: 15
+      },
+      {
+        name: "The Tower",
+        korean: "탑",
+        emoji: "🗼",
+        arcana: "major",
+        number: 16
+      },
+      {
+        name: "The Star",
+        korean: "별",
+        emoji: "⭐",
+        arcana: "major",
+        number: 17
+      },
+      {
+        name: "The Moon",
+        korean: "달",
+        emoji: "🌙",
+        arcana: "major",
+        number: 18
+      },
+      {
+        name: "The Sun",
+        korean: "태양",
+        emoji: "☀️",
+        arcana: "major",
+        number: 19
+      },
+      {
+        name: "Judgement",
+        korean: "심판",
+        emoji: "📯",
+        arcana: "major",
+        number: 20
+      },
+      {
+        name: "The World",
+        korean: "세계",
+        emoji: "🌍",
+        arcana: "major",
+        number: 21
+      }
     ];
   }
 
@@ -862,7 +1049,7 @@ class FortuneModuleV2 {
   generateDummyInterpretation(cards, fortuneType) {
     const messages = [
       "새로운 시작의 기운이 느껴집니다.",
-      "현재 상황에서 균형을 찾는 것이 중요합니다.", 
+      "현재 상황에서 균형을 찾는 것이 중요합니다.",
       "내면의 목소리에 귀 기울여보세요.",
       "변화의 시기가 다가오고 있습니다.",
       "인내심을 갖고 기다리는 것이 필요합니다."
@@ -871,9 +1058,9 @@ class FortuneModuleV2 {
     return {
       summary: messages[Math.floor(Math.random() * messages.length)],
       advice: "카드가 전하는 메시지를 깊이 생각해보세요.",
-      cards: cards.map(card => ({
+      cards: cards.map((card) => ({
         card: card.name,
-        meaning: `${card.korean}는 ${card.isReversed ? '도전' : '기회'}을 의미합니다.`
+        meaning: `${card.korean}는 ${card.isReversed ? "도전" : "기회"}을 의미합니다.`
       }))
     };
   }
@@ -881,18 +1068,36 @@ class FortuneModuleV2 {
   // 질문 유효성 검증
   isValidQuestion(text) {
     if (!text || typeof text !== "string") return false;
-    
+
     const trimmed = text.trim();
     if (trimmed.length < 5 || trimmed.length > 200) return false;
-    
+
     // 의미 있는 단어 체크
     const meaningfulWords = [
-      "사랑", "일", "직장", "가족", "친구", "미래", "고민", "선택", "결정", 
-      "관계", "건강", "돈", "학업", "시험", "이직", "결혼", "연애", "프로젝트"
+      "사랑",
+      "일",
+      "직장",
+      "가족",
+      "친구",
+      "미래",
+      "고민",
+      "선택",
+      "결정",
+      "관계",
+      "건강",
+      "돈",
+      "학업",
+      "시험",
+      "이직",
+      "결혼",
+      "연애",
+      "프로젝트"
     ];
-    
-    return meaningfulWords.some(word => text.includes(word)) || 
-           /[가-힣]{2,}/.test(text); // 완성된 한글이 2글자 이상
+
+    return (
+      meaningfulWords.some((word) => text.includes(word)) ||
+      /[가-힣]{2,}/.test(text)
+    ); // 완성된 한글이 2글자 이상
   }
 
   // 사용자 질문 상태 설정
@@ -916,7 +1121,7 @@ class FortuneModuleV2 {
   // 만료된 상태 정리
   cleanupExpiredStates() {
     const now = Date.now();
-    
+
     // 질문 입력 상태 정리
     for (const [userId, state] of this.userStates) {
       if (now - state.timestamp > this.config.questionTimeout) {
@@ -924,7 +1129,7 @@ class FortuneModuleV2 {
         logger.debug(`🧹 만료된 질문 상태 정리: ${userId}`);
       }
     }
-    
+
     // 캘틱 결과 정리 (1시간 후)
     for (const [userId, result] of this.lastCelticResults) {
       if (now - result.timestamp > 3600000) {
@@ -972,21 +1177,27 @@ class FortuneModuleV2 {
    * 📝 메시지 포맷팅 메서드들 (더미)
    */
   formatMenu(todayInfo, isDeveloper) {
-    return `🔮 **타로카드 운세**\n\n` +
-           `오늘 뽑기: ${todayInfo.todayCount}/${this.config.maxDrawsPerDay}\n` +
-           `${isDeveloper ? '(개발자 모드)' : ''}`;
+    return (
+      `🔮 **타로카드 운세**\n\n` +
+      `오늘 뽑기: ${todayInfo.todayCount}/${this.config.maxDrawsPerDay}\n` +
+      `${isDeveloper ? "(개발자 모드)" : ""}`
+    );
   }
 
   formatDrawResult(drawResult, type) {
-    return `✨ **${this.config.fortuneTypes[type].label} 결과**\n\n` +
-           `뽑힌 카드: ${drawResult.cards.map(c => `${c.emoji} ${c.korean}`).join(', ')}\n\n` +
-           `해석: ${drawResult.interpretation.summary}`;
+    return (
+      `✨ **${this.config.fortuneTypes[type].label} 결과**\n\n` +
+      `뽑힌 카드: ${drawResult.cards.map((c) => `${c.emoji} ${c.korean}`).join(", ")}\n\n` +
+      `해석: ${drawResult.interpretation.summary}`
+    );
   }
 
   formatQuestionPrompt(fortuneType) {
-    return `✨ **${this.config.fortuneTypes[fortuneType].label}**\n\n` +
-           `궁금한 것을 구체적으로 질문해주세요.\n` +
-           `(5자 이상, 200자 이하)`;
+    return (
+      `✨ **${this.config.fortuneTypes[fortuneType].label}**\n\n` +
+      `궁금한 것을 구체적으로 질문해주세요.\n` +
+      `(5자 이상, 200자 이하)`
+    );
   }
 
   formatShuffleResult(shuffleResult) {
@@ -994,14 +1205,18 @@ class FortuneModuleV2 {
   }
 
   formatStats(statsData) {
-    return `📊 **나의 타로 통계**\n\n` +
-           `총 뽑기: ${statsData.totalDraws}회\n` +
-           `오늘 뽑기: ${statsData.todayDraws}회`;
+    return (
+      `📊 **나의 타로 통계**\n\n` +
+      `총 뽑기: ${statsData.totalDraws}회\n` +
+      `오늘 뽑기: ${statsData.todayDraws}회`
+    );
   }
 
   formatHistory(historyData) {
-    return `📋 **뽑기 이력**\n\n` +
-           `${historyData.isEmpty ? '아직 뽑기 이력이 없습니다.' : `총 ${historyData.total}회의 기록`}`;
+    return (
+      `📋 **뽑기 이력**\n\n` +
+      `${historyData.isEmpty ? "아직 뽑기 이력이 없습니다." : `총 ${historyData.total}회의 기록`}`
+    );
   }
 
   formatCelticDetail(result, interpretation) {
@@ -1012,45 +1227,39 @@ class FortuneModuleV2 {
    * 🎹 키보드 생성 메서드들 (더미)
    */
   createMenuKeyboard(todayInfo, isDeveloper) {
-    return { 
+    return {
       inline_keyboard: [
         [{ text: "🃏 싱글카드", callback_data: "fortune:single" }],
         [{ text: "🔮 트리플카드", callback_data: "fortune:triple" }],
         [{ text: "✨ 캘틱 크로스", callback_data: "fortune:celtic" }]
-      ] 
+      ]
     };
   }
 
   createDrawResultKeyboard() {
-    return { 
-      inline_keyboard: [
-        [{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]
-      ] 
+    return {
+      inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]]
     };
   }
 
   createQuestionKeyboard() {
-    return { 
-      inline_keyboard: [
-        [{ text: "❌ 취소", callback_data: "fortune:menu" }]
-      ] 
+    return {
+      inline_keyboard: [[{ text: "❌ 취소", callback_data: "fortune:menu" }]]
     };
   }
 
   createCelticResultKeyboard() {
-    return { 
+    return {
       inline_keyboard: [
         [{ text: "🔍 상세보기", callback_data: "fortune:detail" }],
         [{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]
-      ] 
+      ]
     };
   }
 
   createBackToMenuKeyboard() {
-    return { 
-      inline_keyboard: [
-        [{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]
-      ] 
+    return {
+      inline_keyboard: [[{ text: "🔙 메뉴로", callback_data: "fortune:menu" }]]
     };
   }
 
@@ -1091,8 +1300,10 @@ class FortuneModuleV2 {
       }
 
       // EventBus 구독 해제
-      this.subscriptions.forEach(subscription => {
-        logger.debug(`📤 이벤트 구독 해제: ${subscription.eventName || 'unknown'}`);
+      this.subscriptions.forEach((subscription) => {
+        logger.debug(
+          `📤 이벤트 구독 해제: ${subscription.eventName || "unknown"}`
+        );
         if (subscription.unsubscribe) {
           subscription.unsubscribe();
         }
@@ -1104,7 +1315,10 @@ class FortuneModuleV2 {
       this.lastCelticResults.clear();
 
       // 서비스 정리
-      if (this.fortuneService && typeof this.fortuneService.cleanup === 'function') {
+      if (
+        this.fortuneService &&
+        typeof this.fortuneService.cleanup === "function"
+      ) {
         await this.fortuneService.cleanup();
       }
 
@@ -1129,7 +1343,7 @@ class FortuneModuleV2 {
   }
 
   /**
-   * 🃏 트리플카드 뽑기 (레거시 콜백용)  
+   * 🃏 트리플카드 뽑기 (레거시 콜백용)
    */
   async handleTripleCard(userId, chatId) {
     this.eventBus.publish(EVENTS.FORTUNE.TRIPLE_CARD_REQUEST, {
@@ -1159,11 +1373,11 @@ class FortuneModuleV2 {
       chatId
     });
     return {
-      type: 'stats',
-      module: 'fortune',
+      type: "stats",
+      module: "fortune",
       success: true,
       data: {
-        title: '🔮 *타로카드 통계*',
+        title: "🔮 *타로카드 통계*",
         userId: userId
       }
     };
@@ -1178,11 +1392,11 @@ class FortuneModuleV2 {
       chatId
     });
     return {
-      type: 'history',
-      module: 'fortune',
+      type: "history",
+      module: "fortune",
       success: true,
       data: {
-        title: '🔮 *타로카드 이력*',
+        title: "🔮 *타로카드 이력*",
         userId: userId
       }
     };
@@ -1208,11 +1422,11 @@ class FortuneModuleV2 {
 
       // 렌더러에게 전달할 데이터 구성
       return {
-        type: 'menu',
-        module: 'fortune',
+        type: "menu",
+        module: "fortune",
         success: true,
         data: {
-          title: '🔮 *타로카드 운세*',
+          title: "🔮 *타로카드 운세*",
           userName: userName,
           todayCount: todayInfo.todayCount,
           maxDrawsPerDay: this.config.maxDrawsPerDay,
@@ -1224,15 +1438,14 @@ class FortuneModuleV2 {
           userId: userId
         }
       };
-
     } catch (error) {
-      logger.error('🔮 FortuneModuleV2.showMenu 실패:', error);
+      logger.error("🔮 FortuneModuleV2.showMenu 실패:", error);
       return {
-        type: 'error',
-        module: 'fortune',
+        type: "error",
+        module: "fortune",
         success: false,
         data: {
-          message: '운세 메뉴를 불러오는 중 오류가 발생했습니다.',
+          message: "운세 메뉴를 불러오는 중 오류가 발생했습니다.",
           canRetry: true
         }
       };
